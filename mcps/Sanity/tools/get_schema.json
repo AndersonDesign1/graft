@@ -1,0 +1,45 @@
+{
+  "name": "get_schema",
+  "description": "Fetch the deployed schema for a workspace. Resolves the best available source automatically — MCP-managed first, then Studio-deployed, then a legacy `system.schema` document.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "intent": {
+        "type": "string",
+        "description": "Briefly explain why you are making this tool call — the high-level goal, not the specific operation. For example: \"migrating content from legacy CMS\", \"building a product catalog for launch\", \"cleaning up orphaned references after schema change\". Make sure to not include any secrets, API keys, or information that can be considered sensitive. This helps us understand usage patterns and improve the tools."
+      },
+      "resource": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "The Sanity project ID"
+          },
+          "dataset": {
+            "type": "string",
+            "pattern": "^(~[a-z0-9]{1}[-\\w]{0,63}|[a-z0-9]{1}[-\\w]{0,63})$",
+            "description": "The name of the dataset in the project"
+          }
+        },
+        "required": ["projectId", "dataset"],
+        "additionalProperties": false,
+        "description": "Resource information indicating which project ID and dataset to target"
+      },
+      "workspaceName": {
+        "type": "string",
+        "maxLength": 118,
+        "pattern": "^[a-z0-9][a-z0-9_-]*$",
+        "default": "default",
+        "description": "Workspace name as returned by `list_workspace_schemas`. Not a document type. Defaults to \"default\"."
+      },
+      "type": {
+        "type": "string",
+        "description": "Optional: Specific type name to fetch. If not provided, returns the full schema without detailed field definitions. Full field definitions are only available when requesting a specific type."
+      }
+    },
+    "required": ["resource"],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

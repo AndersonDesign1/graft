@@ -1,0 +1,47 @@
+{
+  "name": "_get_ui_context",
+  "description": "Returns UI enrichment data for widgets. When documentId is provided, returns schema fields, deployed Studio URL, and resolved reference previews. When documentId is omitted, returns project-level context only (Studio URL).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "resource": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "The Sanity project id"
+          },
+          "dataset": {
+            "type": "string",
+            "description": "The name of the dataset in the project"
+          }
+        },
+        "required": ["projectId", "dataset"],
+        "additionalProperties": false
+      },
+      "documentId": {
+        "type": "string",
+        "description": "The document ID to fetch context for. When omitted, returns project-level context only (studio URL)."
+      },
+      "documentType": {
+        "type": "string",
+        "description": "The document _type. When provided, the tool skips fetching the document to infer its type."
+      },
+      "maxRefDepth": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "Maximum depth for collecting reference IDs from the document (default 2)"
+      },
+      "workspaceName": {
+        "type": "string",
+        "maxLength": 118,
+        "pattern": "^[a-z0-9][a-z0-9_-]*$",
+        "default": "default",
+        "description": "Workspace name as returned by `list_workspace_schemas`. Not a document type. Defaults to \"default\"."
+      }
+    },
+    "required": ["resource"],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "name": "query_documents",
+  "description": "Query documents from Sanity using GROQ query language",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "intent": {
+        "type": "string",
+        "description": "Briefly explain why you are making this tool call — the high-level goal, not the specific operation. For example: \"migrating content from legacy CMS\", \"building a product catalog for launch\", \"cleaning up orphaned references after schema change\". Make sure to not include any secrets, API keys, or information that can be considered sensitive. This helps us understand usage patterns and improve the tools."
+      },
+      "resource": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "The Sanity project ID"
+          },
+          "dataset": {
+            "type": "string",
+            "pattern": "^(~[a-z0-9]{1}[-\\w]{0,63}|[a-z0-9]{1}[-\\w]{0,63})$",
+            "description": "The name of the dataset in the project"
+          }
+        },
+        "required": ["projectId", "dataset"],
+        "additionalProperties": false,
+        "description": "Resource information indicating which project ID and dataset to target"
+      },
+      "single": {
+        "type": "boolean",
+        "default": false,
+        "description": "Whether to return a single document or a list"
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 10,
+        "description": "Maximum number of documents to return"
+      },
+      "params": {
+        "type": "object",
+        "additionalProperties": {},
+        "description": "Optional parameters for the GROQ query"
+      },
+      "query": {
+        "type": "string",
+        "description": "Complete GROQ query (e.g. \"*[_type == \\\"post\\\"][0...10]{title, _id}\")"
+      },
+      "perspective": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": ["raw", "drafts", "published"]
+          },
+          {
+            "type": "string"
+          }
+        ],
+        "default": "raw",
+        "description": "Optional perspective to query from: \"raw\", \"drafts\", \"published\", or a release ID. Models should examine available releases and perspectives in the dataset before selecting one to ensure they are querying from the most appropriate view of the content."
+      }
+    },
+    "required": ["resource", "query"],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

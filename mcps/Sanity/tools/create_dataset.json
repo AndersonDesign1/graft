@@ -1,0 +1,42 @@
+{
+  "name": "create_dataset",
+  "description": "Creates a new dataset with specified name and access settings",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "intent": {
+        "type": "string",
+        "description": "Briefly explain why you are making this tool call — the high-level goal, not the specific operation. For example: \"migrating content from legacy CMS\", \"building a product catalog for launch\", \"cleaning up orphaned references after schema change\". Make sure to not include any secrets, API keys, or information that can be considered sensitive. This helps us understand usage patterns and improve the tools."
+      },
+      "resource": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "The Sanity project ID"
+          }
+        },
+        "required": ["projectId"],
+        "additionalProperties": false
+      },
+      "datasetName": {
+        "type": "string",
+        "description": "The name of the dataset (will be automatically formatted to match requirements)"
+      },
+      "aclMode": {
+        "type": "string",
+        "enum": ["private", "public"],
+        "description": "The ACL mode for the dataset"
+      },
+      "description": {
+        "type": "string",
+        "maxLength": 2048,
+        "description": "A brief description of the dataset purpose"
+      }
+    },
+    "required": ["resource", "datasetName"],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

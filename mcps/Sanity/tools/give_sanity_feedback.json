@@ -1,0 +1,44 @@
+{
+  "name": "give_sanity_feedback",
+  "description": "Submit feedback about Sanity when you encounter issues while working with a Sanity codebase or project.\nUse this when:\n- A Sanity MCP tool returned an unexpected error or confusing result\n- You needed a Sanity capability that doesn't exist or is hard to use\n- Sanity docs, MCP tool descriptions, or examples were unclear or incorrect\n- Common Sanity surfaces such as @sanity/client, the HTTP API, schemas, Studio, or deployment were confusing or blocked progress\n- You had to use a workaround for something in Sanity that should be simpler\n\nProvide a specific, detailed message about what you were trying to do,\nwhat happened, and what you expected instead.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "intent": {
+        "type": "string",
+        "description": "Briefly explain why you are making this tool call — the high-level goal, not the specific operation. For example: \"migrating content from legacy CMS\", \"building a product catalog for launch\", \"cleaning up orphaned references after schema change\". Make sure to not include any secrets, API keys, or information that can be considered sensitive. This helps us understand usage patterns and improve the tools."
+      },
+      "message": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000,
+        "description": "Describe the Sanity issue. Include: what you were trying to do, what you tried, and where you got stuck. Be specific — include MCP tool names, Sanity surface names such as @sanity/client, HTTP API, docs, Studio, or schemas, error messages, and parameter values when relevant."
+      },
+      "category": {
+        "type": "string",
+        "enum": [
+          "tool_error",
+          "missing_capability",
+          "confusing_output",
+          "documentation",
+          "sanity_api",
+          "other"
+        ],
+        "description": "Category of feedback to help with triage"
+      },
+      "toolName": {
+        "type": "string",
+        "description": "The MCP tool this feedback is about, if any (e.g. \"query_documents\"). Leave unset for general Sanity feedback."
+      },
+      "severity": {
+        "type": "string",
+        "enum": ["low", "medium", "high"],
+        "default": "medium",
+        "description": "How much this blocked progress. high = completely blocked, medium = workaround needed, low = minor"
+      }
+    },
+    "required": ["message"],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

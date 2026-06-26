@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: graft-postgres
+    environment:
+      POSTGRES_USER: graft
+      POSTGRES_PASSWORD: graft
+      POSTGRES_DB: graft
+    ports:
+      - "5432:5432"
+    volumes:
+      - graft_pg:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U graft -d graft"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: graft-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: graft
+      MINIO_ROOT_PASSWORD: graftsecret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - graft_minio:/data
+
+volumes:
+  graft_pg:
+  graft_minio:

@@ -1,0 +1,25 @@
+{
+  "name": "read_docs",
+  "description": "Read a specific Sanity documentation article",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "intent": {
+        "type": "string",
+        "description": "Briefly explain why you are making this tool call — the high-level goal, not the specific operation. For example: \"migrating content from legacy CMS\", \"building a product catalog for launch\", \"cleaning up orphaned references after schema change\". Make sure to not include any secrets, API keys, or information that can be considered sensitive. This helps us understand usage patterns and improve the tools."
+      },
+      "url": {
+        "type": "string",
+        "format": "uri",
+        "description": "Full URL to the documentation page (e.g., \"https://www.sanity.io/docs/studio/installation\")"
+      },
+      "path": {
+        "type": "string",
+        "pattern": "^\\/docs\\/",
+        "description": "The documentation path (e.g., \"/docs/studio/installation\")"
+      }
+    },
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

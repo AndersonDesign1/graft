@@ -1,0 +1,46 @@
+{
+  "name": "unpublish_documents",
+  "description": "Unpublish one or more published documents (moves them back to drafts), or provide releaseId to mark them for unpublishing when that release runs. Cannot immediately unpublish documents that are referenced by other documents.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "intent": {
+        "type": "string",
+        "description": "Briefly explain why you are making this tool call — the high-level goal, not the specific operation. For example: \"migrating content from legacy CMS\", \"building a product catalog for launch\", \"cleaning up orphaned references after schema change\". Make sure to not include any secrets, API keys, or information that can be considered sensitive. This helps us understand usage patterns and improve the tools."
+      },
+      "resource": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "The Sanity project ID"
+          },
+          "dataset": {
+            "type": "string",
+            "pattern": "^(~[a-z0-9]{1}[-\\w]{0,63}|[a-z0-9]{1}[-\\w]{0,63})$",
+            "description": "The name of the dataset in the project"
+          }
+        },
+        "required": ["projectId", "dataset"],
+        "additionalProperties": false,
+        "description": "Resource information indicating which project ID and dataset to target"
+      },
+      "ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "description": "IDs of the documents to unpublish. Without releaseId, provide published IDs only."
+      },
+      "releaseId": {
+        "type": "string",
+        "description": "Optional release ID for scheduling documents to be unpublished when the release runs"
+      }
+    },
+    "required": ["resource", "ids"],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

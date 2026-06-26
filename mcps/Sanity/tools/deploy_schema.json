@@ -1,0 +1,45 @@
+{
+  "name": "deploy_schema",
+  "description": "Deploy an MCP-managed schema for a workspace. Writes to MCP-managed workspaces and adopts legacy `system.schema` workspaces into MCP management on first call. Refuses Studio-deployed workspaces. Can add new types or overwrite existing types iteratively.\n\nWhen called on a legacy workspace, the existing types become the baseline; pass an empty `schemaDeclaration` to adopt the legacy types as-is, or pass new types to add them on top.\n\nIMPORTANT: Do not use this tool if a local Sanity Studio project exists. When local Studio files exist, modify them and deploy with `npx sanity@latest schema deploy` instead — using this tool would cause the deployed schema to diverge from your source.\n\nIf a Studio-deployed schema already exists at the target workspaceName, this tool refuses. Either update the Studio source and deploy via CLI, or choose a different `workspaceName` for a new MCP-managed schema.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "intent": {
+        "type": "string",
+        "description": "Briefly explain why you are making this tool call — the high-level goal, not the specific operation. For example: \"migrating content from legacy CMS\", \"building a product catalog for launch\", \"cleaning up orphaned references after schema change\". Make sure to not include any secrets, API keys, or information that can be considered sensitive. This helps us understand usage patterns and improve the tools."
+      },
+      "resource": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "The Sanity project ID"
+          },
+          "dataset": {
+            "type": "string",
+            "pattern": "^(~[a-z0-9]{1}[-\\w]{0,63}|[a-z0-9]{1}[-\\w]{0,63})$",
+            "description": "The name of the dataset in the project"
+          }
+        },
+        "required": ["projectId", "dataset"],
+        "additionalProperties": false,
+        "description": "Resource information indicating which project ID and dataset to target"
+      },
+      "schemaDeclaration": {
+        "type": "string",
+        "description": "\n    Sanity schema declaration as a string of JS object literals.\n<syntax>\n- Requires literal values only: no spread operators, variables, dynamic expressions, imports, or function\n   bodies\n- If your schema makes references to other custom types in references, add those type declarations\n  as well, or in a separate call to this tool first\n- Multiple schema types can be declared in the same source string. Simply append the objects one after another\n- This is JavaScript object-literal syntax, not JSON: use unquoted keys and do not wrap the objects in a `[ ]` array\n- The schema declarations are not evaluated, so keep it declarative\n</syntax>\n<example>\n\n{\n  name: 'author',\n  type: 'document',\n  fields: [\n    {\n      name: 'name',\n      type: 'string',\n    },\n  ],\n}\n\n{\n  name: 'article',\n  type: 'document',\n  fields: [\n    {\n      name: 'title',\n      type: 'string',\n      validation: (Rule) => Rule.required().max(100),\n    },\n    {\n      name: 'slug',\n      type: 'slug'\n    },\n    {\n      name: 'body',\n      type: 'array',\n      of: [{type: 'block'}],\n    },\n    {\n      name: 'author',\n      type: 'reference',\n      to: [{type: 'author'}],\n    },\n  ],\n}\n\n</example>"
+      },
+      "workspaceName": {
+        "type": "string",
+        "maxLength": 118,
+        "pattern": "^[a-z0-9][a-z0-9_-]*$",
+        "default": "default",
+        "description": "Workspace name as returned by `list_workspace_schemas`. Not a document type. Defaults to \"default\"."
+      }
+    },
+    "required": ["resource", "schemaDeclaration"],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

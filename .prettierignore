@@ -1,0 +1,10 @@
+node_modules
+dist
+.turbo
+coverage
+pnpm-lock.yaml
+
+# Not part of the Graft build — leave the user's own files untouched
+.claude
+mcps
+ideas.md

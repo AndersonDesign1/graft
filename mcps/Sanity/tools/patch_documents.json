@@ -1,0 +1,159 @@
+{
+  "name": "patch_documents",
+  "description": "Update or edit one or more existing documents by applying precise modifications using @sanity/client patch() operations. Patches for each document are applied as a single transaction (all succeed or all fail). Edits are saved to the draft or release version; published content is never modified directly.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "intent": {
+        "type": "string",
+        "description": "Briefly explain why you are making this tool call — the high-level goal, not the specific operation. For example: \"migrating content from legacy CMS\", \"building a product catalog for launch\", \"cleaning up orphaned references after schema change\". Make sure to not include any secrets, API keys, or information that can be considered sensitive. This helps us understand usage patterns and improve the tools."
+      },
+      "resource": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "The Sanity project ID"
+          },
+          "dataset": {
+            "type": "string",
+            "pattern": "^(~[a-z0-9]{1}[-\\w]{0,63}|[a-z0-9]{1}[-\\w]{0,63})$",
+            "description": "The name of the dataset in the project"
+          }
+        },
+        "required": ["projectId", "dataset"],
+        "additionalProperties": false,
+        "description": "Resource information indicating which project ID and dataset to target"
+      },
+      "workspaceName": {
+        "type": "string",
+        "maxLength": 118,
+        "pattern": "^[a-z0-9][a-z0-9_-]*$",
+        "default": "default",
+        "description": "Workspace name as returned by `list_workspace_schemas`. Not a document type. Defaults to \"default\"."
+      },
+      "documents": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "patches": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "set": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Set or overwrite field values, keyed by path. Dot/bracket paths allowed, e.g. {\"title\": \"x\", \"author.name\": \"y\"}. Destructive at the chosen path."
+                  },
+                  "setIfMissing": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Set values only where the field is missing or null. Use to initialise arrays or objects before inserting."
+                  },
+                  "unset": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Remove fields or array items by path, e.g. [\"draft\", \"tags[_key==\\\"abc\\\"]\"]."
+                  },
+                  "inc": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "number"
+                    },
+                    "description": "Atomically increment numeric fields by path."
+                  },
+                  "dec": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "number"
+                    },
+                    "description": "Atomically decrement numeric fields by path."
+                  },
+                  "insert": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "before": {
+                            "type": "string",
+                            "description": "Array position to insert before, e.g. \"items[0]\" (prepend)."
+                          },
+                          "items": {
+                            "type": "array",
+                            "items": {},
+                            "minItems": 1,
+                            "description": "Items to insert. Objects must include _type."
+                          }
+                        },
+                        "required": ["before", "items"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "after": {
+                            "type": "string",
+                            "description": "Array position to insert after, e.g. \"items[-1]\" (append)."
+                          },
+                          "items": {
+                            "$ref": "#/properties/documents/additionalProperties/properties/patches/items/properties/insert/anyOf/0/properties/items"
+                          }
+                        },
+                        "required": ["after", "items"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "replace": {
+                            "type": "string",
+                            "description": "Array position to replace, e.g. \"items[_key==\\\"k\\\"]\"."
+                          },
+                          "items": {
+                            "$ref": "#/properties/documents/additionalProperties/properties/patches/items/properties/insert/anyOf/0/properties/items"
+                          }
+                        },
+                        "required": ["replace", "items"],
+                        "additionalProperties": false
+                      }
+                    ],
+                    "description": "Insert items relative to an existing array position. To append, use {after: \"field[-1]\"}; to prepend, use {before: \"field[0]\"}. The array must already exist. Use setIfMissing to create it first."
+                  },
+                  "diffMatchPatch": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Apply a diff-match-patch string to a text field, keyed by path."
+                  }
+                },
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "description": "An array of patches following the @sanity/client patch() operations (set, setIfMissing, unset, inc, dec, insert, diffMatchPatch). All patches for this document are applied as a single transaction: they all succeed or all fail together."
+            },
+            "ifRevisionId": {
+              "type": "string",
+              "description": "Optimistic-lock guard: only apply if the target document's current _rev matches. Fails if the document changed since you read it."
+            }
+          },
+          "required": ["patches"],
+          "additionalProperties": false
+        },
+        "description": "Map of document IDs to patch operations, up to 25 documents. Accepts published, draft (\"drafts.<id>\"), and version (\"versions.<releaseId>.<id>\") IDs. Published and draft IDs edit the draft; version IDs edit that release version."
+      },
+      "releaseId": {
+        "type": "string",
+        "description": "Optional release ID for patching documents in an existing release."
+      }
+    },
+    "required": ["resource", "documents"],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

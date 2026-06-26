@@ -1,0 +1,19 @@
+{
+  "name": "@graft/cli",
+  "version": "0.0.0",
+  "private": true,
+  "bin": {
+    "graft": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "lint": "oxlint ."
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "add_cors_origin",
+  "description": "Adds CORS origin(s) to allow client-side requests to a Sanity project",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "intent": {
+        "type": "string",
+        "description": "Briefly explain why you are making this tool call — the high-level goal, not the specific operation. For example: \"migrating content from legacy CMS\", \"building a product catalog for launch\", \"cleaning up orphaned references after schema change\". Make sure to not include any secrets, API keys, or information that can be considered sensitive. This helps us understand usage patterns and improve the tools."
+      },
+      "resource": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "The Sanity project ID"
+          }
+        },
+        "required": ["projectId"],
+        "additionalProperties": false
+      },
+      "origin": {
+        "type": "string",
+        "description": "CORS origin to allow, in format protocol://hostname[:port].\n\nWildcards (*) are supported for subdomains (e.g., https://*.example.com).\n\nCommon values:\n- http://localhost:3000: Local development with Next.js, React, etc.\n- http://localhost:3333: Standalone Sanity Studio\n- https://*.lovable.app: Lovable preview and published apps\n- https://*.figma.site: Figma Make apps\n- https://*.vusercontent.net: v0 preview iframes\n- https://*.vercel.app: v0 published apps\n- https://*.local-credentialless.webcontainer-api.io: Bolt preview\n- https://*.bolt.host: Bolt published apps\n- https://your-domain.com: Your production domain"
+      },
+      "allowCredentials": {
+        "type": "boolean",
+        "default": true,
+        "description": "Allow authenticated requests from this origin. Required for hosting a Studio or making authenticated API requests. Defaults to true."
+      }
+    },
+    "required": ["resource", "origin"],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}
