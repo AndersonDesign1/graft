@@ -19,7 +19,11 @@
     "build": "tsup src/index.ts --format esm --dts --clean",
     "dev": "tsup src/index.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "lint": "oxlint ."
+  },
+  "dependencies": {
+    "@graft/contracts": "workspace:*",
+    "zod": "^3.23.8"
   }
 }

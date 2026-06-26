@@ -1,6 +1,7 @@
 /**
  * @graft/core
- * Schema (defineCollection), function runtime, access, migrations.
- * Placeholder — implemented in a later phase.
+ * The "everything is code" primitives: schema (defineCollection / field), and later
+ * the function runtime, access rules, and migration engine.
  */
-export const PACKAGE = "@graft/core" as const;
+export * from "./field";
+export * from "./collection";
