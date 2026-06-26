@@ -12,3 +12,6 @@ Thumbs.db
 # Local / not part of the Graft source
 .claude/
 ideas.md
+
+# Throwaway Phase 1 spikes (learnings go to docs/design-notes/)
+/spikes/
