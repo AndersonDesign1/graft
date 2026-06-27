@@ -21,5 +21,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "oxlint ."
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20"
   }
 }

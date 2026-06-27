@@ -37,6 +37,14 @@ Foundational conventions for the Graft monorepo. Keep this short and current.
 | `pnpm typecheck`                    | `tsc --noEmit` across packages |
 | `pnpm format` / `pnpm format:check` | oxfmt write / check            |
 
+## Testing
+
+- **Unit tests** (pure logic, no network/DB) run in `pnpm test` and CI — keep them
+  deterministic and fast.
+- **Integration tests** (live DB / R2) are **opt-in** and skipped by default. Name them
+  `*.integration.test.ts`, gate them behind `RUN_INTEGRATION=1`, and load `.env` in-file.
+  Run locally with PowerShell: `$env:RUN_INTEGRATION='1'; pnpm --filter <pkg> test`.
+
 ## Git
 
 - Default branch: `main`. Never commit directly to `main` for feature work.
