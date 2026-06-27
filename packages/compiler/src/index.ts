@@ -1,6 +1,7 @@
 /**
  * @graft/compiler
- * Authored content (MDX/JSON) -> Postgres index + typegen + ref/slug validation.
- * Placeholder — implemented in a later phase.
+ * Authored content (MDX) -> validate against @graft/core collections -> project into
+ * @graft/db's content_index. The bridge that makes file-authored content queryable.
  */
-export const PACKAGE = "@graft/compiler" as const;
+export * from "./parse";
+export * from "./compile";

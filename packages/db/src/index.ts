@@ -4,4 +4,5 @@
  * in a later phase; for now the schema is branch-ready (branch_id + deleted).
  */
 export * from "./client";
+export * from "./content";
 export * from "./schema";
