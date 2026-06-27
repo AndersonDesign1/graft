@@ -20,6 +20,15 @@
     "dev": "tsup src/index.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "lint": "oxlint ."
+    "lint": "oxlint .",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file=../../.env ./scripts/migrate.mjs"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.10"
   }
 }

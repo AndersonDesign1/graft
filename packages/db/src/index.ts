@@ -1,6 +1,7 @@
 /**
  * @graft/db
- * Postgres + Drizzle and the branching abstraction (Neon CoW / branch_id fallback).
- * Placeholder — implemented in a later phase.
+ * Postgres + Drizzle client and schema. Branching abstraction (Spike B) lands here
+ * in a later phase; for now the schema is branch-ready (branch_id + deleted).
  */
-export const PACKAGE = "@graft/db" as const;
+export * from "./client";
+export * from "./schema";

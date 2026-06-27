@@ -8,3 +8,6 @@ pnpm-lock.yaml
 .claude
 mcps
 ideas.md
+
+# Drizzle-generated migrations (managed by drizzle-kit)
+**/drizzle/
