@@ -9,9 +9,11 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# Local / not part of the Graft source
+# Local / not part of the Graft source (private planning — see phases.md / PRD.md)
 .claude/
 ideas.md
+phases.md
+PRD.md
 
 # Throwaway Phase 1 spikes (learnings go to docs/design-notes/)
 /spikes/
