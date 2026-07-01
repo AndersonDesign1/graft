@@ -24,6 +24,6 @@
   },
   "dependencies": {
     "@graft/contracts": "workspace:*",
-    "zod": "^3.23.8"
+    "zod": "^4.1.0"
   }
 }

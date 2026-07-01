@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,22 +35,46 @@ describe.skipIf(!runIntegration)("compile -> content_index (integration)", () =>
 
   afterAll(async () => {
     await handle.sql`delete from content_index where branch_id = ${BRANCH}`;
+    await handle.sql`delete from compilations where branch_id = ${BRANCH}`;
     await handle.close();
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("projects validated docs and is deterministic across re-runs", async () => {
+  it("projects, diffs, soft-deletes, and records every run", async () => {
+    // Clean slate for the branch (idempotent across reruns of the suite).
+    await handle.sql`delete from content_index where branch_id = ${BRANCH}`;
+
+    // First run: everything is added.
     const first = await compile({ db: handle.db, contentDir: dir, collections, branchId: BRANCH });
     expect(first.count).toBe(2);
+    expect(first.changes.added.sort()).toEqual(["pages/about", "pages/home"]);
 
-    const slugs =
-      await handle.sql`select slug from content_index where branch_id = ${BRANCH} order by slug`;
-    expect(slugs.map((row) => row.slug)).toEqual(["about", "home"]);
+    // No-op run: nothing changes, updated_at stays put.
+    const before =
+      await handle.sql`select slug, updated_at from content_index where branch_id = ${BRANCH} order by slug`;
+    const second = await compile({ db: handle.db, contentDir: dir, collections, branchId: BRANCH });
+    expect(second.changes).toEqual({ added: [], changed: [], removed: [], unchanged: 2 });
+    const after =
+      await handle.sql`select slug, updated_at from content_index where branch_id = ${BRANCH} order by slug`;
+    expect(after.map((r) => String(r.updated_at))).toEqual(
+      before.map((r) => String(r.updated_at)),
+    );
 
-    // Full rebuild on re-run: still exactly two rows, no duplicates.
-    await compile({ db: handle.db, contentDir: dir, collections, branchId: BRANCH });
-    const count =
-      await handle.sql`select count(*)::int as n from content_index where branch_id = ${BRANCH}`;
-    expect(count[0].n).toBe(2);
-  }, 30_000);
+    // Edit one file, delete another: changed + soft-removed.
+    writeFileSync(join(dir, "pages", "home.mdx"), "---\ntitle: Home v2\nslug: home\n---\nHello");
+    unlinkSync(join(dir, "pages", "about.mdx"));
+    const third = await compile({ db: handle.db, contentDir: dir, collections, branchId: BRANCH });
+    expect(third.changes.changed).toEqual(["pages/home"]);
+    expect(third.changes.removed).toEqual(["pages/about"]);
+
+    const rows =
+      await handle.sql`select slug, deleted from content_index where branch_id = ${BRANCH} order by slug`;
+    expect(rows.map((r) => `${r.slug}:${r.deleted}`)).toEqual(["about:true", "home:false"]);
+
+    // Every run left an audit row; the temp dir is outside the repo, so git_sha is null.
+    const audits =
+      await handle.sql`select doc_count, added, changed, removed, git_sha from compilations where branch_id = ${BRANCH} order by created_at`;
+    expect(audits.length).toBe(3);
+    expect(audits[2]).toMatchObject({ doc_count: 1, added: 0, changed: 1, removed: 1 });
+  }, 60_000);
 });

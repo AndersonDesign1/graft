@@ -8,8 +8,11 @@
 import { createHash } from "node:crypto";
 import { basename } from "node:path";
 import { GraftError } from "@graft/contracts";
-import type { Collection } from "@graft/core";
+import type { AnyCollection } from "@graft/core";
 import matter from "gray-matter";
+
+/** Kebab-case: URL-safe, unambiguous in paths, and stable as a primary-key part. */
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export interface ProjectedDoc {
   collection: string;
@@ -22,7 +25,7 @@ export interface ProjectedDoc {
 
 export function parseDocument(
   raw: string,
-  collection: Collection,
+  collection: AnyCollection,
   sourcePath: string,
 ): ProjectedDoc {
   const { data: frontmatter, content } = matter(raw);
@@ -45,6 +48,15 @@ export function parseDocument(
     typeof slugValue === "string" && slugValue.length > 0
       ? slugValue
       : basename(sourcePath).replace(/\.mdx?$/, "");
+
+  if (!SLUG_RE.test(slug)) {
+    throw new GraftError({
+      code: "INVALID_SLUG",
+      message: `Slug "${slug}" (${sourcePath}) is not URL-safe`,
+      fix: `Slugs must be kebab-case: lowercase letters, digits, and single hyphens (e.g. "getting-started"). Set a valid \`slug\` in frontmatter or rename the file.`,
+      details: { slug, sourcePath, pattern: SLUG_RE.source },
+    });
+  }
 
   return {
     collection: collection.name,

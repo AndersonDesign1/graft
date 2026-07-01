@@ -5,4 +5,5 @@
  */
 export * from "./client";
 export * from "./content";
+export * from "./diff";
 export * from "./schema";

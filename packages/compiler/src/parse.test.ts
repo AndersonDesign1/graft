@@ -38,6 +38,28 @@ describe("parseDocument", () => {
     }
   });
 
+  it("rejects slugs that are not URL-safe kebab-case", () => {
+    for (const bad of ["Hello World", "a/b", "UPPER", "trailing-", "-leading", "dot.mdx"]) {
+      try {
+        parseDocument(`---\ntitle: X\nslug: "${bad}"\n---\nBody`, page, "pages/x.mdx");
+        expect.unreachable(`slug "${bad}" should have thrown`);
+      } catch (err) {
+        expect(err).toBeInstanceOf(GraftError);
+        expect((err as GraftError).code).toBe("INVALID_SLUG");
+        expect((err as GraftError).fix).toContain("kebab-case");
+      }
+    }
+  });
+
+  it("validates filename-derived slugs too", () => {
+    try {
+      parseDocument("---\ntitle: X\n---\nBody", page, "pages/Bad Name.mdx");
+      expect.unreachable("should have thrown");
+    } catch (err) {
+      expect((err as GraftError).code).toBe("INVALID_SLUG");
+    }
+  });
+
   it("is deterministic — same input yields the same content hash", () => {
     const raw = "---\ntitle: X\n---\nBody";
     expect(parseDocument(raw, page, "pages/x.mdx").contentHash).toBe(

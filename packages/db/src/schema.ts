@@ -6,7 +6,17 @@
  * table forward-compatible with row-level branching (Spike B, self-host overlay); for
  * now every row lives on the implicit "main" branch.
  */
-import { boolean, index, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 export const contentIndex = pgTable(
   "content_index",
@@ -29,3 +39,26 @@ export const contentIndex = pgTable(
 
 export type ContentRow = typeof contentIndex.$inferSelect;
 export type NewContentRow = typeof contentIndex.$inferInsert;
+
+/**
+ * One row per projection run — the audit trail that makes "git is authoritative"
+ * checkable: which commit produced the index, on which branch, and what changed.
+ * uuid (not serial) so rows stay branch-clone-safe (Spike B sequence gotcha).
+ */
+export const compilations = pgTable(
+  "compilations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    branchId: text("branch_id").notNull(),
+    /** Git commit SHA the content tree was compiled from; null when unresolvable. */
+    gitSha: text("git_sha"),
+    docCount: integer("doc_count").notNull(),
+    added: integer("added").notNull(),
+    changed: integer("changed").notNull(),
+    removed: integer("removed").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("compilations_branch_created").on(t.branchId, t.createdAt)],
+);
+
+export type CompilationRow = typeof compilations.$inferSelect;

@@ -4,45 +4,73 @@
  * `readDocs` walks the content directory, maps each top-level folder to a registered
  * collection, validates every file, and enforces slug uniqueness — surfacing problems
  * as agent-actionable GraftErrors. `compile` then projects the result into Postgres via
- * @graft/db's atomic, deterministic full-rebuild.
+ * @graft/db's atomic hash-diff projection and reports exactly what changed, recording
+ * the git SHA it compiled from (the "git is authoritative" audit trail).
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { GraftError } from "@graft/contracts";
-import type { Collection } from "@graft/core";
-import { replaceBranchContent, type Database } from "@graft/db";
+import type { AnyCollection } from "@graft/core";
+import { projectBranchContent, type ChangeSet, type Database } from "@graft/db";
 import { parseDocument, type ProjectedDoc } from "./parse";
 
 export interface CompileOptions {
   contentDir: string;
-  collections: Record<string, Collection>;
+  collections: Record<string, AnyCollection>;
   db: Database;
   branchId?: string;
+  /**
+   * Git commit recorded with this compilation. Omit to auto-resolve from
+   * `contentDir` (tolerant: records null outside a git repo); pass null to skip.
+   */
+  gitSha?: string | null;
 }
 
 export interface CompileResult {
   count: number;
   docs: ProjectedDoc[];
+  /** What this run did to the index: added / changed / removed keys + unchanged count. */
+  changes: ChangeSet;
+  /** The commit the content tree was compiled from, when resolvable. */
+  gitSha: string | null;
 }
 
 /** Read + validate the content tree into normalized docs. Pure of the database. */
 export function readDocs(
   contentDir: string,
-  collections: Record<string, Collection>,
+  collections: Record<string, AnyCollection>,
 ): ProjectedDoc[] {
+  if (!existsSync(contentDir) || !statSync(contentDir).isDirectory()) {
+    throw new GraftError({
+      code: "CONTENT_DIR_NOT_FOUND",
+      message: `Content directory not found: ${contentDir}`,
+      fix: `Create it (documents live at <contentDir>/<collection>/<slug>.mdx, e.g. content/pages/home.mdx) or pass the correct \`contentDir\` to compile().`,
+      details: { contentDir, collections: Object.keys(collections) },
+    });
+  }
+
   const docs: ProjectedDoc[] = [];
   const seen = new Map<string, string>();
 
   for (const file of walk(contentDir)) {
     const sourcePath = relative(contentDir, file).split(sep).join("/");
-    const collectionName = sourcePath.split("/")[0] ?? "";
+    const segments = sourcePath.split("/");
+    const collectionName = segments.length > 1 ? (segments[0] ?? "") : "";
     const collection = collections[collectionName];
     if (!collection) {
+      const known = Object.keys(collections).join(", ") || "(none registered)";
       throw new GraftError({
         code: "COLLECTION_NOT_FOUND",
-        message: `No collection registered for "${collectionName}" (${sourcePath})`,
-        fix: `Register it: defineCollection({ name: "${collectionName}", fields: { … } }) and pass it to compile().`,
-        details: { sourcePath, collection: collectionName },
+        message:
+          segments.length > 1
+            ? `No collection registered for "${collectionName}" (${sourcePath})`
+            : `${sourcePath} sits at the content root; documents must live in a collection folder`,
+        fix:
+          segments.length > 1
+            ? `Register it — defineCollection({ name: "${collectionName}", fields: { … } }) and pass it to compile() — or move the file into one of: ${known}.`
+            : `Move it to <contentDir>/<collection>/${sourcePath}. Registered collections: ${known}.`,
+        details: { sourcePath, collection: collectionName, registered: Object.keys(collections) },
       });
     }
 
@@ -70,7 +98,9 @@ export function readDocs(
 
 export async function compile(options: CompileOptions): Promise<CompileResult> {
   const docs = readDocs(options.contentDir, options.collections);
-  await replaceBranchContent(
+  const gitSha =
+    options.gitSha === undefined ? resolveGitSha(options.contentDir) : options.gitSha;
+  const changes = await projectBranchContent(
     options.db,
     docs.map((doc) => ({
       collection: doc.collection,
@@ -80,9 +110,22 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
       contentHash: doc.contentHash,
       sourcePath: doc.sourcePath,
     })),
-    options.branchId ?? "main",
+    { branchId: options.branchId ?? "main", gitSha },
   );
-  return { count: docs.length, docs };
+  return { count: docs.length, docs, changes, gitSha };
+}
+
+/** HEAD commit of the repo containing `cwd`, or null (no git, no repo — never throws). */
+export function resolveGitSha(cwd: string): string | null {
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return null;
+  }
 }
 
 function walk(dir: string): string[] {

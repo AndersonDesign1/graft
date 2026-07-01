@@ -8,6 +8,13 @@
       "when": 1782536685062,
       "tag": "0000_happy_kang",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782948625937,
+      "tag": "0001_curvy_sue_storm",
+      "breakpoints": true
     }
   ]
 }
