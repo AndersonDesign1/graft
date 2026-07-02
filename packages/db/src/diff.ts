@@ -34,8 +34,7 @@ export interface ContentDiff {
   removals: Array<{ collection: string; slug: string }>;
 }
 
-const key = (row: { collection: string; slug: string }): string =>
-  `${row.collection}/${row.slug}`;
+const key = (row: { collection: string; slug: string }): string => `${row.collection}/${row.slug}`;
 
 export function diffBranchContent(
   existing: ExistingContentState[],

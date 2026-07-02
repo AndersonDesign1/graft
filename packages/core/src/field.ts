@@ -13,7 +13,13 @@ import { z } from "zod";
 export type FieldType = "string" | "text" | "number" | "boolean" | "datetime" | "json";
 
 /** Any JSON-serializable value — what a `json` field validates and infers to. */
-export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
 
 const jsonValue: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([

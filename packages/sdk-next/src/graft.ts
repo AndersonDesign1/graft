@@ -55,16 +55,13 @@ export function createGraft<TCollections extends Record<string, AnyCollection>>(
       branch: string | undefined,
       limit: number | undefined,
       offset: number | undefined,
-    ) =>
-      client.listDocuments(collection as keyof TCollections & string, { branch, limit, offset }),
+    ) => client.listDocuments(collection as keyof TCollections & string, { branch, limit, offset }),
   );
 
   return {
     client,
     getContent: (collection, slug, opts) =>
-      cachedGet(collection, slug, opts?.branch) as ReturnType<
-        Graft<TCollections>["getContent"]
-      >,
+      cachedGet(collection, slug, opts?.branch) as ReturnType<Graft<TCollections>["getContent"]>,
     listContent: (collection, opts) =>
       cachedList(collection, opts?.branch, opts?.limit, opts?.offset) as ReturnType<
         Graft<TCollections>["listContent"]

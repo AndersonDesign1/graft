@@ -21,5 +21,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "oxlint ."
+  },
+  "dependencies": {
+    "@graft/compiler": "workspace:*",
+    "@graft/contracts": "workspace:*",
+    "@graft/core": "workspace:*",
+    "@graft/db": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "gray-matter": "^4.0.3",
+    "zod": "^4.1.0"
   }
 }

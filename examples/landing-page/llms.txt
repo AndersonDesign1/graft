@@ -1,8 +1,28 @@
 # Graft example: landing-page
 
 This site is operated by editing files — there is no dashboard.
+There are two equivalent interfaces: edit files directly, or use the MCP server.
 
-## How to change content
+## MCP server (preferred for agents)
+
+`pnpm mcp` serves this site's content tools over stdio. Register it in the
+repo-root `.mcp.json`:
+
+    {
+      "mcpServers": {
+        "graft-landing-page": {
+          "command": "pnpm",
+          "args": ["--filter", "landing-page", "--silent", "mcp"]
+        }
+      }
+    }
+
+Tools: `list_collections`, `describe_schema`, `list_content`, `get_content`,
+`write_content` (validates, writes the MDX file, compiles — one call),
+`explain_error`. Every failure returns JSON with a `fix` — do what it says.
+Writes land as plain files under `content/`; commit them like any other change.
+
+## How to change content (by hand)
 
 1. Edit or add MDX under `content/pages/`. Frontmatter must satisfy the
    `pages` collection in `graft.config.ts` (title: string; tagline?: string;

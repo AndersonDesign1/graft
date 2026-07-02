@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "compile": "tsx scripts/compile.ts",
+    "mcp": "tsx scripts/mcp.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint ."
   },
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@graft/compiler": "workspace:*",
+    "@graft/mcp": "workspace:*",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "tsx": "^4.20.0"

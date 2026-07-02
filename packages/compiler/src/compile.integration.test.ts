@@ -56,9 +56,7 @@ describe.skipIf(!runIntegration)("compile -> content_index (integration)", () =>
     expect(second.changes).toEqual({ added: [], changed: [], removed: [], unchanged: 2 });
     const after =
       await handle.sql`select slug, updated_at from content_index where branch_id = ${BRANCH} order by slug`;
-    expect(after.map((r) => String(r.updated_at))).toEqual(
-      before.map((r) => String(r.updated_at)),
-    );
+    expect(after.map((r) => String(r.updated_at))).toEqual(before.map((r) => String(r.updated_at)));
 
     // Edit one file, delete another: changed + soft-removed.
     writeFileSync(join(dir, "pages", "home.mdx"), "---\ntitle: Home v2\nslug: home\n---\nHello");

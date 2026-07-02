@@ -98,8 +98,7 @@ export function readDocs(
 
 export async function compile(options: CompileOptions): Promise<CompileResult> {
   const docs = readDocs(options.contentDir, options.collections);
-  const gitSha =
-    options.gitSha === undefined ? resolveGitSha(options.contentDir) : options.gitSha;
+  const gitSha = options.gitSha === undefined ? resolveGitSha(options.contentDir) : options.gitSha;
   const changes = await projectBranchContent(
     options.db,
     docs.map((doc) => ({

@@ -39,9 +39,7 @@ describe("defineField", () => {
 
   it("preserves the concrete Zod type through the builder", () => {
     expectTypeOf(field.string().zod).toEqualTypeOf<z.ZodString>();
-    expectTypeOf(field.number({ optional: true }).zod).toEqualTypeOf<
-      z.ZodOptional<z.ZodNumber>
-    >();
+    expectTypeOf(field.number({ optional: true }).zod).toEqualTypeOf<z.ZodOptional<z.ZodNumber>>();
     expectTypeOf(field.string().zod.parse("x")).toEqualTypeOf<string>();
   });
 });

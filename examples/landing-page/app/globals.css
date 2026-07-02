@@ -14,7 +14,11 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 17px/1.65 ui-serif, Georgia, "Times New Roman", serif;
+  font:
+    17px/1.65 ui-serif,
+    Georgia,
+    "Times New Roman",
+    serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -74,7 +78,11 @@ article h2 {
 }
 
 article code {
-  font: 0.85em/1 ui-monospace, "Cascadia Code", Consolas, monospace;
+  font:
+    0.85em/1 ui-monospace,
+    "Cascadia Code",
+    Consolas,
+    monospace;
   background: #efece7;
   padding: 0.15em 0.4em;
   border-radius: 4px;
