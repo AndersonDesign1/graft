@@ -1,0 +1,15 @@
+---
+title: How it works
+tagline: MDX in, typed reads out.
+slug: how-it-works
+order: 2
+---
+
+1. **Author** — write MDX with typed frontmatter under `content/pages/`.
+2. **Compile** — `pnpm compile` validates every file against the schema and
+   projects it into the `content_index` table (a hash-diff: only what changed
+   is written, and every run is recorded with its git SHA).
+3. **Render** — Server Components call `getContent("pages", slug)` and get the
+   exact inferred document type back. No codegen, no `any`.
+
+Delete a file and recompile: the page 404s. That's the whole lifecycle.

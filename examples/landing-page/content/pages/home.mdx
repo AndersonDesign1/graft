@@ -1,0 +1,23 @@
+---
+title: Graft
+tagline: The CMS where the agent is the operator — and the human is optional.
+slug: home
+order: 1
+---
+
+## Content is code
+
+This page is a file: `content/pages/home.mdx`. Its frontmatter is validated
+against a Zod schema defined in `graft.config.ts`, compiled into a Postgres
+index, and rendered by a fully typed read client. **Editing this file and
+recompiling is the entire publishing workflow.**
+
+## Git is the version history
+
+Every change to this page is a commit. Branch the repo, get a branch of the
+content. No drafts table, no publish button — just `git`.
+
+## Built for agents
+
+Schemas, content, and queries are all plain code an agent can read, edit, and
+introspect. Errors carry a `fix` field that tells the agent the next step.

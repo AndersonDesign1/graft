@@ -1,0 +1,29 @@
+{
+  "name": "landing-page",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "compile": "tsx scripts/compile.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint ."
+  },
+  "dependencies": {
+    "@graft/core": "workspace:*",
+    "@graft/db": "workspace:*",
+    "@graft/sdk-next": "workspace:*",
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^10.0.0"
+  },
+  "devDependencies": {
+    "@graft/compiler": "workspace:*",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tsx": "^4.20.0"
+  }
+}

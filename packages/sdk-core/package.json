@@ -21,5 +21,13 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "oxlint ."
+  },
+  "dependencies": {
+    "@graft/contracts": "workspace:*",
+    "@graft/core": "workspace:*",
+    "@graft/db": "workspace:*"
+  },
+  "devDependencies": {
+    "@graft/compiler": "workspace:*"
   }
 }

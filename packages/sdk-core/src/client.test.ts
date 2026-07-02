@@ -1,0 +1,66 @@
+import { GraftError } from "@graft/contracts";
+import { defineCollection, field } from "@graft/core";
+import type { ContentRow } from "@graft/db";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import { createClient, toDocument, type Document } from "./client";
+
+const pages = defineCollection({
+  name: "pages",
+  fields: { title: field.string(), order: field.number({ optional: true }) },
+});
+
+const row = (overrides: Partial<ContentRow> = {}): ContentRow => ({
+  branchId: "main",
+  collection: "pages",
+  slug: "home",
+  data: { title: "Home", order: 1 },
+  body: "# Welcome",
+  contentHash: "h1",
+  sourcePath: "pages/home.mdx",
+  deleted: false,
+  updatedAt: new Date("2026-07-01T00:00:00Z"),
+  ...overrides,
+});
+
+describe("toDocument", () => {
+  it("shapes an index row into a typed document", () => {
+    const doc = toDocument(pages, row());
+    expect(doc).toMatchObject({
+      collection: "pages",
+      slug: "home",
+      body: "# Welcome",
+      data: { title: "Home", order: 1 },
+    });
+    expectTypeOf(doc.data.title).toEqualTypeOf<string>();
+    expectTypeOf(doc.data.order).toEqualTypeOf<number | undefined>();
+  });
+
+  it("throws an agent-actionable error when the index is stale vs the schema", () => {
+    try {
+      toDocument(pages, row({ data: { order: "not-a-number" } }));
+      expect.unreachable("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(GraftError);
+      expect((err as GraftError).code).toBe("SCHEMA_VALIDATION_FAILED");
+      expect((err as GraftError).fix).toContain("compile");
+    }
+  });
+});
+
+describe("createClient", () => {
+  it("rejects unknown collections with the registered list", async () => {
+    const client = createClient({ db: {} as never, collections: { pages } });
+    await expect(
+      // @ts-expect-error — unknown collection is a type error too
+      client.getDocument("widgets", "x"),
+    ).rejects.toMatchObject({ code: "COLLECTION_NOT_FOUND" });
+  });
+
+  it("returns fully inferred document types per collection key", () => {
+    const client = createClient({ db: {} as never, collections: { pages } });
+    // Assert on the function type — invoking it would hit the fake db.
+    expectTypeOf(client.getDocument<"pages">).returns.resolves.toEqualTypeOf<Document<
+      typeof pages
+    > | null>();
+  });
+});

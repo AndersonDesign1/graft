@@ -1,0 +1,35 @@
+# Graft example: landing-page
+
+This site is operated by editing files — there is no dashboard.
+
+## How to change content
+
+1. Edit or add MDX under `content/pages/`. Frontmatter must satisfy the
+   `pages` collection in `graft.config.ts` (title: string; tagline?: string;
+   order?: number; slug: kebab-case, defaults to the filename).
+2. Run `pnpm compile`. It validates every file and reports exactly what was
+   added/changed/removed. Validation errors include a `fix` field — do what it
+   says and re-run.
+3. The running app (`pnpm dev`, http://localhost:3000) serves the new content
+   on the next request. Home is the `home` slug; everything else is `/<slug>`.
+4. Commit the change — git is the version history and the source of truth.
+
+## How to change the schema
+
+Edit `graft.config.ts` (fields are built with `field.string()`,
+`field.number({ optional: true })`, …), then update the MDX files to match and
+run `pnpm compile`. Reads are typed from this file — no codegen step.
+
+## Layout of this app
+
+- `graft.config.ts` — collections (the schema; single source of truth)
+- `content/pages/*.mdx` — the authored documents
+- `lib/graft.ts` — the typed read client (`getContent`, `listContent`)
+- `app/page.tsx`, `app/[slug]/page.tsx` — routes that render documents
+- `scripts/compile.ts` — projects content into Postgres (`pnpm compile`)
+
+## Rules
+
+- Never write to the database directly; it is a derived index. Files win.
+- Slugs are kebab-case (lowercase letters, digits, hyphens).
+- `DATABASE_URL` comes from the repo-root `.env`.

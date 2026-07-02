@@ -2,9 +2,11 @@ packages:
   - "packages/*"
   - "examples/*"
 
-# Allow esbuild (used by tsup + vitest) to run its install script (pnpm 11 model).
+# Allow esbuild (tsup + vitest) and sharp (Next image optimization) to run
+# their install scripts (pnpm 11 model).
 allowBuilds:
   esbuild: true
+  sharp: true
 
 # Supply-chain guard: dependency versions must be at least 3 days old (4320 minutes).
 # A handful of trusted, frequently-released dev tools are exempted below.

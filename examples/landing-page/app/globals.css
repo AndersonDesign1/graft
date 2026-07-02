@@ -1,0 +1,95 @@
+:root {
+  --bg: #faf9f7;
+  --ink: #1c1b1a;
+  --muted: #6f6a63;
+  --accent: #2f6f4f;
+  --rule: #e5e1da;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 17px/1.65 ui-serif, Georgia, "Times New Roman", serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+header {
+  border-bottom: 1px solid var(--rule);
+}
+
+nav {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1rem 1.25rem;
+  display: flex;
+  gap: 1.5rem;
+  align-items: baseline;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.95rem;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  margin-right: auto;
+}
+
+nav a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+nav a:hover {
+  color: var(--ink);
+}
+
+main {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 4rem;
+}
+
+h1 {
+  font-size: 2.6rem;
+  line-height: 1.15;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.tagline {
+  font-size: 1.25rem;
+  color: var(--muted);
+  margin: 0 0 2.5rem;
+}
+
+article h2 {
+  font-size: 1.35rem;
+  margin: 2.25rem 0 0.5rem;
+}
+
+article code {
+  font: 0.85em/1 ui-monospace, "Cascadia Code", Consolas, monospace;
+  background: #efece7;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+
+article a {
+  color: var(--accent);
+}
+
+footer {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.25rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.85rem;
+}
