@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "graft-landing-page": {
+      "command": "pnpm",
+      "args": ["--filter", "landing-page", "--silent", "mcp"]
+    }
+  }
+}

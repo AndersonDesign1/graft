@@ -7,28 +7,49 @@ are **owned code** an agent edits directly, backed by a self-hostable Postgres e
 **git-native versioning**, **copy-on-write database branches**, and **shadcn-style owned
 extensibility**. Humans get an optional Studio and a configurable approval policy.
 
-See the full PRD and phased delivery plan in
-[`docs/PRD.md`](docs/PRD.md) _(linked from the planning doc)_.
+Design decisions from the de-risking spikes live in
+[`docs/design-notes/`](docs/design-notes/). (The PRD and phase tracker are private planning docs,
+kept out of the repo.)
 
 ## Status
 
-**Phase 0 — Foundations.** Monorepo scaffolding, package skeletons, tooling. Nothing functional yet.
+**Phase 2 — The Wow Loop (in progress).** The core pipeline works end-to-end:
+
+- Authored MDX is validated against a Zod schema defined in code (`defineCollection`) and
+  projected atomically into a Postgres `content_index` (hash-diff; every run leaves a
+  `compilations` audit row with the git SHA).
+- Typed reads via `@graft/sdk-core` / `@graft/sdk-next`;
+  [`examples/landing-page`](examples/landing-page) renders authored content in Next.js.
+- Agents operate content over MCP: `@graft/mcp` exposes `list_collections`, `describe_schema`,
+  `list_content`, `get_content`, `write_content` (validate → write MDX → compile in one call),
+  and `explain_error`. Registered for this repo in [`.mcp.json`](.mcp.json); agent guide at
+  [`examples/landing-page/llms.txt`](examples/landing-page/llms.txt).
+
+Still to come in Phase 2: real CLI commands (`init`/`dev`/`compile`), asset fields (R2-backed
+images), and the cold-agent end-to-end test.
 
 ## Requirements
 
 - Node `>=20` (developed on 24)
-- [pnpm](https://pnpm.io) `10.x`
-- Docker (for Postgres + MinIO in later phases)
+- [pnpm](https://pnpm.io) `11.x` (pinned via `packageManager`)
+- Docker (for the self-host Postgres + MinIO stack)
 
 ## Getting started
 
 ```bash
 pnpm install
 pnpm build
-pnpm test
+pnpm test        # unit tests; live integration tests are opt-in via RUN_INTEGRATION=1
 
-# bring up local infra (Postgres + MinIO) — needed from Phase 1 onward
+# self-host infra (Postgres 18 + MinIO); dev currently runs against Neon + R2 via .env
 docker compose up -d
+```
+
+To see the loop: set `DATABASE_URL` in a repo-root `.env`, then
+
+```bash
+pnpm --filter landing-page compile   # project content/ into Postgres
+pnpm --filter landing-page dev       # renders at http://localhost:3000
 ```
 
 ## Monorepo layout

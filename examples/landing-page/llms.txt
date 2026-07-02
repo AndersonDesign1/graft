@@ -5,8 +5,8 @@ There are two equivalent interfaces: edit files directly, or use the MCP server.
 
 ## MCP server (preferred for agents)
 
-`pnpm mcp` serves this site's content tools over stdio. Register it in the
-repo-root `.mcp.json`:
+`pnpm mcp` serves this site's content tools over stdio. It is already
+registered in the repo-root `.mcp.json` as `graft-landing-page`:
 
     {
       "mcpServers": {
