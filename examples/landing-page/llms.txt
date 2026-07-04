@@ -22,6 +22,10 @@ Tools: `list_collections`, `describe_schema`, `list_content`, `get_content`,
 `explain_error`. Every failure returns JSON with a `fix` — do what it says.
 Writes land as plain files under `content/`; commit them like any other change.
 
+Remote agents (no stdio): the same tools are served over Streamable HTTP at
+`POST /api/mcp` while the app is running (`pnpm dev`). Stateless, JSON
+responses; set `GRAFT_MCP_TOKEN` to require a bearer token.
+
 ## How to change content (by hand)
 
 1. Edit or add MDX under `content/pages/`. Frontmatter must satisfy the
