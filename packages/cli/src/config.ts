@@ -58,8 +58,9 @@ function isCollection(value: unknown): value is AnyCollection {
 }
 
 export async function loadConfig(configPath: string): Promise<ProjectConfig> {
-  // Fresh instance + no caches so `graft dev` picks up config edits on reload.
-  const jiti = createJiti(configPath, { moduleCache: false, fsCache: false });
+  // moduleCache off so `graft dev` reloads pick up config edits; the transform
+  // cache (fsCache) stays on — it is keyed by content, so edits still invalidate.
+  const jiti = createJiti(configPath, { moduleCache: false });
   let mod: Record<string, unknown>;
   try {
     mod = (await jiti.import(configPath)) as Record<string, unknown>;

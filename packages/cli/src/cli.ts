@@ -5,10 +5,6 @@
  * planned stubs that say which phase delivers them. Every failure crossing this
  * boundary is a GraftError printed with its agent-actionable `fix`.
  */
-import { GraftError } from "@graft/contracts";
-import { compileCommand } from "./commands/compile";
-import { devCommand } from "./commands/dev";
-import { initCommand } from "./commands/init";
 import { printGraftError } from "./report";
 
 const VERSION = "0.0.0";
@@ -94,6 +90,7 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
 
     switch (command) {
       case "init": {
+        const { initCommand } = await import("./commands/init");
         const result = initCommand({ targetDir: args.positionals[0] ?? cwd });
         console.log(
           `Initialized a Graft project in ${result.projectDir} (${result.created.length} file(s)):`,
@@ -111,10 +108,12 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
         return 0;
       }
       case "compile": {
+        const { compileCommand } = await import("./commands/compile");
         await compileCommand({ cwd, branchId: args.branchId });
         return 0;
       }
       case "dev": {
+        const { devCommand } = await import("./commands/dev");
         await devCommand({ cwd, branchId: args.branchId });
         return 0;
       }
@@ -132,12 +131,15 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
       }
     }
   } catch (error) {
-    if (error instanceof GraftError) {
-      printGraftError(error);
-      return 1;
-    }
     if (error instanceof UsageError) {
       console.error(`graft: ${error.message}`);
+      return 1;
+    }
+    // Loaded at catch time: contracts pulls in Zod, and `--help`/`--version`/
+    // usage errors should not pay for it.
+    const { GraftError } = await import("@graft/contracts");
+    if (error instanceof GraftError) {
+      printGraftError(error);
       return 1;
     }
     throw error;

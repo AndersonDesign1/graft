@@ -6,9 +6,7 @@
  */
 import { existsSync, watch, type FSWatcher } from "node:fs";
 import { basename, relative } from "node:path";
-import { compile } from "@graft/compiler";
 import { GraftError } from "@graft/contracts";
-import { createDb } from "@graft/db";
 import {
   CONFIG_FILENAMES,
   findConfig,
@@ -40,7 +38,13 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
     });
   }
 
-  const handle = createDb(requireDatabaseUrl());
+  const url = requireDatabaseUrl();
+  // Heavy imports (compiler → database driver) only after the project checks out.
+  const [{ compile }, { createDb }] = await Promise.all([
+    import("@graft/compiler"),
+    import("@graft/db"),
+  ]);
+  const handle = createDb(url);
   let timer: NodeJS.Timeout | undefined;
   let compiling = false;
   let dirty = false;
