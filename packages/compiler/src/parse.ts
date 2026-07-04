@@ -14,6 +14,15 @@ import matter from "gray-matter";
 /** Kebab-case: URL-safe, unambiguous in paths, and stable as a primary-key part. */
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+/** One asset reference found in a document's frontmatter. */
+export interface DocAsset {
+  /** The field the reference came from. */
+  field: string;
+  /** Key of the binary in the asset store. */
+  key: string;
+  alt?: string;
+}
+
 export interface ProjectedDoc {
   collection: string;
   slug: string;
@@ -21,6 +30,8 @@ export interface ProjectedDoc {
   body: string;
   contentHash: string;
   sourcePath: string;
+  /** Asset references indexed from `asset` fields (validated by the schema). */
+  assets: DocAsset[];
 }
 
 export function parseDocument(
@@ -58,12 +69,28 @@ export function parseDocument(
     });
   }
 
+  const data = result.data as Record<string, unknown>;
+
   return {
     collection: collection.name,
     slug,
-    data: result.data as Record<string, unknown>,
+    data,
     body: content.trim(),
     contentHash: createHash("sha256").update(raw).digest("hex"),
     sourcePath,
+    assets: collectAssets(collection, data),
   };
+}
+
+/** Pull every populated `asset` field out of validated frontmatter. */
+function collectAssets(collection: AnyCollection, data: Record<string, unknown>): DocAsset[] {
+  const assets: DocAsset[] = [];
+  for (const [name, definition] of Object.entries(collection.fields)) {
+    if ((definition as { type?: string }).type !== "asset") continue;
+    const value = data[name];
+    if (value === undefined || value === null) continue;
+    const ref = value as { key: string; alt?: string };
+    assets.push({ field: name, key: ref.key, ...(ref.alt !== undefined && { alt: ref.alt }) });
+  }
+  return assets;
 }

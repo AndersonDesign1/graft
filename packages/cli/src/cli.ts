@@ -31,6 +31,7 @@ function printHelp(): void {
     "  init [dir]   Scaffold a Graft project (graft.config.ts, content/, llms.txt)",
     "  compile      Project the content tree into the content index once",
     "  dev          Watch content/ + graft.config.ts and recompile on change",
+    "  asset put <file> [key]   Upload a binary to the asset store (S3_* env)",
     ...PLANNED.map((cmd) => `  ${cmd.name.padEnd(12)} ${cmd.summary}  (${cmd.phase})`),
     "",
     "Options:",
@@ -115,6 +116,25 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
       case "dev": {
         const { devCommand } = await import("./commands/dev");
         await devCommand({ cwd, branchId: args.branchId });
+        return 0;
+      }
+      case "asset": {
+        const [subcommand, file, key] = args.positionals;
+        if (subcommand !== "put" || !file) {
+          throw new UsageError("usage: graft asset put <file> [key]");
+        }
+        const { assetPutCommand } = await import("./commands/asset");
+        const result = await assetPutCommand({ cwd, file, key });
+        console.log(`Uploaded ${result.key} (${result.contentType}, ${result.bytes} bytes)`);
+        console.log(
+          [
+            "",
+            "Reference it from an `asset` field in frontmatter:",
+            `  image:`,
+            `    key: ${result.key}`,
+            "    alt: describe the image for screen readers",
+          ].join("\n"),
+        );
         return 0;
       }
       default: {

@@ -32,6 +32,9 @@ importers:
 
   examples/landing-page:
     dependencies:
+      '@graft/assets':
+        specifier: workspace:*
+        version: link:../../packages/assets
       '@graft/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -83,6 +86,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@graft/assets':
+        specifier: workspace:*
+        version: link:../assets
       '@graft/compiler':
         specifier: workspace:*
         version: link:../compiler

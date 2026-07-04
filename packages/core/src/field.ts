@@ -10,7 +10,29 @@
  */
 import { z } from "zod";
 
-export type FieldType = "string" | "text" | "number" | "boolean" | "datetime" | "json";
+export type FieldType = "string" | "text" | "number" | "boolean" | "datetime" | "json" | "asset";
+
+/**
+ * Lowercase slash-separated path, each segment starting alphanumeric —
+ * URL-safe, no leading slash, and `..` is unrepresentable.
+ */
+const ASSET_KEY_RE = /^[a-z0-9][a-z0-9._-]*(\/[a-z0-9][a-z0-9._-]*)*$/;
+
+/**
+ * What an `asset` field holds: a reference to a binary in the asset store.
+ * The binary lives in object storage (R2/MinIO); this reference lives in
+ * frontmatter like any other field, so git stays authoritative for content.
+ */
+export const AssetRef = z.object({
+  key: z
+    .string()
+    .regex(
+      ASSET_KEY_RE,
+      'asset key must be a lowercase path like "pages/home/hero.png" (letters, digits, ., _, -; segments separated by /)',
+    ),
+  alt: z.string().optional(),
+});
+export type AssetRef = z.infer<typeof AssetRef>;
 
 /** Any JSON-serializable value — what a `json` field validates and infers to. */
 export type JsonValue =
@@ -53,6 +75,7 @@ interface FieldZodMap {
   boolean: z.ZodBoolean;
   datetime: z.ZodISODateTime;
   json: z.ZodType<JsonValue>;
+  asset: typeof AssetRef;
 }
 
 const BASE_ZOD: { [T in FieldType]: () => FieldZodMap[T] } = {
@@ -62,6 +85,7 @@ const BASE_ZOD: { [T in FieldType]: () => FieldZodMap[T] } = {
   boolean: () => z.boolean(),
   datetime: () => z.iso.datetime(),
   json: () => jsonValue,
+  asset: () => AssetRef,
 };
 
 type MaybeOptional<TZod extends z.ZodType, TOptions extends FieldOptions> = TOptions extends {
@@ -94,4 +118,5 @@ export const field = {
   datetime: <const O extends FieldOptions = Record<never, never>>(o?: O) =>
     defineField("datetime", o),
   json: <const O extends FieldOptions = Record<never, never>>(o?: O) => defineField("json", o),
+  asset: <const O extends FieldOptions = Record<never, never>>(o?: O) => defineField("asset", o),
 } as const;

@@ -12,6 +12,10 @@ export const pages = defineCollection({
     title: field.string({ description: "Page headline (h1) and <title>." }),
     tagline: field.string({ optional: true, description: "Short line under the headline." }),
     order: field.number({ optional: true, description: "Nav sort order (ascending)." }),
+    image: field.asset({
+      optional: true,
+      description: "Hero image above the body. Upload with `graft asset put <file> [key]`.",
+    }),
   },
 });
 

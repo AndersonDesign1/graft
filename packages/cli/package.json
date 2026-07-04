@@ -17,6 +17,7 @@
     "lint": "oxlint ."
   },
   "dependencies": {
+    "@graft/assets": "workspace:*",
     "@graft/compiler": "workspace:*",
     "@graft/contracts": "workspace:*",
     "@graft/core": "workspace:*",

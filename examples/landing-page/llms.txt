@@ -39,6 +39,20 @@ responses; set `GRAFT_MCP_TOKEN` to require a bearer token.
    on the next request. Home is the `home` slug; everything else is `/<slug>`.
 4. Commit the change — git is the version history and the source of truth.
 
+## How to add an image (or any binary)
+
+1. Upload it: `pnpm exec graft asset put <file> [key]` (e.g.
+   `graft asset put assets/hero.svg pages/home/hero.svg`). Uses the `S3_*`
+   env from the repo-root `.env`; the command prints the frontmatter snippet.
+2. Reference it from an `asset` field in frontmatter:
+
+       image:
+         key: pages/home/hero.svg
+         alt: describe the image
+
+3. `pnpm compile`. The app resolves the key to a URL at render time
+   (presigned GET; set `S3_PUBLIC_URL` for stable public URLs).
+
 ## How to change the schema
 
 Edit `graft.config.ts` (fields are built with `field.string()`,
