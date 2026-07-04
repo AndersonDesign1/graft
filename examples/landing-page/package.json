@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "compile": "tsx scripts/compile.ts",
+    "compile": "graft compile",
+    "watch": "graft dev",
     "mcp": "tsx scripts/mcp.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint ."
@@ -22,6 +23,7 @@
     "react-markdown": "^10.0.0"
   },
   "devDependencies": {
+    "@graft/cli": "workspace:*",
     "@graft/compiler": "workspace:*",
     "@graft/mcp": "workspace:*",
     "@types/react": "^19.0.0",

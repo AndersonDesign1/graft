@@ -38,6 +38,48 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Call list_collections to see what is registered. Either use one of those names, move the file into a registered collection folder, or add a defineCollection for it in graft.config.ts.",
   },
+  CONFIG_NOT_FOUND: {
+    code: "CONFIG_NOT_FOUND",
+    meaning: "No graft.config.{ts,js} was found in the working directory or any parent.",
+    typicalCauses: [
+      "The command was run outside a Graft project",
+      "The project has not been initialized yet",
+    ],
+    howToRecover:
+      "cd into the project root (the directory holding graft.config.ts) and retry, or scaffold a new project with `graft init`.",
+  },
+  CONFIG_INVALID: {
+    code: "CONFIG_INVALID",
+    meaning:
+      "graft.config exists but could not be loaded, or it does not export a valid `collections` record.",
+    typicalCauses: [
+      "A syntax or import error in graft.config.ts",
+      "Missing `export const collections = { … }`",
+      "A collections entry that was not created with defineCollection",
+    ],
+    howToRecover:
+      "Fix graft.config.ts so it imports defineCollection/field from @graft/core and exports `collections` as a record of defineCollection results — the error message names exactly what failed to load or validate.",
+  },
+  ALREADY_INITIALIZED: {
+    code: "ALREADY_INITIALIZED",
+    meaning: "`graft init` was run in a directory that already has a graft.config.",
+    typicalCauses: [
+      "Re-running init in an existing project",
+      "Pointing init at the wrong directory",
+    ],
+    howToRecover:
+      "This is already a Graft project — evolve it by editing the existing graft.config.ts (add collections or fields there), or run `graft init <dir>` against an empty directory.",
+  },
+  ENV_VAR_MISSING: {
+    code: "ENV_VAR_MISSING",
+    meaning: "A required environment variable is not set.",
+    typicalCauses: [
+      "The project has no .env file yet",
+      "The variable exists in a different environment (e.g. CI but not local)",
+    ],
+    howToRecover:
+      "Add the variable named in `details.variable` to the project's .env (the CLI walks parent directories to find one) or export it in the environment, then retry.",
+  },
   CONTENT_DIR_NOT_FOUND: {
     code: "CONTENT_DIR_NOT_FOUND",
     meaning: "The configured content directory does not exist on disk.",

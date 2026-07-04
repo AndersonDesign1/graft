@@ -27,9 +27,10 @@ Writes land as plain files under `content/`; commit them like any other change.
 1. Edit or add MDX under `content/pages/`. Frontmatter must satisfy the
    `pages` collection in `graft.config.ts` (title: string; tagline?: string;
    order?: number; slug: kebab-case, defaults to the filename).
-2. Run `pnpm compile`. It validates every file and reports exactly what was
-   added/changed/removed. Validation errors include a `fix` field — do what it
-   says and re-run.
+2. Run `pnpm compile` (the `graft compile` CLI). It validates every file and
+   reports exactly what was added/changed/removed. Validation errors include a
+   `fix` field — do what it says and re-run. `pnpm watch` (`graft dev`)
+   recompiles on every save instead.
 3. The running app (`pnpm dev`, http://localhost:3000) serves the new content
    on the next request. Home is the `home` slug; everything else is `/<slug>`.
 4. Commit the change — git is the version history and the source of truth.
@@ -46,7 +47,7 @@ run `pnpm compile`. Reads are typed from this file — no codegen step.
 - `content/pages/*.mdx` — the authored documents
 - `lib/graft.ts` — the typed read client (`getContent`, `listContent`)
 - `app/page.tsx`, `app/[slug]/page.tsx` — routes that render documents
-- `scripts/compile.ts` — projects content into Postgres (`pnpm compile`)
+- `pnpm compile` / `pnpm watch` — project content into Postgres (the `graft` CLI)
 
 ## Rules
 

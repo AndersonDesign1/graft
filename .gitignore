@@ -3,6 +3,7 @@ dist/
 .next/
 next-env.d.ts
 .turbo/
+.test-tmp/
 coverage/
 *.tsbuildinfo
 .env
