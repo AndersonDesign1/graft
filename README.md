@@ -24,8 +24,11 @@ kept out of the repo.)
   `list_content`, `get_content`, `write_content` (validate → write MDX → compile in one call),
   and `explain_error`. Registered for this repo in [`.mcp.json`](.mcp.json); agent guide at
   [`examples/landing-page/llms.txt`](examples/landing-page/llms.txt).
+- The `graft` CLI is real: `graft init` scaffolds a project (schema + content + llms.txt),
+  `graft compile` projects the content tree once, `graft dev` watches content and
+  `graft.config.ts` (hot-reloaded) and recompiles on every save.
 
-Still to come in Phase 2: real CLI commands (`init`/`dev`/`compile`), asset fields (R2-backed
+Still to come in Phase 2: MCP over HTTP (for remote/eve agents), asset fields (R2-backed
 images), and the cold-agent end-to-end test.
 
 ## Requirements
@@ -48,7 +51,8 @@ docker compose up -d
 To see the loop: set `DATABASE_URL` in a repo-root `.env`, then
 
 ```bash
-pnpm --filter landing-page compile   # project content/ into Postgres
+pnpm --filter landing-page compile   # graft compile: project content/ into Postgres
+pnpm --filter landing-page watch     # graft dev: recompile on every save (optional)
 pnpm --filter landing-page dev       # renders at http://localhost:3000
 ```
 
