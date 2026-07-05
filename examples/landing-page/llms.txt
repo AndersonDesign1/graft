@@ -31,6 +31,8 @@ responses; set `GRAFT_MCP_TOKEN` to require a bearer token.
 1. Edit or add MDX under `content/pages/`. Frontmatter must satisfy the
    `pages` collection in `graft.config.ts` (title: string; tagline?: string;
    order?: number; slug: kebab-case, defaults to the filename).
+   `order` is the nav position (ascending; home=1 — give a new page the next
+   free number).
 2. Run `pnpm compile` (the `graft compile` CLI). It validates every file and
    reports exactly what was added/changed/removed. Validation errors include a
    `fix` field — do what it says and re-run. `pnpm watch` (`graft dev`)
