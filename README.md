@@ -13,7 +13,9 @@ kept out of the repo.)
 
 ## Status
 
-**Phase 2 — The Wow Loop (in progress).** The core pipeline works end-to-end:
+**Phase 2 — The Wow Loop: complete.** The core pipeline works end-to-end, and a fresh
+agent given nothing but this repo has authored a page with an R2-hosted image, compiled
+it, and rendered it — guided only by the repo's own docs and error messages:
 
 - Authored MDX is validated against a Zod schema defined in code (`defineCollection`) and
   projected atomically into a Postgres `content_index` (hash-diff; every run leaves a
@@ -26,10 +28,14 @@ kept out of the repo.)
   [`examples/landing-page/llms.txt`](examples/landing-page/llms.txt).
 - The `graft` CLI is real: `graft init` scaffolds a project (schema + content + llms.txt),
   `graft compile` projects the content tree once, `graft dev` watches content and
-  `graft.config.ts` (hot-reloaded) and recompiles on every save.
+  `graft.config.ts` (hot-reloaded) and recompiles on every save, and
+  `graft asset put` uploads binaries referenced from `asset` fields.
+- Remote agents reach the same tools over Streamable HTTP (`createGraftMcpHandler`,
+  mounted in the example at `POST /api/mcp`); images live in R2/MinIO and render via
+  presigned URLs (or `S3_PUBLIC_URL`).
 
-Still to come in Phase 2: MCP over HTTP (for remote/eve agents), asset fields (R2-backed
-images), and the cold-agent end-to-end test.
+Next: Phase 3 — the typed function runtime for live data, scoped agent tokens, audit
+log, and search.
 
 ## Requirements
 
