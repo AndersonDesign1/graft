@@ -1,6 +1,16 @@
 /**
  * @graft/auth
- * Scoped agent tokens, policy-as-code approvals, audit log, rate limits.
- * Placeholder — implemented in a later phase.
+ *
+ * Graft verifies identity; it doesn't mint it. This package turns a request
+ * into a FunctionActor (createActorResolver) by verifying bearer JWTs against
+ * trusted OIDC issuers — a Better Auth instance the app hosts (the default
+ * engine; see betterAuthIssuer), a company IdP, Vercel Connect/Passport — plus
+ * static dev tokens for local bootstrap. requireScopes turns token scopes into
+ * function access rules.
+ *
+ * Later units add: the audit log riding correlationId (P3.4), rate limits, and
+ * the human gate for destructive ops.
  */
-export const PACKAGE = "@graft/auth" as const;
+export * from "./oidc";
+export * from "./resolver";
+export * from "./scopes";

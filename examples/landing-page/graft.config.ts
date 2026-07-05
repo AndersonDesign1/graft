@@ -4,6 +4,7 @@
  * Add fields here, then author documents in content/<collection>/*.mdx.
  * Functions are served at POST /api/fn/<name> (JSON object body).
  */
+import { requireScopes } from "@graft/auth";
 import { defineCollection, defineFunction, field, insertRecord, listRecords } from "@graft/core";
 
 export const pages = defineCollection({
@@ -59,10 +60,14 @@ export const pageStats = defineFunction({
   },
 });
 
-/** Public mutation: the contact form posts here. Input reuses the collection's fields. */
+/**
+ * Public mutation: the contact form posts here. Mutations reject anonymous
+ * callers by default — `public: true` is the explicit, greppable opt-out.
+ */
 export const submitContact = defineFunction({
   name: "submitContact",
   kind: "mutation",
+  public: true,
   description: "Stores a contact-form submission (public; anonymous callers allowed).",
   returns: "{ id: string; receivedAt: string }",
   input: submissions.fields,
@@ -72,15 +77,15 @@ export const submitContact = defineFunction({
   },
 });
 
-/** Gated query: reading submissions requires a non-anonymous actor (bearer token). */
+/** Scope-gated query: the caller's token must carry the submissions:read scope. */
 export const listSubmissions = defineFunction({
   name: "listSubmissions",
   kind: "query",
   description:
-    "Lists recent submissions, newest first. Requires authentication — send Authorization: Bearer <GRAFT_FUNCTIONS_TOKEN>.",
+    "Lists recent submissions, newest first. Requires a token with the submissions:read scope — mint one at GET /api/auth/token after signing in, or use GRAFT_DEV_TOKEN locally.",
   returns: "{ submissions: { id, email, message?, receivedAt }[] }",
   input: { limit: field.number({ optional: true, description: "Max rows (default 50)." }) },
-  access: (ctx) => ctx.actor.kind !== "anonymous",
+  access: requireScopes("submissions:read"),
   handler: async (ctx) => {
     const records = await listRecords(ctx, submissions, { limit: ctx.input.limit });
     return {

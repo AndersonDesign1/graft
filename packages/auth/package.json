@@ -19,7 +19,12 @@
     "build": "tsup src/index.ts --format esm --dts --clean",
     "dev": "tsup src/index.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "lint": "oxlint ."
+  },
+  "dependencies": {
+    "@graft/contracts": "workspace:*",
+    "@graft/core": "workspace:*",
+    "jose": "^6.0.0"
   }
 }

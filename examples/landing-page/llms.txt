@@ -69,15 +69,34 @@ Success is `{ data: … }`; failure is GraftError JSON — `fix` says what to do
 Registered functions:
 
 - `pageStats` — query, no input; returns the live page slugs on the branch.
-- `submitContact` — mutation, public; input `{ email, message? }`; stores a
-  row in the `submissions` collection (the home-page contact form posts here).
-- `listSubmissions` — query, gated; input `{ limit? }`; requires
-  `Authorization: Bearer <GRAFT_FUNCTIONS_TOKEN>` (anonymous callers get 401).
+- `submitContact` — mutation, `public: true`; input `{ email, message? }`;
+  stores a row in the `submissions` collection (the home-page contact form
+  posts here).
+- `listSubmissions` — query, gated by `requireScopes("submissions:read")`;
+  input `{ limit? }`; anonymous or unscoped callers get 401.
 
 To add a function: define input with the same `field.*` builders collections
 use, write the handler against the standard context
 (`{ input, db, actor, branch, request, correlationId }`), and add it to the
-exported `functions` record.
+exported `functions` record. Mutations reject anonymous callers by default —
+set `public: true` only when anonymous calls are the point (e.g. a form), or
+supply an `access` rule (it replaces the default entirely).
+
+## Authentication (who is calling a function)
+
+Callers are identified by `Authorization: Bearer <token>`, resolved by
+`@graft/auth` (`app/api/fn/[name]/route.ts`). Two kinds of tokens work:
+
+- **JWTs from this app's Better Auth instance** (`lib/auth.ts`, mounted at
+  `/api/auth`). Sign in (`POST /api/auth/sign-in/email`), then mint a JWT at
+  `GET /api/auth/token` — it carries `scope: "submissions:read"`. The same
+  verifier path accepts any trusted OIDC issuer (company IdP, Vercel
+  Connect/Passport).
+- **`GRAFT_DEV_TOKEN`** from the repo-root `.env` — a static local-dev
+  credential mapped to a human actor with `submissions:read`.
+
+No header → anonymous. A bad/expired token is `TOKEN_INVALID` (401) with the
+reason in `details` — fix the token; do not retry anonymously.
 
 ## Operational data (db-authoritative collections)
 

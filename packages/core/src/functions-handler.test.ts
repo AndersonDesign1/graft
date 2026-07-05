@@ -56,7 +56,33 @@ const gone = defineFunction({
   },
 });
 
-const functions = { echo, whoami, secret, boom, gone };
+/** No access rule, not public → the secure mutation default applies. */
+const guardedMutation = defineFunction({
+  name: "guardedMutation",
+  kind: "mutation",
+  input: {},
+  handler: () => ({ ok: true }),
+});
+
+/** public: true opts a mutation back into anonymous access (e.g. a contact form). */
+const publicMutation = defineFunction({
+  name: "publicMutation",
+  kind: "mutation",
+  public: true,
+  input: {},
+  handler: () => ({ ok: true }),
+});
+
+/** A custom access rule is the whole policy — it can re-open a mutation to anonymous. */
+const openByRule = defineFunction({
+  name: "openByRule",
+  kind: "mutation",
+  input: {},
+  access: () => true,
+  handler: () => ({ ok: true }),
+});
+
+const functions = { echo, whoami, secret, boom, gone, guardedMutation, publicMutation, openByRule };
 
 /** Parse a response body loosely — tests assert the shape via expect. */
 // oxlint-disable-next-line no-explicit-any
@@ -193,5 +219,48 @@ describe("createFunctionsHandler", () => {
       handler: (ctx: FunctionContext<{ n: number }>) => ctx.input.n * 2,
     });
     expect(true).toBe(true);
+  });
+});
+
+describe("secure mutation default (P3.3)", () => {
+  const anonymous = createFunctionsHandler({ functions, db: fakeDb });
+  const authed = createFunctionsHandler({
+    functions,
+    db: fakeDb,
+    actor: () => ({ kind: "agent", id: "agent-1" }),
+  });
+
+  it("rejects anonymous callers of a mutation with 401 and a self-teaching fix", async () => {
+    const res = await anonymous(post("guardedMutation", {}));
+    expect(res.status).toBe(401);
+    const body = await json(res);
+    expect(body.error).toBe("UNAUTHORIZED");
+    expect(body.fix).toContain("public: true");
+  });
+
+  it("allows authenticated callers of a guarded mutation", async () => {
+    const res = await authed(post("guardedMutation", {}));
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ data: { ok: true } });
+  });
+
+  it("public: true opts a mutation back into anonymous access", async () => {
+    const res = await anonymous(post("publicMutation", {}));
+    expect(res.status).toBe(200);
+  });
+
+  it("a custom access rule overrides the default entirely", async () => {
+    const res = await anonymous(post("openByRule", {}));
+    expect(res.status).toBe(200);
+  });
+
+  it("queries stay open to anonymous callers by default", async () => {
+    const res = await anonymous(post("whoami"));
+    expect(res.status).toBe(200);
+  });
+
+  it("describe() exposes the public flag for introspection", () => {
+    expect(publicMutation.describe().public).toBe(true);
+    expect(guardedMutation.describe().public).toBeUndefined();
   });
 });

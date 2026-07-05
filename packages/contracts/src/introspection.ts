@@ -35,6 +35,8 @@ export const FunctionDescriptor = z.object({
   args: z.array(FieldDescriptor),
   returns: z.string().optional(),
   description: z.string().optional(),
+  /** Anonymous callers allowed. Mutations default to false; queries to true. */
+  public: z.boolean().optional(),
 });
 export type FunctionDescriptor = z.infer<typeof FunctionDescriptor>;
 

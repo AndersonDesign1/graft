@@ -38,6 +38,7 @@ const ERROR_STATUS: Partial<Record<ErrorCode, number>> = {
   FUNCTION_NOT_FOUND: 404,
   DOCUMENT_NOT_FOUND: 404,
   UNAUTHORIZED: 401,
+  TOKEN_INVALID: 401,
   DESTRUCTIVE_OP_REQUIRES_APPROVAL: 403,
   METHOD_NOT_ALLOWED: 405,
   FUNCTION_EXECUTION_FAILED: 500,
@@ -139,12 +140,28 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
       ]);
       const ctx = { input: parsed.data, db, actor, branch, request, correlationId };
 
-      if (fn.access && !(await fn.access(ctx))) {
+      // Access policy: a custom rule is the whole policy; otherwise the
+      // secure default applies — mutations deny anonymous actors unless the
+      // function opts out with `public: true`. Queries default to open (their
+      // data is already reachable through the read SDK).
+      if (fn.access) {
+        if (!(await fn.access(ctx))) {
+          return errorResponse(
+            new GraftError({
+              code: "UNAUTHORIZED",
+              message: `The caller is not allowed to invoke "${name}".`,
+              fix: "Authenticate as an actor this function's access rule accepts; do not retry anonymously.",
+              details: { function: name, actor: actor.kind },
+            }),
+            correlationId,
+          );
+        }
+      } else if (fn.kind === "mutation" && fn.public !== true && actor.kind === "anonymous") {
         return errorResponse(
           new GraftError({
             code: "UNAUTHORIZED",
-            message: `The caller is not allowed to invoke "${name}".`,
-            fix: "Authenticate as an actor this function's access rule accepts; do not retry anonymously.",
+            message: `"${name}" is a mutation and rejects anonymous callers by default.`,
+            fix: "Send `Authorization: Bearer <token>` for a trusted actor. If anonymous calls are intended (e.g. a public form), set `public: true` in the defineFunction config.",
             details: { function: name, actor: actor.kind },
           }),
           correlationId,
@@ -152,10 +169,7 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
       }
 
       const data = await fn.handler(ctx);
-      return Response.json(
-        { data },
-        { headers: { "x-graft-correlation-id": correlationId } },
-      );
+      return Response.json({ data }, { headers: { "x-graft-correlation-id": correlationId } });
     } catch (err) {
       if (err instanceof GraftError) return errorResponse(err, correlationId);
       const message = err instanceof Error ? err.message : String(err);

@@ -46,10 +46,7 @@ export interface FunctionContext<TInput = unknown> {
   correlationId: string;
 }
 
-export interface FunctionConfig<
-  TFields extends Record<string, FieldDefinition>,
-  TOutput,
-> {
+export interface FunctionConfig<TFields extends Record<string, FieldDefinition>, TOutput> {
   name: string;
   kind: FunctionKind;
   description?: string;
@@ -58,9 +55,16 @@ export interface FunctionConfig<
   /** Input fields — the same field.* builders collections use (one Zod layer). */
   input: TFields;
   /**
+   * Allow anonymous callers. Mutations deny anonymous actors unless this is
+   * true; queries are public by default. Ignored when `access` is provided —
+   * a custom rule is the whole policy.
+   */
+  public?: boolean;
+  /**
    * Access control at the function boundary. Runs after input validation,
    * before the handler; returning false rejects with UNAUTHORIZED.
-   * Defaults to allow — the @graft/auth unit hardens defaults for mutations.
+   * When omitted, the default applies: mutations require a non-anonymous
+   * actor unless `public: true`; queries allow everyone.
    */
   access?: (
     ctx: FunctionContext<z.infer<z.ZodObject<FieldsShape<TFields>>>>,
@@ -80,6 +84,7 @@ export interface GraftFunction<
   description?: string;
   returns?: string;
   input: TFields;
+  public?: boolean;
   /** Zod schema validating a full input payload for this function. */
   schema: z.ZodObject<FieldsShape<TFields>>;
   access?: (
@@ -120,6 +125,7 @@ export function defineFunction<TFields extends Record<string, FieldDefinition>, 
     description: config.description,
     returns: config.returns,
     input: config.input,
+    public: config.public,
     schema,
     access: config.access,
     handler: config.handler,
@@ -136,6 +142,7 @@ export function defineFunction<TFields extends Record<string, FieldDefinition>, 
         args,
         returns: config.returns,
         description: config.description,
+        public: config.public,
       };
     },
   };

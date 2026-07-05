@@ -196,9 +196,25 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
   UNAUTHORIZED: {
     code: "UNAUTHORIZED",
     meaning: "The caller's token does not permit this operation.",
-    typicalCauses: ["A missing or expired agent token", "A token scoped to reads used for a write"],
+    typicalCauses: [
+      "A missing or expired agent token",
+      "A token scoped to reads used for a write",
+      "An anonymous call to a mutation that is not marked `public: true` (the secure default)",
+    ],
     howToRecover:
-      "Obtain a token with the required scope from the project owner; do not retry with the same credentials.",
+      "Obtain a token with the required scope from the project owner; do not retry with the same credentials. If the function is meant to accept anonymous callers, its definition needs `public: true`.",
+  },
+  TOKEN_INVALID: {
+    code: "TOKEN_INVALID",
+    meaning:
+      "A bearer token was sent but could not be verified — different from sending no token (which makes the caller anonymous).",
+    typicalCauses: [
+      "An expired or not-yet-valid JWT",
+      "A token issued by an issuer this deployment does not trust",
+      "A wrong audience claim, a bad signature, or a malformed token",
+    ],
+    howToRecover:
+      "Mint a fresh token from a trusted issuer (details.reason states what failed). Do not strip the Authorization header to fall back to anonymous — fix the token instead.",
   },
   DESTRUCTIVE_OP_REQUIRES_APPROVAL: {
     code: "DESTRUCTIVE_OP_REQUIRES_APPROVAL",

@@ -15,10 +15,13 @@
   },
   "dependencies": {
     "@graft/assets": "workspace:*",
+    "@graft/auth": "workspace:*",
     "@graft/core": "workspace:*",
     "@graft/db": "workspace:*",
     "@graft/sdk-next": "workspace:*",
+    "better-auth": "^1.6.23",
     "next": "^16.0.0",
+    "pg": "^8.22.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.0.0"
@@ -27,6 +30,7 @@
     "@graft/cli": "workspace:*",
     "@graft/compiler": "workspace:*",
     "@graft/mcp": "workspace:*",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "tsx": "^4.20.0"

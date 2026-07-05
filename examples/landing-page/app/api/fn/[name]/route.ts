@@ -2,7 +2,13 @@
  * Typed function runtime over HTTP — RPC endpoint for the functions exported
  * by graft.config.ts. Invoke: POST /api/fn/<name> with a JSON object body.
  * Success → { data }; failure → GraftError JSON with an agent-actionable fix.
+ *
+ * Who is calling is decided by @graft/auth: bearer JWTs are verified against
+ * the Better Auth instance this app hosts (mint one at GET /api/auth/token
+ * after signing in); GRAFT_DEV_TOKEN is a static local-dev credential. No
+ * token → anonymous, which mutations reject by default (public: true opts out).
  */
+import { betterAuthIssuer, createActorResolver } from "@graft/auth";
 import { createFunctionsHandler, type GraftFunctionsHandler } from "@graft/core";
 import { createDb } from "@graft/db";
 import { functions } from "@/graft.config";
@@ -21,16 +27,18 @@ function getHandler(): GraftFunctionsHandler {
       }
       return createDb(url).db;
     },
-    // Bearer stopgap until @graft/auth (scoped OIDC-verified tokens, P3.3):
-    // a matching GRAFT_FUNCTIONS_TOKEN makes the caller a non-anonymous actor,
-    // which is what gated functions (listSubmissions) check.
-    actor: (request) => {
-      const token = process.env.GRAFT_FUNCTIONS_TOKEN;
-      const header = request.headers.get("authorization");
-      return token && header === `Bearer ${token}`
-        ? { kind: "human", id: "owner" }
-        : { kind: "anonymous" };
-    },
+    actor: createActorResolver({
+      issuers: [betterAuthIssuer({ url: process.env.BETTER_AUTH_URL ?? "http://localhost:3000" })],
+      devTokens: process.env.GRAFT_DEV_TOKEN
+        ? {
+            [process.env.GRAFT_DEV_TOKEN]: {
+              kind: "human",
+              id: "owner",
+              scopes: ["submissions:read"],
+            },
+          }
+        : undefined,
+    }),
   });
   return handler;
 }
