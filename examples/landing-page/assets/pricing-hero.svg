@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" role="img" aria-label="Pricing tiers">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e3a5f"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="400" fill="url(#bg)"/>
+  <g font-family="Georgia, serif" fill="#e2e8f0" text-anchor="middle">
+    <text x="600" y="90" font-size="44" font-weight="bold">Simple pricing</text>
+    <text x="600" y="130" font-size="20" fill="#94a3b8">Pay for the engine, not the seats.</text>
+  </g>
+  <!-- three tier cards -->
+  <g stroke="#334155" stroke-width="2">
+    <rect x="180" y="170" width="240" height="170" rx="14" fill="#111c2e"/>
+    <rect x="480" y="160" width="240" height="190" rx="14" fill="#16263d"/>
+    <rect x="780" y="170" width="240" height="170" rx="14" fill="#111c2e"/>
+  </g>
+  <g font-family="Georgia, serif" text-anchor="middle" fill="#e2e8f0">
+    <text x="300" y="215" font-size="22">Solo</text>
+    <text x="300" y="265" font-size="34" font-weight="bold">$0</text>
+    <text x="300" y="305" font-size="14" fill="#94a3b8">self-host everything</text>
+    <text x="600" y="205" font-size="22">Team</text>
+    <text x="600" y="260" font-size="34" font-weight="bold">$29</text>
+    <text x="600" y="300" font-size="14" fill="#94a3b8">per project / month</text>
+    <text x="900" y="215" font-size="22">Fleet</text>
+    <text x="900" y="265" font-size="34" font-weight="bold">Custom</text>
+    <text x="900" y="305" font-size="14" fill="#94a3b8">agents at scale</text>
+  </g>
+</svg>
