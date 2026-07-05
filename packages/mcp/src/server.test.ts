@@ -28,6 +28,11 @@ const collections = {
     name: "posts",
     fields: { title: field.string() },
   }),
+  submissions: defineCollection({
+    name: "submissions",
+    authority: "db-authoritative",
+    fields: { email: field.string() },
+  }),
 };
 
 /** A Database that fails the test the moment anything dereferences it. */
@@ -84,13 +89,18 @@ describe("introspection", () => {
     expect(payload.collections).toEqual([
       { name: "pages", description: "Marketing pages", authority: "file-authoritative", fields: 2 },
       { name: "posts", description: undefined, authority: "file-authoritative", fields: 1 },
+      { name: "submissions", description: undefined, authority: "db-authoritative", fields: 1 },
     ]);
   });
 
   it("describes the schema as a valid SchemaDescription", async () => {
     const { payload } = await callTool("describe_schema");
     const parsed = SchemaDescription.parse(payload);
-    expect(parsed.collections.map((collection) => collection.name)).toEqual(["pages", "posts"]);
+    expect(parsed.collections.map((collection) => collection.name)).toEqual([
+      "pages",
+      "posts",
+      "submissions",
+    ]);
     const pages = parsed.collections[0];
     expect(pages?.fields).toContainEqual({
       name: "title",
@@ -173,6 +183,18 @@ describe("write_content validation (never reaches the database)", () => {
     expect(result.payload.error).toBe("SLUG_NOT_UNIQUE");
     expect(result.payload.fix).toContain("pages/renamed.mdx");
     expect(existsSync(join(dir, "pages", "about.mdx"))).toBe(false);
+  });
+
+  it("rejects writes to a db-authoritative collection with AUTHORITY_MISMATCH", async () => {
+    const result = await callTool("write_content", {
+      collection: "submissions",
+      slug: "someone",
+      data: { email: "a@b.co" },
+    });
+    expect(result.isError).toBe(true);
+    expect(result.payload.error).toBe("AUTHORITY_MISMATCH");
+    expect(result.payload.fix).toContain("/api/fn/");
+    expect(existsSync(join(dir, "submissions", "someone.mdx"))).toBe(false);
   });
 
   it("rejects a data.slug that conflicts with the slug argument", async () => {

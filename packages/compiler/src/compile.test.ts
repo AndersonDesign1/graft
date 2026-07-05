@@ -66,6 +66,25 @@ describe("readDocs", () => {
     }
   });
 
+  it("throws AUTHORITY_MISMATCH for files under a db-authoritative collection", () => {
+    const withSubmissions = {
+      ...collections,
+      submissions: defineCollection({
+        name: "submissions",
+        authority: "db-authoritative",
+        fields: { email: field.string() },
+      }),
+    };
+    write("submissions/x.mdx", "---\nemail: a@b.co\n---\n");
+    try {
+      readDocs(dir, withSubmissions);
+      expect.unreachable("should have thrown");
+    } catch (err) {
+      expect((err as GraftError).code).toBe("AUTHORITY_MISMATCH");
+      expect((err as GraftError).fix).toContain("insertRecord");
+    }
+  });
+
   it("throws SLUG_NOT_UNIQUE for duplicate slugs within a collection", () => {
     write("pages/a.mdx", "---\ntitle: A\nslug: dup\n---\n");
     write("pages/b.mdx", "---\ntitle: B\nslug: dup\n---\n");

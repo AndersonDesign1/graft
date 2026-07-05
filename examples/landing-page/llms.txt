@@ -65,12 +65,27 @@ Functions are code in `graft.config.ts` (`defineFunction`) exported via
 
 Success is `{ data: … }`; failure is GraftError JSON — `fix` says what to do,
 `details.issues` lists field violations, and `explain_error` knows every code.
-Currently registered: `pageStats` (query; no input; returns the live page
-slugs on the branch). To add a function: define input with the same
-`field.*` builders collections use, write the handler against the standard
-context (`{ input, db, actor, branch, request, correlationId }`), and add it
-to the exported `functions` record. Mutations that store operational data in
-Postgres arrive in a later unit — today's functions read.
+
+Registered functions:
+
+- `pageStats` — query, no input; returns the live page slugs on the branch.
+- `submitContact` — mutation, public; input `{ email, message? }`; stores a
+  row in the `submissions` collection (the home-page contact form posts here).
+- `listSubmissions` — query, gated; input `{ limit? }`; requires
+  `Authorization: Bearer <GRAFT_FUNCTIONS_TOKEN>` (anonymous callers get 401).
+
+To add a function: define input with the same `field.*` builders collections
+use, write the handler against the standard context
+(`{ input, db, actor, branch, request, correlationId }`), and add it to the
+exported `functions` record.
+
+## Operational data (db-authoritative collections)
+
+`submissions` has `authority: "db-authoritative"`: Postgres owns its rows and
+the ONLY way in or out is through functions (`insertRecord` / `listRecords`
+inside handlers — validated against the collection schema both directions).
+Do not create `content/submissions/` files and do not use `write_content`
+for it — both fail with AUTHORITY_MISMATCH and point you back here.
 
 ## How to change the schema
 

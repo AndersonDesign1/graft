@@ -152,6 +152,17 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Use the method named in the `Allow` response header — for Graft functions, POST a JSON object body to the same URL.",
   },
+  AUTHORITY_MISMATCH: {
+    code: "AUTHORITY_MISMATCH",
+    meaning:
+      "An operation used the wrong interface for a collection's authority: files/write_content on a db-authoritative collection, or record helpers on a file-authoritative one.",
+    typicalCauses: [
+      "Authoring an MDX file for a collection whose rows live in Postgres",
+      "Calling insertRecord/listRecords on a collection whose documents are files",
+    ],
+    howToRecover:
+      "Check the collection's authority with describe_schema. File-authoritative → author MDX (write_content / files + compile). Db-authoritative → go through its functions (POST /api/fn/<name>); the rows are operational data Postgres owns.",
+  },
   SLUG_NOT_UNIQUE: {
     code: "SLUG_NOT_UNIQUE",
     meaning: "Two documents in the same collection resolve to the same slug.",

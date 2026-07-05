@@ -187,6 +187,15 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
       guarded(async () => {
         const collection = requireCollection(collections, name);
 
+        if (collection.authority === "db-authoritative") {
+          throw new GraftError({
+            code: "AUTHORITY_MISMATCH",
+            message: `Collection "${name}" is db-authoritative — its records live in Postgres, not as MDX files.`,
+            fix: `Write this data through the collection's function endpoint (POST /api/fn/<name>, see llms.txt) instead of write_content. write_content is only for file-authoritative collections.`,
+            details: { collection: name, authority: collection.authority },
+          });
+        }
+
         const frontmatterSlug = (data as Record<string, unknown>).slug;
         if (frontmatterSlug !== undefined && frontmatterSlug !== slug) {
           throw new GraftError({

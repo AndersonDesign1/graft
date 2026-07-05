@@ -74,6 +74,15 @@ export function readDocs(
       });
     }
 
+    if (collection.authority === "db-authoritative") {
+      throw new GraftError({
+        code: "AUTHORITY_MISMATCH",
+        message: `${sourcePath} is a file, but collection "${collectionName}" is db-authoritative — its records live in Postgres, not in the content tree.`,
+        fix: `Remove the file and write the data through the collection's functions instead (insertRecord via a defineFunction mutation). Files are only for file-authoritative collections.`,
+        details: { sourcePath, collection: collectionName, authority: collection.authority },
+      });
+    }
+
     const doc = parseDocument(readFileSync(file, "utf8"), collection, sourcePath);
     const key = `${doc.collection}/${doc.slug}`;
     const existing = seen.get(key);

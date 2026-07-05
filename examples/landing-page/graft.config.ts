@@ -4,7 +4,7 @@
  * Add fields here, then author documents in content/<collection>/*.mdx.
  * Functions are served at POST /api/fn/<name> (JSON object body).
  */
-import { defineCollection, defineFunction, field } from "@graft/core";
+import { defineCollection, defineFunction, field, insertRecord, listRecords } from "@graft/core";
 
 export const pages = defineCollection({
   name: "pages",
@@ -20,7 +20,22 @@ export const pages = defineCollection({
   },
 });
 
-export const collections = { pages };
+/**
+ * submissions — operational data (db-authoritative): rows live in Postgres,
+ * written only through the functions below. There is no content/submissions/
+ * folder; files for this collection are an AUTHORITY_MISMATCH.
+ */
+export const submissions = defineCollection({
+  name: "submissions",
+  authority: "db-authoritative",
+  description: "Contact-form submissions. Write via submitContact; read via listSubmissions.",
+  fields: {
+    email: field.string({ description: "Sender address." }),
+    message: field.text({ optional: true, description: "What they wrote." }),
+  },
+});
+
+export const collections = { pages, submissions };
 
 /**
  * pageStats — a zero-arg query demonstrating the typed function runtime:
@@ -44,4 +59,39 @@ export const pageStats = defineFunction({
   },
 });
 
-export const functions = { pageStats };
+/** Public mutation: the contact form posts here. Input reuses the collection's fields. */
+export const submitContact = defineFunction({
+  name: "submitContact",
+  kind: "mutation",
+  description: "Stores a contact-form submission (public; anonymous callers allowed).",
+  returns: "{ id: string; receivedAt: string }",
+  input: submissions.fields,
+  handler: async (ctx) => {
+    const record = await insertRecord(ctx, submissions, ctx.input);
+    return { id: record.id, receivedAt: record.createdAt.toISOString() };
+  },
+});
+
+/** Gated query: reading submissions requires a non-anonymous actor (bearer token). */
+export const listSubmissions = defineFunction({
+  name: "listSubmissions",
+  kind: "query",
+  description:
+    "Lists recent submissions, newest first. Requires authentication — send Authorization: Bearer <GRAFT_FUNCTIONS_TOKEN>.",
+  returns: "{ submissions: { id, email, message?, receivedAt }[] }",
+  input: { limit: field.number({ optional: true, description: "Max rows (default 50)." }) },
+  access: (ctx) => ctx.actor.kind !== "anonymous",
+  handler: async (ctx) => {
+    const records = await listRecords(ctx, submissions, { limit: ctx.input.limit });
+    return {
+      submissions: records.map((r) => ({
+        id: r.id,
+        email: r.data.email,
+        message: r.data.message,
+        receivedAt: r.createdAt.toISOString(),
+      })),
+    };
+  },
+});
+
+export const functions = { pageStats, submitContact, listSubmissions };

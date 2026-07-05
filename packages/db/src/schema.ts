@@ -62,3 +62,28 @@ export const compilations = pgTable(
 );
 
 export type CompilationRow = typeof compilations.$inferSelect;
+
+/**
+ * Operational data for db-authoritative collections (Phase 3): rows Postgres
+ * owns, written only through typed functions — never projected from files.
+ * One shared table (like content_index), collection-typed via jsonb `data`
+ * validated at the function boundary. Actor + correlation columns are the
+ * pre-audit-log breadcrumb trail; uuid keys stay branch-clone-safe.
+ */
+export const dataRecords = pgTable(
+  "data_records",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    branchId: text("branch_id").notNull().default("main"),
+    collection: text("collection").notNull(),
+    data: jsonb("data").$type<Record<string, unknown>>().notNull(),
+    actorKind: text("actor_kind").notNull().default("anonymous"),
+    actorId: text("actor_id"),
+    correlationId: text("correlation_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("data_records_lookup").on(t.branchId, t.collection, t.createdAt)],
+);
+
+export type DataRecordRow = typeof dataRecords.$inferSelect;
+export type NewDataRecordRow = typeof dataRecords.$inferInsert;

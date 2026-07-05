@@ -15,6 +15,13 @@
       "when": 1782948625937,
       "tag": "0001_curvy_sue_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783234633215,
+      "tag": "0002_safe_roulette",
+      "breakpoints": true
     }
   ]
 }

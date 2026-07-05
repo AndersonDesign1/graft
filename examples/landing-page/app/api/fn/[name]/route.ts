@@ -21,6 +21,16 @@ function getHandler(): GraftFunctionsHandler {
       }
       return createDb(url).db;
     },
+    // Bearer stopgap until @graft/auth (scoped OIDC-verified tokens, P3.3):
+    // a matching GRAFT_FUNCTIONS_TOKEN makes the caller a non-anonymous actor,
+    // which is what gated functions (listSubmissions) check.
+    actor: (request) => {
+      const token = process.env.GRAFT_FUNCTIONS_TOKEN;
+      const header = request.headers.get("authorization");
+      return token && header === `Bearer ${token}`
+        ? { kind: "human", id: "owner" }
+        : { kind: "anonymous" };
+    },
   });
   return handler;
 }
