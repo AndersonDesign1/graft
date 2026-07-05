@@ -101,9 +101,9 @@ describe("insertRecord", () => {
 
   it("refuses file-authoritative collections with AUTHORITY_MISMATCH", async () => {
     const { db } = stubDb();
-    await expect(
-      insertRecord(ctx(db), pages, { title: "Home" }),
-    ).rejects.toMatchObject({ code: "AUTHORITY_MISMATCH" });
+    await expect(insertRecord(ctx(db), pages, { title: "Home" })).rejects.toMatchObject({
+      code: "AUTHORITY_MISMATCH",
+    });
   });
 });
 

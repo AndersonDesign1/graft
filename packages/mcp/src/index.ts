@@ -9,11 +9,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 export { createGraftMcp, type GraftMcpOptions } from "./server";
-export {
-  createGraftMcpHandler,
-  type GraftMcpHandler,
-  type GraftMcpHandlerOptions,
-} from "./http";
+export { createGraftMcpHandler, type GraftMcpHandler, type GraftMcpHandlerOptions } from "./http";
 export { ERROR_KNOWLEDGE, explainCode, type ErrorExplanation } from "./explain";
 
 /** Serve an MCP server over stdio (the transport agents' `.mcp.json` entries use). */

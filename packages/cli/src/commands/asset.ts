@@ -25,7 +25,10 @@ export function contentTypeFor(file: string): string {
 
 /** Default key: assets/<lowercased filename>, sanitized to the asset-key alphabet. */
 export function defaultKeyFor(file: string): string {
-  const name = basename(file).toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[._-]+/, "");
+  const name = basename(file)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^[._-]+/, "");
   return `assets/${name}`;
 }
 

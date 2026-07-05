@@ -27,11 +27,13 @@ export interface GraftMcpHandlerOptions extends GraftMcpOptions {
 
 export type GraftMcpHandler = (request: Request) => Promise<Response>;
 
-function jsonRpcError(status: number, code: number, message: string, headers?: Record<string, string>) {
-  return Response.json(
-    { jsonrpc: "2.0", error: { code, message }, id: null },
-    { status, headers },
-  );
+function jsonRpcError(
+  status: number,
+  code: number,
+  message: string,
+  headers?: Record<string, string>,
+) {
+  return Response.json({ jsonrpc: "2.0", error: { code, message }, id: null }, { status, headers });
 }
 
 export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcpHandler {

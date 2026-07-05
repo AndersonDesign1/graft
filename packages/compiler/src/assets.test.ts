@@ -42,7 +42,11 @@ describe("asset indexing", () => {
 
   it("rejects an invalid asset key via the schema (with the fix)", () => {
     try {
-      parseDocument("---\ntitle: Home\nimage:\n  key: ../escape.png\n---\n", pages, "pages/home.mdx");
+      parseDocument(
+        "---\ntitle: Home\nimage:\n  key: ../escape.png\n---\n",
+        pages,
+        "pages/home.mdx",
+      );
       expect.unreachable("should have thrown");
     } catch (error) {
       expect(error).toBeInstanceOf(GraftError);

@@ -108,10 +108,7 @@ export async function listRecords<TCollection extends AnyCollection>(
   });
 }
 
-function toRecord<TData>(
-  row: typeof dataRecords.$inferSelect,
-  data: TData,
-): DataRecord<TData> {
+function toRecord<TData>(row: typeof dataRecords.$inferSelect, data: TData): DataRecord<TData> {
   return {
     id: row.id,
     branch: row.branchId,

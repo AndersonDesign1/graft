@@ -45,34 +45,46 @@ describe.skipIf(!runIntegration)("graft compile projects a scaffolded project", 
     rmSync(projectDir, { recursive: true, force: true });
   }, TEST_TIMEOUT);
 
-  it("compiles the scaffold and reports the ChangeSet", async () => {
-    const result = await compileCommand({ cwd: projectDir, branchId: BRANCH });
-    expect(result.count).toBe(1);
-    expect(result.changes.added).toEqual(["pages/home"]);
+  it(
+    "compiles the scaffold and reports the ChangeSet",
+    async () => {
+      const result = await compileCommand({ cwd: projectDir, branchId: BRANCH });
+      expect(result.count).toBe(1);
+      expect(result.changes.added).toEqual(["pages/home"]);
 
-    const rows = await handle.sql`
+      const rows = await handle.sql`
       select slug from content_index
       where branch_id = ${BRANCH} and collection = 'pages' and deleted = false
     `;
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.slug).toBe("home");
-  }, TEST_TIMEOUT);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.slug).toBe("home");
+    },
+    TEST_TIMEOUT,
+  );
 
-  it("is idempotent on recompile", async () => {
-    const result = await compileCommand({ cwd: projectDir, branchId: BRANCH });
-    expect(result.changes.added).toEqual([]);
-    expect(result.changes.changed).toEqual([]);
-    expect(result.changes.unchanged).toBe(1);
-  }, TEST_TIMEOUT);
+  it(
+    "is idempotent on recompile",
+    async () => {
+      const result = await compileCommand({ cwd: projectDir, branchId: BRANCH });
+      expect(result.changes.added).toEqual([]);
+      expect(result.changes.changed).toEqual([]);
+      expect(result.changes.unchanged).toBe(1);
+    },
+    TEST_TIMEOUT,
+  );
 
-  it("adds and soft-removes documents as files come and go", async () => {
-    const aboutPath = join(projectDir, "content", "pages", "about.mdx");
-    writeFileSync(aboutPath, "---\ntitle: About\n---\n\nAbout page.\n", "utf8");
-    const added = await compileCommand({ cwd: projectDir, branchId: BRANCH });
-    expect(added.changes.added).toEqual(["pages/about"]);
+  it(
+    "adds and soft-removes documents as files come and go",
+    async () => {
+      const aboutPath = join(projectDir, "content", "pages", "about.mdx");
+      writeFileSync(aboutPath, "---\ntitle: About\n---\n\nAbout page.\n", "utf8");
+      const added = await compileCommand({ cwd: projectDir, branchId: BRANCH });
+      expect(added.changes.added).toEqual(["pages/about"]);
 
-    rmSync(aboutPath);
-    const removed = await compileCommand({ cwd: projectDir, branchId: BRANCH });
-    expect(removed.changes.removed).toEqual(["pages/about"]);
-  }, TEST_TIMEOUT);
+      rmSync(aboutPath);
+      const removed = await compileCommand({ cwd: projectDir, branchId: BRANCH });
+      expect(removed.changes.removed).toEqual(["pages/about"]);
+    },
+    TEST_TIMEOUT,
+  );
 });

@@ -12,9 +12,9 @@ describe("field.asset", () => {
   });
 
   it("accepts a key with optional alt", () => {
-    expect(
-      posts.schema.safeParse({ title: "x", cover: { key: "posts/cover.png" } }).success,
-    ).toBe(true);
+    expect(posts.schema.safeParse({ title: "x", cover: { key: "posts/cover.png" } }).success).toBe(
+      true,
+    );
     expect(
       posts.schema.safeParse({
         title: "x",
@@ -27,16 +27,12 @@ describe("field.asset", () => {
     expect(posts.schema.safeParse({ title: "x" }).success).toBe(true);
   });
 
-  it.each([
-    "/leading-slash",
-    "UPPER/case.png",
-    "has space.png",
-    "../escape.png",
-    "trailing/",
-    "",
-  ])("rejects invalid key %j", (key) => {
-    expect(posts.schema.safeParse({ title: "x", cover: { key } }).success).toBe(false);
-  });
+  it.each(["/leading-slash", "UPPER/case.png", "has space.png", "../escape.png", "trailing/", ""])(
+    "rejects invalid key %j",
+    (key) => {
+      expect(posts.schema.safeParse({ title: "x", cover: { key } }).success).toBe(false);
+    },
+  );
 
   it("rejects a bare string (the reference is structured)", () => {
     expect(posts.schema.safeParse({ title: "x", cover: "posts/cover.png" }).success).toBe(false);
