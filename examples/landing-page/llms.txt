@@ -55,6 +55,23 @@ responses; set `GRAFT_MCP_TOKEN` to require a bearer token.
 3. `pnpm compile`. The app resolves the key to a URL at render time
    (presigned GET; set `S3_PUBLIC_URL` for stable public URLs).
 
+## Functions (typed server logic)
+
+Functions are code in `graft.config.ts` (`defineFunction`) exported via
+`export const functions = { … }`, served while the app runs at:
+
+    POST /api/fn/<name>        body: JSON object of the input fields
+                               (empty body = {})
+
+Success is `{ data: … }`; failure is GraftError JSON — `fix` says what to do,
+`details.issues` lists field violations, and `explain_error` knows every code.
+Currently registered: `pageStats` (query; no input; returns the live page
+slugs on the branch). To add a function: define input with the same
+`field.*` builders collections use, write the handler against the standard
+context (`{ input, db, actor, branch, request, correlationId }`), and add it
+to the exported `functions` record. Mutations that store operational data in
+Postgres arrive in a later unit — today's functions read.
+
 ## How to change the schema
 
 Edit `graft.config.ts` (fields are built with `field.string()`,

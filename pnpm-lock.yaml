@@ -133,6 +133,9 @@ importers:
       '@graft/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@graft/db':
+        specifier: workspace:*
+        version: link:../db
       zod:
         specifier: ^4.1.0
         version: 4.4.3

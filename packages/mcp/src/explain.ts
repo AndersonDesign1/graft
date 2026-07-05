@@ -111,6 +111,47 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Call list_content for the collection to see every slug that exists, then retry with a real one — or author the document with write_content.",
   },
+  FUNCTION_NOT_FOUND: {
+    code: "FUNCTION_NOT_FOUND",
+    meaning: "The invoked function name is not registered in the functions runtime.",
+    typicalCauses: [
+      "A typo in the function name (the last path segment of the POST URL)",
+      "The function exists in code but was not included in the exported `functions` record",
+    ],
+    howToRecover:
+      "The error's `details.available` lists every registered function — call one of those, or add a defineFunction to graft.config.ts and include it in the exported `functions`.",
+  },
+  INPUT_VALIDATION_FAILED: {
+    code: "INPUT_VALIDATION_FAILED",
+    meaning: "A function invocation's input does not satisfy the function's Zod input schema.",
+    typicalCauses: [
+      "The request body is not a JSON object",
+      "A required input field is missing or has the wrong type",
+    ],
+    howToRecover:
+      "Fix the fields listed in `details.issues` and retry. describe_schema shows each function's exact input fields; an empty body is treated as {}.",
+  },
+  FUNCTION_EXECUTION_FAILED: {
+    code: "FUNCTION_EXECUTION_FAILED",
+    meaning:
+      "The function's handler threw an unexpected (non-Graft) error — a bug in the handler or its environment, not in the caller's input.",
+    typicalCauses: [
+      "A runtime error inside the handler code",
+      "The database is unreachable or a required env var is missing on the server",
+    ],
+    howToRecover:
+      "Retrying with the same input will fail again. Find the invocation in the server logs via `details.correlationId`, fix the handler code or the server environment, then retry.",
+  },
+  METHOD_NOT_ALLOWED: {
+    code: "METHOD_NOT_ALLOWED",
+    meaning: "The endpoint was called with an HTTP method it does not serve.",
+    typicalCauses: [
+      "GETting a function endpoint (functions are RPC over POST)",
+      "A client following a redirect that downgraded the method",
+    ],
+    howToRecover:
+      "Use the method named in the `Allow` response header — for Graft functions, POST a JSON object body to the same URL.",
+  },
   SLUG_NOT_UNIQUE: {
     code: "SLUG_NOT_UNIQUE",
     meaning: "Two documents in the same collection resolve to the same slug.",
