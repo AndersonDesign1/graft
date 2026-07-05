@@ -7,6 +7,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { GraftError } from "@graft/contracts";
 import { defineCollection, field } from "@graft/core";
 import type { Database } from "@graft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -79,36 +80,75 @@ describe("transport shape", () => {
   });
 });
 
-describe("bearer token gate", () => {
-  it("rejects missing or wrong tokens with 401", async () => {
-    const gated = createGraftMcpHandler({
+describe("actor gate", () => {
+  /** The @graft/auth resolver shape, faked: dev-token semantics + TOKEN_INVALID throw. */
+  const resolver = (request: Request) => {
+    const header = request.headers.get("authorization");
+    if (!header) return { kind: "anonymous" } as const;
+    if (header === "Bearer s3cret") return { kind: "agent", id: "agent-1" } as const;
+    throw new GraftError({
+      code: "TOKEN_INVALID",
+      message: "The bearer token could not be verified.",
+      fix: "Mint a fresh token from a trusted issuer.",
+    });
+  };
+
+  const gated = () =>
+    createGraftMcpHandler({
       contentDir: dir,
       collections,
       db: untouchableDb,
-      bearerToken: "s3cret",
+      actor: resolver,
+      requireActor: true,
     });
-    const post = (headers: Record<string, string> = {}) =>
-      gated(
-        new Request("http://graft.test/api/mcp", {
-          method: "POST",
-          headers: { "content-type": "application/json", accept: "application/json", ...headers },
-          body: JSON.stringify({ jsonrpc: "2.0", method: "ping", id: 1 }),
-        }),
-      );
 
-    expect((await post()).status).toBe(401);
-    expect((await post({ authorization: "Bearer wrong" })).status).toBe(401);
+  const post = (handler: GraftMcpHandler, headers: Record<string, string> = {}) =>
+    handler(
+      new Request("http://graft.test/api/mcp", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json", ...headers },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "ping", id: 1 }),
+      }),
+    );
+
+  it("rejects anonymous callers with 401 when requireActor is set", async () => {
+    const response = await post(gated());
+    expect(response.status).toBe(401);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toContain("Bearer");
   });
 
-  it("accepts the right token end-to-end", async () => {
-    const gated = createGraftMcpHandler({
+  it("rejects a bad token with the resolver's TOKEN_INVALID message (never downgrades)", async () => {
+    const response = await post(gated(), { authorization: "Bearer wrong" });
+    expect(response.status).toBe(401);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toContain("could not be verified");
+  });
+
+  it("allows anonymous callers when requireActor is off (resolver still vets tokens)", async () => {
+    const open = createGraftMcpHandler({
       contentDir: dir,
       collections,
       db: untouchableDb,
-      bearerToken: "s3cret",
+      actor: resolver,
     });
+    expect((await post(open)).status).not.toBe(401);
+    expect((await post(open, { authorization: "Bearer wrong" })).status).toBe(401);
+  });
+
+  it("fails closed when requireActor is set without a resolver", async () => {
+    const misconfigured = createGraftMcpHandler({
+      contentDir: dir,
+      collections,
+      db: untouchableDb,
+      requireActor: true,
+    });
+    expect((await post(misconfigured)).status).toBe(401);
+  });
+
+  it("accepts a resolved actor end-to-end", async () => {
     const transport = new StreamableHTTPClientTransport(new URL("http://graft.test/api/mcp"), {
-      fetch: handlerFetch(gated),
+      fetch: handlerFetch(gated()),
       requestInit: { headers: { authorization: "Bearer s3cret" } },
     });
     const client = new Client({ name: "http-test-agent", version: "0.0.0" });

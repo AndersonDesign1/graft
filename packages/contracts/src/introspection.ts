@@ -37,6 +37,8 @@ export const FunctionDescriptor = z.object({
   description: z.string().optional(),
   /** Anonymous callers allowed. Mutations default to false; queries to true. */
   public: z.boolean().optional(),
+  /** Always human-gated: invoking it requires an approved, one-shot, input-bound approval. */
+  destructive: z.boolean().optional(),
 });
 export type FunctionDescriptor = z.infer<typeof FunctionDescriptor>;
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { defineCollection } from "./collection";
 import { field } from "./field";
 import type { RecordContext } from "./records";
-import { insertRecord, listRecords } from "./records";
+import { deleteRecord, insertRecord, listRecords } from "./records";
 
 const submissions = defineCollection({
   name: "submissions",
@@ -19,10 +19,18 @@ const pages = defineCollection({
   fields: { title: field.string() },
 });
 
-/** Drizzle stub: records what insert() got, returns canned rows for select(). */
-function stubDb(selectRows: unknown[] = []) {
-  const calls: { inserted?: Record<string, unknown> } = {};
+/** Drizzle stub: records what insert() got, returns canned rows for select()/delete(). */
+function stubDb(selectRows: unknown[] = [], deleteRows: unknown[] = []) {
+  const calls: { inserted?: Record<string, unknown>; deleted?: boolean } = {};
   const db = {
+    delete: () => ({
+      where: () => ({
+        returning: async () => {
+          calls.deleted = true;
+          return deleteRows;
+        },
+      }),
+    }),
     insert: () => ({
       values: (v: Record<string, unknown>) => {
         calls.inserted = v;
@@ -137,6 +145,30 @@ describe("listRecords", () => {
   it("refuses file-authoritative collections with AUTHORITY_MISMATCH", async () => {
     const { db } = stubDb();
     await expect(listRecords(ctx(db), pages)).rejects.toMatchObject({
+      code: "AUTHORITY_MISMATCH",
+    });
+  });
+});
+
+describe("deleteRecord", () => {
+  it("hard-deletes by id and returns the removed row's data", async () => {
+    const { db, calls } = stubDb([], [{ id: "rec-1", data: { email: "a@b.co" } }]);
+    const removed = await deleteRecord(ctx(db), submissions, "rec-1");
+    expect(calls.deleted).toBe(true);
+    expect(removed).toEqual({ id: "rec-1", data: { email: "a@b.co" } });
+  });
+
+  it("throws DOCUMENT_NOT_FOUND when nothing matches (id, branch, collection)", async () => {
+    const { db } = stubDb([], []);
+    await expect(deleteRecord(ctx(db), submissions, "ghost")).rejects.toMatchObject({
+      code: "DOCUMENT_NOT_FOUND",
+      details: { collection: "submissions", id: "ghost" },
+    });
+  });
+
+  it("refuses file-authoritative collections with AUTHORITY_MISMATCH", async () => {
+    const { db } = stubDb();
+    await expect(deleteRecord(ctx(db), pages, "any")).rejects.toMatchObject({
       code: "AUTHORITY_MISMATCH",
     });
   });

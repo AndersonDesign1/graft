@@ -216,13 +216,40 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Mint a fresh token from a trusted issuer (details.reason states what failed). Do not strip the Authorization header to fall back to anonymous — fix the token instead.",
   },
+  RATE_LIMITED: {
+    code: "RATE_LIMITED",
+    meaning:
+      "This caller has invoked the function more times than its per-window limit allows. Every attempt counts, including rejected ones.",
+    typicalCauses: [
+      "A retry loop hammering a function after failures",
+      "Many calls from one actor (or one IP, for anonymous callers) in a short window",
+    ],
+    howToRecover:
+      "Wait out the window (the Retry-After header says how long) before retrying, and fix whatever caused the burst — the limit is per caller per function, so backing off actually works.",
+  },
   DESTRUCTIVE_OP_REQUIRES_APPROVAL: {
     code: "DESTRUCTIVE_OP_REQUIRES_APPROVAL",
     meaning:
-      "The operation would destroy data and is human-gated regardless of the approval policy.",
-    typicalCauses: ["Deleting a collection or branch", "A migration that drops columns or rows"],
+      "The operation is human-gated: a pending approval request was filed (details.approvalId) and the call will not run until a human approves it. Destructive functions are always gated; under the 'human' approval policy every mutation is.",
+    typicalCauses: [
+      "Calling a function marked `destructive: true` (deletes or irreversibly overwrites data)",
+      "Calling any mutation on a deployment whose approvalPolicy is 'human'",
+    ],
     howToRecover:
-      "Ask a human to approve the operation through the approval flow; never work around the gate.",
+      "Ask a human operator to run `graft approve <approvalId>` (they can also `graft deny` it). Once approved, retry the EXACT same request with the header `x-graft-approval: <approvalId>`. Approvals are one-shot and bound to the exact input — never work around the gate.",
+  },
+  APPROVAL_INVALID: {
+    code: "APPROVAL_INVALID",
+    meaning:
+      "An x-graft-approval header was sent, but that approval cannot authorize this call — details.reason says why (pending, denied, already_consumed, mismatch, or not_found).",
+    typicalCauses: [
+      "Retrying before a human has decided (pending)",
+      "Reusing an approval — they are one-shot (already_consumed)",
+      "Changing the input or function between request and retry (mismatch)",
+      "A human refused the operation (denied)",
+    ],
+    howToRecover:
+      "pending → wait for the human decision; denied → do not retry, ask the operator; already_consumed or not_found → call again without the header to file a fresh request; mismatch → retry with exactly the approved input.",
   },
   NOT_IMPLEMENTED: {
     code: "NOT_IMPLEMENTED",

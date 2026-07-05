@@ -32,6 +32,9 @@ function printHelp(): void {
     "  compile      Project the content tree into the content index once",
     "  dev          Watch content/ + graft.config.ts and recompile on change",
     "  asset put <file> [key]   Upload a binary to the asset store (S3_* env)",
+    "  approvals    List pending approvals for human-gated (destructive) function calls",
+    "  approve <id> Approve a pending approval (the caller retries with x-graft-approval)",
+    "  deny <id>    Deny a pending approval",
     ...PLANNED.map((cmd) => `  ${cmd.name.padEnd(12)} ${cmd.summary}  (${cmd.phase})`),
     "",
     "Options:",
@@ -135,6 +138,35 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
             "    alt: describe the image for screen readers",
           ].join("\n"),
         );
+        return 0;
+      }
+      case "approvals": {
+        const { approvalsListCommand, formatApproval } = await import("./commands/approvals");
+        const pending = await approvalsListCommand({ cwd });
+        if (pending.length === 0) {
+          console.log("No pending approvals.");
+          return 0;
+        }
+        console.log(`${pending.length} pending approval(s):\n`);
+        for (const row of pending) console.log(`${formatApproval(row)}\n`);
+        console.log("Decide with `graft approve <id>` or `graft deny <id>`.");
+        return 0;
+      }
+      case "approve":
+      case "deny": {
+        const id = args.positionals[0];
+        if (!id) throw new UsageError(`usage: graft ${command} <approval-id>`);
+        const { decideCommand } = await import("./commands/approvals");
+        const decision = command === "approve" ? "approved" : "denied";
+        const row = await decideCommand({ cwd, id, decision });
+        console.log(
+          `${decision}: ${row.functionName} ${JSON.stringify(row.input)} (by ${row.decidedBy})`,
+        );
+        if (decision === "approved") {
+          console.log(
+            `The caller can now retry the exact same request with the header \`x-graft-approval: ${row.id}\` (one-shot).`,
+          );
+        }
         return 0;
       }
       default: {

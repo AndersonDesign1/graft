@@ -87,3 +87,71 @@ export const dataRecords = pgTable(
 
 export type DataRecordRow = typeof dataRecords.$inferSelect;
 export type NewDataRecordRow = typeof dataRecords.$inferInsert;
+
+/**
+ * One row per function invocation (P3.4) — the runtime audit trail pairing
+ * `compilations` (who changed content) with "who ran what, as whom, and how it
+ * went". Rate limiting rides this table too: a limit check is a count of
+ * recent rows for the caller's rate key — no in-memory state, so handlers stay
+ * stateless (the Phase 3 invariant).
+ */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    correlationId: text("correlation_id").notNull(),
+    branchId: text("branch_id").notNull().default("main"),
+    functionName: text("function_name").notNull(),
+    functionKind: text("function_kind").notNull(),
+    actorKind: text("actor_kind").notNull(),
+    actorId: text("actor_id"),
+    /** Who the caller is for rate limiting: actor id when known, else client IP. */
+    rateKey: text("rate_key").notNull(),
+    /** "ok" or the GraftError code the invocation failed with. */
+    status: text("status").notNull(),
+    durationMs: integer("duration_ms").notNull(),
+    /** Git commit SHA of the serving code; null when unresolvable. */
+    gitSha: text("git_sha"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("audit_log_rate").on(t.rateKey, t.functionName, t.createdAt),
+    index("audit_log_branch_created").on(t.branchId, t.createdAt),
+    index("audit_log_correlation").on(t.correlationId),
+  ],
+);
+
+export type AuditLogRow = typeof auditLog.$inferSelect;
+export type NewAuditLogRow = typeof auditLog.$inferInsert;
+
+/**
+ * Human-gated approvals for destructive ops (P3.4). A destructive invocation
+ * without an approval creates a `pending` row and fails self-teachingly; a
+ * human decides (`graft approve`/`graft deny`); the caller retries with the
+ * approval id. Consumption is one-shot and bound to the exact function +
+ * canonical input the approval was requested for — approve A, execute A.
+ */
+export const approvals = pgTable(
+  "approvals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    branchId: text("branch_id").notNull().default("main"),
+    functionName: text("function_name").notNull(),
+    /** The requested input, for the human to review before deciding. */
+    input: jsonb("input").$type<Record<string, unknown>>().notNull(),
+    /** Canonical (sorted-keys) JSON of `input` — the equality the consume binds to. */
+    inputCanonical: text("input_canonical").notNull(),
+    requestedByKind: text("requested_by_kind").notNull(),
+    requestedById: text("requested_by_id"),
+    correlationId: text("correlation_id").notNull(),
+    status: text("status").notNull().default("pending"),
+    /** Who decided (OS user / operator handle) — set on approve/deny. */
+    decidedBy: text("decided_by"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("approvals_status_created").on(t.status, t.createdAt)],
+);
+
+export type ApprovalRow = typeof approvals.$inferSelect;
+export type ApprovalStatus = "pending" | "approved" | "denied" | "consumed";

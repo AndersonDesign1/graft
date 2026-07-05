@@ -5,7 +5,14 @@
  * Functions are served at POST /api/fn/<name> (JSON object body).
  */
 import { requireScopes } from "@graft/auth";
-import { defineCollection, defineFunction, field, insertRecord, listRecords } from "@graft/core";
+import {
+  defineCollection,
+  defineFunction,
+  deleteRecord,
+  field,
+  insertRecord,
+  listRecords,
+} from "@graft/core";
 
 export const pages = defineCollection({
   name: "pages",
@@ -68,7 +75,11 @@ export const submitContact = defineFunction({
   name: "submitContact",
   kind: "mutation",
   public: true,
-  description: "Stores a contact-form submission (public; anonymous callers allowed).",
+  // Public + anonymous = spam surface; the limit is per client IP, counted
+  // against the audit log.
+  rateLimit: { limit: 5, windowSeconds: 60 },
+  description:
+    "Stores a contact-form submission (public; anonymous callers allowed; 5/min per caller).",
   returns: "{ id: string; receivedAt: string }",
   input: submissions.fields,
   handler: async (ctx) => {
@@ -99,4 +110,25 @@ export const listSubmissions = defineFunction({
   },
 });
 
-export const functions = { pageStats, submitContact, listSubmissions };
+/**
+ * Destructive mutation: hard-deletes a row, so it is human-gated — calling it
+ * files an approval (403 with the id), a human runs `graft approve <id>`, and
+ * the caller retries with `x-graft-approval: <id>`. Requires the
+ * submissions:admin scope on top of the gate.
+ */
+export const deleteSubmission = defineFunction({
+  name: "deleteSubmission",
+  kind: "mutation",
+  destructive: true,
+  description:
+    "Permanently deletes one submission by id. Destructive: requires human approval (graft approve) and the submissions:admin scope.",
+  returns: "{ deleted: { id: string; email: string } }",
+  input: { id: field.string({ description: "The submission row id (uuid)." }) },
+  access: requireScopes("submissions:admin"),
+  handler: async (ctx) => {
+    const removed = await deleteRecord(ctx, submissions, ctx.input.id);
+    return { deleted: { id: removed.id, email: removed.data.email } };
+  },
+});
+
+export const functions = { pageStats, submitContact, listSubmissions, deleteSubmission };

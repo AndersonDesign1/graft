@@ -108,6 +108,39 @@ export async function listRecords<TCollection extends AnyCollection>(
   });
 }
 
+/**
+ * Delete one record by id. Hard delete — Postgres owns operational data, and
+ * gone is gone; this is exactly why functions calling it should be marked
+ * `destructive: true` (human-gated). Returns the deleted row's raw data.
+ */
+export async function deleteRecord(
+  ctx: RecordContext,
+  collection: AnyCollection,
+  id: string,
+): Promise<{ id: string; data: Record<string, unknown> }> {
+  assertDbAuthoritative(collection, "deleteRecord");
+
+  const [row] = await ctx.db
+    .delete(dataRecords)
+    .where(
+      and(
+        eq(dataRecords.id, id),
+        eq(dataRecords.branchId, ctx.branch),
+        eq(dataRecords.collection, collection.name),
+      ),
+    )
+    .returning({ id: dataRecords.id, data: dataRecords.data });
+  if (!row) {
+    throw new GraftError({
+      code: "DOCUMENT_NOT_FOUND",
+      message: `No record "${id}" exists in "${collection.name}" on branch "${ctx.branch}".`,
+      fix: "List the collection's records to find a valid id — it may already have been deleted.",
+      details: { collection: collection.name, id, branch: ctx.branch },
+    });
+  }
+  return row;
+}
+
 function toRecord<TData>(row: typeof dataRecords.$inferSelect, data: TData): DataRecord<TData> {
   return {
     id: row.id,

@@ -1,9 +1,13 @@
 import { GraftError } from "@graft/contracts";
-import type { Database } from "@graft/db";
+import type { ApprovalStore, AuditEntry, AuditStore, Database } from "@graft/db";
 import { describe, expect, it } from "vitest";
 import { field } from "./field";
 import { defineFunction, type FunctionContext } from "./function";
-import { createFunctionsHandler } from "./functions-handler";
+import {
+  canonicalJson,
+  createFunctionsHandler,
+  type FunctionsHandlerOptions,
+} from "./functions-handler";
 
 const fakeDb = { __fake: true } as unknown as Database;
 
@@ -99,7 +103,9 @@ function post(name: string, body?: unknown): Request {
 }
 
 describe("createFunctionsHandler", () => {
-  const handler = createFunctionsHandler({ functions, db: fakeDb });
+  // audit: false — these suites cover routing/validation/access; the P3.4
+  // suite below covers auditing with real (in-memory) stores.
+  const handler = createFunctionsHandler({ functions, db: fakeDb, audit: false });
 
   it("dispatches by the last path segment and wraps output in { data }", async () => {
     const res = await handler(post("echo", { message: "hi" }));
@@ -165,6 +171,7 @@ describe("createFunctionsHandler", () => {
     const authed = createFunctionsHandler({
       functions,
       db: fakeDb,
+      audit: false,
       actor: () => ({ kind: "agent", id: "agent-1" }),
     });
     const res = await authed(post("secret", {}));
@@ -196,6 +203,7 @@ describe("createFunctionsHandler", () => {
         return fakeDb;
       },
       branch: "preview/x",
+      audit: false,
     });
     const first = await lazy(post("whoami"));
     const second = await lazy(post("whoami"));
@@ -205,7 +213,11 @@ describe("createFunctionsHandler", () => {
   });
 
   it("routes by function name, not the record key", async () => {
-    const renamed = createFunctionsHandler({ functions: { anything: echo }, db: fakeDb });
+    const renamed = createFunctionsHandler({
+      functions: { anything: echo },
+      db: fakeDb,
+      audit: false,
+    });
     const res = await renamed(post("echo", { message: "x" }));
     expect(res.status).toBe(200);
   });
@@ -223,10 +235,11 @@ describe("createFunctionsHandler", () => {
 });
 
 describe("secure mutation default (P3.3)", () => {
-  const anonymous = createFunctionsHandler({ functions, db: fakeDb });
+  const anonymous = createFunctionsHandler({ functions, db: fakeDb, audit: false });
   const authed = createFunctionsHandler({
     functions,
     db: fakeDb,
+    audit: false,
     actor: () => ({ kind: "agent", id: "agent-1" }),
   });
 
@@ -262,5 +275,372 @@ describe("secure mutation default (P3.3)", () => {
   it("describe() exposes the public flag for introspection", () => {
     expect(publicMutation.describe().public).toBe(true);
     expect(guardedMutation.describe().public).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P3.4 — audit log, rate limits, destructive-op human gate
+// ---------------------------------------------------------------------------
+
+const nuke = defineFunction({
+  name: "nuke",
+  kind: "mutation",
+  destructive: true,
+  input: { target: field.string() },
+  handler: ({ input }) => ({ nuked: input.target }),
+});
+
+const limited = defineFunction({
+  name: "limited",
+  kind: "query",
+  rateLimit: { limit: 2, windowSeconds: 60 },
+  input: {},
+  handler: () => ({ ok: true }),
+});
+
+const p34functions = { echo, whoami, guardedMutation, publicMutation, nuke, limited };
+
+interface MemoryAuditEntry extends AuditEntry {
+  at: number;
+}
+
+/** In-memory stand-ins for the db-backed stores — same contracts, no Postgres. */
+function memoryStores() {
+  const auditRows: MemoryAuditEntry[] = [];
+  const audit: AuditStore = {
+    record: async (entry) => {
+      auditRows.push({ ...entry, at: Date.now() });
+    },
+    countSince: async (rateKey, functionName, since) =>
+      auditRows.filter(
+        (e) => e.rateKey === rateKey && e.functionName === functionName && e.at >= since.getTime(),
+      ).length,
+  };
+
+  const approvalRows = new Map<
+    string,
+    { functionName: string; inputCanonical: string; input: Record<string, unknown>; status: string }
+  >();
+  let seq = 0;
+  const approvals: ApprovalStore = {
+    request: async (req) => {
+      const id = `apr-${++seq}`;
+      approvalRows.set(id, {
+        functionName: req.functionName,
+        inputCanonical: req.inputCanonical,
+        input: req.input,
+        status: "pending",
+      });
+      return id;
+    },
+    consume: async (id, match) => {
+      const row = approvalRows.get(id);
+      if (!row) return { ok: false, reason: "not_found" };
+      if (row.status === "pending") return { ok: false, reason: "pending" };
+      if (row.status === "denied") return { ok: false, reason: "denied" };
+      if (row.status === "consumed") return { ok: false, reason: "already_consumed" };
+      if (row.functionName !== match.functionName || row.inputCanonical !== match.inputCanonical) {
+        return { ok: false, reason: "mismatch" };
+      }
+      row.status = "consumed";
+      return { ok: true };
+    },
+  };
+
+  const approve = (id: string) => {
+    const row = approvalRows.get(id);
+    if (!row) throw new Error(`no approval ${id}`);
+    row.status = "approved";
+  };
+  const deny = (id: string) => {
+    const row = approvalRows.get(id);
+    if (!row) throw new Error(`no approval ${id}`);
+    row.status = "denied";
+  };
+
+  return { audit, approvals, auditRows, approvalRows, approve, deny };
+}
+
+function p34handler(
+  stores: ReturnType<typeof memoryStores>,
+  overrides: Partial<FunctionsHandlerOptions> = {},
+) {
+  return createFunctionsHandler({
+    functions: p34functions,
+    db: fakeDb,
+    audit: stores.audit,
+    approvals: stores.approvals,
+    actor: () => ({ kind: "agent", id: "agent-1" }),
+    gitSha: "sha-test",
+    ...overrides,
+  });
+}
+
+function postWith(name: string, body: unknown, headers: Record<string, string>): Request {
+  return new Request(`http://localhost/api/fn/${name}`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...headers },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("audit log (P3.4)", () => {
+  it("records one row per invocation: ok status, actor, rate key, duration, git SHA", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores);
+    const res = await handler(post("echo", { message: "hi" }));
+    expect(res.status).toBe(200);
+    expect(stores.auditRows).toHaveLength(1);
+    expect(stores.auditRows[0]).toMatchObject({
+      functionName: "echo",
+      functionKind: "query",
+      actorKind: "agent",
+      actorId: "agent-1",
+      rateKey: "agent:agent-1",
+      status: "ok",
+      gitSha: "sha-test",
+      branch: "main",
+    });
+    expect(stores.auditRows[0]?.durationMs).toBeGreaterThanOrEqual(0);
+    expect(stores.auditRows[0]?.correlationId).toBe(res.headers.get("x-graft-correlation-id"));
+  });
+
+  it("records failures with the error code as status (denied mutation, bad input)", async () => {
+    const stores = memoryStores();
+    const anonymous = p34handler(stores, { actor: () => ({ kind: "anonymous" }) });
+    await anonymous(post("guardedMutation", {}));
+    await anonymous(post("echo", { message: 7 }));
+    expect(stores.auditRows.map((e) => e.status)).toEqual([
+      "UNAUTHORIZED",
+      "INPUT_VALIDATION_FAILED",
+    ]);
+  });
+
+  it("keys anonymous callers by client IP", async () => {
+    const stores = memoryStores();
+    const anonymous = p34handler(stores, { actor: () => ({ kind: "anonymous" }) });
+    await anonymous(postWith("echo", { message: "x" }, { "x-forwarded-for": "10.0.0.9, proxy" }));
+    expect(stores.auditRows[0]?.rateKey).toBe("ip:10.0.0.9");
+  });
+
+  it("does not audit 404s or 405s (no function was targeted)", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores);
+    await handler(post("nope", {}));
+    await handler(new Request("http://localhost/api/fn/echo", { method: "GET" }));
+    expect(stores.auditRows).toHaveLength(0);
+  });
+
+  it("a broken audit store never breaks the response", async () => {
+    const stores = memoryStores();
+    const broken: AuditStore = {
+      record: async () => {
+        throw new Error("audit db down");
+      },
+      countSince: stores.audit.countSince,
+    };
+    const handler = p34handler(stores, { audit: broken });
+    const res = await handler(post("echo", { message: "hi" }));
+    expect(res.status).toBe(200);
+  });
+
+  it("audits a TOKEN_INVALID resolver throw with actor unknown", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores, {
+      actor: () => {
+        throw new GraftError({ code: "TOKEN_INVALID", message: "bad", fix: "mint a new one" });
+      },
+    });
+    const res = await handler(post("echo", { message: "hi" }));
+    expect(res.status).toBe(401);
+    expect(stores.auditRows[0]).toMatchObject({ status: "TOKEN_INVALID", actorKind: "unknown" });
+  });
+});
+
+describe("rate limits (P3.4)", () => {
+  it("enforces a per-function limit against the audit rows: 429 + Retry-After", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores);
+    expect((await handler(post("limited"))).status).toBe(200);
+    expect((await handler(post("limited"))).status).toBe(200);
+    const res = await handler(post("limited"));
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBe("60");
+    const body = await json(res);
+    expect(body.error).toBe("RATE_LIMITED");
+    expect(body.details).toMatchObject({ limit: 2, windowSeconds: 60 });
+  });
+
+  it("counts rejected attempts too (a 429 burns budget — no tight-loop retries)", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores);
+    for (let i = 0; i < 4; i++) await handler(post("limited"));
+    // 2 ok + 2 rate-limited, all audited
+    expect(stores.auditRows.filter((e) => e.status === "ok")).toHaveLength(2);
+    expect(stores.auditRows.filter((e) => e.status === "RATE_LIMITED")).toHaveLength(2);
+  });
+
+  it("limits are per caller: another actor has its own budget", async () => {
+    const stores = memoryStores();
+    const a = p34handler(stores);
+    const b = p34handler(stores, { actor: () => ({ kind: "agent", id: "agent-2" }) });
+    await a(post("limited"));
+    await a(post("limited"));
+    expect((await a(post("limited"))).status).toBe(429);
+    expect((await b(post("limited"))).status).toBe(200);
+  });
+
+  it("rows outside the window do not count", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores);
+    await handler(post("limited"));
+    await handler(post("limited"));
+    // Age the rows past the 60s window.
+    for (const row of stores.auditRows) row.at -= 61_000;
+    expect((await handler(post("limited"))).status).toBe(200);
+  });
+
+  it("a handler-wide default applies to every function; per-function overrides win", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores, { rateLimit: { limit: 1, windowSeconds: 30 } });
+    expect((await handler(post("echo", { message: "a" }))).status).toBe(200);
+    expect((await handler(post("echo", { message: "b" }))).status).toBe(429);
+    // `limited` has its own {limit: 2} — the default's limit:1 does not apply.
+    expect((await handler(post("limited"))).status).toBe(200);
+    expect((await handler(post("limited"))).status).toBe(200);
+    expect((await handler(post("limited"))).status).toBe(429);
+  });
+
+  it("audit: false + rate limits is a config error at creation time", () => {
+    expect(() =>
+      createFunctionsHandler({
+        functions: { echo },
+        db: fakeDb,
+        audit: false,
+        rateLimit: { limit: 5, windowSeconds: 60 },
+      }),
+    ).toThrowError(/audit/i);
+    expect(() =>
+      createFunctionsHandler({ functions: { limited }, db: fakeDb, audit: false }),
+    ).toThrowError(/audit/i);
+  });
+});
+
+describe("destructive-op human gate (P3.4)", () => {
+  it("files a pending approval and 403s with the id and the human command", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores);
+    const res = await handler(post("nuke", { target: "row-1" }));
+    expect(res.status).toBe(403);
+    const body = await json(res);
+    expect(body.error).toBe("DESTRUCTIVE_OP_REQUIRES_APPROVAL");
+    const id = body.details.approvalId as string;
+    expect(stores.approvalRows.get(id)).toMatchObject({
+      functionName: "nuke",
+      status: "pending",
+      input: { target: "row-1" },
+    });
+    expect(body.fix).toContain(`graft approve ${id}`);
+    expect(body.fix).toContain("x-graft-approval");
+  });
+
+  it("an approved approval lets the exact same call through, once", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores);
+    const first = await json(await handler(post("nuke", { target: "row-1" })));
+    const id = first.details.approvalId as string;
+    stores.approve(id);
+
+    const ok = await handler(postWith("nuke", { target: "row-1" }, { "x-graft-approval": id }));
+    expect(ok.status).toBe(200);
+    expect(await json(ok)).toEqual({ data: { nuked: "row-1" } });
+
+    // One-shot: the same approval cannot authorize a second call.
+    const reuse = await handler(postWith("nuke", { target: "row-1" }, { "x-graft-approval": id }));
+    expect(reuse.status).toBe(403);
+    expect(await json(reuse)).toMatchObject({
+      error: "APPROVAL_INVALID",
+      details: { reason: "already_consumed" },
+    });
+  });
+
+  it("input-bound: approve A, execute B is refused and the approval survives", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores);
+    const first = await json(await handler(post("nuke", { target: "row-1" })));
+    const id = first.details.approvalId as string;
+    stores.approve(id);
+
+    const other = await handler(postWith("nuke", { target: "row-2" }, { "x-graft-approval": id }));
+    expect(other.status).toBe(403);
+    expect(await json(other)).toMatchObject({
+      error: "APPROVAL_INVALID",
+      details: { reason: "mismatch" },
+    });
+
+    // The mismatch did not burn it — the approved call still works.
+    const ok = await handler(postWith("nuke", { target: "row-1" }, { "x-graft-approval": id }));
+    expect(ok.status).toBe(200);
+  });
+
+  it("input binding is canonical: key order does not matter", async () => {
+    const stores = memoryStores();
+    const twoField = defineFunction({
+      name: "wipe",
+      kind: "mutation",
+      destructive: true,
+      input: { a: field.string(), b: field.string() },
+      handler: () => ({ ok: true }),
+    });
+    const handler = p34handler(stores, { functions: { twoField } });
+    const first = await json(await handler(post("wipe", { a: "1", b: "2" })));
+    stores.approve(first.details.approvalId);
+    const res = await handler(
+      postWith("wipe", { b: "2", a: "1" }, { "x-graft-approval": first.details.approvalId }),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("pending and denied approvals refuse with their reason", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores);
+    const first = await json(await handler(post("nuke", { target: "x" })));
+    const id = first.details.approvalId as string;
+
+    const pending = await handler(postWith("nuke", { target: "x" }, { "x-graft-approval": id }));
+    expect(await json(pending)).toMatchObject({ details: { reason: "pending" } });
+
+    stores.deny(id);
+    const denied = await handler(postWith("nuke", { target: "x" }, { "x-graft-approval": id }));
+    expect(await json(denied)).toMatchObject({ details: { reason: "denied" } });
+  });
+
+  it("approvalPolicy 'human' gates every mutation; queries stay open", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores, { approvalPolicy: "human" });
+    expect((await handler(post("echo", { message: "q" }))).status).toBe(200);
+    const gated = await handler(post("guardedMutation", {}));
+    expect(gated.status).toBe(403);
+    expect(await json(gated)).toMatchObject({ error: "DESTRUCTIVE_OP_REQUIRES_APPROVAL" });
+  });
+
+  it("approvalPolicy 'none' (default) leaves non-destructive mutations ungated", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores);
+    expect((await handler(post("guardedMutation", {}))).status).toBe(200);
+    expect(stores.approvalRows.size).toBe(0);
+  });
+
+  it("describe() exposes the destructive flag for introspection", () => {
+    expect(nuke.describe().destructive).toBe(true);
+    expect(echo.describe().destructive).toBeUndefined();
+  });
+});
+
+describe("canonicalJson", () => {
+  it("sorts keys recursively and drops undefined", () => {
+    expect(canonicalJson({ b: 1, a: { d: [2, { z: 1, y: 2 }], c: undefined } })).toBe(
+      '{"a":{"d":[2,{"y":2,"z":1}]},"b":1}',
+    );
   });
 });

@@ -20,6 +20,12 @@ import type { FieldDefinition } from "./field";
 
 export type FunctionKind = "query" | "mutation";
 
+/** Max invocations per caller per window; enforced against the audit log. */
+export interface RateLimit {
+  limit: number;
+  windowSeconds: number;
+}
+
 /**
  * Who is calling. Anonymous until @graft/auth lands (Phase 3 security slice);
  * the shape is locked now so functions written today survive that unit.
@@ -61,6 +67,18 @@ export interface FunctionConfig<TFields extends Record<string, FieldDefinition>,
    */
   public?: boolean;
   /**
+   * Destructive ops are ALWAYS human-gated, regardless of approval policy
+   * (Phase 3 invariant): invoking one requires an approved, one-shot approval
+   * bound to the exact input (`graft approve` is the human side). Mark
+   * anything that deletes or irreversibly overwrites data.
+   */
+  destructive?: boolean;
+  /**
+   * Per-function rate limit, counted per caller (actor id, or client IP for
+   * anonymous) against the audit log. Overrides the handler-wide default.
+   */
+  rateLimit?: RateLimit;
+  /**
    * Access control at the function boundary. Runs after input validation,
    * before the handler; returning false rejects with UNAUTHORIZED.
    * When omitted, the default applies: mutations require a non-anonymous
@@ -85,6 +103,8 @@ export interface GraftFunction<
   returns?: string;
   input: TFields;
   public?: boolean;
+  destructive?: boolean;
+  rateLimit?: RateLimit;
   /** Zod schema validating a full input payload for this function. */
   schema: z.ZodObject<FieldsShape<TFields>>;
   access?: (
@@ -126,6 +146,8 @@ export function defineFunction<TFields extends Record<string, FieldDefinition>, 
     returns: config.returns,
     input: config.input,
     public: config.public,
+    destructive: config.destructive,
+    rateLimit: config.rateLimit,
     schema,
     access: config.access,
     handler: config.handler,
@@ -143,6 +165,7 @@ export function defineFunction<TFields extends Record<string, FieldDefinition>, 
         returns: config.returns,
         description: config.description,
         public: config.public,
+        destructive: config.destructive,
       };
     },
   };
