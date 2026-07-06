@@ -13,6 +13,7 @@
  */
 import { GraftError } from "@graft/contracts";
 import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { overlaySubquery } from "./branch";
 import type { Database } from "./client";
 import { contentIndex, dataRecords, type ContentRow, type DataRecordRow } from "./schema";
 
@@ -39,7 +40,8 @@ function toTsQuery(query: string): SQL {
 export interface SearchContentOptions {
   /** Websearch-syntax query: words, "quoted phrases", `or`, -exclusions. */
   query: string;
-  branchId?: string;
+  /** Branch chain to search across, leaf-first (from resolveBranchScope). Defaults to ["main"]. */
+  chain?: string[];
   /** Restrict to these collections; defaults to all collections in the index. */
   collections?: string[];
   /** Max hits, best-ranked first. Defaults to 20. */
@@ -59,25 +61,55 @@ export async function searchContent(
   options: SearchContentOptions,
 ): Promise<ContentSearchHit[]> {
   const tsQuery = toTsQuery(options.query);
-  const filters = [
-    eq(contentIndex.branchId, options.branchId ?? "main"),
-    eq(contentIndex.deleted, false),
-    sql`${contentIndex.search} @@ ${tsQuery}`,
-  ];
-  if (options.collections !== undefined) {
-    filters.push(inArray(contentIndex.collection, options.collections));
+  const chain = options.chain ?? ["main"];
+
+  // Fast path: single-branch search hits the GIN index directly (WHERE search @@ q).
+  if (chain.length === 1) {
+    const filters = [
+      eq(contentIndex.branchId, chain[0]),
+      eq(contentIndex.deleted, false),
+      sql`${contentIndex.search} @@ ${tsQuery}`,
+    ];
+    if (options.collections !== undefined) {
+      filters.push(inArray(contentIndex.collection, options.collections));
+    }
+    return db
+      .select({
+        row: contentIndex,
+        rank: sql<number>`ts_rank(${contentIndex.search}, ${tsQuery})`,
+        snippet: sql<string>`ts_headline(${SEARCH_CONFIG}, ${contentIndex.body}, ${tsQuery}, ${HEADLINE_OPTIONS})`,
+      })
+      .from(contentIndex)
+      .where(and(...filters))
+      .orderBy(desc(sql`ts_rank(${contentIndex.search}, ${tsQuery})`), asc(contentIndex.slug))
+      .limit(options.limit ?? DEFAULT_LIMIT);
   }
 
-  return db
+  // Overlay path: search the branch-winning row per (collection, slug) — the same
+  // rows `readContent` would return — so a preview searches its effective content,
+  // not stale ancestor copies of docs it has overridden or tombstoned.
+  const overlay = overlaySubquery(db, chain, { collections: options.collections });
+  const rows = await db
     .select({
-      row: contentIndex,
-      rank: sql<number>`ts_rank(${contentIndex.search}, ${tsQuery})`,
-      snippet: sql<string>`ts_headline(${SEARCH_CONFIG}, ${contentIndex.body}, ${tsQuery}, ${HEADLINE_OPTIONS})`,
+      branchId: overlay.branchId,
+      collection: overlay.collection,
+      slug: overlay.slug,
+      data: overlay.data,
+      body: overlay.body,
+      contentHash: overlay.contentHash,
+      sourcePath: overlay.sourcePath,
+      deleted: overlay.deleted,
+      updatedAt: overlay.updatedAt,
+      search: overlay.search,
+      rank: sql<number>`ts_rank(${overlay.search}, ${tsQuery})`,
+      snippet: sql<string>`ts_headline(${SEARCH_CONFIG}, ${overlay.body}, ${tsQuery}, ${HEADLINE_OPTIONS})`,
     })
-    .from(contentIndex)
-    .where(and(...filters))
-    .orderBy(desc(sql`ts_rank(${contentIndex.search}, ${tsQuery})`), asc(contentIndex.slug))
+    .from(overlay)
+    .where(and(eq(overlay.deleted, false), sql`${overlay.search} @@ ${tsQuery}`))
+    .orderBy(desc(sql`ts_rank(${overlay.search}, ${tsQuery})`), asc(overlay.slug))
     .limit(options.limit ?? DEFAULT_LIMIT);
+
+  return rows.map(({ rank, snippet, ...row }) => ({ row: row as ContentRow, rank, snippet }));
 }
 
 export interface SearchDataOptions {

@@ -1,10 +1,11 @@
 /**
  * @graft/db
- * Postgres + Drizzle client and schema. Branching abstraction (Spike B) lands here
- * in a later phase; for now the schema is branch-ready (branch_id + deleted).
+ * Postgres + Drizzle client and schema. The Phase 4 branching abstraction lives in
+ * ./branch: `resolveBranchScope` + overlay-aware `readContent`/`searchContent`.
  */
 export * from "./approvals";
 export * from "./audit";
+export * from "./branch";
 export * from "./client";
 export * from "./content";
 export * from "./diff";

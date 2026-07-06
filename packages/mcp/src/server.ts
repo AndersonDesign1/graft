@@ -184,9 +184,11 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     ({ query, collection: name, limit }) =>
       guarded(async () => {
         if (name !== undefined) requireCollection(collections, name);
+        // MCP searches its configured branch directly (single-branch chain);
+        // overlay-aware MCP search arrives with branch topology in P4.2.
         const hits = await searchContent(db, {
           query,
-          branchId,
+          chain: [branchId],
           collections: name === undefined ? Object.keys(collections) : [name],
           limit,
         });

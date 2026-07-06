@@ -71,7 +71,7 @@ Phase 3 is closed; the schema is already branch-ready (every operational table c
 `branch_id` default `'main'` + uuid keys; see `packages/db/src/schema.ts`). What is **not**
 built: a branch registry, ancestor-chain overlay resolution, and per-branch endpoint
 routing. Today every read/write scopes by **exact match** (`eq(branch_id, $branch)`), which
-is correct for `main` but is *not* copy-on-write — a fresh branch would see zero rows, not
+is correct for `main` but is _not_ copy-on-write — a fresh branch would see zero rows, not
 its parent's. This section locks the seam so the next unit can implement it without
 re-litigating the shape (the P3.1 pattern: lock the interface before writing against it).
 
@@ -79,14 +79,14 @@ re-litigating the shape (the P3.1 pattern: lock the interface before writing aga
 
 `createDb(url)` is **single-URL**. That is exactly where the two backends split:
 
-| | `overlay` (self-host default) | `neon` (cloud default) |
-| --- | --- | --- |
-| A branch is… | a `branch_id` + a parent pointer | a physically separate Postgres (its own compute endpoint) |
-| Connection | **shared** `DATABASE_URL` | **different URL per branch** (Neon API mints the endpoint) |
-| Isolation | logical (overlay reads, tombstone hides) | physical (storage CoW — incl. sequences) |
-| Query scoping | `branch_id = ANY(chain)` + overlay pick | **none** — each branch DB holds only its own rows |
-| Create cost | 0 ms (insert a registry row) | ~instant (Neon storage CoW), one API call |
-| Validated | ✅ Spike B | ⏳ **pending live creds** (see below) |
+|               | `overlay` (self-host default)            | `neon` (cloud default)                                     |
+| ------------- | ---------------------------------------- | ---------------------------------------------------------- |
+| A branch is…  | a `branch_id` + a parent pointer         | a physically separate Postgres (its own compute endpoint)  |
+| Connection    | **shared** `DATABASE_URL`                | **different URL per branch** (Neon API mints the endpoint) |
+| Isolation     | logical (overlay reads, tombstone hides) | physical (storage CoW — incl. sequences)                   |
+| Query scoping | `branch_id = ANY(chain)` + overlay pick  | **none** — each branch DB holds only its own rows          |
+| Create cost   | 0 ms (insert a registry row)             | ~instant (Neon storage CoW), one API call                  |
+| Validated     | ✅ Spike B                               | ⏳ **pending live creds** (see below)                      |
 
 So a branch handle can't just be "a `Database`". It is **a `Database` + a scoping strategy**.
 That is the whole abstraction:
@@ -95,18 +95,18 @@ That is the whole abstraction:
 // @graft/db — the seam every read/write goes through in Phase 4.
 type BranchScope =
   | { kind: "overlay"; chain: string[]; writeBranch: string } // chain leaf-first
-  | { kind: "physical" };                                      // neon: no WHERE scoping
+  | { kind: "physical" }; // neon: no WHERE scoping
 
 interface BranchHandle {
   name: string;
-  db: Database;        // shared handle (overlay) or the branch's own handle (neon)
-  scope: BranchScope;  // how queries filter; overlay callers NEVER hand-write this
+  db: Database; // shared handle (overlay) or the branch's own handle (neon)
+  scope: BranchScope; // how queries filter; overlay callers NEVER hand-write this
   close(): Promise<void>;
 }
 
 interface BranchBackend {
-  resolve(name: string): Promise<BranchHandle>;          // name → handle to run against
-  create(name: string, from: string): Promise<void>;     // graft branch
+  resolve(name: string): Promise<BranchHandle>; // name → handle to run against
+  create(name: string, from: string): Promise<void>; // graft branch
   drop(name: string): Promise<void>;
   list(): Promise<BranchMeta[]>;
 }
@@ -162,7 +162,7 @@ copy-on-first-write. Decide when implementing.
 
 ## Merge = git recompile + data deltas (the key simplification)
 
-Content is **git-authoritative** (top invariant). So merging *content* is not a row-level DB
+Content is **git-authoritative** (top invariant). So merging _content_ is not a row-level DB
 merge — it's a **git** merge of the authored files + a **recompile** of the target's
 `content_index` (which is derived, and already atomic). Only **`data_records`** — operational,
 Postgres-owned — needs a true row-level merge. `graft merge <branch> [--into main]` therefore:

@@ -27,7 +27,7 @@ verifies agent identity, audits every call, and searches every layer:
   Web-standard `Request → Response` RPC with a standard context
   (`input`/`db`/`actor`/`branch`/`correlationId`); success is `{ data }`, failures are
   `GraftError` JSON carrying a `fix`. Mutating data lives in a db-authoritative
-  `data_records` table, validated against its collection schema on write *and* read.
+  `data_records` table, validated against its collection schema on write _and_ read.
 - **Auth — verify identity, never mint it.** `@graft/auth`'s `createActorResolver` verifies
   bearer OIDC JWTs (via jose; JWKS inline/URL/discovery, `iss`/`exp`/`aud`, scope claims)
   plus static dev tokens; a bad token is `TOKEN_INVALID` (401), never a silent downgrade.
@@ -115,7 +115,7 @@ full surface, including the `search_content` MCP tool and Better Auth token mint
 | `@graft/content-migrations` | Codemod-style authored-content transforms                         |
 | `@graft/db`                 | Postgres + Drizzle + branching abstraction                        |
 | `@graft/assets`             | S3/MinIO storage, transforms, agent upload primitives             |
-| `@graft/auth`               | OIDC token verification, actor resolver, scope-based access        |
+| `@graft/auth`               | OIDC token verification, actor resolver, scope-based access       |
 | `@graft/contracts`          | Shared types, error codes, introspection schemas                  |
 | `@graft/mcp`                | MCP server (primitives + introspection)                           |
 | `@graft/cli`                | Human + agent CLI (`graft`)                                       |

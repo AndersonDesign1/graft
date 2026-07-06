@@ -101,12 +101,12 @@ describe.skipIf(!runIntegration)("full-text search (live)", () => {
     async () => {
       const hits = await searchContent(handle.db, {
         query: "observability",
-        branchId: BRANCH,
+        chain: [BRANCH],
       });
       expect(hits.map((h) => h.row.slug)).toEqual(["observability", "about"]);
       expect(hits[0]!.rank).toBeGreaterThan(hits[1]!.rank);
 
-      const stemmed = await searchContent(handle.db, { query: "dashboard", branchId: BRANCH });
+      const stemmed = await searchContent(handle.db, { query: "dashboard", chain: [BRANCH] });
       expect(stemmed.map((h) => h.row.slug)).toEqual(["observability"]);
     },
     TEST_TIMEOUT,
@@ -115,13 +115,13 @@ describe.skipIf(!runIntegration)("full-text search (live)", () => {
   it(
     "returns highlighted snippets and respects collection filters + limit",
     async () => {
-      const all = await searchContent(handle.db, { query: "tracing", branchId: BRANCH });
+      const all = await searchContent(handle.db, { query: "tracing", chain: [BRANCH] });
       expect(all).toHaveLength(4);
       expect(all[0]!.snippet).toContain("<b>");
 
       const pagesOnly = await searchContent(handle.db, {
         query: "tracing",
-        branchId: BRANCH,
+        chain: [BRANCH],
         collections: ["pages"],
       });
       expect(pagesOnly.every((h) => h.row.collection === "pages")).toBe(true);
@@ -129,7 +129,7 @@ describe.skipIf(!runIntegration)("full-text search (live)", () => {
 
       const capped = await searchContent(handle.db, {
         query: "tracing",
-        branchId: BRANCH,
+        chain: [BRANCH],
         limit: 2,
       });
       expect(capped).toHaveLength(2);
@@ -154,7 +154,7 @@ describe.skipIf(!runIntegration)("full-text search (live)", () => {
         ],
         { branchId: BRANCH },
       );
-      const hits = await searchContent(handle.db, { query: "hiring", branchId: BRANCH });
+      const hits = await searchContent(handle.db, { query: "hiring", chain: [BRANCH] });
       expect(hits).toHaveLength(0);
     },
     TEST_TIMEOUT,
@@ -185,7 +185,7 @@ describe.skipIf(!runIntegration)("full-text search (live)", () => {
   it(
     "returns [] for stopword-only queries instead of erroring",
     async () => {
-      const hits = await searchContent(handle.db, { query: "the", branchId: BRANCH });
+      const hits = await searchContent(handle.db, { query: "the", chain: [BRANCH] });
       expect(hits).toEqual([]);
     },
     TEST_TIMEOUT,

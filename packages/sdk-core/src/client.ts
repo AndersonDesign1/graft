@@ -13,11 +13,11 @@
 import { GraftError } from "@graft/contracts";
 import type { AnyCollection, DocumentData } from "@graft/core";
 import {
-  and,
-  asc,
-  contentIndex,
-  eq,
+  readContent,
+  resolveBranchScope,
+  scopeChain,
   searchContent,
+  type BranchScope,
   type ContentRow,
   type Database,
 } from "@graft/db";
@@ -92,6 +92,20 @@ export function createClient<TCollections extends Record<string, AnyCollection>>
 ): GraftClient<TCollections> {
   const defaultBranch = options.branch ?? "main";
 
+  // Resolve each branch to its overlay scope once per client, sharing the
+  // in-flight promise so concurrent reads don't each pay a topology lookup.
+  // A client is typically request-scoped (sdk-next dedupes it via React.cache);
+  // a topology change (new/dropped branch) is picked up by the next client.
+  const scopeCache = new Map<string, Promise<BranchScope>>();
+  function scopeFor(branch: string): Promise<BranchScope> {
+    let cached = scopeCache.get(branch);
+    if (cached === undefined) {
+      cached = resolveBranchScope(options.db, branch);
+      scopeCache.set(branch, cached);
+    }
+    return cached;
+  }
+
   function resolve<K extends keyof TCollections & string>(name: K): TCollections[K] {
     const collection = options.collections[name];
     if (!collection) {
@@ -111,47 +125,29 @@ export function createClient<TCollections extends Record<string, AnyCollection>>
 
     async getDocument(collection, slug, opts) {
       const def = resolve(collection);
-      const rows = await options.db
-        .select()
-        .from(contentIndex)
-        .where(
-          and(
-            eq(contentIndex.branchId, opts?.branch ?? defaultBranch),
-            eq(contentIndex.collection, def.name),
-            eq(contentIndex.slug, slug),
-            eq(contentIndex.deleted, false),
-          ),
-        )
-        .limit(1);
+      const scope = await scopeFor(opts?.branch ?? defaultBranch);
+      const rows = await readContent(options.db, scope, { collection: def.name, slug, limit: 1 });
       const row = rows[0];
       return row ? toDocument(def, row) : null;
     },
 
     async listDocuments(collection, opts) {
       const def = resolve(collection);
-      let query = options.db
-        .select()
-        .from(contentIndex)
-        .where(
-          and(
-            eq(contentIndex.branchId, opts?.branch ?? defaultBranch),
-            eq(contentIndex.collection, def.name),
-            eq(contentIndex.deleted, false),
-          ),
-        )
-        .orderBy(asc(contentIndex.slug))
-        .$dynamic();
-      if (opts?.limit !== undefined) query = query.limit(opts.limit);
-      if (opts?.offset !== undefined) query = query.offset(opts.offset);
-      const rows = await query;
+      const scope = await scopeFor(opts?.branch ?? defaultBranch);
+      const rows = await readContent(options.db, scope, {
+        collection: def.name,
+        limit: opts?.limit,
+        offset: opts?.offset,
+      });
       return rows.map((row) => toDocument(def, row));
     },
 
     async searchDocuments(collection, query, opts) {
       const def = resolve(collection);
+      const scope = await scopeFor(opts?.branch ?? defaultBranch);
       const hits = await searchContent(options.db, {
         query,
-        branchId: opts?.branch ?? defaultBranch,
+        chain: scopeChain(scope),
         collections: [def.name],
         limit: opts?.limit,
       });

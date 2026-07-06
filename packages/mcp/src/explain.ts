@@ -263,6 +263,39 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "pending → wait for the human decision; denied → do not retry, ask the operator; already_consumed or not_found → call again without the header to file a fresh request; mismatch → retry with exactly the approved input.",
   },
+  BRANCH_NOT_FOUND: {
+    code: "BRANCH_NOT_FOUND",
+    meaning: "An operation referenced a branch that is not registered in the topology.",
+    typicalCauses: [
+      "A typo in the branch name",
+      "Forking from or dropping a branch that was never created",
+      "Expecting a branch to exist that a teammate has not created yet",
+    ],
+    howToRecover:
+      'List the registered branches (graft branch) to see valid names. "main" is always seeded; create previews off it before forking from or merging them.',
+  },
+  BRANCH_EXISTS: {
+    code: "BRANCH_EXISTS",
+    meaning: "A branch with that name is already registered.",
+    typicalCauses: [
+      "Re-running a create for a branch that already exists",
+      "Two previews competing for the same name",
+    ],
+    howToRecover:
+      "Use the existing branch, pick a different name, or drop the existing one first. Registering a branch is idempotent only if you check first — names are unique.",
+  },
+  BRANCH_INVALID: {
+    code: "BRANCH_INVALID",
+    meaning:
+      "A branch operation was rejected because the name or the topology change is not allowed.",
+    typicalCauses: [
+      "A branch name that is not URL-safe (uppercase, spaces, punctuation)",
+      "Making a branch its own parent, or dropping main",
+      "Dropping a branch that still has child branches",
+    ],
+    howToRecover:
+      'Use lowercase kebab names with optional "/" segments (e.g. "preview/checkout"). Fork previews from main; drop child branches before their parent; main is the root and cannot be dropped.',
+  },
   NOT_IMPLEMENTED: {
     code: "NOT_IMPLEMENTED",
     meaning: "The capability is planned but not built yet.",

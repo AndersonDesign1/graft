@@ -10,6 +10,7 @@ import { sql, type SQL } from "drizzle-orm";
 import {
   boolean,
   customType,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -216,3 +217,38 @@ export const migrationsApplied = pgTable(
 
 export type MigrationAppliedRow = typeof migrationsApplied.$inferSelect;
 export type MigrationKind = "content" | "data";
+
+/**
+ * Branch registry (Phase 4) — the control-plane topology for copy-on-write
+ * previews. A branch is a `name` + a `parent` pointer; reads overlay the
+ * ancestor chain (branch rows win over ancestors, `deleted` tombstones hide a
+ * parent's live row) so a preview sees its parent's content plus its own edits
+ * with zero copy (Spike B, self-host default). `main` is the seeded root
+ * (`parent` null). Rows not registered here still work — they resolve to a
+ * self-chain — so "compile into any branch id" keeps working; registering a
+ * branch with a parent is what turns overlay on. The `neon` backend (P4.3)
+ * records its per-branch compute endpoint here; `overlay` needs only name +
+ * parent. The self-FK keeps the topology referentially intact.
+ */
+export const branches = pgTable(
+  "branches",
+  {
+    name: text("name").primaryKey(),
+    /** Null only for a root branch (`main`); otherwise the branch this forked from. */
+    parent: text("parent"),
+    /** 'overlay' (shared DB, branch_id) or 'neon' (per-branch compute endpoint). */
+    backend: text("backend").notNull().default("overlay"),
+    /** neon: the branch's compute host, spliced into the parent's connection string. */
+    endpointHost: text("endpoint_host"),
+    /** neon: the API handle used to reset/drop the branch. */
+    neonBranchId: text("neon_branch_id"),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.parent], foreignColumns: [t.name], name: "branches_parent_fk" }),
+  ],
+);
+
+export type BranchRow = typeof branches.$inferSelect;
+export type BranchBackendKind = "overlay" | "neon";
