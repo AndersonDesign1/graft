@@ -6,8 +6,10 @@
  * table forward-compatible with row-level branching (Spike B, self-host overlay); for
  * now every row lives on the implicit "main" branch.
  */
+import { sql, type SQL } from "drizzle-orm";
 import {
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -17,6 +19,20 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
+
+/**
+ * Postgres `tsvector` — drizzle has no built-in type for it. Search columns are
+ * GENERATED ALWAYS ... STORED, so Postgres owns indexing: every write path
+ * (projection, insertRecord, hand-run SQL) is searchable with zero app-side
+ * bookkeeping, and the column can never drift from the row it derives from.
+ * The text-search config is hardcoded to 'english' for now (i18n is an open
+ * decision); it must match the config used in queries (see search.ts).
+ */
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector";
+  },
+});
 
 export const contentIndex = pgTable(
   "content_index",
@@ -30,10 +46,20 @@ export const contentIndex = pgTable(
     sourcePath: text("source_path").notNull(),
     deleted: boolean("deleted").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * FTS document, weighted so where a term appears matters: slug (A) beats
+     * frontmatter strings (B) beats body prose (C). Kebab-case slugs are
+     * split so "pricing" matches the pricing page by name alone.
+     */
+    search: tsvector("search").generatedAlwaysAs(
+      (): SQL =>
+        sql`setweight(to_tsvector('english', replace(${contentIndex.slug}, '-', ' ')), 'A') || setweight(jsonb_to_tsvector('english', ${contentIndex.data}, '["string"]'), 'B') || setweight(to_tsvector('english', ${contentIndex.body}), 'C')`,
+    ),
   },
   (t) => [
     primaryKey({ columns: [t.branchId, t.collection, t.slug] }),
     index("content_index_lookup").on(t.collection, t.slug, t.branchId),
+    index("content_index_search").using("gin", t.search),
   ],
 );
 
@@ -81,8 +107,15 @@ export const dataRecords = pgTable(
     actorId: text("actor_id"),
     correlationId: text("correlation_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** FTS over every string value in `data` — records have no body or slug. */
+    search: tsvector("search").generatedAlwaysAs(
+      (): SQL => sql`jsonb_to_tsvector('english', ${dataRecords.data}, '["string"]')`,
+    ),
   },
-  (t) => [index("data_records_lookup").on(t.branchId, t.collection, t.createdAt)],
+  (t) => [
+    index("data_records_lookup").on(t.branchId, t.collection, t.createdAt),
+    index("data_records_search").using("gin", t.search),
+  ],
 );
 
 export type DataRecordRow = typeof dataRecords.$inferSelect;

@@ -9,6 +9,7 @@ export * from "./client";
 export * from "./content";
 export * from "./diff";
 export * from "./schema";
+export * from "./search";
 
 // Re-export the query operators consumers need, so downstream packages (sdk-core,
 // functions) never depend on drizzle-orm directly — one drizzle version, owned here.

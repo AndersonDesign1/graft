@@ -12,7 +12,15 @@
  */
 import { GraftError } from "@graft/contracts";
 import type { AnyCollection, DocumentData } from "@graft/core";
-import { and, asc, contentIndex, eq, type ContentRow, type Database } from "@graft/db";
+import {
+  and,
+  asc,
+  contentIndex,
+  eq,
+  searchContent,
+  type ContentRow,
+  type Database,
+} from "@graft/db";
 
 export interface ClientOptions<TCollections extends Record<string, AnyCollection>> {
   db: Database;
@@ -28,6 +36,21 @@ export interface ReadOptions {
 export interface ListOptions extends ReadOptions {
   limit?: number;
   offset?: number;
+}
+
+export interface SearchOptions extends ReadOptions {
+  /** Max hits, best-ranked first. Defaults to 20. */
+  limit?: number;
+}
+
+/** A full-text hit: the document plus its rank and a highlighted body snippet. */
+export interface SearchHit<
+  TCollection extends AnyCollection = AnyCollection,
+> extends Document<TCollection> {
+  /** ts_rank over the weighted vector: slug (A) > frontmatter (B) > body (C). */
+  rank: number;
+  /** Body fragment(s) with matches wrapped in <b>…</b>. */
+  snippet: string;
 }
 
 /** A document as served to the frontend: typed data + the authored body. */
@@ -50,6 +73,16 @@ export interface GraftClient<TCollections extends Record<string, AnyCollection>>
     collection: K,
     options?: ListOptions,
   ): Promise<Document<TCollections[K]>[]>;
+  /**
+   * Full-text search within one collection (websearch syntax: words, "quoted
+   * phrases", `or`, -exclusions), best-ranked first. Searches the compiled
+   * index — results are as fresh as the last compile.
+   */
+  searchDocuments<K extends keyof TCollections & string>(
+    collection: K,
+    query: string,
+    options?: SearchOptions,
+  ): Promise<SearchHit<TCollections[K]>[]>;
   readonly collections: TCollections;
   readonly branch: string;
 }
@@ -112,6 +145,21 @@ export function createClient<TCollections extends Record<string, AnyCollection>>
       if (opts?.offset !== undefined) query = query.offset(opts.offset);
       const rows = await query;
       return rows.map((row) => toDocument(def, row));
+    },
+
+    async searchDocuments(collection, query, opts) {
+      const def = resolve(collection);
+      const hits = await searchContent(options.db, {
+        query,
+        branchId: opts?.branch ?? defaultBranch,
+        collections: [def.name],
+        limit: opts?.limit,
+      });
+      return hits.map(({ row, rank, snippet }) => ({
+        ...toDocument(def, row),
+        rank,
+        snippet,
+      }));
     },
   };
 }

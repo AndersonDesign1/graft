@@ -60,4 +60,16 @@ describe.skipIf(!runIntegration)("sdk-core reads back what the compiler wrote", 
     const list = await client.listDocuments("pages");
     expect(list.map((d) => d.slug)).toEqual(["home"]);
   }, 60_000);
+
+  it("searchDocuments finds compiled content with rank + snippet", async () => {
+    const client = createClient({ db: handle.db, collections, branch: BRANCH });
+
+    const hits = await client.searchDocuments("pages", "welcome");
+    expect(hits.map((h) => h.slug)).toEqual(["home"]);
+    expect(hits[0]!.rank).toBeGreaterThan(0);
+    expect(hits[0]!.snippet).toContain("<b>");
+    expect(hits[0]!.data.title).toBe("Home");
+
+    expect(await client.searchDocuments("pages", "no-such-term-anywhere")).toEqual([]);
+  }, 60_000);
 });

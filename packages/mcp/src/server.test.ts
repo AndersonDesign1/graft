@@ -209,6 +209,81 @@ describe("write_content validation (never reaches the database)", () => {
   });
 });
 
+describe("search_content", () => {
+  it("rejects unknown collections before touching the database", async () => {
+    const { isError, payload } = await callTool("search_content", {
+      query: "anything",
+      collection: "widgets",
+    });
+    expect(isError).toBe(true);
+    expect(payload.error).toBe(ErrorCodes.COLLECTION_NOT_FOUND);
+  });
+
+  it("rejects an empty query before touching the database", async () => {
+    const { isError, payload } = await callTool("search_content", { query: "   " });
+    expect(isError).toBe(true);
+    expect(payload.error).toBe(ErrorCodes.INPUT_VALIDATION_FAILED);
+    expect(payload.fix).toBeTruthy();
+  });
+
+  it("returns ranked hits pointing at source files", async () => {
+    // A separate server over a stub db: search is the one read that goes to
+    // the compiled index, not the files.
+    const stubDb = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            orderBy: () => ({
+              limit: async () => [
+                {
+                  row: {
+                    branchId: "main",
+                    collection: "pages",
+                    slug: "home",
+                    data: { title: "Home" },
+                    body: "Welcome to Graft",
+                    contentHash: "h1",
+                    sourcePath: "pages/home.mdx",
+                    deleted: false,
+                    updatedAt: new Date(),
+                    search: "",
+                  },
+                  rank: 0.61,
+                  snippet: "<b>Welcome</b> to Graft",
+                },
+              ],
+            }),
+          }),
+        }),
+      }),
+    } as unknown as Database;
+
+    const server = createGraftMcp({ contentDir: dir, collections, db: stubDb });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const searchClient = new Client({ name: "test-agent", version: "0.0.0" });
+    await searchClient.connect(clientTransport);
+
+    const result = (await searchClient.callTool({
+      name: "search_content",
+      arguments: { query: "welcome" },
+    })) as { isError?: boolean; content: { type: string; text: string }[] };
+    const payload = JSON.parse(result.content[0]?.text ?? "null");
+
+    expect(result.isError).toBeFalsy();
+    expect(payload.hits).toEqual([
+      {
+        collection: "pages",
+        slug: "home",
+        sourcePath: "pages/home.mdx",
+        rank: 0.61,
+        snippet: "<b>Welcome</b> to Graft",
+        data: { title: "Home" },
+      },
+    ]);
+  });
+});
+
 describe("explain_error (self-teaching)", () => {
   it("covers every contract error code", () => {
     for (const code of Object.keys(ErrorCodes)) {

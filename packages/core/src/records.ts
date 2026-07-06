@@ -8,7 +8,7 @@
  * stamp actor + correlationId — the pre-audit-log breadcrumb trail.
  */
 import { GraftError } from "@graft/contracts";
-import { and, dataRecords, desc, eq } from "@graft/db";
+import { and, dataRecords, desc, eq, searchData } from "@graft/db";
 import type { AnyCollection, DocumentData } from "./collection";
 import type { FunctionContext } from "./function";
 
@@ -94,18 +94,59 @@ export async function listRecords<TCollection extends AnyCollection>(
     .orderBy(desc(dataRecords.createdAt))
     .limit(options.limit ?? 50);
 
-  return rows.map((row) => {
-    const parsed = collection.schema.safeParse(row.data);
-    if (!parsed.success) {
-      throw new GraftError({
-        code: "SCHEMA_VALIDATION_FAILED",
-        message: `Stored record ${row.id} in "${collection.name}" no longer satisfies the collection schema.`,
-        fix: "The schema changed after this row was written. Migrate or backfill the stored rows to the new shape (data migrations are a Phase 3 unit), or make the changed fields optional.",
-        details: { collection: collection.name, id: row.id },
-      });
-    }
-    return toRecord<DocumentData<TCollection>>(row, parsed.data as DocumentData<TCollection>);
+  return rows.map((row) => parseStoredRow(collection, row));
+}
+
+/** Re-validate a stored row on read (one Zod layer, both directions). */
+function parseStoredRow<TCollection extends AnyCollection>(
+  collection: TCollection,
+  row: typeof dataRecords.$inferSelect,
+): DataRecord<DocumentData<TCollection>> {
+  const parsed = collection.schema.safeParse(row.data);
+  if (!parsed.success) {
+    throw new GraftError({
+      code: "SCHEMA_VALIDATION_FAILED",
+      message: `Stored record ${row.id} in "${collection.name}" no longer satisfies the collection schema.`,
+      fix: "The schema changed after this row was written. Migrate or backfill the stored rows to the new shape (data migrations are a Phase 3 unit), or make the changed fields optional.",
+      details: { collection: collection.name, id: row.id },
+    });
+  }
+  return toRecord<DocumentData<TCollection>>(row, parsed.data as DocumentData<TCollection>);
+}
+
+export interface SearchRecordsOptions {
+  /** Max hits, best-ranked first. Defaults to 20. */
+  limit?: number;
+}
+
+/** A search hit: the typed record plus its full-text rank. */
+export interface DataRecordHit<TData> extends DataRecord<TData> {
+  rank: number;
+}
+
+/**
+ * Full-text search over one collection's records (every string value in
+ * `data`), best-ranked first. Same authority + validation rules as
+ * listRecords — search is a read, so it stays behind the typed-function
+ * boundary and re-validates rows on the way out. Query is websearch syntax:
+ * words, "quoted phrases", `or`, -exclusions.
+ */
+export async function searchRecords<TCollection extends AnyCollection>(
+  ctx: RecordContext,
+  collection: TCollection,
+  query: string,
+  options: SearchRecordsOptions = {},
+): Promise<DataRecordHit<DocumentData<TCollection>>[]> {
+  assertDbAuthoritative(collection, "searchRecords");
+
+  const hits = await searchData(ctx.db, {
+    query,
+    collection: collection.name,
+    branchId: ctx.branch,
+    limit: options.limit,
   });
+
+  return hits.map(({ row, rank }) => ({ ...parseStoredRow(collection, row), rank }));
 }
 
 /**

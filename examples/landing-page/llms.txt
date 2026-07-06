@@ -18,9 +18,11 @@ registered in the repo-root `.mcp.json` as `graft-landing-page`:
     }
 
 Tools: `list_collections`, `describe_schema`, `list_content`, `get_content`,
-`write_content` (validates, writes the MDX file, compiles — one call),
-`explain_error`. Every failure returns JSON with a `fix` — do what it says.
-Writes land as plain files under `content/`; commit them like any other change.
+`search_content` (full-text search across collections; each hit carries the
+`sourcePath` of the file to edit), `write_content` (validates, writes the MDX
+file, compiles — one call), `explain_error`. Every failure returns JSON with a
+`fix` — do what it says. Writes land as plain files under `content/`; commit
+them like any other change.
 
 Remote agents (no stdio): the same tools are served over Streamable HTTP at
 `POST /api/mcp` while the app is running (`pnpm dev`). Stateless, JSON
@@ -74,6 +76,8 @@ Registered functions:
   posts here). Rate-limited: 5/min per caller.
 - `listSubmissions` — query, gated by `requireScopes("submissions:read")`;
   input `{ limit? }`; anonymous or unscoped callers get 401.
+- `searchSubmissions` — query, same gate; input `{ query, limit? }`; full-text
+  search over submissions, best match first.
 - `deleteSubmission` — mutation, `destructive: true`; input `{ id }`; requires
   the `submissions:admin` scope AND human approval (see below).
 
@@ -130,6 +134,18 @@ inside handlers — validated against the collection schema both directions).
 Do not create `content/submissions/` files and do not use `write_content`
 for it — both fail with AUTHORITY_MISMATCH and point you back here.
 
+## Search
+
+Full-text search is built in (Postgres, websearch syntax: plain words,
+`"quoted phrases"`, `or`, `-exclusions`):
+
+- **Content:** the `search_content` MCP tool, or `getGraft().searchContent(...)`
+  from `lib/graft.ts` in server components. It searches the compiled index —
+  results are as fresh as the last compile — and ranks slug matches over
+  frontmatter over body. Hits carry a highlighted `snippet` and `sourcePath`.
+- **Operational data:** per collection, through gated functions only
+  (`searchRecords` inside a handler; `searchSubmissions` here).
+
 ## How to change the schema
 
 Edit `graft.config.ts` (fields are built with `field.string()`,
@@ -140,7 +156,8 @@ run `pnpm compile`. Reads are typed from this file — no codegen step.
 
 - `graft.config.ts` — collections (the schema; single source of truth)
 - `content/pages/*.mdx` — the authored documents
-- `lib/graft.ts` — the typed read client (`getContent`, `listContent`)
+- `lib/graft.ts` — the typed read client (`getContent`, `listContent`,
+  `searchContent`)
 - `app/page.tsx`, `app/[slug]/page.tsx` — routes that render documents
 - `pnpm compile` / `pnpm watch` — project content into Postgres (the `graft` CLI)
 

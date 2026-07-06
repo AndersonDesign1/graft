@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { compile, parseDocument } from "@graft/compiler";
 import { GraftError, type SchemaDescription } from "@graft/contracts";
 import type { AnyCollection } from "@graft/core";
-import type { Database } from "@graft/db";
+import { searchContent, type Database } from "@graft/db";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import matter from "gray-matter";
 import { z } from "zod";
@@ -162,6 +162,45 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
           sourcePath: doc.sourcePath,
           data: doc.data,
           body: doc.body,
+        };
+      }),
+  );
+
+  server.registerTool(
+    "search_content",
+    {
+      title: "Full-text search across content",
+      description:
+        'Search authored content by words, "quoted phrases", `or`, and -exclusions (websearch syntax). Searches the compiled Postgres index, so results are as fresh as the last compile (write_content compiles automatically); every hit carries the sourcePath of the file to edit. Ranking weights slug matches over frontmatter over body.',
+      inputSchema: {
+        query: z.string().describe('What to find, e.g. pricing "free tier" -enterprise'),
+        collection: z
+          .string()
+          .optional()
+          .describe("Restrict to one collection (default: all registered collections)"),
+        limit: z.number().optional().describe("Max hits, best-ranked first (default 20)"),
+      },
+    },
+    ({ query, collection: name, limit }) =>
+      guarded(async () => {
+        if (name !== undefined) requireCollection(collections, name);
+        const hits = await searchContent(db, {
+          query,
+          branchId,
+          collections: name === undefined ? Object.keys(collections) : [name],
+          limit,
+        });
+        return {
+          branch: branchId,
+          query,
+          hits: hits.map(({ row, rank, snippet }) => ({
+            collection: row.collection,
+            slug: row.slug,
+            sourcePath: row.sourcePath,
+            rank,
+            snippet,
+            data: row.data,
+          })),
         };
       }),
   );

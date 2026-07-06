@@ -109,4 +109,16 @@ describe.skipIf(!runIntegration)("write_content projects into content_index", ()
     const reread = await callTool("get_content", { collection: "pages", slug: "hello" });
     expect(reread.payload.data.title).toBe("Hello v2");
   });
+
+  it("search_content finds what write_content wrote, pointing back at the file", async () => {
+    const result = await callTool("search_content", { query: "updated" });
+    expect(result.isError).toBeFalsy();
+    expect(result.payload.hits).toHaveLength(1);
+    expect(result.payload.hits[0]).toMatchObject({
+      collection: "pages",
+      slug: "hello",
+      sourcePath: "pages/hello.mdx",
+    });
+    expect(result.payload.hits[0].snippet).toContain("<b>");
+  });
 });

@@ -12,6 +12,7 @@ import {
   field,
   insertRecord,
   listRecords,
+  searchRecords,
 } from "@graft/core";
 
 export const pages = defineCollection({
@@ -110,6 +111,34 @@ export const listSubmissions = defineFunction({
   },
 });
 
+/** Full-text search over submissions — same scope gate as listSubmissions. */
+export const searchSubmissions = defineFunction({
+  name: "searchSubmissions",
+  kind: "query",
+  description:
+    'Full-text search over submissions (websearch syntax: words, "quoted phrases", `or`, -exclusions), best match first. Requires the submissions:read scope.',
+  returns: "{ submissions: { id, email, message?, rank, receivedAt }[] }",
+  input: {
+    query: field.string({ description: 'What to find, e.g. refund "free tier".' }),
+    limit: field.number({ optional: true, description: "Max hits (default 20)." }),
+  },
+  access: requireScopes("submissions:read"),
+  handler: async (ctx) => {
+    const hits = await searchRecords(ctx, submissions, ctx.input.query, {
+      limit: ctx.input.limit,
+    });
+    return {
+      submissions: hits.map((h) => ({
+        id: h.id,
+        email: h.data.email,
+        message: h.data.message,
+        rank: h.rank,
+        receivedAt: h.createdAt.toISOString(),
+      })),
+    };
+  },
+});
+
 /**
  * Destructive mutation: hard-deletes a row, so it is human-gated — calling it
  * files an approval (403 with the id), a human runs `graft approve <id>`, and
@@ -131,4 +160,10 @@ export const deleteSubmission = defineFunction({
   },
 });
 
-export const functions = { pageStats, submitContact, listSubmissions, deleteSubmission };
+export const functions = {
+  pageStats,
+  submitContact,
+  listSubmissions,
+  searchSubmissions,
+  deleteSubmission,
+};

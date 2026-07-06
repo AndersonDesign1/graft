@@ -17,6 +17,8 @@ import {
   type GraftClient,
   type ListOptions,
   type ReadOptions,
+  type SearchHit,
+  type SearchOptions,
 } from "@graft/sdk-core";
 
 export interface Graft<TCollections extends Record<string, AnyCollection>> {
@@ -31,6 +33,12 @@ export interface Graft<TCollections extends Record<string, AnyCollection>> {
     collection: K,
     options?: ListOptions,
   ): Promise<Document<TCollections[K]>[]>;
+  /** Request-deduped searchDocuments (full-text, best-ranked first). */
+  searchContent<K extends keyof TCollections & string>(
+    collection: K,
+    query: string,
+    options?: SearchOptions,
+  ): Promise<SearchHit<TCollections[K]>[]>;
   /** The underlying sdk-core client, for anything the helpers don't cover. */
   client: GraftClient<TCollections>;
 }
@@ -57,6 +65,10 @@ export function createGraft<TCollections extends Record<string, AnyCollection>>(
       offset: number | undefined,
     ) => client.listDocuments(collection as keyof TCollections & string, { branch, limit, offset }),
   );
+  const cachedSearch = cache(
+    (collection: string, query: string, branch: string | undefined, limit: number | undefined) =>
+      client.searchDocuments(collection as keyof TCollections & string, query, { branch, limit }),
+  );
 
   return {
     client,
@@ -65,6 +77,10 @@ export function createGraft<TCollections extends Record<string, AnyCollection>>(
     listContent: (collection, opts) =>
       cachedList(collection, opts?.branch, opts?.limit, opts?.offset) as ReturnType<
         Graft<TCollections>["listContent"]
+      >,
+    searchContent: (collection, query, opts) =>
+      cachedSearch(collection, query, opts?.branch, opts?.limit) as ReturnType<
+        Graft<TCollections>["searchContent"]
       >,
   };
 }

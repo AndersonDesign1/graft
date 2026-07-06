@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { defineCollection } from "./collection";
 import { field } from "./field";
 import type { RecordContext } from "./records";
-import { deleteRecord, insertRecord, listRecords } from "./records";
+import { deleteRecord, insertRecord, listRecords, searchRecords } from "./records";
 
 const submissions = defineCollection({
   name: "submissions",
@@ -145,6 +145,59 @@ describe("listRecords", () => {
   it("refuses file-authoritative collections with AUTHORITY_MISMATCH", async () => {
     const { db } = stubDb();
     await expect(listRecords(ctx(db), pages)).rejects.toMatchObject({
+      code: "AUTHORITY_MISMATCH",
+    });
+  });
+});
+
+describe("searchRecords", () => {
+  const hit = (id: string, data: Record<string, unknown>, rank: number) => ({
+    row: {
+      id,
+      branchId: "main",
+      collection: "submissions",
+      data,
+      actorKind: "anonymous",
+      actorId: null,
+      correlationId: null,
+      createdAt: new Date(),
+    },
+    rank,
+  });
+
+  it("returns typed, re-validated hits carrying their rank", async () => {
+    const { db } = stubDb([hit("r1", { email: "x@y.z", message: "call me" }, 0.61)]);
+    const hits = await searchRecords(ctx(db), submissions, "call");
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatchObject({ id: "r1", rank: 0.61 });
+    expect(hits[0]?.data).toEqual({ email: "x@y.z", message: "call me" });
+  });
+
+  it("rejects an empty query before touching the db", async () => {
+    const untouchable = new Proxy(
+      {},
+      {
+        get(_t, prop) {
+          throw new Error(`touched db (${String(prop)})`);
+        },
+      },
+    ) as Database;
+    await expect(searchRecords(ctx(untouchable), submissions, "  ")).rejects.toMatchObject({
+      code: "INPUT_VALIDATION_FAILED",
+    });
+  });
+
+  it("surfaces schema drift on read as SCHEMA_VALIDATION_FAILED naming the row", async () => {
+    const { db } = stubDb([hit("r-bad", { wrong: true }, 0.5)]);
+    await expect(searchRecords(ctx(db), submissions, "wrong")).rejects.toMatchObject({
+      code: "SCHEMA_VALIDATION_FAILED",
+      details: { id: "r-bad" },
+    });
+  });
+
+  it("refuses file-authoritative collections with AUTHORITY_MISMATCH", async () => {
+    const { db } = stubDb();
+    await expect(searchRecords(ctx(db), pages, "anything")).rejects.toMatchObject({
       code: "AUTHORITY_MISMATCH",
     });
   });

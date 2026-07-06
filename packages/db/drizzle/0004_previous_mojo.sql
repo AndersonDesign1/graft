@@ -1,0 +1,4 @@
+ALTER TABLE "content_index" ADD COLUMN "search" "tsvector" GENERATED ALWAYS AS (setweight(to_tsvector('english', replace("content_index"."slug", '-', ' ')), 'A') || setweight(jsonb_to_tsvector('english', "content_index"."data", '["string"]'), 'B') || setweight(to_tsvector('english', "content_index"."body"), 'C')) STORED;--> statement-breakpoint
+ALTER TABLE "data_records" ADD COLUMN "search" "tsvector" GENERATED ALWAYS AS (jsonb_to_tsvector('english', "data_records"."data", '["string"]')) STORED;--> statement-breakpoint
+CREATE INDEX "content_index_search" ON "content_index" USING gin ("search");--> statement-breakpoint
+CREATE INDEX "data_records_search" ON "data_records" USING gin ("search");
