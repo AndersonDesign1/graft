@@ -13,29 +13,48 @@ kept out of the repo.)
 
 ## Status
 
-**Phase 2 — The Wow Loop: complete.** The core pipeline works end-to-end, and a fresh
-agent given nothing but this repo has authored a page with an R2-hosted image, compiled
-it, and rendered it — guided only by the repo's own docs and error messages:
+**Phase 3 — Runtime data, security & search: complete.** "Everything is code" now
+extends to live, mutating data — safely. On top of the Phase 2 wow loop (a fresh agent
+authoring a page with an R2-hosted image, unaided), Graft now runs typed functions,
+verifies agent identity, audits every call, and searches every layer:
 
-- Authored MDX is validated against a Zod schema defined in code (`defineCollection`) and
-  projected atomically into a Postgres `content_index` (hash-diff; every run leaves a
-  `compilations` audit row with the git SHA).
-- Typed reads via `@graft/sdk-core` / `@graft/sdk-next`;
-  [`examples/landing-page`](examples/landing-page) renders authored content in Next.js.
-- Agents operate content over MCP: `@graft/mcp` exposes `list_collections`, `describe_schema`,
-  `list_content`, `get_content`, `write_content` (validate → write MDX → compile in one call),
-  and `explain_error`. Registered for this repo in [`.mcp.json`](.mcp.json); agent guide at
+- **Authored content** is validated against a Zod schema defined in code
+  (`defineCollection`) and projected atomically into a Postgres `content_index` (hash-diff;
+  every run leaves a `compilations` audit row with the git SHA). Typed reads via
+  `@graft/sdk-core` / `@graft/sdk-next`; [`examples/landing-page`](examples/landing-page)
+  renders it in Next.js, hero image resolved from R2.
+- **Typed function runtime.** `defineFunction` + `createFunctionsHandler` — stateless
+  Web-standard `Request → Response` RPC with a standard context
+  (`input`/`db`/`actor`/`branch`/`correlationId`); success is `{ data }`, failures are
+  `GraftError` JSON carrying a `fix`. Mutating data lives in a db-authoritative
+  `data_records` table, validated against its collection schema on write *and* read.
+- **Auth — verify identity, never mint it.** `@graft/auth`'s `createActorResolver` verifies
+  bearer OIDC JWTs (via jose; JWKS inline/URL/discovery, `iss`/`exp`/`aud`, scope claims)
+  plus static dev tokens; a bad token is `TOKEN_INVALID` (401), never a silent downgrade.
+  Mutations reject anonymous callers unless explicitly `public: true`. The example hosts
+  Better Auth as a reference issuer.
+- **Audit, rate limits & the human gate.** Every invocation writes an `audit_log` row
+  (actor, correlation id, git SHA, status, duration); rate limits ride that log (stateless
+  DB counts → 429). Destructive ops are always human-gated: the call files a pending
+  approval and 403s with its id; a human runs `graft approve <id>`; the caller retries with
+  `x-graft-approval`. Approvals are one-shot and bound to the exact function + input.
+- **Search is a property of the index.** Generated, weighted `tsvector` columns + GIN on
+  `content_index` and `data_records` mean every write path is searchable with zero app-side
+  bookkeeping. Surfaced as `searchDocuments` (sdk-core), `searchContent` (sdk-next), the
+  `search_content` MCP tool, and gated `searchRecords` functions for data.
+- **Migrations are code.** `migrations/<seq>-<name>.ts` default-exports
+  `defineContentMigration` (codemod-style, all-or-nothing frontmatter rewrites) or
+  `defineDataMigration` (transactional `data_records` backfills), tracked in a
+  `migrations_applied` ledger. `graft migrate` is dry-run by default; `--apply` is the
+  operator's consent.
+- **Agent surfaces.** Content ops over MCP (`list_collections`, `describe_schema`,
+  `list_content`, `get_content`, `write_content`, `search_content`, `explain_error`) via
+  stdio and Streamable HTTP (`createGraftMcpHandler`, mounted at `POST /api/mcp` and now on
+  the actor resolver). Registered for this repo in [`.mcp.json`](.mcp.json); agent guide at
   [`examples/landing-page/llms.txt`](examples/landing-page/llms.txt).
-- The `graft` CLI is real: `graft init` scaffolds a project (schema + content + llms.txt),
-  `graft compile` projects the content tree once, `graft dev` watches content and
-  `graft.config.ts` (hot-reloaded) and recompiles on every save, and
-  `graft asset put` uploads binaries referenced from `asset` fields.
-- Remote agents reach the same tools over Streamable HTTP (`createGraftMcpHandler`,
-  mounted in the example at `POST /api/mcp`); images live in R2/MinIO and render via
-  presigned URLs (or `S3_PUBLIC_URL`).
 
-Next: Phase 3 — the typed function runtime for live data, scoped agent tokens, audit
-log, and search.
+Next: Phase 4 — branching & versioning UX: `graft branch` (copy-on-write DB branches),
+`graft merge` replaying the migrations ledger, and the sdk-core cache-invalidation contract.
 
 ## Requirements
 
@@ -71,7 +90,7 @@ pnpm --filter landing-page dev       # renders at http://localhost:3000
 | `@graft/content-migrations` | Codemod-style authored-content transforms                         |
 | `@graft/db`                 | Postgres + Drizzle + branching abstraction                        |
 | `@graft/assets`             | S3/MinIO storage, transforms, agent upload primitives             |
-| `@graft/auth`               | Scoped tokens, policy-as-code, audit log                          |
+| `@graft/auth`               | OIDC token verification, actor resolver, scope-based access        |
 | `@graft/contracts`          | Shared types, error codes, introspection schemas                  |
 | `@graft/mcp`                | MCP server (primitives + introspection)                           |
 | `@graft/cli`                | Human + agent CLI (`graft`)                                       |
