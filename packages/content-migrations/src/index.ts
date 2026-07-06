@@ -1,6 +1,7 @@
 /**
  * @graft/content-migrations
- * Codemod-style transforms for authored content when schema changes.
- * Placeholder — implemented in a later phase.
+ * Codemod-style transforms for authored content when the schema changes.
+ * Author migrations in migrations/<seq>-<name>.ts; run them with `graft migrate`.
  */
-export const PACKAGE = "@graft/content-migrations" as const;
+export * from "./define";
+export * from "./run";

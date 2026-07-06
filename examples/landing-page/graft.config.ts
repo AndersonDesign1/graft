@@ -20,6 +20,8 @@ export const pages = defineCollection({
   description: "Marketing pages rendered at / (home) and /<slug>.",
   fields: {
     title: field.string({ description: "Page headline (h1) and <title>." }),
+    // Added after launch — migrations/0001-pages-description.ts backfilled it.
+    description: field.string({ description: "Meta description for search/social previews." }),
     tagline: field.string({ optional: true, description: "Short line under the headline." }),
     order: field.number({ optional: true, description: "Nav sort order (ascending)." }),
     image: field.asset({

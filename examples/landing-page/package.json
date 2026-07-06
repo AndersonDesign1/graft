@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "compile": "graft compile",
+    "migrate": "graft migrate",
     "watch": "graft dev",
     "mcp": "tsx scripts/mcp.ts",
     "typecheck": "tsc --noEmit",
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@graft/cli": "workspace:*",
     "@graft/compiler": "workspace:*",
+    "@graft/content-migrations": "workspace:*",
     "@graft/mcp": "workspace:*",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.0.0",

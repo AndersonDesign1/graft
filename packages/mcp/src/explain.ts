@@ -193,6 +193,18 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Run the pending migration (content migrations update the files; DB migrations via @graft/db), then retry the operation.",
   },
+  MIGRATION_FAILED: {
+    code: "MIGRATION_FAILED",
+    meaning:
+      "A content or data migration could not be applied; nothing was written (runs are all-or-nothing).",
+    typicalCauses: [
+      "The transform's output does not satisfy the collection's current schema",
+      "The transform threw for some documents/rows",
+      "A file's frontmatter is not parseable YAML",
+    ],
+    howToRecover:
+      "Read details.failures — each entry names the file/row and why it failed. Fix the transform (or the listed files) in migrations/<id>.ts, then re-run `graft migrate --apply`. Dry-run first with `graft migrate` to see what would change.",
+  },
   UNAUTHORIZED: {
     code: "UNAUTHORIZED",
     meaning: "The caller's token does not permit this operation.",

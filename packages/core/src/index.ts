@@ -6,6 +6,7 @@
  */
 export * from "./field";
 export * from "./collection";
+export * from "./data-migrations";
 export * from "./function";
 export * from "./functions-handler";
 export * from "./records";

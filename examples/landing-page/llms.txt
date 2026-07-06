@@ -31,8 +31,9 @@ responses; set `GRAFT_MCP_TOKEN` to require a bearer token.
 ## How to change content (by hand)
 
 1. Edit or add MDX under `content/pages/`. Frontmatter must satisfy the
-   `pages` collection in `graft.config.ts` (title: string; tagline?: string;
-   order?: number; slug: kebab-case, defaults to the filename).
+   `pages` collection in `graft.config.ts` (title: string; description:
+   string — the meta description; tagline?: string; order?: number; slug:
+   kebab-case, defaults to the filename).
    `order` is the nav position (ascending; home=1 — give a new page the next
    free number).
 2. Run `pnpm compile` (the `graft compile` CLI). It validates every file and
@@ -152,10 +153,40 @@ Edit `graft.config.ts` (fields are built with `field.string()`,
 `field.number({ optional: true })`, …), then update the MDX files to match and
 run `pnpm compile`. Reads are typed from this file — no codegen step.
 
+If the change breaks existing content or data (e.g. a new required field),
+write a migration instead of hand-editing every file (see Migrations).
+
+## Migrations (schema moved ahead of content/data)
+
+Migrations are code: `migrations/<seq>-<name>.ts`, one per file, run in
+filename order. The filename is the migration's identity in the
+`migrations_applied` ledger — applied ones are skipped on re-runs.
+
+- **Content migration** (file-authoritative collections):
+  `export default defineContentMigration({ collection, description,
+  transform })` from `@graft/content-migrations`. The transform gets each
+  document's OLD `{ slug, data, body }` and returns the NEW `{ data, body? }`;
+  output is validated against the current schema, files are rewritten in
+  place, and the run compiles — the whole migration is a reviewable git
+  commit. See `migrations/0001-pages-description.ts`.
+- **Data migration** (db-authoritative collections):
+  `export default defineDataMigration({ collection, description, transform })`
+  from `@graft/core`. The transform maps each row's OLD `data` to the new
+  shape; updates + ledger commit in ONE transaction. See
+  `migrations/0002-submissions-email-lowercase.ts`.
+
+Workflow: `pnpm migrate` (= `graft migrate`) is a DRY-RUN — it prints what
+each pending migration would change and writes nothing. Execute with
+`graft migrate --apply`, then commit the rewritten files. A failed run writes
+nothing (all-or-nothing) and lists every failing file/row with the reason —
+fix the transform and re-run. Compile errors after a schema change tell you
+which files are missing what; that is the signal to write a content migration.
+
 ## Layout of this app
 
 - `graft.config.ts` — collections (the schema; single source of truth)
 - `content/pages/*.mdx` — the authored documents
+- `migrations/*.ts` — content/data migrations (`pnpm migrate` to inspect)
 - `lib/graft.ts` — the typed read client (`getContent`, `listContent`,
   `searchContent`)
 - `app/page.tsx`, `app/[slug]/page.tsx` — routes that render documents

@@ -72,6 +72,9 @@ importers:
       '@graft/compiler':
         specifier: workspace:*
         version: link:../../packages/compiler
+      '@graft/content-migrations':
+        specifier: workspace:*
+        version: link:../../packages/content-migrations
       '@graft/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
@@ -114,6 +117,9 @@ importers:
       '@graft/compiler':
         specifier: workspace:*
         version: link:../compiler
+      '@graft/content-migrations':
+        specifier: workspace:*
+        version: link:../content-migrations
       '@graft/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -142,7 +148,17 @@ importers:
         specifier: ^4.0.3
         version: 4.0.3
 
-  packages/content-migrations: {}
+  packages/content-migrations:
+    dependencies:
+      '@graft/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@graft/core':
+        specifier: workspace:*
+        version: link:../core
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
 
   packages/contracts:
     dependencies:

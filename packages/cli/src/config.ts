@@ -25,6 +25,8 @@ export interface ProjectConfig {
   projectDir: string;
   /** Absolute path to the content root. */
   contentDir: string;
+  /** Absolute path to the migrations directory (may not exist yet). */
+  migrationsDir: string;
   collections: Record<string, AnyCollection>;
 }
 
@@ -101,10 +103,13 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
 
   const projectDir = dirname(configPath);
   const contentDirSetting = typeof mod.contentDir === "string" ? mod.contentDir : "content";
+  const migrationsDirSetting =
+    typeof mod.migrationsDir === "string" ? mod.migrationsDir : "migrations";
   return {
     configPath,
     projectDir,
     contentDir: resolve(projectDir, contentDirSetting),
+    migrationsDir: resolve(projectDir, migrationsDirSetting),
     collections: collections as Record<string, AnyCollection>,
   };
 }

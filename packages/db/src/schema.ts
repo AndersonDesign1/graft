@@ -17,6 +17,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -188,3 +189,30 @@ export const approvals = pgTable(
 
 export type ApprovalRow = typeof approvals.$inferSelect;
 export type ApprovalStatus = "pending" | "approved" | "denied" | "consumed";
+
+/**
+ * One row per applied migration (content codemod or data backfill) per branch —
+ * the bookkeeping `graft merge` (Phase 4) replays against. Migration identity
+ * is the file name stem under migrations/ (drizzle-style): renaming a file
+ * makes it a new migration. The unique index is what makes application
+ * idempotent — a concurrent second apply loses the insert race and fails.
+ */
+export const migrationsApplied = pgTable(
+  "migrations_applied",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    branchId: text("branch_id").notNull().default("main"),
+    migrationId: text("migration_id").notNull(),
+    kind: text("kind").notNull(),
+    collection: text("collection").notNull(),
+    /** Files rewritten (content) or rows updated (data). */
+    docCount: integer("doc_count").notNull(),
+    /** Git commit of the checkout at apply time; null when unresolvable. */
+    gitSha: text("git_sha"),
+    appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("migrations_applied_branch_migration").on(t.branchId, t.migrationId)],
+);
+
+export type MigrationAppliedRow = typeof migrationsApplied.$inferSelect;
+export type MigrationKind = "content" | "data";

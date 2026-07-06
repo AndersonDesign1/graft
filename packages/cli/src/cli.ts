@@ -35,10 +35,12 @@ function printHelp(): void {
     "  approvals    List pending approvals for human-gated (destructive) function calls",
     "  approve <id> Approve a pending approval (the caller retries with x-graft-approval)",
     "  deny <id>    Deny a pending approval",
+    "  migrate      Show pending content/data migrations (dry-run); --apply runs them",
     ...PLANNED.map((cmd) => `  ${cmd.name.padEnd(12)} ${cmd.summary}  (${cmd.phase})`),
     "",
     "Options:",
-    "  --branch <id>    Content branch to project into (compile/dev; default: main)",
+    "  --branch <id>    Content branch to project into (compile/dev/migrate; default: main)",
+    "  --apply          Execute pending migrations (migrate; default is a dry-run report)",
     "  -h, --help       Show this help",
     "  -v, --version    Show version",
   ];
@@ -48,6 +50,7 @@ function printHelp(): void {
 interface ParsedArgs {
   positionals: string[];
   branchId?: string;
+  apply: boolean;
 }
 
 class UsageError extends Error {}
@@ -56,6 +59,7 @@ class UsageError extends Error {}
 function parseArgs(rest: string[]): ParsedArgs {
   const positionals: string[] = [];
   let branchId: string | undefined;
+  let apply = false;
   for (let i = 0; i < rest.length; i++) {
     const arg = rest[i] as string;
     if (arg === "--branch" || arg === "-b") {
@@ -63,13 +67,15 @@ function parseArgs(rest: string[]): ParsedArgs {
       if (!branchId || branchId.startsWith("-")) {
         throw new UsageError("--branch requires a value, e.g. --branch main");
       }
+    } else if (arg === "--apply") {
+      apply = true;
     } else if (arg.startsWith("-")) {
       throw new UsageError(`unknown option "${arg}"`);
     } else {
       positionals.push(arg);
     }
   }
-  return { positionals, branchId };
+  return { positionals, branchId, apply };
 }
 
 export interface RunOptions {
@@ -167,6 +173,11 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
             `The caller can now retry the exact same request with the header \`x-graft-approval: ${row.id}\` (one-shot).`,
           );
         }
+        return 0;
+      }
+      case "migrate": {
+        const { migrateCommand } = await import("./commands/migrate");
+        await migrateCommand({ cwd, branchId: args.branchId, apply: args.apply });
         return 0;
       }
       default: {

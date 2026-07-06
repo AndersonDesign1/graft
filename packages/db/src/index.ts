@@ -8,6 +8,7 @@ export * from "./audit";
 export * from "./client";
 export * from "./content";
 export * from "./diff";
+export * from "./ledger";
 export * from "./schema";
 export * from "./search";
 
