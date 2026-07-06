@@ -81,6 +81,31 @@ pnpm --filter landing-page watch     # graft dev: recompile on every save (optio
 pnpm --filter landing-page dev       # renders at http://localhost:3000
 ```
 
+### Try the runtime
+
+With the example app running (`pnpm --filter landing-page dev`), the typed functions from
+`examples/landing-page/graft.config.ts` are live at `POST /api/fn/<name>` — success returns
+`{ data }`, failure returns a `GraftError` JSON carrying a `fix`:
+
+```bash
+# Open query — lists the live page slugs straight from content_index:
+curl -s localhost:3000/api/fn/pageStats -d '{}'
+
+# Public mutation — the contact form's endpoint (anonymous allowed, 5/min per IP):
+curl -s localhost:3000/api/fn/submitContact \
+  -d '{"email":"a@b.com","message":"hi"}'
+
+# Scope-gated query — needs a token; mutations reject anonymous callers by default.
+# Set GRAFT_DEV_TOKEN in .env, then present it as a bearer:
+curl -s localhost:3000/api/fn/listSubmissions \
+  -H "authorization: Bearer $GRAFT_DEV_TOKEN" -d '{}'
+```
+
+Destructive functions (e.g. `deleteSubmission`) are human-gated: the call 403s with a
+pending approval id, a human runs `graft approve <id>`, and the caller retries with an
+`x-graft-approval: <id>` header. See [`llms.txt`](examples/landing-page/llms.txt) for the
+full surface, including the `search_content` MCP tool and Better Auth token minting.
+
 ## Monorepo layout
 
 | Package                     | Purpose                                                           |
