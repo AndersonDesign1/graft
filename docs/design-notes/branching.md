@@ -48,8 +48,8 @@ Per-branch schema with `CREATE TABLE (LIKE … INCLUDING ALL)` + `INSERT … SEL
 ## Decision — ✅ GO
 
 - **Cloud default: Neon-style storage copy-on-write.** Instant branches, real isolation
-  (including sequences), no app-level overlay. **PENDING validation** — not testable
-  without a Neon account; revisit when cloud creds are available.
+  (including sequences), no app-level overlay. **✅ VALIDATED live 2026-07-07** — see
+  "Live Neon CoW validation" below for measurements.
 - **Self-host fallback: `branch_id` overlay (Strategy 1).** Instant, space-efficient,
   isolated. Accept the read-overlay complexity and hide it entirely inside `@graft/db`.
 - **Schema clone is not the primary path** — keep only as an option for small datasets;
@@ -187,25 +187,37 @@ by design (a4ec83d). Phase 4 turns it into cache tags:
 - After every compile, `sdk-next` calls `revalidateTag` over the `ChangeSet` — deferred here
   from P2 on purpose. `subscribe`/SWR for live previews layer on top.
 
-## Still pending: live Neon CoW validation (blocked on creds)
+## Live Neon CoW validation — ✅ PASSED (2026-07-07)
 
-The `neon` backend's **interface** is decided above and needs no account. Its **runtime
-behavior** is the one open item from Spike B and is **blocked on a `NEON_API_KEY`** (the repo
-has only a pooler `DATABASE_URL`; `neonctl` isn't installed). The spike to run when creds land,
-against the existing Frankfurt project:
+Ran `spikes/spike-neon-cow.mjs` (throwaway) against the Frankfurt project
+(`dark-pine-91155521`, pg18) with a `NEON_API_KEY`. All three questions answered yes:
 
-1. Create a branch from `main` via the Neon API → confirm it returns a **distinct endpoint
-   host** and that connecting with the inherited role works.
-2. Confirm the fork **sees the parent's `content_index` + `data_records` rows** at fork time
-   and that subsequent writes on each side are **isolated** (incl. sequence/uuid safety —
-   uuid keys already sidestep the Spike B serial gotcha).
-3. Measure create/drop latency and confirm drop is clean.
+1. **Distinct endpoint, inherited role.** `POST /projects/{id}/branches` with
+   `endpoints: [{ type: "read_write" }]` returned a new branch + its own endpoint host in
+   **784ms**; operations settled at **2.5s**; first successful query over the inherited
+   role (same user/password/db, only the host swapped into `DATABASE_URL`) at **4.8s**
+   after the create call. Host-swap URL construction works exactly as designed above.
+2. **Inheritance + isolation.** The fork saw the parent's rows at fork time
+   (`content_index` 3/3, `data_records` 10/10). Post-fork writes were invisible across the
+   fork in **both** directions (branch→parent and parent→branch). `gen_random_uuid`
+   defaults work on the fork — no Spike B sequence gotcha (uuid keys sidestep it anyway).
+3. **Drop is clean.** `DELETE` (branch + endpoint) completed in **3.4s**; branch gone from
+   the list; parent data byte-identical afterwards.
 
-Result updates the "Cloud default … **PENDING validation**" line at the top of this file.
+Operational findings for the `neon` backend (P4.3):
+
+- **API keys can be project-scoped** (ours is): `GET /projects` 404s with
+  `not allowed … subject_project_id:"…"`. The backend must take the **project id from
+  config**, not discover it by listing.
+- Branch endpoint hosts live on a different cell domain than the parent
+  (`ep-….c-4.eu-central-1.aws.neon.tech`) — derive branch URLs by swapping the **whole
+  host** from the API response, never by string-editing the parent's host.
+- Create→usable is seconds, not ms: `resolve()` for a *fresh* neon branch should poll until
+  the first query succeeds (~5s worst case observed) or create should block until ready.
 
 ## First implementation unit (after this decision)
 
 `branches` table + migration `0006`; `BranchBackend`/`BranchHandle` types + the `overlay`
 backend (fully testable on local PG18 today — **no Neon needed**); migrate the current
 `eq(branch_id, …)` read paths onto the resolved scope. `graft branch`/`merge` and the `neon`
-backend follow once the spike above validates cloud CoW.
+backend follow — cloud CoW is now validated (see above), so nothing blocks either.
