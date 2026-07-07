@@ -9,9 +9,16 @@
  * with a scope and get rows back. See docs/design-notes/branching.md.
  */
 import { GraftError } from "@graft/contracts";
-import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, inArray, sql, type SQL } from "drizzle-orm";
 import type { Database } from "./client";
-import { branches, contentIndex, type BranchBackendKind, type ContentRow } from "./schema";
+import {
+  branches,
+  contentIndex,
+  dataRecords,
+  migrationsApplied,
+  type BranchBackendKind,
+  type ContentRow,
+} from "./schema";
 
 /** Branch names: kebab segments, optionally slash-separated (e.g. `preview/checkout`). */
 const BRANCH_NAME = /^[a-z0-9]+(?:[-/][a-z0-9]+)*$/;
@@ -96,7 +103,7 @@ export async function createBranch(db: Database, input: CreateBranchInput): Prom
     });
   }
 
-  await assertBranchExists(db, from);
+  await getBranch(db, from);
 
   const existing = await db
     .select({ name: branches.name })
@@ -125,12 +132,54 @@ export async function listBranches(db: Database): Promise<BranchMeta[]> {
   return rows.map(toMeta);
 }
 
+/** The registry row for one branch; `BRANCH_NOT_FOUND` when unregistered. */
+export async function getBranch(db: Database, name: string): Promise<BranchMeta> {
+  const [row] = await db.select().from(branches).where(eq(branches.name, name)).limit(1);
+  if (!row) {
+    throw new GraftError({
+      code: "BRANCH_NOT_FOUND",
+      message: `Branch "${name}" is not registered.`,
+      fix: 'Register it first (createBranch / graft branch create). "main" is seeded; fork previews from it.',
+      details: { name },
+    });
+  }
+  return toMeta(row);
+}
+
+/** Rows an overlay branch owns per table — what a purge would (or did) delete. */
+export interface BranchRowCounts {
+  content: number;
+  data: number;
+  ledger: number;
+}
+
+export interface DropBranchOptions {
+  /**
+   * Also delete the branch's `content_index`, `data_records`, and
+   * `migrations_applied` rows, atomically with the registry row. Without this
+   * the rows are orphaned but harmless (tolerant resolution still reads them
+   * if the same id is ever compiled into again). Audit/compilation rows are
+   * history and are never purged.
+   */
+  purgeRows?: boolean;
+}
+
+export interface DropBranchResult {
+  /** Set when `purgeRows` was requested. */
+  purged?: BranchRowCounts;
+}
+
 /**
- * Remove a branch from the registry. Refuses to drop `main` or a branch that
- * still has children (drop those first). Does not delete the branch's rows —
- * that (and the neon-endpoint teardown) is `graft branch --delete`'s job in P4.2.
+ * Remove a branch from the registry, optionally purging its data-plane rows in
+ * the same transaction. Refuses to drop `main` or a branch that still has
+ * children (drop those first). Neon-endpoint teardown is the `neon` backend's
+ * job (P4.3).
  */
-export async function dropBranch(db: Database, name: string): Promise<void> {
+export async function dropBranch(
+  db: Database,
+  name: string,
+  options: DropBranchOptions = {},
+): Promise<DropBranchResult> {
   if (name === "main") {
     throw new GraftError({
       code: "BRANCH_INVALID",
@@ -139,7 +188,7 @@ export async function dropBranch(db: Database, name: string): Promise<void> {
       details: { name },
     });
   }
-  await assertBranchExists(db, name);
+  await getBranch(db, name);
 
   const children = await db
     .select({ name: branches.name })
@@ -155,23 +204,60 @@ export async function dropBranch(db: Database, name: string): Promise<void> {
     });
   }
 
-  await db.delete(branches).where(eq(branches.name, name));
+  if (!options.purgeRows) {
+    await db.delete(branches).where(eq(branches.name, name));
+    return {};
+  }
+
+  return db.transaction(async (tx) => {
+    const content = await tx
+      .delete(contentIndex)
+      .where(eq(contentIndex.branchId, name))
+      .returning({ slug: contentIndex.slug });
+    const data = await tx
+      .delete(dataRecords)
+      .where(eq(dataRecords.branchId, name))
+      .returning({ id: dataRecords.id });
+    const ledger = await tx
+      .delete(migrationsApplied)
+      .where(eq(migrationsApplied.branchId, name))
+      .returning({ id: migrationsApplied.id });
+    await tx.delete(branches).where(eq(branches.name, name));
+    return { purged: { content: content.length, data: data.length, ledger: ledger.length } };
+  });
 }
 
-async function assertBranchExists(db: Database, name: string): Promise<void> {
-  const rows = await db
-    .select({ name: branches.name })
-    .from(branches)
-    .where(eq(branches.name, name))
-    .limit(1);
-  if (rows.length === 0) {
-    throw new GraftError({
-      code: "BRANCH_NOT_FOUND",
-      message: `Branch "${name}" is not registered.`,
-      fix: 'Register it first (createBranch / graft branch). "main" is seeded; fork previews from it.',
-      details: { name },
-    });
-  }
+/** How many rows a branch owns per table — the dry-run side of purge/merge. */
+export async function countBranchRows(db: Database, name: string): Promise<BranchRowCounts> {
+  const [[content], [data], [ledger]] = await Promise.all([
+    db.select({ n: count() }).from(contentIndex).where(eq(contentIndex.branchId, name)),
+    db.select({ n: count() }).from(dataRecords).where(eq(dataRecords.branchId, name)),
+    db.select({ n: count() }).from(migrationsApplied).where(eq(migrationsApplied.branchId, name)),
+  ]);
+  return { content: content?.n ?? 0, data: data?.n ?? 0, ledger: ledger?.n ?? 0 };
+}
+
+export interface MoveDataRecordsInput {
+  from: string;
+  into: string;
+}
+
+/**
+ * Fold a branch's operational rows onto the target by rewriting `branch_id` —
+ * the `graft merge` data-delta step. Today a branch's `data_records` rows are
+ * exactly the rows created on it (data reads are exact-branch until the
+ * tombstone/inheritance decision lands), so the delta is a pure move: uuid
+ * keys can't collide and parent-owned rows can't have been edited from the
+ * branch. Returns the number of rows moved.
+ */
+export async function moveDataRecords(db: Database, input: MoveDataRecordsInput): Promise<number> {
+  if (input.from === input.into) return 0;
+  const moved = await db
+    .update(dataRecords)
+    .set({ branchId: input.into })
+    .where(eq(dataRecords.branchId, input.from))
+    .returning({ id: dataRecords.id });
+  return moved.length;
 }
 
 function toMeta(row: typeof branches.$inferSelect): BranchMeta {

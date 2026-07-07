@@ -10,7 +10,9 @@ import { findConfig, loadConfig } from "./config";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 // Inside the package so the scaffolded config's `@graft/core` import resolves.
-const loadableTmp = resolve(here, "../.test-tmp");
+// Own subdir of .test-tmp: test files run in parallel and the integration
+// suites keep their fixtures in sibling subdirs — never delete the parent.
+const loadableTmp = resolve(here, "../.test-tmp/init-scaffold");
 
 afterAll(() => {
   rmSync(loadableTmp, { recursive: true, force: true });

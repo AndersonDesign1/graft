@@ -39,9 +39,62 @@ describe("run", () => {
   });
 
   it("names the phase for planned commands", async () => {
-    expect(await run(["branch"])).toBe(1);
-    expect(errors.join("\n")).toContain("Phase 4");
+    expect(await run(["add"])).toBe(1);
+    expect(errors.join("\n")).toContain("Phase 5");
   });
+
+  it("rejects an unknown branch subcommand as a usage error", async () => {
+    expect(await run(["branch", "frobnicate"])).toBe(1);
+    expect(errors.join("\n")).toContain('unknown branch subcommand "frobnicate"');
+  });
+
+  it("branch create requires a name", async () => {
+    expect(await run(["branch", "create"])).toBe(1);
+    expect(errors.join("\n")).toContain("usage: graft branch create <name>");
+  });
+
+  it("branch drop requires a name", async () => {
+    expect(await run(["branch", "drop"])).toBe(1);
+    expect(errors.join("\n")).toContain("usage: graft branch drop <name>");
+  });
+
+  it("merge requires a branch argument", async () => {
+    expect(await run(["merge"])).toBe(1);
+    expect(errors.join("\n")).toContain("usage: graft merge <branch>");
+  });
+
+  it("requires a value for --into", async () => {
+    expect(await run(["merge", "preview", "--into"])).toBe(1);
+    expect(errors.join("\n")).toContain("--into requires a value");
+  });
+
+  it("requires a value for --from", async () => {
+    expect(await run(["branch", "create", "x", "--from", "--apply"])).toBe(1);
+    expect(errors.join("\n")).toContain("--from requires a value");
+  });
+
+  // The merge guards run in an empty dir (no config, no db) — proving they
+  // fire first. 30s timeout: the first dynamic import of the command module
+  // pays vitest's cold transform of the migration-engine graph.
+  it("merge refuses to merge a branch into itself before touching config or db", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "graft-cli-merge-self-"));
+    try {
+      expect(await run(["merge", "preview", "--into", "preview"], { cwd: dir })).toBe(1);
+      expect(errors.join("\n")).toContain("BRANCH_INVALID");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("merge refuses to merge main before touching config or db", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "graft-cli-merge-main-"));
+    try {
+      expect(await run(["merge", "main"], { cwd: dir })).toBe(1);
+      expect(errors.join("\n")).toContain("BRANCH_INVALID");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
 
   it("rejects unknown options as usage errors", async () => {
     expect(await run(["compile", "--frob"])).toBe(1);

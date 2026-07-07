@@ -212,7 +212,7 @@ Operational findings for the `neon` backend (P4.3):
 - Branch endpoint hosts live on a different cell domain than the parent
   (`ep-….c-4.eu-central-1.aws.neon.tech`) — derive branch URLs by swapping the **whole
   host** from the API response, never by string-editing the parent's host.
-- Create→usable is seconds, not ms: `resolve()` for a *fresh* neon branch should poll until
+- Create→usable is seconds, not ms: `resolve()` for a _fresh_ neon branch should poll until
   the first query succeeds (~5s worst case observed) or create should block until ready.
 
 ## First implementation unit (after this decision)

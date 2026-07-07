@@ -10,16 +10,19 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  countBranchRows,
   createBranch,
   dropBranch,
+  getBranch,
   listBranches,
+  moveDataRecords,
   readContent,
   resolveBranchScope,
   scopeChain,
 } from "./branch";
 import { createDb, type DbHandle } from "./client";
 import { projectBranchContent } from "./content";
-import { branches } from "./schema";
+import { branches, dataRecords, migrationsApplied } from "./schema";
 import { searchContent } from "./search";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -33,6 +36,7 @@ const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.en
 const TEST_TIMEOUT = 30_000;
 const PARENT = "it-branch-parent";
 const CHILD = "it-branch-child";
+const SCRATCH = "it-branch-scratch";
 
 const doc = (slug: string, title: string, body: string, hash: string) => ({
   collection: "pages",
@@ -47,11 +51,14 @@ describe.skipIf(!runIntegration)("branch overlay (live)", () => {
   let handle: DbHandle;
 
   async function cleanup() {
-    for (const branch of [CHILD, PARENT]) {
+    for (const branch of [SCRATCH, CHILD, PARENT]) {
       await handle.sql`delete from content_index where branch_id = ${branch}`;
       await handle.sql`delete from compilations where branch_id = ${branch}`;
+      await handle.sql`delete from data_records where branch_id = ${branch}`;
+      await handle.sql`delete from migrations_applied where branch_id = ${branch}`;
       await handle.sql`delete from branches where name = ${branch}`;
     }
+    await handle.sql`delete from data_records where collection = 'it-branch-things'`;
   }
 
   beforeAll(async () => {
@@ -191,6 +198,76 @@ describe.skipIf(!runIntegration)("branch overlay (live)", () => {
 
       const names = (await listBranches(handle.db)).map((b) => b.name);
       expect(names).toEqual(expect.arrayContaining([PARENT, CHILD]));
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "getBranch returns the registry row; unregistered names are BRANCH_NOT_FOUND",
+    async () => {
+      const meta = await getBranch(handle.db, CHILD);
+      expect(meta).toMatchObject({ name: CHILD, parent: PARENT, backend: "overlay" });
+      await expect(getBranch(handle.db, "it-branch-nope")).rejects.toMatchObject({
+        code: "BRANCH_NOT_FOUND",
+      });
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "moveDataRecords folds a branch's rows onto the target (the merge data-delta step)",
+    async () => {
+      await createBranch(handle.db, { name: SCRATCH, from: PARENT });
+      await handle.db.insert(dataRecords).values([
+        { branchId: SCRATCH, collection: "it-branch-things", data: { n: 1 } },
+        { branchId: SCRATCH, collection: "it-branch-things", data: { n: 2 } },
+      ]);
+
+      const before = await countBranchRows(handle.db, SCRATCH);
+      expect(before.data).toBe(2);
+
+      const moved = await moveDataRecords(handle.db, { from: SCRATCH, into: PARENT });
+      expect(moved).toBe(2);
+
+      const after = await countBranchRows(handle.db, SCRATCH);
+      expect(after.data).toBe(0);
+      const parent = await countBranchRows(handle.db, PARENT);
+      expect(parent.data).toBe(2);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "dropBranch with purgeRows deletes the branch's data-plane rows atomically",
+    async () => {
+      // Give the scratch branch one row in each purged table.
+      await projectBranchContent(
+        handle.db,
+        [doc("scratch-only", "Scratch", "Scratch body.", "s-1")],
+        { branchId: SCRATCH },
+      );
+      await handle.db
+        .insert(dataRecords)
+        .values({ branchId: SCRATCH, collection: "it-branch-things", data: { n: 3 } });
+      await handle.db.insert(migrationsApplied).values({
+        branchId: SCRATCH,
+        migrationId: "0001-it-branch-test",
+        kind: "data",
+        collection: "it-branch-things",
+        docCount: 1,
+      });
+
+      const result = await dropBranch(handle.db, SCRATCH, { purgeRows: true });
+      expect(result.purged).toEqual({ content: 1, data: 1, ledger: 1 });
+
+      const counts = await countBranchRows(handle.db, SCRATCH);
+      expect(counts).toEqual({ content: 0, data: 0, ledger: 0 });
+      await expect(getBranch(handle.db, SCRATCH)).rejects.toMatchObject({
+        code: "BRANCH_NOT_FOUND",
+      });
+      // The rows moved onto the parent in the previous test are untouched.
+      const parent = await countBranchRows(handle.db, PARENT);
+      expect(parent.data).toBe(2);
     },
     TEST_TIMEOUT,
   );

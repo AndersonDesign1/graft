@@ -1,9 +1,10 @@
 /**
  * @graft/cli — the `graft` command.
  *
- * Phase 2: `init`, `compile`, and `dev` are real; `add`/`branch`/`merge` are
- * planned stubs that say which phase delivers them. Every failure crossing this
- * boundary is a GraftError printed with its agent-actionable `fix`.
+ * `init`/`compile`/`dev` (Phase 2), the approval + migration operator loops
+ * (Phase 3), and `branch`/`merge` (Phase 4) are real; `add` is a planned stub
+ * that says which phase delivers it. Every failure crossing this boundary is a
+ * GraftError printed with its agent-actionable `fix`.
  */
 import { printGraftError } from "./report";
 
@@ -17,8 +18,6 @@ interface PlannedCommand {
 
 const PLANNED: PlannedCommand[] = [
   { name: "add", summary: "Add an owned primitive from the registry", phase: "Phase 5" },
-  { name: "branch", summary: "Create a content + database preview branch", phase: "Phase 4" },
-  { name: "merge", summary: "Merge a branch, running content + DB migrations", phase: "Phase 4" },
 ];
 
 function printHelp(): void {
@@ -36,11 +35,18 @@ function printHelp(): void {
     "  approve <id> Approve a pending approval (the caller retries with x-graft-approval)",
     "  deny <id>    Deny a pending approval",
     "  migrate      Show pending content/data migrations (dry-run); --apply runs them",
+    "  branch                   List branches (name, parent, backend)",
+    "  branch create <name>     Register a preview branch (instant; --from <parent>, default main)",
+    "  branch drop <name>       Drop a branch and purge its content/data/ledger rows",
+    "  merge <name>             Merge a branch into --into (default main): replay ledger,",
+    "                           move data rows, recompile. Dry-run; --apply executes",
     ...PLANNED.map((cmd) => `  ${cmd.name.padEnd(12)} ${cmd.summary}  (${cmd.phase})`),
     "",
     "Options:",
     "  --branch <id>    Content branch to project into (compile/dev/migrate; default: main)",
-    "  --apply          Execute pending migrations (migrate; default is a dry-run report)",
+    "  --from <name>    Parent to fork from (branch create; default: main)",
+    "  --into <name>    Merge target (merge; default: main)",
+    "  --apply          Execute pending migrations / the merge (default is a dry-run report)",
     "  -h, --help       Show this help",
     "  -v, --version    Show version",
   ];
@@ -50,6 +56,8 @@ function printHelp(): void {
 interface ParsedArgs {
   positionals: string[];
   branchId?: string;
+  from?: string;
+  into?: string;
   apply: boolean;
 }
 
@@ -59,14 +67,25 @@ class UsageError extends Error {}
 function parseArgs(rest: string[]): ParsedArgs {
   const positionals: string[] = [];
   let branchId: string | undefined;
+  let from: string | undefined;
+  let into: string | undefined;
   let apply = false;
+
+  const value = (flag: string, raw: string | undefined): string => {
+    if (!raw || raw.startsWith("-")) {
+      throw new UsageError(`${flag} requires a value, e.g. ${flag} main`);
+    }
+    return raw;
+  };
+
   for (let i = 0; i < rest.length; i++) {
     const arg = rest[i] as string;
     if (arg === "--branch" || arg === "-b") {
-      branchId = rest[++i];
-      if (!branchId || branchId.startsWith("-")) {
-        throw new UsageError("--branch requires a value, e.g. --branch main");
-      }
+      branchId = value("--branch", rest[++i]);
+    } else if (arg === "--from") {
+      from = value("--from", rest[++i]);
+    } else if (arg === "--into") {
+      into = value("--into", rest[++i]);
     } else if (arg === "--apply") {
       apply = true;
     } else if (arg.startsWith("-")) {
@@ -75,7 +94,7 @@ function parseArgs(rest: string[]): ParsedArgs {
       positionals.push(arg);
     }
   }
-  return { positionals, branchId, apply };
+  return { positionals, branchId, from, into, apply };
 }
 
 export interface RunOptions {
@@ -178,6 +197,58 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
       case "migrate": {
         const { migrateCommand } = await import("./commands/migrate");
         await migrateCommand({ cwd, branchId: args.branchId, apply: args.apply });
+        return 0;
+      }
+      case "branch": {
+        const [subcommand, name] = args.positionals;
+        // Usage validation before the (heavy) command module loads.
+        if (subcommand && subcommand !== "create" && subcommand !== "drop") {
+          throw new UsageError(
+            `unknown branch subcommand "${subcommand}" — use \`graft branch\`, \`graft branch create <name>\`, or \`graft branch drop <name>\``,
+          );
+        }
+        if (subcommand && !name) {
+          throw new UsageError(`usage: graft branch ${subcommand} <name>`);
+        }
+        const mod = await import("./commands/branch");
+        if (!subcommand) {
+          const rows = await mod.branchListCommand({ cwd });
+          if (rows.length === 0) {
+            console.log("No branches registered (main is seeded by migration 0006).");
+            return 0;
+          }
+          for (const row of rows) console.log(mod.formatBranch(row));
+          return 0;
+        }
+        if (subcommand === "create" && name) {
+          const meta = await mod.branchCreateCommand({ cwd, name, from: args.from });
+          console.log(
+            [
+              `Created branch "${meta.name}" from "${meta.parent}" (${meta.backend} — zero rows copied).`,
+              `Reads overlay the parent until the branch writes its own rows:`,
+              `  graft compile --branch ${meta.name}`,
+              `Merge it back with \`graft merge ${meta.name}\` when ready.`,
+            ].join("\n"),
+          );
+          return 0;
+        }
+        // drop — the only remaining case after the usage validation above.
+        const result = await mod.branchDropCommand({ cwd, name: name as string });
+        const p = result.purged;
+        console.log(
+          `Dropped branch "${name}"` +
+            (p
+              ? ` (purged ${p.content} content, ${p.data} data, ${p.ledger} ledger row(s)).`
+              : "."),
+        );
+        return 0;
+      }
+      case "merge": {
+        const branch = args.positionals[0];
+        if (!branch)
+          throw new UsageError("usage: graft merge <branch> [--into <target>] [--apply]");
+        const { mergeCommand } = await import("./commands/merge");
+        await mergeCommand({ cwd, branch, into: args.into, apply: args.apply });
         return 0;
       }
       default: {

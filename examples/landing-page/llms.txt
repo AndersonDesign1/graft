@@ -182,6 +182,26 @@ nothing (all-or-nothing) and lists every failing file/row with the reason —
 fix the transform and re-run. Compile errors after a schema change tell you
 which files are missing what; that is the signal to write a content migration.
 
+## Branches (preview a change without touching main)
+
+A branch is an instant copy-on-write view: creating one copies zero rows, and
+reads fall through to the parent until the branch writes its own rows.
+
+- `graft branch` — list branches (name, parent, backend).
+- `graft branch create preview/my-change` — register a branch off main
+  (`--from <parent>` to fork elsewhere). Then project into it with
+  `graft compile --branch preview/my-change`; the app reads whichever branch
+  its Graft client is configured for.
+- `graft merge preview/my-change` — DRY-RUN by default, like `graft migrate`.
+  It reports what `--apply` would do: replay migrations the branch applied but
+  main hasn't (data migrations run for real; content migrations just get a
+  ledger row — their file rewrites arrive via the git merge), move the
+  branch's `data_records` rows onto the target, and recompile the working
+  tree into the target. **git-merge the branch's commits first** — content is
+  git-authoritative, so `graft merge` compiles whatever tree you run it from.
+- `graft branch drop preview/my-change` — unregister and purge the branch's
+  content/data/ledger rows (audit history stays).
+
 ## Layout of this app
 
 - `graft.config.ts` — collections (the schema; single source of truth)
