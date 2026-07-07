@@ -1,17 +1,27 @@
 /**
  * Next.js (RSC) adapter over @graft/sdk-core.
  *
- * createGraft wraps the read client with React.cache so repeated reads of the
- * same document within one server render are deduped. Server-only by nature
- * (it holds a database handle) — import it from Server Components or route
- * handlers, never from client components.
+ * `createGraft` wraps the read client with React.cache so repeated reads of the
+ * same document within one server render are deduped. Server-only by nature (it
+ * holds a database handle) — import from Server Components or route handlers,
+ * never client components.
  *
- * Live binding + revalidateTag integration land in Phase 4.
+ * Caching + invalidation (Phase 4) is the cache-tag contract, not a wrapper:
+ * Next 16's `'use cache'` is a compile-time directive an app authors, so this
+ * package can't generate it. Instead it ships the tag helpers (re-exported from
+ * sdk-core — `tagsFor`, `documentTag`, `collectionTag`) that an app drops into
+ * `cacheTag(...)` inside its own `'use cache'` functions, plus the write side:
+ * `revalidateContent` / `updateContent`, which turn a compile's `ChangeSet`
+ * into the exact `revalidateTag` / `updateTag` calls that refresh only the
+ * changed pages. See the example app's llms.txt for the composition.
  */
+import { revalidateTag, updateTag } from "next/cache";
 import { cache } from "react";
 import {
   createClient,
+  tagsForChanges,
   type AnyCollection,
+  type ChangeSet,
   type ClientOptions,
   type Document,
   type GraftClient,
@@ -83,4 +93,41 @@ export function createGraft<TCollections extends Record<string, AnyCollection>>(
         Graft<TCollections>["searchContent"]
       >,
   };
+}
+
+/** How long a background-revalidated tag may keep serving stale before it hard-expires. */
+export type RevalidateProfile = string | { expire?: number };
+
+/**
+ * Background-invalidate the Data Cache for everything a compile changed, on
+ * `branch`. Call it from a **route handler** (a compile webhook): the next
+ * request triggers a background refresh (stale-while-revalidate). Refreshes
+ * only the changed pages — per-doc + per-collection tags — and returns them.
+ *
+ * `profile` is Next 16's required cache-life argument to `revalidateTag`
+ * (a built-in name like `"max"`/`"hours"` or `{ expire }`); defaults to `"max"`.
+ * A no-op unless the reads were cached with `'use cache'` + `cacheTag`, but
+ * always safe to call.
+ */
+export function revalidateContent(
+  branch: string,
+  changes: ChangeSet,
+  profile: RevalidateProfile = "max",
+): string[] {
+  const tags = tagsForChanges(branch, changes);
+  for (const tag of tags) revalidateTag(tag, profile);
+  return tags;
+}
+
+/**
+ * Immediately invalidate the Data Cache for a compile's changes, with
+ * read-your-own-writes semantics. Call it from a **Server Action** (e.g. an
+ * in-app "publish" that compiles then updates): the same request sees fresh
+ * content. Returns the tags it hit. Like `revalidateContent`, a no-op unless
+ * the reads were cached with `'use cache'` + `cacheTag`.
+ */
+export function updateContent(branch: string, changes: ChangeSet): string[] {
+  const tags = tagsForChanges(branch, changes);
+  for (const tag of tags) updateTag(tag);
+  return tags;
 }

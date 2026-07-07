@@ -17,6 +17,7 @@
   "dependencies": {
     "@graft/assets": "workspace:*",
     "@graft/auth": "workspace:*",
+    "@graft/contracts": "workspace:*",
     "@graft/core": "workspace:*",
     "@graft/db": "workspace:*",
     "@graft/sdk-next": "workspace:*",

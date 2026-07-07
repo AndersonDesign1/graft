@@ -38,6 +38,9 @@ importers:
       '@graft/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@graft/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@graft/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -245,6 +248,9 @@ importers:
       '@types/react':
         specifier: ^19.0.0
         version: 19.2.17
+      next:
+        specifier: ^16.0.0
+        version: 16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react:
         specifier: ^19.0.0
         version: 19.2.7

@@ -210,6 +210,35 @@ previews inherit content, never operational data.
   branch's content/data/ledger rows (audit history stays); neon: delete the
   fork and its endpoint.
 
+## Caching & revalidation (optional; reads are force-dynamic today)
+
+This app renders `dynamic = "force-dynamic"`, so every request sees the latest
+compile — no cache, no revalidation needed. Graft ships the cache-tag contract
+for when you want cached/ISR rendering instead:
+
+- **Tag reads** with Next 16 `'use cache'` + `cacheTag`, using the helpers from
+  `@graft/sdk-next` (re-exported from sdk-core):
+  ```ts
+  import { cacheTag, cacheLife } from "next/cache";
+  import { documentTag } from "@graft/sdk-next";
+  async function getPage(slug: string) {
+    "use cache";
+    cacheTag(documentTag("main", "pages", slug)); // list reads: collectionTag(...)
+    cacheLife("max");
+    return getGraft().getContent("pages", slug);
+  }
+  ```
+  (`'use cache'` needs `cacheComponents: true` in next.config.ts.)
+- **Invalidate after a compile** by POSTing the compile's ChangeSet to
+  `POST /api/revalidate` (`{ branch, changes }`, bearer-gated) — it calls
+  `revalidateContent(branch, changes)`, which fires `revalidateTag` for only
+  the per-doc + per-collection tags that changed. Inside a Server Action, use
+  `updateContent(branch, changes)` instead for read-your-own-writes.
+
+The contract is precise: an unchanged-only compile revalidates nothing (the
+hash-diff `ChangeSet` is the invalidation input), and tags are branch-scoped so
+a preview never busts main's cache.
+
 ## Layout of this app
 
 - `graft.config.ts` — collections (the schema; single source of truth)
@@ -218,6 +247,7 @@ previews inherit content, never operational data.
 - `lib/graft.ts` — the typed read client (`getContent`, `listContent`,
   `searchContent`)
 - `app/page.tsx`, `app/[slug]/page.tsx` — routes that render documents
+- `app/api/revalidate/route.ts` — the cache-revalidation webhook (POST a ChangeSet)
 - `pnpm compile` / `pnpm watch` — project content into Postgres (the `graft` CLI)
 
 ## Rules
