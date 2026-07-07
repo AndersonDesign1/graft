@@ -86,7 +86,7 @@ re-litigating the shape (the P3.1 pattern: lock the interface before writing aga
 | Isolation     | logical (overlay reads, tombstone hides) | physical (storage CoW — incl. sequences)                   |
 | Query scoping | `branch_id = ANY(chain)` + overlay pick  | **none** — each branch DB holds only its own rows          |
 | Create cost   | 0 ms (insert a registry row)             | ~instant (Neon storage CoW), one API call                  |
-| Validated     | ✅ Spike B                               | ⏳ **pending live creds** (see below)                      |
+| Validated     | ✅ Spike B                               | ✅ **live 2026-07-07** (see below)                         |
 
 So a branch handle can't just be "a `Database`". It is **a `Database` + a scoping strategy**.
 That is the whole abstraction:
