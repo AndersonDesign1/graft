@@ -1,6 +1,11 @@
 /**
  * graft compile — project the content tree into the content index, once.
  * The same validate → project pipeline the MCP write_content tool runs.
+ *
+ * `--branch` resolves through the branch registry: overlay branches (and
+ * unregistered ids — tolerant by design) compile into the shared DB under
+ * their branch_id; a `neon` branch compiles into its own database (rows there
+ * keep the default id — the fork IS the branch).
  */
 import type { CompileResult } from "@graft/compiler";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
@@ -17,21 +22,31 @@ export async function compileCommand(options: CompileCommandOptions): Promise<Co
   const url = requireDatabaseUrl();
   // The compiler pulls in the database driver (~1s of import) — load both only
   // once the project is known to be valid, so config errors return in milliseconds.
-  const [{ compile }, { createDb }] = await Promise.all([
+  const [{ compile }, { createDb, resolveBranchHandle, scopeWriteBranch }] = await Promise.all([
     import("@graft/compiler"),
     import("@graft/db"),
   ]);
-  const handle = createDb(url);
+  const control = createDb(url);
   try {
-    const result = await compile({
-      db: handle.db,
-      contentDir: config.contentDir,
-      collections: config.collections,
-      branchId: options.branchId,
+    const branch = await resolveBranchHandle(control.db, options.branchId ?? "main", {
+      databaseUrl: url,
     });
-    console.log(formatCompileResult(result));
-    return result;
+    try {
+      if (branch.scope.kind === "physical") {
+        console.log(`neon branch "${branch.name}" — compiling into its own database`);
+      }
+      const result = await compile({
+        db: branch.db,
+        contentDir: config.contentDir,
+        collections: config.collections,
+        branchId: scopeWriteBranch(branch.scope),
+      });
+      console.log(formatCompileResult(result));
+      return result;
+    } finally {
+      await branch.close();
+    }
   } finally {
-    await handle.close();
+    await control.close();
   }
 }

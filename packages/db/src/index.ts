@@ -10,6 +10,7 @@ export * from "./client";
 export * from "./content";
 export * from "./diff";
 export * from "./ledger";
+export * from "./neon";
 export * from "./schema";
 export * from "./search";
 

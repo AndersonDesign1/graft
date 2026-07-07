@@ -296,6 +296,19 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       'Use lowercase kebab names with optional "/" segments (e.g. "preview/checkout"). Fork previews from main; drop child branches before their parent; main is the root and cannot be dropped.',
   },
+  BRANCH_BACKEND_FAILED: {
+    code: "BRANCH_BACKEND_FAILED",
+    meaning:
+      "The branch backend's control plane (the Neon API for `neon` branches) rejected or failed an operation, so the branch's physical state may not match the registry.",
+    typicalCauses: [
+      "An invalid or expired NEON_API_KEY, or one scoped to a different project",
+      "A wrong GRAFT_NEON_PROJECT_ID",
+      "Neon-side limits (max branches) or a transient API outage",
+      "The branch's compute endpoint never became reachable after create",
+    ],
+    howToRecover:
+      "Check NEON_API_KEY and GRAFT_NEON_PROJECT_ID in the environment, then retry. If a create failed partway, the error says whether a Neon branch was left behind — delete it in the Neon console (or retry the drop) before recreating. Overlay branches never hit this: they need no external API.",
+  },
   NOT_IMPLEMENTED: {
     code: "NOT_IMPLEMENTED",
     meaning: "The capability is planned but not built yet.",

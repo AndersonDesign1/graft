@@ -111,12 +111,24 @@ export async function migrateCommand(
   }
 
   const url = requireDatabaseUrl();
-  const [{ compile, resolveGitSha }, { createDb, listAppliedMigrations, recordAppliedMigration }] =
-    await Promise.all([import("@graft/compiler"), import("@graft/db")]);
-  const handle = createDb(url);
+  const [
+    { compile, resolveGitSha },
+    {
+      createDb,
+      listAppliedMigrations,
+      recordAppliedMigration,
+      resolveBranchHandle,
+      scopeWriteBranch,
+    },
+  ] = await Promise.all([import("@graft/compiler"), import("@graft/db")]);
+  const control = createDb(url);
+  // Overlay branches (and unregistered ids) run against the shared DB under
+  // their branch_id; a neon branch runs against its own database.
+  const branch = await resolveBranchHandle(control.db, branchId, { databaseUrl: url });
+  const writeBranch = scopeWriteBranch(branch.scope);
 
   try {
-    const appliedRows = await listAppliedMigrations(handle.db, branchId);
+    const appliedRows = await listAppliedMigrations(branch.db, writeBranch);
     const appliedIds = new Set(appliedRows.map((row) => row.migrationId));
     const applied = migrations.filter((m) => appliedIds.has(m.id)).map((m) => m.id);
     const pending = migrations.filter((m) => !appliedIds.has(m.id));
@@ -145,14 +157,14 @@ export async function migrateCommand(
           // Compile before the ledger row: an applied content migration is only
           // real once the rewritten files validate and project cleanly.
           const compiled = await compile({
-            db: handle.db,
+            db: branch.db,
             contentDir: config.contentDir,
             collections: config.collections,
-            branchId,
+            branchId: writeBranch,
             gitSha,
           });
-          await recordAppliedMigration(handle.db, {
-            branchId,
+          await recordAppliedMigration(branch.db, {
+            branchId: writeBranch,
             migrationId: id,
             kind: "content",
             collection: migration.collection.name,
@@ -176,10 +188,10 @@ export async function migrateCommand(
         });
       } else {
         const report = await runDataMigration({
-          db: handle.db,
+          db: branch.db,
           migration,
           migrationId: id,
-          branchId,
+          branchId: writeBranch,
           gitSha,
           apply: options.apply,
         });
@@ -207,6 +219,7 @@ export async function migrateCommand(
     }
     return { applied, pending: outcomes, didApply: options.apply === true };
   } finally {
-    await handle.close();
+    await branch.close();
+    await control.close();
   }
 }

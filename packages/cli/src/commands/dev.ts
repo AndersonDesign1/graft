@@ -40,11 +40,17 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
 
   const url = requireDatabaseUrl();
   // Heavy imports (compiler → database driver) only after the project checks out.
-  const [{ compile }, { createDb }] = await Promise.all([
+  const [{ compile }, { createDb, resolveBranchHandle, scopeWriteBranch }] = await Promise.all([
     import("@graft/compiler"),
     import("@graft/db"),
   ]);
-  const handle = createDb(url);
+  const control = createDb(url);
+  // Resolved once at startup: a neon branch gets its own connection; overlay
+  // (registered or not) shares the control one.
+  const branch = await resolveBranchHandle(control.db, options.branchId ?? "main", {
+    databaseUrl: url,
+  });
+  const writeBranch = scopeWriteBranch(branch.scope);
   let timer: NodeJS.Timeout | undefined;
   let compiling = false;
   let dirty = false;
@@ -63,10 +69,10 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
         console.log(`reloaded ${basename(configPath)}`);
       }
       const result = await compile({
-        db: handle.db,
+        db: branch.db,
         contentDir: config.contentDir,
         collections: config.collections,
-        branchId: options.branchId,
+        branchId: writeBranch,
       });
       console.log(formatCompileResult(result));
     } catch (error) {
@@ -98,8 +104,10 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
   ];
 
   const watchedContent = relative(options.cwd, config.contentDir) || ".";
+  const branchLabel =
+    branch.scope.kind === "physical" ? `${branch.name} (neon)` : (options.branchId ?? "main");
   console.log(
-    `Watching ${watchedContent} + ${basename(configPath)} (branch: ${options.branchId ?? "main"}). Ctrl+C to stop.`,
+    `Watching ${watchedContent} + ${basename(configPath)} (branch: ${branchLabel}). Ctrl+C to stop.`,
   );
 
   await new Promise<void>((resolveStopped) => {
@@ -112,5 +120,6 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
     process.once("SIGTERM", stop);
   });
 
-  await handle.close();
+  await branch.close();
+  await control.close();
 }

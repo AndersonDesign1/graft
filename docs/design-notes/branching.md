@@ -221,3 +221,55 @@ Operational findings for the `neon` backend (P4.3):
 backend (fully testable on local PG18 today — **no Neon needed**); migrate the current
 `eq(branch_id, …)` read paths onto the resolved scope. `graft branch`/`merge` and the `neon`
 backend follow — cloud CoW is now validated (see above), so nothing blocks either.
+
+---
+
+# Data semantics — DECIDED (2026-07-07, with the `neon` backend)
+
+Two questions were open since P4.1; both are now locked:
+
+## Previews inherit content, never operational data
+
+A preview branch exists to preview a **code/content/schema** change, not to duplicate the
+environment. So:
+
+- **Content (`content_index`) is inherited** — overlay via the ancestor chain, neon via the
+  storage fork. It is derived from git anyway; a recompile regenerates it.
+- **Operational data (`data_records`) starts EMPTY on a branch.** It belongs to the
+  environment (form submissions, orders — often PII), not the code version. Overlay already
+  behaves this way (data reads are exact-branch, no chain); the `neon` backend **enforces**
+  it by clearing `data_records` on the fork right after create. Both backends therefore mean
+  the same thing, and `graft merge`'s data step stays **additive**: everything a branch
+  holds is branch-created, so merge = move (overlay, same DB) or copy (neon, cross-DB) — no
+  row-level conflict resolution exists to need.
+- **`approvals` is also cleared on a neon fork:** approvals are one-shot by conditional
+  UPDATE, which only works inside one database — a pending/approved row copied into a fork
+  could be consumed there _and_ on the parent (one human decision, two executions).
+- **`audit_log` stays on the fork:** append-only history; harmless and useful.
+
+Consequences: no `deleted` tombstone column on `data_records` (nothing to tombstone — a
+branch never sees parent rows), and `deleteRecord` stays a hard delete behind its human
+gate. If branch-side _editing_ of inherited operational data is ever needed, that reopens
+this decision (tombstones + real merge folding); until a vertical demands it, the simple
+model wins.
+
+## Physical scope semantics: the fork IS the branch
+
+Inside a neon fork there is no `branch_id` scoping — rows keep the **default `main` id**
+(they were physically copied from the parent). So `BranchScope { kind: "physical" }` reads
+and writes `main` against the branch's own connection; `scopeChain` → `["main"]`,
+`scopeWriteBranch` → `"main"`. The registry name is a label for routing, never a row value.
+Corollary: a neon branch can only fork **main or another neon branch** — an overlay branch
+has no physical form of its own (its rows live under a non-`main` id the physical scope
+never reads), and `createNeonBranch` rejects it.
+
+## Shipped shape (P4.3)
+
+`@graft/db`: `neon.ts` (`createNeonBranch` / `dropNeonBranch` / `neonConfigFromEnv` —
+`NEON_API_KEY` + `GRAFT_NEON_PROJECT_ID`, project id always from config) and
+`resolveBranchHandle` — the `resolve()` seam from the abstraction above: name → connection
+(shared for overlay, endpoint-host-swapped `createDb` for neon) + scope. The CLI routes
+`compile` / `dev` / `migrate` / `merge` through it, so `--branch <neon-branch>` transparently
+targets the fork. Failure convergence: a partway-failed create deletes the Neon branch
+best-effort; a drop that finds the Neon branch already gone (404) still removes the registry
+row. Errors are `BRANCH_BACKEND_FAILED` with the env/console fix.

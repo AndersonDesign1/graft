@@ -184,14 +184,21 @@ which files are missing what; that is the signal to write a content migration.
 
 ## Branches (preview a change without touching main)
 
-A branch is an instant copy-on-write view: creating one copies zero rows, and
-reads fall through to the parent until the branch writes its own rows.
+A branch is an instant copy-on-write view. Two backends, same commands:
+**overlay** (default) registers a row and scopes reads in the shared DB —
+zero rows copied, reads fall through to the parent until the branch writes.
+**neon** (`--backend neon`) forks a physically separate Postgres via the Neon
+API (needs `NEON_API_KEY` + `GRAFT_NEON_PROJECT_ID` in .env). Either way:
+content is inherited; **operational data (`data_records`) starts empty** —
+previews inherit content, never operational data.
 
 - `graft branch` — list branches (name, parent, backend).
 - `graft branch create preview/my-change` — register a branch off main
-  (`--from <parent>` to fork elsewhere). Then project into it with
-  `graft compile --branch preview/my-change`; the app reads whichever branch
-  its Graft client is configured for.
+  (`--from <parent>` to fork elsewhere; `--backend neon` for a physical
+  fork). Then project into it with
+  `graft compile --branch preview/my-change` — the CLI routes to the right
+  database automatically; the app reads whichever branch its Graft client is
+  configured for.
 - `graft merge preview/my-change` — DRY-RUN by default, like `graft migrate`.
   It reports what `--apply` would do: replay migrations the branch applied but
   main hasn't (data migrations run for real; content migrations just get a
@@ -199,8 +206,9 @@ reads fall through to the parent until the branch writes its own rows.
   branch's `data_records` rows onto the target, and recompile the working
   tree into the target. **git-merge the branch's commits first** — content is
   git-authoritative, so `graft merge` compiles whatever tree you run it from.
-- `graft branch drop preview/my-change` — unregister and purge the branch's
-  content/data/ledger rows (audit history stays).
+- `graft branch drop preview/my-change` — overlay: unregister and purge the
+  branch's content/data/ledger rows (audit history stays); neon: delete the
+  fork and its endpoint.
 
 ## Layout of this app
 

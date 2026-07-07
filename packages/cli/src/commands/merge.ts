@@ -92,18 +92,37 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
       recordAppliedMigration,
       countBranchRows,
       moveDataRecords,
+      copyDataRecords,
+      resolveBranchHandle,
+      scopeWriteBranch,
     },
     { runDataMigration },
   ] = await Promise.all([import("@graft/compiler"), import("@graft/db"), import("@graft/core")]);
-  const handle = createDb(url);
+  const control = createDb(url);
+
+  // Merging requires both ends registered (no tolerant fallback here — a typo
+  // must not silently merge into a fresh overlay id).
+  await getBranch(control.db, options.branch).catch(async (e) => {
+    await control.close();
+    throw e;
+  });
+  await getBranch(control.db, into).catch(async (e) => {
+    await control.close();
+    throw e;
+  });
+
+  // Each end resolves to its own connection + scope: overlay ends share the
+  // control db; a neon end is its own database whose rows live under "main".
+  const src = await resolveBranchHandle(control.db, options.branch, { databaseUrl: url });
+  const target = await resolveBranchHandle(control.db, into, { databaseUrl: url });
+  const srcWrite = scopeWriteBranch(src.scope);
+  const targetWrite = scopeWriteBranch(target.scope);
+  const sameDb = src.scope.kind === "overlay" && target.scope.kind === "overlay";
 
   try {
-    await getBranch(handle.db, options.branch);
-    await getBranch(handle.db, into);
-
     const [branchLedger, targetLedger] = await Promise.all([
-      listAppliedMigrations(handle.db, options.branch),
-      listAppliedMigrations(handle.db, into),
+      listAppliedMigrations(src.db, srcWrite),
+      listAppliedMigrations(target.db, targetWrite),
     ]);
     const pending = pendingLedgerRows(branchLedger, targetLedger);
 
@@ -136,10 +155,10 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
 
       if (migration.kind === "data") {
         const report = await runDataMigration({
-          db: handle.db,
+          db: target.db,
           migration,
           migrationId: row.migrationId,
-          branchId: into,
+          branchId: targetWrite,
           gitSha,
           apply: options.apply,
         });
@@ -152,8 +171,8 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
         // Content rewrites arrive via the git merge; the recompile below
         // projects them. Recording the ledger row is what stops the target
         // from re-running the codemod.
-        await recordAppliedMigration(handle.db, {
-          branchId: into,
+        await recordAppliedMigration(target.db, {
+          branchId: targetWrite,
           migrationId: row.migrationId,
           kind: "content",
           collection: row.collection,
@@ -168,16 +187,27 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
     }
     if (pending.length === 0) console.log(`Ledger: nothing to replay on "${into}".`);
 
-    // Data deltas.
-    const counts = await countBranchRows(handle.db, options.branch);
+    // Data deltas. Same database (overlay → overlay): move the rows by
+    // rewriting branch_id. Different databases (a neon end): additively copy
+    // them — a neon fork started with empty operational data, so everything
+    // it holds is branch-created.
+    const counts = await countBranchRows(src.db, srcWrite);
+    const verb = sameDb ? "move" : "copy";
     let dataMoved = counts.data;
     if (options.apply && counts.data > 0) {
-      dataMoved = await moveDataRecords(handle.db, { from: options.branch, into });
-      console.log(`moved ${dataMoved} data_records row(s) from "${options.branch}" onto "${into}"`);
+      dataMoved = sameDb
+        ? await moveDataRecords(control.db, { from: options.branch, into })
+        : await copyDataRecords(src.db, target.db, {
+            fromBranch: srcWrite,
+            intoBranch: targetWrite,
+          });
+      console.log(
+        `${verb === "move" ? "moved" : "copied"} ${dataMoved} data_records row(s) from "${options.branch}" onto "${into}"`,
+      );
     } else {
       console.log(
         counts.data > 0
-          ? `would move ${counts.data} data_records row(s) from "${options.branch}" onto "${into}"`
+          ? `would ${verb} ${counts.data} data_records row(s) from "${options.branch}" onto "${into}"`
           : `Data: "${options.branch}" owns no data_records rows.`,
       );
     }
@@ -186,10 +216,10 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
     let compiled: ChangeSet | undefined;
     if (options.apply) {
       const result = await compile({
-        db: handle.db,
+        db: target.db,
         contentDir: config.contentDir,
         collections: config.collections,
-        branchId: into,
+        branchId: targetWrite,
         gitSha,
       });
       compiled = result.changes;
@@ -208,6 +238,8 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
 
     return { replayed, dataMoved, compiled, didApply: options.apply === true };
   } finally {
-    await handle.close();
+    await src.close();
+    await target.close();
+    await control.close();
   }
 }

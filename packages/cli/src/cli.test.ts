@@ -73,6 +73,18 @@ describe("run", () => {
     expect(errors.join("\n")).toContain("--from requires a value");
   });
 
+  it("requires a value for --backend", async () => {
+    expect(await run(["branch", "create", "x", "--backend"])).toBe(1);
+    expect(errors.join("\n")).toContain("--backend requires a value");
+  });
+
+  it("rejects an unknown branch backend before touching the db", async () => {
+    expect(await run(["branch", "create", "x", "--backend", "dynamo"])).toBe(1);
+    const output = errors.join("\n");
+    expect(output).toContain("BRANCH_INVALID");
+    expect(output).toContain("--backend neon");
+  }, 30_000);
+
   // The merge guards run in an empty dir (no config, no db) — proving they
   // fire first. 30s timeout: the first dynamic import of the command module
   // pays vitest's cold transform of the migration-engine graph.

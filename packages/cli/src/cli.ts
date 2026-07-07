@@ -36,8 +36,9 @@ function printHelp(): void {
     "  deny <id>    Deny a pending approval",
     "  migrate      Show pending content/data migrations (dry-run); --apply runs them",
     "  branch                   List branches (name, parent, backend)",
-    "  branch create <name>     Register a preview branch (instant; --from <parent>, default main)",
-    "  branch drop <name>       Drop a branch and purge its content/data/ledger rows",
+    "  branch create <name>     Register a preview branch (instant; --from <parent>, default main;",
+    "                           --backend neon forks a physical Neon branch)",
+    "  branch drop <name>       Drop a branch (overlay: purge rows; neon: delete the fork)",
     "  merge <name>             Merge a branch into --into (default main): replay ledger,",
     "                           move data rows, recompile. Dry-run; --apply executes",
     ...PLANNED.map((cmd) => `  ${cmd.name.padEnd(12)} ${cmd.summary}  (${cmd.phase})`),
@@ -46,6 +47,7 @@ function printHelp(): void {
     "  --branch <id>    Content branch to project into (compile/dev/migrate; default: main)",
     "  --from <name>    Parent to fork from (branch create; default: main)",
     "  --into <name>    Merge target (merge; default: main)",
+    "  --backend <kind> Branch backend: overlay (default) or neon (branch create)",
     "  --apply          Execute pending migrations / the merge (default is a dry-run report)",
     "  -h, --help       Show this help",
     "  -v, --version    Show version",
@@ -58,6 +60,7 @@ interface ParsedArgs {
   branchId?: string;
   from?: string;
   into?: string;
+  backend?: string;
   apply: boolean;
 }
 
@@ -69,6 +72,7 @@ function parseArgs(rest: string[]): ParsedArgs {
   let branchId: string | undefined;
   let from: string | undefined;
   let into: string | undefined;
+  let backend: string | undefined;
   let apply = false;
 
   const value = (flag: string, raw: string | undefined): string => {
@@ -86,6 +90,8 @@ function parseArgs(rest: string[]): ParsedArgs {
       from = value("--from", rest[++i]);
     } else if (arg === "--into") {
       into = value("--into", rest[++i]);
+    } else if (arg === "--backend") {
+      backend = value("--backend", rest[++i]);
     } else if (arg === "--apply") {
       apply = true;
     } else if (arg.startsWith("-")) {
@@ -94,7 +100,7 @@ function parseArgs(rest: string[]): ParsedArgs {
       positionals.push(arg);
     }
   }
-  return { positionals, branchId, from, into, apply };
+  return { positionals, branchId, from, into, backend, apply };
 }
 
 export interface RunOptions {
@@ -221,14 +227,26 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
           return 0;
         }
         if (subcommand === "create" && name) {
-          const meta = await mod.branchCreateCommand({ cwd, name, from: args.from });
+          const meta = await mod.branchCreateCommand({
+            cwd,
+            name,
+            from: args.from,
+            backend: args.backend,
+          });
           console.log(
-            [
-              `Created branch "${meta.name}" from "${meta.parent}" (${meta.backend} — zero rows copied).`,
-              `Reads overlay the parent until the branch writes its own rows:`,
-              `  graft compile --branch ${meta.name}`,
-              `Merge it back with \`graft merge ${meta.name}\` when ready.`,
-            ].join("\n"),
+            meta.backend === "neon"
+              ? [
+                  `Created neon branch "${meta.name}" from "${meta.parent}" — a physical fork at ${meta.endpointHost}.`,
+                  `Content is inherited; operational data and approvals start empty on the fork.`,
+                  `  graft compile --branch ${meta.name}   (routes to the fork automatically)`,
+                  `Merge it back with \`graft merge ${meta.name}\` when ready.`,
+                ].join("\n")
+              : [
+                  `Created branch "${meta.name}" from "${meta.parent}" (${meta.backend} — zero rows copied).`,
+                  `Reads overlay the parent until the branch writes its own rows:`,
+                  `  graft compile --branch ${meta.name}`,
+                  `Merge it back with \`graft merge ${meta.name}\` when ready.`,
+                ].join("\n"),
           );
           return 0;
         }
@@ -236,10 +254,12 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
         const result = await mod.branchDropCommand({ cwd, name: name as string });
         const p = result.purged;
         console.log(
-          `Dropped branch "${name}"` +
-            (p
-              ? ` (purged ${p.content} content, ${p.data} data, ${p.ledger} ledger row(s)).`
-              : "."),
+          result.backend === "neon"
+            ? `Dropped neon branch "${name}" (the fork and its endpoint were deleted).`
+            : `Dropped branch "${name}"` +
+                (p
+                  ? ` (purged ${p.content} content, ${p.data} data, ${p.ledger} ledger row(s)).`
+                  : "."),
         );
         return 0;
       }

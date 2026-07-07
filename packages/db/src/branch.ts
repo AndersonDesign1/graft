@@ -10,7 +10,7 @@
  */
 import { GraftError } from "@graft/contracts";
 import { and, asc, count, eq, inArray, sql, type SQL } from "drizzle-orm";
-import type { Database } from "./client";
+import { createDb, type Database } from "./client";
 import {
   branches,
   contentIndex,
@@ -25,7 +25,10 @@ const BRANCH_NAME = /^[a-z0-9]+(?:[-/][a-z0-9]+)*$/;
 
 /**
  * How reads scope to a branch. `overlay` carries the ancestor chain (leaf-first)
- * and the branch writes land on; `physical` is a self-contained Postgres.
+ * and the branch writes land on; `physical` is a self-contained Postgres — a
+ * storage fork whose rows keep the DEFAULT branch id (`main`), because the
+ * database itself IS the branch. `branch` is the registry name, kept for
+ * labeling; queries against a physical scope always read and write `main`.
  */
 export type BranchScope =
   | { kind: "overlay"; chain: string[]; writeBranch: string }
@@ -33,7 +36,12 @@ export type BranchScope =
 
 /** The branch chain (leaf-first) a scope reads across — one element when there's no overlay. */
 export function scopeChain(scope: BranchScope): string[] {
-  return scope.kind === "overlay" ? scope.chain : [scope.branch];
+  return scope.kind === "overlay" ? scope.chain : ["main"];
+}
+
+/** The branch id writes stamp under this scope (a physical fork keeps the default id). */
+export function scopeWriteBranch(scope: BranchScope): string {
+  return scope.kind === "overlay" ? scope.writeBranch : "main";
 }
 
 export interface BranchMeta {
@@ -42,6 +50,10 @@ export interface BranchMeta {
   backend: BranchBackendKind;
   status: string;
   createdAt: Date;
+  /** neon: the branch's compute host; null for overlay. */
+  endpointHost: string | null;
+  /** neon: the Neon API branch id used to reset/drop; null for overlay. */
+  neonBranchId: string | null;
 }
 
 /**
@@ -79,13 +91,14 @@ export interface CreateBranchInput {
 }
 
 /**
- * Register a branch in the topology. Overlay branches are instant — this is one
- * row insert, no data copied (Spike B). Validates the name is URL-safe and the
- * parent exists; a duplicate name is `BRANCH_EXISTS`.
+ * The shared create-side guards: name shape, self-parenting, parent existence,
+ * duplicate name. Returns the parent's registry row (backends fork differently
+ * depending on what the parent is). Used by `createBranch` and the neon backend.
  */
-export async function createBranch(db: Database, input: CreateBranchInput): Promise<BranchMeta> {
-  const from = input.from ?? "main";
-
+export async function assertBranchCreatable(
+  db: Database,
+  input: { name: string; from: string },
+): Promise<BranchMeta> {
   if (!BRANCH_NAME.test(input.name)) {
     throw new GraftError({
       code: "BRANCH_INVALID",
@@ -94,7 +107,7 @@ export async function createBranch(db: Database, input: CreateBranchInput): Prom
       details: { name: input.name },
     });
   }
-  if (input.name === from) {
+  if (input.name === input.from) {
     throw new GraftError({
       code: "BRANCH_INVALID",
       message: `A branch cannot be its own parent ("${input.name}").`,
@@ -103,7 +116,7 @@ export async function createBranch(db: Database, input: CreateBranchInput): Prom
     });
   }
 
-  await getBranch(db, from);
+  const parent = await getBranch(db, input.from);
 
   const existing = await db
     .select({ name: branches.name })
@@ -118,6 +131,16 @@ export async function createBranch(db: Database, input: CreateBranchInput): Prom
       details: { name: input.name },
     });
   }
+  return parent;
+}
+
+/**
+ * Register an overlay branch in the topology. Instant — one row insert, no
+ * data copied (Spike B). The neon backend has its own create (`createNeonBranch`).
+ */
+export async function createBranch(db: Database, input: CreateBranchInput): Promise<BranchMeta> {
+  const from = input.from ?? "main";
+  await assertBranchCreatable(db, { name: input.name, from });
 
   const [row] = await db
     .insert(branches)
@@ -175,11 +198,11 @@ export interface DropBranchResult {
  * children (drop those first). Neon-endpoint teardown is the `neon` backend's
  * job (P4.3).
  */
-export async function dropBranch(
-  db: Database,
-  name: string,
-  options: DropBranchOptions = {},
-): Promise<DropBranchResult> {
+/**
+ * The shared drop-side guards: not `main`, registered, and childless. Returns
+ * the registry row. Used by `dropBranch` and the neon backend.
+ */
+export async function assertBranchDroppable(db: Database, name: string): Promise<BranchMeta> {
   if (name === "main") {
     throw new GraftError({
       code: "BRANCH_INVALID",
@@ -188,7 +211,7 @@ export async function dropBranch(
       details: { name },
     });
   }
-  await getBranch(db, name);
+  const meta = await getBranch(db, name);
 
   const children = await db
     .select({ name: branches.name })
@@ -203,6 +226,15 @@ export async function dropBranch(
       details: { name },
     });
   }
+  return meta;
+}
+
+export async function dropBranch(
+  db: Database,
+  name: string,
+  options: DropBranchOptions = {},
+): Promise<DropBranchResult> {
+  await assertBranchDroppable(db, name);
 
   if (!options.purgeRows) {
     await db.delete(branches).where(eq(branches.name, name));
@@ -267,7 +299,104 @@ function toMeta(row: typeof branches.$inferSelect): BranchMeta {
     backend: row.backend as BranchBackendKind,
     status: row.status,
     createdAt: row.createdAt,
+    endpointHost: row.endpointHost,
+    neonBranchId: row.neonBranchId,
   };
+}
+
+/**
+ * A branch's connection URL: the configured URL with the branch endpoint's
+ * host swapped in wholesale. Neon branch hosts live on their own cell domain
+ * (e.g. `ep-….c-4.eu-central-1.aws.neon.tech`), so never derive them by
+ * editing the parent's host — always use the host the API returned.
+ * Credentials carry over: Neon branches inherit the parent's roles.
+ */
+export function neonBranchUrl(databaseUrl: string, endpointHost: string): string {
+  const url = new URL(databaseUrl);
+  url.hostname = endpointHost;
+  return url.toString();
+}
+
+/**
+ * The resolved seam every branch-aware caller runs through: which database to
+ * talk to, and how queries scope inside it. Overlay branches share the control
+ * connection; neon branches get their own (close() releases it — a no-op for
+ * overlay, where the caller still owns the control handle).
+ */
+export interface BranchHandle {
+  name: string;
+  db: Database;
+  scope: BranchScope;
+  close(): Promise<void>;
+}
+
+/**
+ * Resolve a branch name to the connection + scope to run against. Overlay
+ * resolution stays tolerant (an unregistered id is a self-chain on the shared
+ * db, so "compile into any branch id" keeps working); a registered `neon`
+ * branch opens its own connection against the branch endpoint.
+ */
+export async function resolveBranchHandle(
+  controlDb: Database,
+  branch: string,
+  options: { databaseUrl: string },
+): Promise<BranchHandle> {
+  const [row] = await controlDb.select().from(branches).where(eq(branches.name, branch)).limit(1);
+
+  if (row?.backend === "neon") {
+    if (!row.endpointHost) {
+      throw new GraftError({
+        code: "BRANCH_BACKEND_FAILED",
+        message: `Branch "${branch}" is registered as neon but has no endpoint host.`,
+        fix: "The registry row is incomplete (a create likely failed partway). Drop the branch and recreate it.",
+        details: { name: branch },
+      });
+    }
+    const handle = createDb(neonBranchUrl(options.databaseUrl, row.endpointHost));
+    return {
+      name: branch,
+      db: handle.db,
+      scope: { kind: "physical", branch },
+      close: handle.close,
+    };
+  }
+
+  const scope = await resolveBranchScope(controlDb, branch);
+  return { name: branch, db: controlDb, scope, close: async () => {} };
+}
+
+/**
+ * Additive cross-database sibling of `moveDataRecords` — the merge data step
+ * when source and target live in different databases (a neon fork merging
+ * into the control db, or vice versa). Copies the source branch's rows under
+ * the target's id; `onConflictDoNothing` on the uuid key makes reruns
+ * idempotent. The source keeps its rows (a merged fork is dropped anyway).
+ */
+export async function copyDataRecords(
+  fromDb: Database,
+  intoDb: Database,
+  input: { fromBranch: string; intoBranch: string },
+): Promise<number> {
+  const rows = await fromDb
+    .select()
+    .from(dataRecords)
+    .where(eq(dataRecords.branchId, input.fromBranch))
+    .orderBy(asc(dataRecords.createdAt));
+  let copied = 0;
+  const CHUNK = 500;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const values = rows.slice(i, i + CHUNK).map(({ search: _search, ...row }) => ({
+      ...row,
+      branchId: input.intoBranch,
+    }));
+    const inserted = await intoDb
+      .insert(dataRecords)
+      .values(values)
+      .onConflictDoNothing({ target: dataRecords.id })
+      .returning({ id: dataRecords.id });
+    copied += inserted.length;
+  }
+  return copied;
 }
 
 export interface ReadContentOptions {
