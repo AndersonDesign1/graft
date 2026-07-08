@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "files": [
-    "dist"
+    "dist",
+    "registry"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -21,5 +22,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "oxlint ."
+  },
+  "dependencies": {
+    "@graft/contracts": "workspace:*",
+    "zod": "^4.1.0"
   }
 }

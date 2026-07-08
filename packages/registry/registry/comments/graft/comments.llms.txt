@@ -1,0 +1,13 @@
+## comments (primitive)
+
+Moderated comments backed by db-authoritative rows (`graft/comments.ts`).
+Functions are served at POST /api/fn/<name>:
+
+- `postComment` — public; `{ pageSlug, author, body }` → stores it unapproved. 5/min per caller.
+- `listComments` — public; `{ pageSlug, limit? }` → approved comments, newest first.
+- `moderateComment` — `{ id, approved }` → approve/hide. Needs the `content:moderate` scope.
+- `deleteComment` — `{ id }` → destructive: files an approval (`graft approve <id>`), then
+  retry with the `x-graft-approval` header; also needs `content:moderate`.
+
+New comments are hidden until `moderateComment` approves them. Depends on the
+`scoped-access` primitive (`graft/scoped-access.ts`) for the moderation gate.

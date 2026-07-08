@@ -1,6 +1,12 @@
 /**
  * @graft/registry
- * shadcn-style registry of owned, copy-in primitives (graft add).
- * Placeholder — implemented in a later phase.
+ * The shadcn-style registry of owned, copy-in primitives behind `graft add`:
+ * a validated item manifest, a local-first bundled registry, transitive
+ * resolution, and the plan/apply that writes primitives + regenerates the
+ * graft/ barrel. (docs/design-notes/registry.md.)
  */
-export const PACKAGE = "@graft/registry" as const;
+export * from "./manifest";
+export * from "./version";
+export * from "./barrel";
+export * from "./registry";
+export * from "./add";

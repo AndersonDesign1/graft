@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { defineCollection } from "./collection";
 import { field } from "./field";
 import type { RecordContext } from "./records";
-import { deleteRecord, insertRecord, listRecords, searchRecords } from "./records";
+import { deleteRecord, insertRecord, listRecords, searchRecords, updateRecord } from "./records";
 
 const submissions = defineCollection({
   name: "submissions",
@@ -20,8 +20,12 @@ const pages = defineCollection({
 });
 
 /** Drizzle stub: records what insert() got, returns canned rows for select()/delete(). */
-function stubDb(selectRows: unknown[] = [], deleteRows: unknown[] = []) {
-  const calls: { inserted?: Record<string, unknown>; deleted?: boolean } = {};
+function stubDb(selectRows: unknown[] = [], deleteRows: unknown[] = [], updateRows: unknown[] = []) {
+  const calls: {
+    inserted?: Record<string, unknown>;
+    deleted?: boolean;
+    updated?: Record<string, unknown>;
+  } = {};
   const db = {
     delete: () => ({
       where: () => ({
@@ -30,6 +34,16 @@ function stubDb(selectRows: unknown[] = [], deleteRows: unknown[] = []) {
           return deleteRows;
         },
       }),
+    }),
+    update: () => ({
+      set: (v: Record<string, unknown>) => {
+        calls.updated = v;
+        return {
+          where: () => ({
+            returning: async () => updateRows,
+          }),
+        };
+      },
     }),
     insert: () => ({
       values: (v: Record<string, unknown>) => {
@@ -56,6 +70,7 @@ function stubDb(selectRows: unknown[] = [], deleteRows: unknown[] = []) {
           orderBy: () => ({
             limit: async () => selectRows,
           }),
+          limit: async () => selectRows,
         }),
       }),
     }),
@@ -222,6 +237,55 @@ describe("deleteRecord", () => {
   it("refuses file-authoritative collections with AUTHORITY_MISMATCH", async () => {
     const { db } = stubDb();
     await expect(deleteRecord(ctx(db), pages, "any")).rejects.toMatchObject({
+      code: "AUTHORITY_MISMATCH",
+    });
+  });
+});
+
+describe("updateRecord", () => {
+  const stored = (data: Record<string, unknown>) => ({
+    id: "rec-1",
+    branchId: "main",
+    collection: "submissions",
+    data,
+    actorKind: "anonymous",
+    actorId: null,
+    correlationId: null,
+    createdAt: new Date("2026-07-08T00:00:00Z"),
+  });
+
+  it("merges the patch over stored data, re-validates, and writes it back", async () => {
+    const { db, calls } = stubDb(
+      [stored({ email: "a@b.co", message: "old" })],
+      [],
+      [stored({ email: "a@b.co", message: "new" })],
+    );
+    const record = await updateRecord(ctx(db), submissions, "rec-1", { message: "new" });
+    expect(calls.updated).toEqual({ data: { email: "a@b.co", message: "new" } });
+    expect(record.data).toEqual({ email: "a@b.co", message: "new" });
+  });
+
+  it("throws DOCUMENT_NOT_FOUND when the id does not exist", async () => {
+    const { db } = stubDb([], [], []);
+    await expect(
+      updateRecord(ctx(db), submissions, "ghost", { message: "x" }),
+    ).rejects.toMatchObject({
+      code: "DOCUMENT_NOT_FOUND",
+      details: { collection: "submissions", id: "ghost" },
+    });
+  });
+
+  it("rejects a patch that violates the schema without writing", async () => {
+    const { db, calls } = stubDb([stored({ email: "a@b.co" })]);
+    await expect(
+      updateRecord(ctx(db), submissions, "rec-1", { email: 7 as never }),
+    ).rejects.toMatchObject({ code: "SCHEMA_VALIDATION_FAILED", details: { id: "rec-1" } });
+    expect(calls.updated).toBeUndefined();
+  });
+
+  it("refuses file-authoritative collections with AUTHORITY_MISMATCH", async () => {
+    const { db } = stubDb();
+    await expect(updateRecord(ctx(db), pages, "any", { title: "x" })).rejects.toMatchObject({
       code: "AUTHORITY_MISMATCH",
     });
   });

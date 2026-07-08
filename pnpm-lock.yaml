@@ -132,6 +132,9 @@ importers:
       '@graft/db':
         specifier: workspace:*
         version: link:../db
+      '@graft/registry':
+        specifier: workspace:*
+        version: link:../registry
       jiti:
         specifier: ^2.4.0
         version: 2.7.0
@@ -221,7 +224,14 @@ importers:
         specifier: ^4.1.0
         version: 4.4.3
 
-  packages/registry: {}
+  packages/registry:
+    dependencies:
+      '@graft/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      zod:
+        specifier: ^4.1.0
+        version: 4.4.3
 
   packages/sdk-core:
     dependencies:

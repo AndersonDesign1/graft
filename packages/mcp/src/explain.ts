@@ -309,6 +309,40 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Check NEON_API_KEY and GRAFT_NEON_PROJECT_ID in the environment, then retry. If a create failed partway, the error says whether a Neon branch was left behind — delete it in the Neon console (or retry the drop) before recreating. Overlay branches never hit this: they need no external API.",
   },
+  REGISTRY_ITEM_NOT_FOUND: {
+    code: "REGISTRY_ITEM_NOT_FOUND",
+    meaning: "`graft add` was asked for a registry item (a copy-in primitive) that does not exist.",
+    typicalCauses: [
+      "A typo in the item name",
+      "Expecting a community/remote item — only the bundled Tier-1 registry ships today",
+      "The item was renamed or removed",
+    ],
+    howToRecover:
+      "The error's `details.available` lists every item you can add. Run `graft add <name>` with one of those, or build the primitive by hand as owned code under graft/.",
+  },
+  REGISTRY_ITEM_INVALID: {
+    code: "REGISTRY_ITEM_INVALID",
+    meaning:
+      "A registry item's manifest is malformed, or the item requires a different @graft/core version than the one installed.",
+    typicalCauses: [
+      "registry.item.json does not match the manifest schema",
+      "The item's `graftVersion` range does not include the installed core version",
+      "A file the manifest lists is missing from the item directory",
+    ],
+    howToRecover:
+      "The error names what failed (a manifest field or the version mismatch). For a version mismatch, move @graft/core to the range the item needs; a malformed manifest is a registry bug — fix the item or report it.",
+  },
+  REGISTRY_FILE_EXISTS: {
+    code: "REGISTRY_FILE_EXISTS",
+    meaning:
+      "`graft add` would overwrite a file that already exists in the project, so it wrote nothing (adds are all-or-nothing).",
+    typicalCauses: [
+      "The item (or one of its dependencies) was already added",
+      "A project file happens to share a target path with the item",
+    ],
+    howToRecover:
+      "Inspect the listed file(s). If replacing them is intended, re-run with `--overwrite`; otherwise move/rename your file first. `graft add --dry-run <name>` previews every path an item would write.",
+  },
   NOT_IMPLEMENTED: {
     code: "NOT_IMPLEMENTED",
     meaning: "The capability is planned but not built yet.",

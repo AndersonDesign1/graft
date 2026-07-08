@@ -16,9 +16,9 @@ interface PlannedCommand {
   phase: string;
 }
 
-const PLANNED: PlannedCommand[] = [
-  { name: "add", summary: "Add an owned primitive from the registry", phase: "Phase 5" },
-];
+// `add` shipped in Phase 5. Future not-yet-built commands can be listed here to
+// print a "planned for Phase N" message instead of "unknown command".
+const PLANNED: PlannedCommand[] = [];
 
 function printHelp(): void {
   const lines = [
@@ -41,6 +41,8 @@ function printHelp(): void {
     "  branch drop <name>       Drop a branch (overlay: purge rows; neon: delete the fork)",
     "  merge <name>             Merge a branch into --into (default main): replay ledger,",
     "                           move data rows, recompile. Dry-run; --apply executes",
+    "  add <item>               Copy an owned primitive from the registry into graft/",
+    "                           (+ its deps; regenerates the graft/ barrel — no config edit)",
     ...PLANNED.map((cmd) => `  ${cmd.name.padEnd(12)} ${cmd.summary}  (${cmd.phase})`),
     "",
     "Options:",
@@ -49,6 +51,8 @@ function printHelp(): void {
     "  --into <name>    Merge target (merge; default: main)",
     "  --backend <kind> Branch backend: overlay (default) or neon (branch create)",
     "  --apply          Execute pending migrations / the merge (default is a dry-run report)",
+    "  --dry-run        Preview `graft add` without writing",
+    "  --overwrite      Let `graft add` replace files that differ",
     "  -h, --help       Show this help",
     "  -v, --version    Show version",
   ];
@@ -62,6 +66,8 @@ interface ParsedArgs {
   into?: string;
   backend?: string;
   apply: boolean;
+  dryRun: boolean;
+  overwrite: boolean;
 }
 
 class UsageError extends Error {}
@@ -74,6 +80,8 @@ function parseArgs(rest: string[]): ParsedArgs {
   let into: string | undefined;
   let backend: string | undefined;
   let apply = false;
+  let dryRun = false;
+  let overwrite = false;
 
   const value = (flag: string, raw: string | undefined): string => {
     if (!raw || raw.startsWith("-")) {
@@ -94,13 +102,17 @@ function parseArgs(rest: string[]): ParsedArgs {
       backend = value("--backend", rest[++i]);
     } else if (arg === "--apply") {
       apply = true;
+    } else if (arg === "--dry-run") {
+      dryRun = true;
+    } else if (arg === "--overwrite") {
+      overwrite = true;
     } else if (arg.startsWith("-")) {
       throw new UsageError(`unknown option "${arg}"`);
     } else {
       positionals.push(arg);
     }
   }
-  return { positionals, branchId, from, into, backend, apply };
+  return { positionals, branchId, from, into, backend, apply, dryRun, overwrite };
 }
 
 export interface RunOptions {
@@ -269,6 +281,16 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
           throw new UsageError("usage: graft merge <branch> [--into <target>] [--apply]");
         const { mergeCommand } = await import("./commands/merge");
         await mergeCommand({ cwd, branch, into: args.into, apply: args.apply });
+        return 0;
+      }
+      case "add": {
+        const { addCommand } = await import("./commands/add");
+        await addCommand({
+          cwd,
+          names: args.positionals,
+          dryRun: args.dryRun,
+          overwrite: args.overwrite,
+        });
         return 0;
       }
       default: {

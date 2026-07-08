@@ -255,3 +255,27 @@ a preview never busts main's cache.
 - Never write to the database directly; it is a derived index. Files win.
 - Slugs are kebab-case (lowercase letters, digits, hyphens).
 - `DATABASE_URL` comes from the repo-root `.env`.
+
+## scoped-access (primitive)
+
+`graft/scoped-access.ts` names your token scopes and exposes access rules.
+
+- `requireModerator` gates a function so only callers whose token carries the
+  `content:moderate` scope may run it (anonymous/unscoped → 401 UNAUTHORIZED).
+- Edit the `SCOPES` map to match what your token issuer emits, then reuse the
+  rules on any function's `access:`.
+- Requires `@graft/auth` in the project (mint/verify tokens there).
+
+## comments (primitive)
+
+Moderated comments backed by db-authoritative rows (`graft/comments.ts`).
+Functions are served at POST /api/fn/<name>:
+
+- `postComment` — public; `{ pageSlug, author, body }` → stores it unapproved. 5/min per caller.
+- `listComments` — public; `{ pageSlug, limit? }` → approved comments, newest first.
+- `moderateComment` — `{ id, approved }` → approve/hide. Needs the `content:moderate` scope.
+- `deleteComment` — `{ id }` → destructive: files an approval (`graft approve <id>`), then
+  retry with the `x-graft-approval` header; also needs `content:moderate`.
+
+New comments are hidden until `moderateComment` approves them. Depends on the
+`scoped-access` primitive (`graft/scoped-access.ts`) for the moderation gate.

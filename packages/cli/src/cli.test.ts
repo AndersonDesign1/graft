@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -38,9 +38,11 @@ describe("run", () => {
     expect(errors.join("\n")).toContain('unknown command "frobnicate"');
   });
 
-  it("names the phase for planned commands", async () => {
+  it("graft add with no item name fails, listing what's available", async () => {
     expect(await run(["add"])).toBe(1);
-    expect(errors.join("\n")).toContain("Phase 5");
+    const output = errors.join("\n");
+    expect(output).toContain("REGISTRY_ITEM_NOT_FOUND");
+    expect(output).toContain("comments");
   });
 
   it("rejects an unknown branch subcommand as a usage error", async () => {
@@ -124,6 +126,35 @@ describe("run", () => {
       expect(await run(["init", dir])).toBe(0);
       expect(existsSync(join(dir, "graft.config.ts"))).toBe(true);
       expect(logs.join("\n")).toContain("Next steps:");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("add copies a primitive (+ its dep) into graft/ and regenerates the barrel", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "graft-cli-add-"));
+    try {
+      await run(["init", dir]);
+      logs = [];
+      expect(await run(["add", "comments"], { cwd: dir })).toBe(0);
+      expect(existsSync(join(dir, "graft", "comments.ts"))).toBe(true);
+      expect(existsSync(join(dir, "graft", "scoped-access.ts"))).toBe(true);
+      const barrel = readFileSync(join(dir, "graft", "index.ts"), "utf8");
+      expect(barrel).toContain("mergePrimitives([comments, scopedAccess])");
+      expect(logs.join("\n")).toContain("graft compile");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("add --dry-run previews without writing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "graft-cli-add-dry-"));
+    try {
+      await run(["init", dir]);
+      logs = [];
+      expect(await run(["add", "comments", "--dry-run"], { cwd: dir })).toBe(0);
+      expect(existsSync(join(dir, "graft", "comments.ts"))).toBe(false);
+      expect(logs.join("\n")).toContain("Would add");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

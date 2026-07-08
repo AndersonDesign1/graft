@@ -102,28 +102,33 @@ The hard question: a `bundle` defines collections/functions that must reach the 
    cold agent can fumble. ❌ (was the conservative default)
 2. **AST codemod** — `add` parses `graft.config.ts` and inserts the import + export spread.
    Zero manual step, but edits the user's code with a fragile TS-AST rewrite. ❌
-3. **Directory auto-aggregation** — the config **loader** (not the config file) globs a
-   conventional `graft/` directory and merges every module's `collections`/`functions`
-   exports with the root config's. `add` becomes a pure file-drop; nothing edits user code.
-   ✅ **chosen.**
+3. **Directory auto-aggregation via a generated barrel** — a generated `graft/index.ts`
+   statically imports every `graft/<primitive>.ts` and re-exports the merged
+   `collections`/`functions`; the root `graft.config.ts` imports that barrel once and
+   spreads it. `add` writes the primitive file **and regenerates the barrel** — a pure
+   file-drop from the author's view; nothing edits `graft.config.ts`. ✅ **chosen.**
 
-**The decision:** the Graft config-loading contract (the jiti loader shared by `compile` /
-`dev` / `migrate` / `merge` / the runtime) is extended: after loading `graft.config.ts`, it
-also loads `graft/**/*.ts` and **merges the exported `collections` and `functions` maps**
-(root config wins ties only for _its own_ keys; a **duplicate key across modules is a
-`CONFIG_INVALID`** with the colliding name — deterministic, greppable). `graft add comments`
-writes `graft/comments.ts` and it is live on the next compile. No wiring step.
+**The decision:** `graft init` scaffolds a `graft.config.ts` that imports `./graft` (the
+barrel) and spreads its `collections`/`functions` alongside the project's own, plus an
+initial `graft/index.ts`. `graft add comments` writes `graft/comments.ts` (+ deps) and
+**regenerates `graft/index.ts`**; the primitive is live on the next `graft compile` with
+**zero edits to `graft.config.ts`**. The barrel calls `mergePrimitives()` (new, in
+`@graft/core`), which throws **`CONFIG_INVALID`** on a duplicate `collections`/`functions`
+key across modules — deterministic, greppable. Load order is alphabetical by filename.
 
-This is a **BREAKING change** to the config contract and to what `graft init` scaffolds
-(the single-file config becomes "root config + `graft/` convention"). That's the correct
-long-run shape for an agent-first CMS — a Next.js-`app/`-style file convention, which agents
-handle natively — and pre-1.0 is exactly when to make it. The files stay fully owned and
-greppable (they're right there in `graft/`); the only convention is the merge, which is
-explicit and documented in `llms.txt`.
+_Why a generated barrel, not a load-time glob:_ the first draft had the config **loader**
+globbing `graft/**/*.ts` at load time. That works for the CLI (jiti/Node) but **not for the
+Next runtime**, which imports `graft.config.ts` **statically** — a webpack/Turbopack bundle
+can't include modules discovered by a runtime glob. A generated barrel is statically
+analyzable, so the **same merged config serves both the CLI and the app** through one
+mechanism. The barrel is generated infra (a `routeTree.gen.ts`-style artifact, header-marked
+"do not edit") — owned and greppable, never hand-edited.
 
-_Implementation risk to validate in P5.1:_ the merge/collision semantics (and load order —
-alphabetical, deterministic). If merging maps proves awkward, fall back to each module
-exporting a `definePrimitive()` descriptor the loader collects; decide when writing it.
+This is a **BREAKING change** to what `graft init` scaffolds and to the example's single-file
+config (both migrate to "root config + `graft/` barrel"). That's the correct long-run shape
+for an agent-first CMS — a Next.js-`app/`-style file convention agents handle natively — and
+pre-1.0 is exactly when to make it. `loadConfig` (CLI) is otherwise unchanged: it still reads
+the already-merged `collections` the config exports.
 
 ## `graft add` behaviour
 

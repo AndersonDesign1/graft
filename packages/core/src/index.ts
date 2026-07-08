@@ -9,4 +9,5 @@ export * from "./collection";
 export * from "./data-migrations";
 export * from "./function";
 export * from "./functions-handler";
+export * from "./primitives";
 export * from "./records";

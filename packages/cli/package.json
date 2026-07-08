@@ -23,6 +23,7 @@
     "@graft/contracts": "workspace:*",
     "@graft/core": "workspace:*",
     "@graft/db": "workspace:*",
+    "@graft/registry": "workspace:*",
     "jiti": "^2.4.0"
   }
 }

@@ -5,14 +5,19 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { GraftError } from "@graft/contracts";
+import { barrelSource } from "@graft/registry";
 import { CONFIG_FILENAMES } from "../config";
 
 const CONFIG_TEMPLATE = `/**
  * The schema for this project — collections defined as owned code.
  * Agents: this is the single source of truth for what content exists.
  * Add fields here, then author documents in content/<collection>/<slug>.mdx.
+ *
+ * Primitives you add with \`graft add\` live under graft/ and are merged in via
+ * the generated graft/index.ts barrel — you never edit the import below.
  */
-import { defineCollection, field } from "@graft/core";
+import { defineCollection, field, mergePrimitives } from "@graft/core";
+import * as primitives from "./graft";
 
 export const pages = defineCollection({
   name: "pages",
@@ -23,7 +28,9 @@ export const pages = defineCollection({
   },
 });
 
-export const collections = { pages };
+// Your own collections/functions + everything under graft/ (added via \`graft add\`).
+// mergePrimitives throws CONFIG_INVALID on a duplicate key — never a silent override.
+export const { collections, functions } = mergePrimitives([{ collections: { pages } }, primitives]);
 `;
 
 const HOME_TEMPLATE = `---
@@ -45,12 +52,17 @@ is a derived index. If they disagree, git wins — recompile.
 - Slugs are kebab-case; a frontmatter \`slug:\` overrides the filename.
 - Project into the index: \`graft compile\` (one-shot) or \`graft dev\` (watch mode).
   Both need DATABASE_URL in .env (any parent directory works).
+- Primitives: add owned building blocks with \`graft add <item>\` — they land under
+  graft/ and wire in automatically (the generated graft/index.ts barrel; no config
+  edit). Run \`graft add\` with no name to list what's available.
 - Every Graft error carries a \`fix\` — do what it says, then retry.
 - Ship changes as git commits; every projection records the git SHA it compiled from.
 `;
 
 const SCAFFOLD: Record<string, string> = {
   "graft.config.ts": CONFIG_TEMPLATE,
+  // The generated barrel graft add regenerates; empty until the first `graft add`.
+  [join("graft", "index.ts")]: barrelSource([]),
   [join("content", "pages", "home.mdx")]: HOME_TEMPLATE,
   "llms.txt": LLMS_TEMPLATE,
 };

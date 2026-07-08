@@ -1,0 +1,14 @@
+{
+  "name": "scoped-access",
+  "type": "access",
+  "description": "Name your token scopes once and gate functions with them (a requireScopes preset).",
+  "graftVersion": "*",
+  "dependencies": {
+    "@graft/auth": "workspace:*"
+  },
+  "registryDependencies": [],
+  "files": [
+    { "source": "graft/scoped-access.ts", "target": "graft/scoped-access.ts", "role": "module" }
+  ],
+  "llms": "graft/scoped-access.llms.txt"
+}

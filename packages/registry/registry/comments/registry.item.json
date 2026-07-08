@@ -1,0 +1,12 @@
+{
+  "name": "comments",
+  "type": "bundle",
+  "description": "Moderated comments: a db-authoritative collection + post/list/moderate/delete functions.",
+  "graftVersion": "*",
+  "dependencies": {},
+  "registryDependencies": ["scoped-access"],
+  "files": [
+    { "source": "graft/comments.ts", "target": "graft/comments.ts", "role": "module" }
+  ],
+  "llms": "graft/comments.llms.txt"
+}

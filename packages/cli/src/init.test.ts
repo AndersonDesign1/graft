@@ -24,9 +24,16 @@ describe("initCommand", () => {
     try {
       const result = initCommand({ targetDir: dir });
       expect(result.created.sort()).toEqual(
-        ["graft.config.ts", join("content", "pages", "home.mdx"), "llms.txt"].sort(),
+        [
+          "graft.config.ts",
+          join("graft", "index.ts"),
+          join("content", "pages", "home.mdx"),
+          "llms.txt",
+        ].sort(),
       );
       expect(readFileSync(join(dir, "graft.config.ts"), "utf8")).toContain("defineCollection");
+      // The barrel is scaffolded so the config's `import … from "./graft"` resolves.
+      expect(readFileSync(join(dir, "graft", "index.ts"), "utf8")).toContain("mergePrimitives");
       expect(readFileSync(join(dir, "llms.txt"), "utf8")).toContain("graft compile");
       expect(existsSync(join(dir, "content", "pages", "home.mdx"))).toBe(true);
     } finally {

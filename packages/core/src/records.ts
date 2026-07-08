@@ -182,6 +182,72 @@ export async function deleteRecord(
   return row;
 }
 
+/**
+ * Update one record by id: merge `patch` over the stored data, re-validate the
+ * WHOLE document against the collection schema (one Zod layer, both
+ * directions), and write it back. Missing id → DOCUMENT_NOT_FOUND. A partial
+ * update that would violate the schema → SCHEMA_VALIDATION_FAILED, nothing
+ * written. This is the moderation/status-change primitive (approve a comment,
+ * advance an order) db-authoritative collections were missing.
+ */
+export async function updateRecord<TCollection extends AnyCollection>(
+  ctx: RecordContext,
+  collection: TCollection,
+  id: string,
+  patch: Partial<DocumentData<TCollection>>,
+): Promise<DataRecord<DocumentData<TCollection>>> {
+  assertDbAuthoritative(collection, "updateRecord");
+
+  const [existing] = await ctx.db
+    .select()
+    .from(dataRecords)
+    .where(
+      and(
+        eq(dataRecords.id, id),
+        eq(dataRecords.branchId, ctx.branch),
+        eq(dataRecords.collection, collection.name),
+      ),
+    )
+    .limit(1);
+  if (!existing) {
+    throw new GraftError({
+      code: "DOCUMENT_NOT_FOUND",
+      message: `No record "${id}" exists in "${collection.name}" on branch "${ctx.branch}".`,
+      fix: "List the collection's records to find a valid id — it may already have been deleted.",
+      details: { collection: collection.name, id, branch: ctx.branch },
+    });
+  }
+
+  const merged = { ...(existing.data as Record<string, unknown>), ...patch };
+  const parsed = collection.schema.safeParse(merged);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((i) => ({
+      path: i.path.join("."),
+      message: i.message,
+    }));
+    throw new GraftError({
+      code: "SCHEMA_VALIDATION_FAILED",
+      message: `Updated record ${id} in "${collection.name}" does not satisfy the collection schema.`,
+      fix: "Fix the fields listed in details.issues — describe_schema shows exactly what this collection stores.",
+      details: { collection: collection.name, id, issues },
+    });
+  }
+
+  const [row] = await ctx.db
+    .update(dataRecords)
+    .set({ data: parsed.data as Record<string, unknown> })
+    .where(
+      and(
+        eq(dataRecords.id, id),
+        eq(dataRecords.branchId, ctx.branch),
+        eq(dataRecords.collection, collection.name),
+      ),
+    )
+    .returning();
+  if (!row) throw new Error("update returned no row"); // unreachable; satisfies noUncheckedIndexedAccess
+  return toRecord<DocumentData<TCollection>>(row, parsed.data as DocumentData<TCollection>);
+}
+
 function toRecord<TData>(row: typeof dataRecords.$inferSelect, data: TData): DataRecord<TData> {
   return {
     id: row.id,

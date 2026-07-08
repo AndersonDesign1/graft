@@ -12,8 +12,10 @@ import {
   field,
   insertRecord,
   listRecords,
+  mergePrimitives,
   searchRecords,
 } from "@graft/core";
+import * as primitives from "./graft";
 
 export const pages = defineCollection({
   name: "pages",
@@ -45,8 +47,6 @@ export const submissions = defineCollection({
     message: field.text({ optional: true, description: "What they wrote." }),
   },
 });
-
-export const collections = { pages, submissions };
 
 /**
  * pageStats — a zero-arg query demonstrating the typed function runtime:
@@ -162,10 +162,13 @@ export const deleteSubmission = defineFunction({
   },
 });
 
-export const functions = {
-  pageStats,
-  submitContact,
-  listSubmissions,
-  searchSubmissions,
-  deleteSubmission,
-};
+// The site's own collections + functions, plus any primitives added via
+// `graft add` (they live under graft/ and arrive through the barrel import
+// above). mergePrimitives rejects a duplicate key with CONFIG_INVALID.
+export const { collections, functions } = mergePrimitives([
+  {
+    collections: { pages, submissions },
+    functions: { pageStats, submitContact, listSubmissions, searchSubmissions, deleteSubmission },
+  },
+  primitives,
+]);
