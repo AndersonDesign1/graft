@@ -18,5 +18,10 @@ ideas.md
 phases.md
 PRD.md
 
+# MCP client tool-schema dumps — written into cwd per-session by whatever MCP
+# client is connected (one dir per server: Sanity, shadcn, graft-landing-page, …).
+# Not Graft source; regenerated on demand. Already in .prettierignore.
+mcps/
+
 # Throwaway Phase 1 spikes (learnings go to docs/design-notes/)
 /spikes/
