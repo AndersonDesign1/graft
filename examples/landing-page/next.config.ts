@@ -9,6 +9,12 @@ try {
   /* no root .env — rely on the ambient environment */
 }
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  // @graft/registry reads its bundled primitives from disk at runtime via
+  // `new URL("../registry", import.meta.url)` (the list_registry / describe_item
+  // MCP tools). Keep it out of the Turbopack bundle so that path resolves to the
+  // package's real registry/ dir in node_modules, not a build-time module.
+  serverExternalPackages: ["@graft/registry"],
+};
 
 export default nextConfig;

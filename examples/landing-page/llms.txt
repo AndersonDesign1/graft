@@ -26,6 +26,9 @@ Tools:
   `run_function` (same gates as `POST /api/fn/<name>`: access, audit, rate
   limits, human approval for destructive). Pass `authorization` for scoped
   calls and `approval` after `graft approve <id>`.
+- Registry: `list_registry`, `describe_item` — browse owned primitives
+  (blocks / fields / access rules / bundles) before installing one with
+  `graft add <name>`. MCP shows what exists; the CLI installs it.
 
 Every failure returns JSON with a `fix` — do what it says. Content writes land
 as plain files under `content/`; commit them like any other change.

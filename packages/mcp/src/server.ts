@@ -30,6 +30,7 @@ import {
 } from "@graft/core";
 import type { ApprovalStore, AuditStore, Database } from "@graft/db";
 import { searchContent } from "@graft/db";
+import { describeItem, listItems, loadItem } from "@graft/registry";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import matter from "gray-matter";
 import { z } from "zod";
@@ -67,6 +68,11 @@ export interface GraftMcpOptions {
    */
   audit?: AuditStore | false;
   approvals?: ApprovalStore;
+  /**
+   * Registry root for list_registry / describe_item. Defaults to @graft/registry's
+   * bundled primitives — the set `graft add` installs from. Tests point it at a fixture.
+   */
+  registryRoot?: string;
 }
 
 type ToolResult = {
@@ -298,6 +304,39 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
             : body;
         return { data, correlationId, status: response.status };
       }),
+  );
+
+  server.registerTool(
+    "list_registry",
+    {
+      title: "List registry items",
+      description:
+        "List every owned primitive available to `graft add` — shadcn-style copy-in blocks / fields / access rules / bundles (name, type, one-line description, and any registry items it pulls in). Use describe_item for the full details, then install with `graft add <name>` from the CLI. MCP browses what exists; the CLI installs it.",
+      inputSchema: {},
+    },
+    () =>
+      guarded(() => ({
+        items: listItems(options.registryRoot).map((item) => ({
+          name: item.name,
+          type: item.type,
+          description: item.description,
+          registryDependencies: item.registryDependencies,
+        })),
+      })),
+  );
+
+  server.registerTool(
+    "describe_item",
+    {
+      title: "Describe a registry item",
+      description:
+        "Full details for one owned primitive: type, description, the files it writes into the project, npm dependencies to install, the registry items it pulls in first, and whether it ships an llms.txt fragment. Use list_registry for names; install with `graft add <name>` (CLI). MCP does not install.",
+      inputSchema: {
+        name: z.string().describe("Item name as returned by list_registry"),
+      },
+    },
+    ({ name }) =>
+      guarded(() => describeItem(loadItem(name, options.registryRoot))),
   );
 
   server.registerTool(

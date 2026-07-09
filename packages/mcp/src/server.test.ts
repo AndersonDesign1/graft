@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ErrorCodes, SchemaDescription } from "@graft/contracts";
+import { ErrorCodes, RegistryItemDescriptor, SchemaDescription } from "@graft/contracts";
 import { defineCollection, defineFunction, field } from "@graft/core";
 import type { Database } from "@graft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -506,5 +506,34 @@ describe("explain_error (self-teaching)", () => {
     const { payload } = await callTool("explain_error", { code: "ENOENT" });
     expect(payload.known).toBe(false);
     expect(payload.knownCodes).toContain("DOCUMENT_NOT_FOUND");
+  });
+});
+
+describe("registry tools (P6.3)", () => {
+  it("list_registry lists owned primitives available to graft add", async () => {
+    const { payload } = await callTool("list_registry");
+    const names = payload.items.map((item: { name: string }) => item.name);
+    expect(names).toContain("comments");
+    expect(names).toContain("scoped-access");
+    const comments = payload.items.find((item: { name: string }) => item.name === "comments");
+    expect(comments).toMatchObject({ type: "bundle", registryDependencies: ["scoped-access"] });
+  });
+
+  it("describe_item returns a valid RegistryItemDescriptor (no absolute dir leak)", async () => {
+    const { isError, payload } = await callTool("describe_item", { name: "comments" });
+    expect(isError).toBe(false);
+    const parsed = RegistryItemDescriptor.parse(payload);
+    expect(parsed).toMatchObject({ name: "comments", type: "bundle", llms: true });
+    expect(parsed.files).toEqual([{ target: "graft/comments.ts", role: "module" }]);
+    expect(payload).not.toHaveProperty("dir");
+  });
+
+  it("describe_item rejects unknown items with REGISTRY_ITEM_NOT_FOUND + a fix", async () => {
+    const { isError, payload } = await callTool("describe_item", { name: "does-not-exist" });
+    expect(isError).toBe(true);
+    expect(payload.error).toBe(ErrorCodes.REGISTRY_ITEM_NOT_FOUND);
+    expect(payload.details.available).toContain("comments");
+    expect(payload.fix).toBeTruthy();
+    expect(payload.howToRecover).toBeTruthy();
   });
 });

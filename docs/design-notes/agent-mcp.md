@@ -99,13 +99,17 @@ createGraftMcp(options)  →  McpServer (tools)
 - `authorization` — optional bearer token (or raw token; server prefixes `Bearer `)
 - `approval` — optional approval id (`x-graft-approval`) for human-gated calls
 
-### Registry browse (P6.3+)
+### Registry browse (P6.3) ✅
 
 | Tool | Role |
 | --- | --- |
-| `list_registry` / `describe_item` | Browse owned primitives before `graft add` |
+| `list_registry` | Every owned primitive available to `graft add` (name, type, one-line description, deps it pulls in) |
+| `describe_item` | Full `RegistryItemDescriptor` for one item (files it writes, npm deps, transitive registry deps, llms flag) |
 
-CLI `graft add` remains the install path; MCP teaches *what exists*.
+CLI `graft add` remains the install path; MCP teaches *what exists*. Descriptors
+drop the machine-specific absolute `dir`; the introspection shape lives in
+`@graft/contracts` (`RegistryItemDescriptor`), with a drift test keeping
+registry's authoring enums (`ITEM_TYPES` / `FILE_ROLES`) in lockstep.
 
 ### Still later
 
@@ -175,8 +179,8 @@ Graft never becomes the identity provider of record.
 | Unit | Deliverable |
 | --- | --- |
 | **P6.1** ✅ | Cold-agent MCP unit path + CI (`pnpm test:cold-agent`) |
-| **P6.2** | Function tools + `describe_schema.functions` + `graft mcp` + docs |
-| **P6.3** | Registry MCP browse + introspection contract tests |
+| **P6.2** ✅ | Function tools + `describe_schema.functions` + `graft mcp` + docs |
+| **P6.3** ✅ | Registry MCP browse (`list_registry` / `describe_item`) + introspection contract tests |
 | **P6.4+** | Remote HTTP cold-agent; asset/delete tools; remaining ergonomics |
 
 ## Acceptance (P6.2)
@@ -188,6 +192,15 @@ Graft never becomes the identity provider of record.
 - [x] `graft mcp` CLI command loads project config + functions + stdio serve.
 - [x] Unit tests cover function tools offline; live invoke stays on app HTTP / integration.
 - [x] `llms.txt` / README / design note teach the tools.
+
+## Acceptance (P6.3)
+
+- [x] `list_registry` / `describe_item` registered on stdio + HTTP (same server → both transports).
+- [x] `describe_item` returns a `RegistryItemDescriptor` (from `@graft/contracts`); no absolute `dir` leaks.
+- [x] `describe_item` fails closed on unknown items — `REGISTRY_ITEM_NOT_FOUND` with the available list + `fix`.
+- [x] Introspection contract tests: `describe_schema` / `describe_function` / `describe_item` / `list_registry` outputs validate against the published Zod schemas (recursive object/array fields + function flags covered).
+- [x] Vocabulary drift guard: registry `ITEM_TYPES` / `FILE_ROLES` stay in lockstep with the contracts enums.
+- [x] `llms.txt` / README / design note teach the browse tools.
 
 ## Open questions (not blocking P6.2)
 

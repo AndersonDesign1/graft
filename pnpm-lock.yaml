@@ -50,6 +50,9 @@ importers:
       '@graft/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@graft/registry':
+        specifier: workspace:*
+        version: link:../../packages/registry
       '@graft/sdk-next':
         specifier: workspace:*
         version: link:../../packages/sdk-next
@@ -220,6 +223,9 @@ importers:
       '@graft/db':
         specifier: workspace:*
         version: link:../db
+      '@graft/registry':
+        specifier: workspace:*
+        version: link:../registry
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)

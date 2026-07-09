@@ -29,11 +29,13 @@ model:
   approvals, search, auth.
 
 **Phase 6 — Self-teaching (in progress).** CI gates a cold-agent MCP path
-(`pnpm test:cold-agent`). **P6.2** makes the project MCP a full operator surface:
+(`pnpm test:cold-agent`). **P6.2** made the project MCP a full operator surface:
 `list_functions` / `describe_function` / `run_function` (same access, audit, rate-limit, and
 human-gate rules as `POST /api/fn/<name>`), plus `graft mcp` for one-command stdio install.
-See [`docs/design-notes/agent-mcp.md`](docs/design-notes/agent-mcp.md). Next after that:
-registry browse tools, introspection contract tests, remote HTTP cold-agent.
+**P6.3** adds `list_registry` / `describe_item` so agents browse owned primitives before
+`graft add`, and locks the whole introspection surface with contract tests. See
+[`docs/design-notes/agent-mcp.md`](docs/design-notes/agent-mcp.md). Next: remote HTTP
+cold-agent + asset/delete tools.
 
 ## Requirements
 

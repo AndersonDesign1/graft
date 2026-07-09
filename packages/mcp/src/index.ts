@@ -1,7 +1,8 @@
 /**
  * @graft/mcp
  * MCP server: content ops + schema/function introspection + run_function +
- * agent-actionable errors. `createGraftMcp` builds the server; `serveStdio`
+ * registry browse (list_registry / describe_item) + agent-actionable errors.
+ * `createGraftMcp` builds the server; `serveStdio`
  * binds it to stdio for `.mcp.json` / `graft mcp`; `createGraftMcpHandler`
  * serves it over Streamable HTTP as a stateless `Request → Response` handler.
  * See docs/design-notes/agent-mcp.md.

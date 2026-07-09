@@ -7,17 +7,23 @@
  * `loadItem` for a fetch — the manifest shape is already the wire format.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GraftError } from "@graft/contracts";
+import { GraftError, type RegistryItemDescriptor } from "@graft/contracts";
 import { registryItemSchema, type RegistryItem } from "./manifest";
 import { satisfies } from "./version";
 
 const MANIFEST_FILE = "registry.item.json";
 
-/** The bundled registry root — the sibling `registry/` dir (one level up from src or dist). */
+/**
+ * The bundled registry root — the sibling `registry/` dir (one level up from src
+ * or dist). Built from `import.meta.url` via path.join rather than
+ * `new URL("../registry", import.meta.url)` so bundlers (Turbopack in the Next
+ * example) don't try to statically resolve the directory as a module asset; it
+ * stays plain runtime code. The package is server-external where it runs bundled.
+ */
 export function registryRoot(): string {
-  return fileURLToPath(new URL("../registry", import.meta.url));
+  return join(dirname(fileURLToPath(import.meta.url)), "..", "registry");
 }
 
 /** Names of every bundled item (a subdirectory holding a manifest), sorted. */
@@ -121,4 +127,31 @@ export function resolveItems(
 
   for (const name of names) visit(name);
   return resolved;
+}
+
+/**
+ * The agent-facing description of one item (the `describe_item` MCP shape).
+ * Drops the machine-specific absolute `dir` and reduces files to what an agent
+ * needs: where they land and their role. `llms` becomes a boolean flag.
+ */
+export function describeItem(item: RegistryItem): RegistryItemDescriptor {
+  return {
+    name: item.name,
+    type: item.type,
+    description: item.description,
+    graftVersion: item.graftVersion,
+    dependencies: item.dependencies,
+    registryDependencies: item.registryDependencies,
+    files: item.files.map((file) => ({ target: file.target, role: file.role })),
+    llms: item.llms !== undefined,
+  };
+}
+
+/**
+ * Every bundled item as a descriptor, sorted by name — the `list_registry`
+ * source. Loads + validates each manifest, so a malformed bundled item surfaces
+ * as REGISTRY_ITEM_INVALID here too.
+ */
+export function listItems(root = registryRoot()): RegistryItemDescriptor[] {
+  return listItemNames(root).map((name) => describeItem(loadItem(name, root)));
 }
