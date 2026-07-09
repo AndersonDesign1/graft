@@ -15,3 +15,7 @@ minimumReleaseAgeExclude:
   - turbo
   - "@turbo/*"
   - expect-type
+  # TypeScript 7 (native Go port) + platform binaries — Microsoft-published toolchain;
+  # we pin the major and want latest patches without waiting out the 3-day gate.
+  - typescript
+  - "@typescript/*"

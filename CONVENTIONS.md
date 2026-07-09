@@ -22,6 +22,10 @@ Foundational conventions for the Graft monorepo. Keep this short and current.
 
 ## TypeScript
 
+- **TypeScript 7** (native Go `tsc`) for typechecking. Dual install until tooling catches up:
+  - `@typescript/native` → `typescript@^7` (CLI `tsc` for `pnpm typecheck`)
+  - `typescript` → `@typescript/typescript6` (JS API for tsup DTS / programmatic consumers)
+  - Drop the dual install when tsup (and peers) support the TS 7 API (expected ~7.1 era).
 - `strict` everywhere (see `tsconfig.base.json`). Target ES2022, ESM, `moduleResolution: Bundler`.
 - Prefer explicit return types on exported functions.
 - Errors thrown across boundaries are `GraftError` (from `@graft/contracts`) and must carry a `fix`.

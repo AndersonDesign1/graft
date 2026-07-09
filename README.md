@@ -59,6 +59,7 @@ Next: Phase 4 — branching & versioning UX: `graft branch` (copy-on-write DB br
 ## Requirements
 
 - Node `>=20` (developed on 24)
+- TypeScript **7** (native `tsc`; monorepo dual-install keeps TS 6 API for tsup DTS until tooling catches up)
 - [pnpm](https://pnpm.io) `11.x` (pinned via `packageManager`)
 - Docker (for the self-host Postgres + MinIO stack)
 
