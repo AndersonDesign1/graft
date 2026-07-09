@@ -188,16 +188,12 @@ bundles on the same rails.
 
 ## Build sequence
 
-- **P5.0** — this note (lock the format + wiring). _(current)_
-- **P5.1** — `@graft/registry` (manifest Zod + bundled registry + pure `resolveItem`/`planAdd`
-  + writer) · loader directory-aggregation (the breaking change) + `graft init` scaffolds the
-  `graft/` convention · `graft add` real · the `comments` + `scoped-access` items · contracts
-  codes + explain entries · unit tests + one integration proof in the example.
-- **P5.2** — real MDX bodies (`MdxBody` in `@graft/sdk-next`; generated
-  `components/mdx-components.ts` map parallel to the graft/ barrel) · `field.object` /
-  `field.array` · Tier-1 `seo` / `callout` / `faq` · Tier-2 `commerce` (products files +
-  orders Postgres). Pre-1.0: prefer better long-run design over compatibility; competitive
-  bar is Basehub / Sanity / WordPress / Prismic / Contentful / Strapi / Payload.
+- **P5.0** — this note (lock the format + wiring). ✅
+- **P5.1** — `@graft/registry` + `graft add` + comments/scoped-access. ✅
+- **P5.2** — real MDX (`MdxBody` + generated mdx-components map) · `field.object` /
+  `field.array` · Tier-1 `seo` / `callout` / `faq` · Tier-2 `commerce`. ✅ **Phase 5 closed.**
+- **P6+** — MCP `list_registry` / `describe_item`; remote registry; cold-agent CI (P6.1
+  shipped offline MCP path).
 
 ## Open questions
 

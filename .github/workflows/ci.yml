@@ -14,7 +14,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 11
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -28,3 +28,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm test
+      # P6.1 — cold-agent path must stay green: MCP-only introspection → write → read.
+      # Runs again explicitly so the gate is visible in CI logs (also covered by pnpm test).
+      - name: Cold-agent self-teaching gate
+        run: pnpm test:cold-agent

@@ -13,48 +13,24 @@ kept out of the repo.)
 
 ## Status
 
-**Phase 3 — Runtime data, security & search: complete.** "Everything is code" now
-extends to live, mutating data — safely. On top of the Phase 2 wow loop (a fresh agent
-authoring a page with an R2-hosted image, unaided), Graft now runs typed functions,
-verifies agent identity, audits every call, and searches every layer:
+**Phase 5 — Registry + commerce vertical: complete.** On top of Phases 2–4 (wow loop, runtime
+data, auth, branching, cache tags), Graft now ships **owned primitives** and a real content body
+model:
 
-- **Authored content** is validated against a Zod schema defined in code
-  (`defineCollection`) and projected atomically into a Postgres `content_index` (hash-diff;
-  every run leaves a `compilations` audit row with the git SHA). Typed reads via
-  `@graft/sdk-core` / `@graft/sdk-next`; [`examples/landing-page`](examples/landing-page)
-  renders it in Next.js, hero image resolved from R2.
-- **Typed function runtime.** `defineFunction` + `createFunctionsHandler` — stateless
-  Web-standard `Request → Response` RPC with a standard context
-  (`input`/`db`/`actor`/`branch`/`correlationId`); success is `{ data }`, failures are
-  `GraftError` JSON carrying a `fix`. Mutating data lives in a db-authoritative
-  `data_records` table, validated against its collection schema on write _and_ read.
-- **Auth — verify identity, never mint it.** `@graft/auth`'s `createActorResolver` verifies
-  bearer OIDC JWTs (via jose; JWKS inline/URL/discovery, `iss`/`exp`/`aud`, scope claims)
-  plus static dev tokens; a bad token is `TOKEN_INVALID` (401), never a silent downgrade.
-  Mutations reject anonymous callers unless explicitly `public: true`. The example hosts
-  Better Auth as a reference issuer.
-- **Audit, rate limits & the human gate.** Every invocation writes an `audit_log` row
-  (actor, correlation id, git SHA, status, duration); rate limits ride that log (stateless
-  DB counts → 429). Destructive ops are always human-gated: the call files a pending
-  approval and 403s with its id; a human runs `graft approve <id>`; the caller retries with
-  `x-graft-approval`. Approvals are one-shot and bound to the exact function + input.
-- **Search is a property of the index.** Generated, weighted `tsvector` columns + GIN on
-  `content_index` and `data_records` mean every write path is searchable with zero app-side
-  bookkeeping. Surfaced as `searchDocuments` (sdk-core), `searchContent` (sdk-next), the
-  `search_content` MCP tool, and gated `searchRecords` functions for data.
-- **Migrations are code.** `migrations/<seq>-<name>.ts` default-exports
-  `defineContentMigration` (codemod-style, all-or-nothing frontmatter rewrites) or
-  `defineDataMigration` (transactional `data_records` backfills), tracked in a
-  `migrations_applied` ledger. `graft migrate` is dry-run by default; `--apply` is the
-  operator's consent.
-- **Agent surfaces.** Content ops over MCP (`list_collections`, `describe_schema`,
-  `list_content`, `get_content`, `write_content`, `search_content`, `explain_error`) via
-  stdio and Streamable HTTP (`createGraftMcpHandler`, mounted at `POST /api/mcp` and now on
-  the actor resolver). Registered for this repo in [`.mcp.json`](.mcp.json); agent guide at
-  [`examples/landing-page/llms.txt`](examples/landing-page/llms.txt).
+- **Real MDX bodies.** Authored `*.mdx` is compiled and rendered via `@graft/sdk-next`
+  `MdxBody` with a generated `components/mdx-components.ts` map — registry **blocks** are real
+  React components, not markdown-only fakes.
+- **`graft add`.** Local-first registry (`@graft/registry`): Tier-1 `seo` / `callout` / `faq` /
+  `scoped-access` / `comments`, Tier-2 **`commerce`** (file-authoritative products + db-authoritative
+  orders + place/list/update/cancel). Pure file-drop + generated `graft/` barrel; zero config
+  edits.
+- **Typed nested fields.** `field.object` / `field.array` with recursive `describe_schema`.
+- **Agent surfaces** (MCP + CLI + HTTP functions) unchanged and live: compile, branch/merge,
+  migrate, approvals, search, auth.
 
-Next: Phase 4 — branching & versioning UX: `graft branch` (copy-on-write DB branches),
-`graft merge` replaying the migrations ledger, and the sdk-core cache-invalidation contract.
+**Next: Phase 6 — Self-teaching complete.** CI already gates a cold-agent MCP path
+(`pnpm test:cold-agent`); remaining work is fuller registry MCP tools, introspection contract
+tests, and a harder remote/HTTP cold-agent.
 
 ## Requirements
 
@@ -69,6 +45,7 @@ Next: Phase 4 — branching & versioning UX: `graft branch` (copy-on-write DB br
 pnpm install
 pnpm build
 pnpm test        # unit tests; live integration tests are opt-in via RUN_INTEGRATION=1
+pnpm test:cold-agent   # P6.1 self-teaching gate (also runs under pnpm test)
 
 # self-host infra (Postgres 18 + MinIO); dev currently runs against Neon + R2 via .env
 docker compose up -d
@@ -85,8 +62,9 @@ pnpm --filter landing-page dev       # renders at http://localhost:3000
 ### Try the runtime
 
 With the example app running (`pnpm --filter landing-page dev`), the typed functions from
-`examples/landing-page/graft.config.ts` are live at `POST /api/fn/<name>` — success returns
-`{ data }`, failure returns a `GraftError` JSON carrying a `fix`:
+`examples/landing-page/graft.config.ts` (plus `graft/*` primitives) are live at
+`POST /api/fn/<name>` — success returns `{ data }`, failure returns a `GraftError` JSON
+carrying a `fix`:
 
 ```bash
 # Open query — lists the live page slugs straight from content_index:
@@ -96,16 +74,20 @@ curl -s localhost:3000/api/fn/pageStats -d '{}'
 curl -s localhost:3000/api/fn/submitContact \
   -d '{"email":"a@b.com","message":"hi"}'
 
+# Commerce — place an order against content/products (public; prices snapshotted):
+curl -s localhost:3000/api/fn/placeOrder \
+  -d '{"email":"buyer@example.com","items":[{"productSlug":"team","qty":1}]}'
+
 # Scope-gated query — needs a token; mutations reject anonymous callers by default.
 # Set GRAFT_DEV_TOKEN in .env, then present it as a bearer:
 curl -s localhost:3000/api/fn/listSubmissions \
   -H "authorization: Bearer $GRAFT_DEV_TOKEN" -d '{}'
 ```
 
-Destructive functions (e.g. `deleteSubmission`) are human-gated: the call 403s with a
-pending approval id, a human runs `graft approve <id>`, and the caller retries with an
+Destructive functions (e.g. `deleteSubmission`, `cancelOrder`) are human-gated: the call 403s
+with a pending approval id, a human runs `graft approve <id>`, and the caller retries with an
 `x-graft-approval: <id>` header. See [`llms.txt`](examples/landing-page/llms.txt) for the
-full surface, including the `search_content` MCP tool and Better Auth token minting.
+full surface, including MCP tools and Better Auth token minting.
 
 ## Monorepo layout
 
@@ -123,7 +105,7 @@ full surface, including the `search_content` MCP tool and Better Auth token mint
 | `@graft/studio`             | Optional human Studio UI                                          |
 | `@graft/registry`           | shadcn-style owned-primitive registry                             |
 | `@graft/sdk-core`           | Framework-agnostic client + cache contract                        |
-| `@graft/sdk-next`           | Next.js adapter                                                   |
+| `@graft/sdk-next`           | Next.js adapter + `MdxBody`                                       |
 
 ## Conventions
 
