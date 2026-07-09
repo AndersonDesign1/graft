@@ -1,0 +1,15 @@
+{
+  "name": "commerce",
+  "type": "bundle",
+  "description": "Commerce foundation: file-authoritative product catalog + db-authoritative orders with place/list/update/cancel functions.",
+  "graftVersion": "*",
+  "dependencies": {
+    "@graft/auth": "workspace:*",
+    "@graft/contracts": "workspace:*"
+  },
+  "registryDependencies": [],
+  "files": [
+    { "source": "graft/commerce.ts", "target": "graft/commerce.ts", "role": "module" }
+  ],
+  "llms": "graft/commerce.llms.txt"
+}

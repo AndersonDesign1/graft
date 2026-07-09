@@ -1,12 +1,14 @@
-import Markdown from "react-markdown";
-import type { Document } from "@graft/sdk-next";
+import { MdxBody, type Document } from "@graft/sdk-next";
 import type { pages } from "@/graft.config";
 import { assetUrl } from "@/lib/assets";
+import { Faq } from "./Faq";
+import { mdxComponents } from "./mdx-components";
 
 /** Renders one `pages` document: typed frontmatter as the hero, MDX body below. */
 export async function Page({ doc }: { doc: Document<typeof pages> }) {
   const image = doc.data.image;
   const imageSrc = image ? await assetUrl(image) : null;
+  const faqs = doc.data.faqs;
 
   return (
     <article>
@@ -14,9 +16,20 @@ export async function Page({ doc }: { doc: Document<typeof pages> }) {
       {doc.data.tagline ? <p className="tagline">{doc.data.tagline}</p> : null}
       {imageSrc ? (
         // eslint-disable-next-line @next/next/no-img-element -- presigned URLs are remote + short-lived; next/image gains nothing here
-        <img className="hero" src={imageSrc} alt={image?.alt ?? ""} width={1200} height={400} />
+        <img
+          className="hero"
+          src={imageSrc}
+          alt={image?.alt ?? ""}
+          width={1200}
+          height={400}
+          sizes="(max-width: 44rem) 100vw, 44rem"
+          decoding="async"
+        />
       ) : null}
-      <Markdown>{doc.body}</Markdown>
+      <div className="mdx-body">
+        <MdxBody source={doc.body} components={mdxComponents} />
+      </div>
+      {faqs && faqs.length > 0 ? <Faq title="FAQ" items={faqs} /> : null}
     </article>
   );
 }

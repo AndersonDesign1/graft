@@ -58,10 +58,34 @@ responses; set `GRAFT_MCP_TOKEN` to require a bearer token.
 3. `pnpm compile`. The app resolves the key to a URL at render time
    (presigned GET; set `S3_PUBLIC_URL` for stable public URLs).
 
+## MDX bodies + blocks
+
+Page bodies are **real MDX** (not markdown-only). Rendered by
+`@graft/sdk-next` `MdxBody` with the generated map at
+`components/mdx-components.ts`. Registry blocks land as PascalCase
+components under `components/` and are auto-registered by `graft add`.
+
+Example in content:
+
+    <Callout type="info">Git is authoritative.</Callout>
+
+    <Faq items={[{ question: "…", answer: "…" }]} />
+
+Add more: `graft add callout`, `graft add faq`, `graft add seo`.
+
+## Commerce (catalog + orders)
+
+- Products: file-authoritative MDX under `content/products/` (see `/products`).
+- Orders: db-authoritative via functions in `graft/commerce.ts`.
+- `placeOrder` — public; `{ email, items: [{ productSlug, qty }] }`.
+- `listOrders` / `updateOrderStatus` — need `commerce:orders:read` /
+  `commerce:orders:write`.
+- `cancelOrder` — destructive hard-delete; human-gated + write scope.
+
 ## Functions (typed server logic)
 
-Functions are code in `graft.config.ts` (`defineFunction`) exported via
-`export const functions = { … }`, served while the app runs at:
+Functions are code in `graft.config.ts` + `graft/*` (`defineFunction`)
+exported via `export const functions = { … }`, served while the app runs at:
 
     POST /api/fn/<name>        body: JSON object of the input fields
                                (empty body = {})
@@ -69,7 +93,7 @@ Functions are code in `graft.config.ts` (`defineFunction`) exported via
 Success is `{ data: … }`; failure is GraftError JSON — `fix` says what to do,
 `details.issues` lists field violations, and `explain_error` knows every code.
 
-Registered functions:
+Registered functions (site + primitives):
 
 - `pageStats` — query, no input; returns the live page slugs on the branch.
 - `submitContact` — mutation, `public: true`; input `{ email, message? }`;
@@ -81,6 +105,8 @@ Registered functions:
   search over submissions, best match first.
 - `deleteSubmission` — mutation, `destructive: true`; input `{ id }`; requires
   the `submissions:admin` scope AND human approval (see below).
+- comments primitive: `postComment`, `listComments`, `moderateComment`, `deleteComment`.
+- commerce primitive: `placeOrder`, `listOrders`, `updateOrderStatus`, `cancelOrder`.
 
 To add a function: define input with the same `field.*` builders collections
 use, write the handler against the standard context
@@ -118,11 +144,12 @@ Callers are identified by `Authorization: Bearer <token>`, resolved by
 
 - **JWTs from this app's Better Auth instance** (`lib/auth.ts`, mounted at
   `/api/auth`). Sign in (`POST /api/auth/sign-in/email`), then mint a JWT at
-  `GET /api/auth/token` — it carries `scope: "submissions:read"`. The same
-  verifier path accepts any trusted OIDC issuer (company IdP, Vercel
+  `GET /api/auth/token` — it carries submissions + commerce order scopes.
+  The same verifier path accepts any trusted OIDC issuer (company IdP, Vercel
   Connect/Passport).
 - **`GRAFT_DEV_TOKEN`** from the repo-root `.env` — a static local-dev
-  credential mapped to a human actor with `submissions:read`.
+  credential; map scopes in the actor resolver for admin functions.
+
 
 No header → anonymous. A bad/expired token is `TOKEN_INVALID` (401) with the
 reason in `details` — fix the token; do not retry anonymously.

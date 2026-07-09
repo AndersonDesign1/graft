@@ -3,6 +3,7 @@
 // Safe to delete: `graft add` regenerates it from whatever modules live in graft/.
 import { mergePrimitives } from "@graft/core";
 import * as comments from "./comments";
+import * as commerce from "./commerce";
 import * as scopedAccess from "./scoped-access";
 
-export const { collections, functions } = mergePrimitives([comments, scopedAccess]);
+export const { collections, functions } = mergePrimitives([comments, commerce, scopedAccess]);

@@ -25,6 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {page.data.title}
               </Link>
             ))}
+            <Link href="/products">Catalog</Link>
           </nav>
         </header>
         <main>{children}</main>

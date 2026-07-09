@@ -14,8 +14,15 @@ afterEach(() => {
 });
 
 describe("bundled registry", () => {
-  it("lists the Tier-1 items", () => {
-    expect(listItemNames()).toEqual(["comments", "scoped-access"]);
+  it("lists the bundled items", () => {
+    expect(listItemNames()).toEqual([
+      "callout",
+      "comments",
+      "commerce",
+      "faq",
+      "scoped-access",
+      "seo",
+    ]);
   });
 
   it("loads + validates the comments manifest", () => {
@@ -29,7 +36,10 @@ describe("bundled registry", () => {
     expect(() => loadItem("nope")).toThrow(
       expect.objectContaining({
         code: "REGISTRY_ITEM_NOT_FOUND",
-        details: { name: "nope", available: ["comments", "scoped-access"] },
+        details: {
+          name: "nope",
+          available: ["callout", "comments", "commerce", "faq", "scoped-access", "seo"],
+        },
       }),
     );
   });
@@ -57,6 +67,7 @@ describe("planAdd / applyPlan", () => {
     ]);
     expect(plan.npmDependencies).toMatchObject({ "@graft/auth": "workspace:*" });
     expect(plan.conflicts).toEqual([]);
+    expect(plan.mdxMap).toBeNull();
 
     const result = applyPlan(plan);
     expect(result.written).toHaveLength(2);
@@ -71,6 +82,20 @@ describe("planAdd / applyPlan", () => {
     const llms = readFileSync(join(dir, "llms.txt"), "utf8");
     expect(llms).toContain("## comments (primitive)");
     expect(llms).toContain("## scoped-access (primitive)");
+  });
+
+  it("adds callout, writes the component, and regenerates the MDX map", () => {
+    const plan = planAdd(["callout"], { targetDir: dir });
+    expect(plan.items.map((i) => i.name)).toEqual(["callout"]);
+    expect(plan.files.map((f) => f.relPath)).toEqual(["components/Callout.tsx"]);
+    expect(plan.mdxMap?.relPath.replace(/\\/g, "/")).toBe("components/mdx-components.ts");
+    expect(plan.mdxMap?.content).toContain('import { Callout } from "./Callout"');
+
+    const result = applyPlan(plan);
+    expect(result.mdxMapPath?.replace(/\\/g, "/")).toBe("components/mdx-components.ts");
+    expect(existsSync(join(dir, "components", "Callout.tsx"))).toBe(true);
+    const map = readFileSync(join(dir, "components", "mdx-components.ts"), "utf8");
+    expect(map).toContain("Callout");
   });
 
   it("refuses to overwrite a DIFFERING file unless --overwrite, then replaces it", () => {

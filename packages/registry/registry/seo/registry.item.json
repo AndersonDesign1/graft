@@ -1,0 +1,12 @@
+{
+  "name": "seo",
+  "type": "field",
+  "description": "Spreadable SEO field group (seoTitle, seoDescription, ogImage) for any collection.",
+  "graftVersion": "*",
+  "dependencies": {},
+  "registryDependencies": [],
+  "files": [
+    { "source": "graft/fields/seo.ts", "target": "graft/fields/seo.ts", "role": "module" }
+  ],
+  "llms": "graft/fields/seo.llms.txt"
+}

@@ -1,0 +1,12 @@
+{
+  "name": "callout",
+  "type": "block",
+  "description": "MDX Callout block — highlight info, warning, or tip callouts in authored content.",
+  "graftVersion": "*",
+  "dependencies": {},
+  "registryDependencies": [],
+  "files": [
+    { "source": "components/Callout.tsx", "target": "components/Callout.tsx", "role": "component" }
+  ],
+  "llms": "components/callout.llms.txt"
+}

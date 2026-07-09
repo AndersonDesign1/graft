@@ -8,5 +8,6 @@
 export * from "./manifest";
 export * from "./version";
 export * from "./barrel";
+export * from "./mdx-map";
 export * from "./registry";
 export * from "./add";

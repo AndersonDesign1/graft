@@ -6,6 +6,7 @@
  *
  * Dry-run with `graft migrate`; execute with `graft migrate --apply`.
  */
+import type { DocumentData } from "@graft/core";
 import { defineContentMigration } from "@graft/content-migrations";
 import { pages } from "../graft.config";
 
@@ -13,18 +14,21 @@ export default defineContentMigration({
   collection: pages,
   description: "Backfill the new required `description` from tagline / first sentence / title",
   transform: ({ data, body }) => {
-    const existing = data.description as string | undefined;
-    const tagline = data.tagline as string | undefined;
+    const existing = typeof data.description === "string" ? data.description : undefined;
+    const tagline = typeof data.tagline === "string" ? data.tagline : undefined;
+    const title = typeof data.title === "string" ? data.title : "";
     const firstSentence = body
       .replace(/^#+ .*$/gm, "") // drop headings
       .replace(/[*_`>[\]]/g, "") // drop markdown decoration
       .trim()
       .split(/(?<=\.)\s/)[0];
+    // ContentMigrationDoc.data is the OLD untyped shape; assert the NEW shape
+    // after backfill (validated at apply time against the collection schema).
     return {
       data: {
-        ...(data as { title: string }),
-        description: existing ?? tagline ?? firstSentence ?? (data.title as string),
-      },
+        ...data,
+        description: existing ?? tagline ?? firstSentence ?? title,
+      } as DocumentData<typeof pages>,
     };
   },
 });

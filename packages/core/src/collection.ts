@@ -8,13 +8,21 @@
  * The collection is generic over its fields, so the document type is inferred —
  * `DocumentData<typeof posts>` is the exact frontmatter shape, no codegen needed.
  */
-import type { CollectionDescriptor, ContentAuthority, FieldDescriptor } from "@graft/contracts";
+import type { CollectionDescriptor, ContentAuthority } from "@graft/contracts";
 import { z } from "zod";
-import type { FieldDefinition } from "./field";
+import { toFieldDescriptor, type FieldDefinition } from "./field";
 
 /** The Zod object shape derived from a fields record. */
 export type FieldsShape<TFields extends Record<string, FieldDefinition>> = {
   [K in keyof TFields]: TFields[K]["zod"];
+};
+
+/**
+ * Plain data inferred field-by-field (same result as z.infer of the collection
+ * schema when field.object/array keep their generics — see field.ts).
+ */
+export type InferFieldsData<TFields extends Record<string, FieldDefinition>> = {
+  [K in keyof TFields]: z.infer<TFields[K]["zod"]>;
 };
 
 export interface CollectionConfig<
@@ -69,12 +77,9 @@ export function defineCollection<TFields extends Record<string, FieldDefinition>
     fields: config.fields,
     schema,
     describe(): CollectionDescriptor {
-      const fields: FieldDescriptor[] = Object.entries(config.fields).map(([name, def]) => ({
-        name,
-        type: def.type,
-        optional: def.optional,
-        description: def.description,
-      }));
+      const fields = Object.entries(config.fields).map(([name, def]) =>
+        toFieldDescriptor(name, def),
+      );
       return { name: config.name, authority, fields, description: config.description };
     },
   };

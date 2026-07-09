@@ -7,10 +7,23 @@
  * FieldDefinition is generic over its Zod schema so the concrete type
  * (ZodString, ZodOptional<ZodNumber>, …) survives into defineCollection and from
  * there into z.infer — typed reads all the way down, with no codegen step.
+ *
+ * Nested structure (object / array) is first-class so SEO groups, FAQ lists, and
+ * commerce line items stay typed — not opaque field.json blobs.
  */
+import type { FieldDescriptor } from "@graft/contracts";
 import { z } from "zod";
 
-export type FieldType = "string" | "text" | "number" | "boolean" | "datetime" | "json" | "asset";
+export type ScalarFieldType =
+  | "string"
+  | "text"
+  | "number"
+  | "boolean"
+  | "datetime"
+  | "json"
+  | "asset";
+
+export type FieldType = ScalarFieldType | "object" | "array";
 
 /**
  * Lowercase slash-separated path, each segment starting alphanumeric —
@@ -65,10 +78,14 @@ export interface FieldDefinition<TZod extends z.ZodType = z.ZodType> {
   zod: TZod;
   optional: boolean;
   description?: string;
+  /** Nested fields when type is `object`. */
+  fields?: Record<string, FieldDefinition>;
+  /** Item field when type is `array`. */
+  items?: FieldDefinition;
 }
 
-/** The base Zod schema each field type produces. */
-interface FieldZodMap {
+/** The base Zod schema each scalar field type produces. */
+interface ScalarZodMap {
   string: z.ZodString;
   text: z.ZodString;
   number: z.ZodNumber;
@@ -78,7 +95,7 @@ interface FieldZodMap {
   asset: typeof AssetRef;
 }
 
-const BASE_ZOD: { [T in FieldType]: () => FieldZodMap[T] } = {
+const BASE_ZOD: { [T in ScalarFieldType]: () => ScalarZodMap[T] } = {
   string: () => z.string(),
   text: () => z.string(),
   number: () => z.number(),
@@ -95,20 +112,96 @@ type MaybeOptional<TZod extends z.ZodType, TOptions extends FieldOptions> = TOpt
   : TZod;
 
 export function defineField<
-  TType extends FieldType,
+  TType extends ScalarFieldType,
   const TOptions extends FieldOptions = Record<never, never>,
->(type: TType, options?: TOptions): FieldDefinition<MaybeOptional<FieldZodMap[TType], TOptions>> {
+>(type: TType, options?: TOptions): FieldDefinition<MaybeOptional<ScalarZodMap[TType], TOptions>> {
   const optional = options?.optional ?? false;
   const base = BASE_ZOD[type]();
   return {
     type,
-    zod: (optional ? base.optional() : base) as MaybeOptional<FieldZodMap[TType], TOptions>,
+    zod: (optional ? base.optional() : base) as MaybeOptional<ScalarZodMap[TType], TOptions>,
     optional,
     description: options?.description,
   };
 }
 
-/** Ergonomic builders: `field.string()`, `field.number({ optional: true })`, … */
+export interface ObjectFieldOptions extends FieldOptions {
+  fields: Record<string, FieldDefinition>;
+}
+
+export interface ArrayFieldOptions extends FieldOptions {
+  of: FieldDefinition;
+}
+
+type FieldsToZodShape<TFields extends Record<string, FieldDefinition>> = {
+  [K in keyof TFields]: TFields[K]["zod"];
+};
+
+/** Nested object field — builds a Zod object from child field defs. */
+export function defineObjectField<
+  const TFields extends Record<string, FieldDefinition>,
+  const TOptions extends { optional?: boolean; description?: string } = Record<never, never>,
+>(
+  options: { fields: TFields } & TOptions,
+): FieldDefinition<
+  MaybeOptional<z.ZodObject<FieldsToZodShape<TFields>>, TOptions>
+> {
+  const optional = options.optional ?? false;
+  const shape = Object.fromEntries(
+    Object.entries(options.fields).map(([key, def]) => [key, def.zod]),
+  ) as FieldsToZodShape<TFields>;
+  const base = z.object(shape);
+  return {
+    type: "object",
+    zod: (optional ? base.optional() : base) as MaybeOptional<
+      z.ZodObject<FieldsToZodShape<TFields>>,
+      TOptions
+    >,
+    optional,
+    description: options.description,
+    fields: options.fields,
+  };
+}
+
+/** Array field — items validated by the nested field def. */
+export function defineArrayField<
+  TItemZod extends z.ZodType,
+  const TOptions extends { optional?: boolean; description?: string } = Record<
+    never,
+    never
+  >,
+>(
+  options: { of: FieldDefinition<TItemZod> } & TOptions,
+): FieldDefinition<MaybeOptional<z.ZodArray<TItemZod>, TOptions>> {
+  const optional = options.optional ?? false;
+  const base = z.array(options.of.zod);
+  return {
+    type: "array",
+    zod: (optional ? base.optional() : base) as MaybeOptional<z.ZodArray<TItemZod>, TOptions>,
+    optional,
+    description: options.description,
+    items: options.of,
+  };
+}
+
+/**
+ * Introspection shape for one field (recursive for object/array). Used by
+ * defineCollection.describe and defineFunction.describe so MCP sees nesting.
+ */
+export function toFieldDescriptor(name: string, def: FieldDefinition): FieldDescriptor {
+  return {
+    name,
+    type: def.type,
+    optional: def.optional,
+    description: def.description,
+    fields: def.fields
+      ? Object.entries(def.fields).map(([n, d]) => toFieldDescriptor(n, d))
+      : undefined,
+    items: def.items ? toFieldDescriptor("item", def.items) : undefined,
+  };
+}
+
+/** Ergonomic builders: `field.string()`, `field.object({ fields: … })`, … */
 export const field = {
   string: <const O extends FieldOptions = Record<never, never>>(o?: O) => defineField("string", o),
   text: <const O extends FieldOptions = Record<never, never>>(o?: O) => defineField("text", o),
@@ -119,4 +212,9 @@ export const field = {
     defineField("datetime", o),
   json: <const O extends FieldOptions = Record<never, never>>(o?: O) => defineField("json", o),
   asset: <const O extends FieldOptions = Record<never, never>>(o?: O) => defineField("asset", o),
-} as const;
+  // Keep the same generic signatures as defineObjectField / defineArrayField —
+  // wrapping through ObjectFieldOptions/ArrayFieldOptions erases element types
+  // to ZodType<unknown> in the emitted .d.ts.
+  object: defineObjectField,
+  array: defineArrayField,
+};

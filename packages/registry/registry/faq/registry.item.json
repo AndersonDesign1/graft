@@ -1,0 +1,13 @@
+{
+  "name": "faq",
+  "type": "block",
+  "description": "MDX Faq block — render a list of question/answer pairs in authored content.",
+  "graftVersion": "*",
+  "dependencies": {},
+  "registryDependencies": [],
+  "files": [
+    { "source": "components/Faq.tsx", "target": "components/Faq.tsx", "role": "component" },
+    { "source": "graft/fields/faq.ts", "target": "graft/fields/faq.ts", "role": "module" }
+  ],
+  "llms": "components/faq.llms.txt"
+}

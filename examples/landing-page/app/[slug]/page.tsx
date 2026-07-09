@@ -12,7 +12,11 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const doc = await getGraft().getContent("pages", slug);
-  return doc ? { title: doc.data.title, description: doc.data.description } : {};
+  if (!doc) return {};
+  return {
+    title: doc.data.seoTitle ?? doc.data.title,
+    description: doc.data.seoDescription ?? doc.data.description,
+  };
 }
 
 export default async function ContentPage({ params }: Props) {

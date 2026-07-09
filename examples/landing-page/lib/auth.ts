@@ -26,7 +26,12 @@ export const auth = betterAuth({
         // which @graft/auth reads into actor.scopes. Every signed-in account
         // gets submissions:read here — an example-sized policy; real
         // deployments derive scopes from roles/grants (P3.4).
-        definePayload: ({ user }) => ({ email: user.email, scope: "submissions:read" }),
+        definePayload: ({ user }) => ({
+          email: user.email,
+          // Example-sized policy: signed-in users can read submissions + orders.
+          // Real deployments derive scopes from roles/grants.
+          scope: "submissions:read commerce:orders:read commerce:orders:write",
+        }),
       },
     }),
   ],

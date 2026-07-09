@@ -1,10 +1,11 @@
 /**
  * @graft/sdk-next
  * Next.js (RSC) adapter: createGraft → request-deduped (or Data-Cached), fully
- * typed content reads for Server Components, plus revalidateContent — the
- * cache-tag write side over Next's revalidateTag.
+ * typed content reads for Server Components, revalidateContent (cache-tag write
+ * side), and MdxBody (real MDX evaluation for authored bodies + block components).
  */
 export * from "./graft";
+export * from "./mdx";
 // Re-export the core read + cache-tag surface so apps import one package.
 export {
   createClient,

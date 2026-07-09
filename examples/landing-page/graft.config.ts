@@ -3,6 +3,9 @@
  * Agents: this is the single source of truth for what content exists.
  * Add fields here, then author documents in content/<collection>/*.mdx.
  * Functions are served at POST /api/fn/<name> (JSON object body).
+ *
+ * Primitives from `graft add` live under graft/ and merge via the barrel.
+ * Field helpers (seo, faq) are composed into collections below.
  */
 import { requireScopes } from "@graft/auth";
 import {
@@ -16,6 +19,8 @@ import {
   searchRecords,
 } from "@graft/core";
 import * as primitives from "./graft";
+import { faqFields } from "./graft/fields/faq";
+import { seoFields } from "./graft/fields/seo";
 
 export const pages = defineCollection({
   name: "pages",
@@ -30,6 +35,8 @@ export const pages = defineCollection({
       optional: true,
       description: "Hero image above the body. Upload with `graft asset put <file> [key]`.",
     }),
+    ...seoFields,
+    ...faqFields,
   },
 });
 
@@ -51,7 +58,6 @@ export const submissions = defineCollection({
 /**
  * pageStats — a zero-arg query demonstrating the typed function runtime:
  * standard context in (db, branch, actor, correlationId), JSON out.
- * Live operational data (mutations into Postgres) lands in the next unit.
  */
 export const pageStats = defineFunction({
   name: "pageStats",
@@ -78,8 +84,6 @@ export const submitContact = defineFunction({
   name: "submitContact",
   kind: "mutation",
   public: true,
-  // Public + anonymous = spam surface; the limit is per client IP, counted
-  // against the audit log.
   rateLimit: { limit: 5, windowSeconds: 60 },
   description:
     "Stores a contact-form submission (public; anonymous callers allowed; 5/min per caller).",

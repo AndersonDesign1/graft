@@ -1,0 +1,34 @@
+## commerce (primitive)
+
+Catalog + orders foundation in `graft/commerce.ts`.
+
+### Catalog (files)
+
+Author products under `content/products/<slug>.mdx`:
+
+    ---
+    title: Widget
+    description: A fine widget.
+    priceCents: 2900
+    currency: USD
+    active: true
+    ---
+
+    Longer product body (MDX)…
+
+Then `graft compile`. List via sdk `listContent("products")` or MCP `list_content`.
+
+### Orders (Postgres)
+
+Functions at POST /api/fn/<name>:
+
+- `placeOrder` — public; `{ email, items: [{ productSlug, qty }] }` → creates a
+  `pending` order with snapshotted unit prices. Unknown/inactive products 400.
+- `listOrders` — needs `commerce:orders:read`; `{ limit? }`.
+- `updateOrderStatus` — needs `commerce:orders:write`; `{ id, status }` where
+  status is pending|paid|cancelled|fulfilled.
+- `cancelOrder` — destructive hard-delete; needs write scope + `graft approve`
+  then retry with `x-graft-approval`. Prefer `updateOrderStatus` → cancelled
+  for soft cancel.
+
+Mint scopes on your issuer (example: GRAFT_DEV_TOKEN or Better Auth payload).

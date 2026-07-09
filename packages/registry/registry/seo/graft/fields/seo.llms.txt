@@ -1,0 +1,19 @@
+## seo (primitive)
+
+Spreadable SEO field group in `graft/fields/seo.ts`. Import and spread into a
+collection — no barrel wiring (field items are composition helpers, not
+runtime modules):
+
+    import { seoFields } from "./graft/fields/seo";
+
+    export const pages = defineCollection({
+      name: "pages",
+      fields: {
+        title: field.string(),
+        ...seoFields, // seoTitle?, seoDescription?, ogImage?
+      },
+    });
+
+All three fields are optional (no migration needed). In the app, prefer
+`doc.data.seoTitle ?? doc.data.title` and `doc.data.seoDescription ?? doc.data.description`
+for `generateMetadata` / head tags.

@@ -12,11 +12,11 @@
  * server, so the same code runs in a Next.js route, the self-host container,
  * Vercel Fluid, or a Worker.
  */
-import type { FieldDescriptor, FunctionDescriptor } from "@graft/contracts";
+import type { FunctionDescriptor } from "@graft/contracts";
 import type { Database } from "@graft/db";
 import { z } from "zod";
 import type { FieldsShape } from "./collection";
-import type { FieldDefinition } from "./field";
+import { toFieldDescriptor, type FieldDefinition } from "./field";
 
 export type FunctionKind = "query" | "mutation";
 
@@ -152,12 +152,9 @@ export function defineFunction<TFields extends Record<string, FieldDefinition>, 
     access: config.access,
     handler: config.handler,
     describe(): FunctionDescriptor {
-      const args: FieldDescriptor[] = Object.entries(config.input).map(([name, def]) => ({
-        name,
-        type: def.type,
-        optional: def.optional,
-        description: def.description,
-      }));
+      const args = Object.entries(config.input).map(([name, def]) =>
+        toFieldDescriptor(name, def),
+      );
       return {
         name: config.name,
         kind: config.kind,

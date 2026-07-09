@@ -42,4 +42,73 @@ describe("defineField", () => {
     expectTypeOf(field.number({ optional: true }).zod).toEqualTypeOf<z.ZodOptional<z.ZodNumber>>();
     expectTypeOf(field.string().zod.parse("x")).toEqualTypeOf<string>();
   });
+
+  it("object builds a nested Zod object from child fields", () => {
+    const f = field.object({
+      fields: {
+        title: field.string(),
+        count: field.number({ optional: true }),
+      },
+      description: "A group",
+    });
+    expect(f.type).toBe("object");
+    expect(f.fields?.title?.type).toBe("string");
+    expect(f.zod.safeParse({ title: "hi" }).success).toBe(true);
+    expect(f.zod.safeParse({ title: "hi", count: 2 }).success).toBe(true);
+    expect(f.zod.safeParse({}).success).toBe(false);
+  });
+
+  it("array validates a list of the item field", () => {
+    const f = field.array({
+      of: field.object({
+        fields: {
+          productSlug: field.string(),
+          qty: field.number(),
+        },
+      }),
+    });
+    expect(f.type).toBe("array");
+    expect(f.items?.type).toBe("object");
+    expect(
+      f.zod.safeParse([
+        { productSlug: "widget", qty: 2 },
+        { productSlug: "gizmo", qty: 1 },
+      ]).success,
+    ).toBe(true);
+    expect(f.zod.safeParse([{ productSlug: "widget" }]).success).toBe(false);
+  });
+
+  it("toFieldDescriptor is recursive for object and array", async () => {
+    const { toFieldDescriptor } = await import("./field");
+    const f = field.array({
+      of: field.object({
+        fields: { q: field.string(), a: field.text() },
+      }),
+      description: "FAQ list",
+    });
+    const desc = toFieldDescriptor("faqs", f);
+    expect(desc).toMatchObject({
+      name: "faqs",
+      type: "array",
+      description: "FAQ list",
+      items: {
+        name: "item",
+        type: "object",
+        fields: [
+          { name: "q", type: "string" },
+          { name: "a", type: "text" },
+        ],
+      },
+    });
+  });
+
+  it("object/array inference survives into parse results", () => {
+    const line = field.object({
+      fields: { productSlug: field.string(), qty: field.number() },
+    });
+    const items = field.array({ of: line });
+    const parsed = items.zod.parse([{ productSlug: "widget", qty: 2 }]);
+    expectTypeOf(parsed).toEqualTypeOf<{ productSlug: string; qty: number }[]>();
+    expectTypeOf(parsed[0]!.productSlug).toEqualTypeOf<string>();
+  });
 });

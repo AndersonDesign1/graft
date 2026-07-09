@@ -1,0 +1,22 @@
+## faq (primitive)
+
+MDX block at `components/Faq.tsx` plus optional `graft/fields/faq.ts` field group.
+
+In MDX body (items inline):
+
+    <Faq title="Common questions" items={[
+      { question: "Is content in git?", answer: "Yes — git is authoritative." },
+      { question: "Who operates Graft?", answer: "An AI agent; humans are optional." },
+    ]} />
+
+Or store FAQs in frontmatter via the field helper:
+
+    import { faqFields } from "./graft/fields/faq";
+    // fields: { title: field.string(), ...faqFields }
+
+    # frontmatter
+    faqs:
+      - question: "…"
+        answer: "…"
+
+Then in the page component: `<Faq items={doc.data.faqs ?? []} />`.

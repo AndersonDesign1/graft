@@ -13,9 +13,15 @@ export const resolveActor = createActorResolver({
         [process.env.GRAFT_DEV_TOKEN]: {
           kind: "human",
           id: "owner",
-          // submissions:admin gates deleteSubmission — the dev owner has it;
-          // Better Auth JWTs (scope: submissions:read) do not.
-          scopes: ["submissions:read", "submissions:admin"],
+          // Full local owner: submissions admin + commerce orders + content moderate.
+          // Better Auth JWTs carry a narrower scope set (lib/auth.ts).
+          scopes: [
+            "submissions:read",
+            "submissions:admin",
+            "commerce:orders:read",
+            "commerce:orders:write",
+            "content:moderate",
+          ],
         },
       }
     : undefined,

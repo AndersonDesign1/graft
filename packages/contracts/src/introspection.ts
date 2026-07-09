@@ -13,13 +13,31 @@ export const ContentAuthority = z.enum([
 ]);
 export type ContentAuthority = z.infer<typeof ContentAuthority>;
 
-export const FieldDescriptor = z.object({
-  name: z.string(),
-  type: z.string(),
-  optional: z.boolean().default(false),
-  description: z.string().optional(),
-});
-export type FieldDescriptor = z.infer<typeof FieldDescriptor>;
+/**
+ * Field introspection — recursive so object/array fields expose their shape
+ * to agents (describe_schema), not opaque "json" blobs.
+ */
+export type FieldDescriptor = {
+  name: string;
+  type: string;
+  optional: boolean;
+  description?: string;
+  /** Nested fields when type is `object`. */
+  fields?: FieldDescriptor[];
+  /** Item shape when type is `array` (name is conventionally `"item"`). */
+  items?: FieldDescriptor;
+};
+
+export const FieldDescriptor: z.ZodType<FieldDescriptor> = z.lazy(() =>
+  z.object({
+    name: z.string(),
+    type: z.string(),
+    optional: z.boolean().default(false),
+    description: z.string().optional(),
+    fields: z.array(FieldDescriptor).optional(),
+    items: FieldDescriptor.optional(),
+  }),
+);
 
 export const CollectionDescriptor = z.object({
   name: z.string(),

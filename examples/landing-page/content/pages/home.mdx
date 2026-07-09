@@ -9,6 +9,15 @@ image:
     Graft: a branch grafted onto a trunk — MDX in git, validated, projected,
     rendered.
 description: The CMS where the agent is the operator — and the human is optional.
+seoTitle: Graft — the agent-native CMS
+seoDescription: Content as code, git-native versioning, owned primitives. Agents operate; humans supervise.
+faqs:
+  - question: Is content stored in git?
+    answer: Yes. Git is authoritative; Postgres is a derived index. If they disagree, git wins — recompile.
+  - question: Who is the primary operator?
+    answer: An AI agent. Humans are optional supervisors with an approval policy when they want one.
+  - question: How do I add a feature vertical?
+    answer: graft add commerce (or another primitive). Owned code lands in your repo — no plugin black box.
 ---
 
 ## Content is code
@@ -17,6 +26,11 @@ This page is a file: `content/pages/home.mdx`. Its frontmatter is validated
 against a Zod schema defined in `graft.config.ts`, compiled into a Postgres
 index, and rendered by a fully typed read client. **Editing this file and
 recompiling is the entire publishing workflow.**
+
+<Callout type="info">
+  Bodies are **real MDX** — registry blocks like this Callout are React components
+  wired through `components/mdx-components.ts`.
+</Callout>
 
 ## Git is the version history
 
@@ -27,3 +41,8 @@ content. No drafts table, no publish button — just `git`.
 
 Schemas, content, and queries are all plain code an agent can read, edit, and
 introspect. Errors carry a `fix` field that tells the agent the next step.
+
+<Callout type="tip" title="Try it">
+  Browse the [catalog](/products), place an order via `placeOrder`, or run
+  `graft add callout` in a fresh project.
+</Callout>

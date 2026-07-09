@@ -8,7 +8,11 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const doc = await getGraft().getContent("pages", "home");
-  return doc ? { title: doc.data.title, description: doc.data.description } : {};
+  if (!doc) return {};
+  return {
+    title: doc.data.seoTitle ?? doc.data.title,
+    description: doc.data.seoDescription ?? doc.data.description,
+  };
 }
 
 export default async function Home() {

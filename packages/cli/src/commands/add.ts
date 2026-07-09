@@ -39,6 +39,7 @@ export async function addCommand(options: AddCommandOptions): Promise<void> {
     console.log(`  ${state.padEnd(9)} ${file.relPath}`);
   }
   console.log(`  regenerate ${plan.barrel.relPath}`);
+  if (plan.mdxMap) console.log(`  regenerate ${plan.mdxMap.relPath}`);
 
   if (options.dryRun) {
     if (plan.conflicts.length > 0) {
@@ -53,12 +54,13 @@ export async function addCommand(options: AddCommandOptions): Promise<void> {
   const result = applyPlan(plan, { overwrite: options.overwrite });
   const parts = [`${result.written.length} written`];
   if (result.skipped.length > 0) parts.push(`${result.skipped.length} unchanged`);
+  const regen = [plan.barrel.relPath, result.mdxMapPath].filter(Boolean).join(" + ");
   console.log(
-    `\nAdded ${plan.items.map((i) => i.name).join(", ")} (${parts.join(", ")}); ${plan.barrel.relPath} regenerated.`,
+    `\nAdded ${plan.items.map((i) => i.name).join(", ")} (${parts.join(", ")}); ${regen} regenerated.`,
   );
   printFollowups(plan);
   console.log(
-    "It's live on your next `graft compile` — no graft.config.ts edit needed (the graft/ barrel wires it in).",
+    "It's live on your next `graft compile` — no graft.config.ts edit needed (the graft/ barrel wires modules; the MDX map wires blocks).",
   );
 }
 

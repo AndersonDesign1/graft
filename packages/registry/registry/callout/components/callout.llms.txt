@@ -1,0 +1,19 @@
+## callout (primitive)
+
+MDX block at `components/Callout.tsx`, registered in the generated
+`components/mdx-components.ts` map. Use inside any page body:
+
+    <Callout type="info">
+      Agents edit MDX; git is the version history.
+    </Callout>
+
+    <Callout type="warning" title="Breaking">
+      Pre-1.0 APIs may change for the better long-run design.
+    </Callout>
+
+    <Callout type="tip">
+      Run `graft compile` after editing content.
+    </Callout>
+
+`type` is `info` | `warning` | `tip` (default `info`). Optional `title`
+overrides the default label. Style via `.callout`, `.callout-info`, etc.
