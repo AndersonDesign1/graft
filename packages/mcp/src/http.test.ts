@@ -160,15 +160,18 @@ describe("actor gate", () => {
 });
 
 describe("tools over HTTP", () => {
-  it("serves the same seven tools as stdio", async () => {
+  it("serves the same tools as stdio (content + function surface)", async () => {
     const client = await connectClient(handler);
     const tools = (await client.listTools()).tools.map((tool) => tool.name).sort();
     expect(tools).toEqual([
+      "describe_function",
       "describe_schema",
       "explain_error",
       "get_content",
       "list_collections",
       "list_content",
+      "list_functions",
+      "run_function",
       "search_content",
       "write_content",
     ]);

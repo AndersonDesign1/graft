@@ -1,18 +1,35 @@
 /**
- * The Graft MCP server — the agent surface over a project's content.
+ * The Graft MCP server — the agent surface over a project's content + functions.
  *
  * Tools mirror the file-first model: reads come from the MDX files (git is
  * authoritative), writes go through the same validate → write file → compile
  * pipeline a human uses, so every change lands as a plain file a git commit can
- * carry. Every failure crossing this boundary is GraftError JSON with a `fix`.
+ * carry. Function tools reuse createFunctionsHandler so MCP and HTTP cannot
+ * diverge on auth, audit, rate limits, or the human gate. Every failure
+ * crossing this boundary is GraftError JSON with a `fix`.
+ *
+ * See docs/design-notes/agent-mcp.md for the product bar and non-goals.
  */
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { compile, parseDocument } from "@graft/compiler";
-import { GraftError, type SchemaDescription } from "@graft/contracts";
-import type { AnyCollection } from "@graft/core";
-import { searchContent, type Database } from "@graft/db";
+import {
+  GraftError,
+  type ErrorCode,
+  type GraftErrorJSON,
+  type SchemaDescription,
+} from "@graft/contracts";
+import {
+  createFunctionsHandler,
+  type AnyCollection,
+  type AnyGraftFunction,
+  type FunctionActor,
+  type GraftFunctionsHandler,
+  type RateLimit,
+} from "@graft/core";
+import type { ApprovalStore, AuditStore, Database } from "@graft/db";
+import { searchContent } from "@graft/db";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import matter from "gray-matter";
 import { z } from "zod";
@@ -24,11 +41,32 @@ export interface GraftMcpOptions {
   contentDir: string;
   collections: Record<string, AnyCollection>;
   db: Database;
+  /**
+   * Typed functions from graft.config — enables list_functions / describe_function
+   * / run_function and fills describe_schema.functions. Optional so content-only
+   * projects still work.
+   */
+  functions?: Record<string, AnyGraftFunction>;
   /** Content branch to project into. Defaults to "main". */
   branchId?: string;
   /** Server identity reported to MCP clients. */
   name?: string;
   version?: string;
+  /**
+   * Resolve the caller for run_function (and future gated tools). Same seam as
+   * createFunctionsHandler / createGraftMcpHandler. Defaults to anonymous.
+   */
+  actor?: (request: Request) => FunctionActor | Promise<FunctionActor>;
+  /** Forwarded to createFunctionsHandler for run_function. */
+  approvalPolicy?: "none" | "human";
+  rateLimit?: RateLimit;
+  gitSha?: string;
+  /**
+   * Audit / approval stores for run_function. Defaults match createFunctionsHandler
+   * (db-backed). Pass `audit: false` in unit tests that do not hit a real DB.
+   */
+  audit?: AuditStore | false;
+  approvals?: ApprovalStore;
 }
 
 type ToolResult = {
@@ -70,6 +108,26 @@ async function guarded(body: () => Promise<unknown> | unknown): Promise<ToolResu
 export function createGraftMcp(options: GraftMcpOptions): McpServer {
   const { contentDir, collections, db } = options;
   const branchId = options.branchId ?? "main";
+  const functions = options.functions ?? {};
+  const functionsByName = new Map<string, AnyGraftFunction>();
+  for (const fn of Object.values(functions)) functionsByName.set(fn.name, fn);
+
+  /** Lazy — only built when run_function is first called. */
+  let functionsHandler: GraftFunctionsHandler | undefined;
+  const getFunctionsHandler = (): GraftFunctionsHandler => {
+    functionsHandler ??= createFunctionsHandler({
+      functions,
+      db,
+      branch: branchId,
+      actor: options.actor,
+      approvalPolicy: options.approvalPolicy,
+      rateLimit: options.rateLimit,
+      gitSha: options.gitSha,
+      audit: options.audit,
+      approvals: options.approvals,
+    });
+    return functionsHandler;
+  };
 
   const server = new McpServer({
     name: options.name ?? "graft",
@@ -104,15 +162,141 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     {
       title: "Describe the content schema",
       description:
-        "Full schema introspection: every collection with its typed fields (name, type, optional, description). Documents also accept an optional kebab-case `slug` (defaults to the filename).",
+        "Full schema introspection: every collection with its typed fields (name, type, optional, description), plus every registered function (kind, args, public/destructive). Documents also accept an optional kebab-case `slug` (defaults to the filename). Prefer list_functions / describe_function when you only need the function surface.",
       inputSchema: {},
     },
     () =>
       guarded((): SchemaDescription => {
         return {
           collections: Object.values(collections).map((collection) => collection.describe()),
-          functions: [],
+          functions: [...functionsByName.values()].map((fn) => fn.describe()),
         };
+      }),
+  );
+
+  server.registerTool(
+    "list_functions",
+    {
+      title: "List functions",
+      description:
+        "List every registered typed function (name, kind, public, destructive, short description). Use describe_function for the full input schema, then run_function to invoke. Mutations reject anonymous callers unless public: true; destructive functions always require human approval (graft approve).",
+      inputSchema: {},
+    },
+    () =>
+      guarded(() => ({
+        branch: branchId,
+        functions: [...functionsByName.values()].map((fn) => {
+          const d = fn.describe();
+          return {
+            name: d.name,
+            kind: d.kind,
+            description: d.description,
+            public: d.public,
+            destructive: d.destructive,
+            args: d.args.length,
+          };
+        }),
+      })),
+  );
+
+  server.registerTool(
+    "describe_function",
+    {
+      title: "Describe one function",
+      description:
+        "Full introspection for one function: kind, args (name/type/optional/description), returns, public, destructive. Use this before run_function so the input object matches the schema.",
+      inputSchema: {
+        name: z.string().describe("Function name as returned by list_functions"),
+      },
+    },
+    ({ name }) =>
+      guarded(() => {
+        const fn = functionsByName.get(name);
+        if (!fn) {
+          throw new GraftError({
+            code: "FUNCTION_NOT_FOUND",
+            message: `No function named "${name}" is registered.`,
+            fix: `Call list_functions and use one of: ${[...functionsByName.keys()].join(", ") || "(none registered)"}.`,
+            details: { requested: name, available: [...functionsByName.keys()] },
+          });
+        }
+        return fn.describe();
+      }),
+  );
+
+  server.registerTool(
+    "run_function",
+    {
+      title: "Run a typed function",
+      description:
+        "Invoke a defineFunction by name with a JSON input object. Same pipeline as POST /api/fn/<name>: Zod validation, access rules, rate limits, audit log, and the human gate for destructive ops. Pass authorization (bearer) when the function requires a non-anonymous actor; pass approval after a human runs `graft approve <id>` for gated calls. Success returns { data, correlationId }; failures are GraftError JSON with a fix.",
+      inputSchema: {
+        name: z.string().describe("Function name (defineFunction name, not the export key)"),
+        input: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe("Input fields object; defaults to {}. See describe_function for the schema."),
+        authorization: z
+          .string()
+          .optional()
+          .describe(
+            "Bearer token for gated functions (with or without the 'Bearer ' prefix). Dev: GRAFT_DEV_TOKEN.",
+          ),
+        approval: z
+          .string()
+          .optional()
+          .describe(
+            "Approval id from a prior DESTRUCTIVE_OP_REQUIRES_APPROVAL response (after `graft approve <id>`).",
+          ),
+      },
+    },
+    ({ name, input, authorization, approval }) =>
+      guarded(async () => {
+        if (functionsByName.size === 0) {
+          throw new GraftError({
+            code: "FUNCTION_NOT_FOUND",
+            message: "This MCP server has no functions registered.",
+            fix: "Export `functions` from graft.config.ts (defineFunction results, often via mergePrimitives) and restart the MCP server / pass them to createGraftMcp({ functions }).",
+            details: { requested: name, available: [] },
+          });
+        }
+        if (!functionsByName.has(name)) {
+          throw new GraftError({
+            code: "FUNCTION_NOT_FOUND",
+            message: `No function named "${name}" is registered.`,
+            fix: `Call list_functions and use one of: ${[...functionsByName.keys()].join(", ")}.`,
+            details: { requested: name, available: [...functionsByName.keys()] },
+          });
+        }
+
+        const headers = new Headers({ "content-type": "application/json" });
+        if (authorization) {
+          const token = authorization.trim();
+          headers.set(
+            "authorization",
+            token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`,
+          );
+        }
+        if (approval) headers.set("x-graft-approval", approval);
+
+        const response = await getFunctionsHandler()(
+          new Request(`http://graft.local/fn/${encodeURIComponent(name)}`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(input ?? {}),
+          }),
+        );
+        const body: unknown = await response.json();
+        const correlationId = response.headers.get("x-graft-correlation-id") ?? undefined;
+
+        if (!response.ok) {
+          throw graftErrorFromBody(body, correlationId);
+        }
+        const data =
+          body !== null && typeof body === "object" && "data" in body
+            ? (body as { data: unknown }).data
+            : body;
+        return { data, correlationId, status: response.status };
       }),
   );
 
@@ -314,6 +498,30 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
   );
 
   return server;
+}
+
+/** Rebuild a GraftError from a functions-handler / HTTP error body. */
+function graftErrorFromBody(body: unknown, correlationId?: string): GraftError {
+  if (body !== null && typeof body === "object") {
+    const json = body as GraftErrorJSON;
+    if (typeof json.error === "string" && typeof json.message === "string") {
+      return new GraftError({
+        code: json.error as ErrorCode,
+        message: json.message,
+        fix: json.fix,
+        details: {
+          ...json.details,
+          ...(correlationId ? { correlationId } : {}),
+        },
+      });
+    }
+  }
+  return new GraftError({
+    code: "FUNCTION_EXECUTION_FAILED",
+    message: "Function invocation failed with a non-GraftError response.",
+    fix: "Inspect the server logs; retry with list_functions / describe_function to confirm the name and input shape.",
+    details: { body, correlationId },
+  });
 }
 
 /**

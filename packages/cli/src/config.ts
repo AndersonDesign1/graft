@@ -9,7 +9,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { GraftError } from "@graft/contracts";
-import type { AnyCollection } from "@graft/core";
+import type { AnyCollection, AnyGraftFunction } from "@graft/core";
 import { createJiti } from "jiti";
 
 export const CONFIG_FILENAMES = [
@@ -28,6 +28,11 @@ export interface ProjectConfig {
   /** Absolute path to the migrations directory (may not exist yet). */
   migrationsDir: string;
   collections: Record<string, AnyCollection>;
+  /**
+   * Typed functions exported from graft.config (optional). Used by `graft mcp`
+   * for list_functions / run_function. Empty when the project has none.
+   */
+  functions: Record<string, AnyGraftFunction>;
 }
 
 /** Walk up from `cwd` to the first directory containing a graft.config. */
@@ -55,6 +60,17 @@ function isCollection(value: unknown): value is AnyCollection {
     value !== null &&
     typeof (value as AnyCollection).name === "string" &&
     typeof (value as AnyCollection).describe === "function" &&
+    "schema" in value
+  );
+}
+
+function isFunction(value: unknown): value is AnyGraftFunction {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as AnyGraftFunction).name === "string" &&
+    typeof (value as AnyGraftFunction).describe === "function" &&
+    typeof (value as AnyGraftFunction).handler === "function" &&
     "schema" in value
   );
 }
@@ -101,6 +117,30 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
     }
   }
 
+  // functions are optional — content-only projects stay valid.
+  let functions: Record<string, AnyGraftFunction> = {};
+  if (mod.functions !== undefined) {
+    if (typeof mod.functions !== "object" || mod.functions === null || Array.isArray(mod.functions)) {
+      throw new GraftError({
+        code: "CONFIG_INVALID",
+        message: `${configPath} exports \`functions\` but it is not a record.`,
+        fix: 'Export `functions` as a record of defineFunction results, e.g. `export const functions = { pageStats }`, or omit the export.',
+      });
+    }
+    const fnEntries = Object.entries(mod.functions as Record<string, unknown>);
+    for (const [key, value] of fnEntries) {
+      if (!isFunction(value)) {
+        throw new GraftError({
+          code: "CONFIG_INVALID",
+          message: `functions.${key} in ${configPath} is not a function.`,
+          fix: `Create it with defineFunction from "@graft/core" (it must have a name, a schema, a handler, and describe()).`,
+          details: { key },
+        });
+      }
+    }
+    functions = mod.functions as Record<string, AnyGraftFunction>;
+  }
+
   const projectDir = dirname(configPath);
   const contentDirSetting = typeof mod.contentDir === "string" ? mod.contentDir : "content";
   const migrationsDirSetting =
@@ -111,6 +151,7 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
     contentDir: resolve(projectDir, contentDirSetting),
     migrationsDir: resolve(projectDir, migrationsDirSetting),
     collections: collections as Record<string, AnyCollection>,
+    functions,
   };
 }
 

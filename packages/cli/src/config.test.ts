@@ -51,6 +51,7 @@ describe("loadConfig", () => {
     expect(config.collections.pages?.name).toBe("pages");
     expect(config.projectDir).toBe(join(fixtures, "basic"));
     expect(config.contentDir).toBe(join(fixtures, "basic", "content"));
+    expect(config.functions).toEqual({});
   });
 
   it("respects an exported contentDir", async () => {

@@ -17,16 +17,23 @@ registered in the repo-root `.mcp.json` as `graft-landing-page`:
       }
     }
 
-Tools: `list_collections`, `describe_schema`, `list_content`, `get_content`,
-`search_content` (full-text search across collections; each hit carries the
-`sourcePath` of the file to edit), `write_content` (validates, writes the MDX
-file, compiles — one call), `explain_error`. Every failure returns JSON with a
-`fix` — do what it says. Writes land as plain files under `content/`; commit
-them like any other change.
+Tools:
+
+- Content: `list_collections`, `describe_schema` (collections **and** functions),
+  `list_content`, `get_content`, `search_content` (FTS; hits carry `sourcePath`),
+  `write_content` (validate → write MDX → compile), `explain_error`.
+- Functions: `list_functions`, `describe_function` (full args schema),
+  `run_function` (same gates as `POST /api/fn/<name>`: access, audit, rate
+  limits, human approval for destructive). Pass `authorization` for scoped
+  calls and `approval` after `graft approve <id>`.
+
+Every failure returns JSON with a `fix` — do what it says. Content writes land
+as plain files under `content/`; commit them like any other change.
 
 Remote agents (no stdio): the same tools are served over Streamable HTTP at
 `POST /api/mcp` while the app is running (`pnpm dev`). Stateless, JSON
-responses; set `GRAFT_MCP_TOKEN` to require a bearer token.
+responses; set `GRAFT_MCP_REQUIRE_AUTH=1` to require a non-anonymous actor.
+Generic projects can also run `graft mcp` (stdio) with DATABASE_URL.
 
 ## How to change content (by hand)
 

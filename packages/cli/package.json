@@ -18,11 +18,13 @@
   },
   "dependencies": {
     "@graft/assets": "workspace:*",
+    "@graft/auth": "workspace:*",
     "@graft/compiler": "workspace:*",
     "@graft/content-migrations": "workspace:*",
     "@graft/contracts": "workspace:*",
     "@graft/core": "workspace:*",
     "@graft/db": "workspace:*",
+    "@graft/mcp": "workspace:*",
     "@graft/registry": "workspace:*",
     "jiti": "^2.4.0"
   }

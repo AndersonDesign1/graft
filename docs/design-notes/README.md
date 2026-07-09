@@ -2,13 +2,11 @@
 
 Durable design decisions and spike findings live here, one file per topic.
 
-Phase 1 will add:
+| Note | Topic |
+| --- | --- |
+| [`branching.md`](./branching.md) | Copy-on-write Postgres branching: Neon CoW default + self-host overlay fallback |
+| [`content-projection.md`](./content-projection.md) | Authored content → Postgres index (atomic, deterministic projection) |
+| [`registry.md`](./registry.md) | Owned primitives + `graft add` wiring (barrel, not plugins) |
+| [`agent-mcp.md`](./agent-mcp.md) | Project MCP: install UX, function tools, safety defaults, non-goals |
 
-- `branching.md` — copy-on-write Postgres branching: failure catalog (sequences,
-  extensions, roles, pooling) and the chosen default (Neon CoW) + self-host fallback
-  (`branch_id` row isolation).
-- `content-projection.md` — how authored content files are projected into the Postgres
-  index, atomically and deterministically.
-
-These notes are the hand-off from throwaway spikes to the real `@graft/db` and
-`@graft/compiler` implementations.
+These notes hand off throwaway spikes and research into real package APIs.

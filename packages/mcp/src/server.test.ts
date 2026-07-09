@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ErrorCodes, SchemaDescription } from "@graft/contracts";
-import { defineCollection, field } from "@graft/core";
+import { defineCollection, defineFunction, field } from "@graft/core";
 import type { Database } from "@graft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -32,6 +32,39 @@ const collections = {
     name: "submissions",
     authority: "db-authoritative",
     fields: { email: field.string() },
+  }),
+};
+
+const functions = {
+  ping: defineFunction({
+    name: "ping",
+    kind: "query",
+    description: "Health check",
+    returns: "{ ok: true }",
+    input: {},
+    handler: () => ({ ok: true as const }),
+  }),
+  echo: defineFunction({
+    name: "echo",
+    kind: "query",
+    description: "Echo a message",
+    input: { message: field.string({ description: "Text to echo" }) },
+    handler: ({ input }) => ({ echoed: input.message }),
+  }),
+  secretWrite: defineFunction({
+    name: "secretWrite",
+    kind: "mutation",
+    description: "Gated mutation (rejects anonymous)",
+    input: {},
+    handler: () => ({ wrote: true }),
+  }),
+  publicWrite: defineFunction({
+    name: "publicWrite",
+    kind: "mutation",
+    public: true,
+    description: "Public mutation",
+    input: {},
+    handler: () => ({ wrote: true }),
   }),
 };
 
@@ -101,6 +134,8 @@ describe("introspection", () => {
       "posts",
       "submissions",
     ]);
+    // Content-only fixture has no functions export → empty array (still valid).
+    expect(parsed.functions).toEqual([]);
     const pages = parsed.collections[0];
     expect(pages?.fields).toContainEqual({
       name: "title",
@@ -108,6 +143,165 @@ describe("introspection", () => {
       optional: false,
       description: "Headline",
     });
+  });
+});
+
+describe("function tools (P6.2)", () => {
+  let fnClient: Client;
+
+  async function callFn(name: string, args: Record<string, unknown> = {}) {
+    const result = (await fnClient.callTool({ name, arguments: args })) as {
+      isError?: boolean;
+      content: { type: string; text: string }[];
+    };
+    return {
+      isError: result.isError === true,
+      payload: JSON.parse(result.content[0]?.text ?? "null"),
+    };
+  }
+
+  beforeEach(async () => {
+    // Plain stub db (not the property-tripwire proxy): createFunctionsHandler
+    // does Promise.resolve(db), which probes `.then` — a throwing proxy looks
+    // thenable and aborts. audit: false skips real audit/approval stores.
+    const stubDb = { __stub: true } as unknown as Database;
+    const server = createGraftMcp({
+      contentDir: dir,
+      collections,
+      functions,
+      db: stubDb,
+      audit: false,
+    });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    fnClient = new Client({ name: "fn-agent", version: "0.0.0" });
+    await fnClient.connect(clientTransport);
+  });
+
+  it("lists functions with kind and flags", async () => {
+    const { isError, payload } = await callFn("list_functions");
+    expect(isError).toBe(false);
+    expect(payload.functions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "ping", kind: "query", args: 0 }),
+        expect.objectContaining({ name: "echo", kind: "query", args: 1 }),
+        expect.objectContaining({ name: "secretWrite", kind: "mutation" }),
+        expect.objectContaining({ name: "publicWrite", kind: "mutation", public: true }),
+      ]),
+    );
+  });
+
+  it("describe_schema includes FunctionDescriptors", async () => {
+    const { payload } = await callFn("describe_schema");
+    const parsed = SchemaDescription.parse(payload);
+    expect(parsed.functions.map((f) => f.name).sort()).toEqual([
+      "echo",
+      "ping",
+      "publicWrite",
+      "secretWrite",
+    ]);
+    const echo = parsed.functions.find((f) => f.name === "echo");
+    expect(echo?.args).toContainEqual({
+      name: "message",
+      type: "string",
+      optional: false,
+      description: "Text to echo",
+    });
+  });
+
+  it("describe_function returns one FunctionDescriptor", async () => {
+    const { isError, payload } = await callFn("describe_function", { name: "echo" });
+    expect(isError).toBe(false);
+    expect(payload).toMatchObject({
+      name: "echo",
+      kind: "query",
+      description: "Echo a message",
+    });
+  });
+
+  it("describe_function rejects unknown names with FUNCTION_NOT_FOUND", async () => {
+    const { isError, payload } = await callFn("describe_function", { name: "nope" });
+    expect(isError).toBe(true);
+    expect(payload.error).toBe(ErrorCodes.FUNCTION_NOT_FOUND);
+    expect(payload.fix).toContain("list_functions");
+    expect(payload.details.available).toContain("ping");
+  });
+
+  it("run_function invokes a public query and returns { data }", async () => {
+    const { isError, payload } = await callFn("run_function", {
+      name: "echo",
+      input: { message: "hi" },
+    });
+    expect(isError).toBe(false);
+    expect(payload.data).toEqual({ echoed: "hi" });
+    expect(payload.correlationId).toBeTruthy();
+    expect(payload.status).toBe(200);
+  });
+
+  it("run_function rejects bad input with INPUT_VALIDATION_FAILED", async () => {
+    const { isError, payload } = await callFn("run_function", {
+      name: "echo",
+      input: { message: 7 },
+    });
+    expect(isError).toBe(true);
+    expect(payload.error).toBe(ErrorCodes.INPUT_VALIDATION_FAILED);
+    expect(payload.details.issues).toBeTruthy();
+  });
+
+  it("run_function enforces the secure mutation default (anonymous → UNAUTHORIZED)", async () => {
+    const { isError, payload } = await callFn("run_function", {
+      name: "secretWrite",
+      input: {},
+    });
+    expect(isError).toBe(true);
+    expect(payload.error).toBe(ErrorCodes.UNAUTHORIZED);
+  });
+
+  it("run_function allows public mutations anonymously", async () => {
+    const { isError, payload } = await callFn("run_function", {
+      name: "publicWrite",
+      input: {},
+    });
+    expect(isError).toBe(false);
+    expect(payload.data).toEqual({ wrote: true });
+  });
+
+  it("run_function passes bearer auth into the actor resolver", async () => {
+    const server = createGraftMcp({
+      contentDir: dir,
+      collections,
+      functions,
+      db: { __stub: true } as unknown as Database,
+      audit: false,
+      actor: async (request) => {
+        const header = request.headers.get("authorization");
+        if (header === "Bearer secret-token") {
+          return { kind: "agent", id: "agent-1" };
+        }
+        return { kind: "anonymous" };
+      },
+    });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const authed = new Client({ name: "authed", version: "0.0.0" });
+    await authed.connect(clientTransport);
+
+    const denied = (await authed.callTool({
+      name: "run_function",
+      arguments: { name: "secretWrite", input: {} },
+    })) as { isError?: boolean; content: { type: string; text: string }[] };
+    expect(denied.isError).toBe(true);
+
+    const allowed = (await authed.callTool({
+      name: "run_function",
+      arguments: {
+        name: "secretWrite",
+        input: {},
+        authorization: "secret-token",
+      },
+    })) as { isError?: boolean; content: { type: string; text: string }[] };
+    expect(allowed.isError).toBeFalsy();
+    expect(JSON.parse(allowed.content[0]?.text ?? "null").data).toEqual({ wrote: true });
   });
 });
 

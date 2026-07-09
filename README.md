@@ -25,12 +25,15 @@ model:
   orders + place/list/update/cancel). Pure file-drop + generated `graft/` barrel; zero config
   edits.
 - **Typed nested fields.** `field.object` / `field.array` with recursive `describe_schema`.
-- **Agent surfaces** (MCP + CLI + HTTP functions) unchanged and live: compile, branch/merge,
-  migrate, approvals, search, auth.
+- **Agent surfaces** (MCP + CLI + HTTP functions) live: compile, branch/merge, migrate,
+  approvals, search, auth.
 
-**Next: Phase 6 — Self-teaching complete.** CI already gates a cold-agent MCP path
-(`pnpm test:cold-agent`); remaining work is fuller registry MCP tools, introspection contract
-tests, and a harder remote/HTTP cold-agent.
+**Phase 6 — Self-teaching (in progress).** CI gates a cold-agent MCP path
+(`pnpm test:cold-agent`). **P6.2** makes the project MCP a full operator surface:
+`list_functions` / `describe_function` / `run_function` (same access, audit, rate-limit, and
+human-gate rules as `POST /api/fn/<name>`), plus `graft mcp` for one-command stdio install.
+See [`docs/design-notes/agent-mcp.md`](docs/design-notes/agent-mcp.md). Next after that:
+registry browse tools, introspection contract tests, remote HTTP cold-agent.
 
 ## Requirements
 
@@ -100,8 +103,8 @@ full surface, including MCP tools and Better Auth token minting.
 | `@graft/assets`             | S3/MinIO storage, transforms, agent upload primitives             |
 | `@graft/auth`               | OIDC token verification, actor resolver, scope-based access       |
 | `@graft/contracts`          | Shared types, error codes, introspection schemas                  |
-| `@graft/mcp`                | MCP server (primitives + introspection)                           |
-| `@graft/cli`                | Human + agent CLI (`graft`)                                       |
+| `@graft/mcp`                | Project MCP (content + functions + introspection)                 |
+| `@graft/cli`                | Human + agent CLI (`graft`, including `graft mcp`)                |
 | `@graft/studio`             | Optional human Studio UI                                          |
 | `@graft/registry`           | shadcn-style owned-primitive registry                             |
 | `@graft/sdk-core`           | Framework-agnostic client + cache contract                        |

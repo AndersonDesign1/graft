@@ -1,14 +1,19 @@
 /**
- * The MCP server for this site — the agent surface over content/.
- * Registered in the repo-root .mcp.json; agents get list_collections,
- * describe_schema, list/get/write_content, and explain_error.
+ * The MCP server for this site — the agent surface over content/ + functions.
+ * Registered in the repo-root .mcp.json; agents get content tools plus
+ * list_functions / describe_function / run_function (same gates as POST /api/fn).
  *   pnpm mcp   (stdio; meant to be launched by an MCP client, not by hand)
+ *
+ * Prefer `graft mcp` from the project root for the generic install path
+ * (see docs/design-notes/agent-mcp.md); this script keeps the example name
+ * and wires the full Better Auth actor resolver.
  */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDb } from "@graft/db";
 import { createGraftMcp, serveStdio } from "@graft/mcp";
-import { collections } from "../graft.config";
+import { collections, functions } from "../graft.config";
+import { resolveActor } from "../lib/actor";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 
@@ -29,7 +34,9 @@ const server = createGraftMcp({
   name: "graft-landing-page",
   contentDir: resolve(here, "../content"),
   collections,
+  functions,
   db: handle.db,
+  actor: resolveActor,
 });
 
 await serveStdio(server);

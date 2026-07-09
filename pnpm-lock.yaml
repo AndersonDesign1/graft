@@ -117,6 +117,9 @@ importers:
       '@graft/assets':
         specifier: workspace:*
         version: link:../assets
+      '@graft/auth':
+        specifier: workspace:*
+        version: link:../auth
       '@graft/compiler':
         specifier: workspace:*
         version: link:../compiler
@@ -132,6 +135,9 @@ importers:
       '@graft/db':
         specifier: workspace:*
         version: link:../db
+      '@graft/mcp':
+        specifier: workspace:*
+        version: link:../mcp
       '@graft/registry':
         specifier: workspace:*
         version: link:../registry

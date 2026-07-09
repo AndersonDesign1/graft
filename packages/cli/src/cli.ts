@@ -2,8 +2,8 @@
  * @graft/cli — the `graft` command.
  *
  * `init`/`compile`/`dev` (Phase 2), the approval + migration operator loops
- * (Phase 3), and `branch`/`merge` (Phase 4) are real; `add` is a planned stub
- * that says which phase delivers it. Every failure crossing this boundary is a
+ * (Phase 3), `branch`/`merge` (Phase 4), `add` (Phase 5), and `mcp` (Phase 6
+ * project MCP over stdio) are real. Every failure crossing this boundary is a
  * GraftError printed with its agent-actionable `fix`.
  */
 import { printGraftError } from "./report";
@@ -43,10 +43,12 @@ function printHelp(): void {
     "                           move data rows, recompile. Dry-run; --apply executes",
     "  add <item>               Copy an owned primitive from the registry into graft/",
     "                           (+ its deps; regenerates the graft/ barrel — no config edit)",
+    "  mcp                      Serve the project MCP over stdio (content + function tools;",
+    "                           for .mcp.json / local agents). Requires DATABASE_URL.",
     ...PLANNED.map((cmd) => `  ${cmd.name.padEnd(12)} ${cmd.summary}  (${cmd.phase})`),
     "",
     "Options:",
-    "  --branch <id>    Content branch to project into (compile/dev/migrate; default: main)",
+    "  --branch <id>    Content branch to project into (compile/dev/migrate/mcp; default: main)",
     "  --from <name>    Parent to fork from (branch create; default: main)",
     "  --into <name>    Merge target (merge; default: main)",
     "  --backend <kind> Branch backend: overlay (default) or neon (branch create)",
@@ -291,6 +293,12 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
           dryRun: args.dryRun,
           overwrite: args.overwrite,
         });
+        return 0;
+      }
+      case "mcp": {
+        const { mcpCommand } = await import("./commands/mcp");
+        // Blocks until the MCP client disconnects (stdio lifetime).
+        await mcpCommand({ cwd, branchId: args.branchId });
         return 0;
       }
       default: {
