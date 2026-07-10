@@ -1,0 +1,57 @@
+---
+title: Changelog
+description: "Release notes for Graft: every notable change, newest first."
+tagline: "What shipped, release by release."
+order: 4
+image:
+  key: pages/changelog/hero.svg
+  alt: >-
+    A vertical release timeline listing v0.6 remote MCP and approvals, v0.5
+    typed functions, and v0.4 the asset store.
+seoTitle: Graft Changelog — release notes
+seoDescription: >-
+  Every notable change to the Graft CMS: remote MCP, typed functions, asset
+  store, and more.
+---
+
+Every notable change to Graft, newest first. Dates use ISO format; entries
+follow the spirit of [Keep a Changelog](https://keepachangelog.com/).
+
+## v0.6.0 — 2026-07-08
+
+### Added
+
+- **Remote MCP over Streamable HTTP** — cold agents can now operate the CMS
+  with nothing but an endpoint and a bearer token.
+- `delete_content` MCP tool, gated behind human approval like every other
+  destructive operation.
+- `put_asset` accepts base64 bodies so remote agents can upload binaries.
+
+### Changed
+
+- Error responses now always include a machine-readable `code` and a `fix`
+  hint; feed either to `explain_error`.
+
+## v0.5.0 — 2026-06-19
+
+### Added
+
+- Typed functions (`defineFunction`) with Zod validation, rate limits, and
+  per-scope access rules.
+- Audit log for every mutation, keyed by correlation id.
+
+### Fixed
+
+- Compile no longer drops documents whose frontmatter contains only optional
+  fields.
+
+## v0.4.0 — 2026-05-30
+
+### Added
+
+- Asset store backed by R2 with signed read URLs.
+- Preview branches: content inherits from the parent branch, overrides win.
+
+### Deprecated
+
+- The legacy `graft push` alias; use `graft compile` instead.

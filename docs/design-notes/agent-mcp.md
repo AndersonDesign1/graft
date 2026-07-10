@@ -208,14 +208,14 @@ Graft never becomes the identity provider of record.
 
 ## Phasing
 
-| Unit        | Deliverable                                                                            |
-| ----------- | -------------------------------------------------------------------------------------- |
-| **P6.1** ✅ | Cold-agent MCP unit path + CI (`pnpm test:cold-agent`)                                 |
-| **P6.2** ✅ | Function tools + `describe_schema.functions` + `graft mcp` + docs                      |
-| **P6.3** ✅ | Registry MCP browse (`list_registry` / `describe_item`) + introspection contract tests |
-| **P6.4** ✅ | Remote HTTP cold-agent CI gate (`cold-agent-http.test.ts`)                             |
-| **P6.5** ✅ | `delete_content` (destructive gate over MCP) + `put_asset` tools                       |
-| **P6.5+**   | Live off-repo (eve) cold-agent exercise; remaining ergonomics                          |
+| Unit         | Deliverable                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| **P6.1** ✅  | Cold-agent MCP unit path + CI (`pnpm test:cold-agent`)                                         |
+| **P6.2** ✅  | Function tools + `describe_schema.functions` + `graft mcp` + docs                              |
+| **P6.3** ✅  | Registry MCP browse (`list_registry` / `describe_item`) + introspection contract tests         |
+| **P6.4** ✅  | Remote HTTP cold-agent CI gate (`cold-agent-http.test.ts`)                                     |
+| **P6.5** ✅  | `delete_content` (destructive gate over MCP) + `put_asset` tools                               |
+| **P6.5+** ✅ | Live off-repo cold-agent exercise passed (2026-07-10) + ergonomics fixes from its friction log |
 
 ## Acceptance (P6.2)
 
@@ -243,7 +243,7 @@ Graft never becomes the identity provider of record.
 - [x] A gated typed function is invoked with the **connection's** bearer only — no token in tool arguments (the P6.3-followup forwarding path, gated in CI).
 - [x] Registry browse works over the wire.
 - [x] Runs offline under `pnpm test:cold-agent` (projection stubbed) — CI-blocking alongside the P6.1 file.
-- [ ] Live off-repo agent exercise (fresh agent, running app, network HTTP, no repo checkout) — banked as the P6.5 manual gate; writes need the dev/self-host writable tree.
+- [x] Live off-repo agent exercise (fresh agent, running app, network HTTP, no repo checkout) — passed 2026-07-10; see Acceptance (P6.5 — live half).
 
 ## Acceptance (P6.5 — tools half)
 
@@ -255,7 +255,21 @@ Graft never becomes the identity provider of record.
 - [x] Existing keys refuse without `overwrite: true` — `ASSET_EXISTS` (+ explain entry; the knowledge base stays in lockstep with ErrorCodes by type).
 - [x] All offline: in-memory approval store, fake storage, stubbed projection (`content-ops.test.ts`).
 - [x] `llms.txt` / design note teach both tools.
-- [ ] Live off-repo agent exercise remains the P6.5 manual gate (unchanged).
+- [x] Live off-repo agent exercise — passed, next section.
+
+## Acceptance (P6.5 — live half) ✅ 2026-07-10
+
+The banked "fully cold" gate ran for real: a fresh agent with **no repo checkout
+and no llms.txt** — MCP tool descriptions, schemas, and error messages were its
+only teachers — drove the running example app over network Streamable HTTP
+(`POST /api/mcp`, `GRAFT_MCP_REQUIRE_AUTH=1`, bearer token as its sole context).
+
+- [x] Cold discovery: 4 calls from zero to fully oriented (tools → collections → schema → content).
+- [x] Authored `pages/changelog` end-to-end: hand-wrote an SVG, uploaded via `put_asset` (base64 + key; key convention inferred from existing docs), referenced it as `{ key, alt }`, verified via `get_content` **and** a rendered HTTP 200 with the R2-hosted hero loaded.
+- [x] Destructive gate over the network, both halves: `delete_content` filed the approval and refused; a human ran `graft approve`; the one-shot retry (the `approval` tool argument) deleted the file and recompiled (`removed: ["pages/delete-me-test"]`); `GET /delete-me-test` → 404. A replay of the same approval id was refused (the existence pre-check fires before approval consumption — by design, and no new approval was filed).
+- [x] **Zero unintended tool-call failures across both runs** — the only errors were the mandated gate refusal and the deletion proofs.
+- [x] Friction log → ergonomics fixes (`2bfd3f7`): `describe_schema` now teaches asset fields (`{ key, alt? }` + `put_asset`, recursive through object/array); approval errors are translated to MCP-speak (`approval` argument, never `x-graft-approval`) at the `invokeFunction` boundary; `write_content`/`delete_content` say who owns the git commit (the checkout's operator — remote callers can't and needn't).
+- Declined (minor, from the log): encoding `put_asset`'s path-XOR-(base64+key) rule as JSON-Schema `oneOf` — the prose taught the cold agent on the first try.
 
 ## Open questions (not blocking P6.2)
 
