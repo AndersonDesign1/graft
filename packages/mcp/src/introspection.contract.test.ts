@@ -26,6 +26,7 @@ const collections = {
     description: "Pages with nested fields",
     fields: {
       title: field.string({ description: "Headline" }),
+      image: field.asset({ optional: true, description: "Hero image." }),
       faqs: field.array({
         optional: true,
         description: "FAQ entries",
@@ -33,6 +34,7 @@ const collections = {
           fields: {
             question: field.string({ description: "The question." }),
             answer: field.string({ description: "The answer." }),
+            icon: field.asset({ optional: true }),
           },
         }),
       }),
@@ -118,7 +120,22 @@ describe("introspection contract", () => {
     const faqs = pages?.fields.find((f) => f.name === "faqs");
     expect(faqs?.type).toBe("array");
     expect(faqs?.items?.type).toBe("object");
-    expect(faqs?.items?.fields?.map((f) => f.name)).toEqual(["question", "answer"]);
+    expect(faqs?.items?.fields?.map((f) => f.name)).toEqual(["question", "answer", "icon"]);
+  });
+
+  it("asset fields teach the { key, alt? } shape and put_asset, recursively", async () => {
+    // The P6.5 live cold agent had to reverse-engineer the asset value shape
+    // from existing documents — describe_schema must teach it on the surface.
+    const parsed = SchemaDescription.parse((await call("describe_schema")).payload);
+    const pages = parsed.collections.find((collection) => collection.name === "pages");
+    const image = pages?.fields.find((f) => f.name === "image");
+    expect(image?.description).toContain("Hero image.");
+    expect(image?.description).toContain("{ key, alt? }");
+    expect(image?.description).toContain("put_asset");
+    const icon = pages?.fields
+      .find((f) => f.name === "faqs")
+      ?.items?.fields?.find((f) => f.name === "icon");
+    expect(icon?.description).toContain("put_asset");
   });
 
   it("describe_function conforms to FunctionDescriptor for every function", async () => {

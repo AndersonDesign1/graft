@@ -190,6 +190,10 @@ describe("delete_content — the destructive gate over MCP", () => {
     const details = payload.details as { approvalId?: string };
     expect(details.approvalId).toBe("ap-1");
     expect(String(payload.fix)).toContain("graft approve");
+    // The fix must speak MCP (the `approval` argument), not HTTP headers —
+    // the P6.5 live cold agent flagged the header-speak as a dead end.
+    expect(String(payload.fix)).toContain("`approval` argument");
+    expect(String(payload.fix)).not.toContain("x-graft-approval");
     expect(String(payload.howToRecover)).toBeTruthy();
     // Nothing happened: file intact, projection never ran.
     expect(existsSync(join(dir, "pages", "home.mdx"))).toBe(true);

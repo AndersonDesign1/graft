@@ -24,6 +24,7 @@ import { compile, parseDocument } from "@graft/compiler";
 import {
   GraftError,
   type ErrorCode,
+  type FieldDescriptor,
   type GraftErrorJSON,
   type SchemaDescription,
 } from "@graft/contracts";
@@ -294,7 +295,10 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     () =>
       guarded((): SchemaDescription => {
         return {
-          collections: Object.values(collections).map((collection) => collection.describe()),
+          collections: Object.values(collections).map((collection) => {
+            const descriptor = collection.describe();
+            return { ...descriptor, fields: descriptor.fields.map(teachAssetFields) };
+          }),
           functions: [...functionsByName.values()].map((fn) => fn.describe()),
         };
       }),
@@ -536,7 +540,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     {
       title: "Write a document (create or update)",
       description:
-        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. Commit the file to git afterwards — git is the version history.",
+        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.",
       inputSchema: {
         collection: z.string().describe("Collection name"),
         slug: z
@@ -596,7 +600,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     {
       title: "Delete a document (human-gated)",
       description:
-        "Delete an authored document: removes <contentDir>/<collection>/<slug>.mdx and compiles, so the index soft-deletes it. DESTRUCTIVE and always human-gated — the first call files an approval and fails with its id; a human decides with `graft approve <id>` (or deny); then retry the SAME collection+slug with `approval: <id>` (the MCP form of the x-graft-approval header). Approvals are one-shot and bound to that exact input. Commit the deletion to git afterwards.",
+        "Delete an authored document: removes <contentDir>/<collection>/<slug>.mdx and compiles, so the index soft-deletes it. DESTRUCTIVE and always human-gated — the first call files an approval and fails with its id; a human decides with `graft approve <id>` (or deny); then retry the SAME collection+slug with `approval: <id>` (the MCP form of the x-graft-approval header). Approvals are one-shot and bound to that exact input. Git is the version history: commit the deletion afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.",
       inputSchema: {
         collection: z.string().describe("Collection name"),
         slug: z.string().describe("Document slug to delete"),
@@ -829,6 +833,45 @@ async function invokeFunction(
   return { data, correlationId, status: response.status };
 }
 
+/**
+ * MCP-surface teaching for asset fields. Core's describe() is surface-neutral
+ * (a CLI user uploads with `graft asset put`), so describe_schema appends the
+ * value shape and the put_asset pointer here — the P6.5 live cold agent had to
+ * infer both from existing documents. Recursive: asset fields nest inside
+ * object/array fields.
+ */
+const ASSET_FIELD_HINT =
+  "Asset reference: the value is an object { key, alt? }. Upload the file with the put_asset tool first — its response includes the exact snippet to use here.";
+
+function teachAssetFields(fieldDescriptor: FieldDescriptor): FieldDescriptor {
+  const taught: FieldDescriptor = {
+    ...fieldDescriptor,
+    ...(fieldDescriptor.type === "asset"
+      ? {
+          description: fieldDescriptor.description
+            ? `${fieldDescriptor.description} ${ASSET_FIELD_HINT}`
+            : ASSET_FIELD_HINT,
+        }
+      : {}),
+  };
+  if (fieldDescriptor.fields) taught.fields = fieldDescriptor.fields.map(teachAssetFields);
+  if (fieldDescriptor.items) taught.items = teachAssetFields(fieldDescriptor.items);
+  return taught;
+}
+
+/**
+ * The functions handler speaks HTTP — its approval fixes say "retry with the
+ * header `x-graft-approval: <id>`". Over MCP there are no headers; the retry
+ * carries the `approval` tool argument instead. Translate at the boundary so
+ * the error self-teaches on the surface it is actually served on.
+ */
+function toMcpFix(fix: string | undefined): string | undefined {
+  if (!fix) return fix;
+  return fix
+    .replace(/the header `x-graft-approval: ([^`]+)`/g, 'the `approval` argument set to "$1"')
+    .replace(/WITHOUT the x-graft-approval header/g, "WITHOUT the `approval` argument");
+}
+
 /** Rebuild a GraftError from a functions-handler / HTTP error body. */
 function graftErrorFromBody(body: unknown, correlationId?: string): GraftError {
   if (body !== null && typeof body === "object") {
@@ -837,7 +880,7 @@ function graftErrorFromBody(body: unknown, correlationId?: string): GraftError {
       return new GraftError({
         code: json.error as ErrorCode,
         message: json.message,
-        fix: json.fix,
+        fix: toMcpFix(json.fix),
         details: {
           ...json.details,
           ...(correlationId ? { correlationId } : {}),

@@ -248,12 +248,12 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "Calling any mutation on a deployment whose approvalPolicy is 'human'",
     ],
     howToRecover:
-      "Ask a human operator to run `graft approve <approvalId>` (they can also `graft deny` it). Once approved, retry the EXACT same request with the header `x-graft-approval: <approvalId>`. Approvals are one-shot and bound to the exact input — never work around the gate.",
+      "Ask a human operator to run `graft approve <approvalId>` (they can also `graft deny` it). Once approved, retry the EXACT same call carrying the approval id — over MCP pass it as the `approval` tool argument; over raw HTTP send the `x-graft-approval: <approvalId>` header. Approvals are one-shot and bound to the exact input — never work around the gate.",
   },
   APPROVAL_INVALID: {
     code: "APPROVAL_INVALID",
     meaning:
-      "An x-graft-approval header was sent, but that approval cannot authorize this call — details.reason says why (pending, denied, already_consumed, mismatch, or not_found).",
+      "An approval id was supplied (the `approval` argument over MCP, the x-graft-approval header over raw HTTP), but it cannot authorize this call — details.reason says why (pending, denied, already_consumed, mismatch, or not_found).",
     typicalCauses: [
       "Retrying before a human has decided (pending)",
       "Reusing an approval — they are one-shot (already_consumed)",
@@ -261,7 +261,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "A human refused the operation (denied)",
     ],
     howToRecover:
-      "pending → wait for the human decision; denied → do not retry, ask the operator; already_consumed or not_found → call again without the header to file a fresh request; mismatch → retry with exactly the approved input.",
+      "pending → wait for the human decision; denied → do not retry, ask the operator; already_consumed or not_found → call again without the approval id to file a fresh request; mismatch → retry with exactly the approved input.",
   },
   BRANCH_NOT_FOUND: {
     code: "BRANCH_NOT_FOUND",
