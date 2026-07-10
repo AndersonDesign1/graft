@@ -24,8 +24,10 @@ Tools:
   `write_content` (validate → write MDX → compile), `explain_error`.
 - Functions: `list_functions`, `describe_function` (full args schema),
   `run_function` (same gates as `POST /api/fn/<name>`: access, audit, rate
-  limits, human approval for destructive). Pass `authorization` for scoped
-  calls and `approval` after `graft approve <id>`.
+  limits, human approval for destructive). You usually already have an
+  identity: `graft mcp` acts as `GRAFT_DEV_TOKEN`, and over HTTP MCP the
+  bearer you connected with is forwarded — only pass `authorization` to
+  override it. Pass `approval` after `graft approve <id>`.
 - Registry: `list_registry`, `describe_item` — browse owned primitives
   (blocks / fields / access rules / bundles) before installing one with
   `graft add <name>`. MCP shows what exists; the CLI installs it.

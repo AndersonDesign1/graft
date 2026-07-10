@@ -63,6 +63,14 @@ export interface GraftMcpOptions {
   rateLimit?: RateLimit;
   gitSha?: string;
   /**
+   * Bearer token applied to run_function when the tool call passes no
+   * `authorization` — so the credential lives with the server (env/config),
+   * not in the agent's context window or MCP transcript. An explicit
+   * `authorization` argument still wins. `graft mcp` sets this from
+   * GRAFT_DEV_TOKEN; the HTTP handler forwards the caller's own header.
+   */
+  defaultAuthorization?: string;
+  /**
    * Audit / approval stores for run_function. Defaults match createFunctionsHandler
    * (db-backed). Pass `audit: false` in unit tests that do not hit a real DB.
    */
@@ -235,7 +243,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     {
       title: "Run a typed function",
       description:
-        "Invoke a defineFunction by name with a JSON input object. Same pipeline as POST /api/fn/<name>: Zod validation, access rules, rate limits, audit log, and the human gate for destructive ops. Pass authorization (bearer) when the function requires a non-anonymous actor; pass approval after a human runs `graft approve <id>` for gated calls. Success returns { data, correlationId }; failures are GraftError JSON with a fix.",
+        "Invoke a defineFunction by name with a JSON input object. Same pipeline as POST /api/fn/<name>: Zod validation, access rules, rate limits, audit log, and the human gate for destructive ops. The server may already act with a configured identity (graft mcp uses GRAFT_DEV_TOKEN; over HTTP your connection's bearer is forwarded) — only pass authorization to override it. Pass approval after a human runs `graft approve <id>` for gated calls. Success returns { data, correlationId }; failures are GraftError JSON with a fix.",
       inputSchema: {
         name: z.string().describe("Function name (defineFunction name, not the export key)"),
         input: z
@@ -246,7 +254,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
           .string()
           .optional()
           .describe(
-            "Bearer token for gated functions (with or without the 'Bearer ' prefix). Dev: GRAFT_DEV_TOKEN.",
+            "Bearer token override (with or without the 'Bearer ' prefix). Usually unnecessary — the server's configured identity applies when omitted.",
           ),
         approval: z
           .string()
@@ -276,8 +284,10 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
         }
 
         const headers = new Headers({ "content-type": "application/json" });
-        if (authorization) {
-          const token = authorization.trim();
+        // Explicit tool-arg override beats the server's configured identity.
+        const credential = authorization ?? options.defaultAuthorization;
+        if (credential) {
+          const token = credential.trim();
           headers.set(
             "authorization",
             token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`,
@@ -335,8 +345,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
         name: z.string().describe("Item name as returned by list_registry"),
       },
     },
-    ({ name }) =>
-      guarded(() => describeItem(loadItem(name, options.registryRoot))),
+    ({ name }) => guarded(() => describeItem(loadItem(name, options.registryRoot))),
   );
 
   server.registerTool(

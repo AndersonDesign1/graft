@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GraftError } from "@graft/contracts";
-import { defineCollection, field } from "@graft/core";
+import { defineCollection, defineFunction, field } from "@graft/core";
 import type { Database } from "@graft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -216,5 +216,56 @@ describe("tools over HTTP", () => {
     const payload = JSON.parse(result.content[0]?.text ?? "null");
     expect(payload.error).toBe("SCHEMA_VALIDATION_FAILED");
     await client.close();
+  });
+
+  it("forwards the connection's bearer into run_function (no token in the tool call)", async () => {
+    const gatedHandler = createGraftMcpHandler({
+      contentDir: dir,
+      collections,
+      functions: {
+        secretWrite: defineFunction({
+          name: "secretWrite",
+          kind: "mutation",
+          description: "Gated mutation (rejects anonymous)",
+          input: {},
+          handler: () => ({ wrote: true }),
+        }),
+      },
+      // Plain stub, not the tripwire proxy: createFunctionsHandler probes `.then`.
+      db: { __stub: true } as unknown as Database,
+      audit: false,
+      actor: (request) =>
+        request.headers.get("authorization") === "Bearer s3cret"
+          ? ({ kind: "agent", id: "agent-1" } as const)
+          : ({ kind: "anonymous" } as const),
+    });
+
+    const call = async (headers?: Record<string, string>) => {
+      const transport = new StreamableHTTPClientTransport(new URL("http://graft.test/api/mcp"), {
+        fetch: handlerFetch(gatedHandler),
+        requestInit: headers ? { headers } : undefined,
+      });
+      const client = new Client({ name: "http-test-agent", version: "0.0.0" });
+      await client.connect(transport);
+      const result = (await client.callTool({
+        name: "run_function",
+        arguments: { name: "secretWrite", input: {} },
+      })) as { isError?: boolean; content: { text: string }[] };
+      await client.close();
+      return {
+        isError: result.isError === true,
+        payload: JSON.parse(result.content[0]?.text ?? "null"),
+      };
+    };
+
+    // Anonymous connection → the gated mutation still fails closed.
+    const anonymous = await call();
+    expect(anonymous.isError).toBe(true);
+    expect(anonymous.payload.error).toBe("UNAUTHORIZED");
+
+    // Authenticated connection → the same tool call succeeds with no authorization argument.
+    const authed = await call({ authorization: "Bearer s3cret" });
+    expect(authed.isError).toBe(false);
+    expect(authed.payload.data).toEqual({ wrote: true });
   });
 });

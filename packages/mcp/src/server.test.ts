@@ -303,6 +303,43 @@ describe("function tools (P6.2)", () => {
     expect(allowed.isError).toBeFalsy();
     expect(JSON.parse(allowed.content[0]?.text ?? "null").data).toEqual({ wrote: true });
   });
+
+  it("run_function acts with defaultAuthorization when no token is passed, and an explicit token overrides it", async () => {
+    const server = createGraftMcp({
+      contentDir: dir,
+      collections,
+      functions,
+      db: { __stub: true } as unknown as Database,
+      audit: false,
+      defaultAuthorization: "server-held-token",
+      actor: async (request) => {
+        const header = request.headers.get("authorization");
+        if (header === "Bearer server-held-token") return { kind: "agent", id: "default-actor" };
+        if (header === "Bearer explicit-token") return { kind: "agent", id: "explicit-actor" };
+        return { kind: "anonymous" };
+      },
+    });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const agent = new Client({ name: "default-authed", version: "0.0.0" });
+    await agent.connect(clientTransport);
+
+    // No token in the tool call — the server's own credential authorizes the gated mutation.
+    const viaDefault = (await agent.callTool({
+      name: "run_function",
+      arguments: { name: "secretWrite", input: {} },
+    })) as { isError?: boolean; content: { type: string; text: string }[] };
+    expect(viaDefault.isError).toBeFalsy();
+    expect(JSON.parse(viaDefault.content[0]?.text ?? "null").data).toEqual({ wrote: true });
+
+    // Explicit authorization wins over the default (garbage → anonymous → gated).
+    const overridden = (await agent.callTool({
+      name: "run_function",
+      arguments: { name: "secretWrite", input: {}, authorization: "wrong-token" },
+    })) as { isError?: boolean; content: { type: string; text: string }[] };
+    expect(overridden.isError).toBe(true);
+    expect(JSON.parse(overridden.content[0]?.text ?? "null").error).toBe(ErrorCodes.UNAUTHORIZED);
+  });
 });
 
 describe("reads (from files — git is authoritative)", () => {

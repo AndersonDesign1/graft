@@ -81,7 +81,17 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
       );
     }
 
-    const server = createGraftMcp(serverOptions);
+    // The caller already authenticated to this endpoint — forward their bearer
+    // as run_function's default identity so agents never re-send the token as a
+    // tool argument (an explicit `authorization` argument still overrides). The
+    // resolver must also reach the inner server: it runs again on run_function's
+    // synthetic request, the same seam as the functions route.
+    const server = createGraftMcp({
+      ...serverOptions,
+      actor: resolveActor,
+      defaultAuthorization:
+        request.headers.get("authorization") ?? serverOptions.defaultAuthorization,
+    });
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

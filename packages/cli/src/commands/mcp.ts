@@ -6,9 +6,12 @@
  * Register in `.mcp.json` as: `"command": "pnpm", "args": ["exec", "graft", "mcp"]`.
  *
  * Auth for run_function: optional GRAFT_DEV_TOKEN (+ GRAFT_DEV_SCOPES, comma/space
- * separated). Hosts that need Better Auth / OIDC use createGraftMcpHandler in
- * the app with createActorResolver — the CLI stays issuer-free (verify-don't-mint
- * only for static dev tokens). See docs/design-notes/agent-mcp.md.
+ * separated). The token doubles as the server's default identity — the local
+ * agent acts as it without ever seeing the secret (anyone who can spawn this
+ * process can already read .env, so this grants nothing new). Hosts that need
+ * Better Auth / OIDC use createGraftMcpHandler in the app with
+ * createActorResolver — the CLI stays issuer-free (verify-don't-mint only for
+ * static dev tokens). See docs/design-notes/agent-mcp.md.
  */
 import { createActorResolver } from "@graft/auth";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
@@ -58,6 +61,7 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
       db: branch.db,
       branchId: scopeWriteBranch(branch.scope),
       actor: resolveActor,
+      defaultAuthorization: devToken,
     });
 
     // Stdio MCP: never write noise to stdout (that's the protocol stream).

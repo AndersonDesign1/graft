@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { withGraft } from "@graft/sdk-next/config";
 import type { NextConfig } from "next";
 
 // Dev convenience: pull DATABASE_URL from the repo-root .env so the example
@@ -9,12 +10,8 @@ try {
   /* no root .env — rely on the ambient environment */
 }
 
-const nextConfig: NextConfig = {
-  // @graft/registry reads its bundled primitives from disk at runtime via
-  // `new URL("../registry", import.meta.url)` (the list_registry / describe_item
-  // MCP tools). Keep it out of the Turbopack bundle so that path resolves to the
-  // package's real registry/ dir in node_modules, not a build-time module.
-  serverExternalPackages: ["@graft/registry"],
-};
+// withGraft keeps @graft/registry server-external (it reads its bundled
+// primitives from disk at runtime) plus any future Graft bundler requirements.
+const nextConfig: NextConfig = withGraft({});
 
 export default nextConfig;
