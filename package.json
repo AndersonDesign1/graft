@@ -7,7 +7,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "test": "turbo run test",
+    "test": "turbo run test --concurrency=50%",
     "test:cold-agent": "pnpm --filter @graft/mcp exec vitest run src/cold-agent.test.ts src/cold-agent-http.test.ts",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

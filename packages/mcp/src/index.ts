@@ -14,7 +14,24 @@ export { createGraftMcp, type GraftMcpOptions } from "./server";
 export { createGraftMcpHandler, type GraftMcpHandler, type GraftMcpHandlerOptions } from "./http";
 export { ERROR_KNOWLEDGE, explainCode, type ErrorExplanation } from "./explain";
 
-/** Serve an MCP server over stdio (the transport agents' `.mcp.json` entries use). */
+/**
+ * Serve an MCP server over stdio (the transport agents' `.mcp.json` entries use).
+ * Resolves when the client disconnects (stdin EOF / transport close), NOT at
+ * connect time — callers await this for the server's whole lifetime and then
+ * clean up. Resolving at connect let `graft mcp` fall through to its
+ * process.exit right after the initialize handshake (latent P6.2 bug caught
+ * by the P6.5 live smoke; the example's `pnpm mcp` script masked it by never
+ * exiting after the await).
+ */
 export async function serveStdio(server: McpServer): Promise<void> {
-  await server.connect(new StdioServerTransport());
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  await new Promise<void>((resolve) => {
+    // connect() installed the protocol's own onclose — chain it, don't replace it.
+    const prior = transport.onclose;
+    transport.onclose = () => {
+      prior?.();
+      resolve();
+    };
+  });
 }

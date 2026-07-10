@@ -36,8 +36,12 @@ human-gate rules as `POST /api/fn/<name>`), plus `graft mcp` for one-command std
 `graft add`, and locks the whole introspection surface with contract tests. **P6.4** gates the
 remote path in CI: a cold agent reaching Graft only over Streamable HTTP — auth wall first
 (the 401 teaches the fix), then authoring, function invocation via the connection's bearer,
-and registry browsing. See [`docs/design-notes/agent-mcp.md`](docs/design-notes/agent-mcp.md).
-Next: live off-repo (eve) cold-agent exercise + asset/delete tools.
+and registry browsing. **P6.5** completes the content-ops surface: `delete_content` (the
+destructive human gate over MCP — approval filed on first call, `graft approve <id>`, one-shot
+input-bound retry) and `put_asset` (upload via server-local `path` or remote `base64`;
+refuses existing keys without `overwrite: true`).
+See [`docs/design-notes/agent-mcp.md`](docs/design-notes/agent-mcp.md).
+Next: live off-repo (eve) cold-agent exercise.
 
 ## Requirements
 

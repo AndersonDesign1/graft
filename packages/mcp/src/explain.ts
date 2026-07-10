@@ -343,6 +343,17 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Inspect the listed file(s). If replacing them is intended, re-run with `--overwrite`; otherwise move/rename your file first. `graft add --dry-run <name>` previews every path an item would write.",
   },
+  ASSET_EXISTS: {
+    code: "ASSET_EXISTS",
+    meaning:
+      "An asset upload targeted a key that already holds a binary. The store has no version history, so an overwrite would irreversibly replace it — uploads refuse unless overwrite is explicit.",
+    typicalCauses: [
+      "Re-uploading with the same key instead of picking a new one",
+      "Two documents' assets colliding on a generic key like assets/hero.png",
+    ],
+    howToRecover:
+      "Pick a distinct key (e.g. prefix it with the document: pages/pricing/hero.png) — that is almost always right. Only pass `overwrite: true` when replacing the existing binary is the actual intent; every document referencing that key will show the new bytes.",
+  },
   NOT_IMPLEMENTED: {
     code: "NOT_IMPLEMENTED",
     meaning: "The capability is planned but not built yet.",

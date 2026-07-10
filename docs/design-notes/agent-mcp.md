@@ -120,11 +120,34 @@ drop the machine-specific absolute `dir`; the introspection shape lives in
 `@graft/contracts` (`RegistryItemDescriptor`), with a drift test keeping
 registry's authoring enums (`ITEM_TYPES` / `FILE_ROLES`) in lockstep.
 
+### Content ops + assets (P6.5) ✅
+
+| Tool             | Role                                                                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `delete_content` | Remove an authored MDX file + recompile (index soft-deletes). Destructive → always human-gated                                                                            |
+| `put_asset`      | Upload a binary + return the `asset`-field frontmatter reference. `path` (stdio, server-local file) or `base64` + `key` (remote); `ASSET_EXISTS` unless `overwrite: true` |
+
+`delete_content` is an **internal destructive `defineFunction` served by its own
+`createFunctionsHandler` instance** — never merged into the project's functions
+(no name collisions, absent from `list_functions`), but riding the exact P3.4
+pipeline: first call files a one-shot, input-bound approval and fails with the
+id (`DESTRUCTIVE_OP_REQUIRES_APPROVAL`); after `graft approve <id>` the retry
+passes `approval: <id>` (the MCP form of the `x-graft-approval` header). The
+function is `public` because the human approval IS the gate — requiring a
+bearer as well would brick anonymous local stdio servers without adding
+control. The tool pre-checks collection/authority/existence so a human never
+reviews an approval for a document that doesn't exist; the handler re-resolves
+at execution time. Audit rows + rate limits apply as for `run_function`.
+
+`put_asset` refuses to clobber an existing key without explicit
+`overwrite: true` (new `ASSET_EXISTS` code) because the object store keeps no
+version history — unlike content, an overwritten binary is unrecoverable. Key
+sanitization + content-type inference live in `@graft/assets`
+(`defaultKeyFor` / `contentTypeFor`), shared with `graft asset put`.
+
 ### Still later
 
-- Dedicated asset tools (today: CLI `graft asset put` + frontmatter)
-- Delete-content tool (destructive gate)
-- HTTP-only cold-agent CI (remote transport of the P6.1 path)
+- HTTP-only live off-repo cold-agent exercise (needs a running app + writable tree)
 
 ## `graft mcp` (CLI install)
 
@@ -191,7 +214,8 @@ Graft never becomes the identity provider of record.
 | **P6.2** ✅ | Function tools + `describe_schema.functions` + `graft mcp` + docs                      |
 | **P6.3** ✅ | Registry MCP browse (`list_registry` / `describe_item`) + introspection contract tests |
 | **P6.4** ✅ | Remote HTTP cold-agent CI gate (`cold-agent-http.test.ts`)                             |
-| **P6.5+**   | Live off-repo (eve) cold-agent exercise; asset/delete tools; remaining ergonomics      |
+| **P6.5** ✅ | `delete_content` (destructive gate over MCP) + `put_asset` tools                       |
+| **P6.5+**   | Live off-repo (eve) cold-agent exercise; remaining ergonomics                          |
 
 ## Acceptance (P6.2)
 
@@ -220,6 +244,18 @@ Graft never becomes the identity provider of record.
 - [x] Registry browse works over the wire.
 - [x] Runs offline under `pnpm test:cold-agent` (projection stubbed) — CI-blocking alongside the P6.1 file.
 - [ ] Live off-repo agent exercise (fresh agent, running app, network HTTP, no repo checkout) — banked as the P6.5 manual gate; writes need the dev/self-host writable tree.
+
+## Acceptance (P6.5 — tools half)
+
+- [x] `delete_content` registered on stdio + HTTP; removes the file, recompiles, returns the ChangeSet + correlationId.
+- [x] The destructive gate holds over MCP: no approval → `DESTRUCTIVE_OP_REQUIRES_APPROVAL` with the id; denied → `APPROVAL_INVALID` (denied); consumed ids are one-shot (already_consumed); approvals bind to the exact collection+slug (mismatch).
+- [x] No approval is filed for a missing document or a db-authoritative collection (fail-fast before the human is bothered).
+- [x] The internal delete function never appears in `list_functions` / `describe_schema.functions`.
+- [x] `put_asset` uploads via `path` (server-local) and `base64` + `key` (remote); content type inferred; key validated against the asset-key alphabet; response carries key/bytes/url/frontmatter snippet.
+- [x] Existing keys refuse without `overwrite: true` — `ASSET_EXISTS` (+ explain entry; the knowledge base stays in lockstep with ErrorCodes by type).
+- [x] All offline: in-memory approval store, fake storage, stubbed projection (`content-ops.test.ts`).
+- [x] `llms.txt` / design note teach both tools.
+- [ ] Live off-repo agent exercise remains the P6.5 manual gate (unchanged).
 
 ## Open questions (not blocking P6.2)
 

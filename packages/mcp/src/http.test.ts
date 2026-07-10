@@ -164,6 +164,7 @@ describe("tools over HTTP", () => {
     const client = await connectClient(handler);
     const tools = (await client.listTools()).tools.map((tool) => tool.name).sort();
     expect(tools).toEqual([
+      "delete_content",
       "describe_function",
       "describe_item",
       "describe_schema",
@@ -173,6 +174,7 @@ describe("tools over HTTP", () => {
       "list_content",
       "list_functions",
       "list_registry",
+      "put_asset",
       "run_function",
       "search_content",
       "write_content",

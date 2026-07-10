@@ -21,7 +21,15 @@ Tools:
 
 - Content: `list_collections`, `describe_schema` (collections **and** functions),
   `list_content`, `get_content`, `search_content` (FTS; hits carry `sourcePath`),
-  `write_content` (validate → write MDX → compile), `explain_error`.
+  `write_content` (validate → write MDX → compile), `delete_content`
+  (destructive, so ALWAYS human-gated: the first call files an approval and
+  fails with its id; a human runs `graft approve <id>`; retry the same
+  collection+slug with `approval: <id>` — one-shot, bound to that exact input),
+  `explain_error`.
+- Assets: `put_asset` — upload a binary and get the frontmatter reference.
+  Local/stdio agents pass `path` (a file on this machine); remote agents pass
+  `base64` + `key`. It refuses an existing key unless `overwrite: true` (the
+  store keeps no version history). Equivalent to `graft asset put`.
 - Functions: `list_functions`, `describe_function` (full args schema),
   `run_function` (same gates as `POST /api/fn/<name>`: access, audit, rate
   limits, human approval for destructive). You usually already have an
@@ -59,8 +67,9 @@ Generic projects can also run `graft mcp` (stdio) with DATABASE_URL.
 ## How to add an image (or any binary)
 
 1. Upload it: `pnpm exec graft asset put <file> [key]` (e.g.
-   `graft asset put assets/hero.svg pages/home/hero.svg`). Uses the `S3_*`
-   env from the repo-root `.env`; the command prints the frontmatter snippet.
+   `graft asset put assets/hero.svg pages/home/hero.svg`), or the MCP
+   `put_asset` tool (same rules; remote agents send `base64` + `key`). Uses
+   the `S3_*` env from the repo-root `.env`; both print the frontmatter snippet.
 2. Reference it from an `asset` field in frontmatter:
 
        image:

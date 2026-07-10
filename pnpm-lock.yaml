@@ -211,6 +211,9 @@ importers:
 
   packages/mcp:
     dependencies:
+      '@graft/assets':
+        specifier: workspace:*
+        version: link:../assets
       '@graft/compiler':
         specifier: workspace:*
         version: link:../compiler

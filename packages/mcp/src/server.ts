@@ -10,9 +10,16 @@
  *
  * See docs/design-notes/agent-mcp.md for the product bar and non-goals.
  */
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import {
+  contentTypeFor,
+  createStorage,
+  defaultKeyFor,
+  storageConfigFromEnv,
+  type Storage,
+} from "@graft/assets";
 import { compile, parseDocument } from "@graft/compiler";
 import {
   GraftError,
@@ -21,7 +28,11 @@ import {
   type SchemaDescription,
 } from "@graft/contracts";
 import {
+  APPROVAL_HEADER,
+  AssetRef,
   createFunctionsHandler,
+  defineFunction,
+  field,
   type AnyCollection,
   type AnyGraftFunction,
   type FunctionActor,
@@ -90,6 +101,12 @@ export interface GraftMcpOptions {
    * bundled primitives — the set `graft add` installs from. Tests point it at a fixture.
    */
   registryRoot?: string;
+  /**
+   * Asset store for put_asset. Defaults to S3_* env config (same rules as
+   * `graft asset put`), resolved lazily so content-only servers never need it.
+   * Tests inject a fake.
+   */
+  storage?: Storage | (() => Storage | Promise<Storage>);
 }
 
 type ToolResult = {
@@ -164,6 +181,78 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
       approvals: options.approvals,
     });
     return functionsHandler;
+  };
+
+  /**
+   * delete_content as an internal destructive function, served by its own
+   * handler instance (never mixed into the project's functions, so it cannot
+   * collide with a user function or appear in list_functions). Routing through
+   * createFunctionsHandler is what makes the delete ride the P3.4 machinery —
+   * one-shot input-bound approvals, audit rows, rate limits — instead of a
+   * reimplementation that could drift. `public` because the human approval IS
+   * the gate: requiring a bearer as well would brick anonymous local stdio
+   * servers without making the delete any less human-controlled.
+   */
+  const deleteContentFn = defineFunction({
+    name: "delete_content",
+    kind: "mutation",
+    destructive: true,
+    public: true,
+    description: "Delete an authored MDX document and recompile (MCP delete_content tool).",
+    returns: "{ deleted, branch, gitSha, changes }",
+    input: {
+      collection: field.string({ description: "Collection name" }),
+      slug: field.string({ description: "Document slug to delete" }),
+    },
+    handler: async ({ input }) => {
+      // Re-resolve at execution time — the tree may have changed since the
+      // approval was filed; the file named by the approval must still exist.
+      const collection = requireCollection(collections, input.collection);
+      const doc = findDoc(contentDir, input.collection, collection, input.slug);
+      unlinkSync(join(contentDir, ...doc.sourcePath.split("/")));
+      const result = await compile({ contentDir, collections, db, branchId });
+      return {
+        deleted: doc.sourcePath,
+        branch: branchId,
+        gitSha: result.gitSha,
+        changes: result.changes,
+      };
+    },
+  });
+  let deleteHandler: GraftFunctionsHandler | undefined;
+  const getDeleteHandler = (): GraftFunctionsHandler => {
+    deleteHandler ??= createFunctionsHandler({
+      functions: { delete_content: deleteContentFn },
+      db,
+      branch: branchId,
+      actor: options.actor,
+      rateLimit: options.rateLimit,
+      gitSha: options.gitSha,
+      audit: options.audit,
+      approvals: options.approvals,
+    });
+    return deleteHandler;
+  };
+
+  /** Lazy asset store — content-only servers never pay for (or require) S3 config. */
+  let storagePromise: Promise<Storage> | undefined;
+  const getStorage = (): Promise<Storage> => {
+    storagePromise ??= (async () => {
+      if (options.storage) {
+        return typeof options.storage === "function" ? options.storage() : options.storage;
+      }
+      try {
+        return createStorage(storageConfigFromEnv());
+      } catch (error) {
+        throw new GraftError({
+          code: "ENV_VAR_MISSING",
+          message: error instanceof Error ? error.message : String(error),
+          fix: "Set S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY, and S3_BUCKET in the MCP server's environment (.env), then retry.",
+          details: { variables: ["S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY", "S3_BUCKET"] },
+        });
+      }
+    })();
+    return storagePromise;
   };
 
   const server = new McpServer({
@@ -306,36 +395,11 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
           });
         }
 
-        const headers = new Headers({ "content-type": "application/json" });
         // Explicit tool-arg override beats the server's configured identity.
-        const credential = authorization ?? options.defaultAuthorization;
-        if (credential) {
-          const token = credential.trim();
-          headers.set(
-            "authorization",
-            token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`,
-          );
-        }
-        if (approval) headers.set("x-graft-approval", approval);
-
-        const response = await getFunctionsHandler()(
-          new Request(`http://graft.local/fn/${encodeURIComponent(name)}`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(input ?? {}),
-          }),
-        );
-        const body: unknown = await response.json();
-        const correlationId = response.headers.get("x-graft-correlation-id") ?? undefined;
-
-        if (!response.ok) {
-          throw graftErrorFromBody(body, correlationId);
-        }
-        const data =
-          body !== null && typeof body === "object" && "data" in body
-            ? (body as { data: unknown }).data
-            : body;
-        return { data, correlationId, status: response.status };
+        return invokeFunction(getFunctionsHandler(), name, input ?? {}, {
+          credential: authorization ?? options.defaultAuthorization,
+          approval,
+        });
       }),
   );
 
@@ -528,6 +592,153 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
   );
 
   server.registerTool(
+    "delete_content",
+    {
+      title: "Delete a document (human-gated)",
+      description:
+        "Delete an authored document: removes <contentDir>/<collection>/<slug>.mdx and compiles, so the index soft-deletes it. DESTRUCTIVE and always human-gated — the first call files an approval and fails with its id; a human decides with `graft approve <id>` (or deny); then retry the SAME collection+slug with `approval: <id>` (the MCP form of the x-graft-approval header). Approvals are one-shot and bound to that exact input. Commit the deletion to git afterwards.",
+      inputSchema: {
+        collection: z.string().describe("Collection name"),
+        slug: z.string().describe("Document slug to delete"),
+        approval: z
+          .string()
+          .optional()
+          .describe(
+            "Approval id from a prior DESTRUCTIVE_OP_REQUIRES_APPROVAL response, after a human ran `graft approve <id>`.",
+          ),
+      },
+    },
+    ({ collection: name, slug, approval }) =>
+      guarded(async () => {
+        const collection = requireCollection(collections, name);
+        if (collection.authority === "db-authoritative") {
+          throw new GraftError({
+            code: "AUTHORITY_MISMATCH",
+            message: `Collection "${name}" is db-authoritative — its records live in Postgres, not as MDX files.`,
+            fix: "Delete records through the collection's typed functions (a destructive defineFunction over deleteRecord — see list_functions), not delete_content. delete_content is only for file-authoritative collections.",
+            details: { collection: name, authority: collection.authority },
+          });
+        }
+        // Fail fast on a missing document — never file an approval a human
+        // would review for nothing.
+        findDoc(contentDir, name, collection, slug);
+
+        const { data, correlationId } = await invokeFunction(
+          getDeleteHandler(),
+          "delete_content",
+          { collection: name, slug },
+          { credential: options.defaultAuthorization, approval },
+        );
+        return { ...(data as Record<string, unknown>), correlationId };
+      }),
+  );
+
+  server.registerTool(
+    "put_asset",
+    {
+      title: "Upload an asset (image / binary)",
+      description:
+        "Upload a binary to the asset store and get the frontmatter reference for an `asset` field. Pass `path` (a file on the machine running this MCP server — the stdio case) OR `base64` + `key` (remote agents send the bytes). Refuses to overwrite an existing key unless overwrite: true — the store keeps no version history. Then reference the returned key from an asset field via write_content.",
+      inputSchema: {
+        key: z
+          .string()
+          .optional()
+          .describe(
+            'Asset key — a lowercase path like "pages/pricing/hero.png". Required with base64; defaults to assets/<filename> with path.',
+          ),
+        path: z
+          .string()
+          .optional()
+          .describe("Path to a file on the MCP server's machine (local/stdio agents)."),
+        base64: z
+          .string()
+          .optional()
+          .describe("The file's bytes, base64-encoded (remote/HTTP agents)."),
+        contentType: z
+          .string()
+          .optional()
+          .describe("MIME type. Defaults to an inference from the key/path extension."),
+        overwrite: z
+          .boolean()
+          .optional()
+          .describe("Replace an existing binary at this key. Off by default."),
+      },
+    },
+    ({ key: keyArg, path, base64, contentType, overwrite }) =>
+      guarded(async () => {
+        if ((path === undefined) === (base64 === undefined)) {
+          throw new GraftError({
+            code: "INPUT_VALIDATION_FAILED",
+            message:
+              "Pass exactly one of `path` (a file on the MCP server's machine) or `base64` (the file's bytes).",
+            fix: "Local/stdio agents: pass path. Remote/HTTP agents: read the file yourself and pass base64 + key.",
+          });
+        }
+
+        let bytes: Uint8Array;
+        if (path !== undefined) {
+          try {
+            bytes = readFileSync(path);
+          } catch {
+            throw new GraftError({
+              code: "DOCUMENT_NOT_FOUND",
+              message: `File not found: ${path}`,
+              fix: "Pass a path to a file that exists on the machine running this MCP server, or send the bytes as base64 instead.",
+              details: { path },
+            });
+          }
+        } else {
+          if (!/^[A-Za-z0-9+/=\s]+$/.test(base64!)) {
+            throw new GraftError({
+              code: "INPUT_VALIDATION_FAILED",
+              message: "`base64` contains characters outside the base64 alphabet.",
+              fix: "Encode the file's raw bytes as standard base64 (A-Z a-z 0-9 + / =). To upload a file by its location on the server's machine, use `path` instead.",
+            });
+          }
+          bytes = Buffer.from(base64!, "base64");
+        }
+
+        const key = keyArg ?? (path !== undefined ? defaultKeyFor(path) : undefined);
+        if (key === undefined) {
+          throw new GraftError({
+            code: "INPUT_VALIDATION_FAILED",
+            message: "`key` is required when uploading via base64.",
+            fix: 'Pass a lowercase path key naming the asset, e.g. "pages/pricing/hero.png".',
+          });
+        }
+        const keyCheck = AssetRef.shape.key.safeParse(key);
+        if (!keyCheck.success) {
+          throw new GraftError({
+            code: "INPUT_VALIDATION_FAILED",
+            message: `"${key}" is not a valid asset key.`,
+            fix: 'Use a lowercase path of letters, digits, ".", "_", "-" with "/" separators, each segment starting alphanumeric — e.g. "pages/pricing/hero.png".',
+            details: { key },
+          });
+        }
+
+        const storage = await getStorage();
+        if (overwrite !== true && (await storage.exists(key))) {
+          throw new GraftError({
+            code: "ASSET_EXISTS",
+            message: `Asset key "${key}" already holds a binary.`,
+            fix: "Pick a distinct key (the store keeps no version history), or pass overwrite: true if replacing the existing binary is the actual intent.",
+            details: { key },
+          });
+        }
+
+        const type = contentType ?? contentTypeFor(key);
+        await storage.put(key, bytes, type);
+        return {
+          key,
+          contentType: type,
+          bytes: bytes.byteLength,
+          url: await storage.url(key),
+          frontmatter: `image:\n  key: ${key}\n  alt: describe the image for screen readers`,
+        };
+      }),
+  );
+
+  server.registerTool(
     "explain_error",
     {
       title: "Explain a Graft error",
@@ -574,6 +785,48 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
   );
 
   return server;
+}
+
+/**
+ * Invoke a function through a createFunctionsHandler instance via a synthetic
+ * Request — the shared bridge behind run_function and delete_content, so MCP
+ * calls take the exact pipeline `POST /api/fn/<name>` takes (validation,
+ * access, rate limits, audit, human gate). Failures become GraftErrors.
+ */
+async function invokeFunction(
+  handler: GraftFunctionsHandler,
+  name: string,
+  input: Record<string, unknown>,
+  identity: { credential?: string; approval?: string },
+): Promise<{ data: unknown; correlationId?: string; status: number }> {
+  const headers = new Headers({ "content-type": "application/json" });
+  if (identity.credential) {
+    const token = identity.credential.trim();
+    headers.set(
+      "authorization",
+      token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`,
+    );
+  }
+  if (identity.approval) headers.set(APPROVAL_HEADER, identity.approval);
+
+  const response = await handler(
+    new Request(`http://graft.local/fn/${encodeURIComponent(name)}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(input),
+    }),
+  );
+  const body: unknown = await response.json();
+  const correlationId = response.headers.get("x-graft-correlation-id") ?? undefined;
+
+  if (!response.ok) {
+    throw graftErrorFromBody(body, correlationId);
+  }
+  const data =
+    body !== null && typeof body === "object" && "data" in body
+      ? (body as { data: unknown }).data
+      : body;
+  return { data, correlationId, status: response.status };
 }
 
 /** Rebuild a GraftError from a functions-handler / HTTP error body. */

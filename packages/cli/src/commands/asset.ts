@@ -4,33 +4,12 @@
  * upload, paste the printed snippet into a document, compile.
  */
 import { readFileSync, statSync } from "node:fs";
-import { basename, extname } from "node:path";
+import { contentTypeFor, createStorage, defaultKeyFor, storageConfigFromEnv } from "@graft/assets";
 import { GraftError } from "@graft/contracts";
 import { loadProjectEnv } from "../config";
 
-const CONTENT_TYPES: Record<string, string> = {
-  ".avif": "image/avif",
-  ".gif": "image/gif",
-  ".jpeg": "image/jpeg",
-  ".jpg": "image/jpeg",
-  ".pdf": "application/pdf",
-  ".png": "image/png",
-  ".svg": "image/svg+xml",
-  ".webp": "image/webp",
-};
-
-export function contentTypeFor(file: string): string {
-  return CONTENT_TYPES[extname(file).toLowerCase()] ?? "application/octet-stream";
-}
-
-/** Default key: assets/<lowercased filename>, sanitized to the asset-key alphabet. */
-export function defaultKeyFor(file: string): string {
-  const name = basename(file)
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, "-")
-    .replace(/^[._-]+/, "");
-  return `assets/${name}`;
-}
+// Shared with the MCP put_asset tool — one inference/sanitization rule per store.
+export { contentTypeFor, defaultKeyFor };
 
 export interface AssetPutOptions {
   cwd: string;
@@ -62,7 +41,6 @@ export async function assetPutCommand(options: AssetPutOptions): Promise<AssetPu
 
   // Storage config comes from S3_* env vars; translate its plain Error into
   // the agent-actionable shape.
-  const { createStorage, storageConfigFromEnv } = await import("@graft/assets");
   let storage: ReturnType<typeof createStorage>;
   try {
     storage = createStorage(storageConfigFromEnv());

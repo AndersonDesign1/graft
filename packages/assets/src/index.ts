@@ -4,4 +4,5 @@
  * Transform pipeline + agent upload primitives layer on top in a later phase.
  */
 export * from "./config";
+export * from "./keys";
 export * from "./storage";
