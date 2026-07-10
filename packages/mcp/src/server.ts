@@ -28,8 +28,8 @@ import {
   type GraftFunctionsHandler,
   type RateLimit,
 } from "@graft/core";
-import type { ApprovalStore, AuditStore, Database } from "@graft/db";
-import { searchContent } from "@graft/db";
+import type { ApprovalStore, AuditStore, BranchScope, Database } from "@graft/db";
+import { assertSearchQuery, resolveBranchScope, scopeChain, searchContent } from "@graft/db";
 import { describeItem, listItems, loadItem } from "@graft/registry";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import matter from "gray-matter";
@@ -50,6 +50,15 @@ export interface GraftMcpOptions {
   functions?: Record<string, AnyGraftFunction>;
   /** Content branch to project into. Defaults to "main". */
   branchId?: string;
+  /**
+   * Resolved read scope for `branchId` (from resolveBranchHandle / resolveBranchScope)
+   * — what makes search_content overlay-aware: an overlay branch searches its full
+   * ancestor chain, so content inherited from parents is found, branch overrides
+   * win, and tombstones hide. When omitted, the server resolves the scope itself
+   * on first search (memoized per server instance, like sdk-core's per-client
+   * memo), so a bare branchId still searches the branch's effective content.
+   */
+  scope?: BranchScope;
   /** Server identity reported to MCP clients. */
   name?: string;
   version?: string;
@@ -117,6 +126,20 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
   const functions = options.functions ?? {};
   const functionsByName = new Map<string, AnyGraftFunction>();
   for (const fn of Object.values(functions)) functionsByName.set(fn.name, fn);
+
+  /**
+   * The read scope search runs through. Callers that already hold a resolved
+   * BranchHandle (graft mcp) pass its scope; otherwise resolve lazily and once —
+   * an HTTP-handler server is per-request anyway, so topology changes are picked
+   * up on the next request.
+   */
+  let scopePromise: Promise<BranchScope> | undefined;
+  const getScope = (): Promise<BranchScope> => {
+    scopePromise ??= options.scope
+      ? Promise.resolve(options.scope)
+      : resolveBranchScope(db, branchId);
+    return scopePromise;
+  };
 
   /** Lazy — only built when run_function is first called. */
   let functionsHandler: GraftFunctionsHandler | undefined;
@@ -335,8 +358,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
         name: z.string().describe("Item name as returned by list_registry"),
       },
     },
-    ({ name }) =>
-      guarded(() => describeItem(loadItem(name, options.registryRoot))),
+    ({ name }) => guarded(() => describeItem(loadItem(name, options.registryRoot))),
   );
 
   server.registerTool(
@@ -394,7 +416,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     {
       title: "Full-text search across content",
       description:
-        'Search authored content by words, "quoted phrases", `or`, and -exclusions (websearch syntax). Searches the compiled Postgres index, so results are as fresh as the last compile (write_content compiles automatically); every hit carries the sourcePath of the file to edit. Ranking weights slug matches over frontmatter over body.',
+        'Search authored content by words, "quoted phrases", `or`, and -exclusions (websearch syntax). Searches the branch\'s effective content in the compiled Postgres index — on a preview branch that includes documents inherited from parent branches, with branch overrides winning — so results are as fresh as the last compile (write_content compiles automatically); every hit carries the sourcePath of the file to edit. Ranking weights slug matches over frontmatter over body.',
       inputSchema: {
         query: z.string().describe('What to find, e.g. pricing "free tier" -enterprise'),
         collection: z
@@ -407,16 +429,21 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     ({ query, collection: name, limit }) =>
       guarded(async () => {
         if (name !== undefined) requireCollection(collections, name);
-        // MCP searches its configured branch directly (single-branch chain);
-        // overlay-aware MCP search arrives with branch topology in P4.2.
+        // Cheap input gates first — an invalid query never pays scope resolution.
+        assertSearchQuery(query);
+        // Search the resolved chain (leaf-first), the same effective content
+        // readContent serves: inherited parent docs are found, branch overrides
+        // win, tombstones hide (P4.1 overlay semantics).
+        const chain = scopeChain(await getScope());
         const hits = await searchContent(db, {
           query,
-          chain: [branchId],
+          chain,
           collections: name === undefined ? Object.keys(collections) : [name],
           limit,
         });
         return {
           branch: branchId,
+          chain,
           query,
           hits: hits.map(({ row, rank, snippet }) => ({
             collection: row.collection,

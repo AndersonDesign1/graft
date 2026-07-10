@@ -57,6 +57,9 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
       functions: config.functions,
       db: branch.db,
       branchId: scopeWriteBranch(branch.scope),
+      // The handle's resolved scope makes search_content overlay-aware: an
+      // overlay branch searches its full parent chain, not just its own rows.
+      scope: branch.scope,
       actor: resolveActor,
     });
 

@@ -452,7 +452,14 @@ describe("search_content", () => {
       }),
     } as unknown as Database;
 
-    const server = createGraftMcp({ contentDir: dir, collections, db: stubDb });
+    const server = createGraftMcp({
+      contentDir: dir,
+      collections,
+      db: stubDb,
+      // Explicit scope: the stub only speaks the search query shape, not the
+      // branches lookup lazy resolution would issue.
+      scope: { kind: "overlay", chain: ["main"], writeBranch: "main" },
+    });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     await server.connect(serverTransport);
     const searchClient = new Client({ name: "test-agent", version: "0.0.0" });
