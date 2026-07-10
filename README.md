@@ -39,9 +39,13 @@ remote path in CI: a cold agent reaching Graft only over Streamable HTTP — aut
 and registry browsing. **P6.5** completes the content-ops surface: `delete_content` (the
 destructive human gate over MCP — approval filed on first call, `graft approve <id>`, one-shot
 input-bound retry) and `put_asset` (upload via server-local `path` or remote `base64`;
-refuses existing keys without `overwrite: true`).
-See [`docs/design-notes/agent-mcp.md`](docs/design-notes/agent-mcp.md).
-Next: live off-repo (eve) cold-agent exercise.
+refuses existing keys without `overwrite: true`) — and passed the **live off-repo cold-agent
+exercise**: a fresh agent with no repo checkout and no llms.txt, taught only by tool
+descriptions and error messages over network HTTP MCP, authored a page with an uploaded asset
+and walked the human-gated delete end-to-end with **zero unintended failures**. Its friction
+log fed straight back into the surface (asset-field teaching in `describe_schema`, MCP-speak
+approval errors). See [`docs/design-notes/agent-mcp.md`](docs/design-notes/agent-mcp.md).
+Next: TypeGen completeness + docs coverage close-out, then Phase 7 (packaging + launch).
 
 ## Requirements
 
@@ -96,9 +100,10 @@ curl -s localhost:3000/api/fn/listSubmissions \
 ```
 
 Destructive functions (e.g. `deleteSubmission`, `cancelOrder`) are human-gated: the call 403s
-with a pending approval id, a human runs `graft approve <id>`, and the caller retries with an
-`x-graft-approval: <id>` header. See [`llms.txt`](examples/landing-page/llms.txt) for the
-full surface, including MCP tools and Better Auth token minting.
+with a pending approval id, a human runs `graft approve <id>`, and the caller retries carrying
+that id — an `x-graft-approval: <id>` header over HTTP, or the `approval` tool argument over
+MCP. See [`llms.txt`](examples/landing-page/llms.txt) for the full surface, including MCP
+tools and Better Auth token minting.
 
 ## Monorepo layout
 

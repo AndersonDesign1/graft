@@ -3,7 +3,9 @@
  * revalidateTag/updateTag. next/cache and react's cache are mocked so the test
  * is pure (no RSC runtime, no database); the tag contract itself is real.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { defineCollection, field } from "@graft/core";
+import type { Document, SearchHit } from "@graft/sdk-core";
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 const revalidateTag = vi.fn();
 const updateTag = vi.fn();
@@ -16,7 +18,7 @@ vi.mock("next/cache", () => ({
 vi.mock("react", () => ({ cache: (fn: unknown) => fn }));
 
 // Imported after the mocks are registered.
-const { revalidateContent, updateContent } = await import("./graft");
+const { createGraft, revalidateContent, updateContent } = await import("./graft");
 
 beforeEach(() => {
   revalidateTag.mockClear();
@@ -81,5 +83,30 @@ describe("updateContent", () => {
     expect(tags.sort()).toEqual(EXPECTED.sort());
     expect(updateTag.mock.calls.map((c) => c[0]).sort()).toEqual(EXPECTED.sort());
     for (const call of updateTag.mock.calls) expect(call).toHaveLength(1);
+  });
+});
+
+describe("createGraft type inference", () => {
+  // The no-codegen contract must survive the React.cache wrappers: a schema
+  // defined in graft.config.ts types every read in a Server Component. Assert
+  // on the function types — invoking them would hit the fake db.
+  const pages = defineCollection({
+    name: "pages",
+    fields: { title: field.string(), order: field.number({ optional: true }) },
+  });
+
+  it("getContent/listContent/searchContent keep the exact document type", () => {
+    const graft = createGraft({ db: {} as never, collections: { pages } });
+    expectTypeOf(graft.getContent<"pages">).returns.resolves.toEqualTypeOf<Document<
+      typeof pages
+    > | null>();
+    expectTypeOf(graft.listContent<"pages">).returns.resolves.toEqualTypeOf<
+      Document<typeof pages>[]
+    >();
+    expectTypeOf(graft.searchContent<"pages">).returns.resolves.toEqualTypeOf<
+      SearchHit<typeof pages>[]
+    >();
+    // Unknown collection names are compile errors, not runtime surprises.
+    expectTypeOf(graft.getContent).parameter(0).toEqualTypeOf<"pages">();
   });
 });

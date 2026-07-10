@@ -1,8 +1,8 @@
 import type { Database } from "@graft/db";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { defineCollection } from "./collection";
 import { field } from "./field";
-import type { RecordContext } from "./records";
+import type { DataRecord, DataRecordHit, RecordContext } from "./records";
 import { deleteRecord, insertRecord, listRecords, searchRecords, updateRecord } from "./records";
 
 const submissions = defineCollection({
@@ -292,5 +292,29 @@ describe("updateRecord", () => {
     await expect(updateRecord(ctx(db), pages, "any", { title: "x" })).rejects.toMatchObject({
       code: "AUTHORITY_MISMATCH",
     });
+  });
+});
+
+describe("record type inference", () => {
+  // The no-codegen contract at the function boundary: the collection from
+  // graft.config.ts types every record helper. Assert on the function types —
+  // invoking them would hit the stub db.
+  it("insert/list/search/update return the exact document type", () => {
+    type Data = { email: string; message?: string };
+    expectTypeOf(insertRecord<typeof submissions>).returns.resolves.toEqualTypeOf<
+      DataRecord<Data>
+    >();
+    expectTypeOf(listRecords<typeof submissions>).returns.resolves.toEqualTypeOf<
+      DataRecord<Data>[]
+    >();
+    expectTypeOf(searchRecords<typeof submissions>).returns.resolves.toEqualTypeOf<
+      DataRecordHit<Data>[]
+    >();
+    expectTypeOf(updateRecord<typeof submissions>).returns.resolves.toEqualTypeOf<
+      DataRecord<Data>
+    >();
+    expectTypeOf(updateRecord<typeof submissions>)
+      .parameter(3)
+      .toEqualTypeOf<Partial<Data>>();
   });
 });

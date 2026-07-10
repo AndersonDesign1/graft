@@ -28,7 +28,8 @@ Functions at POST /api/fn/<name>:
 - `updateOrderStatus` — needs `commerce:orders:write`; `{ id, status }` where
   status is pending|paid|cancelled|fulfilled.
 - `cancelOrder` — destructive hard-delete; needs write scope + `graft approve`
-  then retry with `x-graft-approval`. Prefer `updateOrderStatus` → cancelled
-  for soft cancel.
+  then retry with the approval id (MCP: the `approval` argument; HTTP: the
+  `x-graft-approval` header). Prefer `updateOrderStatus` → cancelled for
+  soft cancel.
 
 Mint scopes on your issuer (example: GRAFT_DEV_TOKEN or Better Auth payload).
