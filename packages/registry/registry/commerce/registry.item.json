@@ -8,8 +8,6 @@
     "@graft/contracts": "workspace:*"
   },
   "registryDependencies": [],
-  "files": [
-    { "source": "graft/commerce.ts", "target": "graft/commerce.ts", "role": "module" }
-  ],
+  "files": [{ "source": "graft/commerce.ts", "target": "graft/commerce.ts", "role": "module" }],
   "llms": "graft/commerce.llms.txt"
 }

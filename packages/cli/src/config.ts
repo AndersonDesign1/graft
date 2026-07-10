@@ -120,11 +120,15 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
   // functions are optional — content-only projects stay valid.
   let functions: Record<string, AnyGraftFunction> = {};
   if (mod.functions !== undefined) {
-    if (typeof mod.functions !== "object" || mod.functions === null || Array.isArray(mod.functions)) {
+    if (
+      typeof mod.functions !== "object" ||
+      mod.functions === null ||
+      Array.isArray(mod.functions)
+    ) {
       throw new GraftError({
         code: "CONFIG_INVALID",
         message: `${configPath} exports \`functions\` but it is not a record.`,
-        fix: 'Export `functions` as a record of defineFunction results, e.g. `export const functions = { pageStats }`, or omit the export.',
+        fix: "Export `functions` as a record of defineFunction results, e.g. `export const functions = { pageStats }`, or omit the export.",
       });
     }
     const fnEntries = Object.entries(mod.functions as Record<string, unknown>);

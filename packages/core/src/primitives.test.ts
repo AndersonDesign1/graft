@@ -65,7 +65,10 @@ describe("mergePrimitives", () => {
     expect(() =>
       mergePrimitives([{ functions: { listComments } }, { functions: { listComments } }]),
     ).toThrow(
-      expect.objectContaining({ code: "CONFIG_INVALID", details: { kind: "function", key: "listComments" } }),
+      expect.objectContaining({
+        code: "CONFIG_INVALID",
+        details: { kind: "function", key: "listComments" },
+      }),
     );
   });
 });

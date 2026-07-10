@@ -5,8 +5,6 @@
   "graftVersion": "*",
   "dependencies": {},
   "registryDependencies": [],
-  "files": [
-    { "source": "graft/fields/seo.ts", "target": "graft/fields/seo.ts", "role": "module" }
-  ],
+  "files": [{ "source": "graft/fields/seo.ts", "target": "graft/fields/seo.ts", "role": "module" }],
   "llms": "graft/fields/seo.llms.txt"
 }

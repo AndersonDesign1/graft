@@ -34,9 +34,7 @@ export type RegistryFile = z.infer<typeof registryFileSchema>;
 
 export const registryItemSchema = z.object({
   /** Item id — must equal its directory name. */
-  name: z
-    .string()
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be lowercase kebab-case"),
+  name: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be lowercase kebab-case"),
   type: z.enum(ITEM_TYPES),
   description: z.string().min(1),
   /** Semver range against the installed @graft/core. "*" = any (pre-1.0 default). */

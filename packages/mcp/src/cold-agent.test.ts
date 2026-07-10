@@ -27,10 +27,7 @@ vi.mock("@graft/db", async (importOriginal) => {
   return {
     ...actual,
     projectBranchContent: vi.fn(
-      async (
-        _db: Database,
-        rows: { collection: string; slug: string }[],
-      ): Promise<ChangeSet> => ({
+      async (_db: Database, rows: { collection: string; slug: string }[]): Promise<ChangeSet> => ({
         added: rows.map((r) => `${r.collection}/${r.slug}`),
         changed: [],
         removed: [],

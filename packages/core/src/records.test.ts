@@ -20,7 +20,11 @@ const pages = defineCollection({
 });
 
 /** Drizzle stub: records what insert() got, returns canned rows for select()/delete(). */
-function stubDb(selectRows: unknown[] = [], deleteRows: unknown[] = [], updateRows: unknown[] = []) {
+function stubDb(
+  selectRows: unknown[] = [],
+  deleteRows: unknown[] = [],
+  updateRows: unknown[] = [],
+) {
   const calls: {
     inserted?: Record<string, unknown>;
     deleted?: boolean;

@@ -10,11 +10,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  FunctionDescriptor,
-  RegistryItemDescriptor,
-  SchemaDescription,
-} from "@graft/contracts";
+import { FunctionDescriptor, RegistryItemDescriptor, SchemaDescription } from "@graft/contracts";
 import { defineCollection, defineFunction, field } from "@graft/core";
 import type { Database } from "@graft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -91,7 +87,10 @@ async function call(name: string, args: Record<string, unknown> = {}) {
     isError?: boolean;
     content: { text: string }[];
   };
-  return { isError: result.isError === true, payload: JSON.parse(result.content[0]?.text ?? "null") };
+  return {
+    isError: result.isError === true,
+    payload: JSON.parse(result.content[0]?.text ?? "null"),
+  };
 }
 
 beforeAll(async () => {

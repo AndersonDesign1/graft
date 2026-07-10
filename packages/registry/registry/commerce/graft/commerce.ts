@@ -165,7 +165,10 @@ export const placeOrder = defineFunction({
       }
     }
 
-    const catalog = await loadProducts(ctx, items.map((l) => l.productSlug));
+    const catalog = await loadProducts(
+      ctx,
+      items.map((l) => l.productSlug),
+    );
     const snapshotted: { productSlug: string; qty: number; unitPriceCents: number }[] = [];
     let totalCents = 0;
 
