@@ -64,12 +64,12 @@ createGraftMcp(options)  →  McpServer (tools)
         └── createGraftMcpHandler(options)  # remote agents, POST /api/mcp
 ```
 
-|        | Stdio (`graft mcp`)                     | HTTP (`createGraftMcpHandler`)            |
-| ------ | --------------------------------------- | ----------------------------------------- |
-| Who    | IDE agents, CLI agents, local CI        | Hosted / eve agents                       |
-| Auth   | Env + optional bearer on `run_function` | `actor` resolver; optional `requireActor` |
-| Writes | Writable checkout                       | Same (dev/self-host tree)                 |
-| Config | Loads `graft.config.ts` from cwd        | App wires collections/functions           |
+|        | Stdio (`graft mcp`)                                                                          | HTTP (`createGraftMcpHandler`)                                                                      |
+| ------ | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Who    | IDE agents, CLI agents, local CI                                                             | Hosted / eve agents                                                                                 |
+| Auth   | `GRAFT_DEV_TOKEN` is the server's default identity (secret never enters the agent's context) | `actor` resolver; optional `requireActor`; the connection's bearer is forwarded into `run_function` |
+| Writes | Writable checkout                                                                            | Same (dev/self-host tree)                                                                           |
+| Config | Loads `graft.config.ts` from cwd                                                             | App wires collections/functions                                                                     |
 
 ## Tool surface (target)
 
@@ -96,8 +96,17 @@ createGraftMcp(options)  →  McpServer (tools)
 
 - `name` — function name (the defineFunction `name`, not the export key)
 - `input` — JSON object of field inputs (default `{}`)
-- `authorization` — optional bearer token (or raw token; server prefixes `Bearer `)
+- `authorization` — optional bearer override (or raw token; server prefixes `Bearer `)
 - `approval` — optional approval id (`x-graft-approval`) for human-gated calls
+
+**Credentials stay out of the agent's context.** A server-held
+`defaultAuthorization` applies when the tool call passes no `authorization`:
+`graft mcp` sets it from `GRAFT_DEV_TOKEN` (anyone who can spawn the process
+can already read `.env`, so this grants nothing new), and
+`createGraftMcpHandler` forwards the incoming request's own `Authorization`
+header per request. Agents therefore act as themselves without echoing tokens
+into tool arguments, transcripts, or MCP client logs; an explicit
+`authorization` argument still overrides for acting-as scenarios.
 
 ### Registry browse (P6.3) ✅
 
