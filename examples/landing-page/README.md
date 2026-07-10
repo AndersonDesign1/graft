@@ -11,8 +11,8 @@ pnpm --filter landing-page compile   # project content/ into Postgres
 pnpm --filter landing-page dev       # http://localhost:3000
 ```
 
-- Home: Callout/FAQ blocks + contact form  
-- `/products`: file-authoritative catalog + `placeOrder`  
+- Home: Callout/FAQ blocks + contact form
+- `/products`: file-authoritative catalog + `placeOrder`
 - Primitives under `graft/` (from `graft add`); MDX map at `components/mdx-components.ts`
 
 Pages are `dynamic` (read the index per request). Cache tags via

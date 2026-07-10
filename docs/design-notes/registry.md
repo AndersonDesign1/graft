@@ -51,21 +51,22 @@ half-written project):
 ```jsonc
 {
   "name": "comments",
-  "type": "bundle",                 // block | field | access | bundle
+  "type": "bundle", // block | field | access | bundle
   "description": "Moderated comments: a db-authoritative collection + post/list/delete fns.",
   "graftVersion": ">=0.1.0 <0.2.0", // semver range checked against @graft/core
-  "dependencies": {                  // npm deps to add to the target (if any)
+  "dependencies": {
+    // npm deps to add to the target (if any)
     // "some-lib": "^1.0.0"
   },
   "registryDependencies": ["scoped-access"], // other items to add first (ordered, deduped)
   "files": [
     {
-      "source": "graft/comments.ts",      // path inside the item dir
-      "target": "graft/comments.ts",       // path inside the target project
-      "role": "module"                     // module | component | content | env
-    }
+      "source": "graft/comments.ts", // path inside the item dir
+      "target": "graft/comments.ts", // path inside the target project
+      "role": "module", // module | component | content | env
+    },
   ],
-  "llms": "graft/comments.llms.txt"        // teaching fragment appended to project llms.txt
+  "llms": "graft/comments.llms.txt", // teaching fragment appended to project llms.txt
 }
 ```
 
@@ -74,12 +75,12 @@ file belongs and whether it participates in auto-aggregation.
 
 ## Item types
 
-| type     | what it ships                                   | typical target        |
-| -------- | ----------------------------------------------- | --------------------- |
-| `block`  | an MDX/React component (Callout, FAQ, Hero…)     | `components/`         |
-| `field`  | a reusable `field.*` composition / field group   | `graft/fields/`       |
-| `access` | an access-rule helper (a `requireScopes` preset) | `graft/access/`       |
-| `bundle` | a collection + its functions + access, as a unit | `graft/<name>.ts`     |
+| type     | what it ships                                    | typical target    |
+| -------- | ------------------------------------------------ | ----------------- |
+| `block`  | an MDX/React component (Callout, FAQ, Hero…)     | `components/`     |
+| `field`  | a reusable `field.*` composition / field group   | `graft/fields/`   |
+| `access` | an access-rule helper (a `requireScopes` preset) | `graft/access/`   |
+| `bundle` | a collection + its functions + access, as a unit | `graft/<name>.ts` |
 
 `bundle` is the interesting one — it exercises config wiring, npm deps, `llms.txt`, and
 access rules at once. Prove the mechanism against a bundle and `block`/`field` are trivial.

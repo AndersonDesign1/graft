@@ -35,21 +35,19 @@ export function mdxComponentsSource(basenames: readonly string[]): string {
   if (entries.length === 0) {
     return [
       ...HEADER,
-      "import type { MdxComponents } from \"@graft/sdk-next\";",
+      'import type { MdxComponents } from "@graft/sdk-next";',
       "",
       "export const mdxComponents: MdxComponents = {};",
       "",
     ].join("\n");
   }
 
-  const imports = entries.map(
-    (e) => `import { ${e.exportName} } from "./${e.fileBase}";`,
-  );
+  const imports = entries.map((e) => `import { ${e.exportName} } from "./${e.fileBase}";`);
   const props = entries.map((e) => `  ${e.exportName},`).join("\n");
 
   return [
     ...HEADER,
-    "import type { MdxComponents } from \"@graft/sdk-next\";",
+    'import type { MdxComponents } from "@graft/sdk-next";',
     ...imports,
     "",
     "export const mdxComponents: MdxComponents = {",

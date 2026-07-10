@@ -106,7 +106,10 @@ export function planAdd(names: readonly string[], options: PlanAddOptions): AddP
           newModules.push(basename(file.target).replace(/\.ts$/, ""));
         }
       }
-      if (file.role === "component" && file.target.replace(/\\/g, "/").startsWith(`${COMPONENTS_DIR}/`)) {
+      if (
+        file.role === "component" &&
+        file.target.replace(/\\/g, "/").startsWith(`${COMPONENTS_DIR}/`)
+      ) {
         const base = basename(file.target).replace(/\.tsx$/, "");
         if (base !== "mdx-components") newComponents.push(base);
       }
@@ -120,7 +123,9 @@ export function planAdd(names: readonly string[], options: PlanAddOptions): AddP
   const componentsDir = join(targetDir, COMPONENTS_DIR);
   const componentNames = [...new Set([...listMdxComponents(componentsDir), ...newComponents])];
   const touchesComponents =
-    newComponents.length > 0 || existsSync(componentsDir) || existsSync(join(componentsDir, MDX_MAP_FILE));
+    newComponents.length > 0 ||
+    existsSync(componentsDir) ||
+    existsSync(join(componentsDir, MDX_MAP_FILE));
 
   return {
     items,
@@ -191,7 +196,11 @@ export function applyPlan(plan: AddPlan, options: { overwrite?: boolean } = {}):
     const componentsDir = dirname(plan.mdxMap.targetPath);
     mkdirSync(componentsDir, { recursive: true });
     // Re-scan disk after writes so the map matches reality.
-    writeFileSync(plan.mdxMap.targetPath, mdxComponentsSource(listMdxComponents(componentsDir)), "utf8");
+    writeFileSync(
+      plan.mdxMap.targetPath,
+      mdxComponentsSource(listMdxComponents(componentsDir)),
+      "utf8",
+    );
     mdxMapPath = plan.mdxMap.relPath;
   }
 

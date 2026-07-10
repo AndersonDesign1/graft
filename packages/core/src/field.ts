@@ -143,9 +143,7 @@ export function defineObjectField<
   const TOptions extends { optional?: boolean; description?: string } = Record<never, never>,
 >(
   options: { fields: TFields } & TOptions,
-): FieldDefinition<
-  MaybeOptional<z.ZodObject<FieldsToZodShape<TFields>>, TOptions>
-> {
+): FieldDefinition<MaybeOptional<z.ZodObject<FieldsToZodShape<TFields>>, TOptions>> {
   const optional = options.optional ?? false;
   const shape = Object.fromEntries(
     Object.entries(options.fields).map(([key, def]) => [key, def.zod]),
@@ -166,10 +164,7 @@ export function defineObjectField<
 /** Array field — items validated by the nested field def. */
 export function defineArrayField<
   TItemZod extends z.ZodType,
-  const TOptions extends { optional?: boolean; description?: string } = Record<
-    never,
-    never
-  >,
+  const TOptions extends { optional?: boolean; description?: string } = Record<never, never>,
 >(
   options: { of: FieldDefinition<TItemZod> } & TOptions,
 ): FieldDefinition<MaybeOptional<z.ZodArray<TItemZod>, TOptions>> {

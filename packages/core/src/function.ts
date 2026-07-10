@@ -152,9 +152,7 @@ export function defineFunction<TFields extends Record<string, FieldDefinition>, 
     access: config.access,
     handler: config.handler,
     describe(): FunctionDescriptor {
-      const args = Object.entries(config.input).map(([name, def]) =>
-        toFieldDescriptor(name, def),
-      );
+      const args = Object.entries(config.input).map(([name, def]) => toFieldDescriptor(name, def));
       return {
         name: config.name,
         kind: config.kind,

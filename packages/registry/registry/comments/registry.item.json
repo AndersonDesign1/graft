@@ -5,8 +5,6 @@
   "graftVersion": "*",
   "dependencies": {},
   "registryDependencies": ["scoped-access"],
-  "files": [
-    { "source": "graft/comments.ts", "target": "graft/comments.ts", "role": "module" }
-  ],
+  "files": [{ "source": "graft/comments.ts", "target": "graft/comments.ts", "role": "module" }],
   "llms": "graft/comments.llms.txt"
 }
