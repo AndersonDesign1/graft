@@ -25,7 +25,12 @@ const HEADLINE_OPTIONS = "MaxWords=20, MinWords=8, ShortWord=3, MaxFragments=2";
 
 const DEFAULT_LIMIT = 20;
 
-function toTsQuery(query: string): SQL {
+/**
+ * Reject an empty query with the agent-actionable fix. Exported so search
+ * surfaces (MCP `search_content`) can gate cheap input errors before paying
+ * for branch-scope resolution or a database round-trip.
+ */
+export function assertSearchQuery(query: string): void {
   if (query.trim() === "") {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
@@ -34,6 +39,10 @@ function toTsQuery(query: string): SQL {
       details: { query },
     });
   }
+}
+
+function toTsQuery(query: string): SQL {
+  assertSearchQuery(query);
   return sql`websearch_to_tsquery(${SEARCH_CONFIG}, ${query})`;
 }
 

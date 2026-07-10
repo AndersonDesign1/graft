@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineCollection, field } from "@graft/core";
-import { createDb, type DbHandle } from "@graft/db";
+import { createBranch, createDb, dropBranch, type DbHandle } from "@graft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -120,5 +120,85 @@ describe.skipIf(!runIntegration)("write_content projects into content_index", ()
       sourcePath: "pages/hello.mdx",
     });
     expect(result.payload.hits[0].snippet).toContain("<b>");
+  });
+});
+
+/**
+ * Overlay MCP search: a server on a child branch must find content physically
+ * written on its parent — the resolved chain, not the bare branch id. The child
+ * server passes no scope, so this also live-exercises lazy resolveBranchScope.
+ */
+describe.skipIf(!runIntegration)("search_content across an overlay chain", () => {
+  const PARENT = "mcp-it-overlay-parent";
+  const CHILD = "mcp-it-overlay-child";
+  let handle: DbHandle;
+  let parentDir: string;
+  let childDir: string;
+  let parentClient: Client;
+  let childClient: Client;
+
+  async function call(client: Client, name: string, args: Record<string, unknown>) {
+    const result = (await client.callTool({ name, arguments: args })) as {
+      isError?: boolean;
+      content: { type: string; text: string }[];
+    };
+    return {
+      isError: result.isError === true,
+      payload: JSON.parse(result.content[0]?.text ?? "null"),
+    };
+  }
+
+  async function cleanup() {
+    for (const branch of [CHILD, PARENT]) {
+      await dropBranch(handle.db, branch, { purgeRows: true }).catch(() => undefined);
+    }
+  }
+
+  beforeAll(async () => {
+    handle = createDb(process.env.DATABASE_URL as string);
+    parentDir = mkdtempSync(join(tmpdir(), "graft-mcp-it-parent-"));
+    childDir = mkdtempSync(join(tmpdir(), "graft-mcp-it-child-"));
+    await cleanup();
+    await createBranch(handle.db, { name: PARENT, from: "main" });
+    await createBranch(handle.db, { name: CHILD, from: PARENT });
+
+    const connect = async (contentDir: string, branchId: string) => {
+      const server = createGraftMcp({ contentDir, collections, db: handle.db, branchId });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverTransport);
+      const client = new Client({ name: `it-agent-${branchId}`, version: "0.0.0" });
+      await client.connect(clientTransport);
+      return client;
+    };
+    parentClient = await connect(parentDir, PARENT);
+    childClient = await connect(childDir, CHILD);
+  });
+
+  afterAll(async () => {
+    await cleanup();
+    await handle.close();
+    rmSync(parentDir, { recursive: true, force: true });
+    rmSync(childDir, { recursive: true, force: true });
+  });
+
+  it("finds parent-authored content from the child branch", async () => {
+    const written = await call(parentClient, "write_content", {
+      collection: "pages",
+      slug: "cassowary-care",
+      data: { title: "Cassowary care" },
+      body: "Feeding a cassowary safely.",
+    });
+    expect(written.isError).toBeFalsy();
+
+    const result = await call(childClient, "search_content", { query: "cassowary" });
+    expect(result.isError).toBeFalsy();
+    expect(result.payload.branch).toBe(CHILD);
+    expect(result.payload.chain).toEqual([CHILD, PARENT, "main"]);
+    expect(result.payload.hits).toHaveLength(1);
+    expect(result.payload.hits[0]).toMatchObject({
+      collection: "pages",
+      slug: "cassowary-care",
+      sourcePath: "pages/cassowary-care.mdx",
+    });
   });
 });
