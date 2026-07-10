@@ -190,7 +190,8 @@ Graft never becomes the identity provider of record.
 | **P6.1** ✅ | Cold-agent MCP unit path + CI (`pnpm test:cold-agent`)                                 |
 | **P6.2** ✅ | Function tools + `describe_schema.functions` + `graft mcp` + docs                      |
 | **P6.3** ✅ | Registry MCP browse (`list_registry` / `describe_item`) + introspection contract tests |
-| **P6.4+**   | Remote HTTP cold-agent; asset/delete tools; remaining ergonomics                       |
+| **P6.4** ✅ | Remote HTTP cold-agent CI gate (`cold-agent-http.test.ts`)                             |
+| **P6.5+**   | Live off-repo (eve) cold-agent exercise; asset/delete tools; remaining ergonomics      |
 
 ## Acceptance (P6.2)
 
@@ -210,6 +211,15 @@ Graft never becomes the identity provider of record.
 - [x] Introspection contract tests: `describe_schema` / `describe_function` / `describe_item` / `list_registry` outputs validate against the published Zod schemas (recursive object/array fields + function flags covered).
 - [x] Vocabulary drift guard: registry `ITEM_TYPES` / `FILE_ROLES` stay in lockstep with the contracts enums.
 - [x] `llms.txt` / README / design note teach the browse tools.
+
+## Acceptance (P6.4)
+
+- [x] The whole cold path runs over the Streamable HTTP wire (`createGraftMcpHandler` + a real MCP client), not an in-process transport: discover → failed write → `explain_error` → schema-derived write → read back.
+- [x] The endpoint requires an actor and the very first anonymous connect fails with a 401 whose message teaches the fix (`Authorization: Bearer …`) — the error is the only teacher a remote agent has.
+- [x] A gated typed function is invoked with the **connection's** bearer only — no token in tool arguments (the P6.3-followup forwarding path, gated in CI).
+- [x] Registry browse works over the wire.
+- [x] Runs offline under `pnpm test:cold-agent` (projection stubbed) — CI-blocking alongside the P6.1 file.
+- [ ] Live off-repo agent exercise (fresh agent, running app, network HTTP, no repo checkout) — banked as the P6.5 manual gate; writes need the dev/self-host writable tree.
 
 ## Open questions (not blocking P6.2)
 
