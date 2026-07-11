@@ -32,6 +32,14 @@ type UnionToIntersection<U> = (U extends unknown ? (arg: U) => void : never) ext
   ? I
   : never;
 
+/**
+ * Intersect a union of maps; an empty union (mergePrimitives([]) — the barrel
+ * `graft init` generates before any `graft add`) merges to the empty map, not
+ * `unknown` (UnionToIntersection<never> = unknown, which would poison every
+ * downstream PrimitiveModule check in graft.config.ts).
+ */
+type MergeUnion<U> = [U] extends [never] ? Record<never, never> : UnionToIntersection<U>;
+
 type CollectionsOf<M> = M extends { collections: infer C extends Record<string, AnyCollection> }
   ? C
   : Record<never, never>;
@@ -74,8 +82,8 @@ function mergeInto<T>(
 export function mergePrimitives<const T extends readonly PrimitiveModule[]>(
   modules: T,
 ): MergedPrimitives<
-  UnionToIntersection<CollectionsOf<T[number]>>,
-  UnionToIntersection<FunctionsOf<T[number]>>
+  MergeUnion<CollectionsOf<T[number]>>,
+  MergeUnion<FunctionsOf<T[number]>>
 > {
   const collections: Record<string, AnyCollection> = {};
   const functions: Record<string, AnyGraftFunction> = {};
@@ -84,7 +92,7 @@ export function mergePrimitives<const T extends readonly PrimitiveModule[]>(
     mergeInto(functions, mod.functions, "function");
   }
   return { collections, functions } as MergedPrimitives<
-    UnionToIntersection<CollectionsOf<T[number]>>,
-    UnionToIntersection<FunctionsOf<T[number]>>
+    MergeUnion<CollectionsOf<T[number]>>,
+    MergeUnion<FunctionsOf<T[number]>>
   >;
 }

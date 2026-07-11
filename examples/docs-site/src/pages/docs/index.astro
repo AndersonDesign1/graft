@@ -1,0 +1,77 @@
+---
+/** Docs index — sections and pages, straight from the content index. */
+import Base from "../../layouts/Base.astro";
+import { getGraft } from "../../lib/graft";
+
+const docs = await getGraft().listContent("docs");
+
+const sections = new Map<string, typeof docs>();
+for (const doc of docs) {
+  const list = sections.get(doc.data.section) ?? [];
+  list.push(doc);
+  sections.set(doc.data.section, list);
+}
+for (const list of sections.values()) {
+  list.sort((a, b) => (a.data.order ?? 99) - (b.data.order ?? 99));
+}
+---
+
+<Base title="Docs — Graft" description="Graft documentation: the model, the SDKs, the agent surface.">
+  <div class="docs-index">
+    <h1>Documentation</h1>
+    {
+      [...sections.entries()].map(([section, list]) => (
+        <section>
+          <h2 class="label">{section}</h2>
+          <ul>
+            {list.map((doc) => (
+              <li>
+                <a href={`/docs/${doc.slug}`}>{doc.data.title}</a>
+                <p>{doc.data.description}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    }
+  </div>
+</Base>
+
+<style>
+  .docs-index {
+    padding: var(--space-16) var(--space-8);
+    max-width: 44rem;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    letter-spacing: var(--tracking-display);
+    margin-block-end: var(--space-12);
+  }
+
+  section {
+    margin-block-start: var(--space-8);
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-4) 0 0;
+  }
+
+  li + li {
+    margin-block-start: var(--space-4);
+  }
+
+  li a {
+    font-size: var(--text-md);
+    font-weight: 500;
+  }
+
+  li p {
+    color: var(--ink-muted);
+    font-size: var(--text-sm);
+    margin-block-start: var(--space-1);
+  }
+</style>

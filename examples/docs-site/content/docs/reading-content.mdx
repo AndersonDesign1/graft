@@ -1,0 +1,33 @@
+---
+title: Reading content
+description: Typed reads with sdk-core, and the framework SDKs for Next, Astro, and SvelteKit.
+section: Reading content
+order: 1
+---
+
+All reads go through `@graft/sdk-core`: `getDocument`, `listDocuments`, and
+`searchDocuments`, each re-validated against your Zod schema on the way out.
+The framework SDKs re-export that surface with framework-appropriate ergonomics.
+
+## Astro
+
+```ts
+// src/lib/graft.ts
+import { createDb } from "@graft/db";
+import { createGraft } from "@graft/sdk-astro";
+import { collections } from "../../graft.config";
+
+export const graft = createGraft({
+  db: createDb(process.env.DATABASE_URL!).db,
+  collections,
+});
+```
+
+Use it from `.astro` frontmatter, endpoints, and middleware — never client
+islands (it holds a database handle).
+
+## Caching
+
+Astro has no tag-based data cache, so the Phase 4 tag contract maps onto HTTP:
+stamp `tagsFor(...)` into a CDN surrogate-key header on SSR responses, and
+purge `tagsForChanges(branch, changeSet)` from your compile webhook.

@@ -34,6 +34,17 @@ describe("mergePrimitives", () => {
     expect(mergePrimitives([{}, { functions: {} }])).toEqual({ collections: {}, functions: {} });
   });
 
+  it("types the empty merge as empty maps, not unknown — the fresh `graft init` barrel", () => {
+    // graft init generates `mergePrimitives([])`; its result must still satisfy
+    // PrimitiveModule so graft.config.ts can merge the barrel before any
+    // `graft add`. UnionToIntersection<never> = unknown would break that.
+    const empty = mergePrimitives([]);
+    expectTypeOf(empty.collections).not.toBeUnknown();
+    expectTypeOf(empty.functions).not.toBeUnknown();
+    const remerged = mergePrimitives([{ collections: { pages } }, empty]);
+    expectTypeOf(remerged.collections.pages).toEqualTypeOf<typeof pages>();
+  });
+
   it("preserves precise types — the no-codegen inference contract survives merging", () => {
     const merged = mergePrimitives([
       { collections: { pages } },

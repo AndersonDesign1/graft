@@ -1,0 +1,106 @@
+/**
+ * Graft design tokens — the single source for color, type, space, and motion.
+ *
+ * Thesis: botanical × technical. "Graft" is a horticultural word — a scion
+ * joined to rootstock so both grow as one — and it is exactly what the
+ * product does with git branches. Warm paper and ink instead of SaaS
+ * blue-gray; one living green accent; squared geometry (no pills); serif
+ * display against a working sans. Nothing here is a framework default.
+ *
+ * Theming: every color is light-dark(). `color-scheme` on :root follows the
+ * OS; a theme toggle stamps data-theme on <html> and wins in both directions.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* ---- color: paper & ink ---- */
+  --paper: light-dark(#faf8f3, #151510); /* warm paper / deep loam — never #fff/#000 */
+  --paper-raised: light-dark(#ffffff, #1d1d16); /* cards/code float slightly brighter */
+  --paper-sunken: light-dark(#f1eee6, #100f0b); /* wells, table stripes */
+  --ink: light-dark(#1a1915, #ece9df);
+  --ink-muted: light-dark(#5d5a4e, #a5a191);
+  --ink-faint: light-dark(#8a8677, #6f6c5e);
+  --hairline: light-dark(rgba(26, 25, 21, 0.14), rgba(236, 233, 223, 0.14));
+  --hairline-strong: light-dark(rgba(26, 25, 21, 0.32), rgba(236, 233, 223, 0.32));
+
+  /* ---- color: the graft greens (phosphor-bright in the dark) ---- */
+  --stem: light-dark(#2e6b34, #7cc86a); /* primary accent: links, actions, live marks */
+  --stem-deep: light-dark(#1d4a24, #a4e292); /* hover/active on stem */
+  --bud: light-dark(#c9e94e, #d3f655); /* acid highlight — selection, cursors, tiny marks ONLY */
+  --graft-union: light-dark(#8a5a2b, #c89a62); /* bark brown — rare warm counterpoint */
+
+  /* ---- semantic ---- */
+  --color-bg: var(--paper);
+  --color-fg: var(--ink);
+  --color-accent: var(--stem);
+  --color-selection-bg: var(--bud);
+  --color-selection-fg: light-dark(#1a1915, #151510);
+  --color-focus-ring: var(--stem);
+
+  /* ---- type ---- */
+  --font-display: "Instrument Serif", "Iowan Old Style", georgia, serif;
+  --font-sans: "Instrument Sans Variable", "Instrument Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+
+  /* Scale tuned by hand, not a formula. Display sizes are for Instrument
+     Serif at weight 400 with tight tracking — big and light. */
+  --text-xs: 0.75rem; /* 12 — mono labels, uppercase, tracked wide */
+  --text-sm: 0.875rem; /* 14 — UI chrome, sidebar */
+  --text-base: 1rem; /* 16 — body */
+  --text-md: 1.125rem; /* 18 — docs body / lede */
+  --text-lg: 1.5rem; /* 24 — section intros */
+  --text-xl: 2.25rem; /* 36 — doc h1 */
+  --text-2xl: 3.5rem; /* 56 — page display */
+  --text-3xl: clamp(3.5rem, 9vw, 6.5rem); /* hero display */
+
+  --leading-tight: 1.08;
+  --leading-snug: 1.3;
+  --leading-body: 1.65;
+  --tracking-display: -0.03em; /* serif display, sizes ≥ --text-2xl */
+  --tracking-label: 0.08em; /* uppercase mono labels */
+
+  /* ---- space (4px base) ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+
+  /* ---- geometry: squared, concentric (outer = inner + padding) ---- */
+  --radius-inner: 3px; /* buttons, inputs, code spans */
+  --radius: 6px; /* cards, code blocks */
+  --radius-outer: 10px; /* bento cells, embedded UI frames */
+
+  /* ---- elevation: layered translucent shadows, never solid borders ---- */
+  --shadow-raised:
+    0 0 0 1px var(--hairline),
+    0 1px 2px light-dark(rgba(26, 25, 21, 0.05), rgba(0, 0, 0, 0.4)),
+    0 4px 12px light-dark(rgba(26, 25, 21, 0.06), rgba(0, 0, 0, 0.35));
+  --shadow-floating:
+    0 0 0 1px var(--hairline),
+    0 2px 6px light-dark(rgba(26, 25, 21, 0.07), rgba(0, 0, 0, 0.45)),
+    0 12px 32px light-dark(rgba(26, 25, 21, 0.1), rgba(0, 0, 0, 0.5));
+  /* Image outlines: pure black/white — tinted neutrals read as dirt. */
+  --outline-image: light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.1));
+
+  /* ---- motion (custom curves; the CSS built-ins are too weak) ---- */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --duration-press: 140ms;
+  --duration-fast: 180ms;
+  --duration-base: 240ms;
+  --press-scale: 0.97;
+}
+
+/* A theme toggle stamps data-theme on <html>; it must beat the OS setting. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}

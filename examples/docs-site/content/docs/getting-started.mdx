@@ -1,0 +1,50 @@
+---
+title: Getting started
+description: Init a project, author MDX, project it into Postgres, read it back typed.
+section: Start here
+order: 1
+---
+
+Graft ships libraries and a CLI, not a monolith. A project is a directory with
+a schema (`graft.config.ts`), authored content (`content/`), and whatever
+frontend you like.
+
+## The loop
+
+```sh
+graft init          # schema + content/ + llms.txt
+graft compile       # project content/ into Postgres (content_index)
+graft dev           # or keep a watcher running while you edit
+```
+
+Put `DATABASE_URL=postgres://…` in `.env` (any parent directory works).
+
+## Author a document
+
+Documents are MDX files whose frontmatter must satisfy the collection schema:
+
+```mdx
+---
+title: Hello, Graft
+tagline: Content lives in git; Postgres is the index.
+---
+
+Body prose is real MDX — searchable, versioned, yours.
+```
+
+Every projection records a `compilations` audit row (branch, git SHA, counts),
+so "git wins" is checkable, not just a slogan.
+
+## Read it back, typed
+
+```ts
+import { createGraft } from "@graft/sdk-astro";
+import { collections } from "../graft.config";
+
+const graft = createGraft({ db, collections });
+const home = await graft.getContent("pages", "home");
+//    ^? Document<typeof pages> — title/tagline typed by your schema
+```
+
+The same schema types every read identically across Next, Astro, and
+SvelteKit.
