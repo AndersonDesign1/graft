@@ -58,8 +58,11 @@ container ([`deploy/docker/`](deploy/docker/README.md)): one image = Postgres 18
 `graft serve` — `docker run -p 3903:3903 graft` boots migrate → compile → serve and logs a
 generated bearer (anonymous MCP is never exposed); mount your project at `/project`, set
 `GRAFT_RUNTIME_PASSWORD` to serve under a hardened role, or use the split
-`deploy/docker/compose.yml` (db / storage / graft — swap to Neon/R2 by env alone). Next:
-deploy adapter docs, Astro/SvelteKit SDKs, docs site.
+`deploy/docker/compose.yml` (db / storage / graft — swap to Neon/R2 by env alone). **P7.3**
+adds the deploy adapters ([`deploy/`](deploy/README.md)): Railway, Fly, and VPS run the
+container; Vercel deploys embedded (compile as a build step; the example app is the
+reference) — every adapter carries the runtime-credential harden recipe. Next:
+Astro/SvelteKit SDKs, docs site + compare page.
 
 ## Requirements
 

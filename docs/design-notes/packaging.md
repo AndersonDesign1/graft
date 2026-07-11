@@ -1,8 +1,8 @@
 # Packaging & deploy topology (Phase 7)
 
 **Status: P7.0 decided · P7.1 (`graft serve` + `graft harden`) SHIPPED · P7.2
-(container + compose) SHIPPED.** Remaining units (deploy adapter docs, SDKs,
-docs site) build on the decisions here.
+(container + compose) SHIPPED · P7.3 (deploy adapter docs) SHIPPED.**
+Remaining units (SDKs, docs site) build on the decisions here.
 
 ## What "self-host Graft" actually is
 
@@ -99,12 +99,20 @@ hardened mode serves functions as `graft_runtime` while raw
 compose (db + storage + graft) migrates/compiles against the external
 services and serves the same answers.
 
-## Deploy adapters (P7.3)
+## Deploy adapters (P7.3 — SHIPPED, `deploy/*.md`)
 
 Docs + env recipes, not code — the handlers already run anywhere Web-standard
 requests do: Railway/Fly/VPS run the container; **Vercel** stays the embedded
 topology (Functions/Fluid is request-scoped compute, not a container host —
-banked finding, 2026-07-04). Each adapter doc carries the harden recipe above.
+banked finding, 2026-07-04). Each adapter doc carries the harden recipe;
+`deploy/README.md` is the chooser + the shared credential/who-runs-what
+tables. Adapter-specific calls worth remembering: Fly scale-to-zero is safe
+(stateless handlers; boot compile is a hash-diff no-op), Vercel compile is a
+**build step** (read-only deployed filesystem) and needs the operator
+credential piped into the build script (`DATABASE_URL=$GRAFT_OPERATOR_DATABASE_URL
+graft compile && next build`) since Vercel shares env between build and
+runtime, and `graft harden` covers Graft's tables only — app-owned tables
+(e.g. Better Auth's) get granted separately.
 
 ## Later units
 
