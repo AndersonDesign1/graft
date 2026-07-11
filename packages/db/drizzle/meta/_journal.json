@@ -50,6 +50,13 @@
       "when": 1783366450668,
       "tag": "0006_productive_mandrill",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783764602810,
+      "tag": "0007_first_thing",
+      "breakpoints": true
     }
   ]
 }

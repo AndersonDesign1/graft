@@ -182,6 +182,11 @@ export const approvals = pgTable(
     status: text("status").notNull().default("pending"),
     /** Who decided (OS user / operator handle) — set on approve/deny. */
     decidedBy: text("decided_by"),
+    /**
+     * Postgres role the decision ran as (`current_user`), stamped inside the
+     * UPDATE itself — unlike `decided_by` it cannot be self-reported.
+     */
+    decidedRole: text("decided_role"),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

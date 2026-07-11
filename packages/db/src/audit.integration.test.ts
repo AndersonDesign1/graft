@@ -5,10 +5,12 @@
  */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { GraftError } from "@graft/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { decideApproval, createDbApprovalStore, listPendingApprovals } from "./approvals";
 import { createDbAuditStore } from "./audit";
 import { createDb, type DbHandle } from "./client";
+import { hardenRuntimeRole } from "./harden";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 
@@ -102,6 +104,98 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
         ok: false,
         reason: "not_found",
       });
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "stamps decided_role server-side and refuses approver == requester",
+    async () => {
+      const store = createDbApprovalStore(handle.db);
+      const request = {
+        branch: BRANCH,
+        functionName: "itFn",
+        input: { id: "row-sod" },
+        inputCanonical: '{"id":"row-sod"}',
+        requestedByKind: "agent",
+        requestedById: "it-agent",
+        correlationId: "it-corr-sod",
+      };
+      const id = await store.request(request);
+
+      // Separation of duties: the requesting identity cannot decide.
+      await expect(decideApproval(handle.db, id, "approved", "it-agent")).rejects.toMatchObject({
+        code: "APPROVAL_SELF_DECISION",
+      });
+      await expect(decideApproval(handle.db, id, "denied", "it-agent")).rejects.toBeInstanceOf(
+        GraftError,
+      );
+
+      // The refusal filed nothing: the row is still pending for a real reviewer.
+      const decided = await decideApproval(handle.db, id, "approved", "someone-else");
+      expect(decided).toMatchObject({ id, status: "approved", decidedBy: "someone-else" });
+      // decided_role is current_user, stamped inside the UPDATE — not client input.
+      const [{ current_user: expectedRole }] = await handle.sql`select current_user`;
+      expect(decided?.decidedRole).toBe(expectedRole as string);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "role separation: a hardened runtime role can request + consume but never decide",
+    async () => {
+      const role = "graft_it_runtime";
+      await handle.sql.unsafe(
+        `do $$ begin if not exists (select from pg_roles where rolname = '${role}') then create role ${role} nologin; end if; end $$;`,
+      );
+      // PG16+: creating a role no longer implies SET-able membership for the
+      // creator — grant it so this owner connection can impersonate the role.
+      await handle.sql.unsafe(`grant ${role} to current_user`);
+      await hardenRuntimeRole(handle.db, role);
+
+      const store = createDbApprovalStore(handle.db);
+      const match = { functionName: "itFn", inputCanonical: '{"id":"row-hardened"}' };
+      const id = await store.request({
+        branch: BRANCH,
+        functionName: "itFn",
+        input: { id: "row-hardened" },
+        inputCanonical: match.inputCanonical,
+        requestedByKind: "agent",
+        requestedById: "it-agent",
+        correlationId: "it-corr-hard",
+      });
+
+      try {
+        // Raw SQL as the runtime role: flipping pending → approved is a
+        // permission error, not a policy suggestion. (SET LOCAL pins the role
+        // to this transaction, so the pooled connection is untouched after.)
+        await expect(
+          handle.sql.begin(async (tx) => {
+            await tx.unsafe(`set local role ${role}`);
+            await tx`update approvals set status = 'approved' where id = ${id}::uuid`;
+          }),
+        ).rejects.toThrow(/permission denied for table approvals/i);
+
+        // Still pending — now approve as the operator (owner connection).
+        await decideApproval(handle.db, id, "approved", "it-operator");
+
+        // The runtime role CAN consume — via the SECURITY DEFINER function,
+        // the one status flip it is granted.
+        const consumed = await handle.sql.begin(async (tx) => {
+          await tx.unsafe(`set local role ${role}`);
+          const [row] =
+            await tx`select graft_consume_approval(${id}::uuid, ${match.functionName}, ${match.inputCanonical}) as reason`;
+          return row?.reason;
+        });
+        expect(consumed).toBe("ok");
+      } finally {
+        // DROP OWNED is refused on Neon (it touches objects the owner role
+        // cannot drop); revoke the explicit grants instead, then drop.
+        await handle.sql.unsafe(`revoke all on all tables in schema public from ${role}`);
+        await handle.sql.unsafe(`revoke all on all functions in schema public from ${role}`);
+        await handle.sql.unsafe(`revoke all on schema public from ${role}`);
+        await handle.sql.unsafe(`drop role if exists ${role}`);
+      }
     },
     TEST_TIMEOUT,
   );

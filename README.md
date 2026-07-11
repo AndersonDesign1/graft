@@ -105,6 +105,14 @@ that id — an `x-graft-approval: <id>` header over HTTP, or the `approval` tool
 MCP. See [`llms.txt`](examples/landing-page/llms.txt) for the full surface, including MCP
 tools and Better Auth token minting.
 
+The gate holds against the agent itself, not just accidents: approver == requester is refused
+(`APPROVAL_SELF_DECISION`), decisions record the Postgres role they ran as (stamped
+server-side), and consuming an approval rides a `SECURITY DEFINER` function — so a hardened
+deployment can give its app/agent a runtime role with **no UPDATE on `approvals`**, making
+`pending → approved` unreachable even with raw SQL against the app's own `DATABASE_URL`
+(`runtimeRoleGrantsSql` / `hardenRuntimeRole` in `@graft/db` emit the grants; see
+[`docs/design-notes/approval-hardening.md`](docs/design-notes/approval-hardening.md)).
+
 ## Monorepo layout
 
 | Package                     | Purpose                                                           |

@@ -153,7 +153,11 @@ Destructive functions never run directly. The workflow:
    `details.approvalId`. A pending approval (function + exact input) is filed.
 2. A HUMAN reviews it: `pnpm exec graft approvals` lists pending ones;
    `graft approve <id>` or `graft deny <id>` decides. Agents must not run
-   these themselves — ask the operator and wait.
+   these themselves — ask the operator and wait. Two guards enforce this:
+   the requester's identity can never decide its own approval
+   (`APPROVAL_SELF_DECISION`), and on hardened deployments the runtime
+   database role cannot flip an approval at all — deciding requires the
+   operator credential.
 3. Once approved, retry the EXACT same call carrying the approval id — over
    MCP pass it as the `approval` tool argument; over raw HTTP send the
    `x-graft-approval: <id>` header. Approvals are one-shot and bound to that

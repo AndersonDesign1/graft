@@ -6,8 +6,17 @@
  * handler `consume`s it. Consume is a single conditional UPDATE — atomic,
  * one-shot, and bound to the exact function + canonical input it was requested
  * for, so an approval can never authorize a different call than the human saw.
+ *
+ * Hardened (post-P6): consume runs through the `graft_consume_approval`
+ * SECURITY DEFINER function (migration 0007), so it is the ONLY status flip a
+ * runtime credential needs; `decideApproval` stays a plain UPDATE on the table.
+ * Grant a runtime role no UPDATE on `approvals` (see `runtimeRoleGrantsSql`)
+ * and pending → approved becomes unreachable for it — even with raw SQL.
+ * Decisions also stamp `decided_role` (`current_user`) server-side and refuse
+ * approver == requester (separation of duties).
  */
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { GraftError } from "@graft/contracts";
 import type { Database } from "./client";
 import { approvals, type ApprovalRow } from "./schema";
 
@@ -42,6 +51,17 @@ export interface ApprovalStore {
   ): Promise<ConsumeResult>;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type ConsumeRefusal = Extract<ConsumeResult, { ok: false }>["reason"];
+
+const CONSUME_REASONS = new Set<string>([
+  "pending",
+  "denied",
+  "already_consumed",
+  "mismatch",
+] satisfies ConsumeRefusal[]);
+
 export function createDbApprovalStore(db: Database): ApprovalStore {
   return {
     async request(req: ApprovalRequest): Promise<string> {
@@ -65,28 +85,21 @@ export function createDbApprovalStore(db: Database): ApprovalStore {
       id: string,
       match: { functionName: string; inputCanonical: string },
     ): Promise<ConsumeResult> {
-      const consumed = await db
-        .update(approvals)
-        .set({ status: "consumed" })
-        .where(
-          and(
-            eq(approvals.id, id),
-            eq(approvals.status, "approved"),
-            eq(approvals.functionName, match.functionName),
-            eq(approvals.inputCanonical, match.inputCanonical),
-          ),
-        )
-        .returning({ id: approvals.id });
-      if (consumed.length > 0) return { ok: true };
+      // A malformed id can never match a row; refuse before Postgres throws a
+      // uuid cast error the caller can't act on.
+      if (!UUID_RE.test(id)) return { ok: false, reason: "not_found" };
 
-      // Refused — read the row to say why (diagnostics only; the UPDATE above
-      // is the sole authority on whether execution proceeds).
-      const [row] = await db.select().from(approvals).where(eq(approvals.id, id)).limit(1);
-      if (!row) return { ok: false, reason: "not_found" };
-      if (row.status === "pending") return { ok: false, reason: "pending" };
-      if (row.status === "denied") return { ok: false, reason: "denied" };
-      if (row.status === "consumed") return { ok: false, reason: "already_consumed" };
-      return { ok: false, reason: "mismatch" };
+      // The SECURITY DEFINER path (migration 0007): the one status flip a
+      // runtime credential is allowed, so hardened roles need no table UPDATE.
+      const result = await db.execute<{ reason: string }>(
+        sql`select graft_consume_approval(${id}::uuid, ${match.functionName}, ${match.inputCanonical}) as reason`,
+      );
+      const reason = result[0]?.reason;
+      if (reason === "ok") return { ok: true };
+      if (reason && CONSUME_REASONS.has(reason)) {
+        return { ok: false, reason: reason as ConsumeRefusal };
+      }
+      return { ok: false, reason: "not_found" };
     },
   };
 }
@@ -105,6 +118,12 @@ export async function listPendingApprovals(db: Database): Promise<ApprovalRow[]>
  * Record a human decision on a pending approval. Only pending rows can be
  * decided (conditional UPDATE — deciding an already-decided approval is a
  * no-op returning undefined).
+ *
+ * Separation of duties: the identity that requested the approval can never be
+ * the identity that decides it — approver == requester throws
+ * `APPROVAL_SELF_DECISION` (enforced in the UPDATE's WHERE, not just checked
+ * first). The decision also records `decided_role` = the Postgres
+ * `current_user` it ran as, stamped server-side so it cannot be self-reported.
  */
 export async function decideApproval(
   db: Database,
@@ -112,10 +131,39 @@ export async function decideApproval(
   decision: "approved" | "denied",
   decidedBy: string,
 ): Promise<ApprovalRow | undefined> {
+  if (!UUID_RE.test(id)) return undefined;
   const [row] = await db
     .update(approvals)
-    .set({ status: decision, decidedBy, decidedAt: new Date() })
-    .where(and(eq(approvals.id, id), eq(approvals.status, "pending")))
+    .set({
+      status: decision,
+      decidedBy,
+      decidedRole: sql`current_user`,
+      decidedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(approvals.id, id),
+        eq(approvals.status, "pending"),
+        or(isNull(approvals.requestedById), ne(approvals.requestedById, decidedBy)),
+      ),
+    )
     .returning();
-  return row;
+  if (row) return row;
+
+  // Nothing updated — if a pending row exists, the WHERE's separation-of-duties
+  // clause is what blocked it; say so instead of "not pending".
+  const [pending] = await db
+    .select()
+    .from(approvals)
+    .where(and(eq(approvals.id, id), eq(approvals.status, "pending")))
+    .limit(1);
+  if (pending) {
+    throw new GraftError({
+      code: "APPROVAL_SELF_DECISION",
+      message: `Approval "${id}" was requested by "${decidedBy}" — a requester can never decide their own approval.`,
+      fix: "Have a DIFFERENT operator review it: `graft approve <id>` (or `graft deny <id>`) under their own identity. Separation of duties is deliberate; do not retry as the requester.",
+      details: { id, requestedBy: pending.requestedById, decision },
+    });
+  }
+  return undefined;
 }

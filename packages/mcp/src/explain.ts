@@ -263,6 +263,17 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "pending → wait for the human decision; denied → do not retry, ask the operator; already_consumed or not_found → call again without the approval id to file a fresh request; mismatch → retry with exactly the approved input.",
   },
+  APPROVAL_SELF_DECISION: {
+    code: "APPROVAL_SELF_DECISION",
+    meaning:
+      "The identity deciding an approval is the same identity that requested it. Separation of duties: a requester can never approve (or deny) their own destructive operation.",
+    typicalCauses: [
+      "An agent (or a wrapper acting for it) running `graft approve` on an approval it filed itself",
+      "Passing the requester's identity as the decider (e.g. reusing the same dev-token id)",
+    ],
+    howToRecover:
+      "A DIFFERENT operator must review it: they run `graft approve <id>` (or `graft deny <id>`) under their own identity. Do not retry as the requester and do not switch identities to impersonate a reviewer — the gate exists so a second party sees the exact function + input before it runs.",
+  },
   BRANCH_NOT_FOUND: {
     code: "BRANCH_NOT_FOUND",
     meaning: "An operation referenced a branch that is not registered in the topology.",

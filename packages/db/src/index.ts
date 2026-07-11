@@ -9,6 +9,7 @@ export * from "./branch";
 export * from "./client";
 export * from "./content";
 export * from "./diff";
+export * from "./harden";
 export * from "./ledger";
 export * from "./neon";
 export * from "./schema";
