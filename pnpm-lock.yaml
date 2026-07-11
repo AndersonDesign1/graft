@@ -275,6 +275,16 @@ importers:
         specifier: ^4.1.0
         version: 4.4.3
 
+  packages/sdk-astro:
+    dependencies:
+      '@graft/sdk-core':
+        specifier: workspace:*
+        version: link:../sdk-core
+    devDependencies:
+      '@graft/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/sdk-core:
     dependencies:
       '@graft/contracts':
@@ -318,6 +328,16 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.7
+
+  packages/sdk-sveltekit:
+    dependencies:
+      '@graft/sdk-core':
+        specifier: workspace:*
+        version: link:../sdk-core
+    devDependencies:
+      '@graft/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/studio: {}
 

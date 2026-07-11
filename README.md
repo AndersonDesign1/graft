@@ -61,8 +61,11 @@ generated bearer (anonymous MCP is never exposed); mount your project at `/proje
 `deploy/docker/compose.yml` (db / storage / graft — swap to Neon/R2 by env alone). **P7.3**
 adds the deploy adapters ([`deploy/`](deploy/README.md)): Railway, Fly, and VPS run the
 container; Vercel deploys embedded (compile as a build step; the example app is the
-reference) — every adapter carries the runtime-credential harden recipe. Next:
-Astro/SvelteKit SDKs, docs site + compare page.
+reference) — every adapter carries the runtime-credential harden recipe. **P7.4** ships
+`@graft/sdk-astro` and `@graft/sdk-sveltekit`: the same typed `getContent`/`listContent`/
+`searchContent` surface as sdk-next plus `graftRoute` — mounting the function/MCP handlers is
+one property access because both frameworks' endpoints are already Web-standard; cache
+invalidation maps the tag contract onto CDN surrogate keys. Next: docs site + compare page.
 
 ## Requirements
 
@@ -147,6 +150,8 @@ deployment can give its app/agent a runtime role with **no UPDATE on `approvals`
 | `@graft/registry`           | shadcn-style owned-primitive registry                              |
 | `@graft/sdk-core`           | Framework-agnostic client + cache contract                         |
 | `@graft/sdk-next`           | Next.js adapter + `MdxBody`                                        |
+| `@graft/sdk-astro`          | Astro adapter (typed reads + endpoint mounts)                      |
+| `@graft/sdk-sveltekit`      | SvelteKit adapter (typed reads + endpoint mounts)                  |
 
 ## Conventions
 

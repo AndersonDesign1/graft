@@ -1,8 +1,8 @@
 # Packaging & deploy topology (Phase 7)
 
 **Status: P7.0 decided · P7.1 (`graft serve` + `graft harden`) SHIPPED · P7.2
-(container + compose) SHIPPED · P7.3 (deploy adapter docs) SHIPPED.**
-Remaining units (SDKs, docs site) build on the decisions here.
+(container + compose) SHIPPED · P7.3 (deploy adapter docs) SHIPPED · P7.4
+(Astro/SvelteKit SDKs) SHIPPED.** Remaining: docs site + compare page.
 
 ## What "self-host Graft" actually is
 
@@ -114,10 +114,30 @@ graft compile && next build`) since Vercel shares env between build and
 runtime, and `graft harden` covers Graft's tables only — app-owned tables
 (e.g. Better Auth's) get granted separately.
 
+## Astro / SvelteKit SDKs (P7.4 — SHIPPED)
+
+`@graft/sdk-astro` and `@graft/sdk-sveltekit`: the identical
+`createGraft` → `getContent`/`listContent`/`searchContent` surface as
+sdk-next (same type-inference pins), plus `graftRoute` — the handler mount,
+which is one property access because both frameworks' endpoints are already
+Web-standard (`{ request }` → the handler). Typed **structurally**, so
+neither package depends on astro or @sveltejs/kit.
+
+Honest divergences from sdk-next, by framework reality:
+
+- **No request memo** — React.cache has no equivalent; reads go straight to
+  Postgres (prerendered pages read at build time anyway).
+- **No tag-based data cache** — the Phase 4 tag contract maps onto HTTP
+  instead: stamp `tagsFor(...)` into a CDN surrogate-key header
+  (`Cache-Tag`/`Surrogate-Key`), purge `tagsForChanges(branch, changeSet)`
+  from the compile webhook. The tags are re-exported; purge clients are the
+  CDN's business, not Graft's.
+- **No MdxBody** — that component is React; bodies come back as authored MDX
+  source for the framework's own pipeline (@astrojs/mdx, mdsvex). A deeper
+  MDX story per framework is a launch-feedback decision, not a preemptive
+  build.
+
 ## Later units
 
-- **Astro / SvelteKit SDKs (P7.4):** thin adapters over `sdk-core` reads +
-  mounting the two handlers, mirroring `sdk-next`'s split (reads via the
-  framework's cache primitive; tags from `tagsFor`/`tagsForChanges`).
 - **Docs site + compare page (P7.5):** the PRD §5 table, kept honest by the
   shipped surface; example gallery grows from `examples/`.
