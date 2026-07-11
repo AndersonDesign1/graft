@@ -45,10 +45,16 @@ function printHelp(): void {
     "                           (+ its deps; regenerates the graft/ barrel — no config edit)",
     "  mcp                      Serve the project MCP over stdio (content + function tools;",
     "                           for .mcp.json / local agents). Requires DATABASE_URL.",
+    "  serve                    Run the headless Graft runtime over HTTP: POST /api/fn/<name>,",
+    "                           POST /api/mcp, GET /healthz (what a self-host container runs)",
+    "  harden <role>            Grant an existing Postgres role the runtime privilege set",
+    "                           (can request + consume approvals but never decide them)",
     ...PLANNED.map((cmd) => `  ${cmd.name.padEnd(12)} ${cmd.summary}  (${cmd.phase})`),
     "",
     "Options:",
-    "  --branch <id>    Content branch to project into (compile/dev/migrate/mcp; default: main)",
+    "  --branch <id>    Content branch to project into (compile/dev/migrate/mcp/serve; default: main)",
+    "  --port <n>       Port for `graft serve` (default: 3903, or PORT; 0 picks a free port)",
+    "  --host <h>       Host for `graft serve` (default: 127.0.0.1, or HOST)",
     "  --from <name>    Parent to fork from (branch create; default: main)",
     "  --into <name>    Merge target (merge; default: main)",
     "  --backend <kind> Branch backend: overlay (default) or neon (branch create)",
@@ -67,6 +73,8 @@ interface ParsedArgs {
   from?: string;
   into?: string;
   backend?: string;
+  port?: number;
+  host?: string;
   apply: boolean;
   dryRun: boolean;
   overwrite: boolean;
@@ -81,6 +89,8 @@ function parseArgs(rest: string[]): ParsedArgs {
   let from: string | undefined;
   let into: string | undefined;
   let backend: string | undefined;
+  let port: number | undefined;
+  let host: string | undefined;
   let apply = false;
   let dryRun = false;
   let overwrite = false;
@@ -102,6 +112,15 @@ function parseArgs(rest: string[]): ParsedArgs {
       into = value("--into", rest[++i]);
     } else if (arg === "--backend") {
       backend = value("--backend", rest[++i]);
+    } else if (arg === "--port") {
+      const raw = rest[++i];
+      // "0" (pick a free port) is valid, so validate as a number, not a flag shape.
+      if (raw === undefined || !/^\d+$/.test(raw)) {
+        throw new UsageError("--port requires a number, e.g. --port 3903");
+      }
+      port = Number(raw);
+    } else if (arg === "--host") {
+      host = value("--host", rest[++i]);
     } else if (arg === "--apply") {
       apply = true;
     } else if (arg === "--dry-run") {
@@ -114,7 +133,7 @@ function parseArgs(rest: string[]): ParsedArgs {
       positionals.push(arg);
     }
   }
-  return { positionals, branchId, from, into, backend, apply, dryRun, overwrite };
+  return { positionals, branchId, from, into, backend, port, host, apply, dryRun, overwrite };
 }
 
 export interface RunOptions {
@@ -299,6 +318,30 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
         const { mcpCommand } = await import("./commands/mcp");
         // Blocks until the MCP client disconnects (stdio lifetime).
         await mcpCommand({ cwd, branchId: args.branchId });
+        return 0;
+      }
+      case "serve": {
+        const { serveCommand } = await import("./commands/serve");
+        // Blocks until SIGINT/SIGTERM (server lifetime).
+        await serveCommand({ cwd, branchId: args.branchId, port: args.port, host: args.host });
+        return 0;
+      }
+      case "harden": {
+        const role = args.positionals[0];
+        if (!role) throw new UsageError("usage: graft harden <role>");
+        const { hardenCommand } = await import("./commands/harden");
+        const result = await hardenCommand({ cwd, role });
+        console.log(`Hardened runtime role "${result.role}" (${result.statements.length} grants):`);
+        for (const statement of result.statements) console.log(`  ${statement}`);
+        console.log(
+          [
+            "",
+            "This role can request + consume approvals but can NEVER decide them",
+            "(no UPDATE on approvals) or rewrite content projections. Hand its",
+            "connection URL to the deployment as DATABASE_URL; keep the operator",
+            "URL for graft compile/migrate/branch/merge/approve.",
+          ].join("\n"),
+        );
         return 0;
       }
       default: {

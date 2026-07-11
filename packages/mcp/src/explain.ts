@@ -152,6 +152,17 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Use the method named in the `Allow` response header — for Graft functions, POST a JSON object body to the same URL.",
   },
+  ROUTE_NOT_FOUND: {
+    code: "ROUTE_NOT_FOUND",
+    meaning:
+      "The Graft server (`graft serve`) has nothing mounted at the requested path — the request reached the right process but the wrong URL.",
+    typicalCauses: [
+      "A typo in the endpoint path (e.g. /api/fns instead of /api/fn/<name>)",
+      "Expecting the frontend app's routes on the headless runtime — graft serve hosts only the function, MCP, and health endpoints",
+    ],
+    howToRecover:
+      "Use POST /api/fn/<name> for typed functions, POST /api/mcp for the MCP Streamable HTTP surface, or GET /healthz for liveness. The error's details carry the path that missed.",
+  },
   AUTHORITY_MISMATCH: {
     code: "AUTHORITY_MISMATCH",
     meaning:

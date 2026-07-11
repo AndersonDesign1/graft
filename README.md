@@ -45,7 +45,16 @@ descriptions and error messages over network HTTP MCP, authored a page with an u
 and walked the human-gated delete end-to-end with **zero unintended failures**. Its friction
 log fed straight back into the surface (asset-field teaching in `describe_schema`, MCP-speak
 approval errors). See [`docs/design-notes/agent-mcp.md`](docs/design-notes/agent-mcp.md).
-Next: TypeGen completeness + docs coverage close-out, then Phase 7 (packaging + launch).
+
+**Phase 7 — Packaging, SDKs & launch (in progress).** **P7.1** ships the headless runtime:
+`graft serve` binds the same stateless handlers the example app mounts (typed functions, MCP
+over Streamable HTTP, `/healthz` with a real DB round-trip) to a plain Node server — what a
+self-host container runs. Identity is env-driven (`GRAFT_DEV_TOKEN`, `GRAFT_TRUSTED_ISSUERS`
+for OIDC via discovery, `GRAFT_MCP_REQUIRE_AUTH`, `GRAFT_APPROVAL_POLICY`), and
+`graft harden <role>` applies the runtime privilege split so the deployed credential can
+request and consume approvals but never decide them. Topology decisions in
+[`docs/design-notes/packaging.md`](docs/design-notes/packaging.md). Next: the single-container
+image + split compose, deploy adapter docs, Astro/SvelteKit SDKs, docs site.
 
 ## Requirements
 
@@ -115,21 +124,21 @@ deployment can give its app/agent a runtime role with **no UPDATE on `approvals`
 
 ## Monorepo layout
 
-| Package                     | Purpose                                                           |
-| --------------------------- | ----------------------------------------------------------------- |
-| `@graft/core`               | Schema (`defineCollection`), function runtime, access, migrations |
-| `@graft/compiler`           | Authored content → Postgres index + typegen + validation          |
-| `@graft/content-migrations` | Codemod-style authored-content transforms                         |
-| `@graft/db`                 | Postgres + Drizzle + branching abstraction                        |
-| `@graft/assets`             | S3/MinIO storage, transforms, agent upload primitives             |
-| `@graft/auth`               | OIDC token verification, actor resolver, scope-based access       |
-| `@graft/contracts`          | Shared types, error codes, introspection schemas                  |
-| `@graft/mcp`                | Project MCP (content + functions + introspection)                 |
-| `@graft/cli`                | Human + agent CLI (`graft`, including `graft mcp`)                |
-| `@graft/studio`             | Optional human Studio UI                                          |
-| `@graft/registry`           | shadcn-style owned-primitive registry                             |
-| `@graft/sdk-core`           | Framework-agnostic client + cache contract                        |
-| `@graft/sdk-next`           | Next.js adapter + `MdxBody`                                       |
+| Package                     | Purpose                                                            |
+| --------------------------- | ------------------------------------------------------------------ |
+| `@graft/core`               | Schema (`defineCollection`), function runtime, access, migrations  |
+| `@graft/compiler`           | Authored content → Postgres index + typegen + validation           |
+| `@graft/content-migrations` | Codemod-style authored-content transforms                          |
+| `@graft/db`                 | Postgres + Drizzle + branching abstraction                         |
+| `@graft/assets`             | S3/MinIO storage, transforms, agent upload primitives              |
+| `@graft/auth`               | OIDC token verification, actor resolver, scope-based access        |
+| `@graft/contracts`          | Shared types, error codes, introspection schemas                   |
+| `@graft/mcp`                | Project MCP (content + functions + introspection)                  |
+| `@graft/cli`                | Human + agent CLI (`graft`, including `graft mcp` + `graft serve`) |
+| `@graft/studio`             | Optional human Studio UI                                           |
+| `@graft/registry`           | shadcn-style owned-primitive registry                              |
+| `@graft/sdk-core`           | Framework-agnostic client + cache contract                         |
+| `@graft/sdk-next`           | Next.js adapter + `MdxBody`                                        |
 
 ## Conventions
 
