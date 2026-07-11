@@ -1,0 +1,16 @@
+{
+  "name": "@graft/container-project",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Module-resolution shim for projects mounted into the Graft container at /project (pre-1.0: @graft/* is unpublished, so the image supplies it — the entrypoint symlinks this package's node_modules into the mount).",
+  "dependencies": {
+    "@graft/assets": "workspace:*",
+    "@graft/auth": "workspace:*",
+    "@graft/cli": "workspace:*",
+    "@graft/core": "workspace:*",
+    "@graft/db": "workspace:*",
+    "@graft/mcp": "workspace:*",
+    "@graft/sdk-core": "workspace:*",
+    "zod": "^4.1.0"
+  }
+}

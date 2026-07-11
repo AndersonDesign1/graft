@@ -1,0 +1,66 @@
+# Graft — self-host image (P7.2).
+#
+# One image, two modes (see entrypoint.sh):
+#   all-in-one (default): Postgres 18 + MinIO + `graft serve` in one container —
+#     the "one container (dev)" claim. `docker run -p 3903:3903 graft` serves
+#     the baked-in example project immediately; mount your own at /project.
+#   serve: only the Graft runtime; DATABASE_URL + S3_* point at external
+#     services (the split compose next to this file, or Neon/R2 by env).
+#
+# Build from the repo root (pre-1.0: packages are unpublished, so the image
+# builds the workspace itself):
+#   docker build -f deploy/docker/Dockerfile -t graft .
+
+FROM node:24-bookworm AS builder
+RUN npm install -g pnpm@11.9.0
+WORKDIR /opt/graft
+COPY . .
+ENV CI=true
+RUN pnpm install --frozen-lockfile
+# Only the packages: the example project is served from source (jiti loads its
+# config), so the Next app build has no business in this image.
+RUN pnpm exec turbo run build --filter="./packages/*"
+
+# MinIO server + client binaries come from the official images (registry
+# pulls, not dl.min.io — some networks can't resolve it).
+FROM minio/minio:latest AS minio
+FROM minio/mc:latest AS mc
+
+# Runtime rides the official postgres image: its entrypoint owns initdb +
+# role/db bootstrap, we add Node, MinIO, and the built workspace on top.
+FROM postgres:18
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl ca-certificates openssl \
+  && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+  && apt-get install -y --no-install-recommends nodejs \
+  && rm -rf /var/lib/apt/lists/*
+COPY --from=minio /usr/bin/minio /usr/local/bin/minio
+COPY --from=mc /usr/bin/mc /usr/local/bin/mc
+
+COPY --from=builder /opt/graft /opt/graft
+RUN printf '#!/bin/sh\nexec node /opt/graft/packages/cli/dist/index.js "$@"\n' > /usr/local/bin/graft \
+  && chmod +x /usr/local/bin/graft /opt/graft/deploy/docker/entrypoint.sh
+
+# Embedded-infra defaults; every one of these is overridable (and DATABASE_URL /
+# S3_* pointing elsewhere is exactly how the managed swap works).
+ENV POSTGRES_USER=graft \
+  POSTGRES_PASSWORD=graft \
+  POSTGRES_DB=graft \
+  MINIO_ROOT_USER=graft \
+  MINIO_ROOT_PASSWORD=graftsecret \
+  S3_ENDPOINT=http://127.0.0.1:9000 \
+  S3_ACCESS_KEY=graft \
+  S3_SECRET_KEY=graftsecret \
+  S3_BUCKET=graft-assets \
+  PORT=3903 \
+  HOST=0.0.0.0 \
+  GRAFT_MODE=all-in-one
+
+# 3903 = graft serve; 5432/9000/9001 = embedded Postgres/MinIO(+console), only
+# meaningful in all-in-one mode and only if published.
+EXPOSE 3903 5432 9000 9001
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=90s --retries=5 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3903)+'/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+ENTRYPOINT ["/opt/graft/deploy/docker/entrypoint.sh"]

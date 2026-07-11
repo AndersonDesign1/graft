@@ -1,7 +1,7 @@
 # Packaging & deploy topology (Phase 7)
 
-**Status: P7.0 decided · P7.1 (`graft serve` + `graft harden`) SHIPPED.**
-Remaining units (container image, compose split, deploy adapter docs, SDKs,
+**Status: P7.0 decided · P7.1 (`graft serve` + `graft harden`) SHIPPED · P7.2
+(container + compose) SHIPPED.** Remaining units (deploy adapter docs, SDKs,
 docs site) build on the decisions here.
 
 ## What "self-host Graft" actually is
@@ -59,20 +59,45 @@ graft harden graft_runtime                      -- operator credential
 can never decide an approval — the human gate survives handing the whole
 process to an agent.
 
-## Container topology (P7.2, next)
+## Container topology (P7.2 — SHIPPED, `deploy/docker/`)
 
-- **Single container (dev):** one image = Postgres 18 + MinIO + `graft serve`
-  over a mounted project dir (`/project`), process-supervised; boot order:
-  migrate → compile → harden → serve. One `docker run`, full backend. This is
-  the compare-page claim ("one container dev") and must stay honest: no
-  external services required.
-- **Split compose (scale):** the same three as services (`db`, `storage`,
-  `graft`), each swappable for managed equivalents (Neon / R2) by env alone —
-  the codebase is already pooler-aware and S3-generic, so the compose file is
-  configuration, not code.
-- The monorepo is unpublished (pre-1.0), so the image builds from the
-  workspace (`deploy/docker/`); when packages publish, the Dockerfile slims to
-  `npm i @graft/cli` + the user's project.
+- **Single container (dev):** one image = Postgres 18 + MinIO + `graft serve`.
+  Base is the official `postgres:18` (its entrypoint owns initdb) + Node 24 +
+  MinIO/mc binaries copied from their official images (registry pulls —
+  `dl.min.io` doesn't resolve on every network). Boot:
+  [infra] → bucket → migrate → compile → [harden] → serve. With nothing
+  mounted it serves the baked-in example project and **generates + logs a dev
+  token** (`GRAFT_MCP_REQUIRE_AUTH` defaults to `1` — the container never
+  exposes anonymous MCP). One `docker run`, full backend, no external
+  services — the compare-page claim, kept honest.
+- **Mounted projects:** `/project` (graft.config.ts + content/) is served
+  instead; the entrypoint symlinks `/project/node_modules` to the
+  `deploy/docker/project` workspace shim so `@graft/core`/`zod` imports
+  resolve (pre-1.0: unpublished packages — the image supplies them). MCP
+  writes land in the mounted tree; git stays authoritative on the host.
+- **Hardened mode:** `GRAFT_RUNTIME_PASSWORD` makes boot create the role,
+  `graft harden` it, and serve under it. Trade-off (deliberate): the hardened
+  credential cannot project content, so MCP `write_content`/`delete_content`
+  need the operator credential — enable it for functions/reads-first
+  deployments. Reopens if a vertical needs authored-content writes under
+  runtime creds (a grants-v2 decision).
+- **Split compose (scale):** `deploy/docker/compose.yml` — `db`/`storage`/
+  `graft` services; the graft service runs `GRAFT_MODE=serve` against them.
+  Managed swap is env-only (Neon URL, R2 `S3_*`, `GRAFT_ENSURE_BUCKET=0`).
+- The monorepo is unpublished (pre-1.0), so the image builds the workspace
+  itself (packages-only turbo build — the example app's Next build has no
+  business in the image); when packages publish, the Dockerfile slims to
+  `npm i @graft/cli` + the user's project. The Dockerfile is in
+  `.dockerignore` so editing it doesn't bust the workspace-install cache.
+
+**Verified live (2026-07-11, Docker Desktop 29.5.3):** all-in-one boots to
+healthy (initdb → MinIO → bucket → migrations → compile → serve; healthz
+reports 5 collections / 13 functions), `pageStats` serves compiled content,
+`ROUTE_NOT_FOUND` teaches, MCP anonymous 401 → generated-bearer initialize OK;
+hardened mode serves functions as `graft_runtime` while raw
+`UPDATE approvals` inside the container gets `permission denied`; split
+compose (db + storage + graft) migrates/compiles against the external
+services and serves the same answers.
 
 ## Deploy adapters (P7.3)
 

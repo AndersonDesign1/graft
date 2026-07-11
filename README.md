@@ -53,8 +53,13 @@ self-host container runs. Identity is env-driven (`GRAFT_DEV_TOKEN`, `GRAFT_TRUS
 for OIDC via discovery, `GRAFT_MCP_REQUIRE_AUTH`, `GRAFT_APPROVAL_POLICY`), and
 `graft harden <role>` applies the runtime privilege split so the deployed credential can
 request and consume approvals but never decide them. Topology decisions in
-[`docs/design-notes/packaging.md`](docs/design-notes/packaging.md). Next: the single-container
-image + split compose, deploy adapter docs, Astro/SvelteKit SDKs, docs site.
+[`docs/design-notes/packaging.md`](docs/design-notes/packaging.md). **P7.2** ships the
+container ([`deploy/docker/`](deploy/docker/README.md)): one image = Postgres 18 + MinIO +
+`graft serve` — `docker run -p 3903:3903 graft` boots migrate → compile → serve and logs a
+generated bearer (anonymous MCP is never exposed); mount your project at `/project`, set
+`GRAFT_RUNTIME_PASSWORD` to serve under a hardened role, or use the split
+`deploy/docker/compose.yml` (db / storage / graft — swap to Neon/R2 by env alone). Next:
+deploy adapter docs, Astro/SvelteKit SDKs, docs site.
 
 ## Requirements
 

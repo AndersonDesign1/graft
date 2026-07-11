@@ -33,6 +33,33 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@22.20.0)
 
+  deploy/docker/project:
+    dependencies:
+      '@graft/assets':
+        specifier: workspace:*
+        version: link:../../../packages/assets
+      '@graft/auth':
+        specifier: workspace:*
+        version: link:../../../packages/auth
+      '@graft/cli':
+        specifier: workspace:*
+        version: link:../../../packages/cli
+      '@graft/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@graft/db':
+        specifier: workspace:*
+        version: link:../../../packages/db
+      '@graft/mcp':
+        specifier: workspace:*
+        version: link:../../../packages/mcp
+      '@graft/sdk-core':
+        specifier: workspace:*
+        version: link:../../../packages/sdk-core
+      zod:
+        specifier: ^4.1.0
+        version: 4.4.3
+
   examples/landing-page:
     dependencies:
       '@graft/assets':

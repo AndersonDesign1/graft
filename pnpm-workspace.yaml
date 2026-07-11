@@ -1,6 +1,7 @@
 packages:
   - "packages/*"
   - "examples/*"
+  - "deploy/docker/project"
 
 # Allow esbuild (tsup + vitest) and sharp (Next image optimization) to run
 # their install scripts (pnpm 11 model).

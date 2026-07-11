@@ -1,0 +1,25 @@
+# Build context hygiene for deploy/docker/Dockerfile (context = repo root).
+# Secrets never enter the image.
+.env
+.env.*
+
+# Installed/built inside the builder stage.
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+.turbo
+
+# Not needed to build or run. The Dockerfile itself is excluded so editing it
+# doesn't invalidate the COPY layer (and with it the workspace install cache);
+# entrypoint.sh and compose.yml stay in — the image ships the entrypoint.
+deploy/docker/Dockerfile
+.git
+.github
+.claude
+mcps
+spikes
+docs
+*.md
+!**/llms.txt
