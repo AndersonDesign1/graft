@@ -26,6 +26,10 @@ Pairs with `packaging.md` (which parks "docs site" as the remaining item).
    cell contains actual studio elements), not screenshots. Design skills in
    force: `emil-design-eng`, `make-interfaces-feel-better`, `apple-design`,
    `animation-vocabulary` (+ Emil's review skills for polish passes).
+   **(2026-07-12) Direction v2 locked after competitor study** — see "Design
+   direction v2" below. Palette: **black / ivory / vermilion** (the botanical
+   green is dead; operator: "black and something"). Docs UI: **Fumadocs**
+   (officially supports Astro + React) powered by Graft as the source.
 5. **Build order: docs shell → studio elements → landing.** The docs force the
    design system into existence against real content; `@graft/studio` starts as
    an **embeddable React component library** (approval queue, branch diff,
@@ -33,6 +37,118 @@ Pairs with `packaging.md` (which parks "docs site" as the remaining item).
    the landing then assembles the matured system and embeds those live
    components in its bento cells. Nothing faked, nothing throwaway — the future
    studio app composes the same components.
+
+---
+
+## Design direction v2 (2026-07-12) — the study and the answer
+
+Operator supplied four landing screenshots (Prismic light, Prismic dark/dev,
+Basehub, Fumadocs) with the brief: *study section by section, take
+inspiration, be better, tell our story in the design.*
+
+### What each does well (steal the move, not the look)
+
+**Prismic (light, marketing):**
+- Four-card feature row where **every card contains a mini working product UI**
+  — not icons, product.
+- The MCP diagram section ("One prompt. All your pages, updated"): ChatGPT +
+  Claude cards wired to a central MCP node. **They market the agent surface as
+  a diagram.** We *are* the agent surface — ours must be live, not a picture.
+- Numbered vertical "launch in minutes" steps with a sticky product pane.
+- Weakness to beat: everything is screenshots and stock photography; nothing
+  moves; the product is never actually present on the page.
+
+**Prismic (dark, developer):**
+- "Build with your AI agent of choice" + a row of agent logos — names the
+  agent-native audience directly.
+- Clean perf/infra card grid. Weakness: generic SaaS dark; purple-on-black
+  cards could be any product.
+
+**Basehub:**
+- Opens with **the actual app in an accent-stroked frame** — the product IS
+  the hero art.
+- Branch out → review → merge: three cards showing real UI fragments for the
+  branching story (our CoW branching deserves better than theirs).
+- The **alphabetical feature-index section** (@START, Agents, AI Commits …
+  Webhooks as a selectable list with a live detail pane) — the most
+  distinctive section on any of these pages.
+- Hand-drawn "PLAY WITH IT" annotation — one human touch on a machined page.
+- Weakness to beat: static screenshots everywhere; the index pane is the only
+  interactive-feeling moment.
+
+**Fumadocs:**
+- Real **art direction**: dithered/halftone gradient spheres, mono type,
+  restrained accent — a committed aesthetic, not a template.
+- "TRY IT OUT" terminal card sitting on the art.
+- Docs framework marketing itself *with its own docs UI* embedded.
+- The shadcn-style CLI card ("the shadcn/ui for docs") — exactly our
+  `graft add` story.
+- Weakness to beat: sections are beautiful but the story wanders; no single
+  narrative spine.
+
+### The synthesis — what beats all four
+
+One narrative spine, told in design: **watch an agent operate a CMS, live.**
+Every section is the product doing the thing, not a picture of it.
+
+Landing blueprint (top to bottom):
+
+1. **Hero** — left-aligned. Mono kicker (`the agent-native CMS`), Instrument
+   Serif display: "The CMS where the agent is the operator." Sub: "and the
+   human is optional." To the right / below: **the live loop** — an animated
+   panel where an MCP `write_content` call types itself out, a compile row
+   appears (`+1 added @ <sha>`), and the rendered page updates. This is
+   Basehub's "product as hero" + Prismic's MCP diagram, but *running*.
+2. **The loop diagram** — animated SVG: `MDX in git → compile → content_index
+   → typed reads`, drawn as a schematic with vermilion flow marks; each node
+   annotated in mono. (Our version of Fumadocs' art direction: editorial
+   schematic instead of dither.)
+3. **Bento** — the P7.5.3 studio elements live in cells: ApprovalQueue
+   (approve a destructive call), BranchDiff, CompilationTrail (real
+   `compilations` rows), FTS search box hitting `/api/fn`. Cells are real
+   React islands on real reads — the move none of the four can make.
+4. **Branching triptych** — branch → preview → merge as three panels with an
+   animated branch line grafting back into trunk (vermilion union mark).
+   Beats Basehub's three static cards because the line *moves*.
+5. **The primitives index** — our version of Basehub's alphabetical index:
+   the actual registry (`scoped-access, comments, seo, callout, faq,
+   commerce`) as a selectable list; the detail pane runs `describe_item`
+   against the real MCP endpoint. `graft add commerce` as the terminal card
+   (Fumadocs' CLI card, but the registry is queryable).
+6. **Trust strip** — cold-agent gate: "operated cold, by CI, every commit" +
+   audit/approvals row; mono, quiet, factual.
+7. **Terminal CTA** — `pnpm create graft` (or current init path) in a
+   terminal card; one vermilion button; no marketing paragraph.
+
+Peculiarity budget (one per section, deliberate): the hand-set proof-sheet
+annotations — small vermilion editorial marks (⌐, ×, underlines) in the
+margins, like a proof annotated in red pen. That is the brand gesture that
+ties to grafting wax + editorial red without a single stock illustration.
+
+### Palette v2 (locked)
+
+| Token | Dark (default) | Light |
+| --- | --- | --- |
+| bg | `#0E0D0B` warm ink black | `#F7F5F0` warm ivory |
+| bg-raised | `#161511` | `#FFFFFF` |
+| text | `#EDEAE2` | `#16150F` |
+| accent | `#E8442E` vermilion (grafting wax) | `#D63A25` |
+| accent-dim | `#B5301F` | `#B5301F` |
+| structure | rgba hairlines + mono greys | same |
+
+Dark is the default presentation (landing); docs follow the OS. Type stays:
+Instrument Serif (display) / Instrument Sans (text) / IBM Plex Mono (labels,
+code). Shiki: restrained near-monochrome themes (min-light/min-dark) until a
+custom ink+vermilion theme in the polish pass.
+
+### Docs = Fumadocs powered by Graft
+
+Fumadocs officially supports **Astro (with React)**. `/docs/*` moves onto
+fumadocs-ui (DocsLayout, sidebar, search, TOC) with **Graft as the content
+source** — the page tree built from `listContent("docs")`, bodies through the
+existing MDX pipeline. Fumadocs is the UI; Graft stays the CMS. Our hand-rolled
+Docs.astro shell retires (it was P7.5.2 scaffolding; Fumadocs is the ceiling
+raise).
 
 ---
 

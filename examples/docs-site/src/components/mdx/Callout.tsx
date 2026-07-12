@@ -1,7 +1,7 @@
 /**
  * Callout — the first entry in the docs' MDX component map. Server-rendered
- * to static HTML by renderMdx; no client JS. The bark-brown accent is the
- * design system's rare warm counterpoint, reserved for asides like this.
+ * to static HTML by renderMdx; no client JS. Styled as a red-pen margin
+ * note — the editorial voice the vermilion accent is reserved for.
  */
 import type { ReactNode } from "react";
 

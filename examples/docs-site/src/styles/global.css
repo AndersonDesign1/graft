@@ -173,9 +173,9 @@ button:active,
   background: var(--paper-raised) !important; /* shiki inlines its theme bg; ours wins */
 }
 
-/* Callout — the MDX map's aside; bark brown, the rare warm counterpoint. */
+/* Callout — the MDX map's aside; a red-pen margin note. */
 .callout {
-  border-inline-start: 2px solid var(--graft-union);
+  border-inline-start: 2px solid var(--wax);
   background: var(--paper-sunken);
   border-radius: 0 var(--radius) var(--radius) 0;
   padding: var(--space-3) var(--space-4);
@@ -183,7 +183,7 @@ button:active,
 }
 
 .callout-label {
-  color: var(--graft-union);
+  color: var(--wax);
 }
 
 .callout-body {
@@ -207,7 +207,7 @@ button:active,
 .prose blockquote {
   margin: 0;
   padding-inline-start: var(--space-4);
-  border-inline-start: 2px solid var(--graft-union);
+  border-inline-start: 2px solid var(--wax);
   color: var(--ink-muted);
 }
 

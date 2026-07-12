@@ -42,10 +42,10 @@ export async function renderMdx(source: string, components?: MdxComponents): Pro
       [
         rehypeShiki,
         {
-          // Vitesse's green-leaning palette sits naturally on the graft
-          // greens; both themes ship as CSS vars (defaultColor: false) and
-          // light-dark() picks the live one.
-          themes: { light: "vitesse-light", dark: "vitesse-dark" },
+          // Near-monochrome themes fit the editorial ink/ivory palette; a
+          // custom ink+vermilion theme lands in the polish pass. Both themes
+          // ship as CSS vars (defaultColor: false); light-dark() picks one.
+          themes: { light: "min-light", dark: "min-dark" },
           defaultColor: false,
         },
       ],

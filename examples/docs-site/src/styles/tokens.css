@@ -1,42 +1,42 @@
 /**
- * Graft design tokens — the single source for color, type, space, and motion.
+ * Graft design tokens v2 — the single source for color, type, space, motion.
  *
- * Thesis: botanical × technical. "Graft" is a horticultural word — a scion
- * joined to rootstock so both grow as one — and it is exactly what the
- * product does with git branches. Warm paper and ink instead of SaaS
- * blue-gray; one living green accent; squared geometry (no pills); serif
- * display against a working sans. Nothing here is a framework default.
+ * Thesis: editorial print. Black ink, warm ivory paper, and one vermilion —
+ * the color of grafting wax, the material that seals a scion to its stock —
+ * used the way an editor uses a red pen: marks, unions, decisions. No
+ * gradients-for-vibes, no SaaS blue-gray. Serif display over a working sans,
+ * mono for the annotation voice. Nothing here is a framework default.
  *
  * Theming: every color is light-dark(). `color-scheme` on :root follows the
  * OS; a theme toggle stamps data-theme on <html> and wins in both directions.
+ * The landing presents dark-first; docs follow the reader.
  */
 
 :root {
   color-scheme: light dark;
 
-  /* ---- color: paper & ink ---- */
-  --paper: light-dark(#faf8f3, #151510); /* warm paper / deep loam — never #fff/#000 */
-  --paper-raised: light-dark(#ffffff, #1d1d16); /* cards/code float slightly brighter */
-  --paper-sunken: light-dark(#f1eee6, #100f0b); /* wells, table stripes */
-  --ink: light-dark(#1a1915, #ece9df);
-  --ink-muted: light-dark(#5d5a4e, #a5a191);
-  --ink-faint: light-dark(#8a8677, #6f6c5e);
-  --hairline: light-dark(rgba(26, 25, 21, 0.14), rgba(236, 233, 223, 0.14));
-  --hairline-strong: light-dark(rgba(26, 25, 21, 0.32), rgba(236, 233, 223, 0.32));
+  /* ---- color: ink & ivory ---- */
+  --paper: light-dark(#f7f5f0, #0e0d0b); /* warm ivory / warm ink — never #fff/#000 */
+  --paper-raised: light-dark(#ffffff, #161511); /* cards, code, embedded UI frames */
+  --paper-sunken: light-dark(#eeebe3, #0a0908); /* wells, table stripes, terminals */
+  --ink: light-dark(#16150f, #edeae2);
+  --ink-muted: light-dark(#5f5c52, #a39f93);
+  --ink-faint: light-dark(#8c887b, #6b675c);
+  --hairline: light-dark(rgba(22, 21, 15, 0.14), rgba(237, 234, 226, 0.13));
+  --hairline-strong: light-dark(rgba(22, 21, 15, 0.34), rgba(237, 234, 226, 0.32));
 
-  /* ---- color: the graft greens (phosphor-bright in the dark) ---- */
-  --stem: light-dark(#2e6b34, #7cc86a); /* primary accent: links, actions, live marks */
-  --stem-deep: light-dark(#1d4a24, #a4e292); /* hover/active on stem */
-  --bud: light-dark(#c9e94e, #d3f655); /* acid highlight — selection, cursors, tiny marks ONLY */
-  --graft-union: light-dark(#8a5a2b, #c89a62); /* bark brown — rare warm counterpoint */
+  /* ---- color: vermilion (grafting wax; the red pen) ---- */
+  --wax: light-dark(#d63a25, #e8442e); /* links, actions, live marks, unions */
+  --wax-deep: light-dark(#a92c1a, #ff6a4f); /* hover/active on wax */
+  --wax-tint: light-dark(rgba(214, 58, 37, 0.08), rgba(232, 68, 46, 0.1)); /* washes */
 
   /* ---- semantic ---- */
   --color-bg: var(--paper);
   --color-fg: var(--ink);
-  --color-accent: var(--stem);
-  --color-selection-bg: var(--bud);
-  --color-selection-fg: light-dark(#1a1915, #151510);
-  --color-focus-ring: var(--stem);
+  --color-accent: var(--wax);
+  --color-selection-bg: var(--wax);
+  --color-selection-fg: light-dark(#f7f5f0, #0e0d0b);
+  --color-focus-ring: var(--wax);
 
   /* ---- type ---- */
   --font-display: "Instrument Serif", "Iowan Old Style", georgia, serif;
@@ -79,12 +79,12 @@
   /* ---- elevation: layered translucent shadows, never solid borders ---- */
   --shadow-raised:
     0 0 0 1px var(--hairline),
-    0 1px 2px light-dark(rgba(26, 25, 21, 0.05), rgba(0, 0, 0, 0.4)),
-    0 4px 12px light-dark(rgba(26, 25, 21, 0.06), rgba(0, 0, 0, 0.35));
+    0 1px 2px light-dark(rgba(22, 21, 15, 0.05), rgba(0, 0, 0, 0.45)),
+    0 4px 12px light-dark(rgba(22, 21, 15, 0.06), rgba(0, 0, 0, 0.4));
   --shadow-floating:
     0 0 0 1px var(--hairline),
-    0 2px 6px light-dark(rgba(26, 25, 21, 0.07), rgba(0, 0, 0, 0.45)),
-    0 12px 32px light-dark(rgba(26, 25, 21, 0.1), rgba(0, 0, 0, 0.5));
+    0 2px 6px light-dark(rgba(22, 21, 15, 0.07), rgba(0, 0, 0, 0.5)),
+    0 12px 32px light-dark(rgba(22, 21, 15, 0.1), rgba(0, 0, 0, 0.55));
   /* Image outlines: pure black/white — tinted neutrals read as dirt. */
   --outline-image: light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.1));
 
