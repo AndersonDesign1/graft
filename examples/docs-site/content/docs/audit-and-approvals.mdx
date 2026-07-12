@@ -1,0 +1,44 @@
+---
+title: Audit & approvals
+description: Every invocation leaves a row; destructive operations wait for a human.
+section: Runtime
+order: 2
+---
+
+Agents operate Graft, so the runtime assumes it will be driven hard and
+sometimes wrong. Two mechanisms keep that safe:
+
+## The audit log
+
+Every function invocation — success or failure — writes an `audit_log` row:
+who (actor kind + id), what (function, input hash), when, and the git SHA of
+the code that served it. Rate limits are computed **against those rows**, so
+there is no separate counter to drift and nothing stateful in the handler.
+
+## Human-gated approvals
+
+`destructive: true` functions never execute on first call:
+
+```text
+agent:  POST /api/fn/deleteSubmission {"id": "…"}
+graft:  403 DESTRUCTIVE_OP_REQUIRES_APPROVAL { approvalId: "ap_…", fix: "…" }
+human:  graft approvals            # list what's pending
+human:  graft approve ap_…         # or: graft deny ap_…
+agent:  POST /api/fn/deleteSubmission  (header x-graft-approval: ap_…)
+graft:  200 { data: … }
+```
+
+Approvals are **one-shot** and **input-bound** — an approval authorizes
+exactly one execution of exactly the call that was requested.
+
+<Callout label="hardened">
+  Role separation is enforced in Postgres, not just in code: consuming an
+  approval is a SECURITY DEFINER function, deciding one is an operator-role
+  UPDATE, and the approver can never be the requester. A leaked runtime
+  credential cannot approve its own destructive calls.
+</Callout>
+
+Functions can also opt into `approvalPolicy: "human"` — the same gate for
+operations that aren't destructive but that a project wants supervised.
+Templates ship with sensible defaults; the policy is per-function code, so
+it's greppable and reviewable like everything else.

@@ -1,0 +1,53 @@
+---
+title: Deploy
+description: Two topologies, identical bytes — embedded in your app or headless in a container.
+section: Deploy
+order: 1
+---
+
+Graft ships libraries and a CLI, not a monolith. Everything the runtime does
+is a stateless `Request → Response` handler, so deployment is a wrapper, not
+a rewrite. Two topologies, and both serve identical bytes:
+
+1. **Embedded** — your app (Next, Astro, SvelteKit) mounts the handlers as
+   routes. The app *is* the runtime.
+2. **Headless** — `graft serve` binds the same handler instances to a plain
+   Node HTTP server: `POST /api/fn/name`, `POST /api/mcp`, `GET /healthz`.
+   This is what a container runs.
+
+## Adapters
+
+| Adapter | Topology | Runs |
+| --- | --- | --- |
+| Railway | container | the `deploy/docker` image + managed Postgres/R2 |
+| Fly.io | container | the same image on Fly Machines; Tigris or R2 for assets |
+| VPS | container | the split compose (`db` / `storage` / `graft`) behind a reverse proxy |
+| Vercel | embedded | your app mounts the handlers — request-scoped compute, no container |
+
+Each adapter is a short recipe in the repo's `deploy/` directory; this very
+site deploys with the Vercel embedded path from an Astro app.
+
+## The credential recipe
+
+Every adapter repeats one pattern: the deployment gets a **runtime
+credential** that can execute everything mounted but can never approve its
+own destructive operations.
+
+```sh
+# as the operator (owner DATABASE_URL):
+CREATE ROLE graft_runtime LOGIN PASSWORD '…';
+graft harden graft_runtime
+
+# deploy with the runtime role's URL as DATABASE_URL;
+# keep the operator URL local/CI-only (compile, migrate, approve).
+```
+
+The container automates this: set `GRAFT_RUNTIME_PASSWORD` and boot creates,
+hardens, and serves under the role.
+
+<Callout label="division of labor">
+  Operator credential (CI / your machine): `graft compile`, `graft migrate
+  --apply`, `graft merge`, `graft approve`. Runtime credential (the
+  deployment): functions, MCP, reads. A hardened deployment is
+  functions-and-reads-first by design.
+</Callout>

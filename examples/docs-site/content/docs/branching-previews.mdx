@@ -1,0 +1,52 @@
+---
+title: Branching & previews
+description: Copy-on-write content branches — instant with the overlay backend, physical forks with Neon.
+section: Content
+order: 2
+---
+
+A branch gives you an isolated view of content (and a place to preview it)
+without copying data. Two backends hide behind the same commands:
+
+| Backend | How | Branch cost | Where |
+| --- | --- | --- | --- |
+| `overlay` (default) | `branch_id` rows over `main`; branch rows win, tombstones hide | instant, copies nothing | any Postgres |
+| `neon` | a physical copy-on-write database fork | instant (Neon CoW) | Neon |
+
+```sh
+graft branch create preview-pricing            # overlay branch off main
+graft branch create big-redesign --backend neon
+graft branch list
+graft compile --branch preview-pricing         # project this tree into the branch
+graft branch drop preview-pricing              # overlay: purge rows; neon: delete the fork
+```
+
+Reads are branch-aware end to end: pass `branch` to the SDK client and every
+`getContent`/`listContent`/`searchContent` resolves through the branch chain —
+a branch that only changed three documents reads everything else from `main`.
+
+## Merging
+
+```sh
+graft merge preview-pricing            # dry-run: what would happen
+graft merge preview-pricing --apply    # replay ledger → move data rows → recompile
+```
+
+Content merge stays **git-authoritative**: the merge compiles whatever tree it
+runs from, and refuses ledger entries whose files aren't present. Merging
+content is a git merge followed by a recompile — the database never becomes a
+second source of truth.
+
+<Callout label="decided">
+  Previews inherit **content**, never operational data. A Neon fork starts
+  with cleared `data_records` and approvals — a preview of your site, not a
+  copy of your users.
+</Callout>
+
+## Cache invalidation
+
+Every projection returns a ChangeSet, and the SDKs map it to cache tags:
+`tagsFor(...)` stamps reads, `tagsForChanges(branch, changeSet)` names exactly
+what a compile invalidated. Next.js maps those onto `revalidateTag`; Astro and
+SvelteKit map them onto CDN surrogate-key headers purged from your compile
+webhook.

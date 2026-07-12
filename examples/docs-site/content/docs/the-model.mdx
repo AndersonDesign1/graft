@@ -1,0 +1,71 @@
+---
+title: The model
+description: Git is authoritative, Postgres is a derived index, and one Zod layer validates everything.
+section: Start here
+order: 2
+---
+
+Graft has one load-bearing idea, and everything else follows from it:
+
+<Callout label="invariant">
+  **Git is authoritative for authored content; Postgres is a derived index.**
+  If they ever disagree, git wins — recompile.
+</Callout>
+
+Authored content is MDX files in your repo. `graft compile` validates each
+file against your schema and projects it into the `content_index` table — an
+atomic, hash-diffed projection, so unchanged rows keep their timestamps and
+"what changed" stays meaningful. The database is a cache you can always
+rebuild; the repo is the record.
+
+Every projection writes a `compilations` audit row (branch, git SHA, doc
+counts). "Git wins" isn't a slogan — it's checkable against that trail.
+
+## Two kinds of data
+
+| | Authored content | Operational data |
+| --- | --- | --- |
+| Owner | git (files) | Postgres (rows) |
+| Examples | pages, docs, products | form submissions, orders, comments |
+| Written by | authoring MDX + `graft compile` | typed functions only |
+| Collection flag | default | `authority: "db-authoritative"` |
+
+Operational data never lives in files, and authored content is never written
+through the API. Mixing the two is an `AUTHORITY_MISMATCH` error, caught at
+compile time and at the function boundary.
+
+## One Zod layer
+
+The schema in `graft.config.ts` is plain Zod under the hood, and it is the
+*only* validation layer:
+
+- the **compiler** validates frontmatter against it,
+- **functions** validate their inputs against it,
+- **reads** re-validate on the way out, so a poisoned index can't reach your UI.
+
+There is no codegen step: `defineCollection` infers document types directly,
+so `getContent("pages", "home")` is typed by the same object that validated
+the file.
+
+## Errors teach
+
+Every error crossing a boundary is a `GraftError` carrying a `fix` — the next
+concrete step to take, written for an agent to act on:
+
+```json
+{
+  "error": "INDEX_OWNERSHIP",
+  "message": "Refusing to project: this would remove every document in collection(s) \"products\" …",
+  "fix": "Each Graft project needs its own database (or branch): point DATABASE_URL at …"
+}
+```
+
+Do what the fix says, then retry. The whole surface is designed to be operated
+cold, by an agent that has never seen the project before.
+
+## One database per project
+
+The projection makes the index match your content tree exactly — which means
+pointing two projects at one `DATABASE_URL` would let each purge the other's
+documents. Graft refuses: if a compile would remove collections your schema
+doesn't know, it aborts with `INDEX_OWNERSHIP` and writes nothing.

@@ -7,6 +7,10 @@
  * (async is allowed there), so registry blocks are real JSX with zero client
  * JS — the Astro-native equivalent of sdk-next's <MdxBody />.
  *
+ * Code blocks are highlighted by shiki with both themes emitted as CSS
+ * variables; global.css composes them with light-dark(), so highlighting
+ * follows the same theme mechanism as every other color on the site.
+ *
  * Usage in a page:
  * ```astro
  * ---
@@ -15,12 +19,14 @@
  * <article set:html={html} />
  * ```
  */
+import rehypeShiki from "@shikijs/rehype";
 import { evaluate } from "@mdx-js/mdx";
 import type { MDXComponents } from "mdx/types";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as runtime from "react/jsx-runtime";
 import remarkGfm from "remark-gfm";
+import { mdxComponents } from "../components/mdx";
 
 export type MdxComponents = MDXComponents;
 
@@ -32,8 +38,22 @@ export async function renderMdx(source: string, components?: MdxComponents): Pro
   const { default: Content } = await evaluate(trimmed, {
     ...runtime,
     remarkPlugins: [remarkGfm],
+    rehypePlugins: [
+      [
+        rehypeShiki,
+        {
+          // Vitesse's green-leaning palette sits naturally on the graft
+          // greens; both themes ship as CSS vars (defaultColor: false) and
+          // light-dark() picks the live one.
+          themes: { light: "vitesse-light", dark: "vitesse-dark" },
+          defaultColor: false,
+        },
+      ],
+    ],
     development: false,
   });
 
-  return renderToStaticMarkup(createElement(Content, { components: components ?? {} }));
+  return renderToStaticMarkup(
+    createElement(Content, { components: { ...mdxComponents, ...components } }),
+  );
 }

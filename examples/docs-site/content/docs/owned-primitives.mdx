@@ -1,0 +1,53 @@
+---
+title: Owned primitives
+description: graft add copies real source into your repo — the shadcn model, not the plugin model.
+section: Primitives
+order: 1
+---
+
+A primitive is a unit of **owned, copy-in code**: `graft add comments` drops
+real source files under `graft/` in your repo, wires them in automatically,
+and from that moment they're yours to edit. There is no `@graft/comments`
+dependency to fight, no plugin API boundary, no marketplace security surface.
+
+```sh
+graft add                # list what's available
+graft add comments       # copy the primitive (+ its deps) into graft/
+```
+
+Adding is a **pure file-drop**: the generated `graft/index.ts` barrel
+aggregates every primitive's collections and functions, and your
+`graft.config.ts` merges the barrel once —
+
+```ts
+export const { collections, functions } = mergePrimitives([
+  { collections: { pages }, functions: { … } },
+  primitives, // everything under graft/, via the generated barrel
+]);
+```
+
+— so there is no manual wiring step for an agent to get wrong. A duplicate
+key across modules fails loudly with `CONFIG_INVALID`, never a silent
+override.
+
+## What ships today
+
+| Primitive | What you get |
+| --- | --- |
+| `scoped-access` | named token scopes + access-rule helpers |
+| `comments` | db-authoritative collection + moderated mutations |
+| `seo` | composable SEO frontmatter fields |
+| `callout` | a content block + its MDX component |
+| `faq` | structured FAQ fields + block |
+| `commerce` | products/orders: collections, functions, the full vertical |
+
+Every item is **self-teaching**: it carries its own `llms.txt` fragment, so
+the next agent that opens the repo learns what was added and how to use it.
+Agents can browse before adding via the MCP `list_registry` /
+`describe_item` tools.
+
+<Callout label="governance">
+  The registry is local and in-repo today — deterministic, testable, versioned
+  with core. The manifest format is already remote-ready; a community registry
+  comes after core stabilizes, not before.
+</Callout>

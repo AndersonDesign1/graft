@@ -1,0 +1,48 @@
+---
+title: The agent surface
+description: MCP tools, self-teaching errors, and llms.txt — designed to be operated cold.
+section: Agents
+order: 1
+---
+
+Graft's primary operator is an agent. That isn't a chat box bolted onto an
+admin panel — it's the shape of the whole surface:
+
+- every error carries a `fix` (the next concrete step, machine-actionable),
+- every project ships an `llms.txt` explaining its own loop,
+- and the full content + function surface speaks **MCP**.
+
+## The MCP server
+
+```sh
+graft mcp        # stdio, for local agents
+# or over HTTP: POST /api/mcp (Streamable HTTP, stateless)
+```
+
+| Tools | What they do |
+| --- | --- |
+| `list_collections`, `describe_schema` | discover what content exists and its exact shape |
+| `read_content`, `search_content` | typed reads + FTS over the index |
+| `write_content`, `delete_content` | author MDX files and project them (git stays authoritative) |
+| `put_asset` | upload binaries to the asset store |
+| `list_functions`, `describe_function`, `run_function` | the typed function runtime, same gates as HTTP |
+| `list_registry`, `describe_item` | browse owned primitives before `graft add` |
+| `explain` | turn any GraftError code into causes + recovery steps |
+
+`run_function` reuses the functions handler, so access rules, audit rows, rate
+limits, and approval gates apply identically — MCP is a door, not a bypass.
+`delete_content` is destructive and human-gated like any destructive function.
+
+## Auth
+
+The same resolver as HTTP: bearer tokens or `GRAFT_DEV_TOKEN`. Set
+`GRAFT_MCP_REQUIRE_AUTH=1` to reject anonymous callers on anything reachable
+from outside.
+
+## The cold-agent gate
+
+The contract "an agent that has never seen this project can operate it" is
+**CI-enforced**: the test suite includes cold-agent runs (stdio and remote
+HTTP) where an agent gets only the MCP endpoint and must author content,
+upload an asset, and run functions without human help. Friction found there
+becomes an ergonomics fix, not a documentation footnote.

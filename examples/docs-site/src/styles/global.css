@@ -161,6 +161,39 @@ button:active,
   font-size: inherit;
 }
 
+/* Shiki dual themes: every token carries both palettes as CSS variables
+   (defaultColor: false); light-dark() picks the live one, so highlighting
+   rides the same theme switch as the rest of the site. */
+.prose pre.shiki,
+.prose pre.shiki span {
+  color: light-dark(var(--shiki-light), var(--shiki-dark));
+}
+
+.prose pre.shiki {
+  background: var(--paper-raised) !important; /* shiki inlines its theme bg; ours wins */
+}
+
+/* Callout — the MDX map's aside; bark brown, the rare warm counterpoint. */
+.callout {
+  border-inline-start: 2px solid var(--graft-union);
+  background: var(--paper-sunken);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: var(--space-3) var(--space-4);
+  margin-block: var(--space-6);
+}
+
+.callout-label {
+  color: var(--graft-union);
+}
+
+.callout-body {
+  margin-block-start: var(--space-1);
+}
+
+.callout-body > p {
+  margin: 0;
+}
+
 .prose ul,
 .prose ol {
   padding-inline-start: 1.25em;

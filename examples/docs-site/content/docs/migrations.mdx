@@ -1,0 +1,48 @@
+---
+title: Migrations
+description: Schema changes as code — content codemods and transactional data backfills, dry-run by default.
+section: Content
+order: 3
+---
+
+Schemas change. Migrations are code in your repo (`migrations/<seq>-<name>.ts`),
+applied with a ledger so every environment knows exactly what has run:
+
+```sh
+graft migrate            # dry-run: report pending migrations
+graft migrate --apply    # execute; each run recorded in migrations_applied
+```
+
+Two kinds, matching the two kinds of data:
+
+## Content codemods
+
+For file-authoritative collections, a migration rewrites the **files** —
+because git is authoritative, changing the index alone would just be
+overwritten by the next compile. `defineContentMigration` walks matching
+documents, transforms frontmatter/body, and writes the files back; you review
+the diff and commit it like any other change.
+
+```ts
+// migrations/0001-pages-description.ts
+export default defineContentMigration({
+  collection: "pages",
+  describe: "backfill description from tagline",
+  transform(doc) {
+    doc.data.description ??= doc.data.tagline ?? "";
+    return doc;
+  },
+});
+```
+
+## Data backfills
+
+For db-authoritative collections, `defineDataMigration` runs against the rows
+— inside a transaction, so a failed backfill leaves nothing half-migrated.
+
+<Callout label="gotcha">
+  Renamed or deleted a collection? The old rows now look foreign to your
+  schema, and compile refuses with `INDEX_OWNERSHIP` to protect them. That
+  is the one legitimate use of `graft compile --prune-unknown` — run it once,
+  deliberately, after the rename lands.
+</Callout>

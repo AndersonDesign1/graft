@@ -1,33 +1,30 @@
 ---
-/** Docs index — sections and pages, straight from the content index. */
-import Base from "../../layouts/Base.astro";
-import { getGraft } from "../../lib/graft";
+/** Docs index — the reading path, straight from the content index. */
+import Docs from "../../layouts/Docs.astro";
+import { docsNav } from "../../lib/nav";
 
-const docs = await getGraft().listContent("docs");
-
-const sections = new Map<string, typeof docs>();
-for (const doc of docs) {
-  const list = sections.get(doc.data.section) ?? [];
-  list.push(doc);
-  sections.set(doc.data.section, list);
-}
-for (const list of sections.values()) {
-  list.sort((a, b) => (a.data.order ?? 99) - (b.data.order ?? 99));
-}
+const nav = await docsNav();
 ---
 
-<Base title="Docs — Graft" description="Graft documentation: the model, the SDKs, the agent surface.">
+<Docs
+  title="Docs — Graft"
+  description="Graft documentation: the model, the SDKs, the agent surface."
+>
   <div class="docs-index">
     <h1>Documentation</h1>
+    <p class="lede">
+      Everything is code: schema, content, functions, and the agent surface.
+      Start at the top and read down — the sections are ordered as a path.
+    </p>
     {
-      [...sections.entries()].map(([section, list]) => (
+      nav.map(({ section, entries }) => (
         <section>
           <h2 class="label">{section}</h2>
           <ul>
-            {list.map((doc) => (
+            {entries.map((entry) => (
               <li>
-                <a href={`/docs/${doc.slug}`}>{doc.data.title}</a>
-                <p>{doc.data.description}</p>
+                <a href={`/docs/${entry.slug}`}>{entry.title}</a>
+                <p>{entry.description}</p>
               </li>
             ))}
           </ul>
@@ -35,19 +32,20 @@ for (const list of sections.values()) {
       ))
     }
   </div>
-</Base>
+</Docs>
 
 <style>
-  .docs-index {
-    padding: var(--space-16) var(--space-8);
-    max-width: 44rem;
-  }
-
   h1 {
     font-family: var(--font-display);
     font-size: var(--text-2xl);
     letter-spacing: var(--tracking-display);
-    margin-block-end: var(--space-12);
+  }
+
+  .lede {
+    color: var(--ink-muted);
+    font-size: var(--text-md);
+    max-width: 52ch;
+    margin-block: var(--space-3) var(--space-8);
   }
 
   section {
@@ -73,5 +71,6 @@ for (const list of sections.values()) {
     color: var(--ink-muted);
     font-size: var(--text-sm);
     margin-block-start: var(--space-1);
+    max-width: 60ch;
   }
 </style>

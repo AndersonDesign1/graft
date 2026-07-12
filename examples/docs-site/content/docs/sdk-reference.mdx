@@ -1,0 +1,52 @@
+---
+title: SDK reference
+description: One schema types every read — the same surface across Next, Astro, and SvelteKit.
+section: Reference
+order: 2
+---
+
+All reads flow through `@graft/sdk-core`; the framework SDKs re-export its
+surface with framework-appropriate ergonomics. The same `graft.config.ts`
+types every one of them.
+
+| Package | For | Notes |
+| --- | --- | --- |
+| `@graft/sdk-core` | anything JS | `createClient` → `getDocument` / `listDocuments` / `searchDocuments`; Zod re-validation; branch-aware; cache-tag helpers |
+| `@graft/sdk-next` | Next.js (RSC) | `createGraft` with per-request memo (`React.cache`), `MdxBody`, `revalidateContent`/`updateContent` (ChangeSet → tags) |
+| `@graft/sdk-astro` | Astro | `createGraft` (no memo — reads from frontmatter/endpoints), `graftRoute` endpoint mount |
+| `@graft/sdk-sveltekit` | SvelteKit | `createGraft` + `graftRoute` for `+server.ts` mounts |
+
+## The shared surface
+
+```ts
+const graft = createGraft({ db, collections });
+
+await graft.getContent("pages", "home");          // Document | null, fully typed
+await graft.listContent("docs");                   // Document[]
+await graft.searchContent("docs", "branching");    // ranked hits with snippets
+```
+
+Reads re-validate against the schema on the way out — a corrupted index row
+throws instead of rendering.
+
+## Mounting the runtime
+
+The handlers are Web-standard, so each mount is one line of adapter:
+
+```ts
+// Astro: src/pages/api/fn/[name].ts
+export const POST = graftRoute(functionsHandler);
+
+// SvelteKit: src/routes/api/fn/[name]/+server.ts
+export const POST = graftRoute(functionsHandler);
+
+// Next: app/api/fn/[name]/route.ts
+export const POST = functionsHandler; // already Request → Response
+```
+
+## Cache tags
+
+`tagsFor(collection, slug?)` names what a read depends on;
+`tagsForChanges(branch, changeSet)` names what a compile invalidated. Next
+maps tags onto `'use cache'` + `revalidateTag`; Astro/SvelteKit stamp them
+into CDN surrogate-key headers and purge from the compile webhook.

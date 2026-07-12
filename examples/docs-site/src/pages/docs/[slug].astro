@@ -1,6 +1,6 @@
 ---
 /** A doc page: typed read + real-MDX body rendered to static HTML. */
-import Base from "../../layouts/Base.astro";
+import Docs from "../../layouts/Docs.astro";
 import { getGraft } from "../../lib/graft";
 import { renderMdx } from "../../lib/mdx";
 
@@ -13,21 +13,16 @@ if (!doc) {
 const bodyHtml = await renderMdx(doc.body);
 ---
 
-<Base title={`${doc.data.title} — Graft docs`} description={doc.data.description}>
+<Docs title={`${doc.data.title} — Graft docs`} description={doc.data.description}>
   <article class="doc">
     <p class="label">{doc.data.section}</p>
     <h1>{doc.data.title}</h1>
     <p class="lede">{doc.data.description}</p>
     <div class="prose" set:html={bodyHtml} />
   </article>
-</Base>
+</Docs>
 
 <style>
-  .doc {
-    padding: var(--space-16) var(--space-8);
-    max-width: 48rem;
-  }
-
   h1 {
     font-family: var(--font-display);
     font-size: var(--text-xl);
@@ -39,5 +34,6 @@ const bodyHtml = await renderMdx(doc.body);
     color: var(--ink-muted);
     font-size: var(--text-md);
     margin-block-end: var(--space-12);
+    max-width: 60ch;
   }
 </style>

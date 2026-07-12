@@ -1,0 +1,49 @@
+---
+title: CLI reference
+description: Every graft command, one table each.
+section: Reference
+order: 1
+---
+
+## Project loop
+
+| Command | What it does |
+| --- | --- |
+| `graft init [dir]` | scaffold a project: `graft.config.ts`, `content/`, `llms.txt` |
+| `graft compile` | project the content tree into the content index, once |
+| `graft dev` | watch `content/` + `graft.config.ts`, recompile on change |
+| `graft asset put <file> [key]` | upload a binary to the asset store (S3-compatible env) |
+
+## Operator loop
+
+| Command | What it does |
+| --- | --- |
+| `graft approvals` | list pending approvals for human-gated calls |
+| `graft approve <id>` / `graft deny <id>` | decide one (caller retries with `x-graft-approval`) |
+| `graft migrate [--apply]` | run pending migrations (dry-run by default) |
+| `graft harden <role>` | grant the runtime role least-privilege access |
+
+## Branching
+
+| Command | What it does |
+| --- | --- |
+| `graft branch create <name> [--from main] [--backend neon]` | instant branch (overlay default; neon forks) |
+| `graft branch list` / `graft branch drop <name>` | inspect / remove (drop purges transactionally) |
+| `graft merge <name> [--into main] [--apply]` | replay ledger → move data rows → recompile; dry-run first |
+
+## Extending & serving
+
+| Command | What it does |
+| --- | --- |
+| `graft add [item]` | copy an owned primitive into `graft/` (no name: list available) |
+| `graft mcp` | serve the project MCP over stdio |
+| `graft serve [--port 3903]` | headless runtime: `/api/fn/name`, `/api/mcp`, `/healthz` |
+
+## Flags worth knowing
+
+| Flag | Applies to | Meaning |
+| --- | --- | --- |
+| `--branch <id>` | compile / dev / migrate / mcp / serve | operate on a content branch |
+| `--apply` | migrate / merge | execute (default is a dry-run report) |
+| `--prune-unknown` | compile | remove index rows in collections this schema doesn't know (the `INDEX_OWNERSHIP` override — deliberate use only) |
+| `--dry-run` / `--overwrite` | add | preview / replace differing files |
