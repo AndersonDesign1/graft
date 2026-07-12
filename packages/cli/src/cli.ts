@@ -61,6 +61,8 @@ function printHelp(): void {
     "  --apply          Execute pending migrations / the merge (default is a dry-run report)",
     "  --dry-run        Preview `graft add` without writing",
     "  --overwrite      Let `graft add` replace files that differ",
+    "  --prune-unknown  Let `graft compile` remove index rows in collections this schema",
+    "                   doesn't know (default: refuse — the shared-DATABASE_URL guard)",
     "  -h, --help       Show this help",
     "  -v, --version    Show version",
   ];
@@ -78,6 +80,7 @@ interface ParsedArgs {
   apply: boolean;
   dryRun: boolean;
   overwrite: boolean;
+  pruneUnknown: boolean;
 }
 
 class UsageError extends Error {}
@@ -94,6 +97,7 @@ function parseArgs(rest: string[]): ParsedArgs {
   let apply = false;
   let dryRun = false;
   let overwrite = false;
+  let pruneUnknown = false;
 
   const value = (flag: string, raw: string | undefined): string => {
     if (!raw || raw.startsWith("-")) {
@@ -127,13 +131,27 @@ function parseArgs(rest: string[]): ParsedArgs {
       dryRun = true;
     } else if (arg === "--overwrite") {
       overwrite = true;
+    } else if (arg === "--prune-unknown") {
+      pruneUnknown = true;
     } else if (arg.startsWith("-")) {
       throw new UsageError(`unknown option "${arg}"`);
     } else {
       positionals.push(arg);
     }
   }
-  return { positionals, branchId, from, into, backend, port, host, apply, dryRun, overwrite };
+  return {
+    positionals,
+    branchId,
+    from,
+    into,
+    backend,
+    port,
+    host,
+    apply,
+    dryRun,
+    overwrite,
+    pruneUnknown,
+  };
 }
 
 export interface RunOptions {
@@ -177,7 +195,7 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
       }
       case "compile": {
         const { compileCommand } = await import("./commands/compile");
-        await compileCommand({ cwd, branchId: args.branchId });
+        await compileCommand({ cwd, branchId: args.branchId, pruneUnknown: args.pruneUnknown });
         return 0;
       }
       case "dev": {

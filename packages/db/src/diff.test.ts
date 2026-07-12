@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diffBranchContent, type ContentInput, type ExistingContentState } from "./diff";
+import { diffBranchContent, foreignRemovals, type ContentInput, type ExistingContentState } from "./diff";
 
 const doc = (slug: string, hash: string, overrides: Partial<ContentInput> = {}): ContentInput => ({
   collection: "pages",
@@ -78,5 +78,38 @@ describe("diffBranchContent", () => {
     const { changes } = diffBranchContent(existing, incoming);
     expect(changes.added).toEqual(["posts/intro"]);
     expect(changes.unchanged).toBe(1);
+  });
+});
+
+describe("foreignRemovals", () => {
+  it("flags removals in collections the schema doesn't know — the shared-DB signature", () => {
+    // The real incident: docs-site (pages, docs) compiled against the
+    // landing-page's index (pages, products) and purged products/*.
+    const existing = [
+      row("home", "h1"),
+      row("pricing", "h2"),
+      row("solo", "h3", { collection: "products", sourcePath: "products/solo.mdx" }),
+      row("team", "h4", { collection: "products", sourcePath: "products/team.mdx" }),
+    ];
+    const incoming = [doc("home", "h1-new")];
+    const { removals } = diffBranchContent(existing, incoming);
+
+    expect(foreignRemovals(removals, ["pages", "docs"])).toEqual(["products"]);
+    // Same-collection removals stay legitimate (deleting a file is normal).
+    expect(foreignRemovals(removals, ["pages", "products"])).toEqual([]);
+  });
+
+  it("is empty when nothing is removed or everything is known", () => {
+    expect(foreignRemovals([], ["pages"])).toEqual([]);
+    expect(foreignRemovals([{ collection: "pages" }], ["pages"])).toEqual([]);
+  });
+
+  it("reports each foreign collection once", () => {
+    const removals = [
+      { collection: "products" },
+      { collection: "products" },
+      { collection: "orders" },
+    ];
+    expect(foreignRemovals(removals, ["pages"])).toEqual(["products", "orders"]);
   });
 });

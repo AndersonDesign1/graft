@@ -69,3 +69,16 @@ export function diffBranchContent(
 
   return { changes, upserts, removals };
 }
+
+/**
+ * Collections a projection would wipe that the compiling schema doesn't know.
+ * Non-empty means the index was (almost certainly) compiled by a different
+ * project — the shared-DATABASE_URL footgun projectBranchContent refuses.
+ */
+export function foreignRemovals(
+  removals: ReadonlyArray<{ collection: string }>,
+  knownCollections: readonly string[],
+): string[] {
+  const known = new Set(knownCollections);
+  return [...new Set(removals.map((r) => r.collection))].filter((c) => !known.has(c));
+}

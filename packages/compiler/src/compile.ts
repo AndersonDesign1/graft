@@ -25,6 +25,13 @@ export interface CompileOptions {
    * `contentDir` (tolerant: records null outside a git repo); pass null to skip.
    */
   gitSha?: string | null;
+  /**
+   * Also remove index rows in collections this schema doesn't know. Off by
+   * default: purging unknown collections is the signature of two projects
+   * sharing one DATABASE_URL, so projection aborts with INDEX_OWNERSHIP
+   * unless this is set (legitimate after a collection rename/delete).
+   */
+  pruneUnknown?: boolean;
 }
 
 export interface CompileResult {
@@ -118,7 +125,12 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
       contentHash: doc.contentHash,
       sourcePath: doc.sourcePath,
     })),
-    { branchId: options.branchId ?? "main", gitSha },
+    {
+      branchId: options.branchId ?? "main",
+      gitSha,
+      knownCollections: Object.keys(options.collections),
+      pruneUnknown: options.pruneUnknown,
+    },
   );
   return { count: docs.length, docs, changes, gitSha };
 }

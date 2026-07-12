@@ -308,6 +308,9 @@ a preview never busts main's cache.
 - Never write to the database directly; it is a derived index. Files win.
 - Slugs are kebab-case (lowercase letters, digits, hyphens).
 - `DATABASE_URL` comes from the repo-root `.env`.
+- One project = one database. Never point DATABASE_URL at another project's
+  index — compile refuses with INDEX_OWNERSHIP rather than purge its documents.
+  (examples/docs-site has its own database via its local `.env`.)
 
 ## scoped-access (primitive)
 

@@ -47,13 +47,19 @@ type FunctionsOf<M> = M extends { functions: infer F extends Record<string, AnyG
   ? F
   : Record<never, never>;
 
-export interface MergedPrimitives<
+/**
+ * A type alias (not an interface) on purpose: object-literal type aliases get
+ * an implicit index signature, so a merge result — including the empty one the
+ * fresh `graft init` barrel exports — satisfies PrimitiveModule and can be
+ * merged again in graft.config.ts. An interface here fails that assignability.
+ */
+export type MergedPrimitives<
   TCollections = Record<string, AnyCollection>,
   TFunctions = Record<string, AnyGraftFunction>,
-> {
+> = {
   collections: TCollections;
   functions: TFunctions;
-}
+};
 
 function mergeInto<T>(
   target: Record<string, T>,

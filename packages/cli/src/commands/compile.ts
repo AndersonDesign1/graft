@@ -14,6 +14,8 @@ import { formatCompileResult } from "../report";
 export interface CompileCommandOptions {
   cwd: string;
   branchId?: string;
+  /** Remove index rows in collections this schema doesn't know (see INDEX_OWNERSHIP). */
+  pruneUnknown?: boolean;
 }
 
 export async function compileCommand(options: CompileCommandOptions): Promise<CompileResult> {
@@ -40,6 +42,7 @@ export async function compileCommand(options: CompileCommandOptions): Promise<Co
         contentDir: config.contentDir,
         collections: config.collections,
         branchId: scopeWriteBranch(branch.scope),
+        pruneUnknown: options.pruneUnknown,
       });
       console.log(formatCompileResult(result));
       return result;

@@ -52,6 +52,8 @@ is a derived index. If they disagree, git wins — recompile.
 - Slugs are kebab-case; a frontmatter \`slug:\` overrides the filename.
 - Project into the index: \`graft compile\` (one-shot) or \`graft dev\` (watch mode).
   Both need DATABASE_URL in .env (any parent directory works).
+- One project = one database. Never point DATABASE_URL at another project's
+  index — compile refuses with INDEX_OWNERSHIP rather than purge its documents.
 - Primitives: add owned building blocks with \`graft add <item>\` — they land under
   graft/ and wire in automatically (the generated graft/index.ts barrel; no config
   edit). Run \`graft add\` with no name to list what's available.

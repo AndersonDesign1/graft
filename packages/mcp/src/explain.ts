@@ -174,6 +174,17 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Check the collection's authority with describe_schema. File-authoritative → author MDX (write_content / files + compile). Db-authoritative → go through its functions (POST /api/fn/<name>); the rows are operational data Postgres owns.",
   },
+  INDEX_OWNERSHIP: {
+    code: "INDEX_OWNERSHIP",
+    meaning:
+      "A projection would soft-delete every document in collections this project's schema doesn't know — the signature of two projects pointing at one DATABASE_URL. Nothing was written; the transaction rolled back.",
+    typicalCauses: [
+      "DATABASE_URL points at another project's database (e.g. a shared repo-root .env)",
+      "A collection was renamed or deleted in graft.config.ts, so its old rows look foreign",
+    ],
+    howToRecover:
+      "Each project needs its own database or branch: set DATABASE_URL in a .env next to graft.config.ts (it overrides parent .envs). If the schema really did drop or rename a collection, a human runs `graft compile --prune-unknown` once — the override is CLI-only by design.",
+  },
   SLUG_NOT_UNIQUE: {
     code: "SLUG_NOT_UNIQUE",
     meaning: "Two documents in the same collection resolve to the same slug.",
