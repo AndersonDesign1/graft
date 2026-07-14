@@ -2,6 +2,7 @@
 import { fileURLToPath } from "node:url";
 import react from "@astrojs/react";
 import vercel from "@astrojs/vercel";
+import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
 
 // Env layering, most specific wins: repo-root .env fills shared values
@@ -30,6 +31,9 @@ export default defineConfig({
   adapter: vercel(),
   integrations: [react()],
   vite: {
+    // Tailwind v4 processes the fumadocs-ui stylesheet (docs shell only; the
+    // landing + tokens stay hand-written CSS).
+    plugins: [tailwindcss()],
     ssr: {
       // @graft/registry reads its bundled primitives from disk at runtime
       // (path-form registryRoot()) — never inline it into the SSR bundle.

@@ -1,0 +1,99 @@
+/**
+ * Docs shell stylesheet: Fumadocs UI (Tailwind v4) re-inked in the Graft
+ * palette. The --color-fd-* variables are the theme surface fumadocs exposes;
+ * every value below routes to tokens.css via light-dark(), so the docs follow
+ * the reader's theme with the same mechanism as the rest of the site.
+ */
+@import "./tokens.css";
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+
+:root {
+  --color-fd-background: var(--paper);
+  --color-fd-foreground: var(--ink);
+  --color-fd-muted: var(--paper-sunken);
+  --color-fd-muted-foreground: var(--ink-muted);
+  --color-fd-popover: var(--paper-raised);
+  --color-fd-popover-foreground: var(--ink);
+  --color-fd-card: var(--paper-raised);
+  --color-fd-card-foreground: var(--ink);
+  --color-fd-border: var(--hairline);
+  --color-fd-primary: var(--mark);
+  --color-fd-primary-foreground: var(--primary-foreground);
+  --color-fd-secondary: var(--paper-sunken);
+  --color-fd-secondary-foreground: var(--ink);
+  --color-fd-accent: var(--mark-tint);
+  --color-fd-accent-foreground: var(--ink);
+  --color-fd-ring: var(--mark);
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+}
+
+/* Serif display voice for doc headings — same as the landing. */
+.font-serif,
+#nd-page h1,
+.prose h1,
+.prose h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.prose h2 {
+  margin-top: var(--space-12);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--hairline);
+}
+
+/* Shiki dual themes from renderMdx (defaultColor: false). */
+.prose pre.shiki,
+.prose pre.shiki span {
+  color: light-dark(var(--shiki-light), var(--shiki-dark));
+}
+
+.prose pre.shiki {
+  background: var(--paper-raised) !important;
+  box-shadow: var(--shadow-raised);
+  border-radius: var(--radius);
+  padding: var(--space-4) var(--space-6);
+  overflow-x: auto;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+/* Callout — renderMdx emits static HTML; a margin note in the accent. */
+.callout {
+  border-inline-start: 2px solid var(--mark);
+  background: var(--paper-sunken);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: var(--space-3) var(--space-4);
+  margin-block: var(--space-6);
+}
+
+.callout-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--mark);
+}
+
+.callout-body {
+  margin-block-start: var(--space-1);
+}
+
+.callout-body > p {
+  margin: 0;
+}

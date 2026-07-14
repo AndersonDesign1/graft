@@ -20,3 +20,8 @@ minimumReleaseAgeExclude:
   # we pin the major and want latest patches without waiting out the 3-day gate.
   - typescript
   - "@typescript/*"
+  # Fumadocs Astro adapter shipped in 16.11.2 (2 days before adoption) — the docs
+  # site needs it now; fuma-nama's packages, pinned by ^16.11.3 in docs-site.
+  - fumadocs-core
+  - fumadocs-ui
+  - "@fumadocs/*"

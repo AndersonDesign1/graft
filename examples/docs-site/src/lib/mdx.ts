@@ -20,6 +20,7 @@
  * ```
  */
 import rehypeShiki from "@shikijs/rehype";
+import rehypeSlug from "rehype-slug";
 import { evaluate } from "@mdx-js/mdx";
 import type { MDXComponents } from "mdx/types";
 import { createElement } from "react";
@@ -39,11 +40,13 @@ export async function renderMdx(source: string, components?: MdxComponents): Pro
     ...runtime,
     remarkPlugins: [remarkGfm],
     rehypePlugins: [
+      // Heading ids so the fumadocs TOC (and deep links) have anchors to hit.
+      rehypeSlug,
       [
         rehypeShiki,
         {
           // Near-monochrome themes fit the editorial ink/ivory palette; a
-          // custom ink+vermilion theme lands in the polish pass. Both themes
+          // custom monochrome theme lands in the polish pass. Both themes
           // ship as CSS vars (defaultColor: false); light-dark() picks one.
           themes: { light: "min-light", dark: "min-dark" },
           defaultColor: false,

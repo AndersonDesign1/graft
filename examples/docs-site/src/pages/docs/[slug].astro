@@ -1,8 +1,14 @@
 ---
-/** A doc page: typed read + real-MDX body rendered to static HTML. */
-import Docs from "../../layouts/Docs.astro";
+/**
+ * A doc page in the fumadocs shell: typed read from content_index, body
+ * rendered to static HTML (shiki + Callout, zero client JS for prose), TOC
+ * parsed from the source headings — Fumadocs is the UI, Graft is the source.
+ */
+import { DocsShell } from "../../components/docs-shell";
+import DocsRoot from "../../layouts/DocsRoot.astro";
 import { getGraft } from "../../lib/graft";
 import { renderMdx } from "../../lib/mdx";
+import { docsPageTree } from "../../lib/nav";
 
 const { slug } = Astro.params;
 const doc = slug ? await getGraft().getContent("docs", slug) : null;
@@ -10,30 +16,39 @@ if (!doc) {
   return new Response(null, { status: 404, statusText: "Not Found" });
 }
 
-const bodyHtml = await renderMdx(doc.body);
+const [tree, bodyHtml] = await Promise.all([docsPageTree(), renderMdx(doc.body)]);
+
+/** TOC from the raw MDX: ##/### headings outside code fences, slugged like rehype-slug. */
+const toc: Array<{ title: string; url: string; depth: number }> = [];
+let inFence = false;
+for (const line of doc.body.split("\n")) {
+  if (/^\s*(```|~~~)/.test(line)) {
+    inFence = !inFence;
+    continue;
+  }
+  if (inFence) continue;
+  const match = /^(#{2,3})\s+(.+?)\s*$/.exec(line);
+  if (!match) continue;
+  const title = match[2].replace(/`/g, "");
+  const id = title
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
+    .trim()
+    .replace(/\s+/g, "-");
+  toc.push({ title, url: `#${id}`, depth: match[1].length });
+}
 ---
 
-<Docs title={`${doc.data.title} — Graft docs`} description={doc.data.description}>
-  <article class="doc">
-    <p class="label">{doc.data.section}</p>
-    <h1>{doc.data.title}</h1>
-    <p class="lede">{doc.data.description}</p>
+<DocsRoot title={`${doc.data.title} — Graft docs`} description={doc.data.description}>
+  <DocsShell
+    tree={tree}
+    pathname={Astro.url.pathname}
+    params={Astro.params}
+    toc={toc}
+    title={doc.data.title}
+    description={doc.data.description}
+    client:load
+  >
     <div class="prose" set:html={bodyHtml} />
-  </article>
-</Docs>
-
-<style>
-  h1 {
-    font-family: var(--font-display);
-    font-size: var(--text-xl);
-    letter-spacing: -0.01em;
-    margin-block: var(--space-2) var(--space-3);
-  }
-
-  .lede {
-    color: var(--ink-muted);
-    font-size: var(--text-md);
-    margin-block-end: var(--space-12);
-    max-width: 60ch;
-  }
-</style>
+  </DocsShell>
+</DocsRoot>

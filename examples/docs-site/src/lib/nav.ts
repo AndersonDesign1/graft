@@ -27,6 +27,24 @@ export interface DocNavSection {
   entries: DocNavEntry[];
 }
 
+/** The docsNav sections as a fumadocs PageTree (serializable — strings only). */
+export async function docsPageTree(): Promise<{
+  name: string;
+  children: Array<{ type: "separator"; name: string } | { type: "page"; name: string; url: string }>;
+}> {
+  const sections = await docsNav();
+  const children: Array<
+    { type: "separator"; name: string } | { type: "page"; name: string; url: string }
+  > = [];
+  for (const { section, entries } of sections) {
+    children.push({ type: "separator", name: section });
+    for (const entry of entries) {
+      children.push({ type: "page", name: entry.title, url: `/docs/${entry.slug}` });
+    }
+  }
+  return { name: "Graft docs", children };
+}
+
 export async function docsNav(): Promise<DocNavSection[]> {
   const docs = await getGraft().listContent("docs");
 

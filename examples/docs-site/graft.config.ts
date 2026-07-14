@@ -6,7 +6,13 @@
  * Primitives you add with `graft add` live under graft/ and are merged in via
  * the generated graft/index.ts barrel — you never edit the import below.
  */
-import { defineCollection, defineFunction, field, mergePrimitives } from "@graft/core";
+import {
+  defineCollection,
+  defineFunction,
+  field,
+  insertRecord,
+  mergePrimitives,
+} from "@graft/core";
 import * as primitives from "./graft";
 
 /** Marketing/landing pages (/, /why). */
@@ -19,6 +25,17 @@ export const pages = defineCollection({
     description: field.string({
       optional: true,
       description: "Meta description for search/social previews.",
+    }),
+    faqs: field.array({
+      of: field.object({
+        fields: {
+          question: field.string({ description: "The question, verbatim." }),
+          answer: field.string({ description: "A direct answer, 1–3 sentences." }),
+        },
+        description: "One Q/A pair.",
+      }),
+      optional: true,
+      description: "FAQ entries rendered on the landing page.",
     }),
   },
 });
@@ -63,9 +80,40 @@ export const docStats = defineFunction({
   },
 });
 
+/**
+ * submissions — operational data (db-authoritative): rows live in Postgres,
+ * written only through submitContact. The landing page's contact form is a
+ * live demo of the typed function runtime, not a mock.
+ */
+export const submissions = defineCollection({
+  name: "submissions",
+  authority: "db-authoritative",
+  description: "Landing-page contact submissions. Write via submitContact.",
+  fields: {
+    email: field.string({ description: "Sender address." }),
+    message: field.text({ optional: true, description: "What they wrote." }),
+  },
+});
+
+/** Public mutation the landing form posts to (`public: true` is the greppable opt-out). */
+export const submitContact = defineFunction({
+  name: "submitContact",
+  kind: "mutation",
+  public: true,
+  rateLimit: { limit: 5, windowSeconds: 60 },
+  description:
+    "Stores a contact-form submission (public; anonymous callers allowed; 5/min per caller).",
+  returns: "{ id: string; receivedAt: string }",
+  input: submissions.fields,
+  handler: async (ctx) => {
+    const record = await insertRecord(ctx, submissions, ctx.input);
+    return { id: record.id, receivedAt: record.createdAt.toISOString() };
+  },
+});
+
 // Your own collections/functions + everything under graft/ (added via `graft add`).
 // mergePrimitives throws CONFIG_INVALID on a duplicate key — never a silent override.
 export const { collections, functions } = mergePrimitives([
-  { collections: { pages, docs }, functions: { docStats } },
+  { collections: { pages, docs, submissions }, functions: { docStats, submitContact } },
   primitives,
 ]);

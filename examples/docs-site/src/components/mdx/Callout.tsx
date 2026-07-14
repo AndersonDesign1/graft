@@ -1,7 +1,7 @@
 /**
  * Callout — the first entry in the docs' MDX component map. Server-rendered
- * to static HTML by renderMdx; no client JS. Styled as a red-pen margin
- * note — the editorial voice the vermilion accent is reserved for.
+ * to static HTML by renderMdx; no client JS. Styled as a margin note —
+ * the editorial voice the bright mark is reserved for.
  */
 import type { ReactNode } from "react";
 
