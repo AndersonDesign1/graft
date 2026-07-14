@@ -1,7 +1,16 @@
 ---
 title: Graft
-tagline: The CMS where the agent is the operator — and the human is optional.
+tagline: The CMS that grafts onto your repo — content as code, agents as operators.
 description: Content as code, git-native versioning, copy-on-write preview branches, owned primitives. Agents operate; humans supervise.
+faqs:
+  - question: Is content stored in git?
+    answer: Yes. Git is authoritative; Postgres is a derived index. If they disagree, git wins — recompile.
+  - question: Who is the primary operator?
+    answer: An AI agent. Humans are optional supervisors — destructive operations file an approval a human decides, and every invocation writes an audit row.
+  - question: How do I add a feature vertical?
+    answer: graft add commerce (or comments, seo, faq…). Owned code lands in your repo as plain TypeScript — no plugin black box.
+  - question: What frameworks does it serve?
+    answer: Next, Astro, and SvelteKit SDKs share one typed read surface — or skip the framework and run the whole thing as one container with graft serve.
 ---
 
 Authored content lives in git. Postgres is a derived index. If they disagree,

@@ -1,0 +1,1526 @@
+/**
+ * Landing — "the proof sheet." Consumes tokens.css (monochrome ink/paper, type,
+ * motion); this file is layout + the landing's own components. The landing
+ * presents dark-first: Landing.astro stamps data-theme="dark" on <html>.
+ * Concept + reference analysis: docs/design-notes/landing-redesign.md.
+ */
+
+:root {
+  --measure: 72rem; /* page column */
+  --gutter: clamp(1.25rem, 4vw, 3rem);
+}
+
+/* ---------------------------------------------------------------- nav --- */
+
+.landing-nav {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 50;
+  background: color-mix(in srgb, var(--paper) 72%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid transparent;
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    background-color var(--duration-base) var(--ease-out);
+}
+
+.landing-nav[data-scrolled="true"] {
+  border-bottom-color: var(--hairline);
+}
+
+.landing-nav-inner {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0.85rem var(--gutter);
+  display: flex;
+  align-items: baseline;
+  gap: 1.75rem;
+}
+
+.landing-wordmark {
+  font: 400 1.45rem/1 var(--font-display);
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+  margin-right: auto;
+}
+
+.landing-wordmark b {
+  color: var(--mark);
+  font-weight: 400;
+}
+
+.landing-nav a:not(.landing-wordmark):not(.nav-cta) {
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.landing-nav a:not(.landing-wordmark):not(.nav-cta):hover {
+  color: var(--ink);
+}
+
+.nav-cta {
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--primary-foreground);
+  background: var(--mark);
+  text-decoration: none;
+  padding: 0.55rem 0.9rem;
+  border-radius: var(--radius-inner);
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+/* Monochrome: hover cannot change hue, so it changes lightness — one step
+   brighter in dark, one step darker in light. Same direction as the fill. */
+.nav-cta:hover {
+  background: var(--mark-strong);
+}
+
+.nav-cta:active {
+  transform: scale(0.97);
+}
+
+@media (max-width: 720px) {
+  .landing-nav a[data-secondary] {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------- nav dropdown --- */
+
+/* The panel anchors to the nav (not the item) so it can be wider than the
+   trigger; the item itself is a link + a chevron, side by side. */
+.nav-menu {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.nav-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  padding: 0.25rem;
+  margin: -0.25rem;
+  cursor: pointer;
+  color: var(--ink-faint);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.nav-toggle:hover,
+.nav-toggle[aria-expanded="true"],
+.nav-menu:hover .nav-toggle {
+  color: var(--ink);
+}
+
+/* The link and the chevron light up together — they read as one nav item. */
+.nav-menu:hover .nav-trigger {
+  color: var(--ink);
+}
+
+.nav-toggle svg {
+  width: 9px;
+  height: 5px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  transition: rotate var(--duration-base) var(--ease-out);
+}
+
+.nav-toggle[aria-expanded="true"] svg {
+  rotate: 180deg;
+}
+
+/* The wide panel: full column width, not a narrow menu hanging off a link. */
+.nav-panel {
+  position: absolute;
+  top: calc(100% - 0.35rem);
+  left: 50%;
+  width: min(42rem, calc(100vw - 2 * var(--gutter)));
+  translate: -50% 0;
+  z-index: 40;
+
+  background: var(--paper-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-outer);
+  box-shadow: var(--shadow-floating);
+  overflow: hidden;
+
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.nav-panel[data-open="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+.nav-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.nav-col {
+  padding: 1.15rem 1.25rem;
+}
+
+/* Column rules, not card borders — the panel is one object. */
+.nav-col + .nav-col {
+  border-left: 1px solid var(--hairline);
+}
+
+.nav-col-label {
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 0.75rem;
+}
+
+.nav-link {
+  display: block;
+  padding: 0.4rem 0.5rem;
+  margin: 0 -0.5rem;
+  border-radius: var(--radius);
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.nav-link:hover {
+  background: var(--mark-tint); /* monochrome: hover is a lift, not a hue */
+}
+
+.nav-link + .nav-link {
+  margin-top: 0.15rem;
+}
+
+.nav-link-title {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.35;
+}
+
+.nav-panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1.25rem;
+  border-top: 1px solid var(--hairline);
+  background: var(--paper-sunken);
+  font-size: var(--text-sm);
+}
+
+.nav-panel-foot p {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.nav-panel-foot b {
+  color: var(--ink-faint);
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  margin-right: 0.5rem;
+}
+
+.nav-panel-foot a {
+  color: var(--ink);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.nav-panel-foot a:hover {
+  color: var(--mark-strong);
+}
+
+@media (max-width: 860px) {
+  .nav-panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-col + .nav-col {
+    border-left: 0;
+    border-top: 1px solid var(--hairline);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-panel {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* -------------------------------------------------------------- grain --- */
+
+/* The stage is pure black, and flat #000 reads as generic dark-mode SaaS.
+   Grain gives it material — the tooth of paper under ink. Fixed so it belongs
+   to the viewport, not the scroll; overlay so it lifts the blacks without
+   touching the type; ~3% so you feel it rather than see it. */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.032;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ----------------------------------------------------------- sections --- */
+
+.landing {
+  overflow-x: clip;
+}
+
+.landing ::selection {
+  background: var(--mark);
+  color: var(--paper);
+}
+
+.section {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: clamp(4rem, 10vh, 7rem) var(--gutter);
+  border-top: 1px solid var(--hairline);
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 2.25rem;
+}
+
+.section-label::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mark);
+  flex: none;
+}
+
+.section-label em {
+  font-style: normal;
+  color: var(--ink-muted);
+}
+
+.section h2 {
+  font: 400 clamp(2rem, 4.5vw, var(--text-2xl)) / 1.08 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  margin: 0 auto 1rem;
+  max-width: 26ch;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.section h2 .marked {
+  color: var(--mark);
+}
+
+.section-lede {
+  max-width: 46ch;
+  font-size: var(--text-md);
+  color: var(--ink-muted);
+  margin: 0 auto 2.75rem;
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.section-lede code,
+.section-lede strong {
+  font-size: 0.85em;
+  color: var(--ink);
+}
+
+/* -------------------------------------------------------- reveal (IO) --- */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 600ms var(--ease-out),
+    transform 600ms var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------------------------------------------------------------- hero --- */
+
+/* Centered composition: the hero reads as a title page — kicker, display line,
+   lede and actions stacked on the optical center. The stage below it goes back
+   to left-aligned, because code and diagrams are read, not admired. */
+.hero-section {
+  position: relative;
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: clamp(8rem, 18vh, 11rem) var(--gutter) clamp(4rem, 9vh, 6rem);
+  text-align: center;
+}
+
+.hero-title {
+  position: relative; /* sits above the graft drawing */
+  z-index: 1;
+  font: 400 clamp(2.75rem, 7.5vw, 4.25rem) / 1.06 var(--font-display); /* 68px */
+  letter-spacing: var(--tracking-display);
+  margin: 0 auto 1.75rem;
+  max-width: 20ch;
+  text-wrap: balance;
+}
+
+/* the proof mark under the key phrase — drawn in living tissue */
+.proof-mark {
+  position: relative;
+  white-space: nowrap;
+}
+
+.proof-mark svg {
+  position: absolute;
+  left: -0.06em;
+  right: -0.06em;
+  bottom: -0.14em;
+  width: calc(100% + 0.12em);
+  height: 0.22em;
+  overflow: visible;
+}
+
+.proof-mark path {
+  fill: none;
+  stroke: var(--mark);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-mark 900ms var(--ease-in-out) 700ms forwards;
+}
+
+@keyframes draw-mark {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.hero-sub {
+  max-width: 52ch;
+  font-size: var(--text-md);
+  color: var(--ink-muted);
+  margin: 0 auto 2.5rem;
+  text-wrap: pretty;
+}
+
+.hero-sub code {
+  color: var(--ink);
+  font-size: 0.85em;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 4rem;
+}
+
+.button-primary {
+  font: 500 var(--text-sm) / 1 var(--font-mono);
+  color: var(--primary-foreground);
+  background: var(--mark);
+  text-decoration: none;
+  padding: 0.85rem 1.35rem;
+  border: 0;
+  border-radius: var(--radius-inner);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+.button-primary:hover {
+  background: var(--mark-strong);
+}
+
+.button-primary:active {
+  transform: scale(0.97);
+}
+
+.button-ghost {
+  font: 500 var(--text-sm) / 1 var(--font-mono);
+  color: var(--ink);
+  background: transparent;
+  text-decoration: none;
+  padding: 0.85rem 1.35rem;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-inner);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+.button-ghost:hover {
+  border-color: var(--mark);
+  color: var(--mark-strong);
+}
+
+.button-ghost:active {
+  transform: scale(0.97);
+}
+
+/* One object, not two. The terminal is the only boxed thing in the hero —
+   it is the evidence. The graft drawing is atmosphere, behind the type. */
+.hero-stage {
+  position: relative;
+  z-index: 1; /* the terminal sits above the graft drawing */
+  max-width: 46rem;
+  margin: 0 auto;
+  text-align: left;
+}
+
+/* The rootstock/scion drawing — the landscape, not an illustration.
+   Anchored to the BOTTOM edge so the stock grows up out of the page (a thing
+   that grows needs somewhere to grow from), scaled past the type, and pushed
+   back to ~0.2 so the headline still owns the foreground. It bleeds off the
+   right edge on purpose; .landing has overflow-x: clip, so no h-scroll.
+   Decorative (aria-hidden), and it never stops: the draw runs on a loop. */
+/* The copy block is the figure's frame: rooting to the section put the trunk
+   behind the opaque terminal, which cut the plant in half. */
+.hero-copy {
+  position: relative;
+}
+
+.graft-figure {
+  position: absolute;
+  right: -12%; /* past the column, so the scion genuinely leaves the frame */
+  /* Stands ON the terminal. .hero-actions' 4rem bottom margin collapses out of
+     .hero-copy, so -4rem puts the figure's baseline exactly on the terminal's
+     top edge — the graft is rooted in the live evidence, not floating above it. */
+  bottom: -4rem;
+  z-index: 0;
+  width: min(60rem, 66%);
+  height: 125%; /* taller than the copy — the canopy reaches above the headline */
+  pointer-events: none;
+  opacity: 0.2;
+}
+
+/* Below the two-column threshold the figure would collide with the type. */
+@media (max-width: 1100px) {
+  .graft-figure {
+    display: none;
+  }
+}
+
+.graft-figure svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.graft-figure .stock,
+.graft-figure .scion {
+  fill: none;
+  stroke: var(--ink-muted);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.graft-figure .scion {
+  stroke: var(--ink);
+}
+
+.graft-figure .drawn {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-loop 9s var(--ease-in-out) infinite;
+}
+
+.graft-figure .drawn.late {
+  animation-delay: 700ms;
+}
+
+/* draw in, hold while the union pulses, retract, repeat */
+@keyframes draw-loop {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  22%,
+  78% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 1;
+  }
+}
+
+.graft-figure .union {
+  fill: var(--mark);
+  animation: union-pulse 2.6s var(--ease-in-out) 1.8s infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@keyframes union-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0.75;
+  }
+}
+
+.graft-figure .union-ring {
+  fill: none;
+  stroke: var(--mark);
+  stroke-width: 1;
+  opacity: 0;
+  animation: union-ring 2.6s var(--ease-out) 1.8s infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@keyframes union-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  70%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------ terminal --- */
+
+.terminal {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-outer);
+  background: var(--paper-sunken);
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
+  min-height: 320px;
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--hairline);
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.terminal-bar::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mark);
+}
+
+.terminal-replay {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  color: var(--ink-faint);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  padding: 0.25rem;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.terminal-replay:hover {
+  color: var(--mark);
+}
+
+.terminal-body {
+  flex: 1;
+  margin: 0;
+  padding: 1.1rem 1.2rem;
+  font: 400 0.95rem/1.7 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink-muted);
+}
+
+/* Shiki dual themes: every token carries both palettes as CSS variables
+   (defaultColor: false, same as the docs), light-dark() picks the live one.
+   The terminal and a fenced ```console block are colored by one highlighter. */
+.terminal-body span {
+  color: light-dark(var(--shiki-light), var(--shiki-dark));
+}
+
+.caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  vertical-align: -0.18em;
+  background: var(--mark);
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------ pipeline --- */
+
+.pipeline {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 980px) {
+  .pipeline {
+    grid-template-columns: 1fr;
+    max-width: 30rem;
+  }
+}
+
+.pipeline-stage {
+  position: relative;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  padding: 1.1rem 1.1rem 1rem;
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 500ms var(--ease-out),
+    transform 500ms var(--ease-out);
+}
+
+.pipeline.in .pipeline-stage {
+  opacity: 1;
+  transform: none;
+}
+
+.pipeline.in .pipeline-stage:nth-child(1) {
+  transition-delay: 0ms;
+}
+.pipeline.in .pipeline-stage:nth-child(2) {
+  transition-delay: 260ms;
+}
+.pipeline.in .pipeline-stage:nth-child(3) {
+  transition-delay: 520ms;
+}
+.pipeline.in .pipeline-stage:nth-child(4) {
+  transition-delay: 780ms;
+}
+.pipeline.in .pipeline-stage:nth-child(5) {
+  transition-delay: 1040ms;
+}
+
+.pipeline-stage h3 {
+  font: 500 var(--text-sm) / 1.3 var(--font-mono);
+  margin: 0 0 0.4rem;
+  color: var(--ink);
+}
+
+.pipeline-stage p {
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  margin: 0;
+}
+
+.pipeline-stage .stage-index {
+  position: absolute;
+  top: -0.7rem;
+  left: 0.9rem;
+  padding: 0 0.4rem;
+  background: var(--paper);
+  font: 500 var(--text-xs) / 1.4 var(--font-mono);
+  color: var(--mark);
+}
+
+/* connector between stages (desktop) */
+.pipeline-stage:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -1rem;
+  width: 1rem;
+  height: 1px;
+  background: var(--mark);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 260ms var(--ease-in-out);
+}
+
+.pipeline.in .pipeline-stage:nth-child(2)::before {
+  transition-delay: 130ms;
+  transform: scaleX(1);
+}
+.pipeline.in .pipeline-stage:nth-child(3)::before {
+  transition-delay: 390ms;
+  transform: scaleX(1);
+}
+.pipeline.in .pipeline-stage:nth-child(4)::before {
+  transition-delay: 650ms;
+  transform: scaleX(1);
+}
+.pipeline.in .pipeline-stage:nth-child(5)::before {
+  transition-delay: 910ms;
+  transform: scaleX(1);
+}
+
+@media (max-width: 980px) {
+  .pipeline-stage:not(:first-child)::before {
+    top: -1rem;
+    left: 1.25rem;
+    width: 1px;
+    height: 1rem;
+    transform: scaleY(0);
+    transform-origin: top;
+  }
+
+  .pipeline.in .pipeline-stage:not(:first-child)::before {
+    transform: scaleY(1);
+  }
+}
+
+.pipeline-note {
+  margin: 2rem auto 0;
+  font: 400 var(--text-sm) / 1.7 var(--font-mono);
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.pipeline-note b {
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+
+/* -------------------------------------------------------- agent session --- */
+
+.agent-frame {
+  border-radius: var(--radius-outer);
+  background: var(--paper-sunken);
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
+}
+
+.agent-log {
+  padding: 1.4rem clamp(1rem, 3vw, 2rem);
+  display: grid;
+  gap: 1rem;
+  max-width: 52rem;
+  margin-inline: auto;
+}
+
+.agent-msg {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 480ms var(--ease-out),
+    transform 480ms var(--ease-out);
+  transition-delay: var(--msg-delay, 0ms);
+}
+
+.agent-log.in .agent-msg {
+  opacity: 1;
+  transform: none;
+}
+
+.agent-msg .msg-meta {
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 0.4rem;
+}
+
+.agent-msg[data-role="agent"] .msg-meta::before {
+  content: "▸ ";
+  color: var(--mark);
+}
+
+.agent-msg pre {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--paper);
+  font: 400 0.8rem/1.7 var(--font-mono);
+  overflow-x: auto;
+}
+
+.agent-msg .err {
+  color: var(--danger);
+}
+
+.agent-msg .fix {
+  color: var(--success);
+}
+
+.agent-msg .dim {
+  color: var(--ink-faint);
+}
+
+.agent-msg p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  max-width: 60ch;
+}
+
+/* ----------------------------------------------------------- branching --- */
+
+.branch-demo {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.branch-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.branch-cmd {
+  font: 500 0.8rem/1 var(--font-mono);
+  color: var(--ink-muted);
+  background: var(--paper-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-inner);
+  padding: 0.6rem 0.85rem;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+.branch-cmd::before {
+  content: "$ ";
+  color: var(--ink-faint);
+}
+
+.branch-cmd:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--hairline-strong);
+}
+
+.branch-cmd:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.branch-cmd:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.branch-cmd[data-primary="true"] {
+  color: var(--mark-strong);
+  border-color: var(--primary-wash);
+}
+
+/* The graph. Inherited nodes are hollow because nothing was copied — the
+   drawing carries the model, not just decoration. */
+.branch-graph {
+  margin: 0 auto;
+  max-width: 48rem;
+}
+
+.branch-graph svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.lane-main {
+  stroke: var(--hairline-strong);
+  stroke-width: 1.5;
+}
+
+.lane-name {
+  font: 500 11px var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  fill: var(--ink-faint);
+}
+
+.lane-name[data-on="false"] {
+  opacity: 0;
+}
+
+.lane-name[data-on="true"] {
+  opacity: 1;
+  transition: opacity var(--duration-base) var(--ease-out) 120ms;
+}
+
+/* Edges draw themselves on, and retract when the branch drops. */
+.edge {
+  fill: none;
+  stroke: var(--mark);
+  stroke-width: 1.5;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 620ms var(--ease-in-out);
+}
+
+.edge[data-on="true"] {
+  stroke-dashoffset: 0;
+}
+
+.edge-line {
+  stroke: var(--mark);
+  stroke-width: 1.5;
+  stroke-dasharray: 244;
+  stroke-dashoffset: 244;
+  transition: stroke-dashoffset 520ms var(--ease-in-out) 260ms;
+}
+
+.edge-line[data-on="true"] {
+  stroke-dashoffset: 0;
+}
+
+/* Nodes */
+.bnode {
+  opacity: 0;
+  transition:
+    opacity 420ms var(--ease-out),
+    transform 620ms var(--ease-in-out);
+  transition-delay: var(--node-delay, 0ms);
+}
+
+.bnode[data-visible="true"] {
+  opacity: 1;
+}
+
+.bnode-dot {
+  transition:
+    fill var(--duration-base) var(--ease-out),
+    stroke var(--duration-base) var(--ease-out);
+}
+
+/* inherited: hollow + dashed — a read through the overlay, not a copy */
+.bnode[data-state="inherited"] .bnode-dot {
+  fill: var(--paper);
+  stroke: var(--ink-faint);
+  stroke-width: 1.25;
+  stroke-dasharray: 2 2;
+}
+
+/* own: solid — a real row exists here */
+.bnode[data-state="own"] .bnode-dot {
+  fill: var(--mark);
+  stroke: none;
+}
+
+/* tombstone: the only place the danger hue appears in this demo */
+.bnode[data-state="tombstone"] .bnode-dot {
+  fill: var(--paper);
+  stroke: var(--danger);
+  stroke-width: 1.25;
+  stroke-dasharray: none;
+}
+
+.bnode-x {
+  stroke: var(--danger);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+}
+
+.bnode-label {
+  font: 400 11px var(--font-mono);
+  fill: var(--ink-faint);
+}
+
+.bnode[data-state="own"] .bnode-label {
+  fill: var(--ink-muted);
+}
+
+.bnode[data-state="tombstone"] .bnode-label {
+  fill: var(--danger);
+  text-decoration: line-through;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edge,
+  .edge-line,
+  .bnode {
+    transition: none;
+  }
+}
+
+.branch-status {
+  min-height: 1.5em;
+  margin: 0;
+  font: 400 var(--text-sm) / 1.6 var(--font-mono);
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.branch-status b {
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+
+/* --------------------------------------------------------- typed reads --- */
+
+.typed-panes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 1rem;
+}
+
+.typed-pane {
+  border-radius: var(--radius);
+  background: var(--paper-sunken);
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
+}
+
+.typed-pane-title {
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--hairline);
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.typed-pane pre {
+  margin: 0;
+  padding: 0.9rem 0;
+  font: 400 0.8rem/1.75 var(--font-mono);
+  overflow-x: auto;
+}
+
+.typed-line {
+  display: block;
+  padding: 0 1.1rem;
+  color: var(--ink-muted);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.typed-line[data-hot="true"] {
+  background: var(--mark-tint);
+  color: var(--ink);
+}
+
+.typed-line .tk-key {
+  color: var(--ink);
+}
+
+.typed-line .tk-str {
+  color: var(--code-string);
+}
+
+.typed-line .tk-type {
+  color: var(--code-type);
+}
+
+.typed-line .tk-dim {
+  color: var(--ink-faint);
+}
+
+.typed-hint {
+  margin: 1.25rem auto 0;
+  font: 400 var(--text-sm) / 1.6 var(--font-mono);
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.typed-hint b {
+  color: var(--mark-strong);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------ registry --- */
+
+.registry-demo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: clamp(1.5rem, 4vw, 3rem);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .registry-demo {
+    grid-template-columns: 1fr;
+  }
+}
+
+.file-tree {
+  list-style: none;
+  margin: 0;
+  padding: 1rem 1.2rem;
+  border-radius: var(--radius);
+  background: var(--paper-sunken);
+  box-shadow: var(--shadow-raised);
+  font: 400 0.82rem/1.9 var(--font-mono);
+  color: var(--ink-muted);
+}
+
+.file-tree .added {
+  color: var(--ink);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition:
+    opacity 420ms var(--ease-out),
+    transform 420ms var(--ease-out);
+  transition-delay: var(--drop-delay, 0ms);
+}
+
+.file-tree.in .added {
+  opacity: 1;
+  transform: none;
+}
+
+.file-tree .added::before {
+  content: "+ ";
+  color: var(--mark);
+}
+
+.file-tree .dim {
+  color: var(--ink-faint);
+}
+
+/* --------------------------------------------------------------- runtime --- */
+
+.runtime-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1rem;
+}
+
+.runtime-card {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-outer);
+  background: var(--paper-raised);
+  padding: 1.4rem 1.4rem 1.2rem;
+}
+
+.runtime-card h3 {
+  font: 400 var(--text-lg) / 1.2 var(--font-display);
+  letter-spacing: -0.015em;
+  margin: 0 0 0.6rem;
+}
+
+.runtime-card > p {
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  margin: 0 0 1.1rem;
+}
+
+.runtime-card pre {
+  margin: 0;
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius);
+  background: var(--paper-sunken);
+  border: 1px solid var(--hairline);
+  font: 400 0.78rem/1.7 var(--font-mono);
+  color: var(--ink-muted);
+  overflow-x: auto;
+}
+
+.runtime-card pre b {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.runtime-card pre .t-mark {
+  color: var(--mark-strong);
+}
+
+.boot-line {
+  display: block;
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out);
+  transition-delay: var(--boot-delay, 0ms);
+}
+
+.runtime-card.in .boot-line {
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------------ faq --- */
+
+.faq-list {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0;
+}
+
+.faq-item {
+  border-top: 1px solid var(--hairline);
+}
+
+.faq-item:last-child {
+  border-bottom: 1px solid var(--hairline);
+}
+
+.faq-item summary {
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  padding: 1.1rem 0.25rem;
+  cursor: pointer;
+  font: 500 var(--text-base) / 1.4 var(--font-sans);
+  color: var(--ink);
+}
+
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-item summary::before {
+  content: "+";
+  font-family: var(--font-mono);
+  color: var(--mark);
+  transition: rotate var(--duration-base) var(--ease-in-out);
+  flex: none;
+}
+
+.faq-item[open] summary::before {
+  rotate: 45deg;
+}
+
+.faq-answer {
+  padding: 0 0.25rem 1.2rem 1.9rem;
+  margin: 0;
+  color: var(--ink-muted);
+  max-width: 58ch;
+}
+
+/* ------------------------------------------------------------------ cta --- */
+
+.cta-install {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 auto 3rem;
+  padding: 0.85rem 1.2rem;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius);
+  background: var(--paper-sunken);
+  font: 400 var(--text-sm) / 1 var(--font-mono);
+  color: var(--ink);
+}
+
+.cta-install .t-prompt {
+  color: var(--mark);
+}
+
+.copy-button {
+  border: 0;
+  background: none;
+  color: var(--ink-faint);
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0.25rem;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.copy-button:hover {
+  color: var(--mark);
+}
+
+/* contact form (the live demo) — block centered, fields left-aligned */
+.contact {
+  max-width: 30rem;
+  margin-inline: auto;
+}
+
+.contact h3,
+.contact .contact-sub {
+  text-align: center;
+}
+
+.contact h3 {
+  font: 400 var(--text-lg) / 1.25 var(--font-display);
+  margin: 0 0 0.35rem;
+}
+
+.contact-sub {
+  font: 400 var(--text-xs) / 1.6 var(--font-mono);
+  color: var(--ink-faint);
+  margin: 0 0 1.4rem;
+}
+
+.contact-sub code {
+  color: var(--ink-muted);
+}
+
+.contact form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.contact label {
+  display: grid;
+  gap: 0.35rem;
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.contact input,
+.contact textarea {
+  font: 400 var(--text-sm) / 1.5 var(--font-sans);
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-inner);
+  padding: 0.6rem 0.75rem;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.contact input:focus-visible,
+.contact textarea:focus-visible {
+  outline: none;
+  border-color: var(--mark);
+}
+
+.contact button[type="submit"] {
+  justify-self: center;
+}
+
+.contact-note {
+  font: 400 var(--text-sm) / 1.6 var(--font-mono);
+  color: var(--success);
+  margin: 0.75rem 0 0;
+}
+
+.contact-note .dim {
+  color: var(--ink-faint);
+}
+
+.contact-error {
+  color: var(--danger);
+}
+
+/* --------------------------------------------------------------- footer --- */
+
+.colophon {
+  border-top: 1px solid var(--hairline);
+}
+
+.colophon-inner {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 3rem var(--gutter) 4rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 2rem;
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+}
+
+.colophon h4 {
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 0.8rem;
+}
+
+.colophon p {
+  margin: 0 0 0.5rem;
+  max-width: 38ch;
+}
+
+.colophon a {
+  color: var(--ink-muted);
+  text-decoration-color: var(--hairline-strong);
+  text-underline-offset: 3px;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.colophon a:hover {
+  color: var(--mark-strong);
+}
+
+.colophon code {
+  font-size: 0.85em;
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------ reduced motion --- */
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .pipeline-stage,
+  .agent-msg,
+  .file-tree .added {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .pipeline-stage:not(:first-child)::before {
+    transform: none;
+    transition: none;
+  }
+
+  .proof-mark path,
+  .graft-figure .drawn {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .graft-figure .union,
+  .graft-figure .union-ring,
+  .caret {
+    animation: none;
+  }
+
+  .boot-line {
+    opacity: 1;
+    transition: none;
+  }
+}

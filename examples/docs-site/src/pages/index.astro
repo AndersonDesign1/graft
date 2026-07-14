@@ -1,68 +1,128 @@
 ---
 /**
- * Landing placeholder — the real landing (bento + live studio elements +
- * animated SVGs) is execution step 4 in the P7.5 design note. This page
- * already dogfoods the loop: everything below is a Graft read.
+ * The landing — every section is live, nothing is a screenshot: the terminal
+ * types the real loop, the pipeline draws itself, the MCP transcript replays
+ * a real error → fix exchange, the branching model is a toy you can poke,
+ * and the contact form writes an actual data_records row. Hero copy + FAQ
+ * come from the `home` document — the page eats its own dogfood.
+ * Concept: docs/design-notes/landing-redesign.md.
  */
-import Base from "../layouts/Base.astro";
+import { AgentSession } from "../components/landing/agent-session";
+import { BranchingDemo } from "../components/landing/branching";
+import { ClosingCta } from "../components/landing/cta";
+import { LandingFaq } from "../components/landing/faq";
+import { Hero } from "../components/landing/hero";
+import { Pipeline } from "../components/landing/pipeline";
+import { RegistryDrop } from "../components/landing/registry";
+import { RuntimeSection } from "../components/landing/runtime";
+import { TypedReads } from "../components/landing/typed-reads";
+import Landing from "../layouts/Landing.astro";
 import { getGraft } from "../lib/graft";
-import { renderMdx } from "../lib/mdx";
+import { WOW_LOOP, highlightSession } from "../lib/highlight";
 
-const home = await getGraft().getContent("pages", "home");
-const bodyHtml = home ? await renderMdx(home.body) : "";
+const doc = await getGraft().getContent("pages", "home");
+const faqs = doc?.data.faqs ?? [];
+
+// Tokenized at build time with the same shiki themes the docs use, so the
+// terminal and a fenced ```console block are colored by one highlighter.
+const terminal = await highlightSession(WOW_LOOP);
 ---
 
-<Base
-  title={home ? `${home.data.title} — the agent-native CMS` : "Graft"}
-  description={home?.data.description}
+<Landing
+  title="Graft — the agent-native CMS"
+  description={doc?.data.description ??
+    "Content as code: MDX in git, one Zod schema, a derived Postgres index."}
 >
-  <section class="hero">
-    <p class="label">/* read from content_index via @graft/sdk-astro */</p>
-    <h1>{home?.data.title ?? "Graft"}</h1>
-    {home?.data.tagline && <p class="tagline">{home.data.tagline}</p>}
-    <div class="prose" set:html={bodyHtml} />
-    <a class="cta pressable" href="/docs/getting-started">Get started</a>
-  </section>
-</Base>
+  <div class="landing">
+    <Hero tagline={doc?.data.tagline} terminal={terminal} client:load />
 
-<style>
-  .hero {
-    padding: var(--space-24) var(--space-8);
-    max-width: 56rem;
-  }
+    <section class="section" id="loop">
+      <p class="section-label">§01 <em>the loop</em></p>
+      <div class="reveal">
+        <h2>One loop, <span class="marked">no publish button.</span></h2>
+        <p class="section-lede">
+          Edit a file, run <code>graft compile</code>, refresh. Validation, projection, and audit
+          happen in the loop — publishing is a side effect of correctness.
+        </p>
+      </div>
+      <Pipeline client:visible />
+    </section>
 
-  .hero h1 {
-    font-family: var(--font-display);
-    font-size: var(--text-3xl);
-    letter-spacing: var(--tracking-display);
-    margin-block: var(--space-4) var(--space-6);
-  }
+    <section class="section" id="agents">
+      <p class="section-label">§02 <em>agent-native</em></p>
+      <div class="reveal">
+        <h2>Errors that <span class="marked">teach the fix.</span></h2>
+        <p class="section-lede">
+          A cold agent with nothing but the MCP endpoint has authored pages on Graft — schemas,
+          errors, and tool descriptions were its only teachers. This is the actual loop:
+        </p>
+      </div>
+      <AgentSession client:visible />
+    </section>
 
-  .tagline {
-    font-size: var(--text-lg);
-    color: var(--ink-muted);
-    max-width: 34ch;
-    margin-block-end: var(--space-8);
-  }
+    <section class="section" id="branching">
+      <p class="section-label">§03 <em>branching</em></p>
+      <div class="reveal">
+        <h2>Branch content like code. <span class="marked">Because it is.</span></h2>
+        <p class="section-lede">
+          Branches are copy-on-write overlays (or real Neon forks) — instant, isolated, merged
+          with a dry-run first. Try the model:
+        </p>
+      </div>
+      <BranchingDemo client:visible />
+    </section>
 
-  .cta {
-    display: inline-block;
-    margin-block-start: var(--space-8);
-    background: var(--wax);
-    color: var(--paper);
-    text-decoration: none;
-    font-size: var(--text-sm);
-    font-weight: 600;
-    padding: var(--space-3) var(--space-6);
-    border-radius: var(--radius-inner);
-    transition:
-      background var(--duration-fast) var(--ease-out),
-      transform var(--duration-press) var(--ease-out);
-  }
+    <section class="section" id="types">
+      <p class="section-label">§04 <em>typed reads</em></p>
+      <div class="reveal">
+        <h2>One schema. <span class="marked">Zero codegen.</span></h2>
+        <p class="section-lede">
+          The Zod schema in <code>graft.config.ts</code> types the compiler, the SDKs, the
+          functions, and the MCP tools — inference end to end.
+        </p>
+      </div>
+      <TypedReads client:visible />
+    </section>
 
-  @media (hover: hover) and (pointer: fine) {
-    .cta:hover {
-      background: var(--wax-deep);
-    }
-  }
-</style>
+    <section class="section" id="registry">
+      <p class="section-label">§05 <em>owned primitives</em></p>
+      <div class="reveal">
+        <h2><span class="marked">graft add</span> — and you own the code.</h2>
+      </div>
+      <RegistryDrop client:visible />
+    </section>
+
+    <section class="section" id="runtime">
+      <p class="section-label">§06 <em>runtime</em></p>
+      <div class="reveal">
+        <h2>Embed it, <span class="marked">or serve it whole.</span></h2>
+        <p class="section-lede">
+          Stateless Web-standard handlers under everything: mount them in Next, Astro, or
+          SvelteKit — or run the single container. Auth verifies, never mints; destructive ops
+          wait for a human.
+        </p>
+      </div>
+      <RuntimeSection client:visible />
+    </section>
+
+    <section class="section" id="faq">
+      <p class="section-label">§07 <em>faq — served from content_index</em></p>
+      <div class="reveal">
+        <h2>Asked, answered.</h2>
+      </div>
+      <LandingFaq items={faqs} />
+    </section>
+
+    <section class="section" id="start">
+      <p class="section-label">§08 <em>begin</em></p>
+      <div class="reveal">
+        <h2>Graft it onto <span class="marked">your repo.</span></h2>
+        <p class="section-lede">
+          One command scaffolds the config, the first document, and the llms.txt that teaches
+          your agent the rest.
+        </p>
+      </div>
+      <ClosingCta client:visible />
+    </section>
+  </div>
+</Landing>
