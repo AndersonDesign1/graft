@@ -1,42 +1,128 @@
 /**
- * Graft design tokens v2 — the single source for color, type, space, motion.
+ * Graft design tokens — the single source for color, type, space, motion.
  *
- * Thesis: editorial print. Black ink, warm ivory paper, and one vermilion —
- * the color of grafting wax, the material that seals a scion to its stock —
- * used the way an editor uses a red pen: marks, unions, decisions. No
- * gradients-for-vibes, no SaaS blue-gray. Serif display over a working sans,
- * mono for the annotation voice. Nothing here is a framework default.
+ * Thesis: editorial print, monochrome. A black stage, off-white type, and
+ * elevation carried entirely by *lightness* — surfaces step up from the stage
+ * rather than being drawn in with borders. There is no brand accent. Emphasis
+ * is "bright": the mark, the union, the active state and the primary button are
+ * simply the lightest thing on screen. The only chromatic color in the system
+ * is the error red, and it is function, not identity.
  *
- * Theming: every color is light-dark(). `color-scheme` on :root follows the
- * OS; a theme toggle stamps data-theme on <html> and wins in both directions.
- * The landing presents dark-first; docs follow the reader.
+ * Why no accent (this is measured, not vibes):
+ *   A colored accent on a black stage is a trap. Solving for the lightness a
+ *   hue needs to pass APCA 75 as text on black, red/blue/magenta collapse to
+ *   pastels (chroma 0.067-0.091); only green survives, and green reads as
+ *   "success", not as a brand. Meanwhile every CMS competitor is already
+ *   holding a hue (BaseHub orange #ff6c02, Contentful blue, Strapi indigo).
+ *   Monochrome is the one position nobody occupies, and it is the one that
+ *   makes the *content* — code, terminals, diffs — the only colored thing.
+ *
+ * Structure (the shadcn pattern):
+ *
+ *   1. PALETTE   raw values, authored in OKLCH (perceptually uniform: equal L
+ *                steps = equal brightness). One neutral ramp, one danger red.
+ *                The only place a literal color is allowed.
+ *   2. SEMANTIC  what a color *means* (--background, --primary, --danger).
+ *                Every value is light-dark(), so one set of names themes both
+ *                schemes. Components MUST consume this layer, never layer 1.
+ *   3. ALIASES   the house vocabulary (--paper/--ink/--mark) pointing at layer
+ *                2, so component CSS reads editorially.
+ *
+ * Contrast: every pairing is APCA-verified against its real background (Lc
+ * noted inline). Body text >= 75; small non-body marks >= 60.
  */
 
 :root {
   color-scheme: light dark;
 
-  /* ---- color: ink & ivory ---- */
-  --paper: light-dark(#f7f5f0, #0e0d0b); /* warm ivory / warm ink — never #fff/#000 */
-  --paper-raised: light-dark(#ffffff, #161511); /* cards, code, embedded UI frames */
-  --paper-sunken: light-dark(#eeebe3, #0a0908); /* wells, table stripes, terminals */
-  --ink: light-dark(#16150f, #edeae2);
-  --ink-muted: light-dark(#5f5c52, #a39f93);
-  --ink-faint: light-dark(#8c887b, #6b675c);
-  --hairline: light-dark(rgba(22, 21, 15, 0.14), rgba(237, 234, 226, 0.13));
-  --hairline-strong: light-dark(rgba(22, 21, 15, 0.34), rgba(237, 234, 226, 0.32));
+  /* ====================================================== 1. palette === */
 
-  /* ---- color: vermilion (grafting wax; the red pen) ---- */
-  --wax: light-dark(#d63a25, #e8442e); /* links, actions, live marks, unions */
-  --wax-deep: light-dark(#a92c1a, #ff6a4f); /* hover/active on wax */
-  --wax-tint: light-dark(rgba(214, 58, 37, 0.08), rgba(232, 68, 46, 0.1)); /* washes */
+  /* The neutral ramp. Hue 95 at chroma 0.003 — a whisper of warmth, so this
+     reads as ink-on-paper rather than a cold UI gray. Everything is one hue;
+     only L moves. Elevation IS lightness. */
+  --n-0: #000000; /* the stage */
+  --n-1: oklch(0.17 0.003 95); /* #100f0e — sunken: wells, terminals, code */
+  --n-2: oklch(0.22 0.003 95); /* #1b1b19 — raised: cards, embedded UI frames */
+  --n-3: oklch(0.27 0.003 95); /* #272625 — elevated: hover, popovers */
+  --n-4: oklch(0.32 0.003 95); /* #333331 — the brightest surface */
 
-  /* ---- semantic ---- */
-  --color-bg: var(--paper);
-  --color-fg: var(--ink);
-  --color-accent: var(--wax);
-  --color-selection-bg: var(--wax);
-  --color-selection-fg: light-dark(#f7f5f0, #0e0d0b);
-  --color-focus-ring: var(--wax);
+  --n-6: oklch(0.62 0.003 95); /* #878684 — light-scheme faint */
+  --n-7: oklch(0.79 0.003 95); /* #bcbcb9 — dark-scheme faint  — Lc -65 on black */
+  --n-8: oklch(0.86 0.003 95); /* #d1d1cf — dark-scheme muted  — Lc -79 on black */
+  --n-9: oklch(0.96 0.003 95); /* #f2f2ef — dark-scheme text/bright — Lc -99 */
+
+  /* light scheme neutrals — warm ivory paper, warm near-black ink */
+  --paper-0: #f7f5f0; /* the page */
+  --paper-1: #ffffff; /* raised */
+  --paper-2: #eeebe3; /* sunken */
+  --ink-0: oklch(0.2 0.006 95); /* #1b1a16 — text, and the light-scheme "bright" */
+  --ink-0-hover: oklch(0.32 0.006 95); /* one step off the fill, not a gray jump */
+  --ink-1: oklch(0.44 0.006 95); /* #5c5a52 — muted */
+  --ink-2: oklch(0.56 0.005 95); /* #7a7871 — faint */
+
+  /* danger — hue 25. The ONLY hue in the system; errors only, never brand.
+     A red bright enough for APCA 75 on black would be pale pink, so error
+     text targets the non-body floor (Lc 60). */
+  --danger-300: oklch(0.77 0.123 25); /* on black  #f9948c — Lc -60 */
+  --danger-600: oklch(0.5 0.183 25); /* on ivory  #b42027 — Lc  75 */
+
+  /* syntax — the ONE place color is welcome, because it is content, not
+     chrome. Tuned to clear Lc 60 on the sunken surface. */
+  --amber-400: oklch(0.76 0.132 85); /* #d7aa3e */
+  --azure-400: oklch(0.755 0.085 240); /* #7db7e0 */
+
+  /* ===================================================== 2. semantic === */
+
+  --background: light-dark(var(--paper-0), var(--n-0));
+  --muted: light-dark(var(--paper-2), var(--n-1)); /* wells, terminals */
+  --card: light-dark(var(--paper-1), var(--n-2)); /* cards, embedded UI */
+  --elevated: light-dark(var(--paper-1), var(--n-3)); /* hover, popovers */
+
+  --foreground: light-dark(var(--ink-0), var(--n-9));
+  --muted-foreground: light-dark(var(--ink-1), var(--n-8)); /* passes body 75 */
+  --faint-foreground: light-dark(var(--ink-2), var(--n-7)); /* passes non-body 60 */
+
+  --border: light-dark(rgb(27 26 22 / 0.14), rgb(242 242 239 / 0.11));
+  --border-strong: light-dark(rgb(27 26 22 / 0.34), rgb(242 242 239 / 0.26));
+
+  /* "Primary" is not a hue — it is BRIGHT. Marks, unions, the active state,
+     the filled button. In dark it is the lightest neutral; in light it is the
+     darkest. The fill and its label simply invert. */
+  --primary: light-dark(var(--ink-0), var(--n-9));
+  --primary-hover: light-dark(var(--ink-0-hover), #ffffff); /* fill hover: one step, same direction */
+  --primary-foreground: light-dark(var(--paper-0), var(--n-0));
+  /* Alpha variants derive from --primary, so they follow it.
+     light-dark() must wrap a whole <color> — it cannot sit inside rgb()'s
+     channel list — hence color-mix rather than an --rgb channel triple. */
+  --primary-tint: color-mix(in srgb, var(--primary) 8%, transparent); /* washes, hot rows */
+  --primary-wash: color-mix(in srgb, var(--primary) 40%, transparent); /* soft borders */
+  --primary-underline: color-mix(in srgb, var(--primary) 35%, transparent);
+
+  /* The graft took: success is simply bright. One system, no traffic lights. */
+  --success: var(--primary);
+  --danger: light-dark(var(--danger-600), var(--danger-300));
+
+  --code-string: var(--amber-400);
+  --code-type: var(--azure-400);
+
+  --selection-background: var(--primary);
+  --selection-foreground: var(--primary-foreground);
+  --focus-ring: var(--primary);
+
+  /* ====================================================== 3. aliases === */
+  /* House vocabulary. Component CSS reads these; they resolve to layer 2. */
+
+  --paper: var(--background);
+  --paper-raised: var(--card);
+  --paper-sunken: var(--muted);
+  --ink: var(--foreground);
+  --ink-muted: var(--muted-foreground);
+  --ink-faint: var(--faint-foreground);
+  --hairline: var(--border);
+  --hairline-strong: var(--border-strong);
+  --mark: var(--primary); /* the editorial mark — bright, not colored */
+  --mark-strong: var(--primary-hover);
+  --mark-tint: var(--primary-tint);
 
   /* ---- type ---- */
   --font-display: "Instrument Serif", "Iowan Old Style", georgia, serif;
@@ -76,17 +162,18 @@
   --radius: 6px; /* cards, code blocks */
   --radius-outer: 10px; /* bento cells, embedded UI frames */
 
-  /* ---- elevation: layered translucent shadows, never solid borders ---- */
+  /* ---- elevation: lightness first, shadow second. On a black stage a
+     shadow is invisible; the surface itself must get brighter. ---- */
   --shadow-raised:
-    0 0 0 1px var(--hairline),
-    0 1px 2px light-dark(rgba(22, 21, 15, 0.05), rgba(0, 0, 0, 0.45)),
-    0 4px 12px light-dark(rgba(22, 21, 15, 0.06), rgba(0, 0, 0, 0.4));
+    0 0 0 1px var(--border),
+    0 1px 2px light-dark(rgb(27 26 22 / 0.05), rgb(0 0 0 / 0.6)),
+    0 4px 12px light-dark(rgb(27 26 22 / 0.06), rgb(0 0 0 / 0.5));
   --shadow-floating:
-    0 0 0 1px var(--hairline),
-    0 2px 6px light-dark(rgba(22, 21, 15, 0.07), rgba(0, 0, 0, 0.5)),
-    0 12px 32px light-dark(rgba(22, 21, 15, 0.1), rgba(0, 0, 0, 0.55));
+    0 0 0 1px var(--border),
+    0 2px 6px light-dark(rgb(27 26 22 / 0.07), rgb(0 0 0 / 0.65)),
+    0 12px 32px light-dark(rgb(27 26 22 / 0.1), rgb(0 0 0 / 0.7));
   /* Image outlines: pure black/white — tinted neutrals read as dirt. */
-  --outline-image: light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.1));
+  --outline-image: light-dark(rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.1));
 
   /* ---- motion (custom curves; the CSS built-ins are too weak) ---- */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
