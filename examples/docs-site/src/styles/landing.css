@@ -821,42 +821,38 @@
   stroke: var(--mark);
 }
 
-/* the light: hidden until the circuit is drawn, then circling forever —
-   forward along the rail, home along the return wire (7s round trip) */
-.loop .pulse {
+/* the light: hidden until the circuit is drawn, then lapping it forever.
+   One dash (8% of the path) cycling its offset around a closed path — the
+   path ends where it starts, so the lap has no seam. Linear, because the
+   light is constant motion, not a UI transition. */
+.loop .flow {
+  fill: none;
+  stroke: var(--mark);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 0.08 0.92;
   opacity: 0;
 }
 
-.loop.in .pulse {
+.loop .flow-halo {
+  stroke-width: 5;
+  opacity: 0;
+}
+
+.loop.in .flow {
   opacity: 1;
   transition: opacity 400ms var(--ease-out) 1800ms;
+  animation: loop-lap 7s linear 1800ms infinite;
 }
 
-.loop.in .pulse-fwd {
-  animation: loop-fwd 7s linear 1800ms infinite;
+.loop.in .flow-halo {
+  opacity: 0.16;
 }
 
-.loop.in .pulse-ret {
-  animation: loop-ret 7s linear 1800ms infinite;
-}
-
-@keyframes loop-fwd {
-  0% {
-    transform: translateX(0);
-  }
-  50%,
-  100% {
-    transform: translateX(1204px);
-  }
-}
-
-@keyframes loop-ret {
-  0%,
-  50% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-1304px);
+@keyframes loop-lap {
+  to {
+    stroke-dashoffset: -1;
   }
 }
 
@@ -1661,7 +1657,8 @@
   }
 
   /* no circling light; the ret-label still appears */
-  .loop .pulse {
+  .loop .flow,
+  .loop.in .flow {
     animation: none;
     opacity: 0;
   }

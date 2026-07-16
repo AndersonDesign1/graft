@@ -12,9 +12,9 @@
  *
  * Everything is live:
  *   - the circuit draws itself on entry (pathLength=1 + dashoffset transition)
- *   - a pulse of light circles it continuously: forward along the rail, back
- *     along the return wire (a gradient rect masked by the wire path — the
- *     mask *is* the line, so the light appears to travel through it)
+ *   - a pulse of light laps it endlessly: one dash cycling its offset around
+ *     a closed path (the path's end point is its start point, so there is no
+ *     seam — the light never stops and never jumps)
  *   - each station is a tab: hover/focus/click makes it hot (strokes brighten,
  *     its detail draws) and the CLI strip below types that stage's real
  *     command and output
@@ -65,30 +65,15 @@ const STAGES = [
 const CX = [96, 288, 480, 672, 864];
 const RAIL_Y = 168;
 
+/** The full circuit as one path whose end point *is* its start point, so a
+ *  dash cycling its offset laps it without a seam: rail left → right, return
+ *  wire right → left, home. */
+const CIRCUIT = `M${CX[0]} ${RAIL_Y} H${CX[4]} C926 ${RAIL_Y} 926 252 ${CX[4]} 252 L192 252 C130 252 130 ${RAIL_Y} ${CX[0]} ${RAIL_Y}`;
+
 function Stations({ active }: { active: number }) {
   const hot = (i: number) => (active === i ? "true" : undefined);
   return (
     <svg viewBox="0 90 960 172" aria-hidden="true" className="loop-svg">
-      <defs>
-        <linearGradient id="loop-grad" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="var(--mark)" stopOpacity="0" />
-          <stop offset="50%" stopColor="var(--mark)" stopOpacity="1" />
-          <stop offset="100%" stopColor="var(--mark)" stopOpacity="0" />
-        </linearGradient>
-        {/* the light runs *through* the wires: mask = the line itself */}
-        <mask id="loop-rail-mask">
-          <path d={`M${CX[0]} ${RAIL_Y} H${CX[4]}`} stroke="#fff" strokeWidth="1.5" />
-        </mask>
-        <mask id="loop-ret-mask">
-          <path
-            d={`M${CX[4]} ${RAIL_Y} C926 ${RAIL_Y} 926 252 ${CX[4]} 252 L192 252 C130 252 130 ${RAIL_Y} ${CX[0]} ${RAIL_Y}`}
-            stroke="#fff"
-            strokeWidth="1.5"
-            fill="none"
-          />
-        </mask>
-      </defs>
-
       {/* the rail every station stands on, and the return wire that closes
           the circuit — render feeds back into editing */}
       <path className="ln rail drawn" pathLength={1} d={`M${CX[0]} ${RAIL_Y} H${CX[4]}`} />
@@ -101,26 +86,12 @@ function Stations({ active }: { active: number }) {
         edit again — the loop closes
       </text>
 
-      {/* the light, circling: forward along the rail… */}
-      <rect
-        className="pulse pulse-fwd"
-        x="-170"
-        y="158"
-        width="170"
-        height="20"
-        fill="url(#loop-grad)"
-        mask="url(#loop-rail-mask)"
-      />
-      {/* …and home along the return wire */}
-      <rect
-        className="pulse pulse-ret"
-        x="960"
-        y="150"
-        width="170"
-        height="116"
-        fill="url(#loop-grad)"
-        mask="url(#loop-ret-mask)"
-      />
+      {/* the light: one dash cycling a *closed* path (end = start), so the
+          lap has no seam — forward along the rail, home along the return
+          wire, around again forever. The halo is the same dash, wider and
+          faint, so the segment glows without a filter. */}
+      <path className="flow flow-halo" pathLength={1} d={CIRCUIT} />
+      <path className="flow" pathLength={1} d={CIRCUIT} />
 
       {/* 01 · author — one MDX plate */}
       <g className="station" data-hot={hot(0)} style={{ "--d": "150ms" } as React.CSSProperties}>
