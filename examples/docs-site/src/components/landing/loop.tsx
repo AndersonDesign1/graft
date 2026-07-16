@@ -1,27 +1,25 @@
 "use client";
 
 /**
- * §01 — the loop, drawn as one closed circuit.
+ * §01 — the loop, drawn as one closed circuit, set vertically.
  *
- * The five stages used to be five bordered cards; a bordered box with a title
- * and a paragraph is the most generic object in web design. Now the section is
- * a single hand-authored schematic: five isometric line-art stations standing
- * on one rail — mdx plate → validation gate → index rows → typed read →
- * rendered page — with a return wire underneath, because the whole claim is
- * that this is a *loop*: render feeds back into editing.
+ * The horizontal version left a dead zone beside the copy; this composition
+ * fills the row: the five stages are a hairline row list (the tabs), the CLI
+ * strip types the hot stage's real evidence beneath them, and the circuit
+ * stands to the right — a vertical rail the stations hang off, with the
+ * return wire sweeping back up ("edit again — the loop closes").
  *
  * Everything is live:
- *   - the circuit draws itself on entry (pathLength=1 + dashoffset transition)
- *   - a pulse of light laps it endlessly: one dash cycling its offset around
- *     a closed path (the path's end point is its start point, so there is no
- *     seam — the light never stops and never jumps)
- *   - each station is a tab: hover/focus/click makes it hot (strokes brighten,
- *     its detail draws) and the CLI strip below types that stage's real
- *     command and output
+ *   - the circuit draws in, holds, retracts and redraws forever (10s cycle;
+ *     the station stagger is an animation-delay, so the phase persists and
+ *     the draw/retract runs top-to-bottom as a wave each way)
+ *   - a pulse of light laps the closed path endlessly while it is drawn —
+ *     down the rail, home up the return wire, no seam
+ *   - each row is a tab: hover/focus/click makes its station hot and the
+ *     strip types that stage's real command and output
  *
- * Isometric faces are the rhombus (0,-h)(w,0)(0,h)(-w,0) around a center —
- * everything on a consistent 2:1 grid, no icon set, no 3D library.
- * The SVG is aria-hidden; the tabs + CLI strip carry the same information.
+ * Isometric faces are the rhombus (0,-h)(w,0)(0,h)(-w,0) around a center.
+ * The SVG is aria-hidden; the rows + CLI strip carry the same information.
  */
 import { useCallback, useState } from "react";
 import type { TermLine } from "../../lib/highlight";
@@ -60,75 +58,71 @@ const STAGES = [
   },
 ];
 
-/** Station centers sit at 10/30/50/70/90% of the 960 canvas — exactly the
- *  centers of the five text columns below, so glyph and caption align. */
-const CX = [96, 288, 480, 672, 864];
-const RAIL_Y = 168;
+/** Station centers down the rail. */
+const CY = [70, 230, 390, 550, 710];
+const RAIL_X = 120;
 
 /** The full circuit as one path whose end point *is* its start point, so a
- *  dash cycling its offset laps it without a seam: rail left → right, return
- *  wire right → left, home. */
-const CIRCUIT = `M${CX[0]} ${RAIL_Y} H${CX[4]} C926 ${RAIL_Y} 926 252 ${CX[4]} 252 L192 252 C130 252 130 ${RAIL_Y} ${CX[0]} ${RAIL_Y}`;
+ *  dash cycling its offset laps it without a seam: down the rail, back up
+ *  the return wire, home. */
+const CIRCUIT = `M${RAIL_X} ${CY[0]} V${CY[4]} C196 710 224 682 224 622 L224 158 C224 98 196 70 ${RAIL_X} ${CY[0]}`;
 
 function Stations({ active }: { active: number }) {
   const hot = (i: number) => (active === i ? "true" : undefined);
   return (
-    <svg viewBox="0 90 960 172" aria-hidden="true" className="loop-svg">
-      {/* the rail every station stands on, and the return wire that closes
-          the circuit — render feeds back into editing */}
-      <path className="ln rail drawn" pathLength={1} d={`M${CX[0]} ${RAIL_Y} H${CX[4]}`} />
+    <svg viewBox="0 40 270 706" aria-hidden="true" className="loop-svg">
+      {/* the rail the stations hang off, and the return wire that closes the
+          circuit — render feeds back into editing */}
+      <path className="ln rail drawn" pathLength={1} d={`M${RAIL_X} ${CY[0]} V${CY[4]}`} />
       <path
         className="ln rail ret drawn"
         pathLength={1}
-        d={`M${CX[4]} ${RAIL_Y} C926 ${RAIL_Y} 926 252 ${CX[4]} 252 L192 252 C130 252 130 ${RAIL_Y} ${CX[0]} ${RAIL_Y}`}
+        d={`M${RAIL_X} ${CY[4]} C196 710 224 682 224 622 L224 158 C224 98 196 70 ${RAIL_X} ${CY[0]}`}
       />
-      <text className="ret-label" x="480" y="244" textAnchor="middle">
+      <text className="ret-label" transform="rotate(-90 252 390)" x="252" y="390" textAnchor="middle">
         edit again — the loop closes
       </text>
 
-      {/* the light: one dash cycling a *closed* path (end = start), so the
-          lap has no seam — forward along the rail, home along the return
-          wire, around again forever. The halo is the same dash, wider and
-          faint, so the segment glows without a filter. */}
+      {/* the light: one dash lapping the closed path while the circuit holds */}
       <path className="flow flow-halo" pathLength={1} d={CIRCUIT} />
       <path className="flow" pathLength={1} d={CIRCUIT} />
 
       {/* 01 · author — one MDX plate */}
       <g className="station" data-hot={hot(0)} style={{ "--d": "150ms" } as React.CSSProperties}>
-        <path className="ln drawn" pathLength={1} d={face(96, 136, 46, 24)} />
-        <path className="ln dim drawn" pathLength={1} d="M80 128 H112 M86 120 H106 M80 144 H112" />
-        <path className="ln drawn" pathLength={1} d="M96 160 V168" />
+        <path className="ln drawn" pathLength={1} d={face(64, 70, 46, 24)} />
+        <path className="ln dim drawn" pathLength={1} d="M48 62 H80 M54 54 H74 M48 78 H80" />
+        <path className="ln drawn" pathLength={1} d="M110 70 H120" />
       </g>
 
       {/* 02 · validate — the gate; the check draws when hot */}
       <g className="station" data-hot={hot(1)} style={{ "--d": "300ms" } as React.CSSProperties}>
-        <path className="ln drawn" pathLength={1} d={face(288, 134, 26, 26)} />
-        <path className="ln check" pathLength={1} d="M278 136 L286 144 L300 126" />
-        <path className="ln drawn" pathLength={1} d="M288 160 V168" />
+        <path className="ln drawn" pathLength={1} d={face(64, 230, 26, 26)} />
+        <path className="ln check" pathLength={1} d="M54 232 L62 240 L76 222" />
+        <path className="ln drawn" pathLength={1} d="M90 230 H120" />
       </g>
 
       {/* 03 · index — projected rows */}
       <g className="station" data-hot={hot(2)} style={{ "--d": "450ms" } as React.CSSProperties}>
-        <path className="ln row drawn" pathLength={1} d={face(480, 114, 44, 15)} />
-        <path className="ln row drawn" pathLength={1} d={face(480, 130, 44, 15)} />
-        <path className="ln row drawn" pathLength={1} d={face(480, 146, 44, 15)} />
-        <path className="ln drawn" pathLength={1} d="M480 161 V168" />
+        <path className="ln row drawn" pathLength={1} d={face(64, 374, 44, 15)} />
+        <path className="ln row drawn" pathLength={1} d={face(64, 390, 44, 15)} />
+        <path className="ln row drawn" pathLength={1} d={face(64, 406, 44, 15)} />
+        <path className="ln drawn" pathLength={1} d="M108 390 H120" />
       </g>
 
       {/* 04 · read — a document inside type brackets */}
       <g className="station" data-hot={hot(3)} style={{ "--d": "600ms" } as React.CSSProperties}>
-        <path className="ln drawn" pathLength={1} d="M652 116 L636 134 L652 152" />
-        <path className="ln drawn" pathLength={1} d="M692 116 L708 134 L692 152" />
-        <path className="token drawn" pathLength={1} d={face(672, 134, 13, 9)} />
-        <path className="ln drawn" pathLength={1} d="M672 143 V168" />
+        <path className="ln drawn" pathLength={1} d="M44 532 L28 550 L44 568" />
+        <path className="ln drawn" pathLength={1} d="M84 532 L100 550 L84 568" />
+        <path className="token drawn" pathLength={1} d={face(64, 550, 13, 9)} />
+        <path className="ln drawn" pathLength={1} d="M77 550 H120" />
       </g>
 
       {/* 05 · render — the page, h1 lit */}
       <g className="station" data-hot={hot(4)} style={{ "--d": "750ms" } as React.CSSProperties}>
-        <path className="ln drawn" pathLength={1} d={face(864, 134, 50, 26)} />
-        <path className="ln h1bar drawn" pathLength={1} d="M840 128 H890" />
-        <path className="ln dim drawn" pathLength={1} d="M844 140 H880" />
-        <path className="ln drawn" pathLength={1} d="M864 160 V168" />
+        <path className="ln drawn" pathLength={1} d={face(64, 710, 50, 26)} />
+        <path className="ln h1bar drawn" pathLength={1} d="M40 704 H90" />
+        <path className="ln dim drawn" pathLength={1} d="M44 716 H80" />
+        <path className="ln drawn" pathLength={1} d="M114 710 H120" />
       </g>
     </svg>
   );
@@ -148,39 +142,37 @@ export function Loop({ samples }: { samples: TermLine[][] }) {
 
   return (
     <div ref={ref} className={`loop ${inView ? "in" : ""}`}>
+      <div className="loop-side">
+        <div className="loop-stages" role="tablist" aria-label="Stages of the loop">
+          {STAGES.map((s, i) => (
+            <button
+              key={s.name}
+              type="button"
+              role="tab"
+              aria-selected={active === i}
+              className="loop-stage"
+              data-hot={active === i || undefined}
+              style={{ "--i": i } as React.CSSProperties}
+              onMouseEnter={() => activate(i)}
+              onFocus={() => activate(i)}
+              onClick={() => activate(i)}
+            >
+              <span className="stage-index">0{i + 1}</span>
+              <span className="stage-title">{s.title}</span>
+              <span className="stage-body">{s.body}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="loop-cli">
+          <span className="loop-cli-label">
+            0{active + 1} · {STAGES[active]!.name}
+          </span>
+          <CliStrip lines={samples[active] ?? []} runKey={runKey} play={inView} />
+        </div>
+      </div>
+
       <Stations active={active} />
-
-      <div className="loop-stages" role="tablist" aria-label="Stages of the loop">
-        {STAGES.map((s, i) => (
-          <button
-            key={s.name}
-            type="button"
-            role="tab"
-            aria-selected={active === i}
-            className="loop-stage"
-            data-hot={active === i || undefined}
-            onMouseEnter={() => activate(i)}
-            onFocus={() => activate(i)}
-            onClick={() => activate(i)}
-          >
-            <span className="stage-index">0{i + 1}</span>
-            <span className="stage-title">{s.title}</span>
-            <span className="stage-body">{s.body}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="loop-cli">
-        <span className="loop-cli-label">
-          0{active + 1} · {STAGES[active]!.name}
-        </span>
-        <CliStrip lines={samples[active] ?? []} runKey={runKey} play={inView} />
-      </div>
-
-      <p className="pipeline-note">
-        <b>If git and Postgres ever disagree, git wins</b> — recompile. The index is derived state,
-        never a second source of truth.
-      </p>
     </div>
   );
 }

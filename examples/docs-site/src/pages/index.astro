@@ -137,13 +137,17 @@ graft serve — branch "main"
   <div class="landing">
     <Hero tagline={doc?.data.tagline} terminal={terminal} client:load />
 
-    <section class="section" id="loop" data-flow="banner">
+    <section class="section" id="loop" data-flow="copy-left" style="--copy: 4fr; --stage: 8fr">
       <div class="section-copy reveal">
         <p class="section-label">§01 <em>the loop</em></p>
         <h2>One loop, <span class="marked">no publish button.</span></h2>
         <p class="section-lede">
           Edit a file, run <code>graft compile</code>, refresh. Validation, projection, and audit
           happen in the loop — publishing is a side effect of correctness.
+        </p>
+        <p class="pipeline-note">
+          <b>If git and Postgres ever disagree, git wins</b> — recompile. The index is derived
+          state, never a second source of truth.
         </p>
       </div>
       <div class="section-stage reveal">

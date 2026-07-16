@@ -822,12 +822,19 @@
    light travels continuously. No boxes — the stations are line art, the
    captions are hairline columns, the CLI strip is a bare <pre>. */
 
+/* rows + CLI on the left, the vertical circuit standing on the right */
+.loop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 15rem);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: start;
+}
+
 .loop-svg {
   display: block;
   width: 100%;
   height: auto;
   overflow: visible;
-  margin-bottom: 0.5rem;
 }
 
 .loop .ln {
@@ -991,31 +998,51 @@
   }
 }
 
-/* ------------------------------------------------ the captions (tabs) ---
-   Hairline columns, no boxes. The whole column is the tab. */
+/* --------------------------------------------------- the stage rows ---
+   Hairline rows, no boxes. The whole row is the tab; the hot row's marker
+   grows out of its own hairline, mirroring the station going hot beside it. */
 
 .loop-stages {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
 }
 
 .loop-stage {
   appearance: none;
   background: none;
   border: 0;
-  border-left: 1px solid var(--hairline);
+  border-top: 1px solid var(--hairline);
   font: inherit;
   text-align: left;
   color: inherit;
   cursor: pointer;
-  padding: 0.9rem 1rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.4rem minmax(0, 1fr);
+  column-gap: 0.5rem;
+  row-gap: 0.25rem;
+  padding: 0.75rem 0.25rem;
 }
 
-.loop-stage:first-child {
-  border-left: 0;
+.loop-stage .stage-body {
+  grid-column: 2;
+}
+
+.loop-stage::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  height: 1px;
+  width: 100%;
+  background: var(--mark);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 300ms var(--ease-out);
+}
+
+.loop-stage[data-hot]::before {
+  transform: scaleX(1);
 }
 
 .loop-stage:focus-visible {
@@ -1059,7 +1086,7 @@
    height so switching stations never reflows the page. */
 
 .loop-cli {
-  margin-top: 1.75rem;
+  margin-top: 1.5rem;
   border-top: 1px solid var(--hairline);
   padding-top: 1rem;
 }
@@ -1087,22 +1114,13 @@
 }
 
 @media (max-width: 720px) {
-  .loop .ret-label {
+  /* one column: the rows carry the model; the tall circuit steps aside */
+  .loop {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .loop-svg {
     display: none;
-  }
-
-  .loop-stages {
-    grid-template-columns: 1fr;
-  }
-
-  .loop-stage {
-    border-left: 0;
-    border-top: 1px solid var(--hairline);
-    padding: 0.85rem 0;
-  }
-
-  .loop-stage:first-child {
-    border-top: 0;
   }
 }
 
@@ -1111,6 +1129,12 @@
   font: 400 var(--text-sm) / 1.7 var(--font-mono);
   color: var(--ink-faint);
   text-align: center;
+}
+
+.section[data-flow] .pipeline-note {
+  margin: 1.5rem 0 0;
+  text-align: left;
+  max-width: 40ch;
 }
 
 .pipeline-note b {
