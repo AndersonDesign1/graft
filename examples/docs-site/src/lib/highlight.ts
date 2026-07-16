@@ -44,7 +44,7 @@ function styleOf(token: { htmlStyle?: string | Record<string, string> }): string
  */
 export async function highlightSession(
   source: string,
-  lang: "console" | "ts" | "sql" = "console",
+  lang: "console" | "ts" | "sql" | "json" = "console",
 ): Promise<TermLine[]> {
   const { tokens } = await codeToTokens(source.trim(), {
     lang,

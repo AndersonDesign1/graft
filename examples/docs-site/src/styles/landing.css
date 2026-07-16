@@ -1506,62 +1506,156 @@
   color: var(--ink-faint);
 }
 
-/* --------------------------------------------------------------- runtime --- */
+/* ------------------------------------------------ §06 capability index ---
+   A feature index: hairline rows on the left, one live evidence panel on the
+   right. Rows cascade in on entry; the hot row's marker slides in from the
+   hairline. No cards. */
 
-.runtime-grid {
+.capdex {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-  gap: 1rem;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: start;
 }
 
-.runtime-card {
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-outer);
-  background: var(--paper-raised);
-  padding: 1.4rem 1.4rem 1.2rem;
+.capdex-list {
+  display: flex;
+  flex-direction: column;
 }
 
-.runtime-card h3 {
-  font: 400 var(--text-lg) / 1.2 var(--font-display);
-  letter-spacing: -0.015em;
-  margin: 0 0 0.6rem;
+.capdex-row {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 2.4rem minmax(0, 9rem) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.8rem 0.25rem;
+  position: relative;
+  /* entry cascade */
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 450ms var(--ease-out) calc(var(--i) * 60ms),
+    transform 450ms var(--ease-out) calc(var(--i) * 60ms);
 }
 
-.runtime-card > p {
+.capdex-row:last-child {
+  border-bottom: 1px solid var(--hairline);
+}
+
+.capdex.in .capdex-row {
+  opacity: 1;
+  transform: none;
+}
+
+.capdex-row:focus-visible {
+  outline: 1px solid var(--mark);
+  outline-offset: -1px;
+}
+
+/* the hot marker grows out of the row's top hairline */
+.capdex-row::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  height: 1px;
+  width: 100%;
+  background: var(--mark);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 300ms var(--ease-out);
+}
+
+.capdex-row[data-hot]::before {
+  transform: scaleX(1);
+}
+
+.capdex-num {
+  font: 500 var(--text-xs) / 1.4 var(--font-mono);
+  color: var(--ink-faint);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.capdex-name {
+  font: 500 var(--text-sm) / 1.4 var(--font-mono);
+  color: var(--ink-muted);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.capdex-tag {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.capdex-row[data-hot] .capdex-num {
+  color: var(--mark);
+}
+
+.capdex-row[data-hot] .capdex-name {
+  color: var(--ink);
+}
+
+.capdex-row[data-hot] .capdex-tag {
+  color: var(--ink-muted);
+}
+
+/* the evidence panel — a bare pre under a label, like the loop's strip */
+.capdex-panel {
+  position: sticky;
+  top: 5.5rem;
+  border-top: 1px solid var(--hairline);
+  padding-top: 1rem;
+}
+
+.capdex-label {
+  display: block;
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 0.6rem;
+}
+
+.capdex-panel .cli-strip {
+  min-height: calc(9 * 1.7em);
+}
+
+.capdex-note {
+  margin: 0.75rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hairline);
   font-size: var(--text-sm);
   color: var(--ink-muted);
-  margin: 0 0 1.1rem;
+  max-width: 52ch;
+  text-wrap: pretty;
 }
 
-.runtime-card pre {
-  margin: 0;
-  padding: 0.8rem 1rem;
-  border-radius: var(--radius);
-  background: var(--paper-sunken);
-  border: 1px solid var(--hairline);
-  font: 400 0.78rem/1.7 var(--font-mono);
-  color: var(--ink-muted);
-  overflow-x: auto;
-}
+@media (max-width: 900px) {
+  .capdex {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
 
-.runtime-card pre b {
-  color: var(--ink);
-  font-weight: 500;
-}
+  .capdex-panel {
+    position: static;
+  }
 
-.runtime-card pre .t-mark {
-  color: var(--mark-strong);
-}
+  .capdex-row {
+    grid-template-columns: 2.4rem minmax(0, 1fr);
+  }
 
-.boot-line {
-  display: block;
-  opacity: 0;
-  transition: opacity 300ms var(--ease-out);
-  transition-delay: var(--boot-delay, 0ms);
-}
-
-.runtime-card.in .boot-line {
-  opacity: 1;
+  .capdex-tag {
+    grid-column: 2;
+  }
 }
 
 /* ------------------------------------------------------------------ faq --- */
@@ -1810,8 +1904,10 @@
     animation: none;
   }
 
-  .boot-line {
+  .capdex-row,
+  .capdex.in .capdex-row {
     opacity: 1;
+    transform: none;
     transition: none;
   }
 }

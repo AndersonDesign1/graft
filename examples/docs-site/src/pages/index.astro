@@ -14,8 +14,8 @@ import { ClosingCta } from "../components/landing/cta";
 import { LandingFaq } from "../components/landing/faq";
 import { Hero } from "../components/landing/hero";
 import { Loop } from "../components/landing/loop";
+import { CapabilityIndex } from "../components/landing/capability-index";
 import { RegistryDrop } from "../components/landing/registry";
-import { RuntimeSection } from "../components/landing/runtime";
 import { TypedReads } from "../components/landing/typed-reads";
 import Landing from "../layouts/Landing.astro";
 import { getGraft } from "../lib/graft";
@@ -61,6 +61,71 @@ doc.data.title; // string`,
   highlightSession(`
 $ curl -s http://localhost:4321/ | grep -o '<h1.*</h1>'
 <h1>Content is code. Agents operate it.</h1>`),
+]);
+
+// The capability index (§06): one sample per row, same order as CAPABILITIES
+// in capability-index.tsx. Every transcript is the command's real output —
+// verbatim strings from @graft/cli and the functions handler.
+const capabilitySamples = await Promise.all([
+  highlightSession(
+    `
+{
+  "mcpServers": {
+    "graft-landing-page": {
+      "command": "pnpm",
+      "args": ["--filter", "landing-page", "--silent", "mcp"]
+    }
+  }
+}`,
+    "json",
+  ),
+  highlightSession(`
+$ graft branch create preview
+Created branch "preview" from "main" (overlay — zero rows copied).
+Reads overlay the parent until the branch writes its own rows:
+  graft compile --branch preview
+Merge it back with \`graft merge preview\` when ready.`),
+  highlightSession(`
+$ graft merge preview
+Ledger: nothing to replay on "main".
+would move 2 data_records row(s) from "preview" onto "main"
+would recompile the working tree into "main"
+
+Dry run — nothing was written.`),
+  highlightSession(`
+$ graft approvals
+9b1f42c7
+  function:  deleteOrder  (branch main)
+  requested: 2026-07-16T09:12:03Z by agent:mcp
+  input:     {"id":"ord_7f3a"}
+
+$ graft approve 9b1f42c7`),
+  highlightSession(`
+$ graft asset put hero.svg pages/home/hero.svg
+Uploaded pages/home/hero.svg (image/svg+xml, 8412 bytes)
+
+Reference it from an \`asset\` field in frontmatter:
+  image:
+    key: pages/home/hero.svg
+    alt: describe the image for screen readers`),
+  highlightSession(`
+$ curl -s -X POST localhost:4321/api/fn/submitContact \\
+    -d '{"email":"you@example.com","message":"hello"}'
+{"data":{"id":"3f9c2e1a-…"}}`),
+  highlightSession(
+    `
+select slug from content_index
+where search @@ websearch_to_tsquery('branch merge')
+-- weighted: slug (A) > frontmatter (B) > body (C)
+order by ts_rank(search, query) desc;`,
+    "sql",
+  ),
+  highlightSession(`
+$ graft serve
+graft serve — branch "main"
+  functions  POST http://127.0.0.1:3903/api/fn/<name>
+  mcp        POST http://127.0.0.1:3903/api/mcp
+  health     GET  http://127.0.0.1:3903/healthz`),
 ]);
 ---
 
@@ -143,18 +208,17 @@ $ curl -s http://localhost:4321/ | grep -o '<h1.*</h1>'
       </div>
     </section>
 
-    <section class="section" id="runtime" data-flow="copy-left" style="--copy: 4fr; --stage: 8fr">
+    <section class="section" id="runtime" data-flow="banner">
       <div class="section-copy reveal">
-        <p class="section-label">§06 <em>runtime</em></p>
-        <h2>Embed it, <span class="marked">or serve it whole.</span></h2>
+        <p class="section-label">§06 <em>the surface</em></p>
+        <h2>Every capability is <span class="marked">a command.</span></h2>
         <p class="section-lede">
-          Stateless Web-standard handlers under everything: mount them in Next, Astro, or
-          SvelteKit — or run the single container. Auth verifies, never mints; destructive ops
-          wait for a human.
+          Branch, merge, approve, upload, serve — the whole runtime is things an agent can run.
+          Each row types its command's real output.
         </p>
       </div>
       <div class="section-stage reveal">
-        <RuntimeSection client:visible />
+        <CapabilityIndex samples={capabilitySamples} client:visible />
       </div>
     </section>
 
