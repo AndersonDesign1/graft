@@ -37,19 +37,24 @@ function styleOf(token: { htmlStyle?: string | Record<string, string> }): string
 }
 
 /**
- * Tokenize a shell session. Lines that start with a prompt are "typed"; their
- * output is printed. Blank lines are kept so the transcript breathes.
+ * Tokenize a shell session (or a code snippet — pass `lang`). Console lines
+ * that start with a prompt are "typed"; their output is printed. In other
+ * languages every line is a command — the whole snippet types out. Blank
+ * lines are kept so the transcript breathes.
  */
-export async function highlightSession(source: string): Promise<TermLine[]> {
+export async function highlightSession(
+  source: string,
+  lang: "console" | "ts" | "sql" = "console",
+): Promise<TermLine[]> {
   const { tokens } = await codeToTokens(source.trim(), {
-    lang: "console",
+    lang,
     themes: { light: "min-light", dark: "min-dark" },
     defaultColor: false,
   });
 
   return tokens.map((line) => {
     const text = line.map((t) => t.content).join("");
-    const typed = text.trimStart().startsWith("$");
+    const typed = lang !== "console" || text.trimStart().startsWith("$");
     return {
       typed,
       pause: typed ? 420 : 90,

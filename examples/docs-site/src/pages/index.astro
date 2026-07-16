@@ -1,7 +1,8 @@
 ---
 /**
  * The landing — every section is live, nothing is a screenshot: the terminal
- * types the real loop, the pipeline draws itself, the MCP transcript replays
+ * types the real loop, the loop circuit draws itself and a pulse circles it
+ * forever (each station types its stage's real CLI), the MCP transcript replays
  * a real error → fix exchange, the branching model is a toy you can poke,
  * and the contact form writes an actual data_records row. Hero copy + FAQ
  * come from the `home` document — the page eats its own dogfood.
@@ -12,7 +13,7 @@ import { BranchingDemo } from "../components/landing/branching";
 import { ClosingCta } from "../components/landing/cta";
 import { LandingFaq } from "../components/landing/faq";
 import { Hero } from "../components/landing/hero";
-import { Pipeline } from "../components/landing/pipeline";
+import { Loop } from "../components/landing/loop";
 import { RegistryDrop } from "../components/landing/registry";
 import { RuntimeSection } from "../components/landing/runtime";
 import { TypedReads } from "../components/landing/typed-reads";
@@ -26,6 +27,41 @@ const faqs = doc?.data.faqs ?? [];
 // Tokenized at build time with the same shiki themes the docs use, so the
 // terminal and a fenced ```console block are colored by one highlighter.
 const terminal = await highlightSession(WOW_LOOP);
+
+// One CLI sample per loop stage — each is the stage's real evidence, typed
+// out by the strip under the circuit when that station is hot.
+const loopSamples = await Promise.all([
+  highlightSession(`
+$ cat content/pages/home.mdx
+---
+title: Graft
+tagline: The CMS where the agent is the operator.
+---
+
+## Content is code`),
+  highlightSession(`
+$ pnpm graft compile
+  pages/home  validated ✓
+  projected to content_index @ 9f31c2e
+  +1 added  ~0 changed  −0 removed`),
+  highlightSession(
+    `
+select collection, slug, content_hash from content_index;
+-- collection │ slug │ content_hash
+-- pages      │ home │ 9f31c2e…`,
+    "sql",
+  ),
+  highlightSession(
+    `
+const doc = await graft.getContent("pages", "home");
+//    ^? Document<typeof pages> — inferred, no codegen
+doc.data.title; // string`,
+    "ts",
+  ),
+  highlightSession(`
+$ curl -s http://localhost:4321/ | grep -o '<h1.*</h1>'
+<h1>Content is code. Agents operate it.</h1>`),
+]);
 ---
 
 <Landing
@@ -45,7 +81,7 @@ const terminal = await highlightSession(WOW_LOOP);
           happen in the loop — publishing is a side effect of correctness.
         </p>
       </div>
-      <Pipeline client:visible />
+      <Loop samples={loopSamples} client:visible />
     </section>
 
     <section class="section" id="agents">

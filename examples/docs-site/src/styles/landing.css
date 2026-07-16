@@ -707,121 +707,271 @@
   }
 }
 
-/* ------------------------------------------------------------ pipeline --- */
+/* ------------------------------------------------- §01 · the loop circuit ---
+   Five isometric stations on one rail + a return wire: a closed circuit the
+   light travels continuously. No boxes — the stations are line art, the
+   captions are hairline columns, the CLI strip is a bare <pre>. */
 
-.pipeline {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 1rem;
+.loop-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  margin-bottom: 0.5rem;
 }
 
-@media (max-width: 980px) {
-  .pipeline {
-    grid-template-columns: 1fr;
-    max-width: 30rem;
+.loop .ln {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition: stroke var(--duration-base) var(--ease-out);
+}
+
+.loop .ln.dim {
+  stroke: var(--hairline-strong);
+}
+
+.loop .ln.rail {
+  stroke: var(--hairline-strong);
+}
+
+.loop .ret-label {
+  font: 500 10px/1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  fill: var(--ink-faint);
+  opacity: 0;
+  transition: opacity 600ms var(--ease-out) 1600ms;
+}
+
+.loop.in .ret-label {
+  opacity: 1;
+}
+
+/* the circuit draws itself on entry; stations follow the rail (--d per group) */
+.loop .drawn {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition:
+    stroke-dashoffset 800ms var(--ease-in-out) var(--d, 0ms),
+    stroke var(--duration-base) var(--ease-out);
+}
+
+.loop .rail.drawn {
+  transition-duration: 1100ms;
+}
+
+.loop .rail.ret.drawn {
+  transition-delay: 900ms;
+}
+
+.loop.in .drawn {
+  stroke-dashoffset: 0;
+}
+
+/* a hot station: strokes go from faint to full ink */
+.loop .station {
+  cursor: pointer;
+}
+
+.loop .station[data-hot] .ln {
+  stroke: var(--ink);
+}
+
+.loop .station[data-hot] .ln.dim {
+  stroke: var(--ink-faint);
+}
+
+/* the validation check draws only when its station is hot */
+.loop .check {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 350ms var(--ease-out);
+}
+
+.loop .station[data-hot] .check {
+  stroke-dashoffset: 0;
+  stroke: var(--mark);
+}
+
+/* the typed-read token and the rendered h1 light up when hot */
+.loop .token {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transition:
+    fill var(--duration-base) var(--ease-out),
+    stroke var(--duration-base) var(--ease-out);
+}
+
+.loop .station[data-hot] .token {
+  fill: var(--mark);
+  stroke: var(--mark);
+}
+
+.loop .h1bar {
+  stroke-width: 2.5;
+}
+
+.loop .station[data-hot] .h1bar {
+  stroke: var(--mark);
+}
+
+/* the light: hidden until the circuit is drawn, then circling forever —
+   forward along the rail, home along the return wire (7s round trip) */
+.loop .pulse {
+  opacity: 0;
+}
+
+.loop.in .pulse {
+  opacity: 1;
+  transition: opacity 400ms var(--ease-out) 1800ms;
+}
+
+.loop.in .pulse-fwd {
+  animation: loop-fwd 7s linear 1800ms infinite;
+}
+
+.loop.in .pulse-ret {
+  animation: loop-ret 7s linear 1800ms infinite;
+}
+
+@keyframes loop-fwd {
+  0% {
+    transform: translateX(0);
+  }
+  50%,
+  100% {
+    transform: translateX(1204px);
   }
 }
 
-.pipeline-stage {
-  position: relative;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius);
-  background: var(--paper-raised);
-  padding: 1.1rem 1.1rem 1rem;
-  opacity: 0;
-  transform: translateY(12px);
-  transition:
-    opacity 500ms var(--ease-out),
-    transform 500ms var(--ease-out);
+@keyframes loop-ret {
+  0%,
+  50% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-1304px);
+  }
 }
 
-.pipeline.in .pipeline-stage {
-  opacity: 1;
-  transform: none;
+/* ------------------------------------------------ the captions (tabs) ---
+   Hairline columns, no boxes. The whole column is the tab. */
+
+.loop-stages {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
-.pipeline.in .pipeline-stage:nth-child(1) {
-  transition-delay: 0ms;
-}
-.pipeline.in .pipeline-stage:nth-child(2) {
-  transition-delay: 260ms;
-}
-.pipeline.in .pipeline-stage:nth-child(3) {
-  transition-delay: 520ms;
-}
-.pipeline.in .pipeline-stage:nth-child(4) {
-  transition-delay: 780ms;
-}
-.pipeline.in .pipeline-stage:nth-child(5) {
-  transition-delay: 1040ms;
-}
-
-.pipeline-stage h3 {
-  font: 500 var(--text-sm) / 1.3 var(--font-mono);
-  margin: 0 0 0.4rem;
-  color: var(--ink);
+.loop-stage {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-left: 1px solid var(--hairline);
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.9rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
-.pipeline-stage p {
-  font-size: var(--text-sm);
-  color: var(--ink-muted);
-  margin: 0;
+.loop-stage:first-child {
+  border-left: 0;
 }
 
-.pipeline-stage .stage-index {
-  position: absolute;
-  top: -0.7rem;
-  left: 0.9rem;
-  padding: 0 0.4rem;
-  background: var(--paper);
+.loop-stage:focus-visible {
+  outline: 1px solid var(--mark);
+  outline-offset: -1px;
+}
+
+.loop-stage .stage-index {
   font: 500 var(--text-xs) / 1.4 var(--font-mono);
+  color: var(--ink-faint);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.loop-stage .stage-title {
+  font: 500 var(--text-sm) / 1.3 var(--font-mono);
+  color: var(--ink-muted);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.loop-stage .stage-body {
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--ink-faint);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.loop-stage[data-hot] .stage-index {
   color: var(--mark);
 }
 
-/* connector between stages (desktop) */
-.pipeline-stage:not(:first-child)::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: -1rem;
-  width: 1rem;
-  height: 1px;
-  background: var(--mark);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 260ms var(--ease-in-out);
+.loop-stage[data-hot] .stage-title {
+  color: var(--ink);
 }
 
-.pipeline.in .pipeline-stage:nth-child(2)::before {
-  transition-delay: 130ms;
-  transform: scaleX(1);
-}
-.pipeline.in .pipeline-stage:nth-child(3)::before {
-  transition-delay: 390ms;
-  transform: scaleX(1);
-}
-.pipeline.in .pipeline-stage:nth-child(4)::before {
-  transition-delay: 650ms;
-  transform: scaleX(1);
-}
-.pipeline.in .pipeline-stage:nth-child(5)::before {
-  transition-delay: 910ms;
-  transform: scaleX(1);
+.loop-stage[data-hot] .stage-body {
+  color: var(--ink-muted);
 }
 
-@media (max-width: 980px) {
-  .pipeline-stage:not(:first-child)::before {
-    top: -1rem;
-    left: 1.25rem;
-    width: 1px;
-    height: 1rem;
-    transform: scaleY(0);
-    transform-origin: top;
+/* ------------------------------------------------------- the CLI strip ---
+   A bare pre under a hairline: the hot station's real command, typed. Fixed
+   height so switching stations never reflows the page. */
+
+.loop-cli {
+  margin-top: 1.75rem;
+  border-top: 1px solid var(--hairline);
+  padding-top: 1rem;
+}
+
+.loop-cli-label {
+  display: block;
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 0.6rem;
+}
+
+.cli-strip {
+  margin: 0;
+  min-height: calc(7 * 1.7em);
+  font: 400 0.85rem/1.7 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink-muted);
+}
+
+.cli-strip span {
+  color: light-dark(var(--shiki-light), var(--shiki-dark));
+}
+
+@media (max-width: 720px) {
+  .loop .ret-label {
+    display: none;
   }
 
-  .pipeline.in .pipeline-stage:not(:first-child)::before {
-    transform: scaleY(1);
+  .loop-stages {
+    grid-template-columns: 1fr;
+  }
+
+  .loop-stage {
+    border-left: 0;
+    border-top: 1px solid var(--hairline);
+    padding: 0.85rem 0;
+  }
+
+  .loop-stage:first-child {
+    border-top: 0;
   }
 }
 
@@ -1494,7 +1644,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .reveal,
-  .pipeline-stage,
   .agent-msg,
   .file-tree .added {
     opacity: 1;
@@ -1502,15 +1651,24 @@
     transition: none;
   }
 
-  .pipeline-stage:not(:first-child)::before {
-    transform: none;
+  .proof-mark path,
+  .graft-figure .drawn,
+  .loop .drawn,
+  .loop .check {
+    animation: none;
     transition: none;
+    stroke-dashoffset: 0;
   }
 
-  .proof-mark path,
-  .graft-figure .drawn {
+  /* no circling light; the ret-label still appears */
+  .loop .pulse {
     animation: none;
-    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+
+  .loop .ret-label {
+    opacity: 1;
+    transition: none;
   }
 
   .graft-figure .union,
