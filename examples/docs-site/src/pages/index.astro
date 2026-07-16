@@ -72,65 +72,80 @@ $ curl -s http://localhost:4321/ | grep -o '<h1.*</h1>'
   <div class="landing">
     <Hero tagline={doc?.data.tagline} terminal={terminal} client:load />
 
-    <section class="section" id="loop">
-      <p class="section-label">§01 <em>the loop</em></p>
-      <div class="reveal">
+    <section class="section" id="loop" data-flow="banner">
+      <div class="section-copy reveal">
+        <p class="section-label">§01 <em>the loop</em></p>
         <h2>One loop, <span class="marked">no publish button.</span></h2>
         <p class="section-lede">
           Edit a file, run <code>graft compile</code>, refresh. Validation, projection, and audit
           happen in the loop — publishing is a side effect of correctness.
         </p>
       </div>
-      <Loop samples={loopSamples} client:visible />
+      <div class="section-stage reveal">
+        <Loop samples={loopSamples} client:visible />
+      </div>
     </section>
 
-    <section class="section" id="agents">
-      <p class="section-label">§02 <em>agent-native</em></p>
-      <div class="reveal">
+    <section class="section" id="agents" data-flow="copy-left" style="--copy: 5fr; --stage: 7fr">
+      <div class="section-copy reveal">
+        <p class="section-label">§02 <em>agent-native</em></p>
         <h2>Errors that <span class="marked">teach the fix.</span></h2>
         <p class="section-lede">
           A cold agent with nothing but the MCP endpoint has authored pages on Graft — schemas,
           errors, and tool descriptions were its only teachers. This is the actual loop:
         </p>
       </div>
-      <AgentSession client:visible />
+      <div class="section-stage reveal">
+        <AgentSession client:visible />
+      </div>
     </section>
 
-    <section class="section" id="branching">
-      <p class="section-label">§03 <em>branching</em></p>
-      <div class="reveal">
+    <section
+      class="section"
+      id="branching"
+      data-flow="copy-right"
+      style="--copy: 5fr; --stage: 7fr; --copy-shift: 2.5rem"
+    >
+      <div class="section-copy reveal">
+        <p class="section-label">§03 <em>branching</em></p>
         <h2>Branch content like code. <span class="marked">Because it is.</span></h2>
         <p class="section-lede">
           Branches are copy-on-write overlays (or real Neon forks) — instant, isolated, merged
           with a dry-run first. Try the model:
         </p>
       </div>
-      <BranchingDemo client:visible />
+      <div class="section-stage reveal">
+        <BranchingDemo client:visible />
+      </div>
     </section>
 
-    <section class="section" id="types">
-      <p class="section-label">§04 <em>typed reads</em></p>
-      <div class="reveal">
+    <section class="section" id="types" data-flow="copy-right" style="--copy: 4fr; --stage: 8fr">
+      <div class="section-copy reveal">
+        <p class="section-label">§04 <em>typed reads</em></p>
         <h2>One schema. <span class="marked">Zero codegen.</span></h2>
         <p class="section-lede">
           The Zod schema in <code>graft.config.ts</code> types the compiler, the SDKs, the
           functions, and the MCP tools — inference end to end.
         </p>
       </div>
-      <TypedReads client:visible />
+      <div class="section-stage reveal">
+        <TypedReads client:visible />
+      </div>
     </section>
 
-    <section class="section" id="registry">
-      <p class="section-label">§05 <em>owned primitives</em></p>
-      <div class="reveal">
+    <section class="section" id="registry" data-flow="banner" data-align="right">
+      <div class="section-copy reveal">
+        <p class="section-label">§05 <em>owned primitives</em></p>
         <h2><span class="marked">graft add</span> — and you own the code.</h2>
       </div>
-      <RegistryDrop client:visible />
+      <div class="section-stage reveal">
+        <RegistryDrop client:visible />
+      </div>
     </section>
 
-    <section class="section" id="runtime">
-      <p class="section-label">§06 <em>runtime</em></p>
-      <div class="reveal">
+    <section class="section" id="runtime" data-flow="copy-left" style="--copy: 4fr; --stage: 8fr">
+      <div class="section-copy reveal">
+        <p class="section-label">§06 <em>runtime</em></p>
         <h2>Embed it, <span class="marked">or serve it whole.</span></h2>
         <p class="section-lede">
           Stateless Web-standard handlers under everything: mount them in Next, Astro, or
@@ -138,7 +153,9 @@ $ curl -s http://localhost:4321/ | grep -o '<h1.*</h1>'
           wait for a human.
         </p>
       </div>
-      <RuntimeSection client:visible />
+      <div class="section-stage reveal">
+        <RuntimeSection client:visible />
+      </div>
     </section>
 
     <section class="section" id="faq">

@@ -365,7 +365,7 @@
 
 .reveal {
   opacity: 0;
-  transform: translateY(14px);
+  transform: var(--reveal-from, translateY(14px));
   transition:
     opacity 600ms var(--ease-out),
     transform 600ms var(--ease-out);
@@ -375,6 +375,116 @@
 .reveal.in {
   opacity: 1;
   transform: none;
+}
+
+/* ------------------------------------------------- asymmetric sections ---
+   §02–§06 break the centered column: copy on one side, the live artifact on
+   the other, entering from opposite edges. The side, the column ratio and
+   the vertical seat vary per section (set in index.astro), so the page reads
+   as a sequence of plates, not a template. FAQ + CTA resolve back to center. */
+
+.section[data-flow="copy-left"],
+.section[data-flow="copy-right"] {
+  display: grid;
+  grid-template-columns: minmax(0, var(--copy, 5fr)) minmax(0, var(--stage, 7fr));
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: center;
+}
+
+.section[data-flow="copy-right"] {
+  grid-template-columns: minmax(0, var(--stage, 7fr)) minmax(0, var(--copy, 5fr));
+}
+
+.section[data-flow="copy-right"] .section-copy {
+  order: 2;
+}
+
+/* banner: copy sits off-axis above a full-width artifact */
+.section[data-flow="banner"] .section-copy {
+  max-width: 46ch;
+  margin-bottom: 3rem;
+}
+
+.section[data-flow="banner"][data-align="right"] .section-copy {
+  margin-left: auto;
+  text-align: right;
+}
+
+.section[data-flow="banner"][data-align="right"] .section-label {
+  justify-content: flex-end;
+}
+
+/* side-flow typography: left-set, ragged, no centering */
+.section[data-flow] .section-label {
+  justify-content: flex-start;
+}
+
+.section[data-flow] h2 {
+  margin: 0 0 1rem;
+  text-align: left;
+  max-width: 16ch;
+}
+
+.section[data-flow][data-align="right"] h2 {
+  margin-left: auto;
+}
+
+.section[data-flow] .section-lede {
+  margin: 0;
+  text-align: left;
+}
+
+/* the copy nudges down where the artifact is tall — irregular seating */
+.section[data-flow] .section-copy {
+  margin-top: var(--copy-shift, 0);
+}
+
+/* entrances: copy from its own edge, artifact from the other, 120ms apart */
+.section[data-flow="copy-left"] .section-copy,
+.section[data-flow="banner"] .section-copy {
+  --reveal-from: translateX(-32px);
+}
+
+.section[data-flow="copy-right"] .section-copy,
+.section[data-flow="banner"][data-align="right"] .section-copy {
+  --reveal-from: translateX(32px);
+}
+
+.section[data-flow="copy-left"] .section-stage {
+  --reveal-from: translateX(32px);
+  --reveal-delay: 120ms;
+}
+
+.section[data-flow="copy-right"] .section-stage {
+  --reveal-from: translateX(-32px);
+  --reveal-delay: 120ms;
+}
+
+.section[data-flow="banner"] .section-stage {
+  --reveal-from: translateY(20px);
+  --reveal-delay: 120ms;
+}
+
+@media (max-width: 900px) {
+  .section[data-flow="copy-left"],
+  .section[data-flow="copy-right"] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.25rem;
+  }
+
+  .section[data-flow="copy-right"] .section-copy {
+    order: 0;
+  }
+
+  .section[data-flow] .section-copy {
+    margin-top: 0;
+  }
+
+  /* one column again: everything rises, nothing slides */
+  .section[data-flow] .section-copy,
+  .section[data-flow] .section-stage {
+    --reveal-from: translateY(14px);
+  }
 }
 
 /* ---------------------------------------------------------------- hero --- */
@@ -751,25 +861,36 @@
   opacity: 1;
 }
 
-/* the circuit draws itself on entry; stations follow the rail (--d per group) */
+/* The circuit lives the loop it describes: draw in, hold, retract, redraw —
+   forever, like the hero's graft figure. Stations start on a stagger (--d per
+   group), and because animation-delay is a constant phase offset, they draw
+   *and* retract left-to-right, a wave each way, every cycle. */
 .loop .drawn {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  transition:
-    stroke-dashoffset 800ms var(--ease-in-out) var(--d, 0ms),
-    stroke var(--duration-base) var(--ease-out);
-}
-
-.loop .rail.drawn {
-  transition-duration: 1100ms;
-}
-
-.loop .rail.ret.drawn {
-  transition-delay: 900ms;
+  transition: stroke var(--duration-base) var(--ease-out);
 }
 
 .loop.in .drawn {
-  stroke-dashoffset: 0;
+  animation: loop-draw 10s var(--ease-in-out) var(--d, 0ms) infinite;
+}
+
+.loop.in .rail.ret.drawn {
+  --d: 700ms;
+}
+
+@keyframes loop-draw {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  14%,
+  80% {
+    stroke-dashoffset: 0;
+  }
+  90%,
+  100% {
+    stroke-dashoffset: 1;
+  }
 }
 
 /* a hot station: strokes go from faint to full ink */
@@ -835,24 +956,38 @@
   opacity: 0;
 }
 
+/* the halo's faintness lives in stroke-opacity so the gate can own opacity */
 .loop .flow-halo {
   stroke-width: 5;
-  opacity: 0;
+  stroke-opacity: 0.16;
 }
 
+/* two clocks: the lap (constant motion) and the gate (the light only rides
+   the circuit while the circuit is drawn — same 10s period as loop-draw) */
 .loop.in .flow {
-  opacity: 1;
-  transition: opacity 400ms var(--ease-out) 1800ms;
-  animation: loop-lap 7s linear 1800ms infinite;
-}
-
-.loop.in .flow-halo {
-  opacity: 0.16;
+  animation:
+    loop-lap 3.5s linear infinite,
+    flow-gate 10s var(--ease-in-out) infinite;
 }
 
 @keyframes loop-lap {
   to {
     stroke-dashoffset: -1;
+  }
+}
+
+@keyframes flow-gate {
+  0%,
+  16% {
+    opacity: 0;
+  }
+  24%,
+  74% {
+    opacity: 1;
+  }
+  82%,
+  100% {
+    opacity: 0;
   }
 }
 
@@ -1650,6 +1785,7 @@
   .proof-mark path,
   .graft-figure .drawn,
   .loop .drawn,
+  .loop.in .drawn,
   .loop .check {
     animation: none;
     transition: none;
