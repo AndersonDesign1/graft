@@ -18,6 +18,24 @@
       "sourceType": "github",
       "skillPath": "skills/better-ui/SKILL.md",
       "computedHash": "67bebeb8222cd41757e2498e26f4c6e37d93e00fd9927be940f9998ad5faaeff"
+    },
+    "supermemory": {
+      "source": "supermemoryai/skills",
+      "sourceType": "github",
+      "skillPath": "supermemory/SKILL.md",
+      "computedHash": "5d078ed487113813527602160cad81d40fe350ae05dbd0579b39f97354f955a6"
+    },
+    "supermemory-cli": {
+      "source": "supermemoryai/skills",
+      "sourceType": "github",
+      "skillPath": "supermemory-cli/SKILL.md",
+      "computedHash": "e700432a67bba42c9d1f4f9a5d8d285792ea02b843aa1332635d47a1c9b757fd"
+    },
+    "svg-animations": {
+      "source": "supermemoryai/skills",
+      "sourceType": "github",
+      "skillPath": "svg-animations/SKILL.md",
+      "computedHash": "f25711af04ba7a0f8e662f41cdf707423102eef303dfd3dc7d48d35bb83c7ec4"
     }
   }
 }
