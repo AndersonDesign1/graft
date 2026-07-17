@@ -4,10 +4,9 @@
  * §01 — the loop, drawn as one closed circuit, set vertically.
  *
  * The horizontal version left a dead zone beside the copy; this composition
- * fills the row: the five stages are a hairline row list (the tabs), the CLI
- * strip types the hot stage's real evidence beneath them, and the circuit
- * stands to the right — a vertical rail the stations hang off, with the
- * return wire sweeping back up ("edit again — the loop closes").
+ * fills the row: the five stages are a hairline row list (the tabs) and the
+ * circuit stands to the right — a vertical rail the stations hang off, with
+ * the return wire sweeping back up ("edit again — the loop closes").
  *
  * Everything is live:
  *   - the circuit draws in, holds, retracts and redraws forever (10s cycle;
@@ -15,15 +14,12 @@
  *     the draw/retract runs top-to-bottom as a wave each way)
  *   - a pulse of light laps the closed path endlessly while it is drawn —
  *     down the rail, home up the return wire, no seam
- *   - each row is a tab: hover/focus/click makes its station hot and the
- *     strip types that stage's real command and output
+ *   - each row is a tab: hover/focus/click makes its station hot
  *
  * Isometric faces are the rhombus (0,-h)(w,0)(0,h)(-w,0) around a center.
- * The SVG is aria-hidden; the rows + CLI strip carry the same information.
+ * The SVG is aria-hidden; the rows carry the same information.
  */
-import { useCallback, useState } from "react";
-import type { TermLine } from "../../lib/highlight";
-import { CliStrip } from "./cli-strip";
+import { useState } from "react";
 import { useInView } from "./reveal";
 
 /** One isometric face (rhombus) centered at cx,cy. */
@@ -128,48 +124,31 @@ function Stations({ active }: { active: number }) {
   );
 }
 
-export function Loop({ samples }: { samples: TermLine[][] }) {
+export function Loop() {
   const { ref, inView } = useInView<HTMLDivElement>("-80px");
   const [active, setActive] = useState(0);
-  const [runKey, setRunKey] = useState(0);
-
-  const activate = useCallback((i: number) => {
-    setActive((prev) => {
-      if (prev !== i) setRunKey((k) => k + 1);
-      return i;
-    });
-  }, []);
 
   return (
     <div ref={ref} className={`loop ${inView ? "in" : ""}`}>
-      <div className="loop-side">
-        <div className="loop-stages" role="tablist" aria-label="Stages of the loop">
-          {STAGES.map((s, i) => (
-            <button
-              key={s.name}
-              type="button"
-              role="tab"
-              aria-selected={active === i}
-              className="loop-stage"
-              data-hot={active === i || undefined}
-              style={{ "--i": i } as React.CSSProperties}
-              onMouseEnter={() => activate(i)}
-              onFocus={() => activate(i)}
-              onClick={() => activate(i)}
-            >
-              <span className="stage-index">0{i + 1}</span>
-              <span className="stage-title">{s.title}</span>
-              <span className="stage-body">{s.body}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="loop-cli">
-          <span className="loop-cli-label">
-            0{active + 1} · {STAGES[active]!.name}
-          </span>
-          <CliStrip lines={samples[active] ?? []} runKey={runKey} play={inView} />
-        </div>
+      <div className="loop-stages" role="tablist" aria-label="Stages of the loop">
+        {STAGES.map((s, i) => (
+          <button
+            key={s.name}
+            type="button"
+            role="tab"
+            aria-selected={active === i}
+            className="loop-stage"
+            data-hot={active === i || undefined}
+            style={{ "--i": i } as React.CSSProperties}
+            onMouseEnter={() => setActive(i)}
+            onFocus={() => setActive(i)}
+            onClick={() => setActive(i)}
+          >
+            <span className="stage-index">0{i + 1}</span>
+            <span className="stage-title">{s.title}</span>
+            <span className="stage-body">{s.body}</span>
+          </button>
+        ))}
       </div>
 
       <Stations active={active} />

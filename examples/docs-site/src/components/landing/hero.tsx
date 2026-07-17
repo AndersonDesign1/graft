@@ -2,74 +2,72 @@
 
 /**
  * Hero: display type, one CTA pair, and the terminal as the single boxed
- * object — the evidence. The graft drawing lives off to the side and runs on a
- * loop (no in-view gate): it is the ambient "alive" signal of the page, so it
- * should be moving whether or not you just arrived.
+ * object — the evidence. The graft figure stands on the terminal's top edge
+ * and grows out of it on load; afterwards the sway and the union pulse are
+ * the ambient "alive" signal of the page (no in-view gate — it should be
+ * moving whether or not you just arrived).
  */
 import type { TermLine } from "../../lib/highlight";
 import { Terminal } from "./terminal";
 
+/** The classic leaf silhouette, drawn once; each instance is placed and
+ *  angled by its parent <g>. The base of the leaf is the local origin, so the
+ *  pop animation scales it out of its own stem. */
+const LEAF = "M0 0 C7 -12 22 -16 32 -8 C26 4 10 8 0 0 Z";
+
+function Leaf({ at, delay }: { at: string; delay: string }) {
+  return (
+    <g transform={at}>
+      <path className="leaf" d={LEAF} style={{ "--d": delay } as React.CSSProperties} />
+    </g>
+  );
+}
+
 /**
- * The graft, rooted. The rootstock enters from the bottom edge of the hero and
- * climbs; the union sits mid-canvas; the scion branches off the top-right and
- * deliberately leaves the canvas. It is the landscape the type stands in, not
- * an illustration parked beside it — so it is anchored to an edge (things that
- * grow have somewhere to grow *from*) and it runs off the frame rather than
- * being politely contained.
+ * The graft, rooted in the terminal. The figure stands ON the terminal's top
+ * edge — root grips hold the frame, the rootstock climbs to the union, and
+ * only the scion leafs out above it (that is the point of a graft). Things
+ * that grow need somewhere to grow *from*, and here that somewhere is the
+ * live evidence itself. It grows once — plants do not retract — and then the
+ * living signal is the sway and the union's pulse.
  */
 function GraftFigure() {
+  const d = (delay: string) => ({ "--d": delay }) as React.CSSProperties;
   return (
     <div className="graft-figure" aria-hidden="true">
-      <svg viewBox="0 0 600 620" preserveAspectRatio="xMaxYMax meet">
-        {/* rootstock: your repo — enters from the bottom edge */}
+      <svg viewBox="0 0 320 380">
+        {/* root grips: the stock holds the terminal's top edge */}
+        <path className="stock drawn" pathLength={1} style={d("120ms")} d="M150 378 C132 377 114 380 92 373" />
+        <path className="stock drawn" pathLength={1} style={d("220ms")} d="M150 378 C168 376 186 379 210 372" />
+
+        {/* rootstock: the repo the graft takes on */}
         <path
           className="stock drawn"
           pathLength={1}
-          d="M200 620 C206 522 214 458 246 398 C276 342 302 312 320 268"
-        />
-        <path
-          className="stock drawn"
-          pathLength={1}
-          d="M200 620 C186 558 162 528 118 502"
-          opacity="0.55"
-        />
-        <path
-          className="stock drawn"
-          pathLength={1}
-          d="M214 560 C238 542 262 534 296 530"
-          opacity="0.4"
+          d="M150 380 C148 344 140 316 144 284 C147 262 144 250 142 234"
         />
 
-        {/* scion: graft — runs off the top-right of the canvas on purpose.
-            The paths overshoot the viewBox; the svg is overflow: visible, so
-            they carry on past the frame instead of stopping politely at it. */}
+        {/* scion: grafted above the union, branching as it climbs */}
         <path
-          className="scion drawn late"
+          className="scion drawn"
           pathLength={1}
-          d="M320 268 C384 238 432 190 472 120 C500 68 536 26 610 -26"
+          style={d("650ms")}
+          d="M142 234 C140 204 152 176 172 152 C190 130 214 114 242 102"
         />
-        <path
-          className="scion drawn late"
-          pathLength={1}
-          d="M432 190 C480 204 530 198 620 168"
-          opacity="0.65"
-        />
-        <path
-          className="scion drawn late"
-          pathLength={1}
-          d="M398 222 C414 262 424 300 428 344"
-          opacity="0.5"
-        />
-        <path
-          className="scion drawn late"
-          pathLength={1}
-          d="M472 120 C508 136 548 132 616 112"
-          opacity="0.45"
-        />
+        <path className="scion drawn" pathLength={1} style={d("1050ms")} d="M147 193 C136 184 128 174 124 160" />
+        <path className="scion drawn" pathLength={1} style={d("1150ms")} d="M172 152 C186 148 198 150 210 144" />
+        <path className="scion drawn" pathLength={1} style={d("1250ms")} d="M196 122 C204 110 206 100 204 88" />
+
+        {/* leaves — only above the union */}
+        <Leaf at="translate(124 160) rotate(-115)" delay="1450ms" />
+        <Leaf at="translate(210 144) rotate(-20)" delay="1550ms" />
+        <Leaf at="translate(204 88) rotate(-90)" delay="1650ms" />
+        <Leaf at="translate(242 102) rotate(-58) scale(1.15)" delay="1750ms" />
+        <Leaf at="translate(242 102) rotate(2) scale(0.85)" delay="1850ms" />
 
         {/* the union — where the cambium lines up */}
-        <circle className="union-ring" cx="320" cy="268" r="11" />
-        <circle className="union" cx="320" cy="268" r="6" />
+        <circle className="union-ring" cx="142" cy="234" r="11" />
+        <circle className="union" cx="142" cy="234" r="5" />
       </svg>
     </div>
   );
@@ -78,12 +76,7 @@ function GraftFigure() {
 export function Hero({ tagline, terminal }: { tagline?: string; terminal: TermLine[] }) {
   return (
     <section className="hero-section">
-      {/* The figure roots to the bottom of the copy block — i.e. it grows up
-          out of the terminal's top edge. Anchoring it to the section instead
-          put the trunk *behind* the opaque terminal, which chopped the plant
-          into two disconnected fragments. */}
       <div className="hero-copy">
-        <GraftFigure />
         <h1 className="hero-title">
           Content is code.{" "}
           <span className="proof-mark">
@@ -107,6 +100,9 @@ export function Hero({ tagline, terminal }: { tagline?: string; terminal: TermLi
         </div>
       </div>
       <div className="hero-stage">
+        {/* Anchored inside the stage: bottom: 100% puts the figure's base
+            exactly on the terminal's top edge, so it grows out of it. */}
+        <GraftFigure />
         <Terminal lines={terminal} />
       </div>
     </section>
