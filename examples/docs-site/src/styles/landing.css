@@ -842,7 +842,7 @@
 
 .loop .ln {
   fill: none;
-  stroke: var(--ink-faint);
+  stroke: var(--ink-muted); /* legible at reading distance, not specks */
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -864,17 +864,48 @@
   text-transform: uppercase;
   fill: var(--ink-faint);
   opacity: 0;
-  transition: opacity 600ms var(--ease-out) 1600ms;
+  transition:
+    opacity 600ms var(--ease-out) 1600ms,
+    fill var(--duration-base) var(--ease-out);
 }
 
 .loop.in .ret-label {
   opacity: 1;
 }
 
-/* The circuit lives the loop it describes: draw in, hold, retract, redraw —
-   forever, like the hero's graft figure. Stations start on a stagger (--d per
-   group), and because animation-delay is a constant phase offset, they draw
-   *and* retract left-to-right, a wave each way, every cycle. */
+/* the return beat (06 · edit again): the wire home goes hot */
+.loop[data-ret] .ln.rail.ret {
+  stroke: var(--mark);
+}
+
+.loop[data-ret] .ret-label {
+  fill: var(--mark);
+}
+
+/* the crossed-out publish step the wire routes past */
+.loop .no-publish {
+  font: 500 9px/1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  fill: var(--ink-faint);
+  opacity: 0;
+  transition: opacity 600ms var(--ease-out) 2000ms;
+}
+
+.loop.in .no-publish {
+  opacity: 1;
+}
+
+.loop .no-publish-strike {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The circuit draws itself ONCE when it scrolls into view, then holds. The
+   loop is a machine — a machine that flickers reads as broken — so the
+   endlessness lives in the lapping light, not in redrawing. Stations start
+   on a stagger (--d per group), a top-to-bottom wave. */
 .loop .drawn {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
@@ -882,7 +913,7 @@
 }
 
 .loop.in .drawn {
-  animation: loop-draw 10s var(--ease-in-out) var(--d, 0ms) infinite;
+  animation: loop-draw 1200ms var(--ease-out) var(--d, 0ms) forwards;
 }
 
 .loop.in .rail.ret.drawn {
@@ -890,16 +921,8 @@
 }
 
 @keyframes loop-draw {
-  0% {
-    stroke-dashoffset: 1;
-  }
-  14%,
-  80% {
+  to {
     stroke-dashoffset: 0;
-  }
-  90%,
-  100% {
-    stroke-dashoffset: 1;
   }
 }
 
@@ -972,12 +995,13 @@
   stroke-opacity: 0.16;
 }
 
-/* two clocks: the lap (constant motion) and the gate (the light only rides
-   the circuit while the circuit is drawn — same 10s period as loop-draw) */
+/* the light fades in once the circuit has settled, then laps forever.
+   One lap = one beat of the stage rows (LAP_MS in loop.tsx) — the light
+   delivers the next stage. */
 .loop.in .flow {
   animation:
-    loop-lap 3.5s linear infinite,
-    flow-gate 10s var(--ease-in-out) infinite;
+    loop-lap 4s linear infinite,
+    flow-in 800ms var(--ease-out) 1400ms forwards;
 }
 
 @keyframes loop-lap {
@@ -986,18 +1010,9 @@
   }
 }
 
-@keyframes flow-gate {
-  0%,
-  16% {
-    opacity: 0;
-  }
-  24%,
-  74% {
+@keyframes flow-in {
+  to {
     opacity: 1;
-  }
-  82%,
-  100% {
-    opacity: 0;
   }
 }
 
@@ -1084,6 +1099,16 @@
   color: var(--ink-muted);
 }
 
+/* the ghost row — 06 is 01: quieter than a real stage until its beat,
+   then the wrap-around is the loudest thing in the list */
+.loop-stage-return .stage-title {
+  color: var(--ink-faint);
+}
+
+.loop-stage-return[data-hot] .stage-title {
+  color: var(--mark);
+}
+
 /* ------------------------------------------------------- the CLI strip ---
    A bare pre under a hairline (used by the capability index): the hot row's
    real command, typed. Fixed height so switching rows never reflows. */
@@ -1115,7 +1140,7 @@
 .pipeline-note {
   margin: 2rem auto 0;
   font: 400 var(--text-sm) / 1.7 var(--font-mono);
-  color: var(--ink-faint);
+  color: var(--ink-muted); /* the trust line earns stage-body weight */
   text-align: center;
 }
 
@@ -1126,7 +1151,7 @@
 }
 
 .pipeline-note b {
-  color: var(--ink-muted);
+  color: var(--ink);
   font-weight: 500;
 }
 
