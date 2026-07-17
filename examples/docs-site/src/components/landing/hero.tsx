@@ -38,26 +38,25 @@ function GraftFigure() {
   return (
     <div className="graft-figure" aria-hidden="true">
       <svg viewBox="0 0 300 280">
-        {/* the stick — rooted on the terminal's top edge */}
-        <path className="stock drawn" pathLength={1} d="M50 280 C52 250 46 224 58 190" />
-
-        {/* branches sweep right, into the empty space */}
+        {/* one continuous stem — rooted on the terminal's top edge, rising in
+            a straight up-right diagonal (no elbow; there is space above) */}
         <path
-          className="scion drawn"
+          className="stock drawn"
           pathLength={1}
-          style={d("300ms")}
-          d="M58 190 C70 160 96 142 130 134 C172 124 224 126 264 142"
+          d="M50 280 C56 240 70 190 96 148 C118 112 146 84 180 62"
         />
-        <path className="scion drawn" pathLength={1} style={d("600ms")} d="M130 134 C140 112 158 98 184 92" />
-        <path className="scion drawn" pathLength={1} style={d("750ms")} d="M94 148 C118 150 148 158 166 172" />
 
-        {/* leaves, base-to-tip along the branches */}
-        <Leaf at="translate(151 107) rotate(-55) scale(0.85)" delay="900ms" />
-        <Leaf at="translate(184 92) rotate(-20)" delay="1000ms" />
-        <Leaf at="translate(198 128) rotate(-25) scale(0.9)" delay="1100ms" />
-        <Leaf at="translate(232 132) rotate(-15) scale(0.8)" delay="1200ms" />
-        <Leaf at="translate(264 142) rotate(8) scale(1.15)" delay="1300ms" />
-        <Leaf at="translate(166 172) rotate(30) scale(0.85)" delay="1400ms" />
+        {/* side branches feather off the stem, heading right */}
+        <path className="scion drawn" pathLength={1} style={d("450ms")} d="M96 148 C120 140 144 140 166 148" />
+        <path className="scion drawn" pathLength={1} style={d("700ms")} d="M142 91 C164 84 186 84 206 92" />
+
+        {/* leaves, base-to-tip along stem and branches */}
+        <Leaf at="translate(132 142) rotate(-20) scale(0.75)" delay="900ms" />
+        <Leaf at="translate(166 148) rotate(10) scale(0.9)" delay="1000ms" />
+        <Leaf at="translate(134 100) rotate(-70) scale(0.8)" delay="1100ms" />
+        <Leaf at="translate(175 85) rotate(-30) scale(0.8)" delay="1200ms" />
+        <Leaf at="translate(206 92) rotate(-8)" delay="1300ms" />
+        <Leaf at="translate(180 62) rotate(-35) scale(1.15)" delay="1400ms" />
       </svg>
     </div>
   );
