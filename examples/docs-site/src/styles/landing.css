@@ -633,7 +633,12 @@
 .graft-figure {
   position: absolute;
   bottom: 100%;
-  right: -5rem; /* the canopy overhangs the corner, into the empty space */
+  /* The canopy overhangs the corner into the empty page space — as far as
+     -9rem, but never past the viewport: the calc() term is the (negative)
+     free space between the 46rem stage and the viewport edge, plus a small
+     inset, so on narrower screens the overhang backs off instead of the
+     leaves getting clipped mid-shape. */
+  right: max(-9rem, calc((46rem - 100vw) / 2 + 0.5rem));
   z-index: 0;
   width: clamp(13rem, 24vw, 16rem);
   margin-bottom: -1px; /* base stroke sits ON the edge, not hovering above it */

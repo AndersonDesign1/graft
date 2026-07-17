@@ -29,6 +29,9 @@ function Leaf({ at, delay }: { at: string; delay: string }) {
  * space beside the type — never over it. The growth is endless: branches draw
  * in as a wave, the leaves unfurl, everything holds, retracts tip-first, and
  * regrows (same 10s period as the loop circuit further down the page).
+ *
+ * The endless cycle IS the product story: agents and humans keep making
+ * changes, and the content keeps growing out of the terminal.
  */
 function GraftFigure() {
   const d = (delay: string) => ({ "--d": delay }) as React.CSSProperties;
@@ -43,7 +46,7 @@ function GraftFigure() {
           className="scion drawn"
           pathLength={1}
           style={d("300ms")}
-          d="M58 190 C70 160 96 142 130 134 C168 125 210 126 246 138"
+          d="M58 190 C70 160 96 142 130 134 C172 124 224 126 264 142"
         />
         <path className="scion drawn" pathLength={1} style={d("600ms")} d="M130 134 C140 112 158 98 184 92" />
         <path className="scion drawn" pathLength={1} style={d("750ms")} d="M94 148 C118 150 148 158 166 172" />
@@ -51,9 +54,10 @@ function GraftFigure() {
         {/* leaves, base-to-tip along the branches */}
         <Leaf at="translate(151 107) rotate(-55) scale(0.85)" delay="900ms" />
         <Leaf at="translate(184 92) rotate(-20)" delay="1000ms" />
-        <Leaf at="translate(189 128) rotate(-25) scale(0.9)" delay="1100ms" />
-        <Leaf at="translate(246 138) rotate(5) scale(1.15)" delay="1200ms" />
-        <Leaf at="translate(166 172) rotate(30) scale(0.85)" delay="1300ms" />
+        <Leaf at="translate(198 128) rotate(-25) scale(0.9)" delay="1100ms" />
+        <Leaf at="translate(232 132) rotate(-15) scale(0.8)" delay="1200ms" />
+        <Leaf at="translate(264 142) rotate(8) scale(1.15)" delay="1300ms" />
+        <Leaf at="translate(166 172) rotate(30) scale(0.85)" delay="1400ms" />
       </svg>
     </div>
   );
