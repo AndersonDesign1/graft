@@ -820,211 +820,18 @@
   }
 }
 
-/* ------------------------------------------------- §01 · the loop circuit ---
-   Five isometric stations on one rail + a return wire: a closed circuit the
-   light travels continuously. No boxes — the stations are line art, the
-   captions are hairline columns, the CLI strip is a bare <pre>. */
-
-/* rows + CLI on the left, the vertical circuit standing on the right */
-.loop {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 15rem);
-  gap: clamp(1.5rem, 4vw, 3.5rem);
-  align-items: start;
-}
-
-.loop-svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  overflow: visible;
-}
-
-.loop .ln {
-  fill: none;
-  stroke: var(--ink-muted); /* legible at reading distance, not specks */
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-  transition: stroke var(--duration-base) var(--ease-out);
-}
-
-.loop .ln.dim {
-  stroke: var(--hairline-strong);
-}
-
-.loop .ln.rail {
-  stroke: var(--hairline-strong);
-}
-
-.loop .ret-label {
-  font: 500 10px/1 var(--font-mono);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  fill: var(--ink-faint);
-  opacity: 0;
-  transition:
-    opacity 600ms var(--ease-out) 1600ms,
-    fill var(--duration-base) var(--ease-out);
-}
-
-.loop.in .ret-label {
-  opacity: 1;
-}
-
-/* the return beat (06 · edit again): the wire home goes hot */
-.loop[data-ret] .ln.rail.ret {
-  stroke: var(--mark);
-}
-
-.loop[data-ret] .ret-label {
-  fill: var(--mark);
-}
-
-/* the crossed-out publish step the wire routes past */
-.loop .no-publish {
-  font: 500 9px/1 var(--font-mono);
-  letter-spacing: var(--tracking-label);
-  fill: var(--ink-faint);
-  opacity: 0;
-  transition: opacity 600ms var(--ease-out) 2000ms;
-}
-
-.loop.in .no-publish {
-  opacity: 1;
-}
-
-.loop .no-publish-strike {
-  fill: none;
-  stroke: var(--ink-faint);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-/* The circuit draws itself ONCE when it scrolls into view, then holds. The
-   loop is a machine — a machine that flickers reads as broken — so the
-   endlessness lives in the lapping light, not in redrawing. Stations start
-   on a stagger (--d per group), a top-to-bottom wave. */
-.loop .drawn {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  transition: stroke var(--duration-base) var(--ease-out);
-}
-
-.loop.in .drawn {
-  animation: loop-draw 1200ms var(--ease-out) var(--d, 0ms) forwards;
-}
-
-.loop.in .rail.ret.drawn {
-  --d: 700ms;
-}
-
-@keyframes loop-draw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-/* a hot station: strokes go from faint to full ink */
-.loop .station {
-  cursor: pointer;
-}
-
-.loop .station[data-hot] .ln {
-  stroke: var(--ink);
-}
-
-.loop .station[data-hot] .ln.dim {
-  stroke: var(--ink-faint);
-}
-
-/* the validation check draws only when its station is hot */
-.loop .check {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  transition: stroke-dashoffset 350ms var(--ease-out);
-}
-
-.loop .station[data-hot] .check {
-  stroke-dashoffset: 0;
-  stroke: var(--mark);
-}
-
-/* the typed-read token and the rendered h1 light up when hot */
-.loop .token {
-  fill: none;
-  stroke: var(--ink-faint);
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
-  transition:
-    fill var(--duration-base) var(--ease-out),
-    stroke var(--duration-base) var(--ease-out);
-}
-
-.loop .station[data-hot] .token {
-  fill: var(--mark);
-  stroke: var(--mark);
-}
-
-.loop .h1bar {
-  stroke-width: 2.5;
-}
-
-.loop .station[data-hot] .h1bar {
-  stroke: var(--mark);
-}
-
-/* the light: hidden until the circuit is drawn, then lapping it forever.
-   One dash (8% of the path) cycling its offset around a closed path — the
-   path ends where it starts, so the lap has no seam. Linear, because the
-   light is constant motion, not a UI transition. */
-.loop .flow {
-  fill: none;
-  stroke: var(--mark);
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-  stroke-dasharray: 0.08 0.92;
-  opacity: 0;
-}
-
-/* the halo's faintness lives in stroke-opacity so the gate can own opacity */
-.loop .flow-halo {
-  stroke-width: 5;
-  stroke-opacity: 0.16;
-}
-
-/* the light fades in once the circuit has settled, then laps forever.
-   One lap = one beat of the stage rows (LAP_MS in loop.tsx) — the light
-   delivers the next stage. */
-.loop.in .flow {
-  animation:
-    loop-lap 4s linear infinite,
-    flow-in 800ms var(--ease-out) 1400ms forwards;
-}
-
-@keyframes loop-lap {
-  to {
-    stroke-dashoffset: -1;
-  }
-}
-
-@keyframes flow-in {
-  to {
-    opacity: 1;
-  }
-}
-
-/* --------------------------------------------------- the stage rows ---
-   Hairline rows, no boxes. The whole row is the tab; the hot row's marker
-   grows out of its own hairline, mirroring the station going hot beside it. */
+/* --------------------------------------------------------- §01 · the loop ---
+   The loop as a bare index: six hairline rows, no boxes, no diagram. The
+   whole row is the tab; the hot row's marker grows out of its own hairline,
+   and the hot state walks the list on a beat, wraps through 06, and starts
+   over — the loop is watched running, not illustrated. */
 
 .loop-stages {
   display: flex;
   flex-direction: column;
 }
 
+/* one line per stage: index · title · body — an index, read at a glance */
 .loop-stage {
   appearance: none;
   background: none;
@@ -1036,14 +843,22 @@
   cursor: pointer;
   position: relative;
   display: grid;
-  grid-template-columns: 2.4rem minmax(0, 1fr);
-  column-gap: 0.5rem;
-  row-gap: 0.25rem;
-  padding: 0.75rem 0.25rem;
+  grid-template-columns: 2.75rem minmax(0, 13rem) minmax(0, 1fr);
+  column-gap: 1.25rem;
+  align-items: baseline;
+  padding: 1.1rem 0.25rem;
 }
 
-.loop-stage .stage-body {
-  grid-column: 2;
+/* below the one-line threshold the body drops under the title */
+@media (max-width: 940px) {
+  .loop-stage {
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+    row-gap: 0.25rem;
+  }
+
+  .loop-stage .stage-body {
+    grid-column: 2;
+  }
 }
 
 .loop-stage::before {
@@ -1124,17 +939,6 @@
 
 .cli-strip span {
   color: light-dark(var(--shiki-light), var(--shiki-dark));
-}
-
-@media (max-width: 720px) {
-  /* one column: the rows carry the model; the tall circuit steps aside */
-  .loop {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .loop-svg {
-    display: none;
-  }
 }
 
 .pipeline-note {
@@ -1914,25 +1718,10 @@
   }
 
   .proof-mark path,
-  .graft-figure .drawn,
-  .loop .drawn,
-  .loop.in .drawn,
-  .loop .check {
+  .graft-figure .drawn {
     animation: none;
     transition: none;
     stroke-dashoffset: 0;
-  }
-
-  /* no circling light; the ret-label still appears */
-  .loop .flow,
-  .loop.in .flow {
-    animation: none;
-    opacity: 0;
-  }
-
-  .loop .ret-label {
-    opacity: 1;
-    transition: none;
   }
 
   .graft-figure svg,
