@@ -626,16 +626,16 @@
 }
 
 /* The graft figure — rooted in the terminal. Anchored inside .hero-stage with
-   bottom: 100%, so its base sits exactly on the terminal's top edge: root
-   grips hold the frame, the rootstock climbs, the scion leafs out above the
-   union. It grows once (plants do not retract); afterwards the living signal
-   is the sway and the union pulse. Decorative (aria-hidden). */
+   bottom: 100%, so the stick's base sits exactly on the terminal's top edge,
+   at the FAR RIGHT end: the canopy sweeps right into the open space beside
+   the type and overhangs the terminal's corner (.landing clips overflow-x,
+   so no h-scroll). The growth loops forever. Decorative (aria-hidden). */
 .graft-figure {
   position: absolute;
   bottom: 100%;
-  right: clamp(0.75rem, 5vw, 2.75rem);
+  right: -5rem; /* the canopy overhangs the corner, into the empty space */
   z-index: 0;
-  width: clamp(10rem, 24vw, 13.5rem);
+  width: clamp(13rem, 24vw, 16rem);
   margin-bottom: -1px; /* base stroke sits ON the edge, not hovering above it */
   pointer-events: none;
 }
@@ -652,8 +652,8 @@
   width: 100%;
   height: auto;
   overflow: visible;
-  /* the breeze — pivots at the rooted base (x=150 of the 320 viewBox) */
-  transform-origin: 47% 100%;
+  /* the breeze — pivots at the rooted base (x=50 of the 300 viewBox) */
+  transform-origin: 17% 100%;
   animation: graft-sway 9s var(--ease-in-out) 2.6s infinite;
 }
 
@@ -679,20 +679,31 @@
   stroke: var(--ink-muted);
 }
 
-/* stems grow from their start point, staggered root-to-canopy */
+/* Endless growth, same 10s period as the loop circuit: each stem draws in,
+   holds, and retracts tip-first; the per-path stagger is an animation-delay,
+   so the phase persists and the wave runs base-to-canopy each way. */
 .graft-figure .drawn {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: graft-grow 1300ms var(--ease-out) var(--d, 0ms) forwards;
+  animation: graft-grow-cycle 10s var(--ease-in-out) var(--d, 0ms) infinite;
 }
 
-@keyframes graft-grow {
-  to {
+@keyframes graft-grow-cycle {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  18%,
+  80% {
     stroke-dashoffset: 0;
+  }
+  96%,
+  100% {
+    stroke-dashoffset: 1;
   }
 }
 
-/* leaves unfurl out of their own stem: the leaf base is the local origin */
+/* leaves unfurl out of their own stem (the leaf base is the local origin),
+   ride the hold, and fold away before the branches retract */
 .graft-figure .leaf {
   fill: var(--mark);
   fill-opacity: 0.12;
@@ -702,64 +713,24 @@
   opacity: 0;
   transform: scale(0.25);
   transform-origin: 0 0;
-  animation: leaf-pop 420ms var(--ease-out) var(--d, 1500ms) forwards;
+  animation: leaf-cycle 10s var(--ease-out) var(--d, 0ms) infinite;
 }
 
-@keyframes leaf-pop {
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* the union appears only once the rootstock has grown up to it */
-.graft-figure .union {
-  fill: var(--mark);
-  opacity: 0;
-  animation:
-    union-in 300ms var(--ease-out) 1200ms forwards,
-    union-pulse 2.6s var(--ease-in-out) 1.8s infinite;
-  transform-origin: center;
-  transform-box: fill-box;
-}
-
-@keyframes union-in {
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes union-pulse {
+@keyframes leaf-cycle {
   0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.35);
-    opacity: 0.75;
-  }
-}
-
-.graft-figure .union-ring {
-  fill: none;
-  stroke: var(--mark);
-  stroke-width: 1;
-  opacity: 0;
-  animation: union-ring 2.6s var(--ease-out) 1.8s infinite;
-  transform-origin: center;
-  transform-box: fill-box;
-}
-
-@keyframes union-ring {
-  0% {
-    transform: scale(0.6);
-    opacity: 0.8;
-  }
-  70%,
-  100% {
-    transform: scale(2.4);
+  8% {
     opacity: 0;
+    transform: scale(0.25);
+  }
+  14%,
+  72% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: scale(0.25);
   }
 }
 
@@ -1935,19 +1906,14 @@
   }
 
   .graft-figure svg,
-  .graft-figure .union,
-  .graft-figure .union-ring,
   .caret {
     animation: none;
   }
 
   /* the figure stands fully grown */
-  .graft-figure .leaf,
-  .graft-figure .union {
-    opacity: 1;
-  }
-
   .graft-figure .leaf {
+    animation: none;
+    opacity: 1;
     transform: none;
   }
 
