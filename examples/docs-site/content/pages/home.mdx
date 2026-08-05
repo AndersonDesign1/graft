@@ -1,18 +1,36 @@
 ---
 title: Graft
-tagline: The CMS that grafts onto your repo — content as code, agents as operators.
-description: Content as code, git-native versioning, copy-on-write preview branches, owned primitives. Agents operate; humans supervise.
+tagline: >-
+  Most of us already ship with agents more than by hand. Graft keeps content as
+  code so you and your agent can author, branch, and deploy without living in a
+  dashboard.
+description: >-
+  Open-source, self-hostable CMS for agents and the people who run them. MDX in
+  git, one Zod schema, a derived Postgres index. CLI and MCP for day-to-day work.
 faqs:
+  - question: Do I need a dashboard?
+    answer: >-
+      No for day-to-day authoring. Write MDX, run the CLI, or drive MCP. Approvals
+      today are graft approve on your machine. An optional Studio may come later;
+      it is not required to ship.
+  - question: Is Graft open source and self-hostable?
+    answer: >-
+      Yes. Run the packages on your Postgres and S3-compatible store. One Docker
+      image, split compose, or handlers embedded in your app. No Graft cloud
+      required.
   - question: Is content stored in git?
-    answer: Yes. Git is authoritative; Postgres is a derived index. If they disagree, git wins — recompile.
-  - question: Who is the primary operator?
-    answer: An AI agent. Humans are optional supervisors — destructive operations file an approval a human decides, and every invocation writes an audit row.
+    answer: >-
+      Yes. Git owns authored content. Postgres holds a derived index. If they
+      disagree, recompile. Git wins.
+  - question: Who is this for?
+    answer: >-
+      You and your agent. Agents do most of the edits through MCP and the CLI.
+      You own the repo, review diffs, and decide destructive gates.
   - question: How do I add a feature vertical?
-    answer: graft add commerce (or comments, seo, faq…). Owned code lands in your repo as plain TypeScript — no plugin black box.
-  - question: What frameworks does it serve?
-    answer: Next, Astro, and SvelteKit SDKs share one typed read surface — or skip the framework and run the whole thing as one container with graft serve.
+    answer: >-
+      Run graft add commerce (or comments, seo, faq). Source lands under graft/
+      as TypeScript you own. No plugin black box.
 ---
 
 Authored content lives in git. Postgres is a derived index. If they disagree,
-git wins — recompile. This page is itself a Graft document, read back through
-`@graft/sdk-astro`.
+recompile. This page is a Graft document, read back through `@graft/sdk-astro`.

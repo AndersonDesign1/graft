@@ -1,25 +1,21 @@
 ---
 title: The model
-description: Git is authoritative, Postgres is a derived index, and one Zod layer validates everything.
+description: Git owns authored content. Postgres is a derived index. One Zod layer validates everything.
 section: Start here
 order: 2
 ---
 
-Graft has one load-bearing idea, and everything else follows from it:
-
 <Callout label="invariant">
-  **Git is authoritative for authored content; Postgres is a derived index.**
-  If they ever disagree, git wins — recompile.
+  **Git is authoritative for authored content. Postgres is a derived index.**
+  If they disagree, recompile. Git wins.
 </Callout>
 
-Authored content is MDX files in your repo. `graft compile` validates each
-file against your schema and projects it into the `content_index` table — an
-atomic, hash-diffed projection, so unchanged rows keep their timestamps and
-"what changed" stays meaningful. The database is a cache you can always
-rebuild; the repo is the record.
+Authored content is MDX in your repo. `graft compile` validates each file and
+projects it into `content_index`. The projection is atomic and hash-diffed:
+unchanged rows keep timestamps; the ChangeSet lists what moved.
 
-Every projection writes a `compilations` audit row (branch, git SHA, doc
-counts). "Git wins" isn't a slogan — it's checkable against that trail.
+Authoring and ops go through files, the CLI, and MCP. There is no mandatory
+admin dashboard. Graft is open source and self-hostable on your own Postgres.
 
 ## Two kinds of data
 
@@ -27,30 +23,37 @@ counts). "Git wins" isn't a slogan — it's checkable against that trail.
 | --- | --- | --- |
 | Owner | git (files) | Postgres (rows) |
 | Examples | pages, docs, products | form submissions, orders, comments |
-| Written by | authoring MDX + `graft compile` | typed functions only |
-| Collection flag | default | `authority: "db-authoritative"` |
+| Written by | MDX + compile, or MCP `write_content` | typed functions only |
+| Collection flag | default (`file-authoritative`) | `authority: "db-authoritative"` |
 
-Operational data never lives in files, and authored content is never written
-through the API. Mixing the two is an `AUTHORITY_MISMATCH` error, caught at
-compile time and at the function boundary.
+Operational data never lives in files. Authored content is never written through
+the function API as rows. Mixing the two raises `AUTHORITY_MISMATCH` at compile
+time and at the function boundary.
+
+## Edit surfaces
+
+| Surface | Authored content | Operational data |
+| --- | --- | --- |
+| Agent (MCP / CLI) | Write files → compile | Call typed mutations |
+| You (editor / git) | Same files; commit as usual | Same functions (or CLI approve for destructive calls) |
+| Frontend SDK | Read (+ optional future visual-edit → file diffs) | Read / policy-scoped write |
 
 ## One Zod layer
 
-The schema in `graft.config.ts` is plain Zod under the hood, and it is the
-*only* validation layer:
+The schema in `graft.config.ts` is Zod under the hood. It is the only validation
+layer:
 
-- the **compiler** validates frontmatter against it,
-- **functions** validate their inputs against it,
-- **reads** re-validate on the way out, so a poisoned index can't reach your UI.
+- the **compiler** validates frontmatter against it
+- **functions** validate inputs against it
+- **reads** re-validate on the way out
 
-There is no codegen step: `defineCollection` infers document types directly,
-so `getContent("pages", "home")` is typed by the same object that validated
-the file.
+There is no codegen step. `defineCollection` infers document types, so
+`getContent("pages", "home")` is typed by the same object that validated the file.
 
 ## Errors teach
 
-Every error crossing a boundary is a `GraftError` carrying a `fix` — the next
-concrete step to take, written for an agent to act on:
+Every boundary error is a `GraftError` with a `fix` — the next concrete step,
+written so an agent can act:
 
 ```json
 {
@@ -60,12 +63,17 @@ concrete step to take, written for an agent to act on:
 }
 ```
 
-Do what the fix says, then retry. The whole surface is designed to be operated
-cold, by an agent that has never seen the project before.
-
 ## One database per project
 
-The projection makes the index match your content tree exactly — which means
-pointing two projects at one `DATABASE_URL` would let each purge the other's
-documents. Graft refuses: if a compile would remove collections your schema
-doesn't know, it aborts with `INDEX_OWNERSHIP` and writes nothing.
+Projection makes the index match your content tree. Pointing two projects at one
+`DATABASE_URL` would let each purge the other's documents. Graft refuses: if a
+compile would remove collections your schema does not know, it aborts with
+`INDEX_OWNERSHIP` and writes nothing.
+
+Use `--prune-unknown` only when you renamed or deleted a collection on purpose.
+
+## Next steps
+
+- [Schema](/docs/schema) — define collections and fields
+- [Getting started](/docs/getting-started) — run the loop
+- [Branching & previews](/docs/branching-previews) — overlay and Neon backends

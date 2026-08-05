@@ -1,0 +1,56 @@
+---
+title: Auth
+description: Graft verifies identity. It never mints it. OIDC issuers and local dev tokens.
+section: Runtime
+order: 3
+---
+
+`@graft/auth` resolves `Request → FunctionActor`. Graft checks tokens. Your app
+(or IdP) issues them.
+
+## Resolver inputs
+
+| Source | Use |
+| --- | --- |
+| OIDC bearer JWT | Production. Verified with jose against trusted issuers (JWKS inline, URL, or discovery). Checks `iss`, `exp`, `aud`. Scopes from `scope` / `scopes` / `permissions` |
+| `GRAFT_DEV_TOKEN` | Local bootstrap. Optional `GRAFT_DEV_SCOPES` |
+| No token | Anonymous |
+| Bad token | `TOKEN_INVALID` (401) — never a silent downgrade to anonymous |
+
+## Env
+
+```sh
+GRAFT_DEV_TOKEN=dev-secret
+GRAFT_DEV_SCOPES=submissions:read,submissions:admin
+GRAFT_TRUSTED_ISSUERS=https://your-idp.example
+GRAFT_MCP_REQUIRE_AUTH=1
+```
+
+`GRAFT_TRUSTED_ISSUERS` is a comma-separated list of issuer URLs. Discovery loads
+JWKS for each.
+
+## Access rules
+
+```ts
+import { requireScopes } from "@graft/auth";
+
+access: requireScopes("submissions:read"),
+```
+
+Anonymous and unscoped callers are denied. Combine with `public: true` only on
+mutations that must accept strangers (contact forms).
+
+## Example issuer
+
+The Next example hosts Better Auth and mints a JWT for browser sessions. That
+path is an **example**, not a Graft core dependency. Any OIDC issuer that
+matches `GRAFT_TRUSTED_ISSUERS` works the same way.
+
+## MCP identity
+
+- **stdio (`graft mcp`):** server holds `GRAFT_DEV_TOKEN` as default authorization.
+  The secret does not enter the agent context.
+- **HTTP:** connection bearer forwards into `run_function`. Optional
+  `authorization` argument overrides (acting-as).
+
+See [The agent surface](/docs/agent-surface).

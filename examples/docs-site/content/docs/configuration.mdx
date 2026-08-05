@@ -1,0 +1,59 @@
+---
+title: Configuration
+description: Environment variables for compile, serve, auth, MCP, and assets.
+section: Reference
+order: 3
+---
+
+Commands and runtimes walk up from the working directory for `.env`.
+
+## Required
+
+| Variable | Used by | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | compile, dev, migrate, branch, merge, serve, app reads | Postgres connection |
+
+## Identity and policy
+
+| Variable | Purpose |
+| --- | --- |
+| `GRAFT_DEV_TOKEN` | Static bearer for local / bootstrap actors |
+| `GRAFT_DEV_SCOPES` | Comma-separated scopes for the dev token |
+| `GRAFT_TRUSTED_ISSUERS` | Comma-separated OIDC issuer URLs (discovery) |
+| `GRAFT_MCP_REQUIRE_AUTH` | `1` to reject anonymous MCP on HTTP |
+| `GRAFT_APPROVAL_POLICY` | e.g. `human` to gate mutations by default at the handler |
+
+## Serve
+
+| Variable | Purpose |
+| --- | --- |
+| `PORT` / `HOST` | Bind for `graft serve` (default loopback `:3903`) |
+| `GRAFT_RUNTIME_PASSWORD` | Container: create + harden runtime role at boot |
+| `GRAFT_MODE` | Container compose: `serve` against external db/storage |
+
+## Assets (S3-compatible)
+
+| Variable | Purpose |
+| --- | --- |
+| `S3_BUCKET` | Bucket name |
+| `S3_ENDPOINT` | API endpoint (R2, MinIO, Tigris, …) |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Credentials |
+| `S3_PUBLIC_URL` | Optional stable public base; else presigned GET |
+| `GRAFT_ENSURE_BUCKET` | Container: set `0` when the bucket already exists |
+
+## Neon branching
+
+| Variable | Purpose |
+| --- | --- |
+| `NEON_API_KEY` | Create / drop physical CoW branches |
+| `GRAFT_NEON_PROJECT_ID` | Neon project id (required; keys may be project-scoped) |
+
+## Operator vs runtime
+
+Keep two URLs in production:
+
+1. **Operator** — compile, migrate, merge, approve (CI or your machine)
+2. **Runtime** — `DATABASE_URL` for the deployment after `graft harden`
+
+On Vercel embedded deploys, run compile in the build step with the operator URL,
+then serve the app with the runtime URL. See [Deploy](/docs/deploy).

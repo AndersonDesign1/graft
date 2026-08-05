@@ -1,37 +1,36 @@
 ---
 title: SDK reference
-description: One schema types every read — the same surface across Next, Astro, and SvelteKit.
+description: One schema types every read across Next, Astro, and SvelteKit.
 section: Reference
 order: 2
 ---
 
-All reads flow through `@graft/sdk-core`; the framework SDKs re-export its
-surface with framework-appropriate ergonomics. The same `graft.config.ts`
-types every one of them.
+Reads flow through `@graft/sdk-core`. Framework packages re-export the surface
+with local ergonomics. The same `graft.config.ts` types every package.
 
 | Package | For | Notes |
 | --- | --- | --- |
-| `@graft/sdk-core` | anything JS | `createClient` → `getDocument` / `listDocuments` / `searchDocuments`; Zod re-validation; branch-aware; cache-tag helpers |
-| `@graft/sdk-next` | Next.js (RSC) | `createGraft` with per-request memo (`React.cache`), `MdxBody`, `revalidateContent`/`updateContent` (ChangeSet → tags) |
-| `@graft/sdk-astro` | Astro | `createGraft` (no memo — reads from frontmatter/endpoints), `graftRoute` endpoint mount |
-| `@graft/sdk-sveltekit` | SvelteKit | `createGraft` + `graftRoute` for `+server.ts` mounts |
+| `@graft/sdk-core` | any JS | `getDocument` / `listDocuments` / `searchDocuments`; branch-aware; cache-tag helpers |
+| `@graft/sdk-next` | Next (RSC) | `React.cache` memo; `MdxBody`; `revalidateContent` / `updateContent` |
+| `@graft/sdk-astro` | Astro | No request memo; `graftRoute` for endpoint mounts |
+| `@graft/sdk-sveltekit` | SvelteKit | `graftRoute` for `+server.ts`; CDN surrogate keys for tags |
 
-## The shared surface
+## Shared surface
 
 ```ts
-const graft = createGraft({ db, collections });
+const graft = createGraft({ db, collections, branch: "main" });
 
-await graft.getContent("pages", "home");          // Document | null, fully typed
-await graft.listContent("docs");                   // Document[]
-await graft.searchContent("docs", "branching");    // ranked hits with snippets
+await graft.getContent("pages", "home");
+await graft.listContent("docs");
+await graft.searchContent("docs", "branching");
 ```
 
-Reads re-validate against the schema on the way out — a corrupted index row
-throws instead of rendering.
+Unknown collection names are compile-time errors when you pass your
+`collections` map. Reads re-validate; a poisoned index row throws.
 
-## Mounting the runtime
+## Mount the runtime
 
-The handlers are Web-standard, so each mount is one line of adapter:
+Handlers are Web-standard. Mounts are thin:
 
 ```ts
 // Astro: src/pages/api/fn/[name].ts
@@ -41,12 +40,26 @@ export const POST = graftRoute(functionsHandler);
 export const POST = graftRoute(functionsHandler);
 
 // Next: app/api/fn/[name]/route.ts
-export const POST = functionsHandler; // already Request → Response
+export const POST = functionsHandler;
 ```
+
+MCP mounts the same way with `createGraftMcpHandler`.
 
 ## Cache tags
 
-`tagsFor(collection, slug?)` names what a read depends on;
-`tagsForChanges(branch, changeSet)` names what a compile invalidated. Next
-maps tags onto `'use cache'` + `revalidateTag`; Astro/SvelteKit stamp them
-into CDN surrogate-key headers and purge from the compile webhook.
+| Helper | Use |
+| --- | --- |
+| `tagsFor(collection, slug?)` | What a read depends on |
+| `tagsForChanges(branch, changeSet)` | What a compile invalidated |
+
+Next maps tags onto `'use cache'` + `revalidateTag`. Astro and SvelteKit stamp
+CDN headers and purge from a compile webhook. Unchanged documents invalidate
+nothing. Preview branches do not bust main.
+
+## Honest gaps
+
+- Astro / SvelteKit have no `MdxBody` (React-specific). Author bodies for
+  `@astrojs/mdx` or mdsvex.
+- No React.cache equivalent outside Next — call sites own memoization.
+- Next apps should use `withGraft(nextConfig)` so `@graft/registry` stays
+  externalized for the server.

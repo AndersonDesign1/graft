@@ -69,7 +69,7 @@ export function Hero({ tagline, terminal }: { tagline?: string; terminal: TermLi
         <h1 className="hero-title">
           Content is code.{" "}
           <span className="proof-mark">
-            Agents operate it.
+            Skip the dashboard.
             <svg viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">
               <path pathLength={1} d="M1 7 C 20 3, 45 8.5, 65 5.5 C 80 3.5, 92 6.5, 99 4.5" />
             </svg>
@@ -77,14 +77,14 @@ export function Hero({ tagline, terminal }: { tagline?: string; terminal: TermLi
         </h1>
         <p className="hero-sub">
           {tagline ??
-            "Graft is the CMS that grafts onto your repo: MDX in git, a Zod schema, a Postgres index — and every error teaches the agent its own fix."}
+            "Most of us already ship with agents more than by hand. Graft keeps content as MDX in git so you and your agent can author, branch, and deploy without living in a panel."}
         </p>
         <div className="hero-actions">
           <a className="button-primary" href="#start">
             pnpm graft init
           </a>
-          <a className="button-ghost" href="#how">
-            How it works
+          <a className="button-ghost" href="/why">
+            Why Graft
           </a>
         </div>
       </div>

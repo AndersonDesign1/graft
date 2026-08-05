@@ -1,30 +1,27 @@
 ---
 title: Migrations
-description: Schema changes as code — content codemods and transactional data backfills, dry-run by default.
+description: Schema changes as code — content codemods and transactional data backfills.
 section: Content
 order: 3
 ---
 
-Schemas change. Migrations are code in your repo (`migrations/<seq>-<name>.ts`),
-applied with a ledger so every environment knows exactly what has run:
+Migrations live in `migrations/<seq>-<name>.ts`. The filename is the ledger id.
+`graft migrate` is dry-run by default. Pass `--apply` to execute.
 
 ```sh
-graft migrate            # dry-run: report pending migrations
-graft migrate --apply    # execute; each run recorded in migrations_applied
+graft migrate            # report pending
+graft migrate --apply    # run; record in migrations_applied
 ```
-
-Two kinds, matching the two kinds of data:
 
 ## Content codemods
 
-For file-authoritative collections, a migration rewrites the **files** —
-because git is authoritative, changing the index alone would just be
-overwritten by the next compile. `defineContentMigration` walks matching
-documents, transforms frontmatter/body, and writes the files back; you review
-the diff and commit it like any other change.
+For file-authoritative collections, change the **files**. Changing only the index
+would be overwritten on the next compile.
 
 ```ts
 // migrations/0001-pages-description.ts
+import { defineContentMigration } from "@graft/content-migrations";
+
 export default defineContentMigration({
   collection: "pages",
   describe: "backfill description from tagline",
@@ -35,14 +32,23 @@ export default defineContentMigration({
 });
 ```
 
+The migration validates every output against the current schema, rewrites files
+in place, and fails all-or-nothing. Review the diff and commit it.
+
 ## Data backfills
 
-For db-authoritative collections, `defineDataMigration` runs against the rows
-— inside a transaction, so a failed backfill leaves nothing half-migrated.
+For db-authoritative collections, use `defineDataMigration` from `@graft/core`.
+Updates and the ledger row commit in one transaction. A second apply loses the
+unique race and becomes a no-op.
 
-<Callout label="gotcha">
-  Renamed or deleted a collection? The old rows now look foreign to your
-  schema, and compile refuses with `INDEX_OWNERSHIP` to protect them. That
-  is the one legitimate use of `graft compile --prune-unknown` — run it once,
-  deliberately, after the rename lands.
-</Callout>
+## After a rename or delete
+
+Old index rows can look foreign to a new schema. Compile then refuses with
+`INDEX_OWNERSHIP`. That is the one legitimate use of
+`graft compile --prune-unknown` — run it once, after the rename lands.
+
+## Merge interaction
+
+`graft merge` replays the ledger onto the target before moving data rows. Content
+migrations only record a ledger entry on merge; their file rewrites arrive via
+the git merge you do first. See [Branching & previews](/docs/branching-previews).

@@ -1,44 +1,65 @@
 ---
 title: Audit & approvals
-description: Every invocation leaves a row; destructive operations wait for a human.
+description: Every invocation leaves a row. Destructive operations wait for a human decision.
 section: Runtime
 order: 2
 ---
 
-Agents operate Graft, so the runtime assumes it will be driven hard and
-sometimes wrong. Two mechanisms keep that safe:
+Agents drive Graft hard. Two mechanisms keep that safe: an audit log and
+human-gated approvals.
 
-## The audit log
+## Audit log
 
-Every function invocation — success or failure — writes an `audit_log` row:
-who (actor kind + id), what (function, input hash), when, and the git SHA of
-the code that served it. Rate limits are computed **against those rows**, so
-there is no separate counter to drift and nothing stateful in the handler.
+Every function invocation writes an `audit_log` row: actor, function, input hash,
+status, duration, correlation id, and the git SHA of the serving code. Rate
+limits count those rows. Handlers stay stateless.
+
+Look up a call with `x-graft-correlation-id` from the response headers.
 
 ## Human-gated approvals
 
-`destructive: true` functions never execute on first call:
+`destructive: true` functions never execute on the first call:
 
 ```text
 agent:  POST /api/fn/deleteSubmission {"id": "…"}
-graft:  403 DESTRUCTIVE_OP_REQUIRES_APPROVAL { approvalId: "ap_…", fix: "…" }
-human:  graft approvals            # list what's pending
-human:  graft approve ap_…         # or: graft deny ap_…
-agent:  POST /api/fn/deleteSubmission  (header x-graft-approval: ap_…)
+graft:  403 … { approvalId: "ap_…", fix: "…" }
+human:  graft approvals
+human:  graft approve ap_…
+agent:  retry with x-graft-approval: ap_…   (MCP: approval: "ap_…")
 graft:  200 { data: … }
 ```
 
-Approvals are **one-shot** and **input-bound** — an approval authorizes
-exactly one execution of exactly the call that was requested.
+| Property | Behavior |
+| --- | --- |
+| One-shot | Consume flips `approved → consumed` once |
+| Input-bound | Approve A, execute B is impossible |
+| Self-decision refused | Approver cannot be the requester |
 
-<Callout label="hardened">
-  Role separation is enforced in Postgres, not just in code: consuming an
-  approval is a SECURITY DEFINER function, deciding one is an operator-role
-  UPDATE, and the approver can never be the requester. A leaked runtime
-  credential cannot approve its own destructive calls.
-</Callout>
+### MCP form
 
-Functions can also opt into `approvalPolicy: "human"` — the same gate for
-operations that aren't destructive but that a project wants supervised.
-Templates ship with sensible defaults; the policy is per-function code, so
-it's greppable and reviewable like everything else.
+Pass `approval: "<id>"` on `run_function` or `delete_content`. Do not send the
+HTTP header name over MCP — the bridge maps the argument for you.
+
+### Policy
+
+Set `approvalPolicy: "human"` on a function to gate non-destructive mutations
+the same way. Policy is code: greppable and reviewable.
+
+## Hardened roles
+
+Postgres enforces the split:
+
+- **Consume** (approved → consumed) runs through a SECURITY DEFINER function
+- **Decide** (pending → approved/denied) is an operator-role table UPDATE
+- `decided_role` is stamped server-side from `current_user`
+
+```sh
+CREATE ROLE graft_runtime LOGIN PASSWORD '…';
+graft harden graft_runtime
+```
+
+Deploy with the runtime role as `DATABASE_URL`. Keep the operator URL for
+compile, migrate, merge, and `graft approve`. A leaked runtime credential cannot
+approve its own destructive calls.
+
+See [Deploy](/docs/deploy) and [Configuration](/docs/configuration).

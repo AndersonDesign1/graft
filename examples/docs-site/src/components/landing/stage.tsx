@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * The stage — one sticky frame, three beats.
+ * The stage — one sticky frame, four beats.
  *
  * The copy scrolls, the frame holds, and crossing a beat swaps what the frame
  * shows. Compile → the agent correcting itself → the types that fall out of
- * the same schema is one argument, so it gets one object.
+ * the same schema → self-host is one argument, so it gets one object.
  *
  * State is scroll position, nothing else. A single IntersectionObserver with a
  * middle band (`-45%` top and bottom) leaves at most one beat intersecting at
@@ -43,36 +43,35 @@ const BEATS: Beat[] = [
     frame: "graft compile — live",
     head: (
       <>
-        One loop, <span className="marked">no publish button.</span>
+        Edit a file. <span className="marked">Compile. Refresh.</span>
       </>
     ),
     lede: (
       <>
-        Edit a file. Run <code>graft compile</code>. Refresh. Validation, projection, and audit
-        all land in that pass — publishing is just what correctness looks like.
+        No publish button and no admin write path. You or your agent change MDX;{" "}
+        <code>graft compile</code> validates it and updates the Postgres index.
       </>
     ),
     steps: ["author", "validate", "index", "typed read", "render"],
     note: (
       <>
-        <b>If git and Postgres disagree, git wins</b> — recompile. The index is derived state,
-        never a second source of truth.
+        <b>If git and Postgres disagree, recompile.</b> Git wins. The index is derived state.
       </>
     ),
   },
   {
     n: "02",
-    kicker: "agent-native",
+    kicker: "no dashboard trap",
     frame: "mcp exchange — replayed",
     head: (
       <>
-        Errors that <span className="marked">teach the fix.</span>
+        Dashboards <span className="marked">lock agents out.</span>
       </>
     ),
     lede: (
       <>
-        A cold agent, the MCP endpoint, and error shapes that carry their own fix. Schemas and
-        tool descriptions were its only teachers — this is the actual exchange.
+        A mouse UI is a dead end for an agent. Graft speaks MCP and CLI with errors that carry
+        their own <code>fix</code>. This replay is a real cold exchange.
       </>
     ),
   },
@@ -82,29 +81,59 @@ const BEATS: Beat[] = [
     frame: "graft.config.ts → your editor",
     head: (
       <>
-        One schema. <span className="marked">Zero codegen.</span>
+        One schema. <span className="marked">No codegen.</span>
       </>
     ),
     lede: (
       <>
         The Zod schema in <code>graft.config.ts</code> types the compiler, the SDKs, the
-        functions, and the MCP tools — inference end to end.
+        functions, and the MCP tools.
+      </>
+    ),
+  },
+  {
+    n: "04",
+    kicker: "self-host",
+    frame: "docker run / graft serve",
+    head: (
+      <>
+        Your Postgres. <span className="marked">Your box.</span>
+      </>
+    ),
+    lede: (
+      <>
+        Open source and self-hostable. One container, or <code>graft serve</code> against your
+        database. Same handler bytes either way. No Graft cloud required.
+      </>
+    ),
+    note: (
+      <>
+        <b>Deploy anywhere.</b> Railway, Fly, VPS, or embed the handlers in Next / Astro /
+        SvelteKit.
       </>
     ),
   },
 ];
 
-export function Stage({ compile }: { compile: TermLine[] }) {
+export function Stage({
+  compile,
+  selfhost,
+}: {
+  compile: TermLine[];
+  selfhost: TermLine[];
+}) {
   const [active, setActive] = useState(0);
   // Returning to a beat remounts its demo so the type-out / message cascade
   // plays again instead of sitting finished.
   const [compileRun, setCompileRun] = useState(0);
   const [agentRun, setAgentRun] = useState(0);
+  const [selfhostRun, setSelfhostRun] = useState(0);
   const track = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (active === 0) setCompileRun((r) => r + 1);
     if (active === 1) setAgentRun((r) => r + 1);
+    if (active === 3) setSelfhostRun((r) => r + 1);
   }, [active]);
 
   useEffect(() => {
@@ -158,7 +187,7 @@ export function Stage({ compile }: { compile: TermLine[] }) {
             </span>
           </div>
 
-          {/* All three share one grid cell, so the frame is as tall as the
+          {/* All panels share one grid cell, so the frame is as tall as the
               tallest panel and swapping never reflows the page. */}
           <div className="stage-panels">
             <div className="stage-panel" data-active={active === 0} aria-hidden={active !== 0}>
@@ -169,6 +198,9 @@ export function Stage({ compile }: { compile: TermLine[] }) {
             </div>
             <div className="stage-panel" data-active={active === 2} aria-hidden={active !== 2}>
               <TypedReads />
+            </div>
+            <div className="stage-panel" data-active={active === 3} aria-hidden={active !== 3}>
+              <Terminal key={selfhostRun} lines={selfhost} play={active === 3} />
             </div>
           </div>
         </div>

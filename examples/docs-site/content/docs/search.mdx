@@ -1,0 +1,39 @@
+---
+title: Search
+description: Postgres full-text search on the content index and on operational data.
+section: Content
+order: 5
+---
+
+Search is a property of the index. Generated `tsvector` columns cover
+`content_index` and `data_records`. Every write path is searchable without
+app-side bookkeeping.
+
+## Authored content
+
+Surfaces:
+
+| Surface | Call |
+| --- | --- |
+| SDK | `graft.searchContent(collection, query)` |
+| MCP | `search_content` |
+| db | `searchContent` (used under the hood) |
+
+Query syntax is Postgres `websearch_to_tsquery`: words, `"quoted phrases"`,
+`or`, and `-exclusions`. Empty queries fail with `INPUT_VALIDATION_FAILED`.
+Stopword-only queries return `[]`.
+
+Hits include rank, headline snippets, and `sourcePath` (the file to edit). On
+overlay branches, search walks the branch chain so inherited documents appear.
+
+Weighting on content: slug (A) > frontmatter strings (B) > body (C).
+
+## Operational data
+
+Data search stays behind typed functions (`searchRecords` in core). The same
+authority and Zod rules apply as other record helpers. Example apps expose
+gated functions such as `searchSubmissions`.
+
+## Language
+
+FTS config is `'english'` today. i18n configs are an open follow-up.

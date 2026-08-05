@@ -153,7 +153,7 @@ export function TypedReads() {
         <Pane title="what the SDK knows" lines={TYPES} hot={hot} setHot={setHot} />
       </div>
       <p className="typed-hint">
-        <b>hover a field</b> — one Zod schema; compiler, SDKs, and MCP all infer from it.
+        <b>hover a field</b>. One Zod schema; compiler, SDKs, and MCP all infer from it.
       </p>
     </>
   );

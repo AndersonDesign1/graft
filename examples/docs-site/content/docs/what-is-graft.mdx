@@ -1,0 +1,62 @@
+---
+title: What is Graft
+description: The open-source, self-hostable CMS for agents and the people who run them.
+section: Start here
+order: 0
+---
+
+Graft is the open-source, self-hostable CMS for agents and the people who run
+them.
+
+Content is MDX in git. A Zod schema validates it. Postgres holds a derived
+index. You and your agent work through the CLI and MCP — no dashboard required.
+
+## You'll need
+
+1. Node.js 20 or newer
+2. A Postgres database URL (`DATABASE_URL`)
+3. Optional: an S3-compatible store for assets (see [Configuration](/docs/configuration))
+
+## Quickstart
+
+Pick a path:
+
+<DocCards>
+  <DocCard title="Getting started" href="/docs/getting-started">
+    Init a project, compile MDX, read it typed.
+  </DocCard>
+  <DocCard title="Reading content" href="/docs/reading-content">
+    Next, Astro, and SvelteKit SDK surfaces.
+  </DocCard>
+  <DocCard title="Self-host" href="/docs/deploy">
+    One container, split compose, or embed handlers.
+  </DocCard>
+  <DocCard title="Agents" href="/docs/agent-surface">
+    MCP tools, self-teaching errors, cold-agent gate.
+  </DocCard>
+</DocCards>
+
+## Explore
+
+<DocCards>
+  <DocCard title="The model" href="/docs/the-model">
+    Git owns content. Postgres is the index.
+  </DocCard>
+  <DocCard title="Branching" href="/docs/branching-previews">
+    Copy-on-write overlays or Neon forks.
+  </DocCard>
+  <DocCard title="Owned primitives" href="/docs/owned-primitives">
+    graft add copies source into your repo.
+  </DocCard>
+  <DocCard title="Approvals" href="/docs/audit-and-approvals">
+    Human gates on destructive ops. Audit trail.
+  </DocCard>
+</DocCards>
+
+## Load-bearing ideas
+
+1. **Git owns authored content.** Postgres is derived. Recompile if they disagree.
+2. **One Zod layer** types compile, reads, functions, and MCP.
+3. **MCP + CLI** are first-class. Errors carry a `fix`.
+4. **Preview branches** are copy-on-write.
+5. **Owned primitives** land as source via `graft add`.

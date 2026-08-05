@@ -1,48 +1,55 @@
 ---
 title: The agent surface
-description: MCP tools, self-teaching errors, and llms.txt — designed to be operated cold.
+description: MCP tools and self-teaching errors. Operate without an admin UI.
 section: Agents
 order: 1
 ---
 
-Graft's primary operator is an agent. That isn't a chat box bolted onto an
-admin panel — it's the shape of the whole surface:
+Day-to-day content work goes through MCP and the CLI — the same ops a dashboard
+would expose, without locking agents behind a mouse UI.
 
-- every error carries a `fix` (the next concrete step, machine-actionable),
-- every project ships an `llms.txt` explaining its own loop,
-- and the full content + function surface speaks **MCP**.
+Every error carries a `fix`. Tools expose schema, content, functions, and the
+registry. CI enforces a cold-agent contract: tool descriptions and error
+messages alone are enough to author content and call functions.
 
-## The MCP server
+## Install
 
 ```sh
-graft mcp        # stdio, for local agents
-# or over HTTP: POST /api/mcp (Streamable HTTP, stateless)
+graft mcp        # stdio for local agents (.mcp.json)
+# HTTP: POST /api/mcp  (Streamable HTTP, stateless)
 ```
 
-| Tools | What they do |
+| Transport | Who | Auth |
+| --- | --- | --- |
+| Stdio | IDE / local agents | Server default from `GRAFT_DEV_TOKEN` |
+| HTTP | Remote agents | Bearer on the connection; set `GRAFT_MCP_REQUIRE_AUTH=1` outside loopback |
+
+## Tools
+
+| Tools | Role |
 | --- | --- |
-| `list_collections`, `describe_schema` | discover what content exists and its exact shape |
-| `read_content`, `search_content` | typed reads + FTS over the index |
-| `write_content`, `delete_content` | author MDX files and project them (git stays authoritative) |
-| `put_asset` | upload binaries to the asset store |
-| `list_functions`, `describe_function`, `run_function` | the typed function runtime, same gates as HTTP |
-| `list_registry`, `describe_item` | browse owned primitives before `graft add` |
-| `explain` | turn any GraftError code into causes + recovery steps |
+| `list_collections`, `describe_schema` | Discover collections, fields, and functions |
+| `list_content`, `get_content`, `search_content` | Read authored content (search hits include `sourcePath`) |
+| `write_content`, `delete_content` | Author or remove MDX; compile in the same call |
+| `put_asset` | Upload binaries for `field.asset` |
+| `list_functions`, `describe_function`, `run_function` | Same gates as `POST /api/fn/<name>` |
+| `list_registry`, `describe_item` | Browse owned primitives before `graft add` |
+| `explain_error` | Map any GraftError code to causes + recovery |
 
-`run_function` reuses the functions handler, so access rules, audit rows, rate
-limits, and approval gates apply identically — MCP is a door, not a bypass.
-`delete_content` is destructive and human-gated like any destructive function.
+`run_function` reuses the functions handler. Access rules, audit rows, rate
+limits, and approval gates apply identically. MCP is a door, not a bypass.
 
-## Auth
+`delete_content` is destructive and human-gated. First call files an approval;
+retry with `approval: "<id>"` after `graft approve`.
 
-The same resolver as HTTP: bearer tokens or `GRAFT_DEV_TOKEN`. Set
-`GRAFT_MCP_REQUIRE_AUTH=1` to reject anonymous callers on anything reachable
-from outside.
+## Proof
 
-## The cold-agent gate
+The test suite includes offline cold-agent runs (stdio and remote HTTP) under
+`pnpm test:cold-agent`. A live off-repo exercise authored a page and walked a
+human-gated delete with only the network MCP endpoint as context.
 
-The contract "an agent that has never seen this project can operate it" is
-**CI-enforced**: the test suite includes cold-agent runs (stdio and remote
-HTTP) where an agent gets only the MCP endpoint and must author content,
-upload an asset, and run functions without human help. Friction found there
-becomes an ergonomics fix, not a documentation footnote.
+## Next steps
+
+- [CLI reference](/docs/cli-reference) — every graft command
+- [Auth](/docs/auth) — verify-don't-mint identity
+- [Audit & approvals](/docs/audit-and-approvals) — human gates on destructive ops

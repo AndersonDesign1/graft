@@ -1,13 +1,34 @@
 ---
 title: Reading content
-description: Typed reads with sdk-core, and the framework SDKs for Next, Astro, and SvelteKit.
+description: Typed reads with sdk-core and the Next, Astro, and SvelteKit adapters.
 section: Content
 order: 1
 ---
 
 All reads go through `@graft/sdk-core`: `getDocument`, `listDocuments`, and
-`searchDocuments`, each re-validated against your Zod schema on the way out.
-The framework SDKs re-export that surface with framework-appropriate ergonomics.
+`searchDocuments`. Each call re-validates against your Zod schema. Soft-deleted
+index rows are excluded.
+
+Framework SDKs wrap that surface:
+
+| Package | Entry | Notes |
+| --- | --- | --- |
+| `@graft/sdk-next` | `createGraft` | Per-request memo via `React.cache`; `MdxBody` for React MDX |
+| `@graft/sdk-astro` | `createGraft` | No request memo; use from frontmatter and endpoints only |
+| `@graft/sdk-sveltekit` | `createGraft` | Same shared surface; `graftRoute` for `+server.ts` |
+
+## Shared API
+
+```ts
+const graft = createGraft({ db, collections, branch: "main" });
+
+await graft.getContent("pages", "home");       // Document | null
+await graft.listContent("docs");               // Document[]
+await graft.searchContent("docs", "branching"); // ranked hits + snippets
+```
+
+Pass `branch` to resolve overlay or Neon preview branches. See
+[Branching & previews](/docs/branching-previews).
 
 ## Astro
 
@@ -23,11 +44,36 @@ export const graft = createGraft({
 });
 ```
 
-Use it from `.astro` frontmatter, endpoints, and middleware — never client
-islands (it holds a database handle).
+Call it from `.astro` frontmatter, endpoints, and middleware. Do not import it
+into client islands — it holds a database handle.
 
-## Caching
+## Next.js
 
-Astro has no tag-based data cache, so the Phase 4 tag contract maps onto HTTP:
-stamp `tagsFor(...)` into a CDN surrogate-key header on SSR responses, and
-purge `tagsForChanges(branch, changeSet)` from your compile webhook.
+```ts
+import { createGraft } from "@graft/sdk-next";
+
+export const graft = createGraft({ db, collections });
+// getContent / listContent / searchContent are React.cache-deduped per request
+```
+
+Render authored bodies with `MdxBody` and your generated `components/mdx-components.ts`
+map when you use registry blocks.
+
+## SvelteKit
+
+```ts
+import { createGraft } from "@graft/sdk-sveltekit";
+
+export const graft = createGraft({ db, collections });
+```
+
+Mount functions and MCP with `graftRoute` on `+server.ts` endpoints. See
+[SDK reference](/docs/sdk-reference).
+
+## Cache tags
+
+`tagsFor(collection, slug?)` names what a read depends on.
+`tagsForChanges(branch, changeSet)` names what a compile invalidated.
+
+- **Next:** map tags onto `'use cache'` + `revalidateTag` / `updateTag`
+- **Astro / SvelteKit:** stamp CDN surrogate-key headers; purge from your compile webhook

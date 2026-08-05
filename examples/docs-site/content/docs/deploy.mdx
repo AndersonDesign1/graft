@@ -1,53 +1,70 @@
 ---
 title: Deploy
-description: Two topologies, identical bytes — embedded in your app or headless in a container.
+description: Self-host Graft — one container, split compose, or handlers embedded in your app.
 section: Deploy
 order: 1
 ---
 
-Graft ships libraries and a CLI, not a monolith. Everything the runtime does
-is a stateless `Request → Response` handler, so deployment is a wrapper, not
-a rewrite. Two topologies, and both serve identical bytes:
+## Self-host Graft
 
-1. **Embedded** — your app (Next, Astro, SvelteKit) mounts the handlers as
-   routes. The app *is* the runtime.
-2. **Headless** — `graft serve` binds the same handler instances to a plain
-   Node HTTP server: `POST /api/fn/name`, `POST /api/mcp`, `GET /healthz`.
-   This is what a container runs.
+Graft is self-hostable. You run the source against your Postgres and your object
+store. There is no required Graft cloud.
+
+### Container quick path
+
+```sh
+docker run -p 3903:3903 graft
+# migrate → compile → serve
+# GET /healthz reports branch + git SHA
+```
+
+Mount your project at `/project`, or set `GRAFT_RUNTIME_PASSWORD` so boot
+creates a hardened runtime role. Full recipes live under `deploy/` in the repo.
+
+## Topologies
+
+Runtime work is a stateless `Request → Response` handler. Two wrappers, same bytes:
+
+1. **Embedded** — your app (Next, Astro, SvelteKit) mounts the handlers as routes.
+2. **Headless** — `graft serve` binds those handlers to a Node HTTP server:
+   `POST /api/fn/<name>`, `POST /api/mcp`, `GET /healthz`.
 
 ## Adapters
 
 | Adapter | Topology | Runs |
 | --- | --- | --- |
-| Railway | container | the `deploy/docker` image + managed Postgres/R2 |
-| Fly.io | container | the same image on Fly Machines; Tigris or R2 for assets |
-| VPS | container | the split compose (`db` / `storage` / `graft`) behind a reverse proxy |
-| Vercel | embedded | your app mounts the handlers — request-scoped compute, no container |
+| Railway | container | `deploy/docker` image + managed Postgres / R2 |
+| Fly.io | container | Same image on Fly Machines; Tigris or R2 for assets |
+| VPS | container | Split compose (`db` / `storage` / `graft`) behind a reverse proxy |
+| Vercel | embedded | App mounts handlers; compile is a build step |
 
-Each adapter is a short recipe in the repo's `deploy/` directory; this very
-site deploys with the Vercel embedded path from an Astro app.
+This docs site uses the Vercel embedded path from Astro.
 
-## The credential recipe
+## Credential recipe
 
-Every adapter repeats one pattern: the deployment gets a **runtime
-credential** that can execute everything mounted but can never approve its
-own destructive operations.
+Give the deployment a **runtime** credential that can execute mounted endpoints
+but cannot decide approvals:
 
 ```sh
-# as the operator (owner DATABASE_URL):
 CREATE ROLE graft_runtime LOGIN PASSWORD '…';
 graft harden graft_runtime
-
-# deploy with the runtime role's URL as DATABASE_URL;
-# keep the operator URL local/CI-only (compile, migrate, approve).
+# deploy with the runtime role URL as DATABASE_URL
+# keep the operator URL for compile / migrate / approve
 ```
 
-The container automates this: set `GRAFT_RUNTIME_PASSWORD` and boot creates,
-hardens, and serves under the role.
+The container automates this when you set `GRAFT_RUNTIME_PASSWORD`.
 
-<Callout label="division of labor">
-  Operator credential (CI / your machine): `graft compile`, `graft migrate
-  --apply`, `graft merge`, `graft approve`. Runtime credential (the
-  deployment): functions, MCP, reads. A hardened deployment is
-  functions-and-reads-first by design.
-</Callout>
+| Task | Credential |
+| --- | --- |
+| `graft compile`, `migrate --apply`, `merge`, `approve` | operator |
+| Functions, MCP, reads, approval request/consume | runtime |
+
+Hardened deployments are functions-and-reads first: the runtime role cannot
+project content, so remote MCP writes need the operator path (CI or a writable
+self-host mount).
+
+## Next steps
+
+- [Configuration](/docs/configuration) — env vars for serve, auth, and assets
+- [Audit & approvals](/docs/audit-and-approvals) — how the human gate survives deploy
+- [What is Graft](/docs/what-is-graft) — product overview

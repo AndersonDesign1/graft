@@ -1,12 +1,13 @@
 "use client";
 
 /**
- * Closing CTA — human install + agent guide.
+ * Closing CTA — human install + agent MCP path.
  * Real brand marks from /public/agents (Claude, Cursor, Codex, Copilot, Gemini).
  */
 import { useCallback, useState, type ReactNode } from "react";
 
 const INIT_CMD = "pnpm dlx graft init";
+const MCP_CMD = "graft mcp";
 
 const AGENTS = [
   { name: "Claude", src: "/agents/claude.svg" },
@@ -15,15 +16,6 @@ const AGENTS = [
   { name: "Copilot", src: "/agents/copilot.svg" },
   { name: "Gemini", src: "/agents/gemini.svg" },
 ] as const;
-
-function agentPrompt() {
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const guide = origin ? `${origin}/llms.txt` : "/llms.txt";
-  return (
-    `Read ${guide}. Graft keeps content as MDX in git; graft.config.ts is the schema; ` +
-    "Postgres is a derived index. Scaffold with `pnpm dlx graft init`, then operate via MCP or the CLI."
-  );
-}
 
 function useCopy() {
   const [copied, setCopied] = useState(false);
@@ -100,13 +92,13 @@ export function ClosingCta() {
         <div className="cta-cell cta-agent">
           <AgentMarks />
           <p className="cta-cell-label">For your agent</p>
-          <h3>Paste the project guide.</h3>
+          <h3>Connect MCP or the CLI.</h3>
           <p className="cta-cell-body">
-            <code>llms.txt</code> + MCP — Claude, Cursor, Codex, Copilot, Gemini, or anything that
-            can fetch a URL.
+            Tool descriptions and error <code>fix</code> fields teach the loop. Claude, Cursor,
+            Codex, Copilot, Gemini — anything that speaks MCP.
           </p>
-          <CopyRow getText={agentPrompt} ariaLabel="Copy agent setup prompt">
-            Copy setup prompt → /llms.txt
+          <CopyRow getText={() => MCP_CMD} mono ariaLabel="Copy graft mcp command">
+            $ {MCP_CMD}
           </CopyRow>
         </div>
 
@@ -114,7 +106,7 @@ export function ClosingCta() {
           <p className="cta-cell-label">For you</p>
           <h3>Scaffold the repo.</h3>
           <p className="cta-cell-body">
-            One command. Config, first document, agent guide — files you own.
+            One command. Config and the first document: files you own on your machine.
           </p>
           <CopyRow getText={() => INIT_CMD} mono ariaLabel="Copy init command">
             $ {INIT_CMD}
@@ -123,11 +115,11 @@ export function ClosingCta() {
       </div>
 
       <div className="cta-actions">
-        <a className="button-ghost" href="/docs">
-          Read the docs
+        <a className="button-ghost" href="/why">
+          Why Graft
         </a>
-        <a className="button-primary" href="/docs/getting-started">
-          Start building
+        <a className="button-primary" href="/docs/what-is-graft">
+          What is Graft
         </a>
       </div>
     </div>

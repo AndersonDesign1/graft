@@ -1,17 +1,22 @@
 # Graft project — agent guide
 
-Everything is code. Content lives in MDX files; git is authoritative; Postgres
-is a derived index. If they disagree, git wins — recompile.
+Content is MDX in git. Postgres is a derived index. If they disagree, recompile.
+Git wins. Day-to-day work uses the CLI and MCP. You do not need an admin UI.
+Graft is open source and self-hostable (your Postgres, your object store).
 
-- Schema: graft.config.ts (defineCollection/field over Zod). The single source of truth.
+- Schema: graft.config.ts (`defineCollection` / `field.*` over Zod). Single source of truth.
 - Documents: content/<collection>/<slug>.mdx — frontmatter must satisfy the collection schema.
-- Slugs are kebab-case; a frontmatter `slug:` overrides the filename.
-- Project into the index: `graft compile` (one-shot) or `graft dev` (watch mode).
-  Both need DATABASE_URL in .env (any parent directory works).
-- One project = one database. Never point DATABASE_URL at another project's
-  index — compile refuses with INDEX_OWNERSHIP rather than purge its documents.
-- Primitives: add owned building blocks with `graft add <item>` — they land under
-  graft/ and wire in automatically (the generated graft/index.ts barrel; no config
-  edit). Run `graft add` with no name to list what's available.
-- Every Graft error carries a `fix` — do what it says, then retry.
-- Ship changes as git commits; every projection records the git SHA it compiled from.
+- Slugs are kebab-case. A frontmatter `slug:` overrides the filename.
+- Compile: `graft compile` (once) or `graft dev` (watch). Needs DATABASE_URL in .env.
+- One project = one database. Never point DATABASE_URL at another project's index
+  (compile refuses with INDEX_OWNERSHIP).
+- Primitives: `graft add <item>` copies owned source under graft/ and regenerates
+  the graft/index.ts barrel. Run `graft add` with no name to list items.
+- Assets: `graft asset put` or MCP `put_asset`, then reference `{ key, alt? }` on
+  `field.asset` fields.
+- Functions: POST /api/fn/<name> or MCP `run_function`. Mutations deny anonymous
+  unless `public: true`. Destructive calls need human `graft approve` then retry
+  with `approval` (MCP) or `x-graft-approval` (HTTP).
+- Errors: every GraftError has a `fix` — do what it says, then retry.
+- Docs: /docs/what-is-graft · /docs/getting-started · /docs/the-model · /docs/agent-surface · /why
+- Ship changes as git commits. Every compile records the git SHA.

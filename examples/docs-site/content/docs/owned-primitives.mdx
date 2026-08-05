@@ -1,53 +1,55 @@
 ---
 title: Owned primitives
-description: graft add copies real source into your repo — the shadcn model, not the plugin model.
+description: graft add copies real source into your repo — the shadcn model, not plugins.
 section: Primitives
 order: 1
 ---
 
-A primitive is a unit of **owned, copy-in code**: `graft add comments` drops
-real source files under `graft/` in your repo, wires them in automatically,
-and from that moment they're yours to edit. There is no `@graft/comments`
-dependency to fight, no plugin API boundary, no marketplace security surface.
+A primitive is owned, copy-in code. `graft add comments` drops TypeScript under
+`graft/`, regenerates the barrel, and leaves the files yours to edit. There is
+no `@graft/comments` runtime dependency and no plugin API boundary.
 
 ```sh
-graft add                # list what's available
-graft add comments       # copy the primitive (+ its deps) into graft/
+graft add                # list available items
+graft add comments       # copy item + transitive deps into graft/
+graft add commerce --dry-run
 ```
 
-Adding is a **pure file-drop**: the generated `graft/index.ts` barrel
-aggregates every primitive's collections and functions, and your
-`graft.config.ts` merges the barrel once —
+## Wiring
+
+The generated `graft/index.ts` barrel aggregates collections and functions.
+Your config merges it once:
 
 ```ts
 export const { collections, functions } = mergePrimitives([
-  { collections: { pages }, functions: { … } },
-  primitives, // everything under graft/, via the generated barrel
+  { collections: { pages }, functions: { /* project fns */ } },
+  primitives,
 ]);
 ```
 
-— so there is no manual wiring step for an agent to get wrong. A duplicate
-key across modules fails loudly with `CONFIG_INVALID`, never a silent
-override.
+Duplicate keys fail with `CONFIG_INVALID`.
 
 ## What ships today
 
 | Primitive | What you get |
 | --- | --- |
-| `scoped-access` | named token scopes + access-rule helpers |
-| `comments` | db-authoritative collection + moderated mutations |
-| `seo` | composable SEO frontmatter fields |
-| `callout` | a content block + its MDX component |
-| `faq` | structured FAQ fields + block |
-| `commerce` | products/orders: collections, functions, the full vertical |
+| `scoped-access` | Named token scopes + access-rule helpers |
+| `comments` | Db-authoritative collection + post / list / moderate / delete |
+| `seo` | Composable SEO frontmatter fields |
+| `callout` | Content block + MDX component |
+| `faq` | Structured FAQ fields + block |
+| `commerce` | Products (file) + orders (db) + place / list / update / cancel |
 
-Every item is **self-teaching**: it carries its own `llms.txt` fragment, so
-the next agent that opens the repo learns what was added and how to use it.
-Agents can browse before adding via the MCP `list_registry` /
-`describe_item` tools.
+Browse before you add:
 
-<Callout label="governance">
-  The registry is local and in-repo today — deterministic, testable, versioned
-  with core. The manifest format is already remote-ready; a community registry
-  comes after core stabilizes, not before.
-</Callout>
+```text
+MCP: list_registry → describe_item
+```
+
+## Registry shape
+
+Items live in `@graft/registry` as local manifests (`block` / `field` /
+`access` / `bundle`). Remote HTTP registries are format-compatible later. Today
+the registry is in-repo, versioned with core, and testable.
+
+See [Schema](/docs/schema) for `mergePrimitives` and field nesting.

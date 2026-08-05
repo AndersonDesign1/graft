@@ -1,18 +1,18 @@
 ---
 title: Functions & access
-description: Typed, stateless functions own all operational data — with secure defaults you have to opt out of.
+description: Typed functions own operational data. Mutations deny anonymous callers by default.
 section: Runtime
 order: 1
 ---
 
-Operational data (submissions, orders, anything Postgres owns) is only ever
-touched through functions defined in `graft.config.ts`:
+Operational data (submissions, orders, comments) is written only through
+functions defined in config or under `graft/`:
 
 ```ts
 export const submitContact = defineFunction({
   name: "submitContact",
   kind: "mutation",
-  public: true, // the explicit, greppable opt-out — see below
+  public: true, // greppable opt-out of the anonymous deny default
   rateLimit: { limit: 5, windowSeconds: 60 },
   input: submissions.fields,
   handler: async (ctx) => {
@@ -22,40 +22,37 @@ export const submitContact = defineFunction({
 });
 ```
 
-Functions are served at `POST /api/fn/name` (JSON object body) — mounted in
-your app via the framework SDK, or by `graft serve` headless. Success returns
-`{ data }`; failure returns a GraftError with a `fix`.
+Serve at `POST /api/fn/<name>` (JSON object body) via a framework mount or
+`graft serve`. Success returns `{ data }`. Failure returns a GraftError with
+`fix`. Every response carries `x-graft-correlation-id`.
 
 <Callout label="invariant">
-  Every function is a **stateless Web-standard handler** (`Request →
-  Response`). No long-running server owns a pool — which is why the same
-  handlers run embedded in Next/Astro/SvelteKit, in a container, or on
-  request-scoped compute, byte-for-byte identical.
+  Every function is a **stateless** Web-standard handler (`Request → Response`).
+  The same bytes run embedded in Next/Astro/SvelteKit, in a container, or on
+  request-scoped compute.
 </Callout>
 
 ## Secure by default
 
-- **Mutations reject anonymous callers** unless the function says
-  `public: true`. The default is deny.
-- **`access`** replaces the default with your own rule —
-  `access: requireScopes("submissions:read")` gates on token scopes.
-- **Rate limits** are declarative (`rateLimit`) and counted against the audit
-  log — stateless, no counter service.
-- **Every invocation writes an `audit_log` row**: actor, correlation id, git
-  SHA of the serving code.
+- Mutations reject anonymous callers unless `public: true`
+- `access: requireScopes("submissions:read")` replaces the default with a scope rule
+- `rateLimit` counts against the audit log — no separate counter service
+- Every invocation writes an `audit_log` row (actor, correlation id, git SHA)
 
-## Who is calling
+## Context
 
-`@graft/auth` resolves the actor: OIDC-verified bearer tokens
-(verify-don't-mint — Graft never issues identities) plus `GRAFT_DEV_TOKEN` as
-a static local credential. No token → anonymous; a bad token → `TOKEN_INVALID`,
-never a silent downgrade.
+Handlers receive `FunctionContext`: `{ input, db, actor, branch, request, correlationId }`.
+Use core helpers (`insertRecord`, `listRecords`, `updateRecord`, `deleteRecord`,
+`searchRecords`) so authority and Zod validation stay enforced.
 
 ## Destructive operations
 
-A function marked `destructive: true` is **always human-gated**, regardless of
-any policy: calling it files an approval and returns 403 with the approval id;
-a human runs `graft approve <id>`; the caller retries with the
-`x-graft-approval` header. Approvals are one-shot and input-bound, and the
-runtime credential can never approve its own requests — approval is an
-operator action by construction.
+Mark `destructive: true` for irreversible work. First call files an approval and
+returns 403 with the id. A human runs `graft approve <id>`. The caller retries
+with `x-graft-approval` (HTTP) or `approval` (MCP). Approvals are one-shot and
+input-bound. See [Audit & approvals](/docs/audit-and-approvals).
+
+## Identity
+
+`@graft/auth` verifies bearers. Graft does not mint identities. See
+[Auth](/docs/auth).

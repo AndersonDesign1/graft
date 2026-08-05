@@ -154,7 +154,6 @@ export const HERO_INIT = `
 $ pnpm graft init
   created graft.config.ts
   created content/pages/home.mdx
-  created llms.txt
 
 $ # your repo is now the CMS
 `;
@@ -167,4 +166,12 @@ $ pnpm graft compile
   +1 added  ~1 changed  −0 removed
 
 $ # that was the entire publish
+`;
+
+export const STAGE_SELFHOST = `
+$ docker run -p 3903:3903 graft
+  migrate → compile → serve
+  GET /healthz  200  branch=main
+
+$ # or: graft serve  (same handlers, your Postgres)
 `;

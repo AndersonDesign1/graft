@@ -1,0 +1,92 @@
+---
+title: Schema
+description: defineCollection and field builders — the single Zod layer for content and functions.
+section: Start here
+order: 3
+---
+
+Define collections and fields in `graft.config.ts` (and under `graft/` when you
+add primitives). The same definitions type the compiler, SDK reads, MCP tools,
+and function inputs.
+
+## defineCollection
+
+```ts
+import { defineCollection, field } from "@graft/core";
+
+export const pages = defineCollection({
+  name: "pages",
+  description: "Marketing and site pages.",
+  fields: {
+    title: field.string({ description: "Headline and <title>." }),
+    tagline: field.string({ optional: true }),
+    description: field.string({ optional: true }),
+    image: field.asset({ optional: true }),
+  },
+});
+```
+
+| Option | Purpose |
+| --- | --- |
+| `name` | Collection id. Matches `content/<name>/` |
+| `description` | Shown to agents via `describe_schema` |
+| `fields` | Map of `field.*` builders |
+| `authority` | Omit for file-authoritative. Set `"db-authoritative"` for operational rows |
+
+## Field builders
+
+| Builder | Stores | Notes |
+| --- | --- | --- |
+| `field.string()` | short string | Frontmatter scalars |
+| `field.text()` | long string | Bodies and blurbs |
+| `field.number()` | number | |
+| `field.boolean()` | boolean | |
+| `field.datetime()` | ISO datetime | |
+| `field.json()` | arbitrary JSON | Prefer typed object/array when you can |
+| `field.asset()` | `{ key, alt? }` | See [Assets](/docs/assets) |
+| `field.object({ fields })` | nested object | Recursive in `describe_schema` |
+| `field.array({ of })` | list | `of` is another field |
+
+All builders accept `{ optional: true, description: "…" }`.
+
+### Nested example
+
+```ts
+faqs: field.array({
+  of: field.object({
+    fields: {
+      question: field.string(),
+      answer: field.string(),
+    },
+  }),
+  optional: true,
+}),
+```
+
+## Merge with primitives
+
+`graft add` drops source under `graft/`. Merge your collections with the generated
+barrel:
+
+```ts
+import { mergePrimitives } from "@graft/core";
+import * as primitives from "./graft";
+
+export const { collections, functions } = mergePrimitives([
+  { collections: { pages }, functions: { /* … */ } },
+  primitives,
+]);
+```
+
+Duplicate keys throw `CONFIG_INVALID`. Nothing is overridden silently.
+
+## Wire the config
+
+Export `collections` (and `functions` when you define them). The CLI loads the
+file with jiti. Framework apps import the same module for typed reads.
+
+## Next steps
+
+- [Reading content](/docs/reading-content) — typed reads across frameworks
+- [Assets](/docs/assets) — `field.asset` and uploads
+- [Functions & access](/docs/functions-and-access) — operational data mutations

@@ -38,10 +38,10 @@ const TABS: Tab[] = [
   {
     id: "create",
     label: "Create",
-    title: "One registry row. Zero copies.",
+    title: "A registry row. Nothing copied.",
     body: (
       <>
-        A branch is an edge off <code>main</code> — instant, isolated. Reads fall through the
+        A branch is an edge off <code>main</code>. Instant and isolated. Reads fall through the
         overlay until something writes.
       </>
     ),
@@ -55,11 +55,11 @@ const TABS: Tab[] = [
   {
     id: "edit",
     label: "Edit",
-    title: "Leaf wins. Main never notices.",
+    title: "Compile on the branch.",
     body: (
       <>
-        Compile on the branch writes one overlay row. The leaf shadows the parent;{" "}
-        <code>main</code> stays untouched.
+        Compile writes an overlay row. The leaf shadows the parent. <code>main</code> stays
+        untouched.
       </>
     ),
     lines: [

@@ -1998,3 +1998,172 @@
   }
 
 }
+
+/* --------------------------------------------------------------- why page --- */
+
+.why-hero {
+  padding-top: clamp(5.5rem, 12vh, 7.5rem);
+}
+
+.why-lede {
+  max-width: 38rem;
+}
+
+.why-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+.why-pillar-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 2.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  background: var(--hairline-strong);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-outer);
+  overflow: hidden;
+}
+
+.why-pillar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.5rem 1.4rem 1.6rem;
+  background: var(--paper-sunken);
+}
+
+.why-pillar-n {
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  color: var(--mark);
+}
+
+.why-pillar h3 {
+  margin: 0;
+  font: 400 1.35rem / 1.15 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  color: var(--ink);
+}
+
+.why-pillar p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  max-width: 34ch;
+}
+
+.why-beat {
+  max-width: 40rem;
+}
+
+.why-role-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 2rem;
+  background: var(--hairline-strong);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-outer);
+  overflow: hidden;
+}
+
+.why-role {
+  padding: 1.75rem 1.5rem;
+  background: var(--paper-sunken);
+}
+
+.why-role-label {
+  margin: 0 0 1rem;
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--mark);
+}
+
+.why-role ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.why-role li {
+  position: relative;
+  padding-left: 1rem;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.why-role li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 0.35rem;
+  height: 1px;
+  background: var(--ink-faint);
+}
+
+.why-receipt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 2rem 0 0;
+  padding: 0;
+  list-style: none;
+  background: var(--hairline-strong);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-outer);
+  overflow: hidden;
+}
+
+.why-receipt-grid a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.1rem 1rem;
+  border: none;
+  border-radius: 0;
+  background: var(--paper-sunken);
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: background 160ms var(--ease-out);
+}
+
+.why-receipt-grid a:hover {
+  background: color-mix(in oklch, var(--mark) 8%, var(--paper-sunken));
+}
+
+.why-receipt-grid a:hover .why-receipt-title {
+  color: var(--mark);
+}
+
+.why-receipt-title {
+  font: 400 1.15rem / 1.2 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  color: var(--ink);
+}
+
+.why-receipt-note {
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 820px) {
+  .why-pillar-grid,
+  .why-role-grid,
+  .why-receipt-grid {
+    grid-template-columns: 1fr;
+  }
+}

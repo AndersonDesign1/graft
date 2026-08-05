@@ -1,41 +1,40 @@
 ---
 title: Getting started
-description: Init a project, author MDX, project it into Postgres, read it back typed.
+description: Create a Graft project, compile content, and read it back typed.
 section: Start here
 order: 1
 ---
 
-Graft ships libraries and a CLI, not a monolith. A project is a directory with
-a schema (`graft.config.ts`), authored content (`content/`), and whatever
-frontend you like.
+This page gets you from an empty folder to a typed document in Postgres.
+New to Graft? Start at [What is Graft](/docs/what-is-graft).
 
-## The loop
+## Prerequisites
+
+- Node.js 20 or newer
+- A Postgres database (`DATABASE_URL`)
+- Optional S3-compatible store for assets ([Configuration](/docs/configuration))
+
+## Quick start
 
 ```sh
-graft init          # schema + content/ + llms.txt
-graft compile       # project content/ into Postgres (content_index)
-graft dev           # or keep a watcher running while you edit
+pnpm dlx graft init my-site
+cd my-site
 ```
 
-Put `DATABASE_URL=postgres://…` in `.env` (any parent directory works).
+Add your database URL to `.env` (any parent directory works):
 
-## Author a document
-
-Documents are MDX files whose frontmatter must satisfy the collection schema:
-
-```mdx
----
-title: Hello, Graft
-tagline: Content lives in git; Postgres is the index.
----
-
-Body prose is real MDX — searchable, versioned, yours.
+```sh
+DATABASE_URL=postgres://…
 ```
 
-Every projection records a `compilations` audit row (branch, git SHA, counts),
-so "git wins" is checkable, not just a slogan.
+Compile and watch:
 
-## Read it back, typed
+```sh
+graft compile       # project content/ into content_index once
+graft dev           # recompile when content or config changes
+```
+
+Read a document in your app:
 
 ```ts
 import { createGraft } from "@graft/sdk-astro";
@@ -43,8 +42,50 @@ import { collections } from "../graft.config";
 
 const graft = createGraft({ db, collections });
 const home = await graft.getContent("pages", "home");
-//    ^? Document<typeof pages> — title/tagline typed by your schema
+//    ^? typed by your pages collection
 ```
 
-The same schema types every read identically across Next, Astro, and
-SvelteKit.
+`graft init` writes `graft.config.ts`, `content/pages/home.mdx`, and the
+`graft/` barrel for owned primitives.
+
+## Author a document
+
+Documents are MDX files. Frontmatter must satisfy the collection schema.
+
+```mdx
+---
+title: Hello, Graft
+tagline: Content lives in git. Postgres is the index.
+---
+
+Body prose is real MDX. It is searchable and versioned with the repo.
+```
+
+Path shape: `content/<collection>/<slug>.mdx`. Slugs are kebab-case. A
+frontmatter `slug:` field overrides the filename.
+
+## Terms
+
+| Term | Meaning |
+| --- | --- |
+| **compile** | Validate MDX against the schema and write rows into Postgres |
+| **index** | The `content_index` table. Derived from git. Rebuild with compile |
+| **project** | Your Graft app directory (config + `content/` + optional `graft/`) |
+
+## Common failures
+
+| Error | Meaning | Fix |
+| --- | --- | --- |
+| `CONFIG_NOT_FOUND` | No `graft.config.ts` above cwd | Run `graft init` or cd into the project |
+| `ENV_VAR_MISSING` | `DATABASE_URL` (or other required env) absent | Set it in `.env` |
+| `INDEX_OWNERSHIP` | Compile would purge another project's collections | Use a dedicated database (or branch) per project |
+| `CONTENT_DIR_NOT_FOUND` | `content/` missing | Create it or fix `contentDir` in config |
+
+Every Graft error includes a `fix` field. Do what it says, then retry.
+
+## Next steps
+
+- [Schema](/docs/schema) — define collections and fields with `defineCollection`
+- [Reading content](/docs/reading-content) — typed reads in Next, Astro, SvelteKit
+- [The agent surface](/docs/agent-surface) — operate via MCP and the CLI
+- [Deploy](/docs/deploy) — self-host with a container or embed handlers

@@ -4,7 +4,7 @@
  *
  * v5 (docs/design-notes/landing-redesign.md §3): the page scrolls like a
  * document, but the background never changes and the product frame holds.
- * Hero → the stage (three beats against one sticky frame) → branching →
+ * Hero → the stage (four beats against one sticky frame) → branching →
  * FAQ → CTA. Everything is still live: the terminal types real CLI output,
  * the MCP transcript replays a real error → fix exchange, the branching model
  * is a toy you can poke, and the contact form writes an actual data_records
@@ -18,59 +18,64 @@ import { Hero } from "../components/landing/hero";
 import { Stage } from "../components/landing/stage";
 import Landing from "../layouts/Landing.astro";
 import { getGraft } from "../lib/graft";
-import { HERO_INIT, STAGE_COMPILE, highlightSession } from "../lib/highlight";
+import {
+  HERO_INIT,
+  STAGE_COMPILE,
+  STAGE_SELFHOST,
+  highlightSession,
+} from "../lib/highlight";
 
 const doc = await getGraft().getContent("pages", "home");
 const faqs = doc?.data.faqs ?? [];
 
 // Tokenized at build time with the same shiki themes the docs use, so the
 // terminals and a fenced ```console block are colored by one highlighter.
-// One transcript, told in two places: the hero grafts, the stage compiles.
-const [heroTerminal, compileTerminal] = await Promise.all([
+const [heroTerminal, compileTerminal, selfhostTerminal] = await Promise.all([
   highlightSession(HERO_INIT),
   highlightSession(STAGE_COMPILE),
+  highlightSession(STAGE_SELFHOST),
 ]);
 ---
 
 <Landing
-  title="Graft — the agent-native CMS"
+  title="Graft — CMS for agents and the people who run them"
   description={doc?.data.description ??
-    "Content as code: MDX in git, one Zod schema, a derived Postgres index."}
+    "Content as code: MDX in git, one Zod schema, a derived Postgres index. CLI and MCP — no dashboard required."}
 >
   <div class="landing">
     <Hero tagline={doc?.data.tagline} terminal={heroTerminal} client:load />
 
-    <Stage compile={compileTerminal} client:visible />
+    <Stage compile={compileTerminal} selfhost={selfhostTerminal} client:visible />
 
     <section class="section" id="branching">
-      <p class="section-label">§04 <em>branching</em></p>
+      <p class="section-label">§05 <em>branching</em></p>
       <div class="reveal">
-        <h2>Branch content like code. <span class="marked">Because it is.</span></h2>
+        <h2>Branch content the way you branch code.</h2>
         <p class="section-lede">
-          Branches are copy-on-write overlays (or real Neon forks) — instant, isolated, merged
-          with a dry-run first. Watch the CLI, or pick a step:
+          Copy-on-write overlays on any Postgres, or Neon forks when you want a physical
+          database. Merge dry-runs first. Pick a step:
         </p>
       </div>
       <BranchingDemo client:visible />
     </section>
 
     <section class="section" id="faq">
-      <p class="section-label">§05 <em>faq — served from content_index</em></p>
+      <p class="section-label">§06 <em>faq — served from content_index</em></p>
       <div class="reveal">
-        <h2>Asked, answered.</h2>
+        <h2>Common questions</h2>
       </div>
-      <LandingFaq items={faqs.slice(0, 4)} />
+      <LandingFaq items={faqs.slice(0, 5)} />
     </section>
 
     <section class="section section-start" id="start">
       <p class="section-label"><em>begin</em></p>
       <div class="reveal">
-        <h2>Graft it onto <span class="marked">your repo.</span></h2>
-        <p class="section-lede cta-subhead">You scaffold. The agent authors.</p>
+        <h2>Drop Graft onto <span class="marked">your repo.</span></h2>
+        <p class="section-lede cta-subhead">You scaffold. Your agent authors.</p>
         <p class="section-lede">
-          One command drops <code>graft.config.ts</code>, the first MDX doc, and
-          <code>llms.txt</code>. From there humans and cold agents share the same loop —
-          compile, branch, merge.
+          Open source and self-hostable. One command writes <code>graft.config.ts</code> and
+          the first MDX doc. You and a cold agent share the same loop: compile, branch, merge.
+          No admin login.
         </p>
       </div>
       <ClosingCta client:visible />

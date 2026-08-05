@@ -1,6 +1,6 @@
 ---
 title: CLI reference
-description: Every graft command, one table each.
+description: Every graft command with flags that matter.
 section: Reference
 order: 1
 ---
@@ -9,41 +9,47 @@ order: 1
 
 | Command | What it does |
 | --- | --- |
-| `graft init [dir]` | scaffold a project: `graft.config.ts`, `content/`, `llms.txt` |
-| `graft compile` | project the content tree into the content index, once |
-| `graft dev` | watch `content/` + `graft.config.ts`, recompile on change |
-| `graft asset put <file> [key]` | upload a binary to the asset store (S3-compatible env) |
+| `graft init [dir]` | Scaffold config, `content/`, `graft/` barrel |
+| `graft compile` | Project the content tree into `content_index` once |
+| `graft dev` | Watch `content/` + config; recompile on change |
+| `graft asset put <file> [key]` | Upload a binary; print frontmatter snippet |
 
 ## Operator loop
 
 | Command | What it does |
 | --- | --- |
-| `graft approvals` | list pending approvals for human-gated calls |
-| `graft approve <id>` / `graft deny <id>` | decide one (caller retries with `x-graft-approval`) |
-| `graft migrate [--apply]` | run pending migrations (dry-run by default) |
-| `graft harden <role>` | grant the runtime role least-privilege access |
+| `graft approvals` | List pending approvals |
+| `graft approve <id>` / `graft deny <id>` | Decide one; caller retries with approval |
+| `graft migrate [--apply]` | Run pending migrations (dry-run by default) |
+| `graft harden <role>` | Grant runtime least-privilege on an existing role |
 
 ## Branching
 
 | Command | What it does |
 | --- | --- |
-| `graft branch create <name> [--from main] [--backend neon]` | instant branch (overlay default; neon forks) |
-| `graft branch list` / `graft branch drop <name>` | inspect / remove (drop purges transactionally) |
-| `graft merge <name> [--into main] [--apply]` | replay ledger → move data rows → recompile; dry-run first |
+| `graft branch create <name> [--from main] [--backend neon]` | Create overlay (default) or Neon fork |
+| `graft branch list` / `graft branch drop <name>` | Inspect / remove (drop purges transactionally) |
+| `graft merge <name> [--into main] [--apply]` | Replay ledger → move data → recompile |
 
-## Extending & serving
+## Extending and serving
 
 | Command | What it does |
 | --- | --- |
-| `graft add [item]` | copy an owned primitive into `graft/` (no name: list available) |
-| `graft mcp` | serve the project MCP over stdio |
-| `graft serve [--port 3903]` | headless runtime: `/api/fn/name`, `/api/mcp`, `/healthz` |
+| `graft add [item]` | Copy an owned primitive into `graft/` (no name: list) |
+| `graft mcp` | Serve project MCP over stdio |
+| `graft serve [--port 3903]` | Headless runtime: `/api/fn/<name>`, `/api/mcp`, `/healthz` |
 
-## Flags worth knowing
+## Flags
 
 | Flag | Applies to | Meaning |
 | --- | --- | --- |
-| `--branch <id>` | compile / dev / migrate / mcp / serve | operate on a content branch |
-| `--apply` | migrate / merge | execute (default is a dry-run report) |
-| `--prune-unknown` | compile | remove index rows in collections this schema doesn't know (the `INDEX_OWNERSHIP` override — deliberate use only) |
-| `--dry-run` / `--overwrite` | add | preview / replace differing files |
+| `--branch <id>` | compile, dev, migrate, mcp, serve | Operate on a content branch |
+| `--apply` | migrate, merge | Execute (default is dry-run) |
+| `--prune-unknown` | compile | Remove index rows for collections this schema does not know |
+| `--dry-run` / `--overwrite` | add | Preview / replace differing files |
+| `--port` / `--host` | serve | Bind address (default loopback) |
+
+## Env discovery
+
+Commands walk up from cwd for `.env`. `DATABASE_URL` is required for compile,
+dev, migrate, branch, merge, mcp (when projecting), and serve.
