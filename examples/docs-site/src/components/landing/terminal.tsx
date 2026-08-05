@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * A terminal that types the real wow loop: init → compile → ChangeSet.
+ * A terminal that types a real CLI transcript.
  *
  * Coloring comes from shiki — the same highlighter, themes and dual-theme CSS
  * variables the docs code blocks use — tokenized at build time and passed in as
@@ -12,6 +12,9 @@
  * fires on short viewports while only a sliver is visible and the type-out is
  * wasted below the fold). Replayable; reduced-motion shows the finished
  * transcript immediately.
+ *
+ * The wow loop is split across two surfaces in v5: the hero types `init`, the
+ * stage types `compile`. Pass `label` so the chrome names the half you are on.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TermLine } from "../../lib/highlight";
@@ -34,9 +37,19 @@ function sliceLine(line: TermLine, chars: number): TermLine["tokens"] {
   return out;
 }
 
-export function Terminal({ lines }: { lines: TermLine[] }) {
-  // Wait until half the terminal is actually on screen.
+export function Terminal({
+  lines,
+  label = "Terminal",
+  /** Skip the in-view gate — used when a parent (the stage) already decides visibility. */
+  play = false,
+}: {
+  lines: TermLine[];
+  label?: string;
+  play?: boolean;
+}) {
+  // Wait until half the terminal is actually on screen — unless a parent arms us.
   const { ref, inView } = useInView<HTMLDivElement>("0px", 0.5);
+  const armed = play || inView;
   const [row, setRow] = useState(0); // lines fully shown
   const [chars, setChars] = useState(0); // chars of the current typed line
   const [run, setRun] = useState(0);
@@ -55,7 +68,7 @@ export function Terminal({ lines }: { lines: TermLine[] }) {
   }, []);
 
   useEffect(() => {
-    if (!inView) return;
+    if (!armed) return;
     if (reduced) {
       setRow(lines.length);
       return;
@@ -80,7 +93,7 @@ export function Terminal({ lines }: { lines: TermLine[] }) {
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [inView, row, chars, reduced, run, lines]);
+  }, [armed, row, chars, reduced, run, lines]);
 
   const done = row >= lines.length;
   const current = done ? null : lines[row]!;
@@ -88,12 +101,17 @@ export function Terminal({ lines }: { lines: TermLine[] }) {
   return (
     <div ref={ref} className="terminal">
       <div className="terminal-bar">
-        <span>the wow loop — live</span>
+        <span className="terminal-traffic" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+        <span className="terminal-title">{label}</span>
         <button type="button" className="terminal-replay" onClick={replay}>
           replay
         </button>
       </div>
-      <pre className="terminal-body" aria-label="Terminal demo: graft init, then graft compile">
+      <pre className="terminal-body" aria-label={`Terminal demo: ${label}`}>
         {lines.slice(0, row).map((line, i) => (
           <span key={i}>
             {line.tokens.map((token, j) => (

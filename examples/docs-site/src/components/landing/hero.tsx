@@ -28,7 +28,7 @@ function Leaf({ at, delay }: { at: string; delay: string }) {
  * top edge at its far right end, and the branches sweep RIGHT into the open
  * space beside the type — never over it. The growth is endless: branches draw
  * in as a wave, the leaves unfurl, everything holds, retracts tip-first, and
- * regrows (same 10s period as the loop circuit further down the page).
+ * regrows on a 10s period.
  *
  * The endless cycle IS the product story: agents and humans keep making
  * changes, and the content keeps growing out of the terminal.
@@ -83,7 +83,7 @@ export function Hero({ tagline, terminal }: { tagline?: string; terminal: TermLi
           <a className="button-primary" href="#start">
             pnpm graft init
           </a>
-          <a className="button-ghost" href="/how-it-works">
+          <a className="button-ghost" href="#how">
             How it works
           </a>
         </div>
@@ -94,6 +94,10 @@ export function Hero({ tagline, terminal }: { tagline?: string; terminal: TermLi
         <GraftFigure />
         <Terminal lines={terminal} />
       </div>
+      {/* Margin affordance only — fades on first scroll (Landing.astro). */}
+      <p className="scroll-cue" aria-hidden="true">
+        scroll
+      </p>
     </section>
   );
 }

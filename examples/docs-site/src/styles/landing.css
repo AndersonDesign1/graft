@@ -273,22 +273,6 @@
   }
 }
 
-/* -------------------------------------------------------------- grain --- */
-
-/* The stage is pure black, and flat #000 reads as generic dark-mode SaaS.
-   Grain gives it material — the tooth of paper under ink. Fixed so it belongs
-   to the viewport, not the scroll; overlay so it lifts the blacks without
-   touching the type; ~3% so you feel it rather than see it. */
-.grain {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.032;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
 /* ----------------------------------------------------------- sections --- */
 
 .landing {
@@ -311,21 +295,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   font: 500 var(--text-xs) / 1 var(--font-mono);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   color: var(--ink-faint);
   margin: 0 0 2.25rem;
-}
-
-.section-label::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--mark);
-  flex: none;
 }
 
 .section-label em {
@@ -342,7 +317,8 @@
   text-wrap: balance;
 }
 
-.section h2 .marked {
+.section h2 .marked,
+.stage-beat h2 .marked {
   color: var(--mark);
 }
 
@@ -377,113 +353,365 @@
   transform: none;
 }
 
-/* ------------------------------------------------- asymmetric sections ---
-   §02–§06 break the centered column: copy on one side, the live artifact on
-   the other, entering from opposite edges. The side, the column ratio and
-   the vertical seat vary per section (set in index.astro), so the page reads
-   as a sequence of plates, not a template. FAQ + CTA resolve back to center. */
+/* --------------------------------------------------------------- stage ---
+   One sticky frame, three beats. The copy scrolls, the frame holds, and the
+   beat crossing the middle of the viewport decides what the frame shows.
 
-.section[data-flow="copy-left"],
-.section[data-flow="copy-right"] {
+   The frame comes FIRST in the DOM, which is the narrow-screen order (frame
+   pinned under the nav, beats scrolling beneath it). Desktop re-seats it into
+   column two with explicit grid placement — one DOM, two layouts, no JS
+   breakpoint and no duplicated panels. */
+
+.stage {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  border-top: 1px solid var(--hairline);
   display: grid;
-  grid-template-columns: minmax(0, var(--copy, 5fr)) minmax(0, var(--stage, 7fr));
-  gap: clamp(2rem, 5vw, 4.5rem);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.stage-frame-col {
+  position: sticky;
+  top: 5.25rem;
+  z-index: 2;
+  padding: 1.25rem 0;
+  /* the pinned frame must not let copy show through behind it */
+  background: linear-gradient(
+    to bottom,
+    var(--paper) 0%,
+    var(--paper) 88%,
+    transparent 100%
+  );
+}
+
+.stage-frame {
+  border-radius: var(--radius-outer);
+  background: var(--paper-sunken);
+  box-shadow: var(--shadow-raised);
+  outline: 1px solid light-dark(oklch(0 0 0 / 0.08), oklch(1 0 0 / 0.08));
+  outline-offset: -1px;
+  overflow: hidden;
+}
+
+.stage-frame-bar {
+  display: flex;
   align-items: center;
+  gap: 0.85rem;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--hairline);
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
 }
 
-.section[data-flow="copy-right"] {
-  grid-template-columns: minmax(0, var(--stage, 7fr)) minmax(0, var(--copy, 5fr));
+.stage-frame-label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.section[data-flow="copy-right"] .section-copy {
-  order: 2;
+.stage-frame-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
 }
 
-/* banner: copy sits off-axis above a full-width artifact */
-.section[data-flow="banner"] .section-copy {
-  max-width: 46ch;
-  margin-bottom: 3rem;
+.stage-frame-progress i {
+  display: block;
+  width: 1rem;
+  height: 3px;
+  border-radius: 99px;
+  background: color-mix(in oklch, var(--ink-faint) 45%, transparent);
+  transition:
+    background-color 420ms var(--ease-out),
+    width 420ms var(--ease-out);
 }
 
-.section[data-flow="banner"][data-align="right"] .section-copy {
-  margin-left: auto;
-  text-align: right;
+.stage-frame-progress i[data-done="true"] {
+  background: color-mix(in oklch, var(--ink-muted) 70%, transparent);
 }
 
-.section[data-flow="banner"][data-align="right"] .section-label {
-  justify-content: flex-end;
+.stage-frame-progress i[data-on="true"] {
+  width: 1.75rem;
+  background: var(--mark);
 }
 
-/* side-flow typography: left-set, ragged, no centering */
-.section[data-flow] .section-label {
+.stage-frame-count {
+  flex: none;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* All panels occupy one grid cell: the frame is as tall as the tallest, so
+   swapping a beat never reflows the page under the reader's cursor. */
+.stage-panels {
+  display: grid;
+  align-items: stretch;
+  /* Fixed budget — all three panels share one height so the sticky
+     frame doesn't grow with the agent session and drag scroll pacing. */
+  height: min(22rem, 48vh);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.stage-panel {
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  visibility: hidden; /* also drops it out of the tab order */
+  transform: translateY(10px);
+  transition:
+    opacity 480ms var(--ease-out),
+    transform 480ms var(--ease-out),
+    visibility 0s linear 480ms;
+}
+
+.stage-panel[data-active="true"] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity 480ms var(--ease-out),
+    transform 480ms var(--ease-out),
+    visibility 0s;
+}
+
+/* Inside the stage the panels are content, not objects — the stage frame is
+   already the box, so each panel drops its own chrome. */
+.stage-panel .terminal {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-panel .terminal-bar {
+  display: none; /* the stage bar names the panel; returning to 01 replays */
+}
+
+.stage-panel .terminal-body {
+  /* Sit the transcript in the optical middle of the frame without
+     turning the <pre> into a flex container (that splits typed tokens). */
+  flex: 0 1 auto;
+  margin-block: auto;
+  padding: 1.1rem 1.15rem 1.2rem;
+  font-size: 0.85rem;
+  line-height: 1.65;
+}
+
+.stage-panel .typed-panes {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.stage-panel .typed-pane {
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-panel .typed-pane pre {
+  flex: 1;
+  min-height: 0;
+  padding: 0.55rem 0;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  overflow: hidden;
+}
+
+.stage-panel .typed-pane-title {
+  padding: 0.5rem 0.85rem;
+}
+
+.stage-panel .typed-line {
+  padding: 0 0.85rem;
+}
+
+.stage-panel .typed-pane + .typed-pane {
+  border-left: 1px solid var(--hairline);
+}
+
+.stage-panel .typed-hint {
+  margin: 0;
+  max-width: none;
+  padding: 0.55rem 0.85rem;
+  border-top: 1px solid var(--hairline);
+  text-align: left;
+  font-size: 0.65rem;
+  line-height: 1.45;
+}
+
+.stage-panel .mcp-exchange {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  padding: 0.75rem 0.85rem;
+  gap: 0.4rem;
+  overflow: visible;
+}
+
+.stage-panel .mcp-turn-fill {
+  font-size: 0.66rem;
+  line-height: 1.45;
+  padding: 0.4rem 0.6rem;
+}
+
+.stage-panel .mcp-turn-head {
+  font-size: 0.58rem;
+}
+
+.stage-panel .mcp-turn[data-role="agent"] .mcp-ribbon,
+.stage-panel .mcp-turn[data-role="graft"] .mcp-ribbon {
+  width: min(96%, 100%);
+}
+
+/* ---- the beats ---- */
+
+.stage-track {
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-beat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 58vh;
+  padding: clamp(2.25rem, 6vh, 3.5rem) 0;
+}
+
+.stage-beat .section-label {
   justify-content: flex-start;
+  margin-bottom: 1.5rem;
 }
 
-.section[data-flow] h2 {
-  margin: 0 0 1rem;
+.stage-beat h2 {
+  margin: 0 0 0.85rem;
   text-align: left;
   max-width: 16ch;
 }
 
-.section[data-flow][data-align="right"] h2 {
-  margin-left: auto;
-}
-
-.section[data-flow] .section-lede {
+.stage-beat .section-lede {
   margin: 0;
   text-align: left;
+  max-width: 38ch;
 }
 
-/* the copy nudges down where the artifact is tall — irregular seating */
-.section[data-flow] .section-copy {
-  margin-top: var(--copy-shift, 0);
+.stage-beat .pipeline-note {
+  margin: 1.35rem 0 0;
+  text-align: left;
+  max-width: 40ch;
 }
 
-/* entrances: copy from its own edge, artifact from the other, 120ms apart */
-.section[data-flow="copy-left"] .section-copy,
-.section[data-flow="banner"] .section-copy {
-  --reveal-from: translateX(-32px);
+/* The loop, as chips — the buried arrow chain pulled out of the lede. */
+.stage-pipe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.1rem;
+  list-style: none;
+  margin: 1.35rem 0 0;
+  padding: 0;
+  max-width: 46ch;
 }
 
-.section[data-flow="copy-right"] .section-copy,
-.section[data-flow="banner"][data-align="right"] .section-copy {
-  --reveal-from: translateX(32px);
+.stage-pipe li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  font: 500 0.65rem / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-muted);
 }
 
-.section[data-flow="copy-left"] .section-stage {
-  --reveal-from: translateX(32px);
-  --reveal-delay: 120ms;
+.stage-pipe li span:first-child {
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-inner);
+  background: color-mix(in oklch, var(--paper-sunken) 70%, transparent);
+  white-space: nowrap;
 }
 
-.section[data-flow="copy-right"] .section-stage {
-  --reveal-from: translateX(-32px);
-  --reveal-delay: 120ms;
+.stage-pipe-sep {
+  padding: 0 0.2rem;
+  color: var(--ink-faint);
 }
 
-.section[data-flow="banner"] .section-stage {
-  --reveal-from: translateY(20px);
-  --reveal-delay: 120ms;
+@media (min-width: 901px) {
+  .stage {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    column-gap: clamp(2rem, 5vw, 4.5rem);
+    padding-block: 1rem 2rem;
+  }
+
+  .stage-track {
+    grid-area: 1 / 1;
+  }
+
+  /* Seated near the optical center on tall screens, but never tucked under
+     the nav on short ones. */
+  .stage-frame-col {
+    grid-area: 1 / 2;
+    align-self: start;
+    top: max(5.25rem, calc(50vh - 11rem));
+    padding: 0;
+    background: none;
+  }
+
+  .stage-beat {
+    /* Shorter beats — the frame is shorter, so less scroll per beat. */
+    min-height: 56vh;
+  }
+
+  /* The beat you are reading is the one the frame is answering; the others
+     step back — stronger than before so the active argument reads clearly. */
+  .stage-beat {
+    opacity: 0.3;
+    transition: opacity 520ms var(--ease-out);
+  }
+
+  .stage-beat[data-active="true"] {
+    opacity: 1;
+  }
 }
 
-@media (max-width: 900px) {
-  .section[data-flow="copy-left"],
-  .section[data-flow="copy-right"] {
+@media (max-width: 640px) {
+  .stage-panel .typed-panes {
     grid-template-columns: minmax(0, 1fr);
-    gap: 2.25rem;
   }
 
-  .section[data-flow="copy-right"] .section-copy {
-    order: 0;
+  .stage-panel .typed-pane + .typed-pane {
+    border-left: 0;
+    border-top: 1px solid var(--hairline);
   }
 
-  .section[data-flow] .section-copy {
-    margin-top: 0;
-  }
-
-  /* one column again: everything rises, nothing slides */
-  .section[data-flow] .section-copy,
-  .section[data-flow] .section-stage {
-    --reveal-from: translateY(14px);
+  .stage-frame-progress {
+    display: none;
   }
 }
 
@@ -498,6 +726,36 @@
   margin: 0 auto;
   padding: clamp(8rem, 18vh, 11rem) var(--gutter) clamp(4rem, 9vh, 6rem);
   text-align: center;
+}
+
+/* Hero-only affordance that more page exists (design note §3.5). No scroll
+   spine, no progress fill — just a mono label and a hairline that fade once
+   the reader has taken the first step. Lives in normal flow under the
+   terminal so it never covers the evidence. */
+.scroll-cue {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  margin: clamp(2.5rem, 6vh, 3.5rem) 0 0;
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  opacity: 1;
+  transition: opacity 480ms var(--ease-out);
+  pointer-events: none;
+}
+
+.scroll-cue[data-faded="true"] {
+  opacity: 0;
+}
+
+.scroll-cue::after {
+  content: "";
+  width: 1px;
+  height: 2.25rem;
+  background: var(--hairline-strong);
 }
 
 .hero-title {
@@ -752,10 +1010,11 @@
 }
 
 .terminal-bar {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.65rem 1rem;
+  gap: 0.65rem;
+  padding: 0.7rem 1rem;
   border-bottom: 1px solid var(--hairline);
   font: 500 var(--text-xs) / 1 var(--font-mono);
   letter-spacing: var(--tracking-label);
@@ -763,12 +1022,38 @@
   color: var(--ink-faint);
 }
 
-.terminal-bar::before {
-  content: "";
-  width: 8px;
-  height: 8px;
+/* Window chrome — classic traffic lights; code carries the rest of the color. */
+.terminal-traffic {
+  display: flex;
+  gap: 0.35rem;
+  flex: none;
+}
+
+.terminal-traffic i {
+  display: block;
+  width: 0.55rem;
+  height: 0.55rem;
   border-radius: 50%;
-  background: var(--mark);
+}
+
+.terminal-traffic i:nth-child(1) {
+  background: #ff5f57;
+}
+
+.terminal-traffic i:nth-child(2) {
+  background: #febc2e;
+}
+
+.terminal-traffic i:nth-child(3) {
+  background: #28c840;
+}
+
+.terminal-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--ink-muted);
+  pointer-events: none;
 }
 
 .terminal-replay {
@@ -782,6 +1067,8 @@
   cursor: pointer;
   padding: 0.25rem;
   transition: color var(--duration-fast) var(--ease-out);
+  position: relative;
+  z-index: 1;
 }
 
 .terminal-replay:hover {
@@ -800,8 +1087,8 @@
 
 /* Shiki dual themes: every token carries both palettes as CSS variables
    (defaultColor: false, same as the docs), light-dark() picks the live one.
-   The terminal and a fenced ```console block are colored by one highlighter. */
-.terminal-body span {
+   Skip hand-painted .tline spans used by the branching terminal. */
+.terminal-body span:not([class^="tline"]) {
   color: light-dark(var(--shiki-light), var(--shiki-dark));
 }
 
@@ -820,126 +1107,7 @@
   }
 }
 
-/* --------------------------------------------------------- §01 · the loop ---
-   The loop as a bare index: six hairline rows, no boxes, no diagram. The
-   whole row is the tab; the hot row's marker grows out of its own hairline,
-   and the hot state walks the list on a beat, wraps through 06, and starts
-   over — the loop is watched running, not illustrated. */
-
-.loop-stages {
-  display: flex;
-  flex-direction: column;
-}
-
-/* one line per stage: index · title · body — an index, read at a glance */
-.loop-stage {
-  appearance: none;
-  background: none;
-  border: 0;
-  border-top: 1px solid var(--hairline);
-  font: inherit;
-  text-align: left;
-  color: inherit;
-  cursor: pointer;
-  position: relative;
-  display: grid;
-  grid-template-columns: 2.75rem minmax(0, 13rem) minmax(0, 1fr);
-  column-gap: 1.25rem;
-  align-items: baseline;
-  padding: 1.1rem 0.25rem;
-}
-
-/* below the one-line threshold the body drops under the title */
-@media (max-width: 940px) {
-  .loop-stage {
-    grid-template-columns: 2.75rem minmax(0, 1fr);
-    row-gap: 0.25rem;
-  }
-
-  .loop-stage .stage-body {
-    grid-column: 2;
-  }
-}
-
-.loop-stage::before {
-  content: "";
-  position: absolute;
-  top: -1px;
-  left: 0;
-  height: 1px;
-  width: 100%;
-  background: var(--mark);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 300ms var(--ease-out);
-}
-
-.loop-stage[data-hot]::before {
-  transform: scaleX(1);
-}
-
-.loop-stage:focus-visible {
-  outline: 1px solid var(--mark);
-  outline-offset: -1px;
-}
-
-.loop-stage .stage-index {
-  font: 500 var(--text-xs) / 1.4 var(--font-mono);
-  color: var(--ink-faint);
-  transition: color var(--duration-fast) var(--ease-out);
-}
-
-.loop-stage .stage-title {
-  font: 500 var(--text-sm) / 1.3 var(--font-mono);
-  color: var(--ink-muted);
-  transition: color var(--duration-fast) var(--ease-out);
-}
-
-.loop-stage .stage-body {
-  font-size: var(--text-xs);
-  line-height: 1.55;
-  color: var(--ink-faint);
-  transition: color var(--duration-fast) var(--ease-out);
-}
-
-.loop-stage[data-hot] .stage-index {
-  color: var(--mark);
-}
-
-.loop-stage[data-hot] .stage-title {
-  color: var(--ink);
-}
-
-.loop-stage[data-hot] .stage-body {
-  color: var(--ink-muted);
-}
-
-/* the ghost row — 06 is 01: quieter than a real stage until its beat,
-   then the wrap-around is the loudest thing in the list */
-.loop-stage-return .stage-title {
-  color: var(--ink-faint);
-}
-
-.loop-stage-return[data-hot] .stage-title {
-  color: var(--mark);
-}
-
-/* ------------------------------------------------------- the CLI strip ---
-   A bare pre under a hairline (used by the capability index): the hot row's
-   real command, typed. Fixed height so switching rows never reflows. */
-
-.cli-strip {
-  margin: 0;
-  min-height: calc(7 * 1.7em);
-  font: 400 0.85rem/1.7 var(--font-mono);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: var(--ink-muted);
-}
-
-.cli-strip span {
-  color: light-dark(var(--shiki-light), var(--shiki-dark));
-}
+/* ------------------------------------------------------- the trust line --- */
 
 .pipeline-note {
   margin: 2rem auto 0;
@@ -948,282 +1116,399 @@
   text-align: center;
 }
 
-.section[data-flow] .pipeline-note {
-  margin: 1.5rem 0 0;
-  text-align: left;
-  max-width: 40ch;
-}
-
 .pipeline-note b {
   color: var(--ink);
   font-weight: 500;
 }
 
-/* -------------------------------------------------------- agent session --- */
+/* ------------------------------------------------------ mcp exchange ---
+   Call/response weave on a protocol spine — deliberately not a terminal.
+   Agent ribbons left, graft ribbons right. Packet outlines are SVG so the
+   chamfer gets a real stroke. */
 
-.agent-frame {
+.mcp-exchange {
+  --mcp-stroke: var(--hairline);
+  --mcp-fill: color-mix(in oklch, var(--paper) 88%, var(--paper-sunken));
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.85rem 1rem;
+  /* visible so the 1.5px stroke peek isn't clipped on packet edges */
+  overflow: visible;
+}
+
+.mcp-spine {
+  position: absolute;
+  top: 1rem;
+  bottom: 1rem;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--hairline) 10%,
+    var(--hairline) 90%,
+    transparent
+  );
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.mcp-turn {
+  position: relative;
+  width: 100%;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 420ms var(--ease-out),
+    transform 420ms var(--ease-out);
+  transition-delay: var(--turn-delay, 0ms);
+}
+
+.mcp-exchange.in .mcp-turn {
+  opacity: 1;
+  transform: none;
+}
+
+.mcp-ribbon {
+  width: min(94%, 24rem);
+}
+
+.mcp-turn[data-role="agent"] .mcp-ribbon {
+  margin-right: auto;
+}
+
+.mcp-turn[data-role="graft"] .mcp-ribbon {
+  margin-left: auto;
+  width: min(92%, 23rem);
+}
+
+.mcp-turn-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0 0.28rem;
+  font: 500 0.62rem / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.mcp-turn[data-role="graft"] .mcp-turn-head {
+  flex-direction: row-reverse;
+}
+
+.mcp-who {
+  color: var(--ink-faint);
+}
+
+.mcp-turn[data-role="agent"] .mcp-who {
+  color: var(--mark);
+}
+
+.mcp-tool {
+  color: var(--ink-muted);
+  min-width: 0;
+}
+
+.mcp-turn[data-kind="error"] .mcp-tool {
+  color: var(--code-keyword);
+}
+
+.mcp-turn[data-kind="ok"] .mcp-tool {
+  color: var(--code-ok);
+}
+
+/* Two SVG layers: fill under the text, stroke outline on top of everything
+   so the chamfer edge can't be covered. */
+.mcp-turn-body {
+  --mcp-stroke: var(--hairline);
+  --mcp-fill: color-mix(in oklch, var(--paper) 88%, var(--paper-sunken));
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.mcp-turn-shape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.mcp-turn-shape-fill {
+  z-index: 0;
+}
+
+.mcp-turn-shape-fill polygon {
+  fill: var(--mcp-fill);
+  stroke: none;
+}
+
+.mcp-turn-shape-stroke {
+  z-index: 2;
+}
+
+.mcp-turn-shape-stroke polygon {
+  fill: none;
+  stroke: var(--mcp-stroke);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+.mcp-turn-fill {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin: 0;
+  padding: 0.55rem 0.9rem;
+  font: 400 0.7rem / 1.55 var(--font-mono);
+  color: var(--ink-muted);
+  background: transparent;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.mcp-turn[data-role="agent"] .mcp-turn-body {
+  --mcp-stroke: color-mix(in oklch, var(--mark) 80%, var(--hairline));
+}
+
+.mcp-turn[data-role="agent"] .mcp-turn-fill {
+  clip-path: polygon(0 0, 90% 0, 100% 14%, 100% 100%, 0 100%);
+  padding-right: 1.35rem; /* room under the trailing chamfer */
+}
+
+.mcp-turn[data-role="graft"] .mcp-turn-fill {
+  clip-path: polygon(10% 0, 100% 0, 100% 100%, 0 100%, 0 14%);
+  padding-left: 1.35rem; /* room under the leading chamfer */
+}
+
+.mcp-turn[data-kind="error"] .mcp-turn-body {
+  --mcp-stroke: var(--code-keyword);
+  --mcp-fill: color-mix(in oklch, var(--code-keyword) 7%, var(--paper));
+}
+
+.mcp-turn[data-kind="ok"] .mcp-turn-body {
+  --mcp-stroke: var(--code-ok);
+  --mcp-fill: color-mix(in oklch, var(--code-ok) 6%, var(--paper));
+}
+
+.mcp-turn-fill .ok {
+  color: var(--code-ok);
+}
+
+.mcp-turn-fill .dim {
+  color: var(--code-comment);
+}
+
+/* ----------------------------------------------------------- branching ---
+   One elevated frame. Quiet text tabs on top, copy | terminal, graph footer.
+   Hairlines only — no nested card stack. */
+
+.branch-stage {
+  display: flex;
+  flex-direction: column;
+  max-width: 64rem;
+  margin: 0 auto;
+  text-align: left;
   border-radius: var(--radius-outer);
   background: var(--paper-sunken);
   box-shadow: var(--shadow-raised);
   overflow: hidden;
 }
 
-.agent-log {
-  padding: 1.4rem clamp(1rem, 3vw, 2rem);
+.branch-tabs {
   display: grid;
-  gap: 1rem;
-  max-width: 52rem;
-  margin-inline: auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: 1px solid var(--hairline);
 }
 
-.agent-msg {
-  opacity: 0;
-  transform: translateY(10px);
-  transition:
-    opacity 480ms var(--ease-out),
-    transform 480ms var(--ease-out);
-  transition-delay: var(--msg-delay, 0ms);
+.branch-tab {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 1rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
-.agent-log.in .agent-msg {
-  opacity: 1;
-  transform: none;
+.branch-tab + .branch-tab {
+  border-left: 1px solid var(--hairline);
 }
 
-.agent-msg .msg-meta {
+.branch-tab:hover {
+  color: var(--ink-muted);
+}
+
+.branch-tab[data-active="true"] {
+  color: var(--ink);
+}
+
+.branch-tab-n {
   font: 500 var(--text-xs) / 1 var(--font-mono);
   letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin: 0 0 0.4rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.55;
 }
 
-.agent-msg[data-role="agent"] .msg-meta::before {
-  content: "▸ ";
+.branch-tab[data-active="true"] .branch-tab-n {
   color: var(--mark);
+  opacity: 1;
 }
 
-.agent-msg pre {
-  margin: 0;
-  padding: 0.85rem 1rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--hairline);
-  background: var(--paper);
-  font: 400 0.8rem/1.7 var(--font-mono);
-  overflow-x: auto;
+.branch-tab-label {
+  font: 500 var(--text-sm) / 1 var(--font-sans);
+  letter-spacing: -0.01em;
 }
 
-.agent-msg .err {
-  color: var(--danger);
+.branch-tab-progress {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 0;
+  height: 2px;
+  background: var(--mark);
+  transform-origin: left center;
+  transform: scaleX(var(--p, 0));
+  will-change: transform;
 }
 
-.agent-msg .fix {
-  color: var(--success);
-}
-
-.agent-msg .dim {
-  color: var(--ink-faint);
-}
-
-.agent-msg p {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--ink-muted);
-  max-width: 60ch;
-}
-
-/* ----------------------------------------------------------- branching --- */
-
-.branch-demo {
+.branch-body {
   display: grid;
-  gap: 1.5rem;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  min-height: min(42rem, 70vh);
 }
 
-.branch-controls {
+.branch-copy {
+  padding: 3rem 2.5rem;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   justify-content: center;
-  gap: 0.6rem;
+  gap: 1rem;
+  border-right: 1px solid var(--hairline);
+  min-width: 0;
 }
 
-.branch-cmd {
-  font: 500 0.8rem/1 var(--font-mono);
-  color: var(--ink-muted);
-  background: var(--paper-raised);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-inner);
-  padding: 0.6rem 0.85rem;
-  cursor: pointer;
-  transition:
-    color var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out),
-    transform var(--duration-press) var(--ease-out);
-}
-
-.branch-cmd::before {
-  content: "$ ";
-  color: var(--ink-faint);
-}
-
-.branch-cmd:hover:not(:disabled) {
+.branch-copy h3 {
+  margin: 0;
+  font: 400 clamp(1.75rem, 2.8vw, 2.35rem) / 1.1 var(--font-display);
+  letter-spacing: var(--tracking-display);
   color: var(--ink);
-  border-color: var(--hairline-strong);
+  text-wrap: balance;
+  max-width: 14ch;
 }
 
-.branch-cmd:active:not(:disabled) {
-  transform: scale(0.97);
+.branch-copy-body {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-base, 1rem);
+  line-height: 1.65;
+  max-width: 36ch;
 }
 
-.branch-cmd:disabled {
-  opacity: 0.35;
-  cursor: default;
+.branch-copy-body code {
+  font-size: 0.9em;
+  color: var(--ink);
 }
 
-.branch-cmd[data-primary="true"] {
-  color: var(--mark-strong);
-  border-color: var(--primary-wash);
+.branch-term {
+  display: flex;
+  min-width: 0;
+  background: var(--paper);
 }
 
-/* The graph. Inherited nodes are hollow because nothing was copied — the
-   drawing carries the model, not just decoration. */
-.branch-graph {
-  margin: 0 auto;
-  max-width: 48rem;
+.branch-terminal {
+  flex: 1;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
-.branch-graph svg {
-  width: 100%;
-  height: auto;
-  overflow: visible;
+.branch-terminal .terminal-body {
+  font-size: 0.95rem;
+  padding: 2rem 1.85rem 2.25rem;
+  min-height: 22rem;
 }
 
-.lane-main {
-  stroke: var(--hairline-strong);
-  stroke-width: 1.5;
+/* Branching terminal lines are hand-typed (not shiki) — paint them with the
+   syntax tokens so they match the colored CLI transcripts. */
+.tline {
+  display: inline;
 }
 
-.lane-name {
-  font: 500 11px var(--font-mono);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  fill: var(--ink-faint);
+.tline-cmd {
+  color: var(--ink);
 }
 
-.lane-name[data-on="false"] {
-  opacity: 0;
+.tline-prompt {
+  color: var(--code-prompt);
+  font-weight: 500;
 }
 
-.lane-name[data-on="true"] {
-  opacity: 1;
-  transition: opacity var(--duration-base) var(--ease-out) 120ms;
+.tline-ok {
+  color: var(--code-ok);
 }
 
-/* Edges draw themselves on, and retract when the branch drops. */
-.edge {
-  fill: none;
-  stroke: var(--mark);
-  stroke-width: 1.5;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  transition: stroke-dashoffset 620ms var(--ease-in-out);
+.tline-out {
+  color: var(--code-string);
 }
 
-.edge[data-on="true"] {
-  stroke-dashoffset: 0;
+.tline-dim {
+  color: var(--code-comment);
 }
 
-.edge-line {
-  stroke: var(--mark);
-  stroke-width: 1.5;
-  stroke-dasharray: 244;
-  stroke-dashoffset: 244;
-  transition: stroke-dashoffset 520ms var(--ease-in-out) 260ms;
+.tline-str {
+  color: var(--code-string);
 }
 
-.edge-line[data-on="true"] {
-  stroke-dashoffset: 0;
-}
+/* --------------------------------------------------------- branch deck ---
+   Removed — the typewriter terminal is the model. Keep only the stage
+   responsive + reduced-motion rules that used to live beside the deck. */
 
-/* Nodes */
-.bnode {
-  opacity: 0;
-  transition:
-    opacity 420ms var(--ease-out),
-    transform 620ms var(--ease-in-out);
-  transition-delay: var(--node-delay, 0ms);
-}
+@media (max-width: 900px) {
+  .branch-body {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
 
-.bnode[data-visible="true"] {
-  opacity: 1;
-}
+  .branch-copy {
+    border-right: 0;
+    border-bottom: 1px solid var(--hairline);
+    padding: 1.75rem 1.35rem;
+  }
 
-.bnode-dot {
-  transition:
-    fill var(--duration-base) var(--ease-out),
-    stroke var(--duration-base) var(--ease-out);
-}
+  .branch-copy h3 {
+    max-width: none;
+  }
 
-/* inherited: hollow + dashed — a read through the overlay, not a copy */
-.bnode[data-state="inherited"] .bnode-dot {
-  fill: var(--paper);
-  stroke: var(--ink-faint);
-  stroke-width: 1.25;
-  stroke-dasharray: 2 2;
-}
+  .branch-term {
+    min-height: 18rem;
+  }
 
-/* own: solid — a real row exists here */
-.bnode[data-state="own"] .bnode-dot {
-  fill: var(--mark);
-  stroke: none;
-}
-
-/* tombstone: the only place the danger hue appears in this demo */
-.bnode[data-state="tombstone"] .bnode-dot {
-  fill: var(--paper);
-  stroke: var(--danger);
-  stroke-width: 1.25;
-  stroke-dasharray: none;
-}
-
-.bnode-x {
-  stroke: var(--danger);
-  stroke-width: 1.25;
-  stroke-linecap: round;
-}
-
-.bnode-label {
-  font: 400 11px var(--font-mono);
-  fill: var(--ink-faint);
-}
-
-.bnode[data-state="own"] .bnode-label {
-  fill: var(--ink-muted);
-}
-
-.bnode[data-state="tombstone"] .bnode-label {
-  fill: var(--danger);
-  text-decoration: line-through;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .edge,
-  .edge-line,
-  .bnode {
-    transition: none;
+  .branch-tab-n {
+    display: none;
   }
 }
 
-.branch-status {
-  min-height: 1.5em;
-  margin: 0;
-  font: 400 var(--text-sm) / 1.6 var(--font-mono);
-  color: var(--ink-faint);
-  text-align: center;
-}
-
-.branch-status b {
-  color: var(--ink-muted);
-  font-weight: 500;
+@media (prefers-reduced-motion: reduce) {
+  .branch-tab-progress {
+    display: none;
+  }
 }
 
 /* --------------------------------------------------------- typed reads --- */
@@ -1270,7 +1555,7 @@
 }
 
 .typed-line .tk-key {
-  color: var(--ink);
+  color: var(--code-key);
 }
 
 .typed-line .tk-str {
@@ -1282,7 +1567,7 @@
 }
 
 .typed-line .tk-dim {
-  color: var(--ink-faint);
+  color: var(--code-comment);
 }
 
 .typed-hint {
@@ -1295,208 +1580,6 @@
 .typed-hint b {
   color: var(--mark-strong);
   font-weight: 500;
-}
-
-/* ------------------------------------------------------------ registry --- */
-
-.registry-demo {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  gap: clamp(1.5rem, 4vw, 3rem);
-  align-items: start;
-}
-
-@media (max-width: 900px) {
-  .registry-demo {
-    grid-template-columns: 1fr;
-  }
-}
-
-.file-tree {
-  list-style: none;
-  margin: 0;
-  padding: 1rem 1.2rem;
-  border-radius: var(--radius);
-  background: var(--paper-sunken);
-  box-shadow: var(--shadow-raised);
-  font: 400 0.82rem/1.9 var(--font-mono);
-  color: var(--ink-muted);
-}
-
-.file-tree .added {
-  color: var(--ink);
-  opacity: 0;
-  transform: translateX(-8px);
-  transition:
-    opacity 420ms var(--ease-out),
-    transform 420ms var(--ease-out);
-  transition-delay: var(--drop-delay, 0ms);
-}
-
-.file-tree.in .added {
-  opacity: 1;
-  transform: none;
-}
-
-.file-tree .added::before {
-  content: "+ ";
-  color: var(--mark);
-}
-
-.file-tree .dim {
-  color: var(--ink-faint);
-}
-
-/* ------------------------------------------------ §06 capability index ---
-   A feature index: hairline rows on the left, one live evidence panel on the
-   right. Rows cascade in on entry; the hot row's marker slides in from the
-   hairline. No cards. */
-
-.capdex {
-  display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: clamp(2rem, 5vw, 4.5rem);
-  align-items: start;
-}
-
-.capdex-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.capdex-row {
-  appearance: none;
-  background: none;
-  border: 0;
-  border-top: 1px solid var(--hairline);
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  display: grid;
-  grid-template-columns: 2.4rem minmax(0, 9rem) minmax(0, 1fr);
-  align-items: baseline;
-  gap: 0.75rem;
-  padding: 0.8rem 0.25rem;
-  position: relative;
-  /* entry cascade */
-  opacity: 0;
-  transform: translateY(10px);
-  transition:
-    opacity 450ms var(--ease-out) calc(var(--i) * 60ms),
-    transform 450ms var(--ease-out) calc(var(--i) * 60ms);
-}
-
-.capdex-row:last-child {
-  border-bottom: 1px solid var(--hairline);
-}
-
-.capdex.in .capdex-row {
-  opacity: 1;
-  transform: none;
-}
-
-.capdex-row:focus-visible {
-  outline: 1px solid var(--mark);
-  outline-offset: -1px;
-}
-
-/* the hot marker grows out of the row's top hairline */
-.capdex-row::before {
-  content: "";
-  position: absolute;
-  top: -1px;
-  left: 0;
-  height: 1px;
-  width: 100%;
-  background: var(--mark);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 300ms var(--ease-out);
-}
-
-.capdex-row[data-hot]::before {
-  transform: scaleX(1);
-}
-
-.capdex-num {
-  font: 500 var(--text-xs) / 1.4 var(--font-mono);
-  color: var(--ink-faint);
-  transition: color var(--duration-fast) var(--ease-out);
-}
-
-.capdex-name {
-  font: 500 var(--text-sm) / 1.4 var(--font-mono);
-  color: var(--ink-muted);
-  transition: color var(--duration-fast) var(--ease-out);
-}
-
-.capdex-tag {
-  font-size: var(--text-xs);
-  color: var(--ink-faint);
-  transition: color var(--duration-fast) var(--ease-out);
-}
-
-.capdex-row[data-hot] .capdex-num {
-  color: var(--mark);
-}
-
-.capdex-row[data-hot] .capdex-name {
-  color: var(--ink);
-}
-
-.capdex-row[data-hot] .capdex-tag {
-  color: var(--ink-muted);
-}
-
-/* the evidence panel — a bare pre under a label, like the loop's strip */
-.capdex-panel {
-  position: sticky;
-  top: 5.5rem;
-  border-top: 1px solid var(--hairline);
-  padding-top: 1rem;
-}
-
-.capdex-label {
-  display: block;
-  font: 500 var(--text-xs) / 1 var(--font-mono);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-bottom: 0.6rem;
-}
-
-.capdex-panel .cli-strip {
-  min-height: calc(9 * 1.7em);
-}
-
-.capdex-note {
-  margin: 0.75rem 0 0;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--hairline);
-  font-size: var(--text-sm);
-  color: var(--ink-muted);
-  max-width: 52ch;
-  text-wrap: pretty;
-}
-
-@media (max-width: 900px) {
-  .capdex {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2rem;
-  }
-
-  .capdex-panel {
-    position: static;
-  }
-
-  .capdex-row {
-    grid-template-columns: 2.4rem minmax(0, 1fr);
-  }
-
-  .capdex-tag {
-    grid-column: 2;
-  }
 }
 
 /* ------------------------------------------------------------------ faq --- */
@@ -1551,169 +1634,347 @@
 
 /* ------------------------------------------------------------------ cta --- */
 
-.cta-install {
-  display: flex;
-  width: fit-content;
-  align-items: center;
-  gap: 1rem;
-  margin: 0 auto 3rem;
-  padding: 0.85rem 1.2rem;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius);
-  background: var(--paper-sunken);
-  font: 400 var(--text-sm) / 1 var(--font-mono);
-  color: var(--ink);
+.section-start {
+  padding-block: clamp(5rem, 12vh, 8rem);
 }
 
-.cta-install .t-prompt {
-  color: var(--mark);
+.section-start .reveal {
+  margin-bottom: 2.5rem;
 }
 
-.copy-button {
-  border: 0;
-  background: none;
-  color: var(--ink-faint);
-  font: 500 var(--text-xs) / 1 var(--font-mono);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  cursor: pointer;
-  padding: 0.25rem;
-  transition: color var(--duration-fast) var(--ease-out);
-}
-
-.copy-button:hover {
-  color: var(--mark);
-}
-
-/* contact form (the live demo) — block centered, fields left-aligned */
-.contact {
-  max-width: 30rem;
+.section-start h2 {
+  max-width: 22ch;
   margin-inline: auto;
 }
 
-.contact h3,
-.contact .contact-sub {
-  text-align: center;
-}
-
-.contact h3 {
-  font: 400 var(--text-lg) / 1.25 var(--font-display);
-  margin: 0 0 0.35rem;
-}
-
-.contact-sub {
-  font: 400 var(--text-xs) / 1.6 var(--font-mono);
-  color: var(--ink-faint);
-  margin: 0 0 1.4rem;
-}
-
-.contact-sub code {
+.cta-subhead {
+  font: 400 clamp(1.25rem, 2.2vw, 1.65rem) / 1.25 var(--font-display);
+  font-style: italic;
   color: var(--ink-muted);
+  max-width: 28ch;
+  margin: 0.85rem auto 0.9rem;
 }
 
-.contact form {
-  display: grid;
-  gap: 0.9rem;
+.section-start .section-lede:not(.cta-subhead) {
+  margin-inline: auto;
 }
 
-.contact label {
+.cta-wrap {
+  max-width: 56rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.cta-bento {
   display: grid;
-  gap: 0.35rem;
+  grid-template-columns: 1.15fr 1fr;
+  border-radius: var(--radius-outer);
+  background: var(--paper-sunken);
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
+  text-align: left;
+}
+
+.cta-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 2rem 1.85rem 1.85rem;
+  min-width: 0;
+}
+
+.cta-agent {
+  border-right: 1px solid var(--hairline);
+}
+
+.cta-agents {
+  display: flex;
+  align-items: center;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.cta-agent-mark {
+  display: block;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-left: -0.55rem;
+  border-radius: 999px;
+  border: 2px solid var(--paper-sunken);
+  overflow: hidden;
+  background: var(--paper);
+  z-index: 1;
+}
+
+.cta-agent-mark:first-child {
+  margin-left: 0;
+}
+
+.cta-agent-mark:nth-child(1) {
+  z-index: 5;
+}
+.cta-agent-mark:nth-child(2) {
+  z-index: 4;
+}
+.cta-agent-mark:nth-child(3) {
+  z-index: 3;
+}
+.cta-agent-mark:nth-child(4) {
+  z-index: 2;
+}
+.cta-agent-mark:nth-child(5) {
+  z-index: 1;
+}
+
+.cta-agent-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cta-cell h3 {
+  margin: 0;
+  font: 400 clamp(1.35rem, 2vw, 1.7rem) / 1.15 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  color: var(--ink);
+  text-wrap: balance;
+  max-width: 18ch;
+}
+
+.cta-cell-body {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  max-width: 36ch;
+}
+
+.cta-cell-body code {
+  font-size: 0.9em;
+  color: var(--ink);
+}
+
+.cta-cell-label {
+  margin: 0;
   font: 500 var(--text-xs) / 1 var(--font-mono);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   color: var(--ink-faint);
 }
 
-.contact input,
-.contact textarea {
-  font: 400 var(--text-sm) / 1.5 var(--font-sans);
-  color: var(--ink);
-  background: var(--paper-raised);
+.cta-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  margin-top: auto;
+  padding: 0.95rem 1.1rem;
   border: 1px solid var(--hairline);
-  border-radius: var(--radius-inner);
-  padding: 0.6rem 0.75rem;
-  transition: border-color var(--duration-fast) var(--ease-out);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
 }
 
-.contact input:focus-visible,
-.contact textarea:focus-visible {
-  outline: none;
-  border-color: var(--mark);
+.cta-copy:hover {
+  border-color: var(--hairline-strong);
+  background: var(--paper-raised);
 }
 
-.contact button[type="submit"] {
-  justify-self: center;
+.cta-copy:focus-visible {
+  outline: 2px solid var(--mark);
+  outline-offset: 2px;
 }
 
-.contact-note {
-  font: 400 var(--text-sm) / 1.6 var(--font-mono);
-  color: var(--success);
-  margin: 0.75rem 0 0;
+.cta-copy-text {
+  flex: 1;
+  min-width: 0;
+  font: 500 var(--text-sm) / 1.4 var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.contact-note .dim {
+.cta-copy[data-mono] .cta-copy-text {
+  font: 400 var(--text-sm) / 1.4 var(--font-mono);
+}
+
+.cta-copy-affordance {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
   color: var(--ink-faint);
+  font: 500 var(--text-sm) / 1 var(--font-mono);
 }
 
-.contact-error {
-  color: var(--danger);
+.cta-copy:hover .cta-copy-affordance {
+  color: var(--mark);
+}
+
+.cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+@media (max-width: 800px) {
+  .cta-bento {
+    grid-template-columns: 1fr;
+  }
+
+  .cta-agent {
+    border-right: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .cta-cell {
+    padding: 1.5rem 1.35rem;
+  }
+
+  .cta-copy-text {
+    white-space: normal;
+  }
 }
 
 /* --------------------------------------------------------------- footer --- */
 
-.colophon {
+.landing-footer {
   border-top: 1px solid var(--hairline);
+  position: relative;
+  z-index: 1;
 }
 
-.colophon-inner {
+.landing-footer-inner {
   max-width: var(--measure);
   margin: 0 auto;
-  padding: 3rem var(--gutter) 4rem;
+  padding: 3.5rem var(--gutter) 2.5rem;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: 2rem;
+  grid-template-columns: minmax(12rem, 1.4fr) repeat(4, minmax(0, 1fr));
+  gap: 2.5rem 2rem;
+}
+
+.footer-brand .landing-wordmark {
+  display: inline-block;
+  margin-bottom: 1rem;
+}
+
+.footer-brand p {
+  margin: 0 0 0.75rem;
+  max-width: 32ch;
   font-size: var(--text-sm);
+  color: var(--ink-muted);
+  line-height: 1.6;
+}
+
+.footer-brand-meta {
+  color: var(--ink-faint) !important;
+  font: 400 var(--text-xs) / 1.55 var(--font-mono) !important;
+}
+
+.footer-brand-meta code {
+  font-size: 0.95em;
   color: var(--ink-muted);
 }
 
-.colophon h4 {
+.footer-col h4 {
   font: 500 var(--text-xs) / 1 var(--font-mono);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   color: var(--ink-faint);
-  margin: 0 0 0.8rem;
+  margin: 0 0 1rem;
 }
 
-.colophon p {
-  margin: 0 0 0.5rem;
-  max-width: 38ch;
+.footer-col ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
 }
 
-.colophon a {
+.footer-col a {
+  font-size: var(--text-sm);
   color: var(--ink-muted);
-  text-decoration-color: var(--hairline-strong);
-  text-underline-offset: 3px;
+  text-decoration: none;
   transition: color var(--duration-fast) var(--ease-out);
 }
 
-.colophon a:hover {
-  color: var(--mark-strong);
+.footer-col a:hover {
+  color: var(--ink);
 }
 
-.colophon code {
-  font-size: 0.85em;
-  color: var(--ink);
+.footer-bar {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 1.25rem var(--gutter) 2.5rem;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  font: 400 var(--text-xs) / 1.5 var(--font-mono);
+  color: var(--ink-faint);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.footer-bar p {
+  margin: 0;
+}
+
+@media (max-width: 960px) {
+  .landing-footer-inner {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem 1.5rem;
+  }
+
+  .footer-brand {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .landing-footer-inner {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ------------------------------------------------------ reduced motion --- */
 
 @media (prefers-reduced-motion: reduce) {
   .reveal,
-  .agent-msg,
-  .file-tree .added {
+  .mcp-turn {
     opacity: 1;
     transform: none;
+    transition: none;
+  }
+
+  /* The stage still swaps — it just cuts instead of crossfading, and the
+     beats never dim. */
+  .stage-panel,
+  .stage-beat {
+    transition: none;
+    transform: none;
+  }
+
+  .stage-beat {
+    opacity: 1;
+  }
+
+  .stage-frame-progress i {
     transition: none;
   }
 
@@ -1736,10 +1997,4 @@
     transform: none;
   }
 
-  .capdex-row,
-  .capdex.in .capdex-row {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
 }

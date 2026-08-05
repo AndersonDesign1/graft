@@ -153,8 +153,7 @@ export function TypedReads() {
         <Pane title="what the SDK knows" lines={TYPES} hot={hot} setHot={setHot} />
       </div>
       <p className="typed-hint">
-        <b>hover a field</b> — the schema in graft.config.ts is one Zod layer; the compiler, the
-        SDKs, and the MCP tools all infer from it.
+        <b>hover a field</b> — one Zod schema; compiler, SDKs, and MCP all infer from it.
       </p>
     </>
   );

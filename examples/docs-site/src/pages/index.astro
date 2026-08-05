@@ -1,96 +1,34 @@
 ---
 /**
- * The landing — every section is live, nothing is a screenshot: the terminal
- * types the real loop, the loop index walks its stages on a beat and wraps
- * back to 01 forever, the MCP transcript replays
- * a real error → fix exchange, the branching model is a toy you can poke,
- * and the contact form writes an actual data_records row. Hero copy + FAQ
- * come from the `home` document — the page eats its own dogfood.
- * Concept: docs/design-notes/landing-redesign.md.
+ * The landing — five sections on one persistent stage.
+ *
+ * v5 (docs/design-notes/landing-redesign.md §3): the page scrolls like a
+ * document, but the background never changes and the product frame holds.
+ * Hero → the stage (three beats against one sticky frame) → branching →
+ * FAQ → CTA. Everything is still live: the terminal types real CLI output,
+ * the MCP transcript replays a real error → fix exchange, the branching model
+ * is a toy you can poke, and the contact form writes an actual data_records
+ * row. Hero copy + FAQ come from the `home` document — the page eats its own
+ * dogfood.
  */
-import { AgentSession } from "../components/landing/agent-session";
 import { BranchingDemo } from "../components/landing/branching";
 import { ClosingCta } from "../components/landing/cta";
 import { LandingFaq } from "../components/landing/faq";
 import { Hero } from "../components/landing/hero";
-import { Loop } from "../components/landing/loop";
-import { CapabilityIndex } from "../components/landing/capability-index";
-import { RegistryDrop } from "../components/landing/registry";
-import { TypedReads } from "../components/landing/typed-reads";
+import { Stage } from "../components/landing/stage";
 import Landing from "../layouts/Landing.astro";
 import { getGraft } from "../lib/graft";
-import { WOW_LOOP, highlightSession } from "../lib/highlight";
+import { HERO_INIT, STAGE_COMPILE, highlightSession } from "../lib/highlight";
 
 const doc = await getGraft().getContent("pages", "home");
 const faqs = doc?.data.faqs ?? [];
 
 // Tokenized at build time with the same shiki themes the docs use, so the
-// terminal and a fenced ```console block are colored by one highlighter.
-const terminal = await highlightSession(WOW_LOOP);
-
-// The capability index (§06): one sample per row, same order as CAPABILITIES
-// in capability-index.tsx. Every transcript is the command's real output —
-// verbatim strings from @graft/cli and the functions handler.
-const capabilitySamples = await Promise.all([
-  highlightSession(
-    `
-{
-  "mcpServers": {
-    "graft-landing-page": {
-      "command": "pnpm",
-      "args": ["--filter", "landing-page", "--silent", "mcp"]
-    }
-  }
-}`,
-    "json",
-  ),
-  highlightSession(`
-$ graft branch create preview
-Created branch "preview" from "main" (overlay — zero rows copied).
-Reads overlay the parent until the branch writes its own rows:
-  graft compile --branch preview
-Merge it back with \`graft merge preview\` when ready.`),
-  highlightSession(`
-$ graft merge preview
-Ledger: nothing to replay on "main".
-would move 2 data_records row(s) from "preview" onto "main"
-would recompile the working tree into "main"
-
-Dry run — nothing was written.`),
-  highlightSession(`
-$ graft approvals
-9b1f42c7
-  function:  deleteOrder  (branch main)
-  requested: 2026-07-16T09:12:03Z by agent:mcp
-  input:     {"id":"ord_7f3a"}
-
-$ graft approve 9b1f42c7`),
-  highlightSession(`
-$ graft asset put hero.svg pages/home/hero.svg
-Uploaded pages/home/hero.svg (image/svg+xml, 8412 bytes)
-
-Reference it from an \`asset\` field in frontmatter:
-  image:
-    key: pages/home/hero.svg
-    alt: describe the image for screen readers`),
-  highlightSession(`
-$ curl -s -X POST localhost:4321/api/fn/submitContact \\
-    -d '{"email":"you@example.com","message":"hello"}'
-{"data":{"id":"3f9c2e1a-…"}}`),
-  highlightSession(
-    `
-select slug from content_index
-where search @@ websearch_to_tsquery('branch merge')
--- weighted: slug (A) > frontmatter (B) > body (C)
-order by ts_rank(search, query) desc;`,
-    "sql",
-  ),
-  highlightSession(`
-$ graft serve
-graft serve — branch "main"
-  functions  POST http://127.0.0.1:3903/api/fn/<name>
-  mcp        POST http://127.0.0.1:3903/api/mcp
-  health     GET  http://127.0.0.1:3903/healthz`),
+// terminals and a fenced ```console block are colored by one highlighter.
+// One transcript, told in two places: the hero grafts, the stage compiles.
+const [heroTerminal, compileTerminal] = await Promise.all([
+  highlightSession(HERO_INIT),
+  highlightSession(STAGE_COMPILE),
 ]);
 ---
 
@@ -100,112 +38,39 @@ graft serve — branch "main"
     "Content as code: MDX in git, one Zod schema, a derived Postgres index."}
 >
   <div class="landing">
-    <Hero tagline={doc?.data.tagline} terminal={terminal} client:load />
+    <Hero tagline={doc?.data.tagline} terminal={heroTerminal} client:load />
 
-    <section class="section" id="loop" data-flow="copy-left" style="--copy: 4fr; --stage: 8fr">
-      <div class="section-copy reveal">
-        <p class="section-label">§01 <em>the loop</em></p>
-        <h2>One loop, <span class="marked">no publish button.</span></h2>
-        <p class="section-lede">
-          Edit a file, run <code>graft compile</code>, refresh. Validation, projection, and audit
-          happen in the loop — publishing is a side effect of correctness.
-        </p>
-        <p class="pipeline-note">
-          <b>If git and Postgres ever disagree, git wins</b> — recompile. The index is derived
-          state, never a second source of truth.
-        </p>
-      </div>
-      <div class="section-stage reveal">
-        <Loop client:visible />
-      </div>
-    </section>
+    <Stage compile={compileTerminal} client:visible />
 
-    <section class="section" id="agents" data-flow="copy-left" style="--copy: 5fr; --stage: 7fr">
-      <div class="section-copy reveal">
-        <p class="section-label">§02 <em>agent-native</em></p>
-        <h2>Errors that <span class="marked">teach the fix.</span></h2>
-        <p class="section-lede">
-          A cold agent with nothing but the MCP endpoint has authored pages on Graft — schemas,
-          errors, and tool descriptions were its only teachers. This is the actual loop:
-        </p>
-      </div>
-      <div class="section-stage reveal">
-        <AgentSession client:visible />
-      </div>
-    </section>
-
-    <section
-      class="section"
-      id="branching"
-      data-flow="copy-right"
-      style="--copy: 5fr; --stage: 7fr; --copy-shift: 2.5rem"
-    >
-      <div class="section-copy reveal">
-        <p class="section-label">§03 <em>branching</em></p>
+    <section class="section" id="branching">
+      <p class="section-label">§04 <em>branching</em></p>
+      <div class="reveal">
         <h2>Branch content like code. <span class="marked">Because it is.</span></h2>
         <p class="section-lede">
           Branches are copy-on-write overlays (or real Neon forks) — instant, isolated, merged
-          with a dry-run first. Try the model:
+          with a dry-run first. Watch the CLI, or pick a step:
         </p>
       </div>
-      <div class="section-stage reveal">
-        <BranchingDemo client:visible />
-      </div>
-    </section>
-
-    <section class="section" id="types" data-flow="copy-right" style="--copy: 4fr; --stage: 8fr">
-      <div class="section-copy reveal">
-        <p class="section-label">§04 <em>typed reads</em></p>
-        <h2>One schema. <span class="marked">Zero codegen.</span></h2>
-        <p class="section-lede">
-          The Zod schema in <code>graft.config.ts</code> types the compiler, the SDKs, the
-          functions, and the MCP tools — inference end to end.
-        </p>
-      </div>
-      <div class="section-stage reveal">
-        <TypedReads client:visible />
-      </div>
-    </section>
-
-    <section class="section" id="registry" data-flow="banner" data-align="right">
-      <div class="section-copy reveal">
-        <p class="section-label">§05 <em>owned primitives</em></p>
-        <h2><span class="marked">graft add</span> — and you own the code.</h2>
-      </div>
-      <div class="section-stage reveal">
-        <RegistryDrop client:visible />
-      </div>
-    </section>
-
-    <section class="section" id="runtime" data-flow="banner">
-      <div class="section-copy reveal">
-        <p class="section-label">§06 <em>the surface</em></p>
-        <h2>Every capability is <span class="marked">a command.</span></h2>
-        <p class="section-lede">
-          Branch, merge, approve, upload, serve — the whole runtime is things an agent can run.
-          Each row types its command's real output.
-        </p>
-      </div>
-      <div class="section-stage reveal">
-        <CapabilityIndex samples={capabilitySamples} client:visible />
-      </div>
+      <BranchingDemo client:visible />
     </section>
 
     <section class="section" id="faq">
-      <p class="section-label">§07 <em>faq — served from content_index</em></p>
+      <p class="section-label">§05 <em>faq — served from content_index</em></p>
       <div class="reveal">
         <h2>Asked, answered.</h2>
       </div>
-      <LandingFaq items={faqs} />
+      <LandingFaq items={faqs.slice(0, 4)} />
     </section>
 
-    <section class="section" id="start">
-      <p class="section-label">§08 <em>begin</em></p>
+    <section class="section section-start" id="start">
+      <p class="section-label"><em>begin</em></p>
       <div class="reveal">
         <h2>Graft it onto <span class="marked">your repo.</span></h2>
+        <p class="section-lede cta-subhead">You scaffold. The agent authors.</p>
         <p class="section-lede">
-          One command scaffolds the config, the first document, and the llms.txt that teaches
-          your agent the rest.
+          One command drops <code>graft.config.ts</code>, the first MDX doc, and
+          <code>llms.txt</code>. From there humans and cold agents share the same loop —
+          compile, branch, merge.
         </p>
       </div>
       <ClosingCta client:visible />

@@ -28,6 +28,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import * as runtime from "react/jsx-runtime";
 import remarkGfm from "remark-gfm";
 import { mdxComponents } from "../components/mdx";
+import { SHIKI_THEMES } from "./highlight";
 
 export type MdxComponents = MDXComponents;
 
@@ -45,10 +46,9 @@ export async function renderMdx(source: string, components?: MdxComponents): Pro
       [
         rehypeShiki,
         {
-          // Near-monochrome themes fit the editorial ink/ivory palette; a
-          // custom monochrome theme lands in the polish pass. Both themes
-          // ship as CSS vars (defaultColor: false); light-dark() picks one.
-          themes: { light: "min-light", dark: "min-dark" },
+          // GitHub dual theme — same pair as landing terminals (and Vercel’s
+          // own code-block components). See SHIKI_THEMES in lib/highlight.ts.
+          themes: { ...SHIKI_THEMES },
           defaultColor: false,
         },
       ],

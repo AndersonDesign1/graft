@@ -1,116 +1,135 @@
 "use client";
 
 /**
- * The closing CTA. The contact form is the live demo: it POSTs to the real
- * typed function runtime (submitContact), and success prints the actual
- * data_records row id — proof, not promise. GraftError `fix` text surfaces
- * verbatim on failure (the self-teaching error, all the way to the UI).
+ * Closing CTA — human install + agent guide.
+ * Real brand marks from /public/agents (Claude, Cursor, Codex, Copilot, Gemini).
  */
-import { useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 
-function InstallCommand() {
-  const [copied, setCopied] = useState(false);
-  const cmd = "pnpm dlx graft init";
+const INIT_CMD = "pnpm dlx graft init";
+
+const AGENTS = [
+  { name: "Claude", src: "/agents/claude.svg" },
+  { name: "Cursor", src: "/agents/cursor.svg" },
+  { name: "Codex", src: "/agents/codex.svg" },
+  { name: "Copilot", src: "/agents/copilot.svg" },
+  { name: "Gemini", src: "/agents/gemini.svg" },
+] as const;
+
+function agentPrompt() {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const guide = origin ? `${origin}/llms.txt` : "/llms.txt";
   return (
-    <p className="cta-install">
-      <span>
-        <span className="t-prompt">$ </span>
-        {cmd}
-      </span>
-      <button
-        type="button"
-        className="copy-button"
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(cmd);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1600);
-          } catch {
-            /* clipboard denied — nothing to do */
-          }
-        }}
-      >
-        {copied ? "copied" : "copy"}
-      </button>
-    </p>
+    `Read ${guide}. Graft keeps content as MDX in git; graft.config.ts is the schema; ` +
+    "Postgres is a derived index. Scaffold with `pnpm dlx graft init`, then operate via MCP or the CLI."
   );
 }
 
-type Status =
-  | { state: "idle" }
-  | { state: "sending" }
-  | { state: "sent"; id: string }
-  | { state: "failed"; message: string; fix?: string };
-
-function LiveContactForm() {
-  const [status, setStatus] = useState<Status>({ state: "idle" });
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const fields = new FormData(form);
-    setStatus({ state: "sending" });
-
-    const message = String(fields.get("message") ?? "").trim();
-    const res = await fetch("/api/fn/submitContact", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        email: String(fields.get("email") ?? ""),
-        ...(message ? { message } : {}),
-      }),
-    });
-    const body = await res.json();
-
-    if (res.ok) {
-      form.reset();
-      setStatus({ state: "sent", id: body.data.id });
-    } else {
-      setStatus({ state: "failed", message: body.message, fix: body.fix });
+function useCopy() {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard denied */
     }
-  }
+  }, []);
+  return { copied, copy };
+}
 
+function CopyIcon() {
   return (
-    <div className="contact">
-      <h3>Or say hello.</h3>
-      <p className="contact-sub">
-        this form is live — it calls <code>POST /api/fn/submitContact</code>, validates against
-        the schema, and writes a row you can query back.
-      </p>
-      <form onSubmit={submit}>
-        <label>
-          email
-          <input name="email" type="email" required placeholder="you@example.com" />
-        </label>
-        <label>
-          message
-          <textarea name="message" rows={3} placeholder="optional" />
-        </label>
-        <button className="button-primary" type="submit" disabled={status.state === "sending"}>
-          {status.state === "sending" ? "writing row…" : "submit"}
-        </button>
-      </form>
-      {status.state === "sent" ? (
-        <p className="contact-note" aria-live="polite">
-          row {status.id.slice(0, 8)} written to data_records{" "}
-          <span className="dim">· validated · audit logged · rate-limited 5/min</span>
-        </p>
-      ) : null}
-      {status.state === "failed" ? (
-        <p className="contact-note contact-error" aria-live="polite">
-          {status.message}
-          {status.fix ? ` — ${status.fix}` : null}
-        </p>
-      ) : null}
-    </div>
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <path
+        d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"
+        stroke="currentColor"
+        strokeWidth="1.25"
+      />
+    </svg>
+  );
+}
+
+function CopyRow({
+  getText,
+  children,
+  mono = false,
+  ariaLabel,
+}: {
+  getText: () => string;
+  children: ReactNode;
+  mono?: boolean;
+  ariaLabel: string;
+}) {
+  const { copied, copy } = useCopy();
+  return (
+    <button
+      type="button"
+      className="cta-copy"
+      data-mono={mono || undefined}
+      aria-label={copied ? "Copied" : ariaLabel}
+      onClick={() => copy(getText())}
+    >
+      <span className="cta-copy-text">{children}</span>
+      <span className="cta-copy-affordance" aria-hidden="true">
+        {copied ? "✓" : <CopyIcon />}
+      </span>
+    </button>
+  );
+}
+
+function AgentMarks() {
+  return (
+    <ul className="cta-agents" aria-label="Claude, Cursor, Codex, Copilot, Gemini">
+      {AGENTS.map((a) => (
+        <li key={a.name} className="cta-agent-mark" title={a.name}>
+          <img src={a.src} alt="" width={48} height={48} decoding="async" />
+          <span className="visually-hidden">{a.name}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 export function ClosingCta() {
   return (
-    <>
-      <InstallCommand />
-      <LiveContactForm />
-    </>
+    <div className="cta-wrap">
+      <div className="cta-bento">
+        <div className="cta-cell cta-agent">
+          <AgentMarks />
+          <p className="cta-cell-label">For your agent</p>
+          <h3>Paste the project guide.</h3>
+          <p className="cta-cell-body">
+            <code>llms.txt</code> + MCP — Claude, Cursor, Codex, Copilot, Gemini, or anything that
+            can fetch a URL.
+          </p>
+          <CopyRow getText={agentPrompt} ariaLabel="Copy agent setup prompt">
+            Copy setup prompt → /llms.txt
+          </CopyRow>
+        </div>
+
+        <div className="cta-cell cta-init">
+          <p className="cta-cell-label">For you</p>
+          <h3>Scaffold the repo.</h3>
+          <p className="cta-cell-body">
+            One command. Config, first document, agent guide — files you own.
+          </p>
+          <CopyRow getText={() => INIT_CMD} mono ariaLabel="Copy init command">
+            $ {INIT_CMD}
+          </CopyRow>
+        </div>
+      </div>
+
+      <div className="cta-actions">
+        <a className="button-ghost" href="/docs">
+          Read the docs
+        </a>
+        <a className="button-primary" href="/docs/getting-started">
+          Start building
+        </a>
+      </div>
+    </div>
   );
 }

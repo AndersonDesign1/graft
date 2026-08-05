@@ -66,10 +66,20 @@
   --danger-300: oklch(0.77 0.123 25); /* on black  #f9948c — Lc -60 */
   --danger-600: oklch(0.5 0.183 25); /* on ivory  #b42027 — Lc  75 */
 
-  /* syntax — the ONE place color is welcome, because it is content, not
-     chrome. Tuned to clear Lc 60 on the sunken surface. */
-  --amber-400: oklch(0.76 0.132 85); /* #d7aa3e */
-  --azure-400: oklch(0.755 0.085 240); /* #7db7e0 */
+  /* syntax — GitHub palette (matches shiki github-light / github-dark).
+     Page chrome stays monochrome; code is the one place hue is welcome. */
+  --gh-string-light: #032f62;
+  --gh-string-dark: #9ecbff;
+  --gh-entity-light: #6f42c1;
+  --gh-entity-dark: #b392f0;
+  --gh-constant-light: #005cc5;
+  --gh-constant-dark: #79b8ff;
+  --gh-inserted-light: #22863a;
+  --gh-inserted-dark: #85e89d;
+  --gh-comment-light: #6a737d;
+  --gh-comment-dark: #8b949e;
+  --gh-keyword-light: #d73a49;
+  --gh-keyword-dark: #f97583;
 
   /* ===================================================== 2. semantic === */
 
@@ -102,8 +112,19 @@
   --success: var(--primary);
   --danger: light-dark(var(--danger-600), var(--danger-300));
 
-  --code-string: var(--amber-400);
-  --code-type: var(--azure-400);
+  --code-string: light-dark(var(--gh-string-light), var(--gh-string-dark));
+  --code-type: light-dark(var(--gh-entity-light), var(--gh-entity-dark));
+  --code-key: light-dark(var(--gh-inserted-light), var(--gh-inserted-dark));
+  --code-ok: light-dark(var(--gh-inserted-light), var(--gh-inserted-dark));
+  --code-comment: light-dark(var(--gh-comment-light), var(--gh-comment-dark));
+  --code-prompt: light-dark(var(--gh-constant-light), var(--gh-constant-dark));
+  --code-keyword: light-dark(var(--gh-keyword-light), var(--gh-keyword-dark));
+
+  /* keep short aliases used by older hand-painted tokens */
+  --amber-400: var(--code-string);
+  --azure-400: var(--code-prompt);
+  --green-400: var(--code-ok);
+  --violet-400: var(--code-type);
 
   --selection-background: var(--primary);
   --selection-foreground: var(--primary-foreground);

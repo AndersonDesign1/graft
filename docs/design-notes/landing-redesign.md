@@ -156,3 +156,123 @@ scroll-driven = IntersectionObserver + CSS transitions
 collection; agents write via MCP), themed with the same tokens: ivory/ink,
 Instrument Serif headings, bright marks, hairline rules over Fumadocs UI CSS
 variables.
+
+## 3 · v5 — the persistent stage (2026-08-04)
+
+v4 shipped and it is **too much page**. Eight §-sections, twelve landing
+components, 1,745 lines of `landing.css`. Each section invented its own layout
+mode (`copy-left` / `copy-right` / `banner`), its own reveal choreography, its
+own widget. The concept was right — *nothing is a screenshot* — but it was
+applied eight times instead of once.
+
+**The copy is not the problem.** "One loop, no publish button." / "Errors that
+teach the fix." / "Branch content like code. Because it is." — that writing
+stays. v5 keeps the words and deletes the machinery.
+
+### 3.1 The mechanism: persistent, not pinned
+
+The operator's instinct was a *fixed viewport* — one screen, content swapping
+against an unchanging background. The **goal** (one continuous room, calm,
+short) is right; the **mechanism** is not. Vercel and Resend, the named
+references, both scroll normally; what makes them read premium is short pages,
+monochrome restraint, asymmetric two-column blocks, and one persistent ambient
+texture. A pinned viewport costs anchor links, mobile behaviour, keyboard and
+screen-reader scroll, and crawlability — on the docs site, which we intend to
+rank. It also reads *portfolio*, not *developer tool*.
+
+**Decision: persistent stage, ordinary document scroll.**
+
+- **One fixed background layer** for the whole page — never changes, never
+  sectioned. This is what produces the "single room" sensation.
+- **One sticky product frame.** The frame sits `position: sticky` in one column
+  and *stays* while copy in the other column scrolls past and drives its state.
+  Three beats, one frame. This is the operator's described layout ("the CLI at
+  the side wrapped beautifully, the content at the other side, irregular but it
+  works") and it is the Prismic sticky-panel pattern already recorded at §1.2.
+  Engineering is cheap: `sticky` + IntersectionObserver, both already in
+  `reveal.tsx`.
+
+The structural win: **three bespoke widgets collapse into one widget with three
+states.**
+
+### 3.2 Section ledger
+
+Five sections. Hero → stage → branching → FAQ → CTA.
+
+| v4 | v5 | note |
+| --- | --- | --- |
+| Hero | **keep** | The graft SVG growing out of the terminal is ours and it works. Terminal shortens to `pnpm graft init` + scaffold output only — `compile` moves to the stage, so the two read as a progression instead of a repeat. |
+| §01 loop | **cut** | The five-row beat-driven index is redundant once *scroll* drives state. Its content becomes one sentence of stage copy: author → validate → index → read → render. |
+| §02 agent-native | **→ stage beat B** | `agent-session.tsx` content survives, restyled to live inside the frame. |
+| §03 branching | **keep** | The single "poke it" moment, and the strongest differentiator against Payload and BaseHub. Do not spend it elsewhere. |
+| §04 typed reads | **→ stage beat C** | `typed-reads.tsx` survives; hover/focus field-pairing must keep working inside the frame. |
+| §05 registry | **cut** | One line folded into the CTA. |
+| §06 capability index | **cut** | 124 lines of TSX plus ~130 of CSS for a surface the docs already own. |
+| §07 FAQ | **keep, 4 items** | Still served from the live `home` document — the dogfood claim depends on it. |
+| §08 CTA | **keep** | The form writing a real `data_records` row is the right closing note. |
+
+Also: **`cli-strip.tsx` goes with §06** — its only consumer is
+`capability-index.tsx`, so cutting the index orphans it. 115 lines.
+
+### 3.3 The stage
+
+One sticky frame, three states, crossfaded. The left column carries three copy
+blocks; each sets the frame as it crosses the activation line.
+
+- **A · compile.** The ChangeSet — hash-diff projection, `+2 added ~1 changed`,
+  git SHA. Reuses `terminal.tsx` verbatim (shiki-driven, reduced-motion safe).
+- **B · the agent.** `write_content` fails `SCHEMA_VALIDATION_FAILED`, the error
+  carries its own `fix`, the agent corrects, compile lands.
+- **C · typed reads.** The paired panes: hover a frontmatter field, watch the
+  inferred type light up.
+
+New code is only the shell: sticky container, IntersectionObserver state
+machine, crossfade. **Mobile fallback:** below the stage breakpoint the sticky
+behaviour is dropped entirely — three ordinary stacked sections, frame inline
+beneath each copy block. No sticky, no observer.
+
+### 3.4 The background
+
+**No WebGL.** A shader buys perhaps the last 20% of "material" for an LCP budget
+and a fallback path, on a page we want indexed. Three cheap layers instead:
+
+1. **Grain** — the existing overlay (`landing.css:276`) promoted from
+   per-section to one `position: fixed` layer on `.landing`.
+2. **One light** — a large, very low-contrast radial that lerps toward the
+   pointer. `translate3d` only, rAF-throttled, **desktop and pointer:fine
+   only**, off under `prefers-reduced-motion`.
+3. **Ambient drift** — a ~40s cycle so the light is alive with no cursor.
+
+Revisit the shader only if this reads flat next to the type. Two constraints
+from §0 stand: the system is monochrome **by argument** (APCA, not taste), so no
+gradient field or aurora; and **no video** — a looping mp4 behind a page whose
+entire thesis is "nothing is a screenshot" is the one element that isn't.
+
+### 3.5 The margin affordance
+
+The operator asked for a side cue that scrolling is possible. §1.4 point 3 killed
+the scroll spine because a filling thread is BaseHub's most recognizable
+structural signature — that decision stands. v5 gets a **hero-only** cue (mono
+label + hairline, fades on first scroll) and keeps the static §-numbers,
+renumbered §01–§05. No thread, no fill, no progress rail.
+
+### 3.6 Targets and non-goals
+
+Target: `landing.css` 1,745 → **~950**; twelve landing components → **eight**.
+
+Untouched: `tokens.css` (the OKLCH ramp and its APCA work are settled), the docs
+shell, the nav and footer. **No new dependencies. No animation runtime. No
+Tailwind.**
+
+### 3.7 On the redesign-skill checklist
+
+Reviewed `elayadesign/redesign-skill` (redesign-existing-projects). Use the
+**audit checklist** half — states, easing, copy rules, semantic HTML, strategic
+omissions — which mostly agrees with what we already do. **Discard its "Design
+Values" half entirely:** it hardcodes Geist/Manrope/Poppins, a fixed dark hex
+ramp, a white→`#9B9B9B` hero gradient, Phosphor icons, and Tailwind utilities,
+and carries the rule *"never invent design values not in the Design Values
+section."* Applied literally that deletes the Instrument Serif display face, the
+APCA-validated neutral ramp, and the no-accent position, and it assumes a
+Tailwind project we do not have. It is a skill for generic projects; §0 is the
+argument for why this one isn't.

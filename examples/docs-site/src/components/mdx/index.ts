@@ -4,5 +4,6 @@
  * example; grows as `graft add` primitives land in this project.
  */
 import { Callout } from "./Callout";
+import { InlineCode } from "./InlineCode";
 
-export const mdxComponents = { Callout };
+export const mdxComponents = { Callout, code: InlineCode };

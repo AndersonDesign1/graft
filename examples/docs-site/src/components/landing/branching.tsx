@@ -1,246 +1,313 @@
 "use client";
 
 /**
- * Interactive branching toy — the P4 overlay model you can poke, drawn as a
- * graph rather than two lists of rows:
+ * Branching — one frame, four beats.
  *
- *   branch = an edge splits off main (one registry row, zero copies)
- *   edit   = a node on the branch goes solid — a copy-on-write override
- *   delete = a node becomes a tombstone (hides the parent on this branch only)
- *   merge  = the edge rejoins main, the override lands, the tombstoned row goes
- *
- * The drawing is the model: inherited rows are *hollow* because nothing was
- * copied — that is the whole point of the overlay, and a list of <li>s cannot
- * say it. Everything animates with stroke-dashoffset and transforms; no library.
- *
- * The SVG is aria-hidden and the same state is published as text for screen
- * readers, so the semantics never live only in a picture.
+ * Quiet text tabs across the top; copy on the left; a typewriter terminal on
+ * the right that types the command then drops the response. Auto-advances
+ * while in view; hover/focus pauses; a click selects. No secondary deck —
+ * the CLI output is the model.
  */
-import { useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import { useInView } from "./reveal";
 
-type Step = 0 | 1 | 2 | 3 | 4; // none → branched → edited → deleted → merged
-type NodeState = "own" | "inherited" | "tombstone";
+type Step = 0 | 1 | 2 | 3;
 
-const STATUS: Record<Step, React.ReactNode> = {
-  0: (
-    <>
-      <b>main</b> has three documents. Create a branch — it costs one registry row, zero copies.
-    </>
-  ),
-  1: (
-    <>
-      <b>preview</b> exists instantly. The hollow nodes are inherited reads through the overlay —
-      nothing was copied.
-    </>
-  ),
-  2: (
-    <>
-      Editing wrote one overlay row. <b>Leaf wins</b> over the parent; main never noticed.
-    </>
-  ),
-  3: (
-    <>
-      Deleting wrote a <b>tombstone</b> — it hides the parent row on this branch only.
-    </>
-  ),
-  4: (
-    <>
-      Merged. Content recompiles from the git merge; data rows move; the branch drops. <b>main</b>{" "}
-      carries the new pricing, minus the tombstoned changelog.
-    </>
-  ),
-};
-
-/** Screen-reader truth, so the model isn't only in the drawing. */
-function stateOf(step: Step): { lane: string; rows: string[] }[] {
-  const preview =
-    step >= 1 && step < 4
-      ? [
-          {
-            lane: "preview",
-            rows: [
-              "pages/home — inherited",
-              step >= 2 ? "pages/pricing — override (own row)" : "pages/pricing — inherited",
-              step >= 3 ? "pages/changelog — tombstone" : "pages/changelog — inherited",
-            ],
-          },
-        ]
-      : [];
-  return [
-    {
-      lane: "main",
-      rows:
-        step < 4
-          ? ["pages/home", "pages/pricing", "pages/changelog"]
-          : ["pages/home", "pages/pricing (merged)"],
-    },
-    ...preview,
-  ];
+interface TermBit {
+  kind: "cmd" | "out" | "dim" | "ok";
+  text: string;
 }
 
-const MAIN_Y = 168;
-const BRANCH_Y = 62;
-
-function GraphNode({
-  x,
-  y,
-  label,
-  state,
-  visible,
-  delay = 0,
-}: {
-  x: number;
-  y: number;
+interface Tab {
+  id: string;
   label: string;
-  state: NodeState;
-  visible: boolean;
-  delay?: number;
-}) {
+  title: string;
+  body: ReactNode;
+  lines: TermBit[];
+}
+
+const TABS: Tab[] = [
+  {
+    id: "create",
+    label: "Create",
+    title: "One registry row. Zero copies.",
+    body: (
+      <>
+        A branch is an edge off <code>main</code> — instant, isolated. Reads fall through the
+        overlay until something writes.
+      </>
+    ),
+    lines: [
+      { kind: "cmd", text: "$ graft branch create preview" },
+      { kind: "ok", text: 'Created branch "preview" from "main"' },
+      { kind: "dim", text: "overlay — zero rows copied" },
+      { kind: "out", text: "Reads overlay the parent until the branch writes." },
+    ],
+  },
+  {
+    id: "edit",
+    label: "Edit",
+    title: "Leaf wins. Main never notices.",
+    body: (
+      <>
+        Compile on the branch writes one overlay row. The leaf shadows the parent;{" "}
+        <code>main</code> stays untouched.
+      </>
+    ),
+    lines: [
+      { kind: "cmd", text: "$ graft compile --branch preview" },
+      { kind: "ok", text: "pages/pricing     validated ✓" },
+      { kind: "out", text: "projected to content_index @ preview" },
+      { kind: "dim", text: "+0 added  ~1 changed  −0 removed" },
+    ],
+  },
+  {
+    id: "tombstone",
+    label: "Tombstone",
+    title: "Hide without touching main.",
+    body: (
+      <>
+        A tombstone hides the parent row on this branch only. <code>main</code>&apos;s changelog
+        is still there.
+      </>
+    ),
+    lines: [
+      { kind: "cmd", text: "$ # via MCP write / delete_content" },
+      { kind: "out", text: 'delete_content({ slug: "changelog" })' },
+      { kind: "ok", text: "tombstone written on preview" },
+      { kind: "dim", text: "main.changelog still intact" },
+    ],
+  },
+  {
+    id: "merge",
+    label: "Merge",
+    title: "Dry-run first. Then land it.",
+    body: (
+      <>
+        Content recompiles from the git merge; data rows move; the branch drops.{" "}
+        <code>main</code> carries the new pricing, minus the tombstoned changelog.
+      </>
+    ),
+    lines: [
+      { kind: "cmd", text: "$ graft merge preview --apply" },
+      { kind: "out", text: "Ledger: replaying 2 data_records onto main" },
+      { kind: "ok", text: "would recompile working tree → main" },
+      { kind: "dim", text: 'branch "preview" dropped' },
+    ],
+  },
+];
+
+/** Long enough for the typewriter to finish before the next beat. */
+const DWELL_MS = 7200;
+
+/** Color the `$` prompt and quoted strings inside a terminal line. */
+function paintLine(text: string, kind: TermBit["kind"]) {
+  if (kind === "cmd" && text.startsWith("$")) {
+    return (
+      <>
+        <span className="tline-prompt">$</span>
+        {paintStrings(text.slice(1))}
+      </>
+    );
+  }
+  if (kind === "out" || kind === "ok") return paintStrings(text);
+  return text;
+}
+
+function paintStrings(text: string) {
+  const parts = text.split(/("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    part.startsWith('"') || part.startsWith("'") ? (
+      <span key={i} className="tline-str">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
+/**
+ * Types the command, then drops response lines one by one.
+ * Remounts (via key) whenever the active tab changes.
+ */
+function BranchTerminal({ lines }: { lines: TermBit[] }) {
+  const [row, setRow] = useState(0);
+  const [chars, setChars] = useState(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reduced = useMemo(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    [],
+  );
+
+  useEffect(() => {
+    if (reduced) {
+      setRow(lines.length);
+      return;
+    }
+    if (row >= lines.length) return;
+
+    const line = lines[row]!;
+    const isCmd = line.kind === "cmd";
+    const full = line.text.length;
+    const doneTyping = !isCmd || chars >= full;
+
+    timer.current = setTimeout(
+      () => {
+        if (doneTyping) {
+          setRow((r) => r + 1);
+          setChars(0);
+        } else {
+          setChars((c) => c + 1);
+        }
+      },
+      doneTyping ? (isCmd ? 280 : 380) : 28 + Math.random() * 32,
+    );
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [row, chars, reduced, lines]);
+
+  const done = row >= lines.length;
+  const current = done ? null : lines[row]!;
+  const typingCmd = current?.kind === "cmd";
+
   return (
-    <g
-      className="bnode"
-      data-state={state}
-      data-visible={visible}
-      style={{ "--node-delay": `${delay}ms` } as React.CSSProperties}
-      transform={`translate(${x} ${y})`}
-    >
-      <circle className="bnode-dot" r="6" />
-      {state === "tombstone" ? (
-        <>
-          <line className="bnode-x" x1="-4" y1="-4" x2="4" y2="4" />
-          <line className="bnode-x" x1="4" y1="-4" x2="-4" y2="4" />
-        </>
-      ) : null}
-      <text className="bnode-label" y={y === MAIN_Y ? 24 : -16} textAnchor="middle">
-        {label}
-      </text>
-    </g>
+    <div className="terminal branch-terminal">
+      <div className="terminal-bar">
+        <span className="terminal-traffic" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+        <span className="terminal-title">Terminal</span>
+      </div>
+      <pre className="terminal-body" aria-live="polite">
+        {lines.slice(0, row).map((line, i) => (
+          <span key={i} className={`tline tline-${line.kind}`}>
+            {paintLine(line.text, line.kind)}
+            {"\n"}
+          </span>
+        ))}
+        {typingCmd ? (
+          <span className="tline tline-cmd">
+            {paintLine(current.text.slice(0, chars), "cmd")}
+            <span className="caret" aria-hidden="true" />
+          </span>
+        ) : null}
+        {!done && !typingCmd ? <span className="caret" aria-hidden="true" /> : null}
+        {done ? <span className="caret" aria-hidden="true" /> : null}
+      </pre>
+    </div>
   );
 }
 
 export function BranchingDemo() {
-  const [step, setStep] = useState<Step>(0);
+  const { ref, inView } = useInView<HTMLDivElement>("0px", 0.35);
+  const [active, setActive] = useState<Step>(0);
+  const [paused, setPaused] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const reduced = useRef(
+    typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
 
-  const branched = step >= 1 && step < 4;
-  const merging = step >= 4;
+  useEffect(() => {
+    if (!inView || paused || reduced.current) {
+      setProgress(0);
+      return;
+    }
+    const started = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = (now - started) / DWELL_MS;
+      if (t >= 1) {
+        setActive((s) => ((s + 1) % TABS.length) as Step);
+        setProgress(0);
+        return;
+      }
+      setProgress(t);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [inView, paused, active]);
+
+  const select = useCallback((i: Step) => {
+    setActive(i);
+    setProgress(0);
+  }, []);
+
+  const tab = TABS[active]!;
 
   return (
-    <div className="branch-demo">
-      <div className="branch-controls" role="group" aria-label="Branching demo controls">
-        <button type="button" className="branch-cmd" disabled={step !== 0} onClick={() => setStep(1)}>
-          graft branch create preview
-        </button>
-        <button type="button" className="branch-cmd" disabled={step !== 1} onClick={() => setStep(2)}>
-          graft compile --branch preview
-        </button>
-        <button type="button" className="branch-cmd" disabled={step !== 2} onClick={() => setStep(3)}>
-          delete_content changelog
-        </button>
-        <button
-          type="button"
-          className="branch-cmd"
-          data-primary="true"
-          disabled={step !== 3}
-          onClick={() => setStep(4)}
+    <div
+      ref={ref}
+      className="branch-stage"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setPaused(false);
+      }}
+    >
+      <div className="branch-tabs" role="tablist" aria-label="Branching steps">
+        {TABS.map((t, i) => {
+          const selected = active === i;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              id={`branch-tab-${t.id}`}
+              aria-selected={selected}
+              aria-controls="branch-panel"
+              className="branch-tab"
+              data-active={selected}
+              onClick={() => select(i as Step)}
+            >
+              <span className="branch-tab-n" aria-hidden="true">
+                0{i + 1}
+              </span>
+              <span className="branch-tab-label">{t.label}</span>
+              {selected && !reduced.current ? (
+                <span
+                  className="branch-tab-progress"
+                  style={{ "--p": progress } as CSSProperties}
+                  aria-hidden="true"
+                />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="branch-body">
+        <div
+          className="branch-copy"
+          id="branch-panel"
+          role="tabpanel"
+          aria-labelledby={`branch-tab-${tab.id}`}
         >
-          graft merge preview --apply
-        </button>
-        <button type="button" className="branch-cmd" disabled={step === 0} onClick={() => setStep(0)}>
-          reset
-        </button>
+          <h3>{tab.title}</h3>
+          <p className="branch-copy-body">{tab.body}</p>
+        </div>
+
+        <div className="branch-term">
+          <BranchTerminal key={tab.id} lines={tab.lines} />
+        </div>
       </div>
-
-      <div className="branch-graph">
-        <svg viewBox="0 0 760 230" aria-hidden="true">
-          {/* main: always there, the spine */}
-          <line className="lane-main" x1="24" y1={MAIN_Y} x2="736" y2={MAIN_Y} />
-          <text className="lane-name" x="24" y={MAIN_Y + 44}>
-            main
-          </text>
-
-          {/* the split — one registry row, zero copies */}
-          <path
-            className="edge"
-            data-on={branched || merging}
-            pathLength={1}
-            d={`M232 ${MAIN_Y} C280 ${MAIN_Y}, 268 ${BRANCH_Y}, 316 ${BRANCH_Y}`}
-          />
-          {/* the branch lane itself */}
-          <line
-            className="edge-line"
-            data-on={branched}
-            x1="316"
-            y1={BRANCH_Y}
-            x2="560"
-            y2={BRANCH_Y}
-          />
-          {/* the merge — rejoins main */}
-          <path
-            className="edge"
-            data-on={merging}
-            pathLength={1}
-            d={`M560 ${BRANCH_Y} C608 ${BRANCH_Y}, 596 ${MAIN_Y}, 644 ${MAIN_Y}`}
-          />
-          <text className="lane-name" data-on={branched || merging} x="316" y={BRANCH_Y - 40}>
-            preview
-          </text>
-
-          {/* main rows */}
-          <GraphNode x={72} y={MAIN_Y} label="home" state="own" visible />
-          <GraphNode x={140} y={MAIN_Y} label="pricing" state="own" visible />
-          {/* main's changelog is NEVER tombstoned — a tombstone hides the
-              parent on the BRANCH only. main only loses the row at merge. */}
-          <GraphNode x={208} y={MAIN_Y} label="changelog" state="own" visible={step < 4} />
-
-          {/* the branch: hollow = inherited, nothing was copied */}
-          <GraphNode
-            x={356}
-            y={BRANCH_Y}
-            label="home"
-            state="inherited"
-            visible={branched}
-            delay={80}
-          />
-          <GraphNode
-            x={438}
-            y={BRANCH_Y}
-            label="pricing"
-            state={step >= 2 ? "own" : "inherited"}
-            visible={branched}
-            delay={160}
-          />
-          <GraphNode
-            x={520}
-            y={BRANCH_Y}
-            label="changelog"
-            state={step >= 3 ? "tombstone" : "inherited"}
-            visible={branched}
-            delay={240}
-          />
-
-          {/* what actually lands on main */}
-          <GraphNode
-            x={684}
-            y={MAIN_Y}
-            label="pricing·merged"
-            state="own"
-            visible={merging}
-            delay={420}
-          />
-        </svg>
-      </div>
-
-      <p className="branch-status" aria-live="polite">
-        {STATUS[step]}
-      </p>
-
-      <ul className="visually-hidden">
-        {stateOf(step).map((lane) => (
-          <li key={lane.lane}>
-            {lane.lane}: {lane.rows.join("; ")}
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

@@ -39,6 +39,36 @@ kbd {
   font-variant-ligatures: none;
 }
 
+/* Inline CLI chips — same hue vocabulary as terminals. */
+.prose code.cli-code {
+  color: var(--ink-muted);
+}
+
+.prose code.cli-code .cli-bin {
+  color: var(--code-prompt);
+  font-weight: 500;
+}
+
+.prose code.cli-code .cli-cmd {
+  color: var(--code-key);
+}
+
+.prose code.cli-code .cli-flag {
+  color: var(--code-string);
+}
+
+.prose code.cli-code .cli-arg {
+  color: var(--code-comment);
+}
+
+.prose code.cli-code .cli-path {
+  color: var(--code-type);
+}
+
+.prose code.cli-code .cli-sep {
+  color: var(--ink-faint);
+}
+
 /* Serif display voice for doc headings — same as the landing. */
 .font-serif,
 #nd-page h1,
