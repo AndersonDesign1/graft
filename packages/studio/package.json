@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "files": [
-    "dist"
+    "dist",
+    "openapi.yaml"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -13,13 +14,41 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./panels": {
+      "types": "./dist/panels-entry.d.ts",
+      "import": "./dist/panels-entry.js"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
-    "dev": "tsup src/index.ts --format esm --watch",
+    "build": "pnpm run build:lib && pnpm run build:ui",
+    "build:lib": "tsup src/index.ts src/panels-entry.ts --format esm --dts --clean --external react --external react/jsx-runtime --external react-dom --external react-dom/client",
+    "build:ui": "node ./scripts/build-ui.mjs",
+    "dev": "tsup src/index.ts src/panels-entry.ts --format esm --watch --external react --external react/jsx-runtime --external react-dom --external react-dom/client",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "oxlint ."
+  },
+  "dependencies": {
+    "@graft/compiler": "workspace:*",
+    "@graft/contracts": "workspace:*",
+    "@graft/core": "workspace:*",
+    "@graft/db": "workspace:*",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "esbuild": "^0.25.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "react-dom": { "optional": true }
   }
 }

@@ -1,6 +1,25 @@
 /**
- * @graft/studio
- * Optional human Studio (Drizzle-Studio-style window): browse/edit, diffs, approvals.
- * Becomes a React/Vite app in a later phase. Placeholder for now.
+ * @graft/studio — optional, opt-in Studio (Drizzle-style).
+ *
+ * Headless parity: the UI is only a client of the OpenAPI read surface;
+ * the same operations exist on MCP and CLI.
+ *
+ * React panels: import from `@graft/studio/panels`.
  */
+export { createStudioApiHandler, type StudioApiOptions, type StudioFetchHandler } from "./api";
+export { createStudioHandler, type StudioHandlerOptions } from "./handler";
+export { STUDIO_OPENAPI } from "./openapi";
+export type {
+  ApprovalList,
+  BranchDto,
+  BranchList,
+  CompilationDto,
+  CompilationList,
+  ContentTree,
+  ContentTreeCollection,
+  ContentTreeDoc,
+  DocumentDto,
+  PendingApprovalDto,
+} from "./types";
+
 export const PACKAGE = "@graft/studio" as const;

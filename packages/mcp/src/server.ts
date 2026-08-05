@@ -41,7 +41,16 @@ import {
   type RateLimit,
 } from "@graft/core";
 import type { ApprovalStore, AuditStore, BranchScope, Database } from "@graft/db";
-import { assertSearchQuery, resolveBranchScope, scopeChain, searchContent } from "@graft/db";
+import {
+  assertSearchQuery,
+  decideApproval,
+  listBranches,
+  listCompilations,
+  listPendingApprovals,
+  resolveBranchScope,
+  scopeChain,
+  searchContent,
+} from "@graft/db";
 import { describeItem, listItems, loadItem } from "@graft/registry";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import matter from "gray-matter";
@@ -738,6 +747,119 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
           bytes: bytes.byteLength,
           url: await storage.url(key),
           frontmatter: `image:\n  key: ${key}\n  alt: describe the image for screen readers`,
+        };
+      }),
+  );
+
+  server.registerTool(
+    "list_branches",
+    {
+      title: "List branches",
+      description:
+        "List registered content branches (name, parent, backend, status). Same data as GET /api/studio/v1/branches and `graft branch`.",
+      inputSchema: {},
+    },
+    () =>
+      guarded(async () => ({
+        branches: (await listBranches(db)).map((row) => ({
+          name: row.name,
+          parent: row.parent,
+          backend: row.backend,
+          status: row.status,
+          createdAt: row.createdAt.toISOString(),
+          endpointHost: row.endpointHost,
+        })),
+      })),
+  );
+
+  server.registerTool(
+    "list_compilations",
+    {
+      title: "List compilations",
+      description:
+        "Recent content projection trail rows (git SHA, added/changed/removed counts), newest first. Same data as GET /api/studio/v1/compilations and `graft compilations`.",
+      inputSchema: {
+        branch: z
+          .string()
+          .optional()
+          .describe("Restrict to one branch id (default: all branches)"),
+        limit: z.number().optional().describe("Max rows, newest first (default 20, max 100)"),
+      },
+    },
+    ({ branch, limit }) =>
+      guarded(async () => ({
+        compilations: (
+          await listCompilations(db, {
+            branchId: branch,
+            limit,
+          })
+        ).map((row) => ({
+          id: row.id,
+          branchId: row.branchId,
+          gitSha: row.gitSha,
+          docCount: row.docCount,
+          added: row.added,
+          changed: row.changed,
+          removed: row.removed,
+          createdAt: row.createdAt.toISOString(),
+        })),
+      })),
+  );
+
+  server.registerTool(
+    "list_approvals",
+    {
+      title: "List pending approvals",
+      description:
+        "Pending human-gated approvals. Decide with decide_approval, Studio Approve/Deny, or `graft approve` / `graft deny`. Same data as GET /api/studio/v1/approvals.",
+      inputSchema: {},
+    },
+    () =>
+      guarded(async () => ({
+        approvals: (await listPendingApprovals(db)).map((row) => ({
+          id: row.id,
+          branchId: row.branchId,
+          functionName: row.functionName,
+          input: row.input,
+          requestedByKind: row.requestedByKind,
+          requestedById: row.requestedById,
+          correlationId: row.correlationId,
+          createdAt: row.createdAt.toISOString(),
+        })),
+      })),
+  );
+
+  server.registerTool(
+    "decide_approval",
+    {
+      title: "Approve or deny a pending approval",
+      description:
+        "Record a human decision on a pending approval (same as Studio Approve/Deny and `graft approve` / `graft deny`). Requires an owner DB role that can UPDATE approvals. The requester cannot decide their own approval.",
+      inputSchema: {
+        id: z.string().describe("Pending approval id from list_approvals"),
+        decision: z.enum(["approved", "denied"]).describe("approved or denied"),
+        decidedBy: z
+          .string()
+          .optional()
+          .describe("Operator identity stamp (defaults to mcp-operator)"),
+      },
+    },
+    ({ id, decision, decidedBy }) =>
+      guarded(async () => {
+        const row = await decideApproval(db, id, decision, decidedBy?.trim() || "mcp-operator");
+        if (!row) {
+          throw new GraftError({
+            code: "APPROVAL_INVALID",
+            message: `No PENDING approval "${id}" exists — it may already be decided, consumed, or mistyped.`,
+            fix: "Call list_approvals and use a pending id.",
+            details: { id },
+          });
+        }
+        return {
+          id: row.id,
+          status: row.status,
+          decidedBy: row.decidedBy,
+          functionName: row.functionName,
         };
       }),
   );

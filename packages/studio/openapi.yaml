@@ -1,0 +1,130 @@
+openapi: 3.1.0
+info:
+  title: Graft Studio API
+  version: 0.2.0
+  description: |
+    Opt-in Studio HTTP surface. The UI is only a client of this API.
+    Every operation is also available via MCP and CLI (headless parity).
+servers:
+  - url: /
+paths:
+  /api/studio/v1/openapi.json:
+    get:
+      operationId: getOpenApi
+      summary: OpenAPI document for this surface
+      responses:
+        "200":
+          description: OpenAPI 3 document
+  /api/studio/v1/tree:
+    get:
+      operationId: getContentTree
+      summary: Content tree (collections → documents)
+      parameters:
+        - name: branch
+          in: query
+          schema:
+            type: string
+            default: main
+      responses:
+        "200":
+          description: Collections with document slugs
+  /api/studio/v1/document:
+    get:
+      operationId: getDocument
+      summary: Read one MDX document from disk (git truth)
+      parameters:
+        - name: collection
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: slug
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Document data, body, and raw source
+    put:
+      operationId: putDocument
+      summary: Write MDX and recompile (parity with MCP write_content)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [collection, slug, data]
+              properties:
+                collection:
+                  type: string
+                slug:
+                  type: string
+                data:
+                  type: object
+                  additionalProperties: true
+                body:
+                  type: string
+                branch:
+                  type: string
+      responses:
+        "200":
+          description: Write + compile result
+  /api/studio/v1/compilations:
+    get:
+      operationId: listCompilations
+      summary: Recent compilation trail rows
+      parameters:
+        - name: branch
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Compilation rows, newest first
+  /api/studio/v1/branches:
+    get:
+      operationId: listBranches
+      summary: Registered content branches
+      responses:
+        "200":
+          description: Branch registry
+  /api/studio/v1/approvals:
+    get:
+      operationId: listPendingApprovals
+      summary: Pending human approvals
+      responses:
+        "200":
+          description: Pending queue
+  /api/studio/v1/approvals/{id}/decide:
+    post:
+      operationId: decideApproval
+      summary: Approve or deny (parity with graft approve / deny)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [approved, denied]
+                decidedBy:
+                  type: string
+      responses:
+        "200":
+          description: Decision recorded

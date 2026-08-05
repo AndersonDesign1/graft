@@ -44,7 +44,21 @@ describe("createServeRouter", () => {
     expect(body.error).toBe("ROUTE_NOT_FOUND");
     expect(body.fix).toContain("/api/fn/<name>");
     expect(body.fix).toContain("/healthz");
+    expect(body.fix).toContain("--studio");
     expect(body.details.pathname).toBe("/api/fns/typo");
+  });
+
+  it("mounts opt-in Studio when provided", async () => {
+    const withStudio = createServeRouter({
+      fn: echo("fn"),
+      mcp: echo("mcp"),
+      health: echo("health"),
+      studio: echo("studio"),
+    });
+    for (const path of ["/studio", "/studio/", "/api/studio/v1/tree"]) {
+      const res = await withStudio(new Request(`http://localhost${path}`));
+      expect(((await res.json()) as { label: string }).label).toBe("studio");
+    }
   });
 });
 

@@ -47,14 +47,18 @@ function printHelp(): void {
     "                           for .mcp.json / local agents). Requires DATABASE_URL.",
     "  serve                    Run the headless Graft runtime over HTTP: POST /api/fn/<name>,",
     "                           POST /api/mcp, GET /healthz (what a self-host container runs)",
+    "  studio                   Opt-in Studio UI (edit content, approve/deny, OpenAPI)",
+    "  content                  List the content tree from the compiled index (Studio parity)",
+    "  compilations             List recent content projection trail rows (Studio parity)",
     "  harden <role>            Grant an existing Postgres role the runtime privilege set",
     "                           (can request + consume approvals but never decide them)",
     ...PLANNED.map((cmd) => `  ${cmd.name.padEnd(12)} ${cmd.summary}  (${cmd.phase})`),
     "",
     "Options:",
-    "  --branch <id>    Content branch to project into (compile/dev/migrate/mcp/serve; default: main)",
-    "  --port <n>       Port for `graft serve` (default: 3903, or PORT; 0 picks a free port)",
-    "  --host <h>       Host for `graft serve` (default: 127.0.0.1, or HOST)",
+    "  --branch <id>    Content branch (compile/dev/migrate/mcp/serve/studio/content/compilations; default: main)",
+    "  --port <n>       Port for `graft serve` / `graft studio` (serve default 3903; studio 4983)",
+    "  --host <h>       Host for `graft serve` / `graft studio` (default: 127.0.0.1, or HOST)",
+    "  --studio         Mount opt-in Studio on `graft serve` at /studio (or GRAFT_STUDIO=1)",
     "  --from <name>    Parent to fork from (branch create; default: main)",
     "  --into <name>    Merge target (merge; default: main)",
     "  --backend <kind> Branch backend: overlay (default) or neon (branch create)",
@@ -81,6 +85,7 @@ interface ParsedArgs {
   dryRun: boolean;
   overwrite: boolean;
   pruneUnknown: boolean;
+  studio: boolean;
 }
 
 class UsageError extends Error {}
@@ -98,6 +103,7 @@ function parseArgs(rest: string[]): ParsedArgs {
   let dryRun = false;
   let overwrite = false;
   let pruneUnknown = false;
+  let studio = false;
 
   const value = (flag: string, raw: string | undefined): string => {
     if (!raw || raw.startsWith("-")) {
@@ -133,6 +139,8 @@ function parseArgs(rest: string[]): ParsedArgs {
       overwrite = true;
     } else if (arg === "--prune-unknown") {
       pruneUnknown = true;
+    } else if (arg === "--studio") {
+      studio = true;
     } else if (arg.startsWith("-")) {
       throw new UsageError(`unknown option "${arg}"`);
     } else {
@@ -151,6 +159,7 @@ function parseArgs(rest: string[]): ParsedArgs {
     dryRun,
     overwrite,
     pruneUnknown,
+    studio,
   };
 }
 
@@ -341,7 +350,46 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
       case "serve": {
         const { serveCommand } = await import("./commands/serve");
         // Blocks until SIGINT/SIGTERM (server lifetime).
-        await serveCommand({ cwd, branchId: args.branchId, port: args.port, host: args.host });
+        await serveCommand({
+          cwd,
+          branchId: args.branchId,
+          port: args.port,
+          host: args.host,
+          studio: args.studio,
+        });
+        return 0;
+      }
+      case "studio": {
+        const { studioCommand } = await import("./commands/studio");
+        await studioCommand({
+          cwd,
+          branchId: args.branchId,
+          port: args.port,
+          host: args.host,
+        });
+        return 0;
+      }
+      case "content": {
+        const { contentListCommand, formatContentLine } = await import("./commands/content");
+        const { branch, lines } = await contentListCommand({ cwd, branchId: args.branchId });
+        if (lines.length === 0) {
+          console.log(`No content on branch "${branch}" (run graft compile).`);
+          return 0;
+        }
+        console.log(`${lines.length} document(s) on branch "${branch}":\n`);
+        for (const line of lines) console.log(formatContentLine(line));
+        return 0;
+      }
+      case "compilations": {
+        const { compilationsListCommand, formatCompilation } = await import(
+          "./commands/compilations"
+        );
+        const rows = await compilationsListCommand({ cwd, branchId: args.branchId });
+        if (rows.length === 0) {
+          console.log("No compilations recorded yet (run graft compile).");
+          return 0;
+        }
+        for (const row of rows) console.log(formatCompilation(row));
         return 0;
       }
       case "harden": {

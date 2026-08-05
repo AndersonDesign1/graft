@@ -1,0 +1,214 @@
+/**
+ * Graft design tokens — the single source for color, type, space, motion.
+ *
+ * Thesis: editorial print, monochrome. A black stage, off-white type, and
+ * elevation carried entirely by *lightness* — surfaces step up from the stage
+ * rather than being drawn in with borders. There is no brand accent. Emphasis
+ * is "bright": the mark, the union, the active state and the primary button are
+ * simply the lightest thing on screen. The only chromatic color in the system
+ * is the error red, and it is function, not identity.
+ *
+ * Why no accent (this is measured, not vibes):
+ *   A colored accent on a black stage is a trap. Solving for the lightness a
+ *   hue needs to pass APCA 75 as text on black, red/blue/magenta collapse to
+ *   pastels (chroma 0.067-0.091); only green survives, and green reads as
+ *   "success", not as a brand. Meanwhile every CMS competitor is already
+ *   holding a hue (BaseHub orange #ff6c02, Contentful blue, Strapi indigo).
+ *   Monochrome is the one position nobody occupies, and it is the one that
+ *   makes the *content* — code, terminals, diffs — the only colored thing.
+ *
+ * Structure (the shadcn pattern):
+ *
+ *   1. PALETTE   raw values, authored in OKLCH (perceptually uniform: equal L
+ *                steps = equal brightness). One neutral ramp, one danger red.
+ *                The only place a literal color is allowed.
+ *   2. SEMANTIC  what a color *means* (--background, --primary, --danger).
+ *                Every value is light-dark(), so one set of names themes both
+ *                schemes. Components MUST consume this layer, never layer 1.
+ *   3. ALIASES   the house vocabulary (--paper/--ink/--mark) pointing at layer
+ *                2, so component CSS reads editorially.
+ *
+ * Contrast: every pairing is APCA-verified against its real background (Lc
+ * noted inline). Body text >= 75; small non-body marks >= 60.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* ====================================================== 1. palette === */
+
+  /* The neutral ramp. Hue 95 at chroma 0.003 — a whisper of warmth, so this
+     reads as ink-on-paper rather than a cold UI gray. Everything is one hue;
+     only L moves. Elevation IS lightness. */
+  --n-0: #000000; /* the stage */
+  --n-1: oklch(0.17 0.003 95); /* #100f0e — sunken: wells, terminals, code */
+  --n-2: oklch(0.22 0.003 95); /* #1b1b19 — raised: cards, embedded UI frames */
+  --n-3: oklch(0.27 0.003 95); /* #272625 — elevated: hover, popovers */
+  --n-4: oklch(0.32 0.003 95); /* #333331 — the brightest surface */
+
+  --n-6: oklch(0.62 0.003 95); /* #878684 — light-scheme faint */
+  --n-7: oklch(0.79 0.003 95); /* #bcbcb9 — dark-scheme faint  — Lc -65 on black */
+  --n-8: oklch(0.86 0.003 95); /* #d1d1cf — dark-scheme muted  — Lc -79 on black */
+  --n-9: oklch(0.96 0.003 95); /* #f2f2ef — dark-scheme text/bright — Lc -99 */
+
+  /* light scheme neutrals — warm ivory paper, warm near-black ink */
+  --paper-0: #f7f5f0; /* the page */
+  --paper-1: #ffffff; /* raised */
+  --paper-2: #eeebe3; /* sunken */
+  --ink-0: oklch(0.2 0.006 95); /* #1b1a16 — text, and the light-scheme "bright" */
+  --ink-0-hover: oklch(0.32 0.006 95); /* one step off the fill, not a gray jump */
+  --ink-1: oklch(0.44 0.006 95); /* #5c5a52 — muted */
+  --ink-2: oklch(0.56 0.005 95); /* #7a7871 — faint */
+
+  /* danger — hue 25. The ONLY hue in the system; errors only, never brand.
+     A red bright enough for APCA 75 on black would be pale pink, so error
+     text targets the non-body floor (Lc 60). */
+  --danger-300: oklch(0.77 0.123 25); /* on black  #f9948c — Lc -60 */
+  --danger-600: oklch(0.5 0.183 25); /* on ivory  #b42027 — Lc  75 */
+
+  /* syntax — GitHub palette (matches shiki github-light / github-dark).
+     Page chrome stays monochrome; code is the one place hue is welcome. */
+  --gh-string-light: #032f62;
+  --gh-string-dark: #9ecbff;
+  --gh-entity-light: #6f42c1;
+  --gh-entity-dark: #b392f0;
+  --gh-constant-light: #005cc5;
+  --gh-constant-dark: #79b8ff;
+  --gh-inserted-light: #22863a;
+  --gh-inserted-dark: #85e89d;
+  --gh-comment-light: #6a737d;
+  --gh-comment-dark: #8b949e;
+  --gh-keyword-light: #d73a49;
+  --gh-keyword-dark: #f97583;
+
+  /* ===================================================== 2. semantic === */
+
+  --background: light-dark(var(--paper-0), var(--n-0));
+  --muted: light-dark(var(--paper-2), var(--n-1)); /* wells, terminals */
+  --card: light-dark(var(--paper-1), var(--n-2)); /* cards, embedded UI */
+  --elevated: light-dark(var(--paper-1), var(--n-3)); /* hover, popovers */
+
+  --foreground: light-dark(var(--ink-0), var(--n-9));
+  --muted-foreground: light-dark(var(--ink-1), var(--n-8)); /* passes body 75 */
+  --faint-foreground: light-dark(var(--ink-2), var(--n-7)); /* passes non-body 60 */
+
+  --border: light-dark(rgb(27 26 22 / 0.14), rgb(242 242 239 / 0.11));
+  --border-strong: light-dark(rgb(27 26 22 / 0.34), rgb(242 242 239 / 0.26));
+
+  /* "Primary" is not a hue — it is BRIGHT. Marks, unions, the active state,
+     the filled button. In dark it is the lightest neutral; in light it is the
+     darkest. The fill and its label simply invert. */
+  --primary: light-dark(var(--ink-0), var(--n-9));
+  --primary-hover: light-dark(var(--ink-0-hover), #ffffff); /* fill hover: one step, same direction */
+  --primary-foreground: light-dark(var(--paper-0), var(--n-0));
+  /* Alpha variants derive from --primary, so they follow it.
+     light-dark() must wrap a whole <color> — it cannot sit inside rgb()'s
+     channel list — hence color-mix rather than an --rgb channel triple. */
+  --primary-tint: color-mix(in srgb, var(--primary) 8%, transparent); /* washes, hot rows */
+  --primary-wash: color-mix(in srgb, var(--primary) 40%, transparent); /* soft borders */
+  --primary-underline: color-mix(in srgb, var(--primary) 35%, transparent);
+
+  /* The graft took: success is simply bright. One system, no traffic lights. */
+  --success: var(--primary);
+  --danger: light-dark(var(--danger-600), var(--danger-300));
+
+  --code-string: light-dark(var(--gh-string-light), var(--gh-string-dark));
+  --code-type: light-dark(var(--gh-entity-light), var(--gh-entity-dark));
+  --code-key: light-dark(var(--gh-inserted-light), var(--gh-inserted-dark));
+  --code-ok: light-dark(var(--gh-inserted-light), var(--gh-inserted-dark));
+  --code-comment: light-dark(var(--gh-comment-light), var(--gh-comment-dark));
+  --code-prompt: light-dark(var(--gh-constant-light), var(--gh-constant-dark));
+  --code-keyword: light-dark(var(--gh-keyword-light), var(--gh-keyword-dark));
+
+  /* keep short aliases used by older hand-painted tokens */
+  --amber-400: var(--code-string);
+  --azure-400: var(--code-prompt);
+  --green-400: var(--code-ok);
+  --violet-400: var(--code-type);
+
+  --selection-background: var(--primary);
+  --selection-foreground: var(--primary-foreground);
+  --focus-ring: var(--primary);
+
+  /* ====================================================== 3. aliases === */
+  /* House vocabulary. Component CSS reads these; they resolve to layer 2. */
+
+  --paper: var(--background);
+  --paper-raised: var(--card);
+  --paper-sunken: var(--muted);
+  --ink: var(--foreground);
+  --ink-muted: var(--muted-foreground);
+  --ink-faint: var(--faint-foreground);
+  --hairline: var(--border);
+  --hairline-strong: var(--border-strong);
+  --mark: var(--primary); /* the editorial mark — bright, not colored */
+  --mark-strong: var(--primary-hover);
+  --mark-tint: var(--primary-tint);
+
+  /* ---- type ---- */
+  --font-display: "Instrument Serif", "Iowan Old Style", georgia, serif;
+  --font-sans: "Instrument Sans Variable", "Instrument Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+
+  /* Scale tuned by hand, not a formula. Display sizes are for Instrument
+     Serif at weight 400 with tight tracking — big and light. */
+  --text-xs: 0.75rem; /* 12 — mono labels, uppercase, tracked wide */
+  --text-sm: 0.875rem; /* 14 — UI chrome, sidebar */
+  --text-base: 1rem; /* 16 — body */
+  --text-md: 1.125rem; /* 18 — docs body / lede */
+  --text-lg: 1.5rem; /* 24 — section intros */
+  --text-xl: 2.25rem; /* 36 — doc h1 */
+  --text-2xl: 3.5rem; /* 56 — page display */
+  --text-3xl: clamp(3.5rem, 9vw, 6.5rem); /* hero display */
+
+  --leading-tight: 1.08;
+  --leading-snug: 1.3;
+  --leading-body: 1.65;
+  --tracking-display: -0.03em; /* serif display, sizes ≥ --text-2xl */
+  --tracking-label: 0.08em; /* uppercase mono labels */
+
+  /* ---- space (4px base) ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+
+  /* ---- geometry: squared, concentric (outer = inner + padding) ---- */
+  --radius-inner: 3px; /* buttons, inputs, code spans */
+  --radius: 6px; /* cards, code blocks */
+  --radius-outer: 10px; /* bento cells, embedded UI frames */
+
+  /* ---- elevation: lightness first, shadow second. On a black stage a
+     shadow is invisible; the surface itself must get brighter. ---- */
+  --shadow-raised:
+    0 0 0 1px var(--border),
+    0 1px 2px light-dark(rgb(27 26 22 / 0.05), rgb(0 0 0 / 0.6)),
+    0 4px 12px light-dark(rgb(27 26 22 / 0.06), rgb(0 0 0 / 0.5));
+  --shadow-floating:
+    0 0 0 1px var(--border),
+    0 2px 6px light-dark(rgb(27 26 22 / 0.07), rgb(0 0 0 / 0.65)),
+    0 12px 32px light-dark(rgb(27 26 22 / 0.1), rgb(0 0 0 / 0.7));
+  /* Image outlines: pure black/white — tinted neutrals read as dirt. */
+  --outline-image: light-dark(rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.1));
+
+  /* ---- motion (custom curves; the CSS built-ins are too weak) ---- */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --duration-press: 140ms;
+  --duration-fast: 180ms;
+  --duration-base: 240ms;
+  --press-scale: 0.97;
+}
+
+/* A theme toggle stamps data-theme on <html>; it must beat the OS setting. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}

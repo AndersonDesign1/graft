@@ -37,19 +37,29 @@ order: 1
 | --- | --- |
 | `graft add [item]` | Copy an owned primitive into `graft/` (no name: list) |
 | `graft mcp` | Serve project MCP over stdio |
-| `graft serve [--port 3903]` | Headless runtime: `/api/fn/<name>`, `/api/mcp`, `/healthz` |
+| `graft serve [--port 3903] [--studio]` | Headless runtime: `/api/fn/<name>`, `/api/mcp`, `/healthz`; `--studio` mounts opt-in Studio at `/studio` |
+| `graft studio` | Opt-in Studio UI — edit content, approve/deny, browse branches (default port 4983) |
+| `graft content` | List the content tree from the compiled index (Studio/OpenAPI parity) |
+| `graft compilations` | List recent projection trail rows (Studio/OpenAPI parity) |
+
+Studio is optional. The UI is a client of `/api/studio/v1/*` (see
+`openapi.json`). Same ops on MCP/CLI: content tree + `write_content` / Studio
+Save, `list_compilations`, `list_branches`, `list_approvals` +
+`decide_approval` (or `graft approve` / `deny`).
 
 ## Flags
 
 | Flag | Applies to | Meaning |
 | --- | --- | --- |
-| `--branch <id>` | compile, dev, migrate, mcp, serve | Operate on a content branch |
+| `--branch <id>` | compile, dev, migrate, mcp, serve, studio, content, compilations | Operate on a content branch |
 | `--apply` | migrate, merge | Execute (default is dry-run) |
 | `--prune-unknown` | compile | Remove index rows for collections this schema does not know |
 | `--dry-run` / `--overwrite` | add | Preview / replace differing files |
-| `--port` / `--host` | serve | Bind address (default loopback) |
+| `--port` / `--host` | serve, studio | Bind address (default loopback) |
+| `--studio` | serve | Mount opt-in Studio (or set `GRAFT_STUDIO=1`) |
 
 ## Env discovery
 
 Commands walk up from cwd for `.env`. `DATABASE_URL` is required for compile,
-dev, migrate, branch, merge, mcp (when projecting), and serve.
+dev, migrate, branch, merge, mcp (when projecting), serve, studio, content, and
+compilations.

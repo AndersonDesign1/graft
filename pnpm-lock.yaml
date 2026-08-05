@@ -265,6 +265,9 @@ importers:
       '@graft/registry':
         specifier: workspace:*
         version: link:../registry
+      '@graft/studio':
+        specifier: workspace:*
+        version: link:../studio
       jiti:
         specifier: ^2.4.0
         version: 2.7.0
@@ -433,7 +436,39 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/studio: {}
+  packages/studio:
+    dependencies:
+      '@graft/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@graft/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@graft/core':
+        specifier: workspace:*
+        version: link:../core
+      '@graft/db':
+        specifier: workspace:*
+        version: link:../db
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.17)
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+      react:
+        specifier: ^19.0.0
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.7(react@19.2.7)
 
 packages:
 

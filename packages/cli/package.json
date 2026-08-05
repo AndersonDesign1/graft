@@ -26,6 +26,7 @@
     "@graft/db": "workspace:*",
     "@graft/mcp": "workspace:*",
     "@graft/registry": "workspace:*",
+    "@graft/studio": "workspace:*",
     "jiti": "^2.4.0"
   }
 }

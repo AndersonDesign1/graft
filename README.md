@@ -146,7 +146,7 @@ deployment can give its app/agent a runtime role with **no UPDATE on `approvals`
 | `@graft/contracts`          | Shared types, error codes, introspection schemas                   |
 | `@graft/mcp`                | Project MCP (content + functions + introspection)                  |
 | `@graft/cli`                | Human + agent CLI (`graft`, including `graft mcp` + `graft serve`) |
-| `@graft/studio`             | Optional human Studio UI                                           |
+| `@graft/studio`             | Opt-in Studio UI (`graft studio` / `serve --studio`; OpenAPI-first) |
 | `@graft/registry`           | shadcn-style owned-primitive registry                              |
 | `@graft/sdk-core`           | Framework-agnostic client + cache contract                         |
 | `@graft/sdk-next`           | Next.js adapter + `MdxBody`                                        |

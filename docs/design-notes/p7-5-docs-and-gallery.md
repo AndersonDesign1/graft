@@ -30,13 +30,12 @@ Pairs with `packaging.md` (which parks "docs site" as the remaining item).
    direction v2" below. Palette: **black / ivory / vermilion** (the botanical
    green is dead; operator: "black and something"). Docs UI: **Fumadocs**
    (officially supports Astro + React) powered by Graft as the source.
-5. **Build order: docs shell → studio elements → landing.** The docs force the
-   design system into existence against real content; `@graft/studio` starts as
-   an **embeddable React component library** (approval queue, branch diff,
-   content tree, compilation trail — wired to real reads), *not* a full app;
-   the landing then assembles the matured system and embeds those live
-   components in its bento cells. Nothing faked, nothing throwaway — the future
-   studio app composes the same components.
+5. **Build order: docs shell → studio → landing.** Docs force the design system
+   against real content. `@graft/studio` is an **opt-in Studio** (Drizzle-style
+   `graft studio` locally; hostable via `graft serve --studio`) whose UI is only
+   a client of an **OpenAPI read surface** — every operation also on MCP + CLI
+   (headless dashboard parity). React panels are exported for landing embeds;
+   the full edit/decide Studio story stays later.
 
 ---
 
@@ -157,9 +156,10 @@ the CMS. Hand-rolled `Docs.astro` / `Base.astro` retired.
 apps that prove the SDK matrix (Next / Astro / SvelteKit) against a real Graft
 runtime.
 
-**Is not:** an admin UI. `@graft/studio` stays a placeholder (we win by *not*
-cloning dashboards). No competitor benchmarking. Nothing here becomes a required
-runtime dependency — the site is a leaf app, not a package others import.
+**Is not:** a mandatory admin UI. Studio is **opt-in** (OpenAPI-first; MCP/CLI
+parity) — we win by *not* locking operators into a dashboard. No competitor
+benchmarking. Nothing here becomes a required runtime dependency — the site is
+a leaf app, not a package others import.
 
 **Three deliverables, one unit:**
 
@@ -299,12 +299,12 @@ READMEs — the risk is drift, so prefer links/transclusion over copy-paste.
 1. ~~**Scaffold + design foundation**~~ ✅ P7.5.1
 2. ~~**Docs shell + pages**~~ ✅ P7.5.2 (`b8d87f3`)
 3. ~~**Fumadocs migration**~~ ✅ P7.5.2b (`085df9d`) — shell retired; Graft stays source
-4. **Studio elements** — `@graft/studio` becomes an embeddable React component
-   library: ApprovalQueue, BranchDiff, ContentTree, CompilationTrail — wired to
-   real sdk reads. Scope-guard: components only, no studio app shell/routing.
+4. ~~**Opt-in Studio (OpenAPI-first)**~~ ✅ P7.5.3 — `graft studio` +
+   `graft serve --studio`; OpenAPI at `/api/studio/v1/openapi.json`; MCP/CLI
+   parity; read-only panels (ContentTree, Compilations, Branches, Approvals list)
+5. **Landing + "Why Graft"** — the bento embeds live studio panels (from
+   `@graft/studio/panels`); animated SVGs; benefits-only story with receipts.
    **← next**
-5. **Landing + "Why Graft"** — the bento assembles live studio components as
-   islands; animated SVGs; benefits-only story with receipts wired.
 6. **`examples/gallery-sveltekit`** minimal app (closes SvelteKit example gap).
 7. **Gallery index** linking all three; boot-check each example.
 8. Polish pass with Emil's review skills; update `packaging.md` status +

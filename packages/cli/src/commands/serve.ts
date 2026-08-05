@@ -12,6 +12,7 @@
  *   POST /api/fn/<name>  — typed function RPC (access/audit/limits/approvals)
  *   POST /api/mcp        — MCP Streamable HTTP (content + function + registry tools)
  *   GET  /healthz        — liveness + a real DB round-trip
+ *   GET  /studio (+ /api/studio/v1/*) — opt-in when --studio / GRAFT_STUDIO=1
  *
  * Identity: the same env contract as `graft mcp` (GRAFT_DEV_TOKEN /
  * GRAFT_DEV_SCOPES) plus GRAFT_TRUSTED_ISSUERS — comma/space-separated OIDC
@@ -32,6 +33,8 @@ export interface ServeRoutes {
   fn: FetchHandler;
   mcp: FetchHandler;
   health: FetchHandler;
+  /** Opt-in Studio UI + OpenAPI read API (`--studio` / GRAFT_STUDIO=1). */
+  studio?: FetchHandler;
 }
 
 /** Route table for the headless runtime; anything unmounted is a 404 that teaches the map. */
@@ -41,10 +44,21 @@ export function createServeRouter(routes: ServeRoutes): FetchHandler {
     if (pathname === "/healthz") return routes.health(request);
     if (pathname === "/api/mcp") return routes.mcp(request);
     if (pathname === "/api/fn" || pathname.startsWith("/api/fn/")) return routes.fn(request);
+    if (
+      routes.studio &&
+      (pathname === "/studio" ||
+        pathname.startsWith("/studio/") ||
+        pathname.startsWith("/api/studio/"))
+    ) {
+      return routes.studio(request);
+    }
+    const studioHint = routes.studio
+      ? ", GET /studio (opt-in Studio)"
+      : " — or pass --studio / GRAFT_STUDIO=1 for the opt-in Studio UI";
     const error = new GraftError({
       code: "ROUTE_NOT_FOUND",
       message: `Nothing is mounted at ${pathname}.`,
-      fix: "Use POST /api/fn/<name> (typed functions), POST /api/mcp (MCP Streamable HTTP), or GET /healthz.",
+      fix: `Use POST /api/fn/<name> (typed functions), POST /api/mcp (MCP Streamable HTTP), or GET /healthz${studioHint}.`,
       details: { pathname },
     });
     return new Response(JSON.stringify(error.toJSON()), {
@@ -137,6 +151,8 @@ export interface ServeCommandOptions {
   branchId?: string;
   port?: number;
   host?: string;
+  /** Mount opt-in Studio at /studio + /api/studio/v1/* */
+  studio?: boolean;
 }
 
 export interface RunningGraftServer {
@@ -152,11 +168,19 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   const config = await loadConfig(findConfig(options.cwd));
   const url = requireDatabaseUrl();
 
+  const enableStudio = options.studio === true || process.env.GRAFT_STUDIO === "1";
+
   const [
     { createFunctionsHandler },
     { createGraftMcpHandler },
     { createDb, resolveBranchHandle, scopeWriteBranch, sql },
-  ] = await Promise.all([import("@graft/core"), import("@graft/mcp"), import("@graft/db")]);
+    studioMod,
+  ] = await Promise.all([
+    import("@graft/core"),
+    import("@graft/mcp"),
+    import("@graft/db"),
+    enableStudio ? import("@graft/studio") : Promise.resolve(null),
+  ]);
 
   const control = createDb(url);
   const branchName = options.branchId ?? "main";
@@ -247,8 +271,32 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     );
   }
 
+  let studioHandler: FetchHandler | undefined;
+  if (studioMod) {
+    const authorize =
+      !loopback && (devToken || issuers.length > 0)
+        ? async (request: Request) => {
+            const actor = await resolveActor(request);
+            return actor.kind !== "anonymous";
+          }
+        : !loopback
+          ? () => false
+          : undefined;
+    studioHandler = studioMod.createStudioHandler({
+      db: branch.db,
+      collections: config.collections,
+      contentDir: config.contentDir,
+      defaultBranch: writeBranch,
+      decidedBy: "studio-serve",
+      uiBasePath: "/studio",
+      authorize,
+    });
+  }
+
   const server = createServer(
-    createNodeListener(createServeRouter({ fn: fnHandler, mcp: mcpHandler, health })),
+    createNodeListener(
+      createServeRouter({ fn: fnHandler, mcp: mcpHandler, health, studio: studioHandler }),
+    ),
   );
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -275,12 +323,19 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
 export async function serveCommand(options: ServeCommandOptions): Promise<void> {
   const running = await startServe(options);
   const base = `http://${running.host}:${running.port}`;
+  const studioOn = options.studio === true || process.env.GRAFT_STUDIO === "1";
   console.log(
     [
       `graft serve — branch "${running.branch}"`,
       `  functions  POST ${base}/api/fn/<name>`,
       `  mcp        POST ${base}/api/mcp`,
       `  health     GET  ${base}/healthz`,
+      ...(studioOn
+        ? [
+            `  studio     GET  ${base}/studio`,
+            `  openapi    GET  ${base}/api/studio/v1/openapi.json`,
+          ]
+        : []),
     ].join("\n"),
   );
   await new Promise<void>((resolve) => {

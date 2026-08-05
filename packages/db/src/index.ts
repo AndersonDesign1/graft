@@ -7,6 +7,7 @@ export * from "./approvals";
 export * from "./audit";
 export * from "./branch";
 export * from "./client";
+export * from "./compilations";
 export * from "./content";
 export * from "./diff";
 export * from "./harden";
