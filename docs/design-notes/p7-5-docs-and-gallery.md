@@ -141,14 +141,13 @@ Instrument Serif (display) / Instrument Sans (text) / IBM Plex Mono (labels,
 code). Shiki: restrained near-monochrome themes (min-light/min-dark) until a
 custom ink+vermilion theme in the polish pass.
 
-### Docs = Fumadocs powered by Graft
+### Docs = Fumadocs powered by Graft ✅ `085df9d` (P7.5.2b)
 
-Fumadocs officially supports **Astro (with React)**. `/docs/*` moves onto
+Fumadocs officially supports **Astro (with React)**. `/docs/*` is on
 fumadocs-ui (DocsLayout, sidebar, search, TOC) with **Graft as the content
 source** — the page tree built from `listContent("docs")`, bodies through the
-existing MDX pipeline. Fumadocs is the UI; Graft stays the CMS. Our hand-rolled
-Docs.astro shell retires (it was P7.5.2 scaffolding; Fumadocs is the ceiling
-raise).
+existing MDX pipeline, search via Postgres FTS. Fumadocs is the UI; Graft stays
+the CMS. Hand-rolled `Docs.astro` / `Base.astro` retired.
 
 ---
 
@@ -297,21 +296,18 @@ READMEs — the risk is drift, so prefer links/transclusion over copy-paste.
 
 ## Execution order (locked — decision 5)
 
-1. **Scaffold + design foundation** — `examples/docs-site` Astro + React +
-   Vercel adapter + `graftRoute` mount + tiny graft project (closes the Astro
-   example gap). Design tokens, type scale, color, motion vocabulary defined
-   here, once.
-2. **Docs shell + pages** — nav, code blocks, tables, callouts, MDX map; docs
-   content assembled from existing sources. This matures the design system
-   against real content before any marketing pixel is drawn.
-3. **Studio elements** — `@graft/studio` becomes an embeddable React component
+1. ~~**Scaffold + design foundation**~~ ✅ P7.5.1
+2. ~~**Docs shell + pages**~~ ✅ P7.5.2 (`b8d87f3`)
+3. ~~**Fumadocs migration**~~ ✅ P7.5.2b (`085df9d`) — shell retired; Graft stays source
+4. **Studio elements** — `@graft/studio` becomes an embeddable React component
    library: ApprovalQueue, BranchDiff, ContentTree, CompilationTrail — wired to
    real sdk reads. Scope-guard: components only, no studio app shell/routing.
-4. **Landing + "Why Graft"** — the bento assembles live studio components as
+   **← next**
+5. **Landing + "Why Graft"** — the bento assembles live studio components as
    islands; animated SVGs; benefits-only story with receipts wired.
-5. **`examples/gallery-sveltekit`** minimal app (closes SvelteKit example gap).
-6. **Gallery index** linking all three; boot-check each example.
-7. Polish pass with Emil's review skills; update `packaging.md` status +
+6. **`examples/gallery-sveltekit`** minimal app (closes SvelteKit example gap).
+7. **Gallery index** linking all three; boot-check each example.
+8. Polish pass with Emil's review skills; update `packaging.md` status +
    `phases.md` (tick P7.5, **close Phase 7**).
 
 ---
