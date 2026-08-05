@@ -10,8 +10,9 @@
  *
  * Types when it is genuinely on screen (threshold, not rootMargin — a margin
  * fires on short viewports while only a sliver is visible and the type-out is
- * wasted below the fold). Replayable; reduced-motion shows the finished
- * transcript immediately.
+ * wasted below the fold). Loops forever after a short hold on the finished
+ * transcript; the replay button jumps the cycle. Reduced-motion shows the
+ * finished transcript immediately and stays put.
  *
  * The wow loop is split across two surfaces in v5: the hero types `init`, the
  * stage types `compile`. Pass `label` so the chrome names the half you are on.
@@ -73,7 +74,14 @@ export function Terminal({
       setRow(lines.length);
       return;
     }
-    if (row >= lines.length) return;
+
+    // Finished — hold the full transcript, then loop.
+    if (row >= lines.length) {
+      timer.current = setTimeout(replay, 2200);
+      return () => {
+        if (timer.current) clearTimeout(timer.current);
+      };
+    }
 
     const line = lines[row]!;
     const full = lengthOf(line);
@@ -93,7 +101,7 @@ export function Terminal({
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [armed, row, chars, reduced, run, lines]);
+  }, [armed, row, chars, reduced, run, lines, replay]);
 
   const done = row >= lines.length;
   const current = done ? null : lines[row]!;
