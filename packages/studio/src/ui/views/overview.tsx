@@ -4,9 +4,16 @@ import type {
   CompilationList,
   ContentTree,
 } from "../../types";
-import { DeltaChart, Delta, EmptyState, IdentityMark, StatTile, Status } from "../components/primitives";
+import {
+  Delta,
+  DeltaChart,
+  EmptyState,
+  IdentityMark,
+  StatTile,
+  Status,
+} from "../components/primitives";
 import { IconCompile } from "../components/icons";
-import { Button } from "../components/primitives";
+import { Button } from "../components/ui/button";
 import { qs } from "../lib/api";
 import { relativeTime, shortSha, plural } from "../lib/format";
 import type { Route } from "../lib/route";

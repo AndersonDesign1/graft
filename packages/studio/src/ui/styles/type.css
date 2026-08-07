@@ -1,0 +1,50 @@
+/**
+ * Studio type. Overrides the docs-site faces from tokens.css.
+ *
+ * The docs system is editorial — Instrument Serif at 400 with tight tracking,
+ * sized for prose measures. A dashboard is the opposite problem: dense rows,
+ * small labels, numbers that must line up, and headings that are wayfinding
+ * rather than voice. Geist is drawn for that (compact vertical metrics,
+ * disambiguated 1/l/I/0, real tabular figures) and is the face behind the
+ * Vercel dashboards this design follows.
+ *
+ * There is no serif here. `--font-display` is kept as a name so component
+ * rules don't all have to change, but it now resolves to the sans at a
+ * heavier weight — hierarchy comes from weight and size, not from a second
+ * typeface.
+ */
+
+:root {
+  --font-sans:
+    "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:
+    "Geist Mono Variable", ui-monospace, "Cascadia Mono", "SF Mono", monospace;
+  --font-display: var(--font-sans);
+
+  /* Dashboard scale — compressed against the docs scale. The docs jump
+     16 -> 24 -> 36 -> 56 for reading; a dashboard never needs past ~24, and
+     the small end does the real work. */
+  --text-2xs: 0.6875rem; /* 11 — dense meta, counts, timestamps */
+  --text-xs: 0.75rem; /* 12 — labels, chips, secondary rows */
+  --text-sm: 0.8125rem; /* 13 — the workhorse: rows, inputs, buttons */
+  --text-base: 0.875rem; /* 14 — body, card titles */
+  --text-md: 1rem; /* 16 — section headings */
+  --text-lg: 1.25rem; /* 20 — view titles */
+  --text-xl: 1.5rem; /* 24 — the largest thing on screen (stat values) */
+
+  /* Display weight/tracking, applied wherever --font-display is used. */
+  --display-weight: 560;
+  --display-tracking: -0.014em;
+
+  /* Geist's uppercase mono labels don't need the docs' wide 0.08em. */
+  --tracking-label: 0.05em;
+  --leading-snug: 1.35;
+}
+
+/* Variable-font weights: Geist Variable exposes the full axis, so UI weight
+   steps are real instances rather than synthesised bolds. */
+:root {
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 560;
+}

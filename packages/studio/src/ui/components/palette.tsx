@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BranchList, ContentTree } from "../../types";
 import { IconSearch } from "./icons";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import type { Route, ViewId } from "../lib/route";
 
 interface Command {
@@ -22,13 +23,15 @@ const NAV_LABELS: Array<[ViewId, string]> = [
 ];
 
 /**
- * ⌘K palette. Deliberately unanimated: it is opened by keyboard, dozens of
- * times a session, and an entrance animation on a keyboard action reads as
- * lag no matter how short it is.
+ * ⌘K palette on Base UI's Dialog — focus is trapped and returned, the page
+ * behind goes inert, Escape closes.
+ *
+ * Deliberately unanimated: it is opened by keyboard many times a session, and
+ * an entrance transition on a keyboard action reads as lag however short it is.
  */
 export function CommandPalette({
   open,
-  onClose,
+  onOpenChange,
   tree,
   branches,
   navigate,
@@ -36,7 +39,7 @@ export function CommandPalette({
   onCompile,
 }: {
   open: boolean;
-  onClose: () => void;
+  onOpenChange: (open: boolean) => void;
   tree: ContentTree | null;
   branches: BranchList | null;
   navigate: (route: Route) => void;
@@ -45,18 +48,12 @@ export function CommandPalette({
 }) {
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
   const commands = useMemo<Command[]>(() => {
     const out: Command[] = [];
     for (const [view, label] of NAV_LABELS) {
-      out.push({
-        id: `go:${view}`,
-        label,
-        group: "Go to",
-        run: () => navigate({ view }),
-      });
+      out.push({ id: `go:${view}`, label, group: "Go to", run: () => navigate({ view }) });
     }
     out.push({
       id: "action:compile",
@@ -101,49 +98,40 @@ export function CommandPalette({
     if (open) {
       setQuery("");
       setIndex(0);
-      inputRef.current?.focus();
     }
   }, [open]);
 
   useEffect(() => setIndex(0), [query]);
 
-  // Keep the active row in view when arrowing past the fold.
   useEffect(() => {
-    listRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({
-      block: "nearest",
-    });
+    listRef.current
+      ?.querySelector<HTMLElement>('[data-active="true"]')
+      ?.scrollIntoView({ block: "nearest" });
   }, [index]);
-
-  if (!open) return null;
 
   const run = (command: Command | undefined): void => {
     if (!command) return;
     command.run();
-    onClose();
+    onOpenChange(false);
   };
 
   let lastGroup = "";
 
   return (
-    <div
-      className="palette-backdrop"
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="palette">
+        <DialogTitle className="sr-only">Command palette</DialogTitle>
         <div className="palette-input">
           <IconSearch size={16} />
           <input
-            ref={inputRef}
+            // eslint-disable-next-line jsx-a11y/no-autofocus
+            autoFocus
             value={query}
             placeholder="Jump to a document, switch branch, run a command…"
             aria-label="Command palette"
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Escape") onClose();
-              else if (e.key === "ArrowDown") {
+              if (e.key === "ArrowDown") {
                 e.preventDefault();
                 setIndex((i) => Math.min(i + 1, results.length - 1));
               } else if (e.key === "ArrowUp") {
@@ -175,16 +163,14 @@ export function CommandPalette({
                     onClick={() => run(command)}
                   >
                     <span className="palette-item-label">{command.label}</span>
-                    {command.hint ? (
-                      <span className="palette-item-hint">{command.hint}</span>
-                    ) : null}
+                    {command.hint ? <span className="palette-item-hint">{command.hint}</span> : null}
                   </button>
                 </li>
               );
             })
           )}
         </ul>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

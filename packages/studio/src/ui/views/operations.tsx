@@ -3,15 +3,19 @@ import { useState } from "react";
 import type {
   ApprovalList,
   BranchList,
+  CompilationDto,
   CompilationList,
   PendingApprovalDto,
 } from "../../types";
-import { Button, Delta, EmptyState, Pill, Status } from "../components/primitives";
+import { IconCheck, IconCopy, IconHistory } from "../components/icons";
+import { Delta, EmptyState, Pill, Status } from "../components/primitives";
+import { Button } from "../components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { api, qs } from "../lib/api";
 import { absoluteTime, relativeTime, shortSha, plural } from "../lib/format";
 import { useResource } from "../lib/use-resource";
 
-export function ApprovalsView() {
+export function ApprovalsView({ onDecided }: { onDecided?: () => void }) {
   const { data, error, loading, refresh } = useResource<ApprovalList>("/approvals");
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -28,6 +32,7 @@ export function ApprovalsView() {
       });
       setMsg(`${row.functionName} ${decision}`);
       refresh();
+      onDecided?.();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -52,6 +57,7 @@ export function ApprovalsView() {
       <Status loading={loading && !data} error={error ?? actionError} empty={rows.length === 0}>
         <EmptyState
           title="Queue is clear"
+          icon={<IconCheck size={20} />}
           body="No agent is waiting on a decision. Destructive typed functions land here when they need a human."
         />
       </Status>
@@ -64,8 +70,6 @@ export function ApprovalsView() {
       <ul className="stack">
         {rows.map((row) => (
           <li key={row.id}>
-            {/* Not styled as an alert: a pending approval is normal operation,
-                not an error. */}
             <article className="card">
               <div className="card-head">
                 <div>
@@ -93,7 +97,7 @@ export function ApprovalsView() {
                   Approve
                 </Button>
                 <Button
-                  variant="danger"
+                  variant="destructive"
                   disabled={busy === row.id}
                   onClick={() => void decide(row, "denied")}
                 >
@@ -162,7 +166,11 @@ export function BranchesView({
                 </span>
               </span>
               <Pill tone="ready">{row.status}</Pill>
-              <time className="row-meta" dateTime={row.createdAt} title={absoluteTime(row.createdAt)}>
+              <time
+                className="row-meta"
+                dateTime={row.createdAt}
+                title={absoluteTime(row.createdAt)}
+              >
                 {relativeTime(row.createdAt)}
               </time>
             </button>
@@ -173,10 +181,99 @@ export function BranchesView({
   );
 }
 
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="copy"
+      aria-label={`Copy ${label}`}
+      onClick={() => {
+        void navigator.clipboard?.writeText(value);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1600);
+      }}
+    >
+      {copied ? <IconCheck size={12} /> : <IconCopy size={12} />}
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
+
+/**
+ * Detail for one compilation. The projection stores counts rather than the
+ * changed slugs, so this shows everything the trail actually records — and
+ * says so, instead of implying a per-document diff exists.
+ */
+function CompilationDetail({ row, onClose }: { row: CompilationDto; onClose: () => void }) {
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="dialog-detail">
+        <DialogTitle>Compilation</DialogTitle>
+        <dl className="facts">
+          <div>
+            <dt>When</dt>
+            <dd>
+              <time dateTime={row.createdAt}>{absoluteTime(row.createdAt)}</time>{" "}
+              <span className="muted">({relativeTime(row.createdAt)})</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Branch</dt>
+            <dd>
+              <code>{row.branchId}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Commit</dt>
+            <dd>
+              {row.gitSha ? (
+                <span className="fact-copy">
+                  <code>{row.gitSha}</code>
+                  <CopyButton value={row.gitSha} label="commit sha" />
+                </span>
+              ) : (
+                <span className="muted">Not a git repository at compile time</span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Change</dt>
+            <dd>
+              <Delta added={row.added} changed={row.changed} removed={row.removed} />
+            </dd>
+          </div>
+          <div>
+            <dt>Indexed</dt>
+            <dd data-numeric="">{plural(row.docCount, "document")} after this run</dd>
+          </div>
+          <div>
+            <dt>Run id</dt>
+            <dd>
+              <span className="fact-copy">
+                <code>{row.id}</code>
+                <CopyButton value={row.id} label="run id" />
+              </span>
+            </dd>
+          </div>
+        </dl>
+        <p className="dialog-note">
+          The trail records counts, not which documents changed — the projection is a hash diff, so
+          per-document history lives in git.
+        </p>
+        <div className="card-actions">
+          <Button onClick={onClose}>Close</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function HistoryView({ branch }: { branch: string }) {
   const { data, error, loading } = useResource<CompilationList>(
     `/compilations${qs({ branch, limit: 100 })}`,
   );
+  const [selected, setSelected] = useState<CompilationDto | null>(null);
   const rows = data?.compilations ?? [];
 
   return (
@@ -185,7 +282,8 @@ export function HistoryView({ branch }: { branch: string }) {
         <div>
           <h1 className="view-title">History</h1>
           <p className="view-sub">
-            Every projection of <code>{branch}</code> into the index — newest first.
+            Every projection of <code>{branch}</code> into the index — newest first. Select a run
+            for detail.
           </p>
         </div>
       </header>
@@ -193,6 +291,7 @@ export function HistoryView({ branch }: { branch: string }) {
       <Status loading={loading && !data} error={error} empty={rows.length === 0}>
         <EmptyState
           title="Nothing compiled yet"
+          icon={<IconHistory size={20} />}
           body={
             <>
               This branch has never been projected. Compile from Overview, or run{" "}
@@ -203,7 +302,7 @@ export function HistoryView({ branch }: { branch: string }) {
       </Status>
 
       {rows.length > 0 ? (
-        <table className="table">
+        <table className="table table-rows">
           <thead>
             <tr>
               <th>Commit</th>
@@ -214,8 +313,26 @@ export function HistoryView({ branch }: { branch: string }) {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id}>
-                <td>{row.gitSha ? <code>{shortSha(row.gitSha)}</code> : <span className="muted">no git sha</span>}</td>
+              <tr
+                key={row.id}
+                tabIndex={0}
+                role="button"
+                aria-label={`Compilation ${shortSha(row.gitSha) || row.id}`}
+                onClick={() => setSelected(row)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelected(row);
+                  }
+                }}
+              >
+                <td>
+                  {row.gitSha ? (
+                    <code>{shortSha(row.gitSha)}</code>
+                  ) : (
+                    <span className="muted">no git sha</span>
+                  )}
+                </td>
                 <td>
                   <Delta added={row.added} changed={row.changed} removed={row.removed} />
                 </td>
@@ -231,6 +348,10 @@ export function HistoryView({ branch }: { branch: string }) {
             ))}
           </tbody>
         </table>
+      ) : null}
+
+      {selected ? (
+        <CompilationDetail row={selected} onClose={() => setSelected(null)} />
       ) : null}
     </div>
   );

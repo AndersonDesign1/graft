@@ -16,7 +16,12 @@ const read = (name: string): string => readFileSync(join(here, name), "utf8");
 /** Drop comments so prose about colours doesn't trip the literal checks. */
 const stripComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, "");
 
-const LITERAL = /(oklch|rgba?|hsla?|lab|lch|color-mix)\(|#[0-9a-fA-F]{3,8}\b/;
+/**
+ * An actual colour value. `color-mix()` is deliberately absent: mixing is
+ * still indirection as long as the things being mixed are tokens, which the
+ * per-declaration assertion below checks.
+ */
+const LITERAL = /(oklch|rgba?|hsla?|lab|lch)\(|#[0-9a-fA-F]{3,8}\b/;
 /** Layer-1 scale names, plus the syntax tokens studio.css used to improvise with. */
 const RAW_SCALE = /var\(--(?:c|gh|code)-/;
 
@@ -48,9 +53,15 @@ describe("token layering", () => {
     const declarations = stripComments(read("roles.css")).matchAll(
       /^\s*(--[\w-]+):\s*([^;]+);/gm,
     );
-    for (const [, name, value] of declarations) {
+    for (const [, name, raw] of declarations) {
       if (name === "--identity-count") continue; // a number, not a colour
-      expect(value?.trim(), `${name} must point at a token, not a literal`).toMatch(/^var\(--/);
+      const value = raw?.trim() ?? "";
+      // A bare token, or a color-mix over tokens — mixing is still
+      // indirection as long as every colour in it came from layer 1.
+      const isToken = value.startsWith("var(--");
+      const isMixOfTokens =
+        value.startsWith("color-mix(") && !/#[0-9a-fA-F]{3,8}\b|oklch\(|rgba?\(|hsla?\(/.test(value);
+      expect(isToken || isMixOfTokens, `${name} must point at a token, not a literal`).toBe(true);
     }
   });
 

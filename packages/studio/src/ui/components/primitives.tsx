@@ -1,13 +1,18 @@
 /**
- * Shared primitives.
+ * Domain primitives — the Studio's own vocabulary.
  *
- * State is carried as a `data-state` attribute rather than a conditional
- * class string. One CSS rule per state, so adding a fifth document state is
- * a token block plus a rule — no component edit, no className ternaries.
+ * Generic controls (button, menu, dialog, tabs, fields) live in ./ui and are
+ * Base UI wrappers following shadcn's structure. What is here is specific to
+ * Graft: document state, collection identity, compilation deltas.
+ *
+ * State travels as a `data-state`/`data-tone` attribute rather than a
+ * conditional class string — one CSS rule per state, so adding a state is a
+ * token block plus a rule, with no component edit.
  */
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { DocumentState } from "../../types";
 import { identityIndex } from "../lib/format";
+import { cn } from "../lib/cn";
 import { IconCheck, IconWarning } from "./icons";
 
 /* ---- state vocabulary ---------------------------------------------------- */
@@ -39,34 +44,48 @@ export function StatePill({ state }: { state: DocumentState }) {
   );
 }
 
-/** Generic pill for non-document state (pending, ready, db, …). */
 export function Pill({
   tone,
   children,
   title,
+  className,
 }: {
   tone: "pending" | "ready" | "denied" | "db" | "neutral";
   children: ReactNode;
   title?: string;
+  className?: string;
 }) {
   return (
-    <span className="pill" data-tone={tone} title={title}>
+    <span data-slot="pill" className={cn("pill", className)} data-tone={tone} title={title}>
       {children}
     </span>
   );
 }
 
+/** Schema field type — an identity axis, so colour by type, not by severity. */
+export function TypeBadge({ type }: { type: string }) {
+  return (
+    <code className="type" data-type={type}>
+      {type}
+    </code>
+  );
+}
+
 /* ---- collection identity ------------------------------------------------- */
 
-/**
- * Collections get a stable mark colour, like Sanity's document-type icons.
- * The component only ever reads `var(--identity)`; the cycle it points into
- * is defined in roles.css.
- */
-export function IdentityMark({ name, count }: { name: string; count?: number }) {
+export function IdentityMark({
+  name,
+  count,
+  size = "md",
+}: {
+  name: string;
+  count?: number;
+  size?: "sm" | "md";
+}) {
   return (
     <span
       className="identity"
+      data-size={size}
       style={{ "--identity": `var(--identity-${identityIndex(name)})` } as React.CSSProperties}
       aria-hidden="true"
     >
@@ -75,25 +94,8 @@ export function IdentityMark({ name, count }: { name: string; count?: number }) 
   );
 }
 
-/* ---- buttons ------------------------------------------------------------- */
-
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "default" | "primary" | "danger" | "ghost";
-  size?: "sm" | "md";
-};
-
-export function Button({ variant = "default", size = "md", ...rest }: ButtonProps) {
-  return <button type="button" className="btn" data-variant={variant} data-size={size} {...rest} />;
-}
-
 /* ---- status / empty ------------------------------------------------------ */
 
-/**
- * Every async pane renders this. The empty state is a teaching surface: the
- * old UI said "No documents in this collection" when the real answer was
- * "nothing has been compiled yet", which sent people looking in the wrong
- * place entirely.
- */
 export function Status({
   loading,
   error,
@@ -122,7 +124,6 @@ export function Skeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="skeleton" aria-hidden="true">
       {Array.from({ length: rows }, (_, i) => (
-        // Stagger is decorative and short — a long cascade reads as slowness.
         <span key={i} style={{ "--d": `${i * 60}ms` } as React.CSSProperties} />
       ))}
     </div>
@@ -133,13 +134,16 @@ export function EmptyState({
   title,
   body,
   action,
+  icon,
 }: {
   title: string;
   body: ReactNode;
   action?: ReactNode;
+  icon?: ReactNode;
 }) {
   return (
     <div className="empty">
+      {icon ? <span className="empty-icon">{icon}</span> : null}
       <h3>{title}</h3>
       <p>{body}</p>
       {action ? <div className="empty-action">{action}</div> : null}
@@ -171,10 +175,6 @@ export function StatTile({
   );
 }
 
-/**
- * Compilation trail as stacked bars — the one genuinely chart-shaped dataset
- * the product has. Pure SVG, sized by viewBox so it scales with the card.
- */
 export function DeltaChart({
   points,
 }: {
@@ -197,15 +197,12 @@ export function DeltaChart({
       {points.map((p, i) => {
         const total = p.added + p.changed + p.removed;
         const scale = (n: number) => (n / max) * height;
-        const a = scale(p.added);
-        const c = scale(p.changed);
-        const r = scale(p.removed);
         const x = i * (w + gap);
-        let y = height - a - c - r;
+        let y = height - scale(total);
         const segs: Array<[string, number]> = [
-          ["add", a],
-          ["change", c],
-          ["remove", r],
+          ["add", scale(p.added)],
+          ["change", scale(p.changed)],
+          ["remove", scale(p.removed)],
         ];
         return (
           <g key={i}>
@@ -227,7 +224,15 @@ export function DeltaChart({
   );
 }
 
-export function Delta({ added, changed, removed }: { added: number; changed: number; removed: number }) {
+export function Delta({
+  added,
+  changed,
+  removed,
+}: {
+  added: number;
+  changed: number;
+  removed: number;
+}) {
   return (
     <span className="delta" data-numeric="">
       <span data-seg="add">+{added}</span>

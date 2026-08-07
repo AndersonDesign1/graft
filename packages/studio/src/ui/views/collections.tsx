@@ -1,37 +1,58 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ContentTree, ContentTreeCollection, DocumentDto, DocumentState } from "../../types";
-import { IconDatabase, IconFile, IconSearch } from "../components/icons";
+import type {
+  ContentTree,
+  ContentTreeCollection,
+  ContentTreeDoc,
+  DocumentDto,
+  DocumentState,
+} from "../../types";
+import { MdxEditor } from "../components/editor";
+import { IconDatabase, IconFile, IconSearch, IconSort } from "../components/icons";
 import {
-  Button,
   EmptyState,
-  IdentityMark,
   Pill,
   StatePill,
   StatusDot,
   Status,
   STATE_LABEL,
 } from "../components/primitives";
+import { Button } from "../components/ui/button";
+import { Field, FieldLabel, Input, NumberField, Switch, Textarea } from "../components/ui/field";
+import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from "../components/ui/menu";
+import { Tabs, TabsIndicator, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { api, qs } from "../lib/api";
 import { relativeTime } from "../lib/format";
 import type { Route } from "../lib/route";
 
 type EditorMode = "fields" | "raw";
 type Filter = "all" | "drifted" | "unindexed";
+type SortMode = "site" | "alpha" | "updated";
 
-/** Only string/number/boolean frontmatter is editable as a field. */
-function scalarEntries(data: Record<string, unknown>): Array<[string, string]> {
-  const out: Array<[string, string]> = [];
+const SORTS: Array<{ id: SortMode; label: string; hint: string }> = [
+  { id: "site", label: "Site order", hint: "Section, then order — as published" },
+  { id: "alpha", label: "A–Z", hint: "By title" },
+  { id: "updated", label: "Recently indexed", hint: "Newest compile first" },
+];
+
+/**
+ * Frontmatter values the field editor can round-trip. Anything else (arrays,
+ * nested objects) is left to the Raw tab rather than flattened into a string
+ * the user would have to retype correctly.
+ */
+type Scalar = { key: string; value: string | number | boolean; kind: "string" | "number" | "boolean" };
+
+function scalars(data: Record<string, unknown>): Scalar[] {
+  const out: Scalar[] = [];
   for (const [key, value] of Object.entries(data)) {
-    if (value === null || value === undefined) continue;
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      out.push([key, String(value)]);
-    }
+    if (typeof value === "string") out.push({ key, value, kind: "string" });
+    else if (typeof value === "number") out.push({ key, value, kind: "number" });
+    else if (typeof value === "boolean") out.push({ key, value, kind: "boolean" });
   }
   const order = ["title", "description", "section", "order", "tagline"];
   out.sort((a, b) => {
-    const ai = order.indexOf(a[0]);
-    const bi = order.indexOf(b[0]);
-    if (ai === -1 && bi === -1) return a[0].localeCompare(b[0]);
+    const ai = order.indexOf(a.key);
+    const bi = order.indexOf(b.key);
+    if (ai === -1 && bi === -1) return a.key.localeCompare(b.key);
     if (ai === -1) return 1;
     if (bi === -1) return -1;
     return ai - bi;
@@ -54,23 +75,26 @@ function buildRaw(data: Record<string, unknown>, body: string): string {
   return `${lines.join("\n")}${body.replace(/^\n/, "")}`;
 }
 
-/** Coerce edited strings back to the type the original frontmatter used. */
-function mergeFields(
-  original: Record<string, unknown>,
-  fields: Record<string, string>,
-): Record<string, unknown> {
-  const data: Record<string, unknown> = { ...original };
-  for (const [key, value] of Object.entries(fields)) {
-    const prev = original[key];
-    if (typeof prev === "number" && value.trim() !== "" && !Number.isNaN(Number(value))) {
-      data[key] = Number(value);
-    } else if (typeof prev === "boolean") {
-      data[key] = value === "true";
-    } else {
-      data[key] = value;
-    }
+/** Documents in the order the site renders them, grouped by section. */
+function group(docs: ContentTreeDoc[], sort: SortMode): Array<[string, ContentTreeDoc[]]> {
+  const sorted = [...docs];
+  if (sort === "alpha") {
+    sorted.sort((a, b) => (a.title ?? a.slug).localeCompare(b.title ?? b.slug));
+  } else if (sort === "updated") {
+    sorted.sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
   }
-  return data;
+  // "site" arrives pre-sorted from the API, which owns the ordering rule.
+
+  if (sort !== "site" || !sorted.some((d) => d.section)) return [["", sorted]];
+
+  const sections = new Map<string, ContentTreeDoc[]>();
+  for (const doc of sorted) {
+    const key = doc.section ?? "Ungrouped";
+    const list = sections.get(key);
+    if (list) list.push(doc);
+    else sections.set(key, [doc]);
+  }
+  return [...sections.entries()];
 }
 
 export function CollectionsView({
@@ -88,8 +112,9 @@ export function CollectionsView({
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [sort, setSort] = useState<SortMode>("site");
   const [doc, setDoc] = useState<DocumentDto | null>(null);
-  const [fields, setFields] = useState<Record<string, string>>({});
+  const [fields, setFields] = useState<Record<string, string | number | boolean>>({});
   const [body, setBody] = useState("");
   const [raw, setRaw] = useState("");
   const [mode, setMode] = useState<EditorMode>("fields");
@@ -103,14 +128,13 @@ export function CollectionsView({
   const active: ContentTreeCollection | undefined =
     collections.find((c) => c.name === route.collection) ?? collections[0];
 
-  // Keep the URL honest once the tree resolves, so reloads land in the same place.
   useEffect(() => {
     if (!route.collection && active) {
       navigate({ view: "collections", collection: active.name });
     }
   }, [active, route.collection, navigate]);
 
-  const docs = useMemo(() => {
+  const visible = useMemo(() => {
     const list = active?.documents ?? [];
     const q = query.trim().toLowerCase();
     return list.filter((d) => {
@@ -125,30 +149,29 @@ export function CollectionsView({
     });
   }, [active, query, filter]);
 
-  const openDoc = useCallback(
-    async (collection: string, slug: string) => {
-      setDocError(null);
-      setSaveMsg(null);
-      setDocLoading(true);
-      setDirty(false);
-      try {
-        const next = await api<DocumentDto>(`/document${qs({ collection, slug })}`);
-        setDoc(next);
-        setRaw(next.raw);
-        setBody(next.body);
-        setFields(Object.fromEntries(scalarEntries(next.data)));
-      } catch (err) {
-        setDoc(null);
-        setRaw("");
-        setBody("");
-        setFields({});
-        setDocError(err instanceof Error ? err.message : String(err));
-      } finally {
-        setDocLoading(false);
-      }
-    },
-    [],
-  );
+  const groups = useMemo(() => group(visible, sort), [visible, sort]);
+
+  const openDoc = useCallback(async (collection: string, slug: string) => {
+    setDocError(null);
+    setSaveMsg(null);
+    setDocLoading(true);
+    setDirty(false);
+    try {
+      const next = await api<DocumentDto>(`/document${qs({ collection, slug })}`);
+      setDoc(next);
+      setRaw(next.raw);
+      setBody(next.body);
+      setFields(Object.fromEntries(scalars(next.data).map((f) => [f.key, f.value])));
+    } catch (err) {
+      setDoc(null);
+      setRaw("");
+      setBody("");
+      setFields({});
+      setDocError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDocLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (route.collection && route.slug) void openDoc(route.collection, route.slug);
@@ -171,7 +194,7 @@ export function CollectionsView({
           : {
               collection: route.collection,
               slug: route.slug,
-              data: mergeFields(doc.data, fields),
+              data: { ...doc.data, ...fields },
               body,
               branch,
             };
@@ -179,8 +202,6 @@ export function CollectionsView({
         method: "PUT",
         body: JSON.stringify(payload),
       });
-      // Save recompiles, so the document lands `synced` — say so rather than
-      // echoing a bare path.
       setSaveMsg(
         `Saved ${result.written} · index updated${result.gitSha ? ` @ ${result.gitSha.slice(0, 7)}` : ""}`,
       );
@@ -194,7 +215,6 @@ export function CollectionsView({
     }
   }, [route.collection, route.slug, doc, mode, raw, fields, body, branch, onSaved, openDoc]);
 
-  // ⌘S / Ctrl+S — the shortcut anyone editing text will reach for first.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
@@ -208,66 +228,49 @@ export function CollectionsView({
 
   function switchMode(next: EditorMode): void {
     if (next === mode) return;
-    if (next === "raw" && doc) setRaw(buildRaw(mergeFields(doc.data, fields), body));
+    if (next === "raw" && doc) setRaw(buildRaw({ ...doc.data, ...fields }, body));
     setMode(next);
   }
+
+  const setField = (key: string, value: string | number | boolean): void => {
+    setDirty(true);
+    setFields((prev) => ({ ...prev, [key]: value }));
+  };
 
   const readOnly = active?.authority === "db";
 
   return (
     <div className="panes">
-      {/* pane 1 — collections */}
-      <section className="pane pane-nav">
-        <div className="pane-head">
-          <h2 className="pane-title">Collections</h2>
-        </div>
-        <div className="pane-scroll">
-          <Status
-            loading={tree.loading && !tree.data}
-            error={tree.error}
-            empty={!tree.loading && !tree.error && collections.length === 0}
-          >
-            <p className="muted pane-pad-sm">
-              None registered — add one to <code>graft.config.ts</code>.
-            </p>
-          </Status>
-          {collections.map((collection) => (
-            <button
-              key={collection.name}
-              type="button"
-              className="row"
-              data-active={collection.name === active?.name}
-              onClick={() => navigate({ view: "collections", collection: collection.name })}
-            >
-              <IdentityMark name={collection.name} />
-              <span className="row-main">
-                <span className="row-title">{collection.name}</span>
-                <span className="row-sub">
-                  {collection.authority === "db"
-                    ? "db-authoritative"
-                    : collection.error
-                      ? "read failed"
-                      : `${collection.documents.length} doc${collection.documents.length === 1 ? "" : "s"}`}
-                </span>
-              </span>
-              {collection.authority === "db" ? (
-                <IconDatabase size={13} className="row-mark" />
-              ) : collection.driftCount > 0 ? (
-                <span className="count" data-tone="drifted" data-numeric="">
-                  {collection.driftCount}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* pane 2 — documents */}
+      {/* pane 1 — documents (collections now live in the rail) */}
       <section className="pane pane-list">
         <div className="pane-head">
           <div className="pane-head-row">
             <h2 className="pane-title">{active?.name ?? "Documents"}</h2>
-            {active?.authority === "db" ? <Pill tone="db">read-only</Pill> : null}
+            {active?.authority === "db" ? (
+              <Pill tone="db">
+                <IconDatabase size={11} />
+                read-only
+              </Pill>
+            ) : (
+              <Menu>
+                <MenuTrigger className="icon-btn" aria-label="Sort documents" title="Sort">
+                  <IconSort size={14} />
+                </MenuTrigger>
+                <MenuContent align="end">
+                  <MenuLabel>Order</MenuLabel>
+                  {SORTS.map((option) => (
+                    <MenuItem
+                      key={option.id}
+                      data-active={sort === option.id}
+                      onClick={() => setSort(option.id)}
+                    >
+                      <span className="menu-item-label">{option.label}</span>
+                      <span className="menu-item-hint">{option.hint}</span>
+                    </MenuItem>
+                  ))}
+                </MenuContent>
+              </Menu>
+            )}
           </div>
           <div className="search">
             <IconSearch size={14} />
@@ -279,29 +282,25 @@ export function CollectionsView({
             />
           </div>
           {active?.authority === "file" ? (
-            <div className="segmented" role="group" aria-label="Filter by state">
-              {(["all", "drifted", "unindexed"] as Filter[]).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  data-active={filter === f}
-                  onClick={() => setFilter(f)}
-                >
-                  {f === "all" ? "All" : f === "drifted" ? "Out of sync" : "Not indexed"}
-                </button>
-              ))}
-            </div>
+            <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
+              <TabsList>
+                <TabsIndicator />
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="drifted">Out of sync</TabsTrigger>
+                <TabsTrigger value="unindexed">New</TabsTrigger>
+              </TabsList>
+            </Tabs>
           ) : null}
         </div>
+
         <div className="pane-scroll">
-          {/* This pane used to swallow errors entirely — a failed tree fetch
-              rendered a blank column with no explanation. */}
           <Status loading={tree.loading && !tree.data} error={tree.error ?? active?.error} />
 
           {active?.authority === "db" ? (
             <div className="pane-pad-sm">
               <EmptyState
                 title="Rows, not files"
+                icon={<IconDatabase size={20} />}
                 body={
                   <>
                     <code>{active.name}</code> is db-authoritative — its records live in{" "}
@@ -313,7 +312,7 @@ export function CollectionsView({
             </div>
           ) : null}
 
-          {active?.authority === "file" && !tree.loading && docs.length === 0 ? (
+          {active?.authority === "file" && !tree.loading && visible.length === 0 ? (
             <div className="pane-pad-sm">
               <EmptyState
                 title={query || filter !== "all" ? "No matches" : "No documents"}
@@ -322,8 +321,7 @@ export function CollectionsView({
                     "Nothing in this collection matches the current filter."
                   ) : (
                     <>
-                      Author the first one at{" "}
-                      <code>content/{active.name}/&lt;slug&gt;.mdx</code>.
+                      Author the first one at <code>content/{active.name}/&lt;slug&gt;.mdx</code>.
                     </>
                   )
                 }
@@ -331,35 +329,41 @@ export function CollectionsView({
             </div>
           ) : null}
 
-          {docs.map((d) => (
-            <button
-              key={d.slug}
-              type="button"
-              className="row"
-              data-active={route.slug === d.slug}
-              onClick={() =>
-                navigate({ view: "collections", collection: active?.name, slug: d.slug })
-              }
-            >
-              <StatusDot state={d.state} />
-              <span className="row-main">
-                <span className="row-title">{d.title ?? d.slug}</span>
-                <span className="row-sub">{d.sourcePath}</span>
-              </span>
-              <span className="row-meta" data-numeric="">
-                {d.state === "unindexed" ? STATE_LABEL[d.state] : relativeTime(d.updatedAt)}
-              </span>
-            </button>
+          {groups.map(([section, docs]) => (
+            <div key={section || "_"} className="doc-group">
+              {section ? <p className="doc-group-label">{section}</p> : null}
+              {docs.map((d) => (
+                <button
+                  key={d.slug}
+                  type="button"
+                  className="row"
+                  data-active={route.slug === d.slug}
+                  onClick={() =>
+                    navigate({ view: "collections", collection: active?.name, slug: d.slug })
+                  }
+                >
+                  <StatusDot state={d.state} />
+                  <span className="row-main">
+                    <span className="row-title">{d.title ?? d.slug}</span>
+                    <span className="row-sub">{d.sourcePath}</span>
+                  </span>
+                  <span className="row-meta" data-numeric="">
+                    {d.state === "unindexed" ? STATE_LABEL[d.state] : relativeTime(d.updatedAt)}
+                  </span>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       </section>
 
-      {/* pane 3 — document */}
+      {/* pane 2 — the document */}
       <section className="pane pane-doc">
         {!route.slug ? (
           <div className="pane-pad">
             <EmptyState
               title="No document selected"
+              icon={<IconFile size={20} />}
               body="Pick one from the list to edit its frontmatter and body."
             />
           </div>
@@ -372,7 +376,7 @@ export function CollectionsView({
                   <span className="crumb-sep">/</span>
                   <span className="crumb-current">{route.slug}</span>
                 </nav>
-                <h2 className="doc-title">{fields.title || route.slug}</h2>
+                <h2 className="doc-title">{String(fields.title ?? route.slug)}</h2>
                 <p className="doc-path">
                   <IconFile size={12} />
                   {doc?.sourcePath ?? "…"}
@@ -380,22 +384,13 @@ export function CollectionsView({
               </div>
               <div className="doc-head-actions">
                 {selectedState ? <StatePill state={selectedState} /> : null}
-                <div className="segmented" role="group" aria-label="Editor mode">
-                  <button
-                    type="button"
-                    data-active={mode === "fields"}
-                    onClick={() => switchMode("fields")}
-                  >
-                    Fields
-                  </button>
-                  <button
-                    type="button"
-                    data-active={mode === "raw"}
-                    onClick={() => switchMode("raw")}
-                  >
-                    Raw
-                  </button>
-                </div>
+                <Tabs value={mode} onValueChange={(v) => switchMode(v as EditorMode)}>
+                  <TabsList>
+                    <TabsIndicator />
+                    <TabsTrigger value="fields">Fields</TabsTrigger>
+                    <TabsTrigger value="raw">Raw MDX</TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
             </header>
 
@@ -410,74 +405,82 @@ export function CollectionsView({
               </p>
             ) : null}
 
-            <div className="doc-scroll">
+            <div className="doc-body" data-mode={mode}>
               {docLoading ? (
-                <Status loading />
+                <div className="doc-scroll">
+                  <Status loading />
+                </div>
               ) : mode === "fields" ? (
                 <>
-                  <div className="field-grid">
+                  <div className="doc-fields">
                     {Object.keys(fields).length === 0 ? (
                       <p className="muted">No scalar frontmatter — edit the body below.</p>
                     ) : (
-                      Object.entries(fields).map(([key, value]) => (
-                        <label key={key} className="field">
-                          <span className="field-label">{key}</span>
-                          {key === "description" || value.length > 80 ? (
-                            <textarea
-                              rows={3}
-                              value={value}
+                      doc &&
+                      scalars(doc.data).map((field) => (
+                        <Field key={field.key} disabled={readOnly}>
+                          <FieldLabel>{field.key}</FieldLabel>
+                          {field.kind === "boolean" ? (
+                            <Switch
+                              checked={Boolean(fields[field.key])}
+                              onCheckedChange={(next) => setField(field.key, next)}
                               disabled={readOnly}
-                              onChange={(e) => {
-                                setDirty(true);
-                                setFields((p) => ({ ...p, [key]: e.target.value }));
-                              }}
+                            />
+                          ) : field.kind === "number" ? (
+                            <NumberField
+                              value={Number(fields[field.key] ?? 0)}
+                              onValueChange={(next) => setField(field.key, next ?? 0)}
+                              disabled={readOnly}
+                            />
+                          ) : String(fields[field.key] ?? "").length > 72 ||
+                            field.key === "description" ? (
+                            <Textarea
+                              rows={3}
+                              value={String(fields[field.key] ?? "")}
+                              disabled={readOnly}
+                              onChange={(e) => setField(field.key, e.target.value)}
                             />
                           ) : (
-                            <input
-                              value={value}
+                            <Input
+                              value={String(fields[field.key] ?? "")}
                               disabled={readOnly}
-                              onChange={(e) => {
-                                setDirty(true);
-                                setFields((p) => ({ ...p, [key]: e.target.value }));
-                              }}
+                              onChange={(e) => setField(field.key, e.target.value)}
                             />
                           )}
-                        </label>
+                        </Field>
                       ))
                     )}
                   </div>
-                  <label className="field field-body">
-                    <span className="field-label">Body</span>
-                    <textarea
-                      className="code"
+                  <div className="doc-editor">
+                    <p className="doc-editor-label">Body</p>
+                    <MdxEditor
                       value={body}
-                      spellCheck={false}
-                      disabled={readOnly}
-                      onChange={(e) => {
+                      onChange={(next) => {
                         setDirty(true);
-                        setBody(e.target.value);
+                        setBody(next);
                       }}
+                      readOnly={readOnly}
+                      ariaLabel="Document body"
+                      placeholder="Write MDX…"
                     />
-                  </label>
+                  </div>
                 </>
               ) : (
-                <label className="field field-body">
-                  <span className="field-label">MDX source</span>
-                  <textarea
-                    className="code"
+                <div className="doc-editor doc-editor-full">
+                  <MdxEditor
                     value={raw}
-                    spellCheck={false}
-                    disabled={readOnly}
-                    onChange={(e) => {
+                    onChange={(next) => {
                       setDirty(true);
-                      setRaw(e.target.value);
+                      setRaw(next);
                     }}
+                    readOnly={readOnly}
+                    showLineNumbers
+                    ariaLabel="Raw MDX source"
                   />
-                </label>
+                </div>
               )}
             </div>
 
-            {/* Pinned like Sanity's Publish — the primary action never scrolls away. */}
             <footer className="doc-foot">
               <span className="doc-foot-hint">
                 {readOnly

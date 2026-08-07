@@ -5,5 +5,5 @@
  * `*.css` glob can't match (no extension on the specifier). Declared here so
  * the side-effect imports in main.tsx typecheck.
  */
-declare module "@fontsource/instrument-serif";
-declare module "@fontsource-variable/instrument-sans";
+declare module "@fontsource-variable/geist";
+declare module "@fontsource-variable/geist-mono";

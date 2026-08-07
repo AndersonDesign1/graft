@@ -25,6 +25,14 @@ export interface ContentTreeDoc {
   state: DocumentState;
   /** Index row timestamp; absent while a document is still `unindexed`. */
   updatedAt?: string;
+  /**
+   * Grouping and ordering as the site renders them. Conventional frontmatter
+   * (`section`, `order`) — the same fields the docs sidebar sorts on — so the
+   * Studio lists documents in publication order by default rather than
+   * alphabetically. Absent on collections that don't use them.
+   */
+  section?: string;
+  order?: number;
 }
 
 export interface ContentTreeCollection {

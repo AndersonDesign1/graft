@@ -20,6 +20,24 @@ export default defineConfig({
     emptyOutDir: true,
     target: "es2022",
     sourcemap: false,
+    // The editor is the heavy dependency and it never changes between Studio
+    // builds. Splitting it out means editing a view invalidates ~40 kB rather
+    // than the whole megabyte, which matters because hashed assets are served
+    // `immutable`.
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        // Rolldown (Vite 8) takes the function form only.
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("@codemirror") || id.includes("@lezer")) return "editor";
+          if (id.includes("@base-ui-components") || /[/\\]react(-dom)?[/\\]/.test(id)) {
+            return "vendor";
+          }
+          return;
+        },
+      },
+    },
   },
   server: {
     port: 5173,

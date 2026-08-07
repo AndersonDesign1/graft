@@ -91,6 +91,32 @@ function titleOf(data: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
+/** Conventional ordering frontmatter, when the collection uses it. */
+function placementOf(data: Record<string, unknown>): { section?: string; order?: number } {
+  return {
+    ...(typeof data.section === "string" ? { section: data.section } : {}),
+    ...(typeof data.order === "number" ? { order: data.order } : {}),
+  };
+}
+
+/**
+ * Publication order: section, then explicit order, then title.
+ *
+ * This is the default the Studio lists in, because it is the order the
+ * operator sees on the site — alphabetical is only useful for hunting a known
+ * name, which is what search is for. Documents with no `order` sort after
+ * those that have one, so adding `order` to a single page promotes it rather
+ * than reshuffling everything around it.
+ */
+function bySiteOrder(a: ContentTreeDoc, b: ContentTreeDoc): number {
+  const section = (a.section ?? "").localeCompare(b.section ?? "");
+  if (section !== 0) return section;
+  const ao = a.order ?? Number.POSITIVE_INFINITY;
+  const bo = b.order ?? Number.POSITIVE_INFINITY;
+  if (ao !== bo) return ao - bo;
+  return (a.title ?? a.slug).localeCompare(b.title ?? b.slug);
+}
+
 /**
  * One collection's documents, merging what is on disk with what is indexed.
  *
@@ -126,6 +152,7 @@ async function buildFileCollection(
       state,
       ...(titleOf(doc.data) ? { title: titleOf(doc.data) } : {}),
       ...(row?.updatedAt ? { updatedAt: row.updatedAt.toISOString() } : {}),
+      ...placementOf(doc.data),
     };
   });
 
@@ -133,18 +160,18 @@ async function buildFileCollection(
   // as `orphaned` beats silently dropping it — a stale index is the operator's
   // problem to see, not ours to hide.
   for (const row of bySlug.values()) {
+    const data = row.data as Record<string, unknown>;
     docs.push({
       slug: row.slug,
       sourcePath: row.sourcePath,
       state: "orphaned",
-      ...(titleOf(row.data as Record<string, unknown>)
-        ? { title: titleOf(row.data as Record<string, unknown>) }
-        : {}),
+      ...(titleOf(data) ? { title: titleOf(data) } : {}),
       updatedAt: row.updatedAt.toISOString(),
+      ...placementOf(data),
     });
   }
 
-  return docs.sort((a, b) => a.slug.localeCompare(b.slug));
+  return docs.sort(bySiteOrder);
 }
 
 async function buildTree(

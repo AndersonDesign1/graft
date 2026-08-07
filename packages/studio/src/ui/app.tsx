@@ -1,19 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { IconContext } from "@phosphor-icons/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { BranchList, CompileResultDto, ContentTree } from "../types";
 import { CommandPalette } from "./components/palette";
 import {
   IconApprovals,
   IconBranches,
-  IconChevron,
-  IconCollections,
+  IconCaretUpDown,
   IconCompile,
+  IconDatabase,
   IconHistory,
+  IconMoon,
   IconOverview,
   IconSchema,
   IconSettings,
-  IconTheme,
+  IconSun,
+  IconSystem,
   IconWarning,
+  type IconComponent,
 } from "./components/icons";
+import { IdentityMark } from "./components/primitives";
+import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from "./components/ui/menu";
 import { api, qs } from "./lib/api";
 import { plural } from "./lib/format";
 import { currentBranch, setBranchInUrl, useRoute, type ViewId } from "./lib/route";
@@ -25,33 +31,24 @@ import { OverviewView } from "./views/overview";
 import { SchemaView } from "./views/schema";
 import { SettingsView } from "./views/settings";
 
-type NavItem = { id: ViewId; label: string; Icon: typeof IconOverview };
+type NavItem = { id: ViewId; label: string; Icon: IconComponent };
 
-const NAV: Array<{ group?: string; items: NavItem[] }> = [
-  { items: [{ id: "overview", label: "Overview", Icon: IconOverview }] },
-  {
-    group: "Content",
-    items: [
-      { id: "collections", label: "Collections", Icon: IconCollections },
-      { id: "schema", label: "Schema", Icon: IconSchema },
-    ],
-  },
-  {
-    group: "Operations",
-    items: [
-      { id: "approvals", label: "Approvals", Icon: IconApprovals },
-      { id: "branches", label: "Branches", Icon: IconBranches },
-      { id: "history", label: "History", Icon: IconHistory },
-    ],
-  },
-  { items: [{ id: "settings", label: "Settings", Icon: IconSettings }] },
+const TOP: NavItem[] = [{ id: "overview", label: "Overview", Icon: IconOverview }];
+const OPERATIONS: NavItem[] = [
+  { id: "approvals", label: "Approvals", Icon: IconApprovals },
+  { id: "branches", label: "Branches", Icon: IconBranches },
+  { id: "history", label: "History", Icon: IconHistory },
+];
+const BOTTOM: NavItem[] = [
+  { id: "schema", label: "Schema", Icon: IconSchema },
+  { id: "settings", label: "Settings", Icon: IconSettings },
 ];
 
 const THEME_ORDER: Theme[] = ["system", "light", "dark"];
-const THEME_LABEL: Record<Theme, string> = {
-  system: "Theme: following the system",
-  light: "Theme: light",
-  dark: "Theme: dark",
+const THEME_META: Record<Theme, { label: string; Icon: IconComponent }> = {
+  system: { label: "Theme: following the system", Icon: IconSystem },
+  light: { label: "Theme: light", Icon: IconSun },
+  dark: { label: "Theme: dark", Icon: IconMoon },
 };
 
 export function StudioApp({ branch: initialBranch = "main" }: { branch?: string }) {
@@ -61,16 +58,14 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [compiling, setCompiling] = useState(false);
   const [compileMsg, setCompileMsg] = useState<string | null>(null);
-  const [branchMenu, setBranchMenu] = useState(false);
-  const branchMenuRef = useRef<HTMLDivElement>(null);
 
   const tree = useResource<ContentTree>(`/tree${qs({ branch })}`);
   const branches = useResource<BranchList>("/branches");
+  const approvals = useResource<{ approvals: unknown[] }>("/approvals");
 
   const selectBranch = useCallback((name: string) => {
     setBranch(name);
     setBranchInUrl(name);
-    setBranchMenu(false);
   }, []);
 
   const compile = useCallback(async () => {
@@ -89,15 +84,11 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
     }
   }, [branch, tree]);
 
-  // ⌘K anywhere; Esc closes.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPaletteOpen((open) => !open);
-      } else if (e.key === "Escape") {
-        setPaletteOpen(false);
-        setBranchMenu(false);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -105,22 +96,15 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
   }, []);
 
   useEffect(() => {
-    if (!branchMenu) return;
-    const onClick = (e: MouseEvent): void => {
-      if (!branchMenuRef.current?.contains(e.target as Node)) setBranchMenu(false);
-    };
-    window.addEventListener("mousedown", onClick);
-    return () => window.removeEventListener("mousedown", onClick);
-  }, [branchMenu]);
-
-  // The compile toast is informational; it should not linger.
-  useEffect(() => {
     if (!compileMsg) return;
     const timer = window.setTimeout(() => setCompileMsg(null), 6000);
     return () => window.clearTimeout(timer);
   }, [compileMsg]);
 
   const drift = tree.data?.summary.drift ?? 0;
+  const pending = approvals.data?.approvals.length ?? 0;
+  const collections = useMemo(() => tree.data?.collections ?? [], [tree.data]);
+  const themeMeta = THEME_META[theme];
 
   let main: React.ReactNode;
   if (route.view === "collections") {
@@ -134,20 +118,12 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
       />
     );
   } else if (route.view === "schema") main = <SchemaView />;
-  else if (route.view === "approvals") main = <ApprovalsView />;
+  else if (route.view === "approvals") main = <ApprovalsView onDecided={approvals.refresh} />;
   else if (route.view === "branches") {
-    main = (
-      <BranchesView
-        branch={branch}
-        onSelectBranch={(name) => {
-          selectBranch(name);
-          navigate({ view: "collections" });
-        }}
-      />
-    );
+    main = <BranchesView branch={branch} onSelectBranch={selectBranch} />;
   } else if (route.view === "history") main = <HistoryView branch={branch} />;
   else if (route.view === "settings") {
-    main = <SettingsView branch={branch} theme={theme} setTheme={setTheme} />;
+    main = <SettingsView branch={branch} theme={theme} setTheme={setTheme} tree={tree.data} />;
   } else {
     main = (
       <OverviewView
@@ -160,44 +136,49 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
     );
   }
 
-  return (
-    <div className="studio">
-      <header className="topbar">
-        <div className="topbar-left">
-          <span className="brand">
-            graft<b>.</b>
-          </span>
-          <span className="crumb-sep">/</span>
-          <span className="scope">studio</span>
-          <span className="crumb-sep">/</span>
+  const railItem = ({ id, label, Icon }: NavItem, badge?: React.ReactNode) => (
+    <button
+      key={id}
+      type="button"
+      className="rail-item"
+      data-active={route.view === id}
+      aria-current={route.view === id ? "page" : undefined}
+      onClick={() => navigate({ view: id })}
+    >
+      <Icon />
+      <span>{label}</span>
+      {badge}
+    </button>
+  );
 
-          {/* Branch is a first-class scope selector, not a label — switching
-              re-scopes every view and the URL, so a reload lands in the same
-              place. */}
-          <div className="branch-select" ref={branchMenuRef}>
-            <button
-              type="button"
-              className="branch-trigger"
-              aria-haspopup="listbox"
-              aria-expanded={branchMenu}
-              onClick={() => setBranchMenu((open) => !open)}
-            >
-              <span className="dot" data-state="synced" />
-              {branch}
-              <IconChevron size={12} className="branch-caret" />
-            </button>
-            {branchMenu ? (
-              <div className="menu" role="listbox" aria-label="Switch branch">
+  return (
+    // One place decides icon weight and size, so glyphs stay optically
+    // consistent with the 1px hairlines they sit beside.
+    <IconContext.Provider value={{ size: 16, weight: "regular" }}>
+      <div className="studio">
+        <header className="topbar">
+          <div className="topbar-left">
+            <span className="brand">
+              graft<b>.</b>
+            </span>
+            <span className="crumb-sep">/</span>
+            <span className="scope">studio</span>
+            <span className="crumb-sep">/</span>
+
+            <Menu>
+              <MenuTrigger className="branch-trigger">
+                <span className="dot" data-state="synced" />
+                {branch}
+                <IconCaretUpDown size={12} className="branch-caret" />
+              </MenuTrigger>
+              <MenuContent>
+                <MenuLabel>Switch branch</MenuLabel>
                 {(branches.data?.branches ?? []).length === 0 ? (
                   <p className="menu-empty">No other branches registered.</p>
                 ) : (
                   branches.data?.branches.map((row) => (
-                    <button
+                    <MenuItem
                       key={row.name}
-                      type="button"
-                      role="option"
-                      aria-selected={row.name === branch}
-                      className="menu-item"
                       data-active={row.name === branch}
                       onClick={() => selectBranch(row.name)}
                     >
@@ -206,108 +187,131 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
                         {row.backend}
                         {row.parent ? ` ← ${row.parent}` : " · root"}
                       </span>
-                    </button>
+                    </MenuItem>
                   ))
                 )}
-              </div>
-            ) : null}
+              </MenuContent>
+            </Menu>
           </div>
-        </div>
 
-        <div className="topbar-right">
-          {drift > 0 ? (
+          <div className="topbar-right">
+            {drift > 0 ? (
+              <button
+                type="button"
+                className="drift"
+                onClick={() => void compile()}
+                disabled={compiling}
+                title="Recompile so the index matches disk"
+              >
+                <IconWarning size={13} />
+                {compiling ? "Compiling…" : `${plural(drift, "change")} to compile`}
+              </button>
+            ) : null}
             <button
               type="button"
-              className="drift"
-              onClick={() => void compile()}
-              disabled={compiling}
-              title="Recompile so the index matches disk"
+              className="icon-btn"
+              onClick={() => setPaletteOpen(true)}
+              title="Command palette"
+              aria-label="Open command palette"
             >
-              <IconWarning size={13} />
-              {compiling ? "Compiling…" : `${plural(drift, "change")} to compile`}
+              <kbd>⌘K</kbd>
             </button>
-          ) : null}
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={() => setPaletteOpen(true)}
-            title="Command palette"
-            aria-label="Open command palette"
-          >
-            <kbd>⌘K</kbd>
-          </button>
-          <button
-            type="button"
-            className="icon-btn"
-            title={THEME_LABEL[theme]}
-            aria-label={THEME_LABEL[theme]}
-            data-theme-state={theme}
-            onClick={() => setTheme(THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % 3] as Theme)}
-          >
-            <IconTheme size={15} />
-          </button>
-        </div>
-      </header>
+            <button
+              type="button"
+              className="icon-btn"
+              title={themeMeta.label}
+              aria-label={themeMeta.label}
+              onClick={() => setTheme(THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % 3] as Theme)}
+            >
+              <themeMeta.Icon size={15} />
+            </button>
+          </div>
+        </header>
 
-      <div className="body">
-        <nav className="rail" aria-label="Studio sections">
-          {NAV.map((section, i) => (
-            <div className="rail-group" key={section.group ?? `g${i}`}>
-              {section.group ? <p className="rail-label">{section.group}</p> : null}
-              {section.items.map(({ id, label, Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  className="rail-item"
-                  data-active={route.view === id}
-                  aria-current={route.view === id ? "page" : undefined}
-                  onClick={() => navigate({ view: id })}
-                >
-                  <Icon size={15} />
-                  <span>{label}</span>
-                  {id === "approvals" ? <ApprovalCount /> : null}
-                  {id === "collections" && drift > 0 ? (
-                    <span className="count" data-tone="drifted" data-numeric="">
-                      {drift}
-                    </span>
-                  ) : null}
-                </button>
-              ))}
+        <div className="body">
+          {/* Collections live in the rail rather than in their own pane: it
+              removes a whole column from the workspace, and the rail is
+              already the "where am I" surface. Payload's model. */}
+          <nav className="rail" aria-label="Studio sections">
+            <div className="rail-group">{TOP.map((item) => railItem(item))}</div>
+
+            <div className="rail-group">
+              <p className="rail-label">Content</p>
+              {collections.map((collection) => {
+                const active =
+                  route.view === "collections" && route.collection === collection.name;
+                return (
+                  <button
+                    key={collection.name}
+                    type="button"
+                    className="rail-item"
+                    data-active={active}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() =>
+                      navigate({ view: "collections", collection: collection.name })
+                    }
+                  >
+                    <IdentityMark name={collection.name} size="sm" />
+                    <span>{collection.name}</span>
+                    {collection.authority === "db" ? (
+                      <IconDatabase size={13} className="rail-mark" />
+                    ) : collection.driftCount > 0 ? (
+                      <span className="count" data-tone="drifted" data-numeric="">
+                        {collection.driftCount}
+                      </span>
+                    ) : (
+                      <span className="count" data-numeric="">
+                        {collection.documents.length}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              {tree.loading && collections.length === 0 ? (
+                <p className="rail-loading">Loading…</p>
+              ) : null}
+              {!tree.loading && collections.length === 0 ? (
+                <p className="rail-loading">None registered</p>
+              ) : null}
             </div>
-          ))}
-        </nav>
 
-        <main className="main">{main}</main>
+            <div className="rail-group">
+              <p className="rail-label">Operations</p>
+              {OPERATIONS.map((item) =>
+                railItem(
+                  item,
+                  item.id === "approvals" && pending > 0 ? (
+                    <span className="count" data-tone="pending" data-numeric="">
+                      {pending}
+                    </span>
+                  ) : undefined,
+                ),
+              )}
+            </div>
+
+            <div className="rail-group rail-group-end">{BOTTOM.map((item) => railItem(item))}</div>
+          </nav>
+
+          <main className="main">{main}</main>
+        </div>
+
+        {compileMsg ? (
+          <output className="toast" aria-live="polite">
+            <IconCompile size={14} />
+            {compileMsg}
+          </output>
+        ) : null}
+
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          tree={tree.data}
+          branches={branches.data}
+          navigate={navigate}
+          onSelectBranch={selectBranch}
+          onCompile={() => void compile()}
+        />
       </div>
-
-      {compileMsg ? (
-        <output className="toast" aria-live="polite">
-          <IconCompile size={14} />
-          {compileMsg}
-        </output>
-      ) : null}
-
-      <CommandPalette
-        open={paletteOpen}
-        onClose={() => setPaletteOpen(false)}
-        tree={tree.data}
-        branches={branches.data}
-        navigate={navigate}
-        onSelectBranch={selectBranch}
-        onCompile={() => void compile()}
-      />
-    </div>
-  );
-}
-
-/** Small enough to live here; the rail is the only place it renders. */
-function ApprovalCount() {
-  const { data } = useResource<{ approvals: unknown[] }>("/approvals");
-  const n = data?.approvals.length ?? 0;
-  if (n === 0) return null;
-  return (
-    <span className="count" data-tone="pending" data-numeric="">
-      {n}
-    </span>
+    </IconContext.Provider>
   );
 }

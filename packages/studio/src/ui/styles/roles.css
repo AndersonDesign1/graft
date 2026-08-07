@@ -79,6 +79,31 @@
   --state-db-solid: var(--c-purple-solid);
   --state-db-text: var(--c-purple-text);
 
+  /* ---- schema field types -------------------------------------------------
+     Types are an identity axis, not a severity one — nothing here means
+     "worse". Hues are assigned so related types read as related: the two
+     text-ish types share green, the two container types share purple. */
+  --type-string: var(--c-green-text-loud);
+  --type-text: var(--c-green-text-loud);
+  --type-number: var(--c-blue-text-loud);
+  --type-boolean: var(--c-amber-text-loud);
+  --type-date: var(--c-amber-text-loud);
+  --type-array: var(--c-purple-text-loud);
+  --type-object: var(--c-purple-text-loud);
+  --type-asset: var(--c-red-text-loud);
+  --type-reference: var(--c-red-text-loud);
+  --type-json: var(--c-blue-text-loud);
+  --type-unknown: var(--ink-muted);
+
+  --field-required: var(--c-amber-text);
+  --field-required-bg: var(--c-amber-bg);
+  --field-optional: var(--ink-faint);
+
+  /* ---- code editor ---- */
+  --editor-active-line: color-mix(in oklch, var(--mark) 4%, transparent);
+  --editor-match: color-mix(in oklch, var(--c-blue-solid) 22%, transparent);
+  --editor-gutter: var(--ink-faint);
+
   /* ---- the default chip surface: pills, counts and tags with no state ---- */
   --chip-bg: var(--c-neutral-bg);
   --chip-border: var(--c-neutral-border);
