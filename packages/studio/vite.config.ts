@@ -30,8 +30,26 @@ export default defineConfig({
         // Rolldown (Vite 8) takes the function form only.
         manualChunks(id: string) {
           if (!id.includes("node_modules")) return;
-          if (id.includes("@codemirror") || id.includes("@lezer")) return "editor";
-          if (id.includes("@base-ui-components") || /[/\\]react(-dom)?[/\\]/.test(id)) {
+          // Both editors and their parser stacks. They are the bulk of the
+          // bundle and never change between Studio builds, so they cache
+          // independently of the app.
+          if (
+            id.includes("@codemirror") ||
+            id.includes("@lezer") ||
+            id.includes("@milkdown") ||
+            id.includes("prosemirror") ||
+            id.includes("remark") ||
+            id.includes("micromark") ||
+            id.includes("mdast")
+          ) {
+            return "editor";
+          }
+          if (
+            id.includes("@base-ui-components") ||
+            id.includes("cmdk") ||
+            id.includes("sonner") ||
+            /[/\\]react(-dom)?[/\\]/.test(id)
+          ) {
             return "vendor";
           }
           return;

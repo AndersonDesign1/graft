@@ -102,6 +102,31 @@ export interface CompileResultDto {
   docCount: number;
 }
 
+/** Whether reverting to a compilation is safe, and why not if it isn't. */
+export interface RevertPreviewDto {
+  compilationId: string;
+  gitSha: string | null;
+  shortSha: string;
+  /** The commit exists in this clone. */
+  reachable: boolean;
+  /** Uncommitted content files a revert would destroy. */
+  dirty: string[];
+  canRevert: boolean;
+  createdAt: string;
+}
+
+export interface RevertResultDto {
+  compilationId: string;
+  gitSha: string | null;
+  branch: string;
+  /** Content files git restored, relative to the content directory. */
+  filesChanged: string[];
+  added: number;
+  changed: number;
+  removed: number;
+  docCount: number;
+}
+
 export interface BranchDto {
   name: string;
   parent: string | null;

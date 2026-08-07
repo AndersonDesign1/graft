@@ -1,13 +1,17 @@
 /** Approvals, Branches, History — the operational list views. */
 import { useState } from "react";
+import { toast } from "sonner";
 import type {
   ApprovalList,
   BranchList,
   CompilationDto,
   CompilationList,
   PendingApprovalDto,
+  RevertPreviewDto,
+  RevertResultDto,
 } from "../../types";
-import { IconCheck, IconCopy, IconHistory } from "../components/icons";
+import { IconCheck, IconCopy, IconHistory, IconRevert, IconWarning } from "../components/icons";
+import { CardsSkeleton, ListSkeleton, TableSkeleton } from "../components/skeletons";
 import { Delta, EmptyState, Pill, Status } from "../components/primitives";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
@@ -54,7 +58,7 @@ export function ApprovalsView({ onDecided }: { onDecided?: () => void }) {
         {rows.length > 0 ? <Pill tone="pending">{plural(rows.length, "waiting")}</Pill> : null}
       </header>
 
-      <Status loading={loading && !data} error={error ?? actionError} empty={rows.length === 0}>
+      <Status loading={loading && !data} error={error ?? actionError} empty={rows.length === 0} skeleton={<CardsSkeleton />}>
         <EmptyState
           title="Queue is clear"
           icon={<IconCheck size={20} />}
@@ -133,7 +137,7 @@ export function BranchesView({
         </div>
       </header>
 
-      <Status loading={loading && !data} error={error} empty={rows.length === 0}>
+      <Status loading={loading && !data} error={error} empty={rows.length === 0} skeleton={<ListSkeleton rows={3} avatar />}>
         <EmptyState
           title="No branches registered"
           body={
@@ -201,11 +205,53 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 }
 
 /**
- * Detail for one compilation. The projection stores counts rather than the
- * changed slugs, so this shows everything the trail actually records — and
- * says so, instead of implying a per-document diff exists.
+ * Detail for one compilation, and the revert control.
+ *
+ * Revert is only possible because content is git-authoritative: the trail
+ * records the SHA each compilation read, so going back restores real files
+ * rather than replaying an undo stack. The preflight runs before the button
+ * is offered, so an operator learns it would destroy uncommitted work *before*
+ * committing to the action, not after.
  */
-function CompilationDetail({ row, onClose }: { row: CompilationDto; onClose: () => void }) {
+function CompilationDetail({
+  row,
+  onClose,
+  onReverted,
+}: {
+  row: CompilationDto;
+  onClose: () => void;
+  onReverted: () => void;
+}) {
+  const preview = useResource<RevertPreviewDto>(
+    `/compilations/${encodeURIComponent(row.id)}/revert`,
+  );
+  const [reverting, setReverting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  async function revert() {
+    setReverting(true);
+    try {
+      const result = await api<RevertResultDto>(
+        `/compilations/${encodeURIComponent(row.id)}/revert`,
+        { method: "POST" },
+      );
+      toast.success(`Reverted to ${shortSha(result.gitSha)}`, {
+        description: `${plural(result.filesChanged.length, "file")} restored · index recompiled (+${result.added} ~${result.changed} −${result.removed})`,
+      });
+      onReverted();
+      onClose();
+    } catch (err) {
+      toast.error("Revert failed", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setReverting(false);
+      setConfirming(false);
+    }
+  }
+
+  const pre = preview.data;
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="dialog-detail">
@@ -261,7 +307,56 @@ function CompilationDetail({ row, onClose }: { row: CompilationDto; onClose: () 
           The trail records counts, not which documents changed — the projection is a hash diff, so
           per-document history lives in git.
         </p>
+
+        {/* Revert */}
+        {preview.loading && !pre ? (
+          <p className="muted">Checking whether this can be reverted…</p>
+        ) : !pre ? null : !pre.reachable ? (
+          <p className="notice" data-tone="warn">
+            <IconWarning size={14} />
+            <span>
+              Commit <code>{pre.shortSha}</code> is not in this clone, so there is nothing to
+              restore from. Fetch the full history and reopen.
+            </span>
+          </p>
+        ) : pre.dirty.length > 0 ? (
+          <p className="notice" data-tone="warn">
+            <IconWarning size={14} />
+            <span>
+              {plural(pre.dirty.length, "uncommitted change")} in the content directory would be
+              destroyed. Commit or stash first — reverting cannot bring them back.
+            </span>
+          </p>
+        ) : confirming ? (
+          <div className="notice" data-tone="error">
+            <IconWarning size={14} />
+            <div>
+              <p className="confirm-title">
+                Restore every content file to <code>{pre.shortSha}</code>?
+              </p>
+              <p className="confirm-body">
+                Files are rewritten and staged in git — not committed, so you can review the diff.
+                The index recompiles to match.
+              </p>
+              <div className="card-actions">
+                <Button variant="destructive" disabled={reverting} onClick={() => void revert()}>
+                  {reverting ? "Reverting…" : "Yes, revert"}
+                </Button>
+                <Button disabled={reverting} onClick={() => setConfirming(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="card-actions">
+          {pre?.canRevert && !confirming ? (
+            <Button variant="destructive" onClick={() => setConfirming(true)}>
+              <IconRevert size={14} />
+              Revert to this
+            </Button>
+          ) : null}
           <Button onClick={onClose}>Close</Button>
         </div>
       </DialogContent>
@@ -270,7 +365,7 @@ function CompilationDetail({ row, onClose }: { row: CompilationDto; onClose: () 
 }
 
 export function HistoryView({ branch }: { branch: string }) {
-  const { data, error, loading } = useResource<CompilationList>(
+  const { data, error, loading, refresh } = useResource<CompilationList>(
     `/compilations${qs({ branch, limit: 100 })}`,
   );
   const [selected, setSelected] = useState<CompilationDto | null>(null);
@@ -288,7 +383,7 @@ export function HistoryView({ branch }: { branch: string }) {
         </div>
       </header>
 
-      <Status loading={loading && !data} error={error} empty={rows.length === 0}>
+      <Status loading={loading && !data} error={error} empty={rows.length === 0} skeleton={<TableSkeleton />}>
         <EmptyState
           title="Nothing compiled yet"
           icon={<IconHistory size={20} />}
@@ -351,7 +446,7 @@ export function HistoryView({ branch }: { branch: string }) {
       ) : null}
 
       {selected ? (
-        <CompilationDetail row={selected} onClose={() => setSelected(null)} />
+        <CompilationDetail row={selected} onClose={() => setSelected(null)} onReverted={refresh} />
       ) : null}
     </div>
   );

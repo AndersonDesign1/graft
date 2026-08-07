@@ -50,7 +50,7 @@ export function Pill({
   title,
   className,
 }: {
-  tone: "pending" | "ready" | "denied" | "db" | "neutral";
+  tone: "pending" | "ready" | "denied" | "db" | "file" | "neutral";
   children: ReactNode;
   title?: string;
   className?: string;
@@ -101,11 +101,18 @@ export function Status({
   error,
   empty,
   children,
+  skeleton,
 }: {
   loading?: boolean;
   error?: string | null;
   empty?: boolean;
   children?: ReactNode;
+  /**
+   * A placeholder shaped like the content that is coming. Callers pass the
+   * one matching their layout; the generic bars are only a fallback, because
+   * a skeleton that doesn't match still makes the page jump on arrival.
+   */
+  skeleton?: ReactNode;
 }) {
   if (error) {
     return (
@@ -115,16 +122,16 @@ export function Status({
       </p>
     );
   }
-  if (loading) return <Skeleton rows={4} />;
+  if (loading) return <>{skeleton ?? <Skeleton rows={4} />}</>;
   if (empty) return <>{children}</>;
   return null;
 }
 
 export function Skeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="skeleton" aria-hidden="true">
+    <div className="sk" aria-hidden="true">
       {Array.from({ length: rows }, (_, i) => (
-        <span key={i} style={{ "--d": `${i * 60}ms` } as React.CSSProperties} />
+        <span key={i} className="sk-bar" style={{ width: `${100 - i * 12}%` }} />
       ))}
     </div>
   );

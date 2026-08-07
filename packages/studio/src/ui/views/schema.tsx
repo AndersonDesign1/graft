@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { SchemaFieldDto, SchemaList } from "../../types";
 import { IconDatabase, IconFile, IconSearch } from "../components/icons";
-import { EmptyState, IdentityMark, Pill, Status, TypeBadge } from "../components/primitives";
+import { EmptyState, Pill, Status, TypeBadge } from "../components/primitives";
+import { CollectionMark } from "../components/collection-icon";
+import { CardsSkeleton } from "../components/skeletons";
 import { useResource } from "../lib/use-resource";
 import { plural } from "../lib/format";
 
@@ -82,7 +84,7 @@ export function SchemaView() {
         </div>
       </header>
 
-      <Status loading={loading && !data} error={error} empty={collections.length === 0}>
+      <Status loading={loading && !data} error={error} empty={collections.length === 0} skeleton={<CardsSkeleton />}>
         <EmptyState
           title={q ? "No matching fields" : "No collections registered"}
           body={
@@ -103,7 +105,7 @@ export function SchemaView() {
             <section className="card">
               <div className="card-head">
                 <div className="card-head-title">
-                  <IdentityMark name={collection.name} />
+                  <CollectionMark name={collection.name} authority={collection.authority} />
                   <div>
                     <h2 className="card-title">{collection.name}</h2>
                     <p className="card-sub">
@@ -112,7 +114,7 @@ export function SchemaView() {
                   </div>
                 </div>
                 <Pill
-                  tone={collection.authority === "db" ? "db" : "neutral"}
+                  tone={collection.authority === "db" ? "db" : "file"}
                   title={collection.authorityRaw}
                 >
                   {collection.authority === "db" ? (

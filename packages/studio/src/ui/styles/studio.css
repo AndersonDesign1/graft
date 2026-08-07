@@ -454,18 +454,6 @@ h3 {
   color: var(--nav-active-rail);
 }
 
-.rail-item[data-active="true"]::before {
-  content: "";
-  position: absolute;
-  left: -0.5rem;
-  top: 50%;
-  translate: 0 -50%;
-  width: 2px;
-  height: 1.05rem;
-  border-radius: 1px;
-  background: var(--nav-active-rail);
-}
-
 .rail-mark {
   flex-shrink: 0;
   color: var(--state-db-solid);
@@ -1087,7 +1075,7 @@ h3 {
   transition: color var(--duration-fast) var(--ease-out);
 }
 
-.segmented-tab[data-selected] {
+.segmented-tab[data-active] {
   color: var(--ink);
 }
 
@@ -1095,7 +1083,7 @@ h3 {
   .segmented-tab:hover {
     color: var(--ink-muted);
   }
-  .segmented-tab[data-selected]:hover {
+  .segmented-tab[data-active]:hover {
     color: var(--ink);
   }
 }
@@ -1686,17 +1674,6 @@ h3 {
   background: var(--row-active-bg);
 }
 
-.row[data-active="true"]::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.35rem;
-  bottom: 0.35rem;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--row-active-rail);
-}
-
 .row-main {
   display: flex;
   flex-direction: column;
@@ -1939,36 +1916,6 @@ h3 {
   margin-top: var(--space-3);
 }
 
-.skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.5rem;
-}
-
-.skeleton span {
-  height: 0.85rem;
-  border-radius: var(--radius-inner);
-  background: var(--paper-sunken);
-  animation: pulse 1.4s var(--ease-in-out) infinite;
-  animation-delay: var(--d, 0ms);
-}
-
-.skeleton span:nth-child(2) {
-  width: 80%;
-}
-.skeleton span:nth-child(3) {
-  width: 65%;
-}
-.skeleton span:nth-child(4) {
-  width: 72%;
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.45;
-  }
-}
 
 .table {
   width: 100%;
@@ -2315,31 +2262,6 @@ kbd {
   font-size: var(--text-2xs);
 }
 
-/* ---- toast ---- */
-
-.toast {
-  position: fixed;
-  right: var(--space-4);
-  bottom: var(--space-4);
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0.55rem 0.8rem;
-  border-radius: var(--radius);
-  background: var(--elevated);
-  box-shadow: var(--shadow-floating);
-  font-size: var(--text-xs);
-  animation: toast-in var(--duration-base) var(--ease-out);
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    /* Percentage of its own height — works whatever the message length. */
-    transform: translateY(100%);
-  }
-}
 
 /* ==========================================================================
    Dialog (Base UI) — palette and detail
@@ -2567,15 +2489,6 @@ kbd {
     white-space: nowrap;
   }
 
-  .rail-item[data-active="true"]::before {
-    left: 0.4rem;
-    right: 0.4rem;
-    top: auto;
-    bottom: 0;
-    width: auto;
-    height: 2px;
-    translate: 0;
-  }
 
   .pane {
     border-right: 0;

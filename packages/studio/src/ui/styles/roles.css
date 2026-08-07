@@ -73,11 +73,18 @@
   --state-ready-solid: var(--c-green-solid);
   --state-ready-text: var(--c-green-text);
 
-  /* db-authoritative collections: rows live in data_records, not on disk */
+  /* Where a collection's content lives. Two halves of one distinction, so
+     both get a colour — badging only the db half made "mdx files" read as
+     the absence of a property rather than a property. */
   --state-db-bg: var(--c-purple-bg);
   --state-db-border: var(--c-purple-border);
   --state-db-solid: var(--c-purple-solid);
   --state-db-text: var(--c-purple-text);
+
+  --state-file-bg: var(--c-blue-bg);
+  --state-file-border: var(--c-blue-border);
+  --state-file-solid: var(--c-blue-solid);
+  --state-file-text: var(--c-blue-text);
 
   /* ---- schema field types -------------------------------------------------
      Types are an identity axis, not a severity one — nothing here means
@@ -108,6 +115,12 @@
   --preview-dark-bg: var(--n-0);
   --preview-bar: var(--ink-2);
   --preview-line: var(--n-6);
+
+  /* ---- loading placeholders ---- */
+  --skeleton-bg: var(--paper-sunken);
+
+  /* ---- rendered prose (the rich editor) ---- */
+  --prose-code: var(--code-string);
 
   /* ---- code editor ---- */
   --editor-active-line: color-mix(in oklch, var(--mark) 4%, transparent);

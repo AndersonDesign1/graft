@@ -1,0 +1,470 @@
+/**
+ * Graft Studio — LAYER 3, part two.
+ *
+ * Same rules as studio.css: role names only, no literals, no raw scales. Split
+ * out because these are the newer component families (skeletons, the rich
+ * editor, cmdk, sonner) and studio.css was long enough that finding anything
+ * in it had become the slow part of changing it.
+ */
+
+/* ==========================================================================
+   Collapsible sidebar
+   ========================================================================== */
+
+.rail[data-collapsed="true"] {
+  width: 0 !important;
+  padding-inline: 0;
+  overflow: hidden;
+  /* Not display:none — a width transition needs something to animate, so the
+     panel slides away rather than blinking out. */
+  transition: width var(--duration-base) var(--ease-out);
+}
+
+/* ==========================================================================
+   Skeletons — shaped like the thing that is loading
+   ========================================================================== */
+
+.sk {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0.25rem;
+}
+
+.sk-bar,
+.sk-square,
+.sk-dot,
+.sk-input,
+.sk-syncbar {
+  display: block;
+  border-radius: var(--radius-inner);
+  background: var(--skeleton-bg);
+  animation: sk-pulse 1.6s var(--ease-in-out) infinite;
+}
+
+.sk-square {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.sk-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.sk-input {
+  width: 100%;
+  height: var(--control-height);
+}
+
+.sk-syncbar {
+  height: 2px;
+  margin: 0 0.45rem 0.3rem 1.55rem;
+}
+
+@keyframes sk-pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.sk-tree-collection + .sk-tree-collection {
+  margin-top: var(--space-3);
+}
+
+.sk-tree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.35rem 0.15rem;
+}
+
+.sk-tree-children {
+  margin-left: 1.1rem;
+  padding-left: 0.45rem;
+  border-left: 1px solid var(--hairline);
+}
+
+.sk-tree-doc {
+  padding: 0.25rem 0.15rem;
+}
+
+.sk-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.5rem 0;
+}
+
+.sk-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.sk-cards {
+  gap: var(--space-3);
+  padding: 0;
+}
+
+.sk-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-outer);
+  background: var(--paper-raised);
+}
+
+.sk-table {
+  padding: 0;
+}
+
+.sk-table-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: var(--space-4);
+  align-items: center;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.sk-doc {
+  gap: var(--space-4);
+  padding: var(--space-6);
+  max-width: 48rem;
+  margin-inline: auto;
+}
+
+.sk-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-block: 1px solid var(--hairline);
+}
+
+.sk-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sk-prose {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* ==========================================================================
+   Document sheet — one column, frontmatter above body
+   ========================================================================== */
+
+.doc-sheet {
+  width: 100%;
+  max-width: 48rem;
+  margin-inline: auto;
+  padding: var(--space-6) var(--space-6) var(--space-16);
+}
+
+.doc-frontmatter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* Label beside the value, not above it. Frontmatter is a short list of
+   properties; stacking each one doubled the height of the block sitting
+   between the operator and the thing they came to write. */
+.doc-field {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.save-state {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.save-state[data-state="saving"] {
+  color: var(--state-drifted-text);
+}
+
+.save-state[data-state="saved"] {
+  color: var(--state-synced-text);
+}
+
+.save-state[data-state="error"] {
+  color: var(--state-orphaned-text);
+}
+
+/* ==========================================================================
+   Rich editor (Milkdown / ProseMirror)
+   ========================================================================== */
+
+.doc-body-editor {
+  min-height: 24rem;
+}
+
+.rich .milkdown,
+.rich .ProseMirror {
+  outline: none;
+}
+
+.rich .ProseMirror {
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  color: var(--ink);
+}
+
+.rich .ProseMirror > * + * {
+  margin-top: var(--space-4);
+}
+
+.rich .ProseMirror h1,
+.rich .ProseMirror h2,
+.rich .ProseMirror h3,
+.rich .ProseMirror h4 {
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  line-height: var(--leading-snug);
+  margin-top: var(--space-6);
+}
+
+.rich .ProseMirror h1 {
+  font-size: var(--text-lg);
+}
+
+.rich .ProseMirror h2 {
+  font-size: var(--text-md);
+}
+
+.rich .ProseMirror h3,
+.rich .ProseMirror h4 {
+  font-size: var(--text-base);
+}
+
+.rich .ProseMirror a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--primary-underline);
+  text-underline-offset: 3px;
+}
+
+.rich .ProseMirror code {
+  padding: 0.1rem 0.3rem;
+  border-radius: var(--radius-inner);
+  background: var(--paper-sunken);
+  font-size: 0.9em;
+  color: var(--prose-code);
+}
+
+.rich .ProseMirror pre {
+  padding: var(--space-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--paper-sunken);
+  overflow-x: auto;
+}
+
+.rich .ProseMirror blockquote {
+  margin-inline: 0;
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--hairline-strong);
+  color: var(--ink-muted);
+}
+
+.rich .ProseMirror ul,
+.rich .ProseMirror ol {
+  padding-left: var(--space-6);
+}
+
+.rich .ProseMirror li + li {
+  margin-top: var(--space-1);
+}
+
+.rich .ProseMirror hr {
+  border: 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.rich .ProseMirror table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+}
+
+.rich .ProseMirror th,
+.rich .ProseMirror td {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--hairline);
+  text-align: left;
+}
+
+.rich .ProseMirror th {
+  background: var(--paper-sunken);
+  font-weight: var(--weight-medium);
+}
+
+/* Milkdown ships its own surfaces for the slash menu and toolbar; point them
+   at ours so the editor doesn't arrive with a second design system. */
+.rich .milkdown-slash-menu,
+.rich .milkdown-toolbar,
+.rich .milkdown-block-handle {
+  background: var(--elevated);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-floating);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+/* ==========================================================================
+   Command palette (cmdk)
+   ========================================================================== */
+
+.palette [cmdk-root] {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 60vh;
+}
+
+.palette [cmdk-input] {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+
+.palette [cmdk-list] {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-1);
+  scroll-padding-block: var(--space-2);
+}
+
+.palette [cmdk-group-heading] {
+  padding: var(--space-2) 0.5rem 0.15rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.palette [cmdk-item] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.45rem 0.5rem;
+  border-radius: var(--radius-inner);
+  color: var(--ink-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.palette [cmdk-item][data-selected="true"] {
+  background: var(--nav-hover-bg);
+  color: var(--ink);
+}
+
+.palette [cmdk-item] svg {
+  flex-shrink: 0;
+  color: var(--ink-faint);
+}
+
+.palette [cmdk-empty] {
+  padding: var(--space-4);
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+/* ==========================================================================
+   Sonner — pointed at our surfaces rather than its own palette
+   ========================================================================== */
+
+[data-sonner-toaster] {
+  --normal-bg: var(--elevated);
+  --normal-text: var(--ink);
+  --normal-border: var(--hairline-strong);
+  --success-bg: var(--state-synced-bg);
+  --success-text: var(--state-synced-text);
+  --success-border: var(--state-synced-border);
+  --error-bg: var(--state-orphaned-bg);
+  --error-text: var(--state-orphaned-text);
+  --error-border: var(--state-orphaned-border);
+  font-family: var(--font-sans);
+}
+
+.sonner-toast {
+  border-radius: var(--radius) !important;
+  font-size: var(--text-xs) !important;
+}
+
+/* ==========================================================================
+   Misc: warn notices, revert confirmation, file pill, tree search
+   ========================================================================== */
+
+.notice[data-tone="warn"] {
+  border-color: var(--state-drifted-border);
+  background: var(--state-drifted-bg);
+  color: var(--state-drifted-text);
+}
+
+.confirm-title {
+  margin: 0;
+  font-weight: var(--weight-medium);
+}
+
+.confirm-body {
+  margin: 0.25rem 0 var(--space-3);
+  opacity: 0.85;
+  line-height: var(--leading-body);
+}
+
+.pill[data-tone="file"] {
+  border-color: var(--state-file-border);
+  background: var(--state-file-bg);
+  color: var(--state-file-text);
+}
+
+.search-tree {
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.search-tree > span {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .search-tree:hover {
+    border-color: var(--hairline-strong);
+    color: var(--ink-muted);
+  }
+}

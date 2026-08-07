@@ -18,6 +18,7 @@ import { GraftError } from "@graft/contracts";
 import matter from "gray-matter";
 import { readCollectionDocs, readRawDocument, requireCollection, writeDocument } from "./content";
 import { STUDIO_OPENAPI } from "./openapi";
+import { preflightRevert, revertContentTo } from "./revert";
 import type {
   ApprovalList,
   BranchList,
@@ -28,6 +29,8 @@ import type {
   ContentTreeDoc,
   DocumentDto,
   DocumentState,
+  RevertPreviewDto,
+  RevertResultDto,
   SchemaCollectionDto,
   SchemaFieldDto,
   SchemaList,
@@ -442,6 +445,59 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
           decidedBy: row.decidedBy,
           functionName: row.functionName,
         });
+      }
+
+      // Revert is the payoff of git-authoritative content: a compilation
+      // records the SHA it read, so "go back" restores real files rather than
+      // replaying an undo stack. GET previews whether it is safe; POST does it.
+      const revertMatch = /^\/api\/studio\/v1\/compilations\/([^/]+)\/revert$/.exec(pathname);
+      if (revertMatch && (method === "GET" || method === "POST")) {
+        const id = decodeURIComponent(revertMatch[1] ?? "");
+        const rows = await listCompilations(options.db, { limit: 500 });
+        const row = rows.find((candidate) => candidate.id === id);
+        if (!row) {
+          throw new GraftError({
+            code: "DOCUMENT_NOT_FOUND",
+            message: `No compilation "${id}".`,
+            fix: "Refresh History; the trail may have been pruned.",
+            details: { id },
+          });
+        }
+
+        if (method === "GET") {
+          const pre = await preflightRevert(options.contentDir, row.gitSha);
+          const body: RevertPreviewDto = {
+            compilationId: row.id,
+            gitSha: row.gitSha,
+            shortSha: pre.shortSha,
+            reachable: pre.reachable,
+            dirty: pre.dirty,
+            canRevert: pre.reachable && pre.dirty.length === 0,
+            createdAt: row.createdAt.toISOString(),
+          };
+          return json(body);
+        }
+
+        const changed = await revertContentTo(options.contentDir, row.gitSha as string);
+        // Recompile only after the files landed, so the index can never
+        // describe content that failed to write.
+        const result = await compile({
+          contentDir: options.contentDir,
+          collections: options.collections,
+          db: options.db,
+          branchId: row.branchId,
+        });
+        const body: RevertResultDto = {
+          compilationId: row.id,
+          gitSha: row.gitSha,
+          branch: row.branchId,
+          filesChanged: changed,
+          added: result.changes.added.length,
+          changed: result.changes.changed.length,
+          removed: result.changes.removed.length,
+          docCount: result.count,
+        };
+        return json(body);
       }
 
       if (pathname === "/api/studio/v1/document" && method === "GET") {

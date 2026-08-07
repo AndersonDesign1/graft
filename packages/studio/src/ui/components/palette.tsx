@@ -1,33 +1,39 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Command } from "cmdk";
+import { useEffect, useMemo } from "react";
 import type { BranchList, ContentTree } from "../../types";
-import { IconSearch } from "./icons";
+import {
+  IconBranches,
+  IconCompile,
+  IconFile,
+  IconOverview,
+  IconSchema,
+  IconSettings,
+  IconApprovals,
+  IconHistory,
+  type IconComponent,
+} from "./icons";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import type { Route, ViewId } from "../lib/route";
 
-interface Command {
-  id: string;
-  label: string;
-  hint?: string;
-  group: string;
-  run: () => void;
-}
-
-const NAV_LABELS: Array<[ViewId, string]> = [
-  ["overview", "Overview"],
-  ["collections", "Collections"],
-  ["schema", "Schema"],
-  ["approvals", "Approvals"],
-  ["branches", "Branches"],
-  ["history", "History"],
-  ["settings", "Settings"],
+const NAV: Array<[ViewId, string, IconComponent]> = [
+  ["overview", "Overview", IconOverview],
+  ["collections", "Collections", IconFile],
+  ["schema", "Schema", IconSchema],
+  ["approvals", "Approvals", IconApprovals],
+  ["branches", "Branches", IconBranches],
+  ["history", "History", IconHistory],
+  ["settings", "Settings", IconSettings],
 ];
 
 /**
- * ⌘K palette on Base UI's Dialog — focus is trapped and returned, the page
- * behind goes inert, Escape closes.
+ * ⌘K palette on cmdk, inside a Base UI dialog.
+ *
+ * cmdk owns the list semantics — filtering, scoring, roving selection, the
+ * combobox ARIA contract — which is a surprising amount of behaviour to get
+ * right by hand and the part users notice when it is wrong.
  *
  * Deliberately unanimated: it is opened by keyboard many times a session, and
- * an entrance transition on a keyboard action reads as lag however short it is.
+ * an entrance transition on a keyboard action reads as lag however short.
  */
 export function CommandPalette({
   open,
@@ -46,130 +52,102 @@ export function CommandPalette({
   onSelectBranch: (name: string) => void;
   onCompile: () => void;
 }) {
-  const [query, setQuery] = useState("");
-  const [index, setIndex] = useState(0);
-  const listRef = useRef<HTMLUListElement>(null);
+  const documents = useMemo(
+    () =>
+      (tree?.collections ?? []).flatMap((collection) =>
+        collection.documents.map((doc) => ({ collection: collection.name, doc })),
+      ),
+    [tree],
+  );
 
-  const commands = useMemo<Command[]>(() => {
-    const out: Command[] = [];
-    for (const [view, label] of NAV_LABELS) {
-      out.push({ id: `go:${view}`, label, group: "Go to", run: () => navigate({ view }) });
-    }
-    out.push({
-      id: "action:compile",
-      label: "Compile this branch",
-      hint: "Refresh the content index from disk",
-      group: "Actions",
-      run: onCompile,
-    });
-    for (const collection of tree?.collections ?? []) {
-      for (const doc of collection.documents) {
-        out.push({
-          id: `doc:${collection.name}/${doc.slug}`,
-          label: doc.title ?? doc.slug,
-          hint: doc.sourcePath,
-          group: collection.name,
-          run: () =>
-            navigate({ view: "collections", collection: collection.name, slug: doc.slug }),
-        });
-      }
-    }
-    for (const b of branches?.branches ?? []) {
-      out.push({
-        id: `branch:${b.name}`,
-        label: b.name,
-        hint: b.parent ? `branch ← ${b.parent}` : "branch · root",
-        group: "Switch branch",
-        run: () => onSelectBranch(b.name),
-      });
-    }
-    return out;
-  }, [tree, branches, navigate, onSelectBranch, onCompile]);
-
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return commands.slice(0, 40);
-    return commands
-      .filter((c) => `${c.label} ${c.hint ?? ""} ${c.group}`.toLowerCase().includes(q))
-      .slice(0, 40);
-  }, [commands, query]);
-
+  // Escape is handled by the dialog; cmdk only needs to not fight it.
   useEffect(() => {
-    if (open) {
-      setQuery("");
-      setIndex(0);
-    }
+    if (!open) return;
+    return () => undefined;
   }, [open]);
 
-  useEffect(() => setIndex(0), [query]);
-
-  useEffect(() => {
-    listRef.current
-      ?.querySelector<HTMLElement>('[data-active="true"]')
-      ?.scrollIntoView({ block: "nearest" });
-  }, [index]);
-
-  const run = (command: Command | undefined): void => {
-    if (!command) return;
-    command.run();
+  const go = (fn: () => void): void => {
+    fn();
     onOpenChange(false);
   };
-
-  let lastGroup = "";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="palette">
         <DialogTitle className="sr-only">Command palette</DialogTitle>
-        <div className="palette-input">
-          <IconSearch size={16} />
-          <input
-            // eslint-disable-next-line jsx-a11y/no-autofocus
-            autoFocus
-            value={query}
-            placeholder="Jump to a document, switch branch, run a command…"
-            aria-label="Command palette"
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                setIndex((i) => Math.min(i + 1, results.length - 1));
-              } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setIndex((i) => Math.max(i - 1, 0));
-              } else if (e.key === "Enter") {
-                e.preventDefault();
-                run(results[index]);
-              }
-            }}
-          />
-          <kbd>Esc</kbd>
-        </div>
-        <ul className="palette-list" ref={listRef}>
-          {results.length === 0 ? (
-            <li className="palette-empty">No matches.</li>
-          ) : (
-            results.map((command, i) => {
-              const header = command.group !== lastGroup ? command.group : null;
-              lastGroup = command.group;
-              return (
-                <li key={command.id}>
-                  {header ? <p className="palette-group">{header}</p> : null}
-                  <button
-                    type="button"
+        <Command label="Command palette" loop>
+          <div className="palette-input">
+            <Command.Input placeholder="Jump to a document, switch branch, run a command…" />
+            <kbd>Esc</kbd>
+          </div>
+          <Command.List className="palette-list">
+            <Command.Empty className="palette-empty">No matches.</Command.Empty>
+
+            <Command.Group heading="Go to" className="palette-group">
+              {NAV.map(([view, label, Icon]) => (
+                <Command.Item
+                  key={view}
+                  value={`go ${label}`}
+                  className="palette-item"
+                  onSelect={() => go(() => navigate({ view }))}
+                >
+                  <Icon size={14} />
+                  <span className="palette-item-label">{label}</span>
+                </Command.Item>
+              ))}
+            </Command.Group>
+
+            <Command.Group heading="Actions" className="palette-group">
+              <Command.Item
+                value="compile branch index"
+                className="palette-item"
+                onSelect={() => go(onCompile)}
+              >
+                <IconCompile size={14} />
+                <span className="palette-item-label">Compile this branch</span>
+                <span className="palette-item-hint">Refresh the index from disk</span>
+              </Command.Item>
+            </Command.Group>
+
+            {documents.length > 0 ? (
+              <Command.Group heading="Documents" className="palette-group">
+                {documents.map(({ collection, doc }) => (
+                  <Command.Item
+                    key={`${collection}/${doc.slug}`}
+                    value={`${collection} ${doc.title ?? doc.slug} ${doc.sourcePath}`}
                     className="palette-item"
-                    data-active={i === index}
-                    onMouseEnter={() => setIndex(i)}
-                    onClick={() => run(command)}
+                    onSelect={() =>
+                      go(() => navigate({ view: "collections", collection, slug: doc.slug }))
+                    }
                   >
-                    <span className="palette-item-label">{command.label}</span>
-                    {command.hint ? <span className="palette-item-hint">{command.hint}</span> : null}
-                  </button>
-                </li>
-              );
-            })
-          )}
-        </ul>
+                    <span className="dot" data-state={doc.state} />
+                    <span className="palette-item-label">{doc.title ?? doc.slug}</span>
+                    <span className="palette-item-hint">{doc.sourcePath}</span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            ) : null}
+
+            {(branches?.branches.length ?? 0) > 0 ? (
+              <Command.Group heading="Switch branch" className="palette-group">
+                {branches?.branches.map((row) => (
+                  <Command.Item
+                    key={row.name}
+                    value={`branch ${row.name}`}
+                    className="palette-item"
+                    onSelect={() => go(() => onSelectBranch(row.name))}
+                  >
+                    <IconBranches size={14} />
+                    <span className="palette-item-label">{row.name}</span>
+                    <span className="palette-item-hint">
+                      {row.parent ? `← ${row.parent}` : "root"}
+                    </span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            ) : null}
+          </Command.List>
+        </Command>
       </DialogContent>
     </Dialog>
   );

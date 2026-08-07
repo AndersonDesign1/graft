@@ -1,4 +1,5 @@
 import { IconContext } from "@phosphor-icons/react";
+import { Toaster, toast } from "sonner";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { BranchList, CompileResultDto, ContentTree } from "../types";
 import { CommandPalette } from "./components/palette";
@@ -6,7 +7,7 @@ import {
   IconApprovals,
   IconBranches,
   IconCaretUpDown,
-  IconCompile,
+  IconSidebar,
   IconHistory,
   IconMoon,
   IconOverview,
@@ -57,7 +58,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
   const [theme, setTheme] = useTheme();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [compiling, setCompiling] = useState(false);
-  const [compileMsg, setCompileMsg] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
   const sidebar = useSidebarWidth();
 
   const tree = useResource<ContentTree>(`/tree${qs({ branch })}`);
@@ -71,15 +72,16 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
 
   const compile = useCallback(async () => {
     setCompiling(true);
-    setCompileMsg(null);
     try {
       const result = await api<CompileResultDto>(`/compile${qs({ branch })}`, { method: "POST" });
-      setCompileMsg(
-        `Compiled ${plural(result.docCount, "document")} · +${result.added} ~${result.changed} −${result.removed}`,
-      );
+      toast.success(`Compiled ${plural(result.docCount, "document")}`, {
+        description: `+${result.added} added · ~${result.changed} changed · −${result.removed} removed`,
+      });
       tree.refresh();
     } catch (err) {
-      setCompileMsg(err instanceof Error ? err.message : String(err));
+      toast.error("Compile failed", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setCompiling(false);
     }
@@ -95,12 +97,6 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-
-  useEffect(() => {
-    if (!compileMsg) return;
-    const timer = window.setTimeout(() => setCompileMsg(null), 6000);
-    return () => window.clearTimeout(timer);
-  }, [compileMsg]);
 
   const drift = tree.data?.summary.drift ?? 0;
   const pending = approvals.data?.approvals.length ?? 0;
@@ -159,6 +155,16 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
       <div className="studio">
         <header className="topbar">
           <div className="topbar-left">
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={collapsed ? "Show sidebar" : "Hide sidebar"}
+              aria-expanded={!collapsed}
+              title={`${collapsed ? "Show" : "Hide"} sidebar`}
+              onClick={() => setCollapsed((v) => !v)}
+            >
+              <IconSidebar size={16} />
+            </button>
             <span className="brand">
               graft<b>.</b>
             </span>
@@ -237,7 +243,8 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
           <nav
             className="rail"
             aria-label="Studio sections"
-            style={{ width: `${sidebar.width}px` }}
+            data-collapsed={collapsed}
+            style={collapsed ? undefined : { width: `${sidebar.width}px` }}
           >
             <div className="rail-group">{TOP.map((item) => railItem(item))}</div>
 
@@ -252,6 +259,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
               onSelectDocument={(collection, slug) =>
                 navigate({ view: "collections", collection, slug })
               }
+              onSearch={() => setPaletteOpen(true)}
             />
 
             <div className="rail-group">
@@ -273,6 +281,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
 
           <div
             className="rail-resize"
+            hidden={collapsed}
             data-dragging={sidebar.dragging}
             role="separator"
             aria-label="Resize sidebar"
@@ -285,12 +294,13 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
           <main className="main">{main}</main>
         </div>
 
-        {compileMsg ? (
-          <output className="toast" aria-live="polite">
-            <IconCompile size={14} />
-            {compileMsg}
-          </output>
-        ) : null}
+        {/* Sonner: bottom-right, and it inherits our surface tokens rather
+            than shipping its own palette. */}
+        <Toaster
+          position="bottom-right"
+          closeButton
+          toastOptions={{ className: "sonner-toast" }}
+        />
 
         <CommandPalette
           open={paletteOpen}

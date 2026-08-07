@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import type {
   ContentTree,
   ContentTreeCollection,
@@ -6,21 +7,18 @@ import type {
   DocumentState,
 } from "../../types";
 import { MdxEditor } from "../components/editor";
-import { IconDatabase, IconFile } from "../components/icons";
+import { hasMdxSyntax, RichEditor } from "../components/rich-editor";
+import { IconDatabase, IconFile, IconWarning } from "../components/icons";
+import { DocumentSkeleton } from "../components/skeletons";
 import { EmptyState, Pill, StatePill, Status } from "../components/primitives";
-import { Button } from "../components/ui/button";
 import { Field, FieldLabel, Input, NumberField, Switch, Textarea } from "../components/ui/field";
 import { Tabs, TabsIndicator, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { api, qs } from "../lib/api";
+import { useAutosave } from "../lib/autosave";
 import type { Route } from "../lib/route";
 
-type EditorMode = "fields" | "raw";
+type EditorMode = "rich" | "raw";
 
-/**
- * Frontmatter values the field editor can round-trip. Anything else (arrays,
- * nested objects) is left to the Raw tab rather than flattened into a string
- * the user would have to retype correctly.
- */
 type Scalar = {
   key: string;
   value: string | number | boolean;
@@ -61,6 +59,14 @@ function buildRaw(data: Record<string, unknown>, body: string): string {
   return `${lines.join("\n")}${body.replace(/^\n/, "")}`;
 }
 
+const SAVE_LABEL: Record<string, string> = {
+  idle: "Saved",
+  dirty: "Editing…",
+  saving: "Saving…",
+  saved: "Saved",
+  error: "Not saved",
+};
+
 export function CollectionsView({
   branch,
   route,
@@ -78,19 +84,21 @@ export function CollectionsView({
   const [fields, setFields] = useState<Record<string, string | number | boolean>>({});
   const [body, setBody] = useState("");
   const [raw, setRaw] = useState("");
-  const [mode, setMode] = useState<EditorMode>("fields");
+  const [mode, setMode] = useState<EditorMode>("rich");
   const [docError, setDocError] = useState<string | null>(null);
   const [docLoading, setDocLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
 
   const collections = tree.data?.collections ?? [];
   const active: ContentTreeCollection | undefined =
     collections.find((c) => c.name === route.collection) ?? collections[0];
+  const readOnly = active?.authority === "db";
 
-  // Landing on /collections with nothing chosen should still show a document
-  // — the first in reading order — rather than an empty pane.
+  // MDX is markdown plus JSX, and a commonmark editor has no node for
+  // `<Callout>`. Rather than quietly mangle it on the next save, those
+  // documents stay in Raw.
+  const mdxOnly = useMemo(() => hasMdxSyntax(body), [body]);
+  const effectiveMode: EditorMode = mdxOnly ? "raw" : mode;
+
   useEffect(() => {
     if (!route.collection && active) {
       navigate({
@@ -101,11 +109,58 @@ export function CollectionsView({
     }
   }, [active, route.collection, navigate]);
 
+  // Latest values, so the debounced save never writes a stale snapshot.
+  const latest = useRef({ fields, body, raw, mode: effectiveMode, doc });
+  latest.current = { fields, body, raw, mode: effectiveMode, doc };
+
+  const persist = useCallback(async () => {
+    const { collection, slug } = route;
+    const snapshot = latest.current;
+    if (!collection || !slug || !snapshot.doc || readOnly) return;
+
+    // Second guard against writing a file nobody edited. The editor already
+    // ignores its own mount-time normalisation, but a write is destructive
+    // and cheap to skip, so verify something actually differs from what we
+    // loaded rather than trusting one check.
+    const fieldsChanged = Object.entries(snapshot.fields).some(
+      ([key, value]) => snapshot.doc?.data[key] !== value,
+    );
+    const unchanged =
+      snapshot.mode === "raw"
+        ? snapshot.raw === snapshot.doc.raw
+        : !fieldsChanged && snapshot.body === snapshot.doc.body;
+    if (unchanged) return;
+
+    const payload =
+      snapshot.mode === "raw"
+        ? { collection, slug, raw: snapshot.raw, branch }
+        : {
+            collection,
+            slug,
+            data: { ...snapshot.doc.data, ...snapshot.fields },
+            body: snapshot.body,
+            branch,
+          };
+    await api<{ written: string; gitSha: string | null }>("/document", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+    onSaved();
+  }, [route.collection, route.slug, branch, readOnly, onSaved]);
+
+  const autosave = useAutosave({ save: persist, enabled: !readOnly });
+
+  // Surface failures as a toast — a save that silently didn't happen is the
+  // one thing an autosaving editor must never do.
+  useEffect(() => {
+    if (autosave.state === "error" && autosave.error) {
+      toast.error("Could not save", { description: autosave.error });
+    }
+  }, [autosave.state, autosave.error]);
+
   const openDoc = useCallback(async (collection: string, slug: string) => {
     setDocError(null);
-    setSaveMsg(null);
     setDocLoading(true);
-    setDirty(false);
     try {
       const next = await api<DocumentDto>(`/document${qs({ collection, slug })}`);
       setDoc(next);
@@ -123,74 +178,48 @@ export function CollectionsView({
     }
   }, []);
 
+  // Flush before swapping documents, or the pending edit lands on the wrong file.
+  const previous = useRef<string | null>(null);
   useEffect(() => {
+    const key = route.collection && route.slug ? `${route.collection}/${route.slug}` : null;
+    if (previous.current && previous.current !== key) void autosave.flush();
+    previous.current = key;
     if (route.collection && route.slug) void openDoc(route.collection, route.slug);
     else setDoc(null);
+    // autosave.flush is stable; including it would re-open on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route.collection, route.slug, openDoc]);
 
   const selectedState: DocumentState | undefined = active?.documents.find(
     (d) => d.slug === route.slug,
   )?.state;
 
-  const save = useCallback(async () => {
-    if (!route.collection || !route.slug || !doc) return;
-    setSaving(true);
-    setDocError(null);
-    setSaveMsg(null);
-    try {
-      const payload =
-        mode === "raw"
-          ? { collection: route.collection, slug: route.slug, raw, branch }
-          : {
-              collection: route.collection,
-              slug: route.slug,
-              data: { ...doc.data, ...fields },
-              body,
-              branch,
-            };
-      const result = await api<{ written: string; gitSha: string | null }>("/document", {
-        method: "PUT",
-        body: JSON.stringify(payload),
-      });
-      setSaveMsg(
-        `Saved ${result.written} · index updated${result.gitSha ? ` @ ${result.gitSha.slice(0, 7)}` : ""}`,
-      );
-      setDirty(false);
-      onSaved();
-      await openDoc(route.collection, route.slug);
-    } catch (err) {
-      setDocError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
-    }
-  }, [route.collection, route.slug, doc, mode, raw, fields, body, branch, onSaved, openDoc]);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        if (dirty && !saving) void save();
+        void autosave.flush();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dirty, saving, save]);
+  }, [autosave]);
 
   function switchMode(next: EditorMode): void {
     if (next === mode) return;
     if (next === "raw" && doc) setRaw(buildRaw({ ...doc.data, ...fields }, body));
+    if (next === "rich" && doc) {
+      // Raw is authoritative while it is open, so re-split it on the way back.
+      const match = /^---\n([\s\S]*?)\n---\n?/.exec(raw);
+      setBody(match ? raw.slice(match[0].length) : raw);
+    }
     setMode(next);
   }
 
   const setField = (key: string, value: string | number | boolean): void => {
-    setDirty(true);
     setFields((prev) => ({ ...prev, [key]: value }));
+    autosave.touch();
   };
-
-  const readOnly = active?.authority === "db";
-
-  /* The list pane is gone — the sidebar tree is the document list now, so
-     this view is only ever the document itself. */
 
   if (tree.error) {
     return (
@@ -238,19 +267,23 @@ export function CollectionsView({
             <span className="crumb-sep">/</span>
             <span className="crumb-current">{route.slug}</span>
           </nav>
-          <h2 className="doc-title">{String(fields.title ?? route.slug)}</h2>
           <p className="doc-path">
             <IconFile size={12} />
             {doc?.sourcePath ?? "…"}
           </p>
         </div>
         <div className="doc-head-actions">
-          {readOnly ? <Pill tone="db">read-only</Pill> : null}
+          <span className="save-state" data-state={autosave.state}>
+            {readOnly ? "Read-only" : SAVE_LABEL[autosave.state]}
+          </span>
+          {readOnly ? <Pill tone="db">db</Pill> : null}
           {selectedState ? <StatePill state={selectedState} /> : null}
-          <Tabs value={mode} onValueChange={(v) => switchMode(v as EditorMode)}>
+          <Tabs value={effectiveMode} onValueChange={(v) => switchMode(v as EditorMode)}>
             <TabsList>
               <TabsIndicator />
-              <TabsTrigger value="fields">Fields</TabsTrigger>
+              <TabsTrigger value="rich" disabled={mdxOnly}>
+                Rich
+              </TabsTrigger>
               <TabsTrigger value="raw">Raw MDX</TabsTrigger>
             </TabsList>
           </Tabs>
@@ -262,27 +295,18 @@ export function CollectionsView({
           {docError}
         </p>
       ) : null}
-      {saveMsg ? (
-        <p className="notice" data-tone="ok">
-          {saveMsg}
-        </p>
-      ) : null}
 
-      <div className="doc-body" data-mode={mode}>
+      {/* One column. Frontmatter is part of the document, not a sidebar to it,
+          so it sits above the body in the same scroll. */}
+      <div className="doc-scroll">
         {docLoading ? (
-          <div className="doc-scroll">
-            <Status loading />
-          </div>
-        ) : mode === "fields" ? (
-          <>
-            <div className="doc-fields">
-              <p className="doc-fields-label">Frontmatter</p>
-              {Object.keys(fields).length === 0 ? (
-                <p className="muted">No scalar frontmatter — edit the body alongside.</p>
-              ) : (
-                doc &&
+          <DocumentSkeleton />
+        ) : (
+          <article className="doc-sheet">
+            <div className="doc-frontmatter">
+              {doc &&
                 scalars(doc.data).map((field) => (
-                  <Field key={field.key} disabled={readOnly}>
+                  <Field key={field.key} disabled={readOnly} className="doc-field">
                     <FieldLabel>{field.key}</FieldLabel>
                     {field.kind === "boolean" ? (
                       <Switch
@@ -299,7 +323,7 @@ export function CollectionsView({
                     ) : String(fields[field.key] ?? "").length > 72 ||
                       field.key === "description" ? (
                       <Textarea
-                        rows={3}
+                        rows={2}
                         value={String(fields[field.key] ?? "")}
                         disabled={readOnly}
                         onChange={(e) => setField(field.key, e.target.value)}
@@ -312,51 +336,51 @@ export function CollectionsView({
                       />
                     )}
                   </Field>
-                ))
+                ))}
+              {doc && scalars(doc.data).length === 0 ? (
+                <p className="muted">No frontmatter fields.</p>
+              ) : null}
+            </div>
+
+            {mdxOnly ? (
+              <p className="notice" data-tone="warn">
+                <IconWarning size={14} />
+                <span>
+                  This document uses MDX components, which the rich editor cannot represent without
+                  rewriting them. Editing the source directly keeps them intact.
+                </span>
+              </p>
+            ) : null}
+
+            <div className="doc-body-editor">
+              {effectiveMode === "rich" ? (
+                <RichEditor
+                  // Remount per document: the editor owns its buffer, so a new
+                  // file needs a new instance rather than a contents swap.
+                  key={`${route.collection}/${route.slug}`}
+                  value={body}
+                  readOnly={readOnly}
+                  onChange={(next) => {
+                    setBody(next);
+                    autosave.touch();
+                  }}
+                />
+              ) : (
+                <MdxEditor
+                  value={raw}
+                  readOnly={readOnly}
+                  showLineNumbers
+                  ariaLabel="Raw MDX source"
+                  onChange={(next) => {
+                    setRaw(next);
+                    autosave.touch();
+                  }}
+                />
               )}
             </div>
-            <div className="doc-editor">
-              <p className="doc-editor-label">Body</p>
-              <MdxEditor
-                value={body}
-                onChange={(next) => {
-                  setDirty(true);
-                  setBody(next);
-                }}
-                readOnly={readOnly}
-                ariaLabel="Document body"
-                placeholder="Write MDX…"
-              />
-            </div>
-          </>
-        ) : (
-          <div className="doc-editor doc-editor-full">
-            <MdxEditor
-              value={raw}
-              onChange={(next) => {
-                setDirty(true);
-                setRaw(next);
-              }}
-              readOnly={readOnly}
-              showLineNumbers
-              ariaLabel="Raw MDX source"
-            />
-          </div>
+          </article>
         )}
       </div>
-
-      <footer className="doc-foot">
-        <span className="doc-foot-hint">
-          {readOnly
-            ? "Read-only — db-authoritative collection"
-            : dirty
-              ? "Unsaved changes"
-              : "Saving writes the file and recompiles the index"}
-        </span>
-        <Button variant="primary" disabled={saving || !doc || readOnly} onClick={() => void save()}>
-          {saving ? "Saving…" : "Save"}
-        </Button>
-      </footer>
     </section>
   );
 }

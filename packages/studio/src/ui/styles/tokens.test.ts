@@ -13,6 +13,10 @@ import { describe, expect, it } from "vitest";
 const here = join(process.cwd(), "src", "ui", "styles");
 const read = (name: string): string => readFileSync(join(here, name), "utf8");
 
+/** Every layer-3 stylesheet. Both must obey the same rules. */
+const COMPONENT_SHEETS = ["studio.css", "parts.css"];
+const components = (): string => COMPONENT_SHEETS.map(read).join("\n");
+
 /** Drop comments so prose about colours doesn't trip the literal checks. */
 const stripComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, "");
 
@@ -33,17 +37,17 @@ describe("token layering", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("keeps colour literals out of studio.css", () => {
+  it("keeps colour literals out of the component sheets", () => {
     // color-mix is allowed here only against a role var (the identity tint),
     // so check for actual literals rather than any colour function.
-    const offenders = stripComments(read("studio.css"))
+    const offenders = stripComments(components())
       .split("\n")
       .filter((line) => /(oklch|lab|lch)\(|#[0-9a-fA-F]{3,8}\b/.test(line));
     expect(offenders).toEqual([]);
   });
 
   it("stops components reaching past roles into the raw scales", () => {
-    const offenders = stripComments(read("studio.css"))
+    const offenders = stripComments(components())
       .split("\n")
       .filter((line) => RAW_SCALE.test(line));
     expect(offenders).toEqual([]);

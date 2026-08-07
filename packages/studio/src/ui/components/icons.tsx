@@ -31,6 +31,8 @@ export { Check as IconCheck } from "@phosphor-icons/react/dist/icons/Check";
 export { Copy as IconCopy } from "@phosphor-icons/react/dist/icons/Copy";
 export { ArrowSquareOut as IconExternal } from "@phosphor-icons/react/dist/icons/ArrowSquareOut";
 export { SortAscending as IconSort } from "@phosphor-icons/react/dist/icons/SortAscending";
+export { Sidebar as IconSidebar } from "@phosphor-icons/react/dist/icons/Sidebar";
+export { ArrowCounterClockwise as IconRevert } from "@phosphor-icons/react/dist/icons/ArrowCounterClockwise";
 
 // status / meaning
 export { Warning as IconWarning } from "@phosphor-icons/react/dist/icons/Warning";
