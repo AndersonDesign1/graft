@@ -18,7 +18,21 @@ paths:
   /api/studio/v1/tree:
     get:
       operationId: getContentTree
-      summary: Content tree (collections → documents)
+      summary: Content tree (disk merged with the compiled index)
+      description: |
+        Filesystem-first. Graft content is git-authoritative: the .mdx files on
+        disk are truth and content_index is a projection refreshed by compile.
+        Every on-disk document appears immediately, tagged by comparing its
+        contentHash against the index:
+
+          synced     on disk, in the index, hashes match
+          drifted    in both, hashes differ — edited since the last compile
+          unindexed  on disk only — never compiled
+          orphaned   in the index only — the file is gone, the index is stale
+
+        db-authoritative collections are returned with authority "db" and no
+        documents; their rows live in data_records, reached through typed
+        functions, and have no file to compare against.
       parameters:
         - name: branch
           in: query
@@ -27,7 +41,31 @@ paths:
             default: main
       responses:
         "200":
-          description: Collections with document slugs
+          description: Collections with per-document state and a drift summary
+  /api/studio/v1/collections:
+    get:
+      operationId: listCollectionSchemas
+      summary: Collection schemas (same shape as MCP describe_schema)
+      responses:
+        "200":
+          description: Collections with their field descriptors
+  /api/studio/v1/compile:
+    post:
+      operationId: compileBranch
+      summary: Recompile a branch's content index (same as graft compile)
+      description: |
+        Refreshes content_index from disk for one branch. Exposed so the Studio
+        can resolve the drift it reports instead of sending the operator to a
+        terminal.
+      parameters:
+        - name: branch
+          in: query
+          schema:
+            type: string
+            default: main
+      responses:
+        "200":
+          description: Added/changed/removed counts, doc count and git SHA
   /api/studio/v1/document:
     get:
       operationId: getDocument

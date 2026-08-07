@@ -1,10 +1,17 @@
-import { createRoot } from "react-dom/client";
-import { StudioApp } from "../panels";
+import "@fontsource/instrument-serif";
+import "@fontsource-variable/instrument-sans";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
+import "./styles/tokens.css";
+import "./styles/palette.css";
+import "./styles/roles.css";
+import "./styles/studio.css";
 
-const params = new URLSearchParams(window.location.search);
-const branch = params.get("branch")?.trim() || "main";
+import { createRoot } from "react-dom/client";
+import { StudioApp } from "./app";
+import { currentBranch } from "./lib/route";
 
 const root = document.getElementById("root");
 if (root) {
-  createRoot(root).render(<StudioApp branch={branch} />);
+  createRoot(root).render(<StudioApp branch={currentBranch()} />);
 }

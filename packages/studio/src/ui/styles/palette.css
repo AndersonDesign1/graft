@@ -1,0 +1,75 @@
+/**
+ * Studio palette — LAYER 1 of 3. Raw scales only.
+ *
+ * This is the ONLY file in the Studio permitted to contain a color literal.
+ * Nothing here carries meaning: `--c-amber-solid` is a color, not a status.
+ * Meaning is assigned in roles.css; components read roles, never this file.
+ *
+ * Generated, not hand-picked. Every slot shares a fixed lightness and a fixed
+ * PERCENTAGE of that hue's maximum in-gamut chroma, so all five hues read at
+ * equal brightness and equal vividness — the thing absolute chroma gets wrong.
+ * Slot structure follows Geist: backgrounds -> borders -> solid -> text.
+ *
+ *   bg          tinted surface behind a pill or row
+ *   bg-hover    same, hovered
+ *   border      hairline on that surface
+ *   solid       the saturated mark: dot, bar, fill
+ *   text        label sitting ON -bg
+ *   text-loud   label sitting on plain --paper
+ *
+ * Verified APCA (text vs its own -bg, and text-loud vs --paper) in both
+ * schemes; every pair lands |Lc| 63-85 against a >= 60 floor for non-body
+ * text. Retuning means re-running the generator, not nudging by eye: contrast
+ * moves with L, so change L and re-check rather than reaching for chroma.
+ */
+
+:root {
+  /* ---- blue — hue 252, anchored to --gh-constant ---- */
+  --c-blue-bg: light-dark(oklch(0.945 0.019 252), oklch(0.245 0.041 252));
+  --c-blue-bg-hover: light-dark(oklch(0.91 0.034 252), oklch(0.295 0.053 252));
+  --c-blue-border: light-dark(oklch(0.8 0.057 252), oklch(0.4 0.066 252));
+  --c-blue-solid: light-dark(oklch(0.58 0.156 252), oklch(0.74 0.127 252));
+  --c-blue-text: light-dark(oklch(0.45 0.115 252), oklch(0.8 0.093 252));
+  --c-blue-text-loud: light-dark(oklch(0.42 0.107 252), oklch(0.82 0.079 252));
+
+  /* ---- green — hue 150, anchored to --gh-inserted ---- */
+  --c-green-bg: light-dark(oklch(0.945 0.065 150), oklch(0.245 0.037 150));
+  --c-green-bg-hover: light-dark(oklch(0.91 0.12 150), oklch(0.295 0.049 150));
+  --c-green-border: light-dark(oklch(0.8 0.121 150), oklch(0.4 0.061 150));
+  --c-green-solid: light-dark(oklch(0.58 0.144 150), oklch(0.74 0.188 150));
+  --c-green-text: light-dark(oklch(0.45 0.105 150), oklch(0.8 0.198 150));
+  --c-green-text-loud: light-dark(oklch(0.42 0.098 150), oklch(0.82 0.192 150));
+
+  /* ---- amber — hue 75, new to the system ---- */
+  --c-amber-bg: light-dark(oklch(0.945 0.031 75), oklch(0.245 0.029 75));
+  --c-amber-bg-hover: light-dark(oklch(0.91 0.056 75), oklch(0.295 0.038 75));
+  --c-amber-border: light-dark(oklch(0.8 0.093 75), oklch(0.4 0.047 75));
+  --c-amber-solid: light-dark(oklch(0.58 0.11 75), oklch(0.74 0.144 75));
+  --c-amber-text: light-dark(oklch(0.45 0.081 75), oklch(0.8 0.152 75));
+  --c-amber-text-loud: light-dark(oklch(0.42 0.075 75), oklch(0.82 0.134 75));
+
+  /* ---- red — hue 25, the hue tokens.css already spends on --danger ---- */
+  --c-red-bg: light-dark(oklch(0.945 0.019 25), oklch(0.245 0.055 25));
+  --c-red-bg-hover: light-dark(oklch(0.91 0.035 25), oklch(0.295 0.072 25));
+  --c-red-border: light-dark(oklch(0.8 0.063 25), oklch(0.4 0.089 25));
+  --c-red-solid: light-dark(oklch(0.58 0.212 25), oklch(0.74 0.146 25));
+  --c-red-text: light-dark(oklch(0.45 0.155 25), oklch(0.8 0.103 25));
+  --c-red-text-loud: light-dark(oklch(0.42 0.145 25), oklch(0.82 0.086 25));
+
+  /* ---- purple — hue 300, anchored to --gh-entity ---- */
+  --c-purple-bg: light-dark(oklch(0.945 0.022 300), oklch(0.245 0.072 300));
+  --c-purple-bg-hover: light-dark(oklch(0.91 0.038 300), oklch(0.295 0.095 300));
+  --c-purple-border: light-dark(oklch(0.8 0.065 300), oklch(0.4 0.118 300));
+  --c-purple-solid: light-dark(oklch(0.58 0.246 300), oklch(0.74 0.146 300));
+  --c-purple-text: light-dark(oklch(0.45 0.204 300), oklch(0.8 0.107 300));
+  --c-purple-text-loud: light-dark(oklch(0.42 0.191 300), oklch(0.82 0.09 300));
+
+  /* ---- neutral — not a hue. Aliases into the tokens.css ramp so the
+     colorless states share one source of truth with the chrome. ---- */
+  --c-neutral-bg: var(--paper-sunken);
+  --c-neutral-bg-hover: var(--elevated);
+  --c-neutral-border: var(--hairline);
+  --c-neutral-solid: var(--ink-faint);
+  --c-neutral-text: var(--ink-muted);
+  --c-neutral-text-loud: var(--ink-muted);
+}

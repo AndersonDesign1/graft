@@ -1,0 +1,73 @@
+/**
+ * Enforces the three-layer token contract, so "swap a colour without touching
+ * a component" stays true rather than becoming folklore.
+ *
+ *   palette.css  raw scales — the only file allowed a colour literal
+ *   roles.css    meaning -> scale — var() indirection only
+ *   studio.css   components — role names only
+ */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const here = join(process.cwd(), "src", "ui", "styles");
+const read = (name: string): string => readFileSync(join(here, name), "utf8");
+
+/** Drop comments so prose about colours doesn't trip the literal checks. */
+const stripComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+const LITERAL = /(oklch|rgba?|hsla?|lab|lch|color-mix)\(|#[0-9a-fA-F]{3,8}\b/;
+/** Layer-1 scale names, plus the syntax tokens studio.css used to improvise with. */
+const RAW_SCALE = /var\(--(?:c|gh|code)-/;
+
+describe("token layering", () => {
+  it("keeps colour literals out of roles.css", () => {
+    const offenders = stripComments(read("roles.css"))
+      .split("\n")
+      .filter((line) => LITERAL.test(line));
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps colour literals out of studio.css", () => {
+    // color-mix is allowed here only against a role var (the identity tint),
+    // so check for actual literals rather than any colour function.
+    const offenders = stripComments(read("studio.css"))
+      .split("\n")
+      .filter((line) => /(oklch|lab|lch)\(|#[0-9a-fA-F]{3,8}\b/.test(line));
+    expect(offenders).toEqual([]);
+  });
+
+  it("stops components reaching past roles into the raw scales", () => {
+    const offenders = stripComments(read("studio.css"))
+      .split("\n")
+      .filter((line) => RAW_SCALE.test(line));
+    expect(offenders).toEqual([]);
+  });
+
+  it("resolves every role to a var(), never to a literal", () => {
+    const declarations = stripComments(read("roles.css")).matchAll(
+      /^\s*(--[\w-]+):\s*([^;]+);/gm,
+    );
+    for (const [, name, value] of declarations) {
+      if (name === "--identity-count") continue; // a number, not a colour
+      expect(value?.trim(), `${name} must point at a token, not a literal`).toMatch(/^var\(--/);
+    }
+  });
+
+  it("defines a role for every document state the API can return", () => {
+    const roles = read("roles.css");
+    for (const state of ["synced", "drifted", "unindexed", "orphaned"]) {
+      for (const slot of ["bg", "border", "solid", "text"]) {
+        expect(roles, `--state-${state}-${slot} is missing`).toContain(`--state-${state}-${slot}:`);
+      }
+    }
+  });
+
+  it("keeps the identity cycle and its declared count in step", () => {
+    const roles = read("roles.css");
+    const count = Number(/--identity-count:\s*(\d+)/.exec(roles)?.[1]);
+    const defined = [...roles.matchAll(/--identity-(\d+):/g)].length;
+    // format.ts hashes into this range; a mismatch silently drops a hue.
+    expect(defined).toBe(count);
+  });
+});

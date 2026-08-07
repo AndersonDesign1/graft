@@ -1,20 +1,60 @@
 /** Serializable shapes matching packages/studio/openapi.yaml */
 
+/**
+ * Where a document exists relative to the compiled index.
+ *
+ * Graft content is git-authoritative: the `.mdx` on disk is truth and the
+ * Postgres `content_index` is a projection refreshed by `graft compile`. The
+ * gap between the two is real operator state, not a loading artifact, so it
+ * is modelled explicitly rather than inferred from an empty list.
+ */
+export type DocumentState =
+  /** on disk, in the index, contentHash matches */
+  | "synced"
+  /** on disk and in the index, hashes differ — edited since the last compile */
+  | "drifted"
+  /** on disk only — never compiled */
+  | "unindexed"
+  /** in the index only — the file is gone and the index is stale */
+  | "orphaned";
+
 export interface ContentTreeDoc {
   slug: string;
   sourcePath: string;
   title?: string;
+  state: DocumentState;
+  /** Index row timestamp; absent while a document is still `unindexed`. */
+  updatedAt?: string;
 }
 
 export interface ContentTreeCollection {
   name: string;
   description?: string;
+  /** file-authoritative collections live on disk; db ones live in data_records. */
+  authority: "file" | "db";
   documents: ContentTreeDoc[];
+  /** Documents that are neither `synced` nor (for db collections) applicable. */
+  driftCount: number;
+  /**
+   * Set when this collection alone failed to read (e.g. one unparseable file).
+   * The rest of the tree still renders — one bad document must not blank the UI.
+   */
+  error?: string;
 }
 
 export interface ContentTree {
   branch: string;
   collections: ContentTreeCollection[];
+  /** Rolled-up counts, so the header and Overview don't each recompute them. */
+  summary: {
+    documents: number;
+    synced: number;
+    drifted: number;
+    unindexed: number;
+    orphaned: number;
+    /** drifted + unindexed + orphaned — the "compile would change something" count. */
+    drift: number;
+  };
 }
 
 export interface DocumentDto {
@@ -39,6 +79,19 @@ export interface CompilationDto {
 
 export interface CompilationList {
   compilations: CompilationDto[];
+}
+
+/**
+ * Result of an operator-triggered compile. Named `…Dto` because @graft/compiler
+ * exports its own richer `CompileResult`; this is the flattened wire shape.
+ */
+export interface CompileResultDto {
+  branch: string;
+  gitSha: string | null;
+  added: number;
+  changed: number;
+  removed: number;
+  docCount: number;
 }
 
 export interface BranchDto {
@@ -67,4 +120,31 @@ export interface PendingApprovalDto {
 
 export interface ApprovalList {
   approvals: PendingApprovalDto[];
+}
+
+/**
+ * One field of a collection schema, for the read-only Schema view.
+ * Recursive: object fields carry `fields`, array fields carry `items` — the
+ * same shape MCP's describe_schema returns, so the two never drift.
+ */
+export interface SchemaFieldDto {
+  name: string;
+  type: string;
+  optional: boolean;
+  description?: string;
+  fields?: SchemaFieldDto[];
+  items?: SchemaFieldDto;
+}
+
+export interface SchemaCollectionDto {
+  name: string;
+  description?: string;
+  authority: "file" | "db";
+  /** Verbatim authority from the descriptor, for the tooltip. */
+  authorityRaw: string;
+  fields: SchemaFieldDto[];
+}
+
+export interface SchemaList {
+  collections: SchemaCollectionDto[];
 }

@@ -4,11 +4,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Graft Studio</title>
-    <link rel="stylesheet" href="./tokens.css" />
-    <link rel="stylesheet" href="./studio.css" />
+    <script>
+      // Stamp the stored theme before first paint — otherwise a dark-mode
+      // operator gets a white flash on every load.
+      try {
+        var t = localStorage.getItem("graft-studio-theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (_) {
+        /* private mode — fall back to the OS setting */
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <script src="./studio.js"></script>
+    <script type="module" src="/main.tsx"></script>
   </body>
 </html>

@@ -22,9 +22,26 @@ export const STUDIO_OPENAPI = {
     "/api/studio/v1/tree": {
       get: {
         operationId: "getContentTree",
-        summary: "Content tree",
+        summary: "Content tree (disk merged with the compiled index)",
+        description:
+          "Filesystem-first: every on-disk document appears immediately, each tagged synced | drifted | unindexed | orphaned by comparing its contentHash against content_index. db-authoritative collections are returned with authority:\"db\" and no documents.",
         parameters: [{ name: "branch", in: "query", schema: { type: "string" } }],
-        responses: { "200": { description: "Collections → documents" } },
+        responses: { "200": { description: "Collections → documents + drift summary" } },
+      },
+    },
+    "/api/studio/v1/collections": {
+      get: {
+        operationId: "listCollectionSchemas",
+        summary: "Collection schemas (same shape as MCP describe_schema)",
+        responses: { "200": { description: "Collections → fields" } },
+      },
+    },
+    "/api/studio/v1/compile": {
+      post: {
+        operationId: "compileBranch",
+        summary: "Recompile a branch's content index (same as graft compile)",
+        parameters: [{ name: "branch", in: "query", schema: { type: "string" } }],
+        responses: { "200": { description: "Change counts + git SHA" } },
       },
     },
     "/api/studio/v1/document": {

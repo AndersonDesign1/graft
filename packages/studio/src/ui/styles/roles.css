@@ -1,0 +1,123 @@
+/**
+ * Studio roles — LAYER 2 of 3. Meaning -> scale. The swap surface.
+ *
+ * Every value here is a var() of a palette.css slot. No literals, no
+ * color-mix against literals. This is the file you edit to change what a
+ * state LOOKS like; you never touch a component to do it.
+ *
+ *   want drifted to read blue instead of amber?  one line, here.
+ *   adding a sixth document state?               one block, here.
+ *   retuning green itself?                       palette.css, not here.
+ *
+ * Components read ONLY these names. A rule naming `--c-amber-*` directly is
+ * a bug — the literal-and-scale grep in the tests will catch it.
+ */
+
+:root {
+  /* ---- document state: disk vs index -------------------------------------
+     Graft's content is git-authoritative. Files on disk are truth; the
+     Postgres content_index is a projection built by `graft compile`. The gap
+     between the two is the Studio's central status axis — this is our
+     Draft/Published, and it is real rather than ceremonial. */
+
+  /* on disk, in the index, hashes match */
+  --state-synced-bg: var(--c-green-bg);
+  --state-synced-bg-hover: var(--c-green-bg-hover);
+  --state-synced-border: var(--c-green-border);
+  --state-synced-solid: var(--c-green-solid);
+  --state-synced-text: var(--c-green-text);
+  --state-synced-text-loud: var(--c-green-text-loud);
+
+  /* in both, hashes differ — edited since the last compile */
+  --state-drifted-bg: var(--c-amber-bg);
+  --state-drifted-bg-hover: var(--c-amber-bg-hover);
+  --state-drifted-border: var(--c-amber-border);
+  --state-drifted-solid: var(--c-amber-solid);
+  --state-drifted-text: var(--c-amber-text);
+  --state-drifted-text-loud: var(--c-amber-text-loud);
+
+  /* on disk only — never compiled. Absence of state, so: no hue. */
+  --state-unindexed-bg: var(--c-neutral-bg);
+  --state-unindexed-bg-hover: var(--c-neutral-bg-hover);
+  --state-unindexed-border: var(--c-neutral-border);
+  --state-unindexed-solid: var(--c-neutral-solid);
+  --state-unindexed-text: var(--c-neutral-text);
+  --state-unindexed-text-loud: var(--c-neutral-text-loud);
+
+  /* in the index only — the file is gone and the index is stale */
+  --state-orphaned-bg: var(--c-red-bg);
+  --state-orphaned-bg-hover: var(--c-red-bg-hover);
+  --state-orphaned-border: var(--c-red-border);
+  --state-orphaned-solid: var(--c-red-solid);
+  --state-orphaned-text: var(--c-red-text);
+  --state-orphaned-text-loud: var(--c-red-text-loud);
+
+  /* ---- operational state: approvals, branches ---- */
+  --state-pending-bg: var(--c-amber-bg);
+  --state-pending-border: var(--c-amber-border);
+  --state-pending-solid: var(--c-amber-solid);
+  --state-pending-text: var(--c-amber-text);
+
+  --state-approved-bg: var(--c-green-bg);
+  --state-approved-border: var(--c-green-border);
+  --state-approved-solid: var(--c-green-solid);
+  --state-approved-text: var(--c-green-text);
+
+  --state-denied-bg: var(--c-red-bg);
+  --state-denied-border: var(--c-red-border);
+  --state-denied-solid: var(--c-red-solid);
+  --state-denied-text: var(--c-red-text);
+
+  --state-ready-bg: var(--c-green-bg);
+  --state-ready-border: var(--c-green-border);
+  --state-ready-solid: var(--c-green-solid);
+  --state-ready-text: var(--c-green-text);
+
+  /* db-authoritative collections: rows live in data_records, not on disk */
+  --state-db-bg: var(--c-purple-bg);
+  --state-db-border: var(--c-purple-border);
+  --state-db-solid: var(--c-purple-solid);
+  --state-db-text: var(--c-purple-text);
+
+  /* ---- the default chip surface: pills, counts and tags with no state ---- */
+  --chip-bg: var(--c-neutral-bg);
+  --chip-border: var(--c-neutral-border);
+  --chip-text: var(--c-neutral-text);
+  --chip-text-faint: var(--ink-faint);
+
+  /* ---- compilation deltas ---- */
+  --delta-add: var(--c-green-text-loud);
+  --delta-change: var(--c-amber-text-loud);
+  --delta-remove: var(--c-red-text-loud);
+
+  /* ---- chrome ------------------------------------------------------------
+     Deliberately neutral. "Monochrome chrome, color is state" is the whole
+     thesis, and pointing these at neutrals is how it's enforced — by a token
+     rather than by everyone remembering. Colouring the rail later is a
+     one-line change here, and an intentional one. */
+  --nav-active-bg: var(--elevated);
+  --nav-active-rail: var(--mark);
+  --nav-active-text: var(--ink);
+  --nav-hover-bg: var(--mark-tint);
+  --nav-text: var(--ink-muted);
+
+  --row-active-bg: var(--mark-tint);
+  --row-active-rail: var(--mark);
+  --row-hover-bg: var(--mark-tint);
+
+  --field-label: var(--ink-muted);
+  --focus-ring: var(--c-blue-solid);
+  --selection-bg: var(--c-blue-bg);
+
+  /* ---- per-collection identity -------------------------------------------
+     Collections get a stable mark colour, like Sanity's document-type icons.
+     Components hash the collection name to an index and read var(--identity)
+     only; extending the cycle is one line here. */
+  --identity-count: 5;
+  --identity-0: var(--c-blue-solid);
+  --identity-1: var(--c-green-solid);
+  --identity-2: var(--c-purple-solid);
+  --identity-3: var(--c-amber-solid);
+  --identity-4: var(--c-red-solid);
+  --identity: var(--identity-0);
+}

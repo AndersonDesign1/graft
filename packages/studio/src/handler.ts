@@ -2,7 +2,7 @@
  * Full Studio mount: OpenAPI API + static SPA shell.
  */
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { GraftError } from "@graft/contracts";
 import { createStudioApiHandler, type StudioApiOptions, type StudioFetchHandler } from "./api";
@@ -21,44 +21,76 @@ function uiRoot(): string {
   return join(here, "ui");
 }
 
+const CONTENT_TYPES: Record<string, string> = {
+  ".js": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".webp": "image/webp",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+};
+
 function contentType(path: string): string {
-  if (path.endsWith(".js")) return "application/javascript; charset=utf-8";
-  if (path.endsWith(".css")) return "text/css; charset=utf-8";
-  if (path.endsWith(".svg")) return "image/svg+xml";
-  return "text/html; charset=utf-8";
+  const dot = path.lastIndexOf(".");
+  return (dot === -1 ? undefined : CONTENT_TYPES[path.slice(dot)]) ?? "text/html; charset=utf-8";
+}
+
+/**
+ * Resolve a request path to a file inside dist/ui, or null if it escapes.
+ *
+ * Vite emits hashed assets under `assets/`, so the old flat "no slashes"
+ * allowlist can't be used. Confinement is enforced by resolving the candidate
+ * and checking it still lives under the root — which also covers `..`,
+ * absolute paths, and Windows separators.
+ */
+function resolveUiFile(rel: string): string | null {
+  const root = resolve(uiRoot());
+  const cleaned = decodeURIComponent(rel).replace(/^\/+/, "");
+  if (!cleaned || cleaned.includes("\0")) return null;
+  const candidate = resolve(root, normalize(cleaned));
+  if (candidate !== root && !candidate.startsWith(root + sep)) return null;
+  return candidate;
 }
 
 function serveUiAsset(pathname: string, uiBase: string): Response | null {
-  const root = uiRoot();
-  let rel = pathname;
+  let rel: string;
   if (uiBase && (pathname === uiBase || pathname === `${uiBase}/`)) {
-    rel = "/index.html";
+    rel = "index.html";
   } else if (uiBase && pathname.startsWith(`${uiBase}/`)) {
-    rel = pathname.slice(uiBase.length) || "/index.html";
+    rel = pathname.slice(uiBase.length + 1) || "index.html";
   } else if (!uiBase && (pathname === "/" || pathname === "")) {
-    rel = "/index.html";
+    rel = "index.html";
   } else if (!uiBase && pathname.startsWith("/")) {
-    // Local `graft studio`: serve any file from dist/ui (html/css/js).
-    rel = pathname;
+    rel = pathname.slice(1);
   } else {
     return null;
   }
+  if (rel === "" || rel.endsWith("/")) rel = `${rel}index.html`;
 
-  const file =
-    rel === "/index.html" || rel === "/"
-      ? "index.html"
-      : rel.replace(/^\//, "").replace(/^assets\//, "");
-  // Only flat ui assets (no nested traversal).
-  if (!file || file.includes("..") || file.includes("/") || file.includes("\\")) return null;
+  const file = resolveUiFile(rel);
+  if (!file) return null;
 
   try {
-    const body = readFileSync(join(root, file));
+    const body = readFileSync(file);
+    const isHtml = rel.endsWith(".html");
     return new Response(body, {
       status: 200,
-      headers: { "content-type": contentType(file) },
+      headers: {
+        "content-type": contentType(rel),
+        // Hashed filenames are immutable; the shell must never be cached.
+        "cache-control": isHtml
+          ? "no-cache"
+          : rel.startsWith("assets/")
+            ? "public, max-age=31536000, immutable"
+            : "public, max-age=3600",
+      },
     });
   } catch {
-    if (file === "index.html") {
+    if (rel === "index.html") {
       return new Response(
         JSON.stringify({
           error: "CONFIG_INVALID",
@@ -88,10 +120,22 @@ export function createStudioHandler(options: StudioHandlerOptions): StudioFetchH
       return api(request);
     }
 
-    // Keep a trailing slash so relative ./studio.css resolves under /studio/.
-    if (uiBase && pathname === uiBase) {
-      url.pathname = `${uiBase}/`;
-      return Response.redirect(url.toString(), 302);
+    // Two things happen on the way into the shell:
+    //  1. force a trailing slash, so the relative ./assets/* refs resolve;
+    //  2. pin ?branch to the branch this handler was actually mounted on.
+    // (2) is a real bug fix: the SPA reads ?branch from the URL, so without it
+    // `graft serve --studio --branch preview` silently served `main`.
+    // Guarded on defaultBranch being set, and the redirect always adds the
+    // param, so this can't loop.
+    const isShell = uiBase ? pathname === uiBase || pathname === `${uiBase}/` : pathname === "/";
+    if (isShell) {
+      const needsSlash = Boolean(uiBase) && pathname === uiBase;
+      const needsBranch = !url.searchParams.has("branch") && Boolean(options.defaultBranch);
+      if (needsSlash || needsBranch) {
+        if (needsSlash) url.pathname = `${uiBase}/`;
+        if (needsBranch) url.searchParams.set("branch", options.defaultBranch as string);
+        return Response.redirect(url.toString(), 302);
+      }
     }
 
     const asset = serveUiAsset(pathname, uiBase);

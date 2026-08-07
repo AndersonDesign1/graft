@@ -3,6 +3,7 @@
  * Shared by `graft studio` and `graft serve --studio`.
  * Reads + mutations (edit content, decide approvals) — same ops as MCP/CLI.
  */
+import { compile } from "@graft/compiler";
 import type { AnyCollection } from "@graft/core";
 import {
   decideApproval,
@@ -15,14 +16,21 @@ import {
 } from "@graft/db";
 import { GraftError } from "@graft/contracts";
 import matter from "gray-matter";
-import { readRawDocument, requireCollection, writeDocument } from "./content";
+import { readCollectionDocs, readRawDocument, requireCollection, writeDocument } from "./content";
 import { STUDIO_OPENAPI } from "./openapi";
 import type {
   ApprovalList,
   BranchList,
   CompilationList,
+  CompileResultDto,
   ContentTree,
+  ContentTreeCollection,
+  ContentTreeDoc,
   DocumentDto,
+  DocumentState,
+  SchemaCollectionDto,
+  SchemaFieldDto,
+  SchemaList,
 } from "./types";
 
 export type StudioFetchHandler = (request: Request) => Promise<Response>;
@@ -77,36 +85,163 @@ function statusFor(error: GraftError): number {
   }
 }
 
+function titleOf(data: Record<string, unknown>): string | undefined {
+  if (typeof data.title === "string") return data.title;
+  if (typeof data.name === "string") return data.name;
+  return undefined;
+}
+
+/**
+ * One collection's documents, merging what is on disk with what is indexed.
+ *
+ * This is deliberately filesystem-first. Graft content is git-authoritative:
+ * the `.mdx` files are truth and `content_index` is a projection that only
+ * exists after `graft compile`. Reading the index alone — which is what this
+ * used to do — meant a project that had authored content but never compiled
+ * showed zero documents, with no way to tell that apart from genuinely having
+ * none. Now every on-disk file appears immediately and carries its own state.
+ */
+async function buildFileCollection(
+  db: Database,
+  scope: Awaited<ReturnType<typeof resolveBranchScope>>,
+  contentDir: string,
+  name: string,
+  collection: AnyCollection,
+): Promise<ContentTreeDoc[]> {
+  const disk = readCollectionDocs(contentDir, name, collection);
+  const indexed = await readContent(db, scope, { collection: name });
+  const bySlug = new Map(indexed.map((row) => [row.slug, row]));
+
+  const docs: ContentTreeDoc[] = disk.map((doc) => {
+    const row = bySlug.get(doc.slug);
+    bySlug.delete(doc.slug);
+    const state: DocumentState = !row
+      ? "unindexed"
+      : row.contentHash === doc.contentHash
+        ? "synced"
+        : "drifted";
+    return {
+      slug: doc.slug,
+      sourcePath: doc.sourcePath,
+      state,
+      ...(titleOf(doc.data) ? { title: titleOf(doc.data) } : {}),
+      ...(row?.updatedAt ? { updatedAt: row.updatedAt.toISOString() } : {}),
+    };
+  });
+
+  // Whatever is left in the index has no file behind it any more. Showing it
+  // as `orphaned` beats silently dropping it — a stale index is the operator's
+  // problem to see, not ours to hide.
+  for (const row of bySlug.values()) {
+    docs.push({
+      slug: row.slug,
+      sourcePath: row.sourcePath,
+      state: "orphaned",
+      ...(titleOf(row.data as Record<string, unknown>)
+        ? { title: titleOf(row.data as Record<string, unknown>) }
+        : {}),
+      updatedAt: row.updatedAt.toISOString(),
+    });
+  }
+
+  return docs.sort((a, b) => a.slug.localeCompare(b.slug));
+}
+
 async function buildTree(
   db: Database,
   collections: Record<string, AnyCollection>,
+  contentDir: string,
   branch: string,
 ): Promise<ContentTree> {
   const scope = await resolveBranchScope(db, branch);
-  const out: ContentTree["collections"] = [];
+  const out: ContentTreeCollection[] = [];
+
   for (const [name, collection] of Object.entries(collections)) {
     const descriptor = collection.describe();
-    const rows = await readContent(db, scope, { collection: name });
+    const isDb = collection.authority === "db-authoritative";
+    let documents: ContentTreeDoc[] = [];
+    let error: string | undefined;
+
+    try {
+      if (isDb) {
+        // Rows live in data_records, reached through typed functions — there
+        // are no files to compare against, so state is not meaningful here.
+        documents = [];
+      } else {
+        documents = await buildFileCollection(db, scope, contentDir, name, collection);
+      }
+    } catch (err) {
+      // One unparseable document must degrade its own collection, not blank
+      // the entire tree — the old behaviour 500'd the whole request.
+      error = err instanceof Error ? err.message : String(err);
+    }
+
     out.push({
       name,
-      description: descriptor.description,
-      documents: rows.map((row) => {
-        const title =
-          typeof row.data.title === "string"
-            ? row.data.title
-            : typeof row.data.name === "string"
-              ? row.data.name
-              : undefined;
-        return {
-          slug: row.slug,
-          sourcePath: row.sourcePath,
-          ...(title ? { title } : {}),
-        };
-      }),
+      ...(descriptor.description ? { description: descriptor.description } : {}),
+      authority: isDb ? "db" : "file",
+      documents,
+      driftCount: documents.filter((d) => d.state !== "synced").length,
+      ...(error ? { error } : {}),
     });
   }
+
   out.sort((a, b) => a.name.localeCompare(b.name));
-  return { branch, collections: out };
+
+  const all = out.flatMap((c) => c.documents);
+  const count = (state: DocumentState): number =>
+    all.reduce((n, d) => n + (d.state === state ? 1 : 0), 0);
+  const drifted = count("drifted");
+  const unindexed = count("unindexed");
+  const orphaned = count("orphaned");
+
+  return {
+    branch,
+    collections: out,
+    summary: {
+      documents: all.length,
+      synced: count("synced"),
+      drifted,
+      unindexed,
+      orphaned,
+      drift: drifted + unindexed + orphaned,
+    },
+  };
+}
+
+function toSchemaField(field: {
+  name: string;
+  type: string;
+  optional: boolean;
+  description?: string;
+  fields?: unknown;
+  items?: unknown;
+}): SchemaFieldDto {
+  const nested = field.fields as SchemaFieldDto[] | undefined;
+  const items = field.items as SchemaFieldDto | undefined;
+  return {
+    name: field.name,
+    type: field.type,
+    optional: field.optional,
+    ...(field.description ? { description: field.description } : {}),
+    ...(nested ? { fields: nested.map(toSchemaField) } : {}),
+    ...(items ? { items: toSchemaField(items) } : {}),
+  };
+}
+
+function buildSchema(collections: Record<string, AnyCollection>): SchemaList {
+  const out: SchemaCollectionDto[] = Object.values(collections).map((collection) => {
+    const descriptor = collection.describe();
+    return {
+      name: descriptor.name,
+      ...(descriptor.description ? { description: descriptor.description } : {}),
+      authority: descriptor.authority === "db-authoritative" ? "db" : "file",
+      authorityRaw: descriptor.authority,
+      fields: descriptor.fields.map(toSchemaField),
+    };
+  });
+  out.sort((a, b) => a.name.localeCompare(b.name));
+  return { collections: out };
 }
 
 function operator(options: StudioApiOptions): string {
@@ -141,7 +276,37 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
 
       if (pathname === "/api/studio/v1/tree" && method === "GET") {
         const branch = url.searchParams.get("branch")?.trim() || defaultBranch;
-        return json(await buildTree(options.db, options.collections, branch));
+        return json(
+          await buildTree(options.db, options.collections, options.contentDir, branch),
+        );
+      }
+
+      if (pathname === "/api/studio/v1/collections" && method === "GET") {
+        return json(buildSchema(options.collections));
+      }
+
+      // Operator-triggered compile. The Studio surfaces drift, so it has to be
+      // able to resolve it too — sending someone to a terminal to fix a thing
+      // the dashboard just told them about is a dead end.
+      if (pathname === "/api/studio/v1/compile" && method === "POST") {
+        const payload = (await request.json().catch(() => ({}))) as { branch?: string };
+        const branch =
+          payload.branch?.trim() || url.searchParams.get("branch")?.trim() || defaultBranch;
+        const result = await compile({
+          contentDir: options.contentDir,
+          collections: options.collections,
+          db: options.db,
+          branchId: branch,
+        });
+        const body: CompileResultDto = {
+          branch,
+          gitSha: result.gitSha ?? null,
+          added: result.changes.added.length,
+          changed: result.changes.changed.length,
+          removed: result.changes.removed.length,
+          docCount: result.count,
+        };
+        return json(body);
       }
 
       if (pathname === "/api/studio/v1/compilations" && method === "GET") {
