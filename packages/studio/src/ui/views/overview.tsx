@@ -13,6 +13,7 @@ import {
   Status,
 } from "../components/primitives";
 import { IconCompile } from "../components/icons";
+import { ChartSkeleton, MiniListSkeleton, OverviewSkeleton } from "../components/skeletons";
 import { Button } from "../components/ui/button";
 import { qs } from "../lib/api";
 import { relativeTime, shortSha, plural } from "../lib/format";
@@ -55,7 +56,11 @@ export function OverviewView({
         </div>
       </header>
 
-      <Status loading={tree.loading && !tree.data} error={tree.error} />
+      <Status
+        loading={tree.loading && !tree.data}
+        error={tree.error}
+        skeleton={<OverviewSkeleton />}
+      />
 
       {tree.data ? (
         <>
@@ -178,6 +183,7 @@ export function OverviewView({
                 loading={compilations.loading && !compilations.data}
                 error={compilations.error}
                 empty={neverCompiled}
+                skeleton={<ChartSkeleton />}
               >
                 <p className="muted">Nothing compiled on this branch yet.</p>
               </Status>
@@ -232,6 +238,7 @@ export function OverviewView({
                 loading={approvals.loading && !approvals.data}
                 error={approvals.error}
                 empty={pending === 0}
+                skeleton={<MiniListSkeleton rows={3} />}
               >
                 <p className="muted">No agent is waiting on a decision.</p>
               </Status>
@@ -276,6 +283,7 @@ export function OverviewView({
                 loading={branches.loading && !branches.data}
                 error={branches.error}
                 empty={(branches.data?.branches.length ?? 0) === 0}
+                skeleton={<MiniListSkeleton rows={3} />}
               >
                 <p className="muted">No branches registered — only the default.</p>
               </Status>

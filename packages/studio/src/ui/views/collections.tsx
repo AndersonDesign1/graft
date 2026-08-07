@@ -15,6 +15,7 @@ import { Field, FieldLabel, Input, NumberField, Switch, Textarea } from "../comp
 import { Tabs, TabsIndicator, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { api, qs } from "../lib/api";
 import { useAutosave } from "../lib/autosave";
+import { hasUnsavedChanges } from "../lib/draft";
 import type { Route } from "../lib/route";
 
 type EditorMode = "rich" | "raw";
@@ -118,18 +119,15 @@ export function CollectionsView({
     const snapshot = latest.current;
     if (!collection || !slug || !snapshot.doc || readOnly) return;
 
-    // Second guard against writing a file nobody edited. The editor already
-    // ignores its own mount-time normalisation, but a write is destructive
-    // and cheap to skip, so verify something actually differs from what we
-    // loaded rather than trusting one check.
-    const fieldsChanged = Object.entries(snapshot.fields).some(
-      ([key, value]) => snapshot.doc?.data[key] !== value,
-    );
-    const unchanged =
-      snapshot.mode === "raw"
-        ? snapshot.raw === snapshot.doc.raw
-        : !fieldsChanged && snapshot.body === snapshot.doc.body;
-    if (unchanged) return;
+    // Second guard against writing a file nobody edited — see draft.ts.
+    const changed = hasUnsavedChanges({
+      mode: snapshot.mode,
+      fields: snapshot.fields,
+      body: snapshot.body,
+      raw: snapshot.raw,
+      loaded: snapshot.doc,
+    });
+    if (!changed) return;
 
     const payload =
       snapshot.mode === "raw"
@@ -144,6 +142,16 @@ export function CollectionsView({
     await api<{ written: string; gitSha: string | null }>("/document", {
       method: "PUT",
       body: JSON.stringify(payload),
+    });
+    // Toasted here rather than off the autosave state, so it fires exactly
+    // when a file was written — the guard above means "saved" can mean
+    // "decided not to write", and a toast claiming otherwise would be a lie.
+    // The fixed id replaces the previous toast instead of stacking one per
+    // pause in typing.
+    toast.success("Saved", {
+      id: "document-autosave",
+      description: `${collection}/${slug}`,
+      duration: 1600,
     });
     onSaved();
   }, [route.collection, route.slug, branch, readOnly, onSaved]);

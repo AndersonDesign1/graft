@@ -27,6 +27,25 @@ async function git(cwd: string, args: string[]): Promise<string> {
   return stdout.trim();
 }
 
+/**
+ * Paths out of `git status --porcelain`.
+ *
+ * Porcelain v1 lines are `XY PATH`, where the status field is two columns —
+ * but either column can be a space, and we trim the output, so the first line
+ * may arrive with one, two or no leading spaces. Slicing a fixed offset ate
+ * the first character of the path whenever it did. Match the status field
+ * instead of counting characters.
+ *
+ * Renames read `R  old -> new`; the new path is the one that exists.
+ */
+export function parsePorcelainPaths(status: string): string[] {
+  return status
+    .split("\n")
+    .map((line) => /^\s*\S{1,2}\s+(.+)$/.exec(line)?.[1]?.trim())
+    .map((path) => path?.split(" -> ").pop())
+    .filter((path): path is string => Boolean(path));
+}
+
 export interface RevertPreflight {
   /** Files under contentDir with uncommitted changes; revert refuses if any. */
   dirty: string[];
@@ -56,20 +75,12 @@ export async function preflightRevert(
     reachable = false;
   }
 
-  // Porcelain output is the stable machine format; --  limits it to content.
+  // Porcelain output is the stable machine format; `-- .` limits it to content.
   const status = reachable
     ? await git(contentDir, ["status", "--porcelain", "--", "."]).catch(() => "")
     : "";
-  // Porcelain v1 lines are `XY PATH`, but the status field can be one or two
-  // characters and renames add ` -> `. Slicing a fixed offset ate the first
-  // character of the path, so match the status field instead of counting it.
-  const dirty = status
-    .split("\n")
-    .map((line) => /^\s*\S{1,2}\s+(.+)$/.exec(line)?.[1]?.trim())
-    .map((path) => path?.split(" -> ").pop())
-    .filter((path): path is string => Boolean(path));
 
-  return { dirty, reachable, shortSha: gitSha.slice(0, 7) };
+  return { dirty: parsePorcelainPaths(status), reachable, shortSha: gitSha.slice(0, 7) };
 }
 
 /**

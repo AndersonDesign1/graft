@@ -244,6 +244,8 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
             className="rail"
             aria-label="Studio sections"
             data-collapsed={collapsed}
+            // The collapse animates; a width drag must not, or it lags the pointer.
+            data-dragging={sidebar.dragging}
             style={collapsed ? undefined : { width: `${sidebar.width}px` }}
           >
             <div className="rail-group">{TOP.map((item) => railItem(item))}</div>

@@ -17,6 +17,7 @@ import {
   type IconComponent,
 } from "../components/icons";
 import { IdentityMark, Pill } from "../components/primitives";
+import { ListSkeleton } from "../components/skeletons";
 import { Switch } from "../components/ui/field";
 import type { Theme } from "../lib/theme";
 import { plural } from "../lib/format";
@@ -262,7 +263,7 @@ export function SettingsView({
               </ul>
             </>
           ) : (
-            <p className="muted">Loading the content tree…</p>
+            <ListSkeleton rows={4} avatar />
           )}
         </Section>
 

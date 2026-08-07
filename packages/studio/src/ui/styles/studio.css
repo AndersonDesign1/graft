@@ -328,6 +328,18 @@ h3 {
   background: var(--paper-sunken);
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* On the base rule, not the collapsed one, so the panel animates open as
+     well as shut. The collapsed state itself lives in parts.css. */
+  transition:
+    width var(--duration-base) var(--ease-out),
+    padding var(--duration-base) var(--ease-out),
+    visibility var(--duration-base);
+}
+
+/* …except while dragging the width, which must track the pointer rather than
+   trail 240ms behind it. */
+.rail[data-dragging="true"] {
+  transition: none;
 }
 
 /* Sits between the sidebar and the workspace. 1px of visible rule, 9px of
@@ -1277,6 +1289,14 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+}
+
+/* The column scrolls, so nothing in it may be squeezed to fit.
+   Without this, a child with `overflow: hidden` — the stat strip — has an
+   automatic minimum size of zero and gets flattened to its border once the
+   page is taller than the viewport, taking its contents with it. */
+.view > * {
+  flex-shrink: 0;
 }
 
 /* Settings and other read-heavy views: a measured column beats full bleed,

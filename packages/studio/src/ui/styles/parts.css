@@ -16,8 +16,14 @@
   padding-inline: 0;
   overflow: hidden;
   /* Not display:none — a width transition needs something to animate, so the
-     panel slides away rather than blinking out. */
-  transition: width var(--duration-base) var(--ease-out);
+     panel slides away rather than blinking out. `visibility` then takes the
+     hidden controls out of the tab order; it is transitioned too, so it flips
+     only once the panel has finished closing. */
+  visibility: hidden;
+  transition:
+    width var(--duration-base) var(--ease-out),
+    padding var(--duration-base) var(--ease-out),
+    visibility var(--duration-base);
 }
 
 /* ==========================================================================
@@ -160,6 +166,31 @@
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+}
+
+/* Matches `.chart`: same height and full width, so the real chart drops in
+   without shifting the list beneath it. */
+.sk-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  width: 100%;
+  height: 3rem;
+}
+
+.sk-chart-bar {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The banner's own box is reused; only its text block is a placeholder.
+   The gap is the `p`'s margin-top, so the two stacks measure the same. */
+.sk-banner-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 40rem;
 }
 
 /* ==========================================================================

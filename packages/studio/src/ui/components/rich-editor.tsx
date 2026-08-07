@@ -16,6 +16,7 @@
  */
 import { Crepe } from "@milkdown/crepe";
 import { useEffect, useRef } from "react";
+import { watchEditIntent } from "../lib/edit-intent";
 
 /**
  * Does this body contain MDX-specific syntax a commonmark editor would eat?
@@ -47,21 +48,14 @@ export function RichEditor({
   const crepe = useRef<Crepe | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
-  /**
-   * Has the operator actually touched this document?
-   *
-   * Milkdown emits `markdownUpdated` as soon as it mounts, because parsing and
-   * re-serialising normalises the source — folding long frontmatter, dropping
-   * a blank line, re-wrapping tables. Treated as an edit, that means *opening*
-   * a document rewrites it, and with autosave on, browsing the tree quietly
-   * reformats every file you look at. So changes are ignored until a real
-   * input event proves a human is typing.
-   */
-  const touched = useRef(false);
 
   useEffect(() => {
     if (!host.current) return;
     let disposed = false;
+
+    // Milkdown emits `markdownUpdated` the moment it mounts, from its own
+    // re-serialisation rather than anything the operator did. Suppress those.
+    const intent = watchEditIntent(host.current);
 
     const instance = new Crepe({
       root: host.current,
@@ -82,24 +76,10 @@ export function RichEditor({
 
     instance.on((listener) => {
       listener.markdownUpdated((_ctx, markdown) => {
-        if (disposed || !touched.current) return;
+        if (disposed || !intent.touched) return;
         onChangeRef.current(markdown);
       });
     });
-
-    // These are the events that mean "a person is editing", as opposed to the
-    // editor settling after mount. `beforeinput` covers typing, paste, drop
-    // and IME; the rest cover the toolbar and slash menu, which act on the
-    // document without an input event.
-    const markTouched = (): void => {
-      touched.current = true;
-    };
-    const node = host.current;
-    for (const type of ["beforeinput", "keydown", "paste", "drop", "cut"] as const) {
-      node.addEventListener(type, markTouched, true);
-    }
-    // Toolbar and block-handle actions dispatch pointer events, not input ones.
-    node.addEventListener("pointerdown", markTouched, true);
 
     void instance.create().then(() => {
       if (disposed) return;
@@ -110,10 +90,7 @@ export function RichEditor({
     return () => {
       disposed = true;
       crepe.current = null;
-      for (const type of ["beforeinput", "keydown", "paste", "drop", "cut"] as const) {
-        node.removeEventListener(type, markTouched, true);
-      }
-      node.removeEventListener("pointerdown", markTouched, true);
+      intent.dispose();
       void instance.destroy();
     };
     // `value` seeds the document; syncing it here would fight typing. Swapping
