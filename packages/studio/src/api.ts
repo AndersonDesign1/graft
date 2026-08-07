@@ -100,21 +100,38 @@ function placementOf(data: Record<string, unknown>): { section?: string; order?:
 }
 
 /**
- * Publication order: section, then explicit order, then title.
+ * Publication order: section (in the collection's declared reading order),
+ * then explicit order, then title.
  *
  * This is the default the Studio lists in, because it is the order the
  * operator sees on the site — alphabetical is only useful for hunting a known
- * name, which is what search is for. Documents with no `order` sort after
- * those that have one, so adding `order` to a single page promotes it rather
- * than reshuffling everything around it.
+ * name, which is what search is for.
+ *
+ * Section order cannot be inferred from the documents: `order` restarts inside
+ * each section, so every section has a "1". It has to be declared, which is
+ * what `collection.sections` is for. Without it we fall back to alphabetical,
+ * which is at least stable. Documents with no `order` sort after those that
+ * have one, so adding `order` to a single page promotes it rather than
+ * reshuffling everything around it.
  */
-function bySiteOrder(a: ContentTreeDoc, b: ContentTreeDoc): number {
-  const section = (a.section ?? "").localeCompare(b.section ?? "");
-  if (section !== 0) return section;
-  const ao = a.order ?? Number.POSITIVE_INFINITY;
-  const bo = b.order ?? Number.POSITIVE_INFINITY;
-  if (ao !== bo) return ao - bo;
-  return (a.title ?? a.slug).localeCompare(b.title ?? b.slug);
+function bySiteOrder(sections: readonly string[] | undefined) {
+  const rank = (section: string | undefined): number => {
+    if (!sections?.length) return 0;
+    const i = sections.indexOf(section ?? "");
+    // Unlisted sections sort last rather than vanishing.
+    return i === -1 ? sections.length : i;
+  };
+
+  return (a: ContentTreeDoc, b: ContentTreeDoc): number => {
+    const byRank = rank(a.section) - rank(b.section);
+    if (byRank !== 0) return byRank;
+    const byName = (a.section ?? "").localeCompare(b.section ?? "");
+    if (byName !== 0) return byName;
+    const ao = a.order ?? Number.POSITIVE_INFINITY;
+    const bo = b.order ?? Number.POSITIVE_INFINITY;
+    if (ao !== bo) return ao - bo;
+    return (a.title ?? a.slug).localeCompare(b.title ?? b.slug);
+  };
 }
 
 /**
@@ -171,7 +188,7 @@ async function buildFileCollection(
     });
   }
 
-  return docs.sort(bySiteOrder);
+  return docs.sort(bySiteOrder(collection.sections));
 }
 
 async function buildTree(

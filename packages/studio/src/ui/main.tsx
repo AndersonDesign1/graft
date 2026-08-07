@@ -4,7 +4,7 @@
 // reference this design follows.
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
-import "./styles/tokens.css";
+import "@graft/tokens/tokens.css";
 import "./styles/palette.css";
 import "./styles/roles.css";
 import "./styles/type.css";

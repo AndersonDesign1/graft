@@ -16,7 +16,13 @@ export default defineConfig({
   entry: ["src/index.ts", "src/panels-entry.ts"],
   format: ["esm"],
   dts: true,
-  clean: true,
+  /**
+   * Cleaning is handled by scripts/clean-lib.mjs, which removes only the
+   * top-level files in dist/. Both `clean: true` and its glob form reach into
+   * `dist/ui` — the Vite bundle that lives in the same directory — and wiping
+   * it left the Studio serving a 500 until the UI was rebuilt.
+   */
+  clean: false,
   external: [
     "react",
     "react-dom",

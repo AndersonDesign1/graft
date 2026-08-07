@@ -89,9 +89,15 @@ export function CollectionsView({
   const active: ContentTreeCollection | undefined =
     collections.find((c) => c.name === route.collection) ?? collections[0];
 
+  // Landing on /collections with nothing chosen should still show a document
+  // — the first in reading order — rather than an empty pane.
   useEffect(() => {
     if (!route.collection && active) {
-      navigate({ view: "collections", collection: active.name });
+      navigate({
+        view: "collections",
+        collection: active.name,
+        slug: active.authority === "db" ? undefined : active.documents[0]?.slug,
+      });
     }
   }, [active, route.collection, navigate]);
 

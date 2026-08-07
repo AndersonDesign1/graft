@@ -33,6 +33,12 @@ export interface CollectionConfig<
   authority?: ContentAuthority;
   description?: string;
   fields: TFields;
+  /**
+   * Reading order for this collection's `section` values, when it groups.
+   * Declared here so the site nav and every tool that lists content sort the
+   * same way; unlisted sections sort last. See CollectionDescriptor.sections.
+   */
+  sections?: readonly string[];
 }
 
 export interface Collection<
@@ -42,6 +48,8 @@ export interface Collection<
   authority: ContentAuthority;
   description?: string;
   fields: TFields;
+  /** Declared reading order for `section` values; unlisted sections sort last. */
+  sections?: readonly string[];
   /** Zod schema validating a full document's data for this collection. */
   schema: z.ZodObject<FieldsShape<TFields>>;
   /** Introspection descriptor — the single source of truth for describe_schema. */
@@ -75,12 +83,19 @@ export function defineCollection<TFields extends Record<string, FieldDefinition>
     authority,
     description: config.description,
     fields: config.fields,
+    sections: config.sections,
     schema,
     describe(): CollectionDescriptor {
       const fields = Object.entries(config.fields).map(([name, def]) =>
         toFieldDescriptor(name, def),
       );
-      return { name: config.name, authority, fields, description: config.description };
+      return {
+        name: config.name,
+        authority,
+        fields,
+        description: config.description,
+        ...(config.sections ? { sections: [...config.sections] } : {}),
+      };
     },
   };
 }

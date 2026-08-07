@@ -3,18 +3,15 @@
  * grouped/sorted here. Section order is deliberate (a reading path, not
  * alphabetical); a section missing from the list sorts last so new content
  * never vanishes from the sidebar.
+ *
+ * The order itself lives on the `docs` collection in graft.config.ts, so this
+ * sidebar and the Studio's content tree sort from one declaration instead of
+ * keeping their own copies in step by hand.
  */
+import { docs as docsCollection } from "../../graft.config";
 import { getGraft } from "./graft";
 
-export const SECTION_ORDER = [
-  "Start here",
-  "Content",
-  "Runtime",
-  "Agents",
-  "Primitives",
-  "Deploy",
-  "Reference",
-] as const;
+export const SECTION_ORDER = docsCollection.sections ?? [];
 
 export interface DocNavEntry {
   slug: string;

@@ -2,7 +2,7 @@
  * Global base styles. Element defaults + the .prose scope for rendered MDX
  * bodies. Components layer on top; nothing here should need overriding.
  */
-@import "./tokens.css";
+@import "@graft/tokens/tokens.css";
 
 *,
 *::before,

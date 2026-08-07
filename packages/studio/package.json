@@ -22,13 +22,14 @@
   },
   "scripts": {
     "build": "pnpm run build:lib && pnpm run build:ui",
-    "build:lib": "tsup",
+    "build:lib": "node ./scripts/clean-lib.mjs && tsup",
     "build:ui": "vite build",
     "dev": "tsup --watch",
     "dev:ui": "vite",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "lint": "oxlint ."
+    "lint": "oxlint .",
+    "clean:lib": "node ./scripts/clean-lib.mjs"
   },
   "dependencies": {
     "@graft/compiler": "workspace:*",
@@ -50,6 +51,7 @@
     "@fontsource-variable/instrument-sans": "^5.2.8",
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/instrument-serif": "^5.2.8",
+    "@graft/tokens": "workspace:*",
     "@lezer/highlight": "^1.2.3",
     "@phosphor-icons/react": "^2.1.10",
     "@types/react": "^19.0.0",

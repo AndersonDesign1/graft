@@ -44,6 +44,11 @@ export const pages = defineCollection({
 export const docs = defineCollection({
   name: "docs",
   description: "Documentation pages rendered at /docs/<slug>, grouped by section.",
+  // A reading path, not an alphabet. Declared here rather than in the site's
+  // nav so the sidebar, the Studio and agents all sort identically — there is
+  // nothing in the documents to infer it from, since `order` restarts inside
+  // each section. Unlisted sections sort last, so new content never vanishes.
+  sections: ["Start here", "Content", "Runtime", "Agents", "Primitives", "Deploy", "Reference"],
   fields: {
     title: field.string({ description: "Doc page title (h1, sidebar label, <title>)." }),
     description: field.string({ description: "One-line summary shown in listings and meta." }),

@@ -159,6 +159,84 @@ describe("content tree merge", () => {
     expect(db?.driftCount).toBe(0);
   });
 
+  it("orders sections by the collection's declared reading order", async () => {
+    // Section order is editorial and cannot be inferred: `order` restarts
+    // inside each section, so every section has a "1". Declaring it on the
+    // collection is what keeps the Studio and the site's own nav in step.
+    const guide = defineCollection({
+      name: "guide",
+      sections: ["Start here", "Content", "Reference"],
+      fields: {
+        title: field.string(),
+        section: field.string(),
+        order: field.number({ optional: true }),
+      },
+    });
+
+    const write = (slug: string, section: string, order: number): void => {
+      mkdirSync(join(contentDir, "guide"), { recursive: true });
+      writeFileSync(
+        join(contentDir, "guide", `${slug}.mdx`),
+        `---\ntitle: ${slug}\nsection: ${section}\norder: ${order}\n---\n\nbody\n`,
+      );
+    };
+    // Authored in an order that is neither alphabetical nor the reading path.
+    write("cli", "Reference", 1);
+    write("assets", "Content", 2);
+    write("intro", "Start here", 1);
+    write("reading", "Content", 1);
+    write("sdk", "Reference", 2);
+
+    const tree = await getTree({ guide });
+    const docs = tree.collections[0]?.documents ?? [];
+
+    expect(docs.map((d) => d.slug)).toEqual(["intro", "reading", "assets", "cli", "sdk"]);
+  });
+
+  it("sorts unlisted sections last so new content never vanishes", async () => {
+    const guide = defineCollection({
+      name: "guide",
+      sections: ["Start here"],
+      fields: { title: field.string(), section: field.string() },
+    });
+    mkdirSync(join(contentDir, "guide"), { recursive: true });
+    for (const [slug, section] of [
+      ["brand-new", "Undeclared"],
+      ["intro", "Start here"],
+    ]) {
+      writeFileSync(
+        join(contentDir, "guide", `${slug}.mdx`),
+        `---\ntitle: ${slug}\nsection: ${section}\n---\n\nbody\n`,
+      );
+    }
+
+    const tree = await getTree({ guide });
+
+    expect(tree.collections[0]?.documents.map((d) => d.slug)).toEqual(["intro", "brand-new"]);
+  });
+
+  it("falls back to alphabetical sections when none are declared", async () => {
+    const guide = defineCollection({
+      name: "guide",
+      fields: { title: field.string(), section: field.string() },
+    });
+    mkdirSync(join(contentDir, "guide"), { recursive: true });
+    for (const [slug, section] of [
+      ["zeta", "Zebra"],
+      ["alpha", "Apple"],
+    ]) {
+      writeFileSync(
+        join(contentDir, "guide", `${slug}.mdx`),
+        `---\ntitle: ${slug}\nsection: ${section}\n---\n\nbody\n`,
+      );
+    }
+
+    const tree = await getTree({ guide });
+
+    // Not meaningful, but stable — which beats arbitrary.
+    expect(tree.collections[0]?.documents.map((d) => d.slug)).toEqual(["alpha", "zeta"]);
+  });
+
   it("degrades one bad collection instead of failing the whole tree", async () => {
     writeDoc("docs", "good", "Good");
     // Missing the required `title`, so parseDocument throws for this file only.

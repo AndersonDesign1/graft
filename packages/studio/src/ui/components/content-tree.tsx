@@ -100,7 +100,12 @@ export function ContentExplorer({
   loading: boolean;
   activeCollection?: string;
   activeSlug?: string;
-  onSelectCollection: (name: string) => void;
+  /**
+   * `firstSlug` is the first document currently visible in that collection —
+   * after the active filter and sort, not just the first on disk — so opening
+   * a collection lands on something real instead of an empty pane.
+   */
+  onSelectCollection: (name: string, firstSlug?: string) => void;
   onSelectDocument: (collection: string, slug: string) => void;
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -222,7 +227,10 @@ export function ContentExplorer({
                 type="button"
                 className="tree-collection-main"
                 onClick={() => {
-                  onSelectCollection(collection.name);
+                  // groups[0] is the first section in reading order, so its
+                  // first entry is the document the site leads with.
+                  const first = groups[0]?.[1][0]?.slug;
+                  onSelectCollection(collection.name, isDb ? undefined : first);
                   if (!isDb) setExpanded((prev) => ({ ...prev, [collection.name]: true }));
                 }}
               >

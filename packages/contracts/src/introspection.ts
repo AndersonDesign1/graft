@@ -44,6 +44,17 @@ export const CollectionDescriptor = z.object({
   authority: ContentAuthority,
   fields: z.array(FieldDescriptor),
   description: z.string().optional(),
+  /**
+   * Reading order for the collection's `section` values, when it groups.
+   *
+   * Section order is editorial — "Start here" before "Reference" — and there
+   * is nothing in the content to infer it from, since `order` restarts within
+   * each section. Declaring it on the collection means the site nav and any
+   * tool that lists content (Studio, agents) sort identically instead of each
+   * inventing an order. Sections not listed sort last, so new content never
+   * disappears from a sidebar.
+   */
+  sections: z.array(z.string()).optional(),
 });
 export type CollectionDescriptor = z.infer<typeof CollectionDescriptor>;
 

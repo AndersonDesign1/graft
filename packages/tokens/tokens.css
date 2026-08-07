@@ -1,6 +1,11 @@
 /**
  * Graft design tokens — the single source for color, type, space, motion.
  *
+ * Lives in its own package because it has two consumers: the docs site and
+ * the Studio. It used to be a hand-copied duplicate in both, which is a
+ * design system with two sources of truth — the exact thing tokens exist to
+ * prevent. Import it as `@graft/tokens/tokens.css`.
+ *
  * Thesis: editorial print, monochrome. A black stage, off-white type, and
  * elevation carried entirely by *lightness* — surfaces step up from the stage
  * rather than being drawn in with borders. There is no brand accent. Emphasis

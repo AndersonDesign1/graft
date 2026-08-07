@@ -4,7 +4,7 @@
  * every value below routes to tokens.css via light-dark(), so the docs follow
  * the reader's theme with the same mechanism as the rest of the site.
  */
-@import "./tokens.css";
+@import "@graft/tokens/tokens.css";
 @import "tailwindcss";
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";

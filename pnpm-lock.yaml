@@ -98,6 +98,9 @@ importers:
       '@graft/sdk-astro':
         specifier: workspace:*
         version: link:../../packages/sdk-astro
+      '@graft/tokens':
+        specifier: workspace:*
+        version: link:../../packages/tokens
       '@mdx-js/mdx':
         specifier: ^3.1.1
         version: 3.1.1
@@ -490,6 +493,9 @@ importers:
       '@fontsource/instrument-serif':
         specifier: ^5.2.8
         version: 5.2.8
+      '@graft/tokens':
+        specifier: workspace:*
+        version: link:../tokens
       '@lezer/highlight':
         specifier: ^1.2.3
         version: 1.2.3
@@ -514,6 +520,8 @@ importers:
       vite:
         specifier: ^8.1.3
         version: 8.1.3(@types/node@22.20.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+
+  packages/tokens: {}
 
 packages:
 

@@ -1,0 +1,14 @@
+{
+  "name": "@graft/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Graft design tokens — one stylesheet, consumed by the docs site and the Studio.",
+  "type": "module",
+  "files": [
+    "*.css"
+  ],
+  "exports": {
+    "./tokens.css": "./tokens.css",
+    "./package.json": "./package.json"
+  }
+}

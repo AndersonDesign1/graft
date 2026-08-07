@@ -246,8 +246,8 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
               loading={tree.loading}
               activeCollection={route.view === "collections" ? route.collection : undefined}
               activeSlug={route.view === "collections" ? route.slug : undefined}
-              onSelectCollection={(name) =>
-                navigate({ view: "collections", collection: name })
+              onSelectCollection={(name, firstSlug) =>
+                navigate({ view: "collections", collection: name, slug: firstSlug })
               }
               onSelectDocument={(collection, slug) =>
                 navigate({ view: "collections", collection, slug })
