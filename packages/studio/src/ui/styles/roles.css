@@ -99,6 +99,16 @@
   --field-required-bg: var(--c-amber-bg);
   --field-optional: var(--ink-faint);
 
+  /* ---- theme preview swatches -------------------------------------------
+     The one place that must NOT follow the active scheme: each swatch shows
+     what picking that option looks like, so the light preview stays light
+     even in dark mode. Named here so the exception is deliberate and
+     documented rather than a component reaching into the ramp. */
+  --preview-light-bg: var(--paper-1);
+  --preview-dark-bg: var(--n-0);
+  --preview-bar: var(--ink-2);
+  --preview-line: var(--n-6);
+
   /* ---- code editor ---- */
   --editor-active-line: color-mix(in oklch, var(--mark) 4%, transparent);
   --editor-match: color-mix(in oklch, var(--c-blue-solid) 22%, transparent);

@@ -105,7 +105,10 @@ export function SettingsView({
   const dbCollections = tree?.collections.filter((c) => c.authority === "db") ?? [];
 
   return (
-    <div className="view">
+    // A centred column, not a grid. Settings cards have wildly different
+    // heights, and auto-fit packing made the page look ragged and unfinished;
+    // one column reads as deliberate and keeps every label on the same axis.
+    <div className="view view-narrow">
       <header className="view-head">
         <div>
           <h1 className="view-title">Settings</h1>
@@ -116,7 +119,7 @@ export function SettingsView({
         </div>
       </header>
 
-      <div className="settings-grid">
+      <div className="settings-stack">
         <Section
           title="Appearance"
           description="Both schemes are first-class — the tokens are built on light-dark()."
@@ -129,12 +132,21 @@ export function SettingsView({
                 type="button"
                 className="choice"
                 data-active={theme === option.id}
+                data-scheme={option.id}
                 onClick={() => setTheme(option.id)}
               >
-                <span className="choice-icon">
-                  <option.Icon size={15} />
+                {/* A swatch beats a description: you pick a theme by looking
+                    at it, not by reading about it. */}
+                <span className="choice-preview" aria-hidden="true">
+                  <span className="choice-preview-bar" />
+                  <span className="choice-preview-line" />
+                  <span className="choice-preview-line" data-short="" />
                 </span>
-                <span className="choice-label">{option.label}</span>
+                <span className="choice-row">
+                  <option.Icon size={14} />
+                  <span className="choice-label">{option.label}</span>
+                  {theme === option.id ? <IconCheck size={13} className="choice-check" /> : null}
+                </span>
                 <span className="choice-hint">{option.hint}</span>
               </button>
             ))}

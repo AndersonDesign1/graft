@@ -7,7 +7,6 @@ import {
   IconBranches,
   IconCaretUpDown,
   IconCompile,
-  IconDatabase,
   IconHistory,
   IconMoon,
   IconOverview,
@@ -18,11 +17,12 @@ import {
   IconWarning,
   type IconComponent,
 } from "./components/icons";
-import { IdentityMark } from "./components/primitives";
+import { ContentExplorer } from "./components/content-tree";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from "./components/ui/menu";
 import { api, qs } from "./lib/api";
 import { plural } from "./lib/format";
 import { currentBranch, setBranchInUrl, useRoute, type ViewId } from "./lib/route";
+import { useSidebarWidth } from "./lib/sidebar";
 import { useTheme, type Theme } from "./lib/theme";
 import { useResource } from "./lib/use-resource";
 import { CollectionsView } from "./views/collections";
@@ -58,6 +58,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [compiling, setCompiling] = useState(false);
   const [compileMsg, setCompileMsg] = useState<string | null>(null);
+  const sidebar = useSidebarWidth();
 
   const tree = useResource<ContentTree>(`/tree${qs({ branch })}`);
   const branches = useResource<BranchList>("/branches");
@@ -229,51 +230,29 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
         </header>
 
         <div className="body">
-          {/* Collections live in the rail rather than in their own pane: it
-              removes a whole column from the workspace, and the rail is
-              already the "where am I" surface. Payload's model. */}
-          <nav className="rail" aria-label="Studio sections">
+          {/* The sidebar is the content explorer, not just a section list:
+              browsing content IS navigation, so a separate list pane was a
+              redundant column. Width is a real preference here — document
+              titles vary — so it drags. */}
+          <nav
+            className="rail"
+            aria-label="Studio sections"
+            style={{ width: `${sidebar.width}px` }}
+          >
             <div className="rail-group">{TOP.map((item) => railItem(item))}</div>
 
-            <div className="rail-group">
-              <p className="rail-label">Content</p>
-              {collections.map((collection) => {
-                const active =
-                  route.view === "collections" && route.collection === collection.name;
-                return (
-                  <button
-                    key={collection.name}
-                    type="button"
-                    className="rail-item"
-                    data-active={active}
-                    aria-current={active ? "page" : undefined}
-                    onClick={() =>
-                      navigate({ view: "collections", collection: collection.name })
-                    }
-                  >
-                    <IdentityMark name={collection.name} size="sm" />
-                    <span>{collection.name}</span>
-                    {collection.authority === "db" ? (
-                      <IconDatabase size={13} className="rail-mark" />
-                    ) : collection.driftCount > 0 ? (
-                      <span className="count" data-tone="drifted" data-numeric="">
-                        {collection.driftCount}
-                      </span>
-                    ) : (
-                      <span className="count" data-numeric="">
-                        {collection.documents.length}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-              {tree.loading && collections.length === 0 ? (
-                <p className="rail-loading">Loading…</p>
-              ) : null}
-              {!tree.loading && collections.length === 0 ? (
-                <p className="rail-loading">None registered</p>
-              ) : null}
-            </div>
+            <ContentExplorer
+              collections={collections}
+              loading={tree.loading}
+              activeCollection={route.view === "collections" ? route.collection : undefined}
+              activeSlug={route.view === "collections" ? route.slug : undefined}
+              onSelectCollection={(name) =>
+                navigate({ view: "collections", collection: name })
+              }
+              onSelectDocument={(collection, slug) =>
+                navigate({ view: "collections", collection, slug })
+              }
+            />
 
             <div className="rail-group">
               <p className="rail-label">Operations</p>
@@ -291,6 +270,17 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
 
             <div className="rail-group rail-group-end">{BOTTOM.map((item) => railItem(item))}</div>
           </nav>
+
+          <div
+            className="rail-resize"
+            data-dragging={sidebar.dragging}
+            role="separator"
+            aria-label="Resize sidebar"
+            aria-orientation="vertical"
+            onPointerDown={sidebar.onPointerDown}
+            onDoubleClick={sidebar.reset}
+            title="Drag to resize · double-click to reset"
+          />
 
           <main className="main">{main}</main>
         </div>
