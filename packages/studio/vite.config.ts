@@ -15,6 +15,17 @@ export default defineConfig({
   root: fileURLToPath(new URL("./src/ui", import.meta.url)),
   base: "./",
   plugins: [react()],
+  resolve: {
+    /**
+     * Milkdown identifies a context Slice by object identity. Crepe bundles
+     * its own path to `@milkdown/core`, so a second copy — reached through
+     * `@milkdown/kit/core`, or created by dep pre-bundling — hands out
+     * different Slice objects and `ctx.update(remarkStringifyOptionsCtx)`
+     * fails with `contextNotFound` against a slice the editor did inject.
+     * One copy of each, so identity holds.
+     */
+    dedupe: ["@milkdown/core", "@milkdown/ctx", "@milkdown/kit", "@milkdown/transformer"],
+  },
   build: {
     outDir: fileURLToPath(new URL("./dist/ui", import.meta.url)),
     emptyOutDir: true,

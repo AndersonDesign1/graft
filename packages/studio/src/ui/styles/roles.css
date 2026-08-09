@@ -110,11 +110,24 @@
      The one place that must NOT follow the active scheme: each swatch shows
      what picking that option looks like, so the light preview stays light
      even in dark mode. Named here so the exception is deliberate and
-     documented rather than a component reaching into the ramp. */
-  --preview-light-bg: var(--paper-1);
+     documented rather than a component reaching into the ramp.
+
+     Two full sets rather than one bg each: the swatch is a miniature of this
+     Studio — rail, sidebar, workspace — so it needs every surface the real
+     chrome has. You pick a theme by recognising the app in it. */
+  --preview-light-bg: var(--paper-0);
+  --preview-light-rail: var(--paper-2);
+  --preview-light-panel: var(--paper-1);
+  --preview-light-hairline: var(--paper-2);
+  --preview-light-mark: var(--ink-0);
+  --preview-light-line: var(--ink-2);
+
   --preview-dark-bg: var(--n-0);
-  --preview-bar: var(--ink-2);
-  --preview-line: var(--n-6);
+  --preview-dark-rail: var(--n-1);
+  --preview-dark-panel: var(--n-2);
+  --preview-dark-hairline: var(--n-3);
+  --preview-dark-mark: var(--n-9);
+  --preview-dark-line: var(--n-6);
 
   /* ---- loading placeholders ---- */
   --skeleton-bg: var(--paper-sunken);

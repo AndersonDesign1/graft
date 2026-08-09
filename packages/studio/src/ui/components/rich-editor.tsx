@@ -10,48 +10,52 @@
  * rather than a plugin bolted on. That matters here: every save rewrites the
  * author's file.
  *
- * The honest limit: MDX is markdown plus JSX, and a commonmark editor has no
- * node type for `<Callout>`. Rather than silently mangle it, `hasMdxSyntax`
- * detects component syntax and the caller keeps those documents in Raw MDX.
+ * On MDX: a commonmark editor has no node type for `<Callout>`, but it does
+ * have one for raw HTML, and an unbroken JSX block parses as exactly that —
+ * so it survives the round trip untouched. Rather than refuse those documents
+ * on sight (the old `hasMdxSyntax` regex, which locked out three of twenty
+ * real docs that were provably safe), the editor now *proves* fidelity per
+ * document: Milkdown re-serialises on mount, and `onFidelity` reports that
+ * text so the caller can compare it against the bytes it loaded.
  */
 import { Crepe } from "@milkdown/crepe";
+// From @milkdown/core, the same entry Crepe resolves internally. Importing the
+// re-export at `@milkdown/kit/core` gives a *different* module instance under
+// Vite's dep pre-bundling, and a Slice is identified by object identity — so
+// the ctx update would look up a slice that Crepe's copy of core never
+// injected and throw `contextNotFound`. vite.config.ts dedupes these too.
+import { remarkStringifyOptionsCtx } from "@milkdown/core";
 import { useEffect, useRef } from "react";
 import { watchEditIntent } from "../lib/edit-intent";
-
-/**
- * Does this body contain MDX-specific syntax a commonmark editor would eat?
- *
- * Looks for JSX elements and ESM import/export, the two things MDX adds. Kept
- * deliberately eager: a false positive costs the operator a richer editor, a
- * false negative costs them their content.
- */
-export function hasMdxSyntax(body: string): boolean {
-  // Fenced code can legitimately contain angle brackets; ignore those regions.
-  const withoutFences = body.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
-  return (
-    /<\/?[A-Z][\w.]*[\s/>]/.test(withoutFences) || // <Callout>, <Foo.Bar />
-    /^\s*(import|export)\s/m.test(withoutFences) || // ESM in MDX
-    /\{[^}\n]*\}/.test(withoutFences.replace(/\$\{[^}]*\}/g, "")) // {expression}
-  );
-}
 
 export function RichEditor({
   value,
   onChange,
+  onFidelity,
   readOnly = false,
 }: {
   value: string;
   onChange: (next: string) => void;
+  /**
+   * Fired once, with the editor's own re-serialisation of `value`. This is
+   * the mount-time `markdownUpdated` that `watchEditIntent` suppresses as an
+   * edit — the same event, read for what it actually tells us: exactly what
+   * this editor would write to disk if the operator typed one character.
+   */
+  onFidelity?: (roundTripped: string) => void;
   readOnly?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const crepe = useRef<Crepe | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onFidelityRef = useRef(onFidelity);
+  onFidelityRef.current = onFidelity;
 
   useEffect(() => {
     if (!host.current) return;
     let disposed = false;
+    let probed = false;
 
     // Milkdown emits `markdownUpdated` the moment it mounts, from its own
     // re-serialisation rather than anything the operator did. Suppress those.
@@ -74,9 +78,37 @@ export function RichEditor({
       },
     });
 
+    // Match the serialiser to how these files are actually written. remark
+    // defaults to `*` for bullets, which would rewrite every list in the
+    // repository the first time someone touched a document — churn with no
+    // meaning behind it. The fidelity check forgives marker style, but not
+    // creating the diff at all is better than forgiving it.
+    instance.editor.config((ctx) => {
+      ctx.update(remarkStringifyOptionsCtx, (options) => ({
+        ...options,
+        bullet: "-" as const,
+        emphasis: "_" as const,
+        strong: "*" as const,
+        fences: true,
+        rule: "-" as const,
+      }));
+    });
+
     instance.on((listener) => {
       listener.markdownUpdated((_ctx, markdown) => {
-        if (disposed || !intent.touched) return;
+        if (disposed) return;
+        // An emission with no interaction behind it is the mount
+        // re-serialisation: the fidelity probe, never an edit. Keyed on
+        // `intent.touched` rather than "is this the first one" on purpose —
+        // if Milkdown ever stops emitting on mount, "first" would swallow the
+        // operator's opening keystroke as a probe and drop the edit.
+        if (!intent.touched) {
+          if (!probed) {
+            probed = true;
+            onFidelityRef.current?.(markdown);
+          }
+          return;
+        }
         onChangeRef.current(markdown);
       });
     });

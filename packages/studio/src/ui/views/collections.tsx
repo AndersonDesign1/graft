@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
   ContentTree,
@@ -7,7 +7,7 @@ import type {
   DocumentState,
 } from "../../types";
 import { MdxEditor } from "../components/editor";
-import { hasMdxSyntax, RichEditor } from "../components/rich-editor";
+import { RichEditor } from "../components/rich-editor";
 import { IconDatabase, IconFile, IconWarning } from "../components/icons";
 import { DocumentSkeleton } from "../components/skeletons";
 import { EmptyState, Pill, StatePill, Status } from "../components/primitives";
@@ -16,6 +16,7 @@ import { Tabs, TabsIndicator, TabsList, TabsTrigger } from "../components/ui/tab
 import { api, qs } from "../lib/api";
 import { useAutosave } from "../lib/autosave";
 import { hasUnsavedChanges } from "../lib/draft";
+import { compareRoundTrip, describeFidelity, type FidelityResult } from "../lib/fidelity";
 import type { Route } from "../lib/route";
 
 type EditorMode = "rich" | "raw";
@@ -94,11 +95,13 @@ export function CollectionsView({
     collections.find((c) => c.name === route.collection) ?? collections[0];
   const readOnly = active?.authority === "db";
 
-  // MDX is markdown plus JSX, and a commonmark editor has no node for
-  // `<Callout>`. Rather than quietly mangle it on the next save, those
-  // documents stay in Raw.
-  const mdxOnly = useMemo(() => hasMdxSyntax(body), [body]);
-  const effectiveMode: EditorMode = mdxOnly ? "raw" : mode;
+  // Whether rich editing is safe is measured, not guessed: the editor
+  // re-serialises the document on mount and we compare that against the bytes
+  // we loaded. Until the probe reports, rich is allowed — the edit-intent and
+  // draft guards already make an unprobed document read-only in practice,
+  // since neither an untouched editor nor an unchanged body can write.
+  const [fidelity, setFidelity] = useState<FidelityResult | null>(null);
+  const effectiveMode: EditorMode = fidelity && !fidelity.lossless ? "raw" : mode;
 
   useEffect(() => {
     if (!route.collection && active) {
@@ -169,6 +172,9 @@ export function CollectionsView({
   const openDoc = useCallback(async (collection: string, slug: string) => {
     setDocError(null);
     setDocLoading(true);
+    // Fidelity is a property of the document, not of the session — a new file
+    // is unmeasured until its own editor instance reports back.
+    setFidelity(null);
     try {
       const next = await api<DocumentDto>(`/document${qs({ collection, slug })}`);
       setDoc(next);
@@ -289,7 +295,14 @@ export function CollectionsView({
           <Tabs value={effectiveMode} onValueChange={(v) => switchMode(v as EditorMode)}>
             <TabsList>
               <TabsIndicator />
-              <TabsTrigger value="rich" disabled={mdxOnly}>
+              {/* Never disabled up front. A document is only refused rich
+                  editing once its own editor has proved it would be rewritten,
+                  and then the tab explains itself rather than sitting dead. */}
+              <TabsTrigger
+                value="rich"
+                disabled={Boolean(fidelity && !fidelity.lossless)}
+                title={fidelity && !fidelity.lossless ? describeFidelity(fidelity) : undefined}
+              >
                 Rich
               </TabsTrigger>
               <TabsTrigger value="raw">Raw MDX</TabsTrigger>
@@ -350,13 +363,10 @@ export function CollectionsView({
               ) : null}
             </div>
 
-            {mdxOnly ? (
+            {fidelity && !fidelity.lossless ? (
               <p className="notice" data-tone="warn">
                 <IconWarning size={14} />
-                <span>
-                  This document uses MDX components, which the rich editor cannot represent without
-                  rewriting them. Editing the source directly keeps them intact.
-                </span>
+                <span>{describeFidelity(fidelity)}</span>
               </p>
             ) : null}
 
@@ -368,6 +378,7 @@ export function CollectionsView({
                   key={`${route.collection}/${route.slug}`}
                   value={body}
                   readOnly={readOnly}
+                  onFidelity={(roundTripped) => setFidelity(compareRoundTrip(body, roundTripped))}
                   onChange={(next) => {
                     setBody(next);
                     autosave.touch();
