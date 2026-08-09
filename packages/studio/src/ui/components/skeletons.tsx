@@ -12,7 +12,13 @@ function Bar({ w = "100%", h = "0.85rem" }: { w?: string; h?: string }) {
 }
 
 /** Sidebar content tree: collection row + nested document rows. */
-export function TreeSkeleton({ collections = 2, docs = 4 }: { collections?: number; docs?: number }) {
+export function TreeSkeleton({
+  collections = 2,
+  docs = 4,
+}: {
+  collections?: number;
+  docs?: number;
+}) {
   return (
     <div className="sk" aria-hidden="true">
       {Array.from({ length: collections }, (_, c) => (
@@ -103,7 +109,11 @@ export function TableSkeleton({ rows = 6, cols = 4 }: { rows?: number; cols?: nu
       {Array.from({ length: rows }, (_, r) => (
         <div key={r} className="sk-table-row">
           {Array.from({ length: cols }, (_, c) => (
-            <Bar key={c} w={c === cols - 1 ? "4rem" : `${40 + ((r + c) * 11) % 45}%`} h="0.75rem" />
+            <Bar
+              key={c}
+              w={c === cols - 1 ? "4rem" : `${40 + (((r + c) * 11) % 45)}%`}
+              h="0.75rem"
+            />
           ))}
         </div>
       ))}

@@ -70,8 +70,8 @@ const BEATS: Beat[] = [
     ),
     lede: (
       <>
-        A mouse UI is a dead end for an agent. Graft speaks MCP and CLI with errors that carry
-        their own <code>fix</code>. This replay is a real cold exchange.
+        A mouse UI is a dead end for an agent. Graft speaks MCP and CLI with errors that carry their
+        own <code>fix</code>. This replay is a real cold exchange.
       </>
     ),
   },
@@ -86,8 +86,8 @@ const BEATS: Beat[] = [
     ),
     lede: (
       <>
-        The Zod schema in <code>graft.config.ts</code> types the compiler, the SDKs, the
-        functions, and the MCP tools.
+        The Zod schema in <code>graft.config.ts</code> types the compiler, the SDKs, the functions,
+        and the MCP tools.
       </>
     ),
   },
@@ -115,13 +115,7 @@ const BEATS: Beat[] = [
   },
 ];
 
-export function Stage({
-  compile,
-  selfhost,
-}: {
-  compile: TermLine[];
-  selfhost: TermLine[];
-}) {
+export function Stage({ compile, selfhost }: { compile: TermLine[]; selfhost: TermLine[] }) {
   const [active, setActive] = useState(0);
   // Returning to a beat remounts its demo so the type-out / message cascade
   // plays again instead of sitting finished.

@@ -84,7 +84,12 @@ export function SchemaView() {
         </div>
       </header>
 
-      <Status loading={loading && !data} error={error} empty={collections.length === 0} skeleton={<CardsSkeleton />}>
+      <Status
+        loading={loading && !data}
+        error={error}
+        empty={collections.length === 0}
+        skeleton={<CardsSkeleton />}
+      >
         <EmptyState
           title={q ? "No matching fields" : "No collections registered"}
           body={

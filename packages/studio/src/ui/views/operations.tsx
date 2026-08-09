@@ -58,7 +58,12 @@ export function ApprovalsView({ onDecided }: { onDecided?: () => void }) {
         {rows.length > 0 ? <Pill tone="pending">{plural(rows.length, "waiting")}</Pill> : null}
       </header>
 
-      <Status loading={loading && !data} error={error ?? actionError} empty={rows.length === 0} skeleton={<CardsSkeleton />}>
+      <Status
+        loading={loading && !data}
+        error={error ?? actionError}
+        empty={rows.length === 0}
+        skeleton={<CardsSkeleton />}
+      >
         <EmptyState
           title="Queue is clear"
           icon={<IconCheck size={20} />}
@@ -137,7 +142,12 @@ export function BranchesView({
         </div>
       </header>
 
-      <Status loading={loading && !data} error={error} empty={rows.length === 0} skeleton={<ListSkeleton rows={3} avatar />}>
+      <Status
+        loading={loading && !data}
+        error={error}
+        empty={rows.length === 0}
+        skeleton={<ListSkeleton rows={3} avatar />}
+      >
         <EmptyState
           title="No branches registered"
           body={
@@ -383,7 +393,12 @@ export function HistoryView({ branch }: { branch: string }) {
         </div>
       </header>
 
-      <Status loading={loading && !data} error={error} empty={rows.length === 0} skeleton={<TableSkeleton />}>
+      <Status
+        loading={loading && !data}
+        error={error}
+        empty={rows.length === 0}
+        skeleton={<TableSkeleton />}
+      >
         <EmptyState
           title="Nothing compiled yet"
           icon={<IconHistory size={20} />}

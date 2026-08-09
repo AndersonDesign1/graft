@@ -72,13 +72,7 @@ const TURNS: Turn[] = [
   },
 ];
 
-function PacketShape({
-  role,
-  mode,
-}: {
-  role: "agent" | "graft";
-  mode: "fill" | "stroke";
-}) {
+function PacketShape({ role, mode }: { role: "agent" | "graft"; mode: "fill" | "stroke" }) {
   return (
     <svg
       className={`mcp-turn-shape mcp-turn-shape-${mode}`}

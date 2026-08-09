@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { diffBranchContent, foreignRemovals, type ContentInput, type ExistingContentState } from "./diff";
+import {
+  diffBranchContent,
+  foreignRemovals,
+  type ContentInput,
+  type ExistingContentState,
+} from "./diff";
 
 const doc = (slug: string, hash: string, overrides: Partial<ContentInput> = {}): ContentInput => ({
   collection: "pages",

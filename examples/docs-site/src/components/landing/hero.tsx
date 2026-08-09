@@ -47,8 +47,18 @@ function GraftFigure() {
         />
 
         {/* side branches feather off the stem, heading right */}
-        <path className="scion drawn" pathLength={1} style={d("450ms")} d="M96 148 C120 140 144 140 166 148" />
-        <path className="scion drawn" pathLength={1} style={d("700ms")} d="M142 91 C164 84 186 84 206 92" />
+        <path
+          className="scion drawn"
+          pathLength={1}
+          style={d("450ms")}
+          d="M96 148 C120 140 144 140 166 148"
+        />
+        <path
+          className="scion drawn"
+          pathLength={1}
+          style={d("700ms")}
+          d="M142 91 C164 84 186 84 206 92"
+        />
 
         {/* leaves, base-to-tip along stem and branches */}
         <Leaf at="translate(132 142) rotate(-20) scale(0.75)" delay="900ms" />

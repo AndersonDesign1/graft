@@ -323,9 +323,7 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
 
       if (pathname === "/api/studio/v1/tree" && method === "GET") {
         const branch = url.searchParams.get("branch")?.trim() || defaultBranch;
-        return json(
-          await buildTree(options.db, options.collections, options.contentDir, branch),
-        );
+        return json(await buildTree(options.db, options.collections, options.contentDir, branch));
       }
 
       if (pathname === "/api/studio/v1/collections" && method === "GET") {

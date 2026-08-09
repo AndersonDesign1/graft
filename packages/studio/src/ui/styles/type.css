@@ -15,10 +15,8 @@
  */
 
 :root {
-  --font-sans:
-    "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono:
-    "Geist Mono Variable", ui-monospace, "Cascadia Mono", "SF Mono", monospace;
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "Cascadia Mono", "SF Mono", monospace;
   --font-display: var(--font-sans);
 
   /* Dashboard scale. The docs jump 16 -> 24 -> 36 -> 56 for reading; a

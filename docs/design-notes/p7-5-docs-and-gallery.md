@@ -11,7 +11,7 @@ Pairs with `packaging.md` (which parks "docs site" as the remaining item).
 ## Operator decisions (2026-07-11)
 
 1. **No competitor comparison.** Do **not** name or table competitors. Sell the
-   product on its own benefits and on *how Graft is different* — not "better than
+   product on its own benefits and on _how Graft is different_ — not "better than
    X." The old "compare page" is replaced by a **"Why Graft" / product story**
    page framed entirely around what it does and how it feels.
 2. **Stack: Astro + React, using Graft.** Both the landing page and the docs are
@@ -42,28 +42,31 @@ Pairs with `packaging.md` (which parks "docs site" as the remaining item).
 ## Design direction v2 (2026-07-12) — the study and the answer
 
 Operator supplied four landing screenshots (Prismic light, Prismic dark/dev,
-Basehub, Fumadocs) with the brief: *study section by section, take
-inspiration, be better, tell our story in the design.*
+Basehub, Fumadocs) with the brief: _study section by section, take
+inspiration, be better, tell our story in the design._
 
 ### What each does well (steal the move, not the look)
 
 **Prismic (light, marketing):**
+
 - Four-card feature row where **every card contains a mini working product UI**
   — not icons, product.
 - The MCP diagram section ("One prompt. All your pages, updated"): ChatGPT +
   Claude cards wired to a central MCP node. **They market the agent surface as
-  a diagram.** We *are* the agent surface — ours must be live, not a picture.
+  a diagram.** We _are_ the agent surface — ours must be live, not a picture.
 - Numbered vertical "launch in minutes" steps with a sticky product pane.
 - Weakness to beat: everything is screenshots and stock photography; nothing
   moves; the product is never actually present on the page.
 
 **Prismic (dark, developer):**
+
 - "Build with your AI agent of choice" + a row of agent logos — names the
   agent-native audience directly.
 - Clean perf/infra card grid. Weakness: generic SaaS dark; purple-on-black
   cards could be any product.
 
 **Basehub:**
+
 - Opens with **the actual app in an accent-stroked frame** — the product IS
   the hero art.
 - Branch out → review → merge: three cards showing real UI fragments for the
@@ -76,10 +79,11 @@ inspiration, be better, tell our story in the design.*
   interactive-feeling moment.
 
 **Fumadocs:**
+
 - Real **art direction**: dithered/halftone gradient spheres, mono type,
   restrained accent — a committed aesthetic, not a template.
 - "TRY IT OUT" terminal card sitting on the art.
-- Docs framework marketing itself *with its own docs UI* embedded.
+- Docs framework marketing itself _with its own docs UI_ embedded.
 - The shadcn-style CLI card ("the shadcn/ui for docs") — exactly our
   `graft add` story.
 - Weakness to beat: sections are beautiful but the story wanders; no single
@@ -97,9 +101,9 @@ Landing blueprint (top to bottom):
    human is optional." To the right / below: **the live loop** — an animated
    panel where an MCP `write_content` call types itself out, a compile row
    appears (`+1 added @ <sha>`), and the rendered page updates. This is
-   Basehub's "product as hero" + Prismic's MCP diagram, but *running*.
+   Basehub's "product as hero" + Prismic's MCP diagram, but _running_.
 2. **The loop diagram** — animated SVG: `MDX in git → compile → content_index
-   → typed reads`, drawn as a schematic with vermilion flow marks; each node
+→ typed reads`, drawn as a schematic with vermilion flow marks; each node
    annotated in mono. (Our version of Fumadocs' art direction: editorial
    schematic instead of dither.)
 3. **Bento** — the P7.5.3 studio elements live in cells: ApprovalQueue
@@ -108,10 +112,10 @@ Landing blueprint (top to bottom):
    React islands on real reads — the move none of the four can make.
 4. **Branching triptych** — branch → preview → merge as three panels with an
    animated branch line grafting back into trunk (vermilion union mark).
-   Beats Basehub's three static cards because the line *moves*.
+   Beats Basehub's three static cards because the line _moves_.
 5. **The primitives index** — our version of Basehub's alphabetical index:
    the actual registry (`scoped-access, comments, seo, callout, faq,
-   commerce`) as a selectable list; the detail pane runs `describe_item`
+commerce`) as a selectable list; the detail pane runs `describe_item`
    against the real MCP endpoint. `graft add commerce` as the terminal card
    (Fumadocs' CLI card, but the registry is queryable).
 6. **Trust strip** — cold-agent gate: "operated cold, by CI, every commit" +
@@ -126,14 +130,14 @@ ties to grafting wax + editorial red without a single stock illustration.
 
 ### Palette v2 (locked)
 
-| Token | Dark (default) | Light |
-| --- | --- | --- |
-| bg | `#0E0D0B` warm ink black | `#F7F5F0` warm ivory |
-| bg-raised | `#161511` | `#FFFFFF` |
-| text | `#EDEAE2` | `#16150F` |
-| accent | `#E8442E` vermilion (grafting wax) | `#D63A25` |
-| accent-dim | `#B5301F` | `#B5301F` |
-| structure | rgba hairlines + mono greys | same |
+| Token      | Dark (default)                     | Light                |
+| ---------- | ---------------------------------- | -------------------- |
+| bg         | `#0E0D0B` warm ink black           | `#F7F5F0` warm ivory |
+| bg-raised  | `#161511`                          | `#FFFFFF`            |
+| text       | `#EDEAE2`                          | `#16150F`            |
+| accent     | `#E8442E` vermilion (grafting wax) | `#D63A25`            |
+| accent-dim | `#B5301F`                          | `#B5301F`            |
+| structure  | rgba hairlines + mono greys        | same                 |
 
 Dark is the default presentation (landing); docs follow the OS. Type stays:
 Instrument Serif (display) / Instrument Sans (text) / IBM Plex Mono (labels,
@@ -157,7 +161,7 @@ apps that prove the SDK matrix (Next / Astro / SvelteKit) against a real Graft
 runtime.
 
 **Is not:** a mandatory admin UI. Studio is **opt-in** (OpenAPI-first; MCP/CLI
-parity) — we win by *not* locking operators into a dashboard. No competitor
+parity) — we win by _not_ locking operators into a dashboard. No competitor
 benchmarking. Nothing here becomes a required runtime dependency — the site is
 a leaf app, not a package others import.
 
@@ -179,7 +183,7 @@ a leaf app, not a package others import.
 same breath — one app earns two checkboxes. React is used for the interactive
 bits (nav, code-tabs, any live demo island); Astro carries the static shell.
 
-**SvelteKit** gets a *separate* minimal app (`examples/gallery-sveltekit/`) so
+**SvelteKit** gets a _separate_ minimal app (`examples/gallery-sveltekit/`) so
 each framework SDK has exactly one runnable proof. The gallery links to all
 three; it is not folded into the docs host.
 
@@ -201,7 +205,7 @@ examples/
   gallery-sveltekit/     # NEW — minimal SvelteKit app proving sdk-sveltekit
 ```
 
-Docs *content* is authored MDX compiled by `@graft/compiler` and read back
+Docs _content_ is authored MDX compiled by `@graft/compiler` and read back
 through `sdk-astro` where it earns the round-trip; prose that genuinely doesn't
 need the DB may use Astro content collections directly. Dogfood where it's
 honest, not performative.
@@ -218,7 +222,7 @@ another product. Organize by the four things that actually define it:
   not a rivalry.
 - **Git is the source of truth.** Authored content is MDX in the repo with real
   history; Postgres is a derived, rebuildable index. Explain the "git wins →
-  recompile" invariant as a *feature*: no lock-in, no opaque content tree.
+  recompile" invariant as a _feature_: no lock-in, no opaque content tree.
 - **Copy-on-write preview branches.** `graft branch`/`merge`, overlay + neon
   backends — real previews without cloning prod data. Link `branching.md`.
 - **You own your primitives.** `graft add` copies components into your repo
@@ -227,7 +231,7 @@ another product. Organize by the four things that actually define it:
 
 Plus the portability story the operator called out: **"deploy anywhere, migrate
 cheaply"** — embedded or `graft serve`, Vercel today, container tomorrow, same
-bytes (`packaging.md`). That *is* a differentiator stated as a benefit.
+bytes (`packaging.md`). That _is_ a differentiator stated as a benefit.
 
 Rules: every capability claim links to the primitive/doc that backs it (receipts,
 so the page can't drift from reality). No feature-matrix, no logos, no "vs."
@@ -239,11 +243,11 @@ so the page can't drift from reality). No feature-matrix, no logos, no "vs."
 Index page cards each runnable example: framework, SDK package, features it
 exercises, "run it" instructions, screenshot/live link.
 
-| Example | SDK | Proves |
-| --- | --- | --- |
-| `landing-page` | `@graft/sdk-next` | RSC reads, MdxBody, revalidate webhook, functions, MCP route |
-| `docs-site` | `@graft/sdk-astro` | typed reads (no memo) + `graftRoute` endpoint mount, React islands |
-| `gallery-sveltekit` | `@graft/sdk-sveltekit` | typed reads + `graftRoute` `+server.ts` mount |
+| Example             | SDK                    | Proves                                                             |
+| ------------------- | ---------------------- | ------------------------------------------------------------------ |
+| `landing-page`      | `@graft/sdk-next`      | RSC reads, MdxBody, revalidate webhook, functions, MCP route       |
+| `docs-site`         | `@graft/sdk-astro`     | typed reads (no memo) + `graftRoute` endpoint mount, React islands |
+| `gallery-sveltekit` | `@graft/sdk-sveltekit` | typed reads + `graftRoute` `+server.ts` mount                      |
 
 Each example must **actually boot** against a Graft runtime — no faked
 screenshots. The gallery is the visual proof that identical-bytes packaging holds
@@ -321,7 +325,7 @@ Browsed live for inspiration only — **nothing competitor-facing ships** (decis
 - **Type does the talking:** custom grotesque (Waldenburg) at ~96px, weight 400,
   very tight tracking (−4%). Big-type-light-weight reads expensive; no gradient-
   text slop anywhere.
-- **Palette:** white / near-black `#0b0b0b`, cool gray borders, then *soft*
+- **Palette:** white / near-black `#0b0b0b`, cool gray borders, then _soft_
   pastel accents (powder blue, coral, lavender) + one display-P3 lime for punch.
   Pill buttons (`border-radius: 9999px`).
 - **The big move — they embed real product UI in the landing:** "CLICK TO
@@ -333,14 +337,14 @@ Browsed live for inspiration only — **nothing competitor-facing ships** (decis
   trigger→function→output pipeline visualization; heavy use of real code with
   file-tab chrome (`hero.ts` / `terminal`).
 - Positioning: "The Content Operating System for the AI era" — they are racing
-  to the same agent story. Our landing must out-credibility them: they *narrate*
-  agent ops; we can *demonstrate* them (MCP + cold-agent gate are real).
+  to the same agent story. Our landing must out-credibility them: they _narrate_
+  agent ops; we can _demonstrate_ them (MCP + cold-agent gate are real).
 
 ### Basehub (basehub.com — live read)
 
 - **Market signal: "BaseHub Is Joining Vercel"** (banner, verbatim). The
   agent-native CMS space is consolidating; independence + self-host is now a
-  *differentiator we hold*.
+  _differentiator we hold_.
 - **Dark, quiet, engineered:** near-black bg, gray text hierarchy, Geist, h1
   only 48px/500 (understated), one signature accent — orange `#ff6c02`. Pill
   buttons. 20 inline SVGs, zero canvas — light and fast.
@@ -352,6 +356,7 @@ Browsed live for inspiration only — **nothing competitor-facing ships** (decis
   cards.
 
 ### Payload (payloadcms.com — **unreachable from this environment**; notes from
+
 memory, verify before borrowing)
 
 Historically: brutalist black/white technical aesthetic, crosshair/registration

@@ -54,9 +54,7 @@ function SyncBar({ documents }: { documents: ContentTreeDoc[] }) {
   return (
     <span className="sync-bar" aria-hidden="true">
       {segments.map(([state, n]) =>
-        n === 0 ? null : (
-          <span key={state} data-state={state} style={{ flexGrow: n }} />
-        ),
+        n === 0 ? null : <span key={state} data-state={state} style={{ flexGrow: n }} />,
       )}
     </span>
   );
@@ -73,10 +71,7 @@ function sortDocs(docs: ContentTreeDoc[], sort: SortMode): ContentTreeDoc[] {
   return out;
 }
 
-function groupDocs(
-  docs: ContentTreeDoc[],
-  sort: SortMode,
-): Array<[string, ContentTreeDoc[]]> {
+function groupDocs(docs: ContentTreeDoc[], sort: SortMode): Array<[string, ContentTreeDoc[]]> {
   const sorted = sortDocs(docs, sort);
   // Sections only mean something in publication order.
   if (sort !== "site" || !sorted.some((d) => d.section)) return [["", sorted]];
@@ -216,9 +211,7 @@ export function ContentExplorer({
                 aria-label={open ? `Collapse ${collection.name}` : `Expand ${collection.name}`}
                 aria-expanded={open}
                 disabled={isDb || documents.length === 0}
-                onClick={() =>
-                  setExpanded((prev) => ({ ...prev, [collection.name]: !open }))
-                }
+                onClick={() => setExpanded((prev) => ({ ...prev, [collection.name]: !open }))}
               >
                 <IconCaretDown size={11} />
               </button>

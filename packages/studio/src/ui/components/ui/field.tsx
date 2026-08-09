@@ -19,7 +19,11 @@ export function Field({ className, ...props }: FieldPrimitive.Root.Props) {
 
 export function FieldLabel({ className, ...props }: FieldPrimitive.Label.Props) {
   return (
-    <FieldPrimitive.Label data-slot="field-label" className={cx("field-label", className)} {...props} />
+    <FieldPrimitive.Label
+      data-slot="field-label"
+      className={cx("field-label", className)}
+      {...props}
+    />
   );
 }
 
@@ -45,12 +49,13 @@ export function Textarea({
   return <textarea data-slot="textarea" className={cn("input textarea", className)} {...props} />;
 }
 
-export function NumberField({
-  className,
-  ...props
-}: NumberFieldPrimitive.Root.Props) {
+export function NumberField({ className, ...props }: NumberFieldPrimitive.Root.Props) {
   return (
-    <NumberFieldPrimitive.Root data-slot="number-field" className={cx("number-field", className)} {...props}>
+    <NumberFieldPrimitive.Root
+      data-slot="number-field"
+      className={cx("number-field", className)}
+      {...props}
+    >
       <NumberFieldPrimitive.Group className="number-field-group">
         <NumberFieldPrimitive.Decrement className="number-field-step" aria-label="Decrease">
           −

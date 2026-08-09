@@ -378,12 +378,7 @@
   z-index: 2;
   padding: 1.25rem 0;
   /* the pinned frame must not let copy show through behind it */
-  background: linear-gradient(
-    to bottom,
-    var(--paper) 0%,
-    var(--paper) 88%,
-    transparent 100%
-  );
+  background: linear-gradient(to bottom, var(--paper) 0%, var(--paper) 88%, transparent 100%);
 }
 
 .stage-frame {
@@ -1996,7 +1991,6 @@
     opacity: 1;
     transform: none;
   }
-
 }
 
 /* --------------------------------------------------------------- why page --- */

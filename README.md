@@ -135,23 +135,23 @@ deployment can give its app/agent a runtime role with **no UPDATE on `approvals`
 
 ## Monorepo layout
 
-| Package                     | Purpose                                                            |
-| --------------------------- | ------------------------------------------------------------------ |
-| `@graft/core`               | Schema (`defineCollection`), function runtime, access, migrations  |
-| `@graft/compiler`           | Authored content → Postgres index + typegen + validation           |
-| `@graft/content-migrations` | Codemod-style authored-content transforms                          |
-| `@graft/db`                 | Postgres + Drizzle + branching abstraction                         |
-| `@graft/assets`             | S3/MinIO storage, transforms, agent upload primitives              |
-| `@graft/auth`               | OIDC token verification, actor resolver, scope-based access        |
-| `@graft/contracts`          | Shared types, error codes, introspection schemas                   |
-| `@graft/mcp`                | Project MCP (content + functions + introspection)                  |
-| `@graft/cli`                | Human + agent CLI (`graft`, including `graft mcp` + `graft serve`) |
+| Package                     | Purpose                                                             |
+| --------------------------- | ------------------------------------------------------------------- |
+| `@graft/core`               | Schema (`defineCollection`), function runtime, access, migrations   |
+| `@graft/compiler`           | Authored content → Postgres index + typegen + validation            |
+| `@graft/content-migrations` | Codemod-style authored-content transforms                           |
+| `@graft/db`                 | Postgres + Drizzle + branching abstraction                          |
+| `@graft/assets`             | S3/MinIO storage, transforms, agent upload primitives               |
+| `@graft/auth`               | OIDC token verification, actor resolver, scope-based access         |
+| `@graft/contracts`          | Shared types, error codes, introspection schemas                    |
+| `@graft/mcp`                | Project MCP (content + functions + introspection)                   |
+| `@graft/cli`                | Human + agent CLI (`graft`, including `graft mcp` + `graft serve`)  |
 | `@graft/studio`             | Opt-in Studio UI (`graft studio` / `serve --studio`; OpenAPI-first) |
-| `@graft/registry`           | shadcn-style owned-primitive registry                              |
-| `@graft/sdk-core`           | Framework-agnostic client + cache contract                         |
-| `@graft/sdk-next`           | Next.js adapter + `MdxBody`                                        |
-| `@graft/sdk-astro`          | Astro adapter (typed reads + endpoint mounts)                      |
-| `@graft/sdk-sveltekit`      | SvelteKit adapter (typed reads + endpoint mounts)                  |
+| `@graft/registry`           | shadcn-style owned-primitive registry                               |
+| `@graft/sdk-core`           | Framework-agnostic client + cache contract                          |
+| `@graft/sdk-next`           | Next.js adapter + `MdxBody`                                         |
+| `@graft/sdk-astro`          | Astro adapter (typed reads + endpoint mounts)                       |
+| `@graft/sdk-sveltekit`      | SvelteKit adapter (typed reads + endpoint mounts)                   |
 
 ## Conventions
 

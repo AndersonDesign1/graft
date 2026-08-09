@@ -54,9 +54,7 @@ describe("token layering", () => {
   });
 
   it("resolves every role to a var(), never to a literal", () => {
-    const declarations = stripComments(read("roles.css")).matchAll(
-      /^\s*(--[\w-]+):\s*([^;]+);/gm,
-    );
+    const declarations = stripComments(read("roles.css")).matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm);
     for (const [, name, raw] of declarations) {
       if (name === "--identity-count") continue; // a number, not a colour
       const value = raw?.trim() ?? "";
@@ -64,7 +62,8 @@ describe("token layering", () => {
       // indirection as long as every colour in it came from layer 1.
       const isToken = value.startsWith("var(--");
       const isMixOfTokens =
-        value.startsWith("color-mix(") && !/#[0-9a-fA-F]{3,8}\b|oklch\(|rgba?\(|hsla?\(/.test(value);
+        value.startsWith("color-mix(") &&
+        !/#[0-9a-fA-F]{3,8}\b|oklch\(|rgba?\(|hsla?\(/.test(value);
       expect(isToken || isMixOfTokens, `${name} must point at a token, not a literal`).toBe(true);
     }
   });

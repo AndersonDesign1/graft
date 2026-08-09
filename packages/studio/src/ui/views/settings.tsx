@@ -231,11 +231,7 @@ export function SettingsView({
         <div className="settings-sections">
           <Section id="appearance" title="Appearance" sub={SECTION_BY_ID.appearance.sub}>
             <div className="set-panel">
-              <Row
-                label="Theme"
-                hint="Applies immediately and persists across sessions."
-                stack
-              >
+              <Row label="Theme" hint="Applies immediately and persists across sessions." stack>
                 <div className="theme-choices">
                   {THEMES.map((option) => (
                     <button
@@ -297,7 +293,9 @@ export function SettingsView({
                     : "Bound beyond loopback — every request must carry a bearer token."
                 }
               >
-                <Pill tone={loopback ? "ready" : "pending"}>{loopback ? "loopback" : "remote"}</Pill>
+                <Pill tone={loopback ? "ready" : "pending"}>
+                  {loopback ? "loopback" : "remote"}
+                </Pill>
               </Row>
               <Row label="API" hint="The same surface the CLI and MCP tools call.">
                 <a

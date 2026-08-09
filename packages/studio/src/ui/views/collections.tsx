@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type {
-  ContentTree,
-  ContentTreeCollection,
-  DocumentDto,
-  DocumentState,
-} from "../../types";
+import type { ContentTree, ContentTreeCollection, DocumentDto, DocumentState } from "../../types";
 import { MdxEditor } from "../components/editor";
 import { RichEditor } from "../components/rich-editor";
 import { IconDatabase, IconFile, IconWarning } from "../components/icons";

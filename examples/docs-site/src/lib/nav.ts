@@ -27,7 +27,9 @@ export interface DocNavSection {
 /** The docsNav sections as a fumadocs PageTree (serializable — strings only). */
 export async function docsPageTree(): Promise<{
   name: string;
-  children: Array<{ type: "separator"; name: string } | { type: "page"; name: string; url: string }>;
+  children: Array<
+    { type: "separator"; name: string } | { type: "page"; name: string; url: string }
+  >;
 }> {
   const sections = await docsNav();
   const children: Array<
@@ -62,8 +64,6 @@ export async function docsNav(): Promise<DocNavSection[]> {
     .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
     .map(([section, entries]) => ({
       section,
-      entries: entries.sort(
-        (a, b) => (orderOf.get(a.slug) ?? 99) - (orderOf.get(b.slug) ?? 99),
-      ),
+      entries: entries.sort((a, b) => (orderOf.get(a.slug) ?? 99) - (orderOf.get(b.slug) ?? 99)),
     }));
 }

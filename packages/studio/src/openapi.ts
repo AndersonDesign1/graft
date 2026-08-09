@@ -24,7 +24,7 @@ export const STUDIO_OPENAPI = {
         operationId: "getContentTree",
         summary: "Content tree (disk merged with the compiled index)",
         description:
-          "Filesystem-first: every on-disk document appears immediately, each tagged synced | drifted | unindexed | orphaned by comparing its contentHash against content_index. db-authoritative collections are returned with authority:\"db\" and no documents.",
+          'Filesystem-first: every on-disk document appears immediately, each tagged synced | drifted | unindexed | orphaned by comparing its contentHash against content_index. db-authoritative collections are returned with authority:"db" and no documents.',
         parameters: [{ name: "branch", in: "query", schema: { type: "string" } }],
         responses: { "200": { description: "Collections → documents + drift summary" } },
       },

@@ -298,11 +298,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
 
         {/* Sonner: bottom-right, and it inherits our surface tokens rather
             than shipping its own palette. */}
-        <Toaster
-          position="bottom-right"
-          closeButton
-          toastOptions={{ className: "sonner-toast" }}
-        />
+        <Toaster position="bottom-right" closeButton toastOptions={{ className: "sonner-toast" }} />
 
         <CommandPalette
           open={paletteOpen}

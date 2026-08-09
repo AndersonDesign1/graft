@@ -381,9 +381,8 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
         return 0;
       }
       case "compilations": {
-        const { compilationsListCommand, formatCompilation } = await import(
-          "./commands/compilations"
-        );
+        const { compilationsListCommand, formatCompilation } =
+          await import("./commands/compilations");
         const rows = await compilationsListCommand({ cwd, branchId: args.branchId });
         if (rows.length === 0) {
           console.log("No compilations recorded yet (run graft compile).");

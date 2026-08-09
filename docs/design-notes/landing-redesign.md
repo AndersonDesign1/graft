@@ -13,15 +13,15 @@ are worth recording, because each one taught the constraint that produced v4.
 **Why vermilion died.** Live inspection of basehub.com gives
 `--color-accent: rgb(255 108 2)` on `--color-bg: rgb(4 4 4)` — orange on black,
 `theme-color: #000000`. Our vermilion sat ~15° away in OKLCH hue on the same
-black ground: a sibling brand, not a distinct one. It also *failed contrast* —
+black ground: a sibling brand, not a distinct one. It also _failed contrast_ —
 `#e8442e` as small mono text on black is APCA **Lc -55**, under the 60 floor,
 and ivory labels on the accent fill were **Lc -50**.
 
 **Why a colored accent can't work on a black stage at all.** Solve for the
 lightness each hue needs to reach APCA 75 as text on black: red, blue and
 magenta collapse to pastels (chroma 0.067–0.091 — vermilion literally becomes
-pale pink `#f8bdb3`). Only green stays vivid (chroma 0.189). But green *reads as
-"success"*, not as identity — and the whole CMS field is already holding a hue
+pale pink `#f8bdb3`). Only green stays vivid (chroma 0.189). But green _reads as
+"success"_, not as identity — and the whole CMS field is already holding a hue
 (BaseHub orange, Contentful blue, Strapi indigo, Storyblok teal). A colored
 accent here is either illegible, borrowed, or a status light.
 
@@ -29,7 +29,7 @@ accent here is either illegible, borrowed, or a status light.
 
 - **Elevation is lightness, not borders.** One neutral ramp (hue 95, chroma
   0.003 — a whisper of warmth, so it reads as ink-on-paper, not a cold UI gray).
-  Surfaces step *up* from the black stage: `#000` → sunken `#100f0e` → raised
+  Surfaces step _up_ from the black stage: `#000` → sunken `#100f0e` → raised
   `#1b1b19` → elevated `#272625`. On a black stage a drop shadow is invisible;
   the surface itself has to get brighter.
 - **"Primary" is not a hue — it is BRIGHT.** The mark, the union, the active
@@ -41,7 +41,7 @@ accent here is either illegible, borrowed, or a status light.
   errors only, never brand. Error text targets the non-body floor (Lc 60) —
   an APCA-75 red on black would be pale pink.
 - **The code is the only colored thing on the page.** Syntax highlighting keeps
-  its amber/azure because that is *content*, not chrome. Verified: the only
+  its amber/azure because that is _content_, not chrome. Verified: the only
   chromatic paints on the rendered landing are the error red and the two syntax
   tokens.
 
@@ -57,13 +57,13 @@ The closest product to Graft (git-shaped CMS) and the strongest overall referenc
 
 - **Navbar** — thin, dark, quiet; product name + few links + one filled CTA. No mega-menu. The restraint signals "developer tool," not "marketing platform."
 - **Hero** — one bold claim ("The AI-Native Headless CMS"), two lines of support, one CTA. The real hero is **the product itself**: a full embedded screenshot/live frame of the editor UI with an orange focus ring around it and a hand-written "PLAY WITH IT" annotation rotated ~15° — an editorial mark that breaks the grid and directs the eye. Engineering note: the frame is a real DOM embed, not a flat image, so text stays crisp at every DPR.
-- **Feature narrative** — sections alternate copy + *live-looking* product UI (branch/review/merge cards mirror the git workflow 1:1). Each section is introduced by a small mono label ("Editor", "Branching", "Developer Experience") — a consistent wayfinding voice.
+- **Feature narrative** — sections alternate copy + _live-looking_ product UI (branch/review/merge cards mirror the git workflow 1:1). Each section is introduced by a small mono label ("Editor", "Branching", "Developer Experience") — a consistent wayfinding voice.
 - **Vertical thread** — a thin connector line with nodes runs between sections (visible dots/plus marks at section boundaries), stitching the page into one continuous story. This is the single best structural idea on the page.
 - **Feature index** — a two-column list ("@START, Agents, AI Commits, … Webhooks") where each row swaps a per-character duplicated label on hover (every glyph exists twice in the DOM; hover flips them with a tiny per-character stagger). Selecting a row swaps the right-hand live panel. Data-dense, interactive, memorable.
-- **Code section** — real `import { basehub } from "basehub"` code with framework tabs (Next/Astro/SvelteKit). Line numbers, syntax highlighting, "Read docs" beneath. Typesafety is *shown*, not claimed.
+- **Code section** — real `import { basehub } from "basehub"` code with framework tabs (Next/Astro/SvelteKit). Line numbers, syntax highlighting, "Read docs" beneath. Typesafety is _shown_, not claimed.
 - **Color** — near-black warm ground, one orange accent used sparingly (annotation, focus ring, link marks), white type. Testimonials inline, single-voice, believable.
 - **Type** — a geometric sans for display, mono for labels/annotations. Scale restrained; hierarchy from weight and space, not size explosions.
-- **Motion** — mostly scroll-triggered opacity/translate reveals + the hover-flip letters; nothing gratuitous. The page feels alive because the *content* is alive (product frames, code), not because things fly around.
+- **Motion** — mostly scroll-triggered opacity/translate reveals + the hover-flip letters; nothing gratuitous. The page feels alive because the _content_ is alive (product frames, code), not because things fly around.
 
 ### 1.2 Prismic (prismic.io)
 
@@ -83,11 +83,11 @@ Two-audience page (For Marketers / For Developers toggle literally splits the he
 The taste reference — a docs framework whose landing is itself a designed object.
 
 - **Live inspection** — Geist + JetBrains Mono on `#121212`; **3 canvases** (WebGL dither shaders: the huge halftone-dithered orange sphere, the duotone landscape panels); 39 SVGs.
-- **Hero** — display type over a dithered-gradient sphere; a rotated hand-written annotation ("the React.js docs framework you love"); below, an embedded *real* docs UI frame (sidebar + Quick Start) — the product as hero, again.
-- **Texture as identity** — halftone dither, duotone photography, terminal frames: a print/zine texture language executed with shaders. The site is memorable because it has *material*, not because it has motion. Lesson: pick one texture voice and commit (ours: editorial print — hairlines, off-white type, elevation instead of accent).
+- **Hero** — display type over a dithered-gradient sphere; a rotated hand-written annotation ("the React.js docs framework you love"); below, an embedded _real_ docs UI frame (sidebar + Quick Start) — the product as hero, again.
+- **Texture as identity** — halftone dither, duotone photography, terminal frames: a print/zine texture language executed with shaders. The site is memorable because it has _material_, not because it has motion. Lesson: pick one texture voice and commit (ours: editorial print — hairlines, off-white type, elevation instead of accent).
 - **Terminal card** — "TRY IT OUT: pnpm create fumadocs-app" rendered as an actual terminal with prompt frames. CLI-first products should show the CLI.
 - **Bento** — cards mix live component demos (search dialog embed, MDX editor pane with output), duotone art, and code. Live > screenshot everywhere.
-- **Editorial humor/voice** — "Anybody can write.", "Docs for Engineers.", "Open Source Forever." Sections are short declarative sentences used as h2 display — the copy *is* the design.
+- **Editorial humor/voice** — "Anybody can write.", "Docs for Engineers.", "Open Source Forever." Sections are short declarative sentences used as h2 display — the copy _is_ the design.
 - **Color** — near-black + cream + one hot orange; light sections interleaved (yellow-cream band) to pace the scroll.
 - **Motion** — restrained: hover states, some reveals; the shaders carry the aliveness at near-zero motion cost. `prefers-color-scheme` respected.
 
@@ -95,18 +95,18 @@ The taste reference — a docs framework whose landing is itself a designed obje
 
 1. **The product is the hero image.** All three embed real UI/code/terminals instead of illustrations.
 2. **One accent color, spent like money.** Orange (BaseHub, Fumadocs) / purple (Prismic) against near-black; accent = interaction/mark, never decoration fields.
-3. ~~**A connective spine.**~~ **Cut 2026-07-14.** BaseHub's node-line was the single best structural idea on their page — which is exactly why we cannot have it. We shipped a scroll-progress spine, then removed it: a competitor's most recognizable structural signature is the last thing to borrow. The section numbers (§01…) stay; the line does not. Its replacement is *material*, not structure — see the grain overlay.
+3. ~~**A connective spine.**~~ **Cut 2026-07-14.** BaseHub's node-line was the single best structural idea on their page — which is exactly why we cannot have it. We shipped a scroll-progress spine, then removed it: a competitor's most recognizable structural signature is the last thing to borrow. The section numbers (§01…) stay; the line does not. Its replacement is _material_, not structure — see the grain overlay.
 4. **Mono voice for wayfinding.** Small mono/uppercase labels introduce sections in all three.
-5. **Texture beats animation.** Fumadocs' shaders and BaseHub's annotations do more for memorability than any scroll-jack would. Motion budget goes to *meaningful* state change (hover flips, step activation, type-out).
+5. **Texture beats animation.** Fumadocs' shaders and BaseHub's annotations do more for memorability than any scroll-jack would. Motion budget goes to _meaningful_ state change (hover flips, step activation, type-out).
 6. **Real code, real tabs, real output.** Nothing converts a developer like their own stack rendered truthfully.
 
 ## 2 · Concept — "The proof sheet"
 
-**Thesis.** Graft's landing is set like a *typeset proof under revision*: a
+**Thesis.** Graft's landing is set like a _typeset proof under revision_: a
 black stage, off-white type, hairline rules, and no accent at all — emphasis is
 carried by brightness and elevation. The page is a living document about a
 system where documents are code.
-Every section is *live*: the terminal types real CLI output, the pipeline draws
+Every section is _live_: the terminal types real CLI output, the pipeline draws
 itself, the MCP transcript replays a real agent session, the contact form writes
 a real Postgres row and shows its correlation id. Nothing is a screenshot.
 
@@ -139,7 +139,7 @@ generic bento, purple-on-dark SaaS, testimonial carousels.
   "owned code, no plugin black box."
 - **§ Runtime.** The two topologies (embedded / `graft serve` container) as a
   small animated schematic; audit/approvals as ledger lines.
-- **§ FAQ + CTA.** FAQ from the *live* `home` document's `faqs` field. The
+- **§ FAQ + CTA.** FAQ from the _live_ `home` document's `faqs` field. The
   contact form posts to `POST /api/fn/submitContact` and, on success, prints
   the row id — with the mono annotation "row written to data_records ·
   audit logged". The form is the demo.
@@ -162,7 +162,7 @@ variables.
 v4 shipped and it is **too much page**. Eight §-sections, twelve landing
 components, 1,745 lines of `landing.css`. Each section invented its own layout
 mode (`copy-left` / `copy-right` / `banner`), its own reveal choreography, its
-own widget. The concept was right — *nothing is a screenshot* — but it was
+own widget. The concept was right — _nothing is a screenshot_ — but it was
 applied eight times instead of once.
 
 **The copy is not the problem.** "One loop, no publish button." / "Errors that
@@ -171,21 +171,21 @@ stays. v5 keeps the words and deletes the machinery.
 
 ### 3.1 The mechanism: persistent, not pinned
 
-The operator's instinct was a *fixed viewport* — one screen, content swapping
+The operator's instinct was a _fixed viewport_ — one screen, content swapping
 against an unchanging background. The **goal** (one continuous room, calm,
 short) is right; the **mechanism** is not. Vercel and Resend, the named
 references, both scroll normally; what makes them read premium is short pages,
 monochrome restraint, asymmetric two-column blocks, and one persistent ambient
 texture. A pinned viewport costs anchor links, mobile behaviour, keyboard and
 screen-reader scroll, and crawlability — on the docs site, which we intend to
-rank. It also reads *portfolio*, not *developer tool*.
+rank. It also reads _portfolio_, not _developer tool_.
 
 **Decision: persistent stage, ordinary document scroll.**
 
 - **One fixed background layer** for the whole page — never changes, never
   sectioned. This is what produces the "single room" sensation.
 - **One sticky product frame.** The frame sits `position: sticky` in one column
-  and *stays* while copy in the other column scrolls past and drives its state.
+  and _stays_ while copy in the other column scrolls past and drives its state.
   Three beats, one frame. This is the operator's described layout ("the CLI at
   the side wrapped beautifully, the content at the other side, irregular but it
   works") and it is the Prismic sticky-panel pattern already recorded at §1.2.
@@ -199,17 +199,17 @@ states.**
 
 Five sections. Hero → stage → branching → FAQ → CTA.
 
-| v4 | v5 | note |
-| --- | --- | --- |
-| Hero | **keep** | The graft SVG growing out of the terminal is ours and it works. Terminal shortens to `pnpm graft init` + scaffold output only — `compile` moves to the stage, so the two read as a progression instead of a repeat. |
-| §01 loop | **cut** | The five-row beat-driven index is redundant once *scroll* drives state. Its content becomes one sentence of stage copy: author → validate → index → read → render. |
-| §02 agent-native | **→ stage beat B** | `agent-session.tsx` content survives, restyled to live inside the frame. |
-| §03 branching | **keep** | The single "poke it" moment, and the strongest differentiator against Payload and BaseHub. Do not spend it elsewhere. |
-| §04 typed reads | **→ stage beat C** | `typed-reads.tsx` survives; hover/focus field-pairing must keep working inside the frame. |
-| §05 registry | **cut** | One line folded into the CTA. |
-| §06 capability index | **cut** | 124 lines of TSX plus ~130 of CSS for a surface the docs already own. |
-| §07 FAQ | **keep, 4 items** | Still served from the live `home` document — the dogfood claim depends on it. |
-| §08 CTA | **keep** | The form writing a real `data_records` row is the right closing note. |
+| v4                   | v5                 | note                                                                                                                                                                                                                |
+| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hero                 | **keep**           | The graft SVG growing out of the terminal is ours and it works. Terminal shortens to `pnpm graft init` + scaffold output only — `compile` moves to the stage, so the two read as a progression instead of a repeat. |
+| §01 loop             | **cut**            | The five-row beat-driven index is redundant once _scroll_ drives state. Its content becomes one sentence of stage copy: author → validate → index → read → render.                                                  |
+| §02 agent-native     | **→ stage beat B** | `agent-session.tsx` content survives, restyled to live inside the frame.                                                                                                                                            |
+| §03 branching        | **keep**           | The single "poke it" moment, and the strongest differentiator against Payload and BaseHub. Do not spend it elsewhere.                                                                                               |
+| §04 typed reads      | **→ stage beat C** | `typed-reads.tsx` survives; hover/focus field-pairing must keep working inside the frame.                                                                                                                           |
+| §05 registry         | **cut**            | One line folded into the CTA.                                                                                                                                                                                       |
+| §06 capability index | **cut**            | 124 lines of TSX plus ~130 of CSS for a surface the docs already own.                                                                                                                                               |
+| §07 FAQ              | **keep, 4 items**  | Still served from the live `home` document — the dogfood claim depends on it.                                                                                                                                       |
+| §08 CTA              | **keep**           | The form writing a real `data_records` row is the right closing note.                                                                                                                                               |
 
 Also: **`cli-strip.tsx` goes with §06** — its only consumer is
 `capability-index.tsx`, so cutting the index orphans it. 115 lines.
@@ -271,8 +271,8 @@ Reviewed `elayadesign/redesign-skill` (redesign-existing-projects). Use the
 omissions — which mostly agrees with what we already do. **Discard its "Design
 Values" half entirely:** it hardcodes Geist/Manrope/Poppins, a fixed dark hex
 ramp, a white→`#9B9B9B` hero gradient, Phosphor icons, and Tailwind utilities,
-and carries the rule *"never invent design values not in the Design Values
-section."* Applied literally that deletes the Instrument Serif display face, the
+and carries the rule _"never invent design values not in the Design Values
+section."_ Applied literally that deletes the Instrument Serif display face, the
 APCA-validated neutral ramp, and the no-accent position, and it assumes a
 Tailwind project we do not have. It is a skill for generic projects; §0 is the
 argument for why this one isn't.

@@ -12,11 +12,19 @@ import { cx } from "../../lib/cn";
 export const Tabs = TabsPrimitive.Root;
 
 export function TabsList({ className, ...props }: TabsPrimitive.List.Props) {
-  return <TabsPrimitive.List data-slot="tabs-list" className={cx("segmented", className)} {...props} />;
+  return (
+    <TabsPrimitive.List data-slot="tabs-list" className={cx("segmented", className)} {...props} />
+  );
 }
 
 export function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
-  return <TabsPrimitive.Tab data-slot="tabs-trigger" className={cx("segmented-tab", className)} {...props} />;
+  return (
+    <TabsPrimitive.Tab
+      data-slot="tabs-trigger"
+      className={cx("segmented-tab", className)}
+      {...props}
+    />
+  );
 }
 
 export function TabsIndicator({ className, ...props }: TabsPrimitive.Indicator.Props) {

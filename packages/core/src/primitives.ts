@@ -87,10 +87,7 @@ function mergeInto<T>(
  */
 export function mergePrimitives<const T extends readonly PrimitiveModule[]>(
   modules: T,
-): MergedPrimitives<
-  MergeUnion<CollectionsOf<T[number]>>,
-  MergeUnion<FunctionsOf<T[number]>>
-> {
+): MergedPrimitives<MergeUnion<CollectionsOf<T[number]>>, MergeUnion<FunctionsOf<T[number]>>> {
   const collections: Record<string, AnyCollection> = {};
   const functions: Record<string, AnyGraftFunction> = {};
   for (const mod of modules) {

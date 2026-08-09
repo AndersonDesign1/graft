@@ -115,13 +115,9 @@ export async function revertContentTo(contentDir: string, gitSha: string): Promi
   // is deliberately not a commit: reverting is their decision to record.
   await git(contentDir, ["checkout", gitSha, "--", "."]);
 
-  const changed = await git(contentDir, [
-    "diff",
-    "--name-only",
-    "--cached",
-    "--",
-    ".",
-  ]).catch(() => "");
+  const changed = await git(contentDir, ["diff", "--name-only", "--cached", "--", "."]).catch(
+    () => "",
+  );
 
   return changed.split("\n").filter(Boolean);
 }

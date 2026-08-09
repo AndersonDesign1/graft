@@ -75,8 +75,8 @@ const TABS: Tab[] = [
     title: "Hide without touching main.",
     body: (
       <>
-        A tombstone hides the parent row on this branch only. <code>main</code>&apos;s changelog
-        is still there.
+        A tombstone hides the parent row on this branch only. <code>main</code>&apos;s changelog is
+        still there.
       </>
     ),
     lines: [
@@ -92,8 +92,8 @@ const TABS: Tab[] = [
     title: "Dry-run first. Then land it.",
     body: (
       <>
-        Content recompiles from the git merge; data rows move; the branch drops.{" "}
-        <code>main</code> carries the new pricing, minus the tombstoned changelog.
+        Content recompiles from the git merge; data rows move; the branch drops. <code>main</code>{" "}
+        carries the new pricing, minus the tombstoned changelog.
       </>
     ),
     lines: [
@@ -219,8 +219,7 @@ export function BranchingDemo() {
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
   const reduced = useRef(
-    typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
 
   useEffect(() => {

@@ -43,7 +43,9 @@ export function MenuContent({
 }
 
 export function MenuItem({ className, ...props }: MenuPrimitive.Item.Props) {
-  return <MenuPrimitive.Item data-slot="menu-item" className={cx("menu-item", className)} {...props} />;
+  return (
+    <MenuPrimitive.Item data-slot="menu-item" className={cx("menu-item", className)} {...props} />
+  );
 }
 
 export function MenuLabel({ className, ...props }: MenuPrimitive.GroupLabel.Props) {

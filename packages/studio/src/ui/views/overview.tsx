@@ -1,9 +1,4 @@
-import type {
-  ApprovalList,
-  BranchList,
-  CompilationList,
-  ContentTree,
-} from "../../types";
+import type { ApprovalList, BranchList, CompilationList, ContentTree } from "../../types";
 import {
   Delta,
   DeltaChart,
@@ -33,9 +28,7 @@ export function OverviewView({
   onCompile: () => void;
   navigate: (route: Route) => void;
 }) {
-  const compilations = useResource<CompilationList>(
-    `/compilations${qs({ branch, limit: 30 })}`,
-  );
+  const compilations = useResource<CompilationList>(`/compilations${qs({ branch, limit: 30 })}`);
   const approvals = useResource<ApprovalList>("/approvals");
   const branches = useResource<BranchList>("/branches");
 
@@ -142,9 +135,7 @@ export function OverviewView({
                     <button
                       type="button"
                       className="mini-row"
-                      onClick={() =>
-                        navigate({ view: "collections", collection: collection.name })
-                      }
+                      onClick={() => navigate({ view: "collections", collection: collection.name })}
                     >
                       <IdentityMark name={collection.name} />
                       <span className="mini-row-main">
@@ -175,7 +166,11 @@ export function OverviewView({
             <section className="card">
               <div className="card-head">
                 <h2>Compilations</h2>
-                <button type="button" className="link" onClick={() => navigate({ view: "history" })}>
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => navigate({ view: "history" })}
+                >
                   History
                 </button>
               </div>
@@ -190,14 +185,12 @@ export function OverviewView({
               {!neverCompiled && compilations.data ? (
                 <>
                   <DeltaChart
-                    points={[...compilations.data.compilations]
-                      .reverse()
-                      .map((row) => ({
-                        added: row.added,
-                        changed: row.changed,
-                        removed: row.removed,
-                        label: relativeTime(row.createdAt),
-                      }))}
+                    points={[...compilations.data.compilations].reverse().map((row) => ({
+                      added: row.added,
+                      changed: row.changed,
+                      removed: row.removed,
+                      label: relativeTime(row.createdAt),
+                    }))}
                   />
                   <ul className="mini-list">
                     {compilations.data.compilations.slice(0, 5).map((row) => (
@@ -207,9 +200,7 @@ export function OverviewView({
                             <span className="mini-row-title">
                               {row.gitSha ? <code>{shortSha(row.gitSha)}</code> : "no git sha"}
                             </span>
-                            <span className="mini-row-sub">
-                              {plural(row.docCount, "document")}
-                            </span>
+                            <span className="mini-row-sub">{plural(row.docCount, "document")}</span>
                           </span>
                           <Delta added={row.added} changed={row.changed} removed={row.removed} />
                           <time className="mini-row-time" dateTime={row.createdAt}>

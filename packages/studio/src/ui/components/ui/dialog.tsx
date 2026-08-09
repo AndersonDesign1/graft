@@ -12,11 +12,7 @@ export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
 
-export function DialogContent({
-  className,
-  children,
-  ...props
-}: DialogPrimitive.Popup.Props) {
+export function DialogContent({ className, children, ...props }: DialogPrimitive.Popup.Props) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Backdrop data-slot="dialog-backdrop" className="dialog-backdrop" />
@@ -33,7 +29,11 @@ export function DialogContent({
 
 export function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
   return (
-    <DialogPrimitive.Title data-slot="dialog-title" className={cx("dialog-title", className)} {...props} />
+    <DialogPrimitive.Title
+      data-slot="dialog-title"
+      className={cx("dialog-title", className)}
+      {...props}
+    />
   );
 }
 

@@ -1936,7 +1936,6 @@ h3 {
   margin-top: var(--space-3);
 }
 
-
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -2521,7 +2520,6 @@ kbd {
   font-size: var(--text-2xs);
 }
 
-
 /* ==========================================================================
    Dialog (Base UI) — palette and detail
    ========================================================================== */
@@ -2747,7 +2745,6 @@ kbd {
     width: auto;
     white-space: nowrap;
   }
-
 
   .pane {
     border-right: 0;

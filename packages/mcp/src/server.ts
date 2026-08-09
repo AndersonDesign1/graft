@@ -779,10 +779,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
       description:
         "Recent content projection trail rows (git SHA, added/changed/removed counts), newest first. Same data as GET /api/studio/v1/compilations and `graft compilations`.",
       inputSchema: {
-        branch: z
-          .string()
-          .optional()
-          .describe("Restrict to one branch id (default: all branches)"),
+        branch: z.string().optional().describe("Restrict to one branch id (default: all branches)"),
         limit: z.number().optional().describe("Max rows, newest first (default 20, max 100)"),
       },
     },

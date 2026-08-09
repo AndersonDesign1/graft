@@ -23,8 +23,7 @@ const YAML: Line[] = [
     key: "tagline",
     jsx: (
       <>
-        <span className="tk-key">tagline</span>:{" "}
-        <span className="tk-str">Content is code.</span>
+        <span className="tk-key">tagline</span>: <span className="tk-str">Content is code.</span>
       </>
     ),
   },
