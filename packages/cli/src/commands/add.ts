@@ -8,8 +8,8 @@
  * (identical files are always skipped, so re-adding is a no-op).
  */
 import { dirname } from "node:path";
-import { GraftError } from "@graft/contracts";
-import { type AddPlan, applyPlan, listItemNames, planAdd } from "@graft/registry";
+import { GraftError } from "@usegraft/contracts";
+import { type AddPlan, applyPlan, listItemNames, planAdd } from "@usegraft/registry";
 import { findConfig } from "../config";
 
 export interface AddCommandOptions {

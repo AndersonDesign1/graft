@@ -5,7 +5,7 @@
  * All fields optional so existing documents keep compiling. Wire into
  * `generateMetadata` (or your framework's head helper) from the page data.
  */
-import { field } from "@graft/core";
+import { field } from "@usegraft/core";
 
 /** Optional SEO fields — spread into a collection's `fields` map. */
 export const seoFields = {

@@ -13,9 +13,9 @@
  * caches reads with `'use cache'` + `cacheTag(...tagsFor(...))` — see llms.txt.
  * Gated by the same actor resolver as the function runtime: anonymous → 401.
  */
-import { GraftError } from "@graft/contracts";
-import type { ChangeSet } from "@graft/sdk-next";
-import { revalidateContent } from "@graft/sdk-next";
+import { GraftError } from "@usegraft/contracts";
+import type { ChangeSet } from "@usegraft/sdk-next";
+import { revalidateContent } from "@usegraft/sdk-next";
 import { resolveActor } from "@/lib/actor";
 
 function isChangeSet(value: unknown): value is ChangeSet {

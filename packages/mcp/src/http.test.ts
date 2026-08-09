@@ -7,9 +7,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GraftError } from "@graft/contracts";
-import { defineCollection, defineFunction, field } from "@graft/core";
-import type { Database } from "@graft/db";
+import { GraftError } from "@usegraft/contracts";
+import { defineCollection, defineFunction, field } from "@usegraft/core";
+import type { Database } from "@usegraft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -81,7 +81,7 @@ describe("transport shape", () => {
 });
 
 describe("actor gate", () => {
-  /** The @graft/auth resolver shape, faked: dev-token semantics + TOKEN_INVALID throw. */
+  /** The @usegraft/auth resolver shape, faked: dev-token semantics + TOKEN_INVALID throw. */
   const resolver = (request: Request) => {
     const header = request.headers.get("authorization");
     if (!header) return { kind: "anonymous" } as const;

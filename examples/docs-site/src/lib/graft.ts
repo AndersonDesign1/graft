@@ -3,8 +3,8 @@
  * every page is server-rendered (the first request initializes the pool).
  * Server-only: import from .astro frontmatter and endpoints, never islands.
  */
-import { createDb } from "@graft/db";
-import { createGraft, type Graft } from "@graft/sdk-astro";
+import { createDb } from "@usegraft/db";
+import { createGraft, type Graft } from "@usegraft/sdk-astro";
 import { collections } from "../../graft.config";
 
 let graft: Graft<typeof collections> | null = null;

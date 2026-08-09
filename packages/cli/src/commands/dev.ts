@@ -6,7 +6,7 @@
  */
 import { existsSync, watch, type FSWatcher } from "node:fs";
 import { basename, relative } from "node:path";
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import {
   CONFIG_FILENAMES,
   findConfig,
@@ -41,8 +41,8 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
   const url = requireDatabaseUrl();
   // Heavy imports (compiler → database driver) only after the project checks out.
   const [{ compile }, { createDb, resolveBranchHandle, scopeWriteBranch }] = await Promise.all([
-    import("@graft/compiler"),
-    import("@graft/db"),
+    import("@usegraft/compiler"),
+    import("@usegraft/db"),
   ]);
   const control = createDb(url);
   // Resolved once at startup: a neon branch gets its own connection; overlay

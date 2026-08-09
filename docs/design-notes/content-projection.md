@@ -1,6 +1,6 @@
 # Content projection (Spike A findings)
 
-Hand-off from the Phase 1 spike to the real `@graft/compiler` + `@graft/db` work.
+Hand-off from the Phase 1 spike to the real `@usegraft/compiler` + `@usegraft/db` work.
 
 ## Question
 

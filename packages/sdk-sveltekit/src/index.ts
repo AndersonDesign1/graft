@@ -1,5 +1,5 @@
 /**
- * @graft/sdk-sveltekit
+ * @usegraft/sdk-sveltekit
  * SvelteKit adapter: typed reads (`createGraft`) + endpoint mounts
  * (`graftRoute`) over the same stateless handlers every other surface serves.
  * Cache invalidation is the sdk-core tag contract mapped onto CDN surrogate
@@ -27,4 +27,4 @@ export {
   type ReadOptions,
   type SearchHit,
   type SearchOptions,
-} from "@graft/sdk-core";
+} from "@usegraft/sdk-core";

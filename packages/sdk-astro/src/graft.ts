@@ -1,6 +1,6 @@
 /**
- * Astro adapter over @graft/sdk-core — the same `getContent` / `listContent` /
- * `searchContent` surface as @graft/sdk-next, so a schema types every read
+ * Astro adapter over @usegraft/sdk-core — the same `getContent` / `listContent` /
+ * `searchContent` surface as @usegraft/sdk-next, so a schema types every read
  * identically across frameworks.
  *
  * No request-level memo here (sdk-next's React.cache has no Astro
@@ -25,7 +25,7 @@ import {
   type ReadOptions,
   type SearchHit,
   type SearchOptions,
-} from "@graft/sdk-core";
+} from "@usegraft/sdk-core";
 
 export interface Graft<TCollections extends Record<string, AnyCollection>> {
   /** Typed getDocument. */

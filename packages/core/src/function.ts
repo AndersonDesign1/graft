@@ -3,7 +3,7 @@
  *
  * A function is a typed unit of server logic: Zod-validated input (the same
  * field.* builders collections use), a handler that receives the standard
- * FunctionContext, and a describe() that yields a @graft/contracts
+ * FunctionContext, and a describe() that yields a @usegraft/contracts
  * FunctionDescriptor so MCP introspection and the CLI agree on shape.
  *
  * LOCKED SHAPE (Phase 3 invariant): functions are served as stateless
@@ -12,8 +12,8 @@
  * server, so the same code runs in a Next.js route, the self-host container,
  * Vercel Fluid, or a Worker.
  */
-import type { FunctionDescriptor } from "@graft/contracts";
-import type { Database } from "@graft/db";
+import type { FunctionDescriptor } from "@usegraft/contracts";
+import type { Database } from "@usegraft/db";
 import { z } from "zod";
 import type { FieldsShape } from "./collection";
 import { toFieldDescriptor, type FieldDefinition } from "./field";
@@ -27,7 +27,7 @@ export interface RateLimit {
 }
 
 /**
- * Who is calling. Anonymous until @graft/auth lands (Phase 3 security slice);
+ * Who is calling. Anonymous until @usegraft/auth lands (Phase 3 security slice);
  * the shape is locked now so functions written today survive that unit.
  */
 export interface FunctionActor {
@@ -41,7 +41,7 @@ export interface FunctionActor {
 export interface FunctionContext<TInput = unknown> {
   /** Input already validated against the function's Zod schema. */
   input: TInput;
-  /** Request-scoped Drizzle handle (@graft/db) — operational data lives behind this. */
+  /** Request-scoped Drizzle handle (@usegraft/db) — operational data lives behind this. */
   db: Database;
   actor: FunctionActor;
   /** Content/data branch this invocation targets ("main" unless overridden). */

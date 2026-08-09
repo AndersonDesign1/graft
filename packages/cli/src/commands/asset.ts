@@ -4,8 +4,8 @@
  * upload, paste the printed snippet into a document, compile.
  */
 import { readFileSync, statSync } from "node:fs";
-import { contentTypeFor, createStorage, defaultKeyFor, storageConfigFromEnv } from "@graft/assets";
-import { GraftError } from "@graft/contracts";
+import { contentTypeFor, createStorage, defaultKeyFor, storageConfigFromEnv } from "@usegraft/assets";
+import { GraftError } from "@usegraft/contracts";
 import { loadProjectEnv } from "../config";
 
 // Shared with the MCP put_asset tool — one inference/sanitization rule per store.

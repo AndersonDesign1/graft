@@ -1,5 +1,5 @@
 /** Unit: the cache-tag contract (pure). */
-import type { ChangeSet } from "@graft/db";
+import type { ChangeSet } from "@usegraft/db";
 import { describe, expect, it } from "vitest";
 import { collectionTag, documentTag, tagsFor, tagsForChanges } from "./tags";
 

@@ -1,5 +1,5 @@
 /**
- * OIDC/JWT verification — the trusted-issuer half of @graft/auth.
+ * OIDC/JWT verification — the trusted-issuer half of @usegraft/auth.
  *
  * Graft does not mint identity; it verifies it. A deployment lists the issuers
  * it trusts (a Better Auth instance it hosts, a company IdP, Vercel
@@ -8,8 +8,8 @@
  * `aud`. Verified claims become a FunctionActor: `sub` → id, scopes claim →
  * scopes.
  */
-import { GraftError } from "@graft/contracts";
-import type { FunctionActor } from "@graft/core";
+import { GraftError } from "@usegraft/contracts";
+import type { FunctionActor } from "@usegraft/core";
 import {
   createLocalJWKSet,
   createRemoteJWKSet,

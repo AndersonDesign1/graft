@@ -1,5 +1,5 @@
 ---
-"@graft/core": minor
+"@usegraft/core": minor
 ---
 
 Initial public release of the Graft packages: contracts, core, db, assets,

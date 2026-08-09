@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineCollection, field } from "@graft/core";
-import { createDb, type DbHandle } from "@graft/db";
+import { defineCollection, field } from "@usegraft/core";
+import { createDb, type DbHandle } from "@usegraft/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { compile } from "./compile";
 

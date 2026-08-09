@@ -5,14 +5,14 @@
  *
  * Includes content tools + list_functions / describe_function / run_function
  * (run_function reuses createFunctionsHandler — same access/audit/approval gates
- * as POST /api/fn/<name>). Callers are identified by the same @graft/auth
+ * as POST /api/fn/<name>). Callers are identified by the same @usegraft/auth
  * resolver (Better Auth JWTs or GRAFT_DEV_TOKEN). Set GRAFT_MCP_REQUIRE_AUTH=1
  * to reject anonymous callers — do that for anything reachable from outside.
  * Writes need this process to see the repo checkout (dev / self-host).
  */
 import { resolve } from "node:path";
-import { createDb } from "@graft/db";
-import { createGraftMcpHandler, type GraftMcpHandler } from "@graft/mcp";
+import { createDb } from "@usegraft/db";
+import { createGraftMcpHandler, type GraftMcpHandler } from "@usegraft/mcp";
 import { collections, functions } from "@/graft.config";
 import { resolveActor } from "@/lib/actor";
 

@@ -6,7 +6,7 @@
  * can be decided, and a decision is recorded with who made it.
  */
 import { userInfo } from "node:os";
-import type { ApprovalRow } from "@graft/db";
+import type { ApprovalRow } from "@usegraft/db";
 import { loadProjectEnv, requireDatabaseUrl } from "../config";
 
 export interface ApprovalsCommandOptions {
@@ -34,7 +34,7 @@ export async function approvalsListCommand(
 ): Promise<ApprovalRow[]> {
   loadProjectEnv(options.cwd);
   const url = requireDatabaseUrl();
-  const { createDb, listPendingApprovals } = await import("@graft/db");
+  const { createDb, listPendingApprovals } = await import("@usegraft/db");
   const handle = createDb(url);
   try {
     return await listPendingApprovals(handle.db);
@@ -47,8 +47,8 @@ export async function decideCommand(options: DecideCommandOptions): Promise<Appr
   loadProjectEnv(options.cwd);
   const url = requireDatabaseUrl();
   const [{ createDb, decideApproval }, { GraftError }] = await Promise.all([
-    import("@graft/db"),
-    import("@graft/contracts"),
+    import("@usegraft/db"),
+    import("@usegraft/contracts"),
   ]);
   const handle = createDb(url);
   try {

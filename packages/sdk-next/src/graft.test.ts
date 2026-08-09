@@ -3,8 +3,8 @@
  * revalidateTag/updateTag. next/cache and react's cache are mocked so the test
  * is pure (no RSC runtime, no database); the tag contract itself is real.
  */
-import { defineCollection, field } from "@graft/core";
-import type { Document, SearchHit } from "@graft/sdk-core";
+import { defineCollection, field } from "@usegraft/core";
+import type { Document, SearchHit } from "@usegraft/sdk-core";
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 const revalidateTag = vi.fn();

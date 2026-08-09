@@ -3,7 +3,7 @@
  * target, and in what order. The end-to-end merge needs a live DB — see
  * merge.integration.test.ts.
  */
-import type { MigrationAppliedRow } from "@graft/db";
+import type { MigrationAppliedRow } from "@usegraft/db";
 import { describe, expect, it } from "vitest";
 import { pendingLedgerRows } from "./merge";
 

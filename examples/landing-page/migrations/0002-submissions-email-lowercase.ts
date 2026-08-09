@@ -5,7 +5,7 @@
  *
  * Dry-run with `graft migrate`; execute with `graft migrate --apply`.
  */
-import { defineDataMigration } from "@graft/core";
+import { defineDataMigration } from "@usegraft/core";
 import { submissions } from "../graft.config";
 
 export default defineDataMigration({

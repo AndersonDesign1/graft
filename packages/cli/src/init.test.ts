@@ -2,14 +2,14 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:f
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readDocs } from "@graft/compiler";
-import { GraftError } from "@graft/contracts";
+import { readDocs } from "@usegraft/compiler";
+import { GraftError } from "@usegraft/contracts";
 import { afterAll, describe, expect, it } from "vitest";
 import { initCommand } from "./commands/init";
 import { findConfig, loadConfig } from "./config";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
-// Inside the package so the scaffolded config's `@graft/core` import resolves.
+// Inside the package so the scaffolded config's `@usegraft/core` import resolves.
 // Own subdir of .test-tmp: test files run in parallel and the integration
 // suites keep their fixtures in sibling subdirs — never delete the parent.
 const loadableTmp = resolve(here, "../.test-tmp/init-scaffold");

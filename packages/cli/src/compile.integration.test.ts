@@ -5,7 +5,7 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createDb, type DbHandle } from "@graft/db";
+import { createDb, type DbHandle } from "@usegraft/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { compileCommand } from "./commands/compile";
 import { initCommand } from "./commands/init";
@@ -23,7 +23,7 @@ const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.en
 // live database — well past the default 5s on a cold run.
 const TEST_TIMEOUT = 30_000;
 const BRANCH = "cli-it";
-// Inside the package so the scaffolded config's `@graft/core` import resolves.
+// Inside the package so the scaffolded config's `@usegraft/core` import resolves.
 const projectDir = resolve(here, "../.test-tmp/it-project");
 
 describe.skipIf(!runIntegration)("graft compile projects a scaffolded project", () => {

@@ -4,7 +4,7 @@
  * plus GRAFT_DEV_TOKEN as a static local-dev credential. No token → anonymous;
  * a bad token → TOKEN_INVALID, never a silent downgrade.
  */
-import { betterAuthIssuer, createActorResolver } from "@graft/auth";
+import { betterAuthIssuer, createActorResolver } from "@usegraft/auth";
 
 export const resolveActor = createActorResolver({
   issuers: [betterAuthIssuer({ url: process.env.BETTER_AUTH_URL ?? "http://localhost:3000" })],

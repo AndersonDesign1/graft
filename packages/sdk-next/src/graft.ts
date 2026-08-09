@@ -1,5 +1,5 @@
 /**
- * Next.js (RSC) adapter over @graft/sdk-core.
+ * Next.js (RSC) adapter over @usegraft/sdk-core.
  *
  * `createGraft` wraps the read client with React.cache so repeated reads of the
  * same document within one server render are deduped. Server-only by nature (it
@@ -29,7 +29,7 @@ import {
   type ReadOptions,
   type SearchHit,
   type SearchOptions,
-} from "@graft/sdk-core";
+} from "@usegraft/sdk-core";
 
 export interface Graft<TCollections extends Record<string, AnyCollection>> {
   /** Request-deduped getDocument. */

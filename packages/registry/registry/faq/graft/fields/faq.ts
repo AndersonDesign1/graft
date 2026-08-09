@@ -5,7 +5,7 @@
  * Then in MDX: `<Faq items={/* from frontmatter faqs *\/} />` or pass
  * `doc.data.faqs` from the page component.
  */
-import { field } from "@graft/core";
+import { field } from "@usegraft/core";
 
 export const faqFields = {
   faqs: field.array({

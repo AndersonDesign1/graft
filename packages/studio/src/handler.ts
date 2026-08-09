@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { createStudioApiHandler, type StudioApiOptions, type StudioFetchHandler } from "./api";
 
 export interface StudioHandlerOptions extends StudioApiOptions {
@@ -94,8 +94,8 @@ function serveUiAsset(pathname: string, uiBase: string): Response | null {
       return new Response(
         JSON.stringify({
           error: "CONFIG_INVALID",
-          message: "Studio UI assets are missing from the @graft/studio package build.",
-          fix: "Rebuild @graft/studio (pnpm --filter @graft/studio build).",
+          message: "Studio UI assets are missing from the @usegraft/studio package build.",
+          fix: "Rebuild @usegraft/studio (pnpm --filter @usegraft/studio build).",
         }),
         { status: 500, headers: { "content-type": "application/json" } },
       );

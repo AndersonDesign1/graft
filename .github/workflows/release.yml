@@ -1,6 +1,6 @@
 name: Release
 
-# Publishes @graft/* to npm via changesets.
+# Publishes @usegraft/* to npm via changesets.
 # feat/core is the working mainline (operator decision 2026-07-11);
 # main is listed for the eventual post-launch branch model.
 on:

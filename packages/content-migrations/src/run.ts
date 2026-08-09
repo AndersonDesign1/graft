@@ -7,7 +7,7 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, sep } from "node:path";
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import matter from "gray-matter";
 import type { AnyContentMigration } from "./define";
 

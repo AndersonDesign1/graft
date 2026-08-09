@@ -9,7 +9,7 @@
  * tokens (or give dev tokens explicit `scopes`) for gated functions. With no
  * arguments it degrades to "any non-anonymous actor".
  */
-import type { FunctionActor } from "@graft/core";
+import type { FunctionActor } from "@usegraft/core";
 
 export function requireScopes(
   ...required: readonly string[]

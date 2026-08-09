@@ -18,7 +18,7 @@
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 
 const run = promisify(execFile);
 

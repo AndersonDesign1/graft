@@ -15,7 +15,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { barrelSource } from "./barrel";
 import type { RegistryItem } from "./manifest";
 import { mdxComponentsSource } from "./mdx-map";

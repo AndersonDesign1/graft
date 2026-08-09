@@ -5,7 +5,7 @@ ALTER TABLE "approvals" ADD COLUMN "decided_role" text;
 -- SECURITY DEFINER function owned by the migrating (operator/owner) role.
 -- Deciding (pending -> approved/denied) stays a plain UPDATE on the table,
 -- which a hardened runtime role is simply never granted — so even raw SQL with
--- the app's DATABASE_URL cannot self-approve. See @graft/db runtimeRoleGrantsSql.
+-- the app's DATABASE_URL cannot self-approve. See @usegraft/db runtimeRoleGrantsSql.
 CREATE OR REPLACE FUNCTION graft_consume_approval(
   p_id uuid,
   p_function_name text,

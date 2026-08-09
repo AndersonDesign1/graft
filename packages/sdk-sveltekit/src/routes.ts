@@ -5,14 +5,14 @@
  *
  * ```ts
  * // src/routes/api/fn/[name]/+server.ts
- * import { createFunctionsHandler } from "@graft/core";
- * import { graftRoute } from "@graft/sdk-sveltekit";
+ * import { createFunctionsHandler } from "@usegraft/core";
+ * import { graftRoute } from "@usegraft/sdk-sveltekit";
  * const handler = createFunctionsHandler({ … });
  * export const POST = graftRoute(handler);
  * export const GET = graftRoute(handler);   // 405s with Allow + fix
  *
  * // src/routes/api/mcp/+server.ts
- * import { createGraftMcpHandler } from "@graft/mcp";
+ * import { createGraftMcpHandler } from "@usegraft/mcp";
  * export const POST = graftRoute(createGraftMcpHandler({ … }));
  * ```
  *

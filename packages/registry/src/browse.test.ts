@@ -1,10 +1,10 @@
 /**
  * Registry browse surface (describeItem / listItems) + the vocabulary drift
- * guard. @graft/registry's authoring enums (ITEM_TYPES / FILE_ROLES) must stay
- * identical to @graft/contracts' introspection enums, so the descriptor is the
+ * guard. @usegraft/registry's authoring enums (ITEM_TYPES / FILE_ROLES) must stay
+ * identical to @usegraft/contracts' introspection enums, so the descriptor is the
  * single source of truth without contracts depending on registry.
  */
-import { RegistryFileRole, RegistryItemDescriptor, RegistryItemType } from "@graft/contracts";
+import { RegistryFileRole, RegistryItemDescriptor, RegistryItemType } from "@usegraft/contracts";
 import { describe, expect, it } from "vitest";
 import { FILE_ROLES, ITEM_TYPES } from "./manifest";
 import { describeItem, listItems, loadItem } from "./registry";
@@ -36,15 +36,15 @@ describe("registry browse", () => {
     expect(descriptor).not.toHaveProperty("dir");
   });
 
-  it("carries npm dependencies through (scoped-access → @graft/auth)", () => {
+  it("carries npm dependencies through (scoped-access → @usegraft/auth)", () => {
     const descriptor = describeItem(loadItem("scoped-access"));
     expect(descriptor.type).toBe("access");
-    expect(descriptor.dependencies).toEqual({ "@graft/auth": "workspace:*" });
+    expect(descriptor.dependencies).toEqual({ "@usegraft/auth": "workspace:*" });
     expect(descriptor.registryDependencies).toEqual([]);
   });
 });
 
-describe("vocabulary stays in lockstep with @graft/contracts", () => {
+describe("vocabulary stays in lockstep with @usegraft/contracts", () => {
   it("ITEM_TYPES matches RegistryItemType", () => {
     expect([...ITEM_TYPES].sort()).toEqual([...RegistryItemType.options].sort());
   });

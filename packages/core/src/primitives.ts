@@ -11,7 +11,7 @@
  * key across modules is a CONFIG_INVALID at runtime, never a silent override.
  * (See docs/design-notes/registry.md § Wiring.)
  */
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import type { AnyCollection } from "./collection";
 import type { AnyGraftFunction } from "./function";
 

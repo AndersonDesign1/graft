@@ -38,25 +38,25 @@ importers:
 
   deploy/docker/project:
     dependencies:
-      '@graft/assets':
+      '@usegraft/assets':
         specifier: workspace:*
         version: link:../../../packages/assets
-      '@graft/auth':
+      '@usegraft/auth':
         specifier: workspace:*
         version: link:../../../packages/auth
-      '@graft/cli':
+      '@usegraft/cli':
         specifier: workspace:*
         version: link:../../../packages/cli
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../../../packages/core
-      '@graft/db':
+      '@usegraft/db':
         specifier: workspace:*
         version: link:../../../packages/db
-      '@graft/mcp':
+      '@usegraft/mcp':
         specifier: workspace:*
         version: link:../../../packages/mcp
-      '@graft/sdk-core':
+      '@usegraft/sdk-core':
         specifier: workspace:*
         version: link:../../../packages/sdk-core
       zod:
@@ -80,28 +80,28 @@ importers:
       '@fontsource/instrument-serif':
         specifier: ^5.2.8
         version: 5.2.8
-      '@graft/auth':
+      '@usegraft/auth':
         specifier: workspace:*
         version: link:../../packages/auth
-      '@graft/contracts':
+      '@usegraft/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@graft/db':
+      '@usegraft/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@graft/mcp':
+      '@usegraft/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
-      '@graft/registry':
+      '@usegraft/registry':
         specifier: workspace:*
         version: link:../../packages/registry
-      '@graft/sdk-astro':
+      '@usegraft/sdk-astro':
         specifier: workspace:*
         version: link:../../packages/sdk-astro
-      '@graft/tokens':
+      '@usegraft/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens
       '@mdx-js/mdx':
@@ -144,10 +144,10 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
-      '@graft/cli':
+      '@usegraft/cli':
         specifier: workspace:*
         version: link:../../packages/cli
-      '@graft/compiler':
+      '@usegraft/compiler':
         specifier: workspace:*
         version: link:../../packages/compiler
       '@tailwindcss/vite':
@@ -162,25 +162,25 @@ importers:
 
   examples/landing-page:
     dependencies:
-      '@graft/assets':
+      '@usegraft/assets':
         specifier: workspace:*
         version: link:../../packages/assets
-      '@graft/auth':
+      '@usegraft/auth':
         specifier: workspace:*
         version: link:../../packages/auth
-      '@graft/contracts':
+      '@usegraft/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@graft/db':
+      '@usegraft/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@graft/registry':
+      '@usegraft/registry':
         specifier: workspace:*
         version: link:../../packages/registry
-      '@graft/sdk-next':
+      '@usegraft/sdk-next':
         specifier: workspace:*
         version: link:../../packages/sdk-next
       better-auth:
@@ -199,16 +199,16 @@ importers:
         specifier: ^19.0.0
         version: 19.2.7(react@19.2.7)
     devDependencies:
-      '@graft/cli':
+      '@usegraft/cli':
         specifier: workspace:*
         version: link:../../packages/cli
-      '@graft/compiler':
+      '@usegraft/compiler':
         specifier: workspace:*
         version: link:../../packages/compiler
-      '@graft/content-migrations':
+      '@usegraft/content-migrations':
         specifier: workspace:*
         version: link:../../packages/content-migrations
-      '@graft/mcp':
+      '@usegraft/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
       '@types/pg':
@@ -232,10 +232,10 @@ importers:
 
   packages/auth:
     dependencies:
-      '@graft/contracts':
+      '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../core
       jose:
@@ -244,34 +244,34 @@ importers:
 
   packages/cli:
     dependencies:
-      '@graft/assets':
+      '@usegraft/assets':
         specifier: workspace:*
         version: link:../assets
-      '@graft/auth':
+      '@usegraft/auth':
         specifier: workspace:*
         version: link:../auth
-      '@graft/compiler':
+      '@usegraft/compiler':
         specifier: workspace:*
         version: link:../compiler
-      '@graft/content-migrations':
+      '@usegraft/content-migrations':
         specifier: workspace:*
         version: link:../content-migrations
-      '@graft/contracts':
+      '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../core
-      '@graft/db':
+      '@usegraft/db':
         specifier: workspace:*
         version: link:../db
-      '@graft/mcp':
+      '@usegraft/mcp':
         specifier: workspace:*
         version: link:../mcp
-      '@graft/registry':
+      '@usegraft/registry':
         specifier: workspace:*
         version: link:../registry
-      '@graft/studio':
+      '@usegraft/studio':
         specifier: workspace:*
         version: link:../studio
       jiti:
@@ -280,13 +280,13 @@ importers:
 
   packages/compiler:
     dependencies:
-      '@graft/contracts':
+      '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../core
-      '@graft/db':
+      '@usegraft/db':
         specifier: workspace:*
         version: link:../db
       gray-matter:
@@ -295,10 +295,10 @@ importers:
 
   packages/content-migrations:
     dependencies:
-      '@graft/contracts':
+      '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../core
       gray-matter:
@@ -313,10 +313,10 @@ importers:
 
   packages/core:
     dependencies:
-      '@graft/contracts':
+      '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@graft/db':
+      '@usegraft/db':
         specifier: workspace:*
         version: link:../db
       zod:
@@ -325,7 +325,7 @@ importers:
 
   packages/db:
     dependencies:
-      '@graft/contracts':
+      '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
       drizzle-orm:
@@ -341,22 +341,22 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@graft/assets':
+      '@usegraft/assets':
         specifier: workspace:*
         version: link:../assets
-      '@graft/compiler':
+      '@usegraft/compiler':
         specifier: workspace:*
         version: link:../compiler
-      '@graft/contracts':
+      '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../core
-      '@graft/db':
+      '@usegraft/db':
         specifier: workspace:*
         version: link:../db
-      '@graft/registry':
+      '@usegraft/registry':
         specifier: workspace:*
         version: link:../registry
       '@modelcontextprotocol/sdk':
@@ -371,7 +371,7 @@ importers:
 
   packages/registry:
     dependencies:
-      '@graft/contracts':
+      '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
       zod:
@@ -380,33 +380,33 @@ importers:
 
   packages/sdk-astro:
     dependencies:
-      '@graft/sdk-core':
+      '@usegraft/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
     devDependencies:
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../core
 
   packages/sdk-core:
     dependencies:
-      '@graft/contracts':
+      '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../core
-      '@graft/db':
+      '@usegraft/db':
         specifier: workspace:*
         version: link:../db
     devDependencies:
-      '@graft/compiler':
+      '@usegraft/compiler':
         specifier: workspace:*
         version: link:../compiler
 
   packages/sdk-next:
     dependencies:
-      '@graft/sdk-core':
+      '@usegraft/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
       '@mdx-js/mdx':
@@ -416,7 +416,7 @@ importers:
         specifier: ^4.0.1
         version: 4.0.1
     devDependencies:
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../core
       '@types/mdx':
@@ -434,26 +434,26 @@ importers:
 
   packages/sdk-sveltekit:
     dependencies:
-      '@graft/sdk-core':
+      '@usegraft/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
     devDependencies:
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../core
 
   packages/studio:
     dependencies:
-      '@graft/compiler':
+      '@usegraft/compiler':
         specifier: workspace:*
         version: link:../compiler
-      '@graft/contracts':
+      '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@graft/core':
+      '@usegraft/core':
         specifier: workspace:*
         version: link:../core
-      '@graft/db':
+      '@usegraft/db':
         specifier: workspace:*
         version: link:../db
       gray-matter:
@@ -496,7 +496,7 @@ importers:
       '@fontsource/instrument-serif':
         specifier: ^5.2.8
         version: 5.2.8
-      '@graft/tokens':
+      '@usegraft/tokens':
         specifier: workspace:*
         version: link:../tokens
       '@lezer/highlight':

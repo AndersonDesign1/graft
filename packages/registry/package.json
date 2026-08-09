@@ -1,5 +1,5 @@
 {
-  "name": "@graft/registry",
+  "name": "@usegraft/registry",
   "version": "0.0.0",
   "license": "MIT",
   "files": [
@@ -27,7 +27,7 @@
     "lint": "oxlint ."
   },
   "dependencies": {
-    "@graft/contracts": "workspace:*",
+    "@usegraft/contracts": "workspace:*",
     "zod": "^4.1.0"
   }
 }

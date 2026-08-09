@@ -1,4 +1,4 @@
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { describe, expect, it } from "vitest";
 import type { Database } from "./client";
 import { searchContent, searchData } from "./search";

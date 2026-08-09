@@ -65,7 +65,7 @@ describe("planAdd / applyPlan", () => {
       "graft/comments.ts",
       "graft/scoped-access.ts",
     ]);
-    expect(plan.npmDependencies).toMatchObject({ "@graft/auth": "workspace:*" });
+    expect(plan.npmDependencies).toMatchObject({ "@usegraft/auth": "workspace:*" });
     expect(plan.conflicts).toEqual([]);
     expect(plan.mdxMap).toBeNull();
 

@@ -2,7 +2,7 @@
  * graft serve — the router (what is mounted where) and the thin Node adapter
  * (node:http ↔ Web-standard Request/Response), both without a database: the
  * mounted handlers are stubs, because functions/MCP behavior is owned and
- * tested by @graft/core and @graft/mcp. Full-stack behavior is covered by the
+ * tested by @usegraft/core and @usegraft/mcp. Full-stack behavior is covered by the
  * live smoke against the example app.
  */
 import { createServer, type Server } from "node:http";

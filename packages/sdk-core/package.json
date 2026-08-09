@@ -1,5 +1,5 @@
 {
-  "name": "@graft/sdk-core",
+  "name": "@usegraft/sdk-core",
   "version": "0.0.0",
   "license": "MIT",
   "files": [
@@ -26,11 +26,11 @@
     "lint": "oxlint ."
   },
   "dependencies": {
-    "@graft/contracts": "workspace:*",
-    "@graft/core": "workspace:*",
-    "@graft/db": "workspace:*"
+    "@usegraft/contracts": "workspace:*",
+    "@usegraft/core": "workspace:*",
+    "@usegraft/db": "workspace:*"
   },
   "devDependencies": {
-    "@graft/compiler": "workspace:*"
+    "@usegraft/compiler": "workspace:*"
   }
 }

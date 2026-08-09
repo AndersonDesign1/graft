@@ -1,6 +1,6 @@
 # Approval-gate hardening — role separation (post-P6)
 
-**Status: SHIPPED** (migration `0007`; `@graft/db` `approvals.ts` + `harden.ts`).
+**Status: SHIPPED** (migration `0007`; `@usegraft/db` `approvals.ts` + `harden.ts`).
 
 ## The gap this closes
 
@@ -52,7 +52,7 @@ the separation-of-duties check still covers.
 
 ## Provisioning a runtime role
 
-`@graft/db` exports the grants (`runtimeRoleGrantsSql(role)`) and an applier
+`@usegraft/db` exports the grants (`runtimeRoleGrantsSql(role)`) and an applier
 (`hardenRuntimeRole(db, role)`, run over an operator connection). Creating the
 role itself (LOGIN, password) stays with the operator/platform — e.g.
 `CREATE ROLE graft_runtime LOGIN PASSWORD '…'` or the Neon console. The grants:
@@ -88,7 +88,7 @@ grants before `DROP ROLE`.
   command (create role + password handling included). Do when Phase 7 deploy
   adapters make provisioning a recurring task.
 - **Authenticated CLI approver** — resolving `graft approve` through
-  `@graft/auth` (dev token / OIDC) so `decided_by` is verified too, not just
+  `@usegraft/auth` (dev token / OIDC) so `decided_by` is verified too, not just
   `decided_role`. Needs a CLI-side resolver config story.
 - **Out-of-band approval UX** (Studio / notifications) — rides the deferred
   Studio work.

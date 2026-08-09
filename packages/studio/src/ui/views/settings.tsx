@@ -375,7 +375,7 @@ export function SettingsView({
           <Section id="about" title="About" sub={SECTION_BY_ID.about.sub}>
             <div className="set-panel">
               <Row label="Package">
-                <code className="set-value">@graft/studio</code>
+                <code className="set-value">@usegraft/studio</code>
               </Row>
               <Row
                 label="Parity"

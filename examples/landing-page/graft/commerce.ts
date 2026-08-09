@@ -7,8 +7,8 @@
  * Wired via the graft/ barrel — live on the next `graft compile`.
  * See graft/commerce.llms.txt for the agent flow.
  */
-import { requireScopes } from "@graft/auth";
-import { GraftError } from "@graft/contracts";
+import { requireScopes } from "@usegraft/auth";
+import { GraftError } from "@usegraft/contracts";
 import {
   defineCollection,
   defineFunction,
@@ -18,7 +18,7 @@ import {
   listRecords,
   updateRecord,
   type FunctionContext,
-} from "@graft/core";
+} from "@usegraft/core";
 
 /** Scopes this vertical checks — point them at whatever your issuer emits. */
 export const COMMERCE_SCOPES = {

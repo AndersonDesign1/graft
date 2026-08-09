@@ -1,5 +1,5 @@
 /**
- * @graft/registry
+ * @usegraft/registry
  * The shadcn-style registry of owned, copy-in primitives behind `graft add`:
  * a validated item manifest, a local-first bundled registry, transitive
  * resolution, and the plan/apply that writes primitives + regenerates the

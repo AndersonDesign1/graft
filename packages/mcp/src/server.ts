@@ -19,15 +19,15 @@ import {
   defaultKeyFor,
   storageConfigFromEnv,
   type Storage,
-} from "@graft/assets";
-import { compile, parseDocument } from "@graft/compiler";
+} from "@usegraft/assets";
+import { compile, parseDocument } from "@usegraft/compiler";
 import {
   GraftError,
   type ErrorCode,
   type FieldDescriptor,
   type GraftErrorJSON,
   type SchemaDescription,
-} from "@graft/contracts";
+} from "@usegraft/contracts";
 import {
   APPROVAL_HEADER,
   AssetRef,
@@ -39,8 +39,8 @@ import {
   type FunctionActor,
   type GraftFunctionsHandler,
   type RateLimit,
-} from "@graft/core";
-import type { ApprovalStore, AuditStore, BranchScope, Database } from "@graft/db";
+} from "@usegraft/core";
+import type { ApprovalStore, AuditStore, BranchScope, Database } from "@usegraft/db";
 import {
   assertSearchQuery,
   decideApproval,
@@ -50,8 +50,8 @@ import {
   resolveBranchScope,
   scopeChain,
   searchContent,
-} from "@graft/db";
-import { describeItem, listItems, loadItem } from "@graft/registry";
+} from "@usegraft/db";
+import { describeItem, listItems, loadItem } from "@usegraft/registry";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import matter from "gray-matter";
 import { z } from "zod";
@@ -107,7 +107,7 @@ export interface GraftMcpOptions {
   audit?: AuditStore | false;
   approvals?: ApprovalStore;
   /**
-   * Registry root for list_registry / describe_item. Defaults to @graft/registry's
+   * Registry root for list_registry / describe_item. Defaults to @usegraft/registry's
    * bundled primitives — the set `graft add` installs from. Tests point it at a fixture.
    */
   registryRoot?: string;

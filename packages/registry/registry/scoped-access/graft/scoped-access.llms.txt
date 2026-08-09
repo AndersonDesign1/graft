@@ -6,4 +6,4 @@
   `content:moderate` scope may run it (anonymous/unscoped → 401 UNAUTHORIZED).
 - Edit the `SCOPES` map to match what your token issuer emits, then reuse the
   rules on any function's `access:`.
-- Requires `@graft/auth` in the project (mint/verify tokens there).
+- Requires `@usegraft/auth` in the project (mint/verify tokens there).

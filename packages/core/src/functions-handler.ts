@@ -17,14 +17,14 @@
  * route, the self-host container, Vercel Fluid, or a Worker — the Phase 3
  * runtime invariant, locked here before the first mutation function exists.
  */
-import { GraftError, type ErrorCode } from "@graft/contracts";
+import { GraftError, type ErrorCode } from "@usegraft/contracts";
 import {
   createDbApprovalStore,
   createDbAuditStore,
   type ApprovalStore,
   type AuditStore,
   type Database,
-} from "@graft/db";
+} from "@usegraft/db";
 import type { AnyGraftFunction, FunctionActor, RateLimit } from "./function";
 
 export interface FunctionsHandlerOptions {
@@ -35,7 +35,7 @@ export interface FunctionsHandlerOptions {
   /** Branch invocations target. Defaults to "main". */
   branch?: string;
   /**
-   * Resolve the caller from the request — the seam where @graft/auth plugs in.
+   * Resolve the caller from the request — the seam where @usegraft/auth plugs in.
    * Defaults to `{ kind: "anonymous" }`.
    */
   actor?: (request: Request) => FunctionActor | Promise<FunctionActor>;

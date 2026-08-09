@@ -1,4 +1,4 @@
-import { defineCollection, field } from "@graft/core";
+import { defineCollection, field } from "@usegraft/core";
 
 export const pages = defineCollection({
   name: "pages",

@@ -4,10 +4,10 @@
  * slug into the cache tags that reads register and a recompile invalidates,
  * so refreshing content refreshes exactly the affected pages and nothing else.
  *
- * Framework-agnostic on purpose: `@graft/sdk-next` binds these to Next's
+ * Framework-agnostic on purpose: `@usegraft/sdk-next` binds these to Next's
  * `revalidateTag`, but any cache keyed by string tags can use the same scheme.
  */
-import type { ChangeSet } from "@graft/db";
+import type { ChangeSet } from "@usegraft/db";
 
 /** Every Graft tag starts here, so an app can namespace or bulk-clear them. */
 export const TAG_NAMESPACE = "graft";

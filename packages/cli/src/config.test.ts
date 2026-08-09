@@ -1,7 +1,7 @@
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { describe, expect, it } from "vitest";
 import { findConfig, loadConfig, requireDatabaseUrl } from "./config";
 

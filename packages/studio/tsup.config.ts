@@ -1,5 +1,5 @@
 /**
- * Server library + the React embed surface (`@graft/studio/panels`).
+ * Server library + the React embed surface (`@usegraft/studio/panels`).
  *
  * A config file rather than CLI flags because the externals need regexes:
  * the UI imports deep subpaths (`@phosphor-icons/react/dist/icons/X`,

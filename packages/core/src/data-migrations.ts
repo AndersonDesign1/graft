@@ -1,15 +1,15 @@
 /**
  * Data migrations — backfills over db-authoritative collections.
  *
- * The mirror of @graft/content-migrations for rows Postgres owns: the
+ * The mirror of @usegraft/content-migrations for rows Postgres owns: the
  * transform receives each record's OLD `data` shape (untyped) and returns the
  * NEW shape, validated against the collection's current schema. A run is one
  * transaction — every row transforms and validates before anything is
  * updated, and the ledger row (migrations_applied) commits with the updates,
  * so a migration either fully happened and is recorded, or neither.
  */
-import { GraftError } from "@graft/contracts";
-import { and, asc, dataRecords, eq, migrationsApplied, type Database } from "@graft/db";
+import { GraftError } from "@usegraft/contracts";
+import { and, asc, dataRecords, eq, migrationsApplied, type Database } from "@usegraft/db";
 import type { AnyCollection, DocumentData } from "./collection";
 
 /** What the transform sees per record: the old, pre-migration shape. */
@@ -45,7 +45,7 @@ export function defineDataMigration<TCollection extends AnyCollection>(
     throw new GraftError({
       code: "AUTHORITY_MISMATCH",
       message: `Data migrations transform Postgres rows, but collection "${options.collection.name}" is ${options.collection.authority} — its documents are files.`,
-      fix: `Use defineContentMigration from "@graft/content-migrations" for file-authoritative collections; defineDataMigration is only for collections defined with authority: "db-authoritative".`,
+      fix: `Use defineContentMigration from "@usegraft/content-migrations" for file-authoritative collections; defineDataMigration is only for collections defined with authority: "db-authoritative".`,
       details: { collection: options.collection.name, authority: options.collection.authority },
     });
   }

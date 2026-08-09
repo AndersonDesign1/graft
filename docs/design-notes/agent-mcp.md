@@ -47,7 +47,7 @@ wrapper around a dashboard CMS."
 - **Agent Auth / capability-token bus** as a Graft product surface. Interesting
   research; not required for agents to edit content or call functions today.
 - **Graft as an OAuth provider.** Hosts may add OAuth later; Graft verifies
-  tokens from trusted issuers (`@graft/auth`).
+  tokens from trusted issuers (`@usegraft/auth`).
 - **Better Auth plugins as Graft plugins.** Better Auth stays an example issuer
   in the landing-page app. No "Graft Auth MCP plugin" dependency in core.
 - **Cloud project admin tools** (create org, bill, deploy studio) as first-class
@@ -117,7 +117,7 @@ into tool arguments, transcripts, or MCP client logs; an explicit
 
 CLI `graft add` remains the install path; MCP teaches _what exists_. Descriptors
 drop the machine-specific absolute `dir`; the introspection shape lives in
-`@graft/contracts` (`RegistryItemDescriptor`), with a drift test keeping
+`@usegraft/contracts` (`RegistryItemDescriptor`), with a drift test keeping
 registry's authoring enums (`ITEM_TYPES` / `FILE_ROLES`) in lockstep.
 
 ### Content ops + assets (P6.5) ✅
@@ -142,7 +142,7 @@ at execution time. Audit rows + rate limits apply as for `run_function`.
 `put_asset` refuses to clobber an existing key without explicit
 `overwrite: true` (new `ASSET_EXISTS` code) because the object store keeps no
 version history — unlike content, an overwritten binary is unrecoverable. Key
-sanitization + content-type inference live in `@graft/assets`
+sanitization + content-type inference live in `@usegraft/assets`
 (`defaultKeyFor` / `contentTypeFor`), shared with `graft asset put`.
 
 ### Still later
@@ -200,7 +200,7 @@ is the documented default.
 | Layer           | Responsibility                                         |
 | --------------- | ------------------------------------------------------ |
 | App / host      | Mint tokens (Better Auth example, company IdP, etc.)   |
-| `@graft/auth`   | Verify JWT / map dev tokens → `FunctionActor` + scopes |
+| `@usegraft/auth`   | Verify JWT / map dev tokens → `FunctionActor` + scopes |
 | Functions / MCP | Enforce `access`, scopes, public, destructive gate     |
 | Humans          | `graft approvals` / `approve` / `deny` for gated ops   |
 
@@ -230,7 +230,7 @@ Graft never becomes the identity provider of record.
 ## Acceptance (P6.3)
 
 - [x] `list_registry` / `describe_item` registered on stdio + HTTP (same server → both transports).
-- [x] `describe_item` returns a `RegistryItemDescriptor` (from `@graft/contracts`); no absolute `dir` leaks.
+- [x] `describe_item` returns a `RegistryItemDescriptor` (from `@usegraft/contracts`); no absolute `dir` leaks.
 - [x] `describe_item` fails closed on unknown items — `REGISTRY_ITEM_NOT_FOUND` with the available list + `fix`.
 - [x] Introspection contract tests: `describe_schema` / `describe_function` / `describe_item` / `list_registry` outputs validate against the published Zod schemas (recursive object/array fields + function flags covered).
 - [x] Vocabulary drift guard: registry `ITEM_TYPES` / `FILE_ROLES` stay in lockstep with the contracts enums.

@@ -17,7 +17,7 @@
  * e.g. `CREATE ROLE graft_runtime LOGIN PASSWORD '…'` or the Neon console.
  */
 import { sql } from "drizzle-orm";
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import type { Database } from "./client";
 
 /** Postgres identifier we're willing to splice into DDL. */

@@ -8,7 +8,7 @@
  * `compilations` row (git SHA + counts) — all in a single transaction, so the
  * projection stays atomic and deterministic.
  */
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { and, eq, or, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { diffBranchContent, foreignRemovals, type ChangeSet, type ContentInput } from "./diff";

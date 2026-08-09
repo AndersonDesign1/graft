@@ -81,8 +81,8 @@ export type SchemaDescription = z.infer<typeof SchemaDescription>;
  * Registry introspection — the shape the MCP `list_registry` / `describe_item`
  * tools return so agents can browse owned primitives before `graft add`.
  *
- * The vocabulary here mirrors @graft/registry's authoring manifest (ITEM_TYPES /
- * FILE_ROLES); a drift test in @graft/registry keeps the two in lockstep so this
+ * The vocabulary here mirrors @usegraft/registry's authoring manifest (ITEM_TYPES /
+ * FILE_ROLES); a drift test in @usegraft/registry keeps the two in lockstep so this
  * stays the single introspection source of truth without contracts depending on
  * registry.
  */
@@ -107,7 +107,7 @@ export const RegistryItemDescriptor = z.object({
   name: z.string(),
   type: RegistryItemType,
   description: z.string(),
-  /** Semver range against @graft/core; "*" = any (pre-1.0 default). */
+  /** Semver range against @usegraft/core; "*" = any (pre-1.0 default). */
   graftVersion: z.string(),
   /** npm packages the target must install first (package → version range). */
   dependencies: z.record(z.string(), z.string()),

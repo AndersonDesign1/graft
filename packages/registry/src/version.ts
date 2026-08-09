@@ -1,6 +1,6 @@
 /**
  * A deliberately tiny semver check — enough to gate a registry item's
- * `graftVersion` against the installed @graft/core, with no dependency.
+ * `graftVersion` against the installed @usegraft/core, with no dependency.
  *
  * Supported:
  * - "*" / "" / "x"        → any version

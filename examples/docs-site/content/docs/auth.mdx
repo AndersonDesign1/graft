@@ -5,7 +5,7 @@ section: Runtime
 order: 3
 ---
 
-`@graft/auth` resolves `Request → FunctionActor`. Graft checks tokens. Your app
+`@usegraft/auth` resolves `Request → FunctionActor`. Graft checks tokens. Your app
 (or IdP) issues them.
 
 ## Resolver inputs
@@ -32,7 +32,7 @@ JWKS for each.
 ## Access rules
 
 ```ts
-import { requireScopes } from "@graft/auth";
+import { requireScopes } from "@usegraft/auth";
 
 access: requireScopes("submissions:read"),
 ```

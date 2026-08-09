@@ -7,9 +7,9 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { parseDocument, type ProjectedDoc } from "@graft/compiler";
-import { GraftError } from "@graft/contracts";
-import type { AnyCollection } from "@graft/core";
+import { parseDocument, type ProjectedDoc } from "@usegraft/compiler";
+import { GraftError } from "@usegraft/contracts";
+import type { AnyCollection } from "@usegraft/core";
 
 /** Resolve a registered collection or throw the agent-actionable miss. */
 export function requireCollection(

@@ -1,5 +1,5 @@
 /**
- * Embed surface for `@graft/studio/panels`.
+ * Embed surface for `@usegraft/studio/panels`.
  *
  * The components live under `src/ui/`; this module is the stable public
  * shape. It deliberately imports no CSS — a host app embedding a panel

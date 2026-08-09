@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GraftError } from "@graft/contracts";
-import { defineCollection, field } from "@graft/core";
+import { GraftError } from "@usegraft/contracts";
+import { defineCollection, field } from "@usegraft/core";
 import matter from "gray-matter";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { defineContentMigration } from "./define";

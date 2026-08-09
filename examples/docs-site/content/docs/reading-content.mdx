@@ -5,7 +5,7 @@ section: Content
 order: 1
 ---
 
-All reads go through `@graft/sdk-core`: `getDocument`, `listDocuments`, and
+All reads go through `@usegraft/sdk-core`: `getDocument`, `listDocuments`, and
 `searchDocuments`. Each call re-validates against your Zod schema. Soft-deleted
 index rows are excluded.
 
@@ -13,9 +13,9 @@ Framework SDKs wrap that surface:
 
 | Package | Entry | Notes |
 | --- | --- | --- |
-| `@graft/sdk-next` | `createGraft` | Per-request memo via `React.cache`; `MdxBody` for React MDX |
-| `@graft/sdk-astro` | `createGraft` | No request memo; use from frontmatter and endpoints only |
-| `@graft/sdk-sveltekit` | `createGraft` | Same shared surface; `graftRoute` for `+server.ts` |
+| `@usegraft/sdk-next` | `createGraft` | Per-request memo via `React.cache`; `MdxBody` for React MDX |
+| `@usegraft/sdk-astro` | `createGraft` | No request memo; use from frontmatter and endpoints only |
+| `@usegraft/sdk-sveltekit` | `createGraft` | Same shared surface; `graftRoute` for `+server.ts` |
 
 ## Shared API
 
@@ -34,8 +34,8 @@ Pass `branch` to resolve overlay or Neon preview branches. See
 
 ```ts
 // src/lib/graft.ts
-import { createDb } from "@graft/db";
-import { createGraft } from "@graft/sdk-astro";
+import { createDb } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-astro";
 import { collections } from "../../graft.config";
 
 export const graft = createGraft({
@@ -50,7 +50,7 @@ into client islands — it holds a database handle.
 ## Next.js
 
 ```ts
-import { createGraft } from "@graft/sdk-next";
+import { createGraft } from "@usegraft/sdk-next";
 
 export const graft = createGraft({ db, collections });
 // getContent / listContent / searchContent are React.cache-deduped per request
@@ -62,7 +62,7 @@ map when you use registry blocks.
 ## SvelteKit
 
 ```ts
-import { createGraft } from "@graft/sdk-sveltekit";
+import { createGraft } from "@usegraft/sdk-sveltekit";
 
 export const graft = createGraft({ db, collections });
 ```

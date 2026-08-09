@@ -2,7 +2,7 @@
  * Introspection contract tests (P6.3) — lock the agent-facing surface.
  *
  * Every introspection tool's output must validate against the published
- * @graft/contracts Zod schema. A change to a describe() shape that would
+ * @usegraft/contracts Zod schema. A change to a describe() shape that would
  * silently break cold agents fails here instead. Covers the full descriptor
  * surface: collections (incl. recursive object/array fields), functions (all
  * flags), and the registry browse tools over the real bundled registry.
@@ -10,9 +10,9 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FunctionDescriptor, RegistryItemDescriptor, SchemaDescription } from "@graft/contracts";
-import { defineCollection, defineFunction, field } from "@graft/core";
-import type { Database } from "@graft/db";
+import { FunctionDescriptor, RegistryItemDescriptor, SchemaDescription } from "@usegraft/contracts";
+import { defineCollection, defineFunction, field } from "@usegraft/core";
+import type { Database } from "@usegraft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

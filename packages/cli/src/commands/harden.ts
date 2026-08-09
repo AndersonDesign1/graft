@@ -24,8 +24,8 @@ export async function hardenCommand(options: HardenCommandOptions): Promise<Hard
   loadProjectEnv(options.cwd);
   const url = requireDatabaseUrl();
   const [{ createDb, hardenRuntimeRole }, { GraftError }] = await Promise.all([
-    import("@graft/db"),
-    import("@graft/contracts"),
+    import("@usegraft/db"),
+    import("@usegraft/contracts"),
   ]);
   const handle = createDb(url);
   try {

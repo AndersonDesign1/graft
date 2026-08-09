@@ -11,7 +11,7 @@
  * A query that reduces to nothing (only stopwords, e.g. "the") matches no rows
  * and returns [] — that is Postgres semantics, not an error.
  */
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { overlaySubquery } from "./branch";
 import type { Database } from "./client";

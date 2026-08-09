@@ -19,8 +19,8 @@
  * `--apply` is the operator's consent, same contract as `graft migrate`.
  */
 import { basename } from "node:path";
-import { GraftError } from "@graft/contracts";
-import type { ChangeSet, MigrationAppliedRow } from "@graft/db";
+import { GraftError } from "@usegraft/contracts";
+import type { ChangeSet, MigrationAppliedRow } from "@usegraft/db";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { discoverMigrations } from "./migrate";
 
@@ -97,7 +97,7 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
       scopeWriteBranch,
     },
     { runDataMigration },
-  ] = await Promise.all([import("@graft/compiler"), import("@graft/db"), import("@graft/core")]);
+  ] = await Promise.all([import("@usegraft/compiler"), import("@usegraft/db"), import("@usegraft/core")]);
   const control = createDb(url);
 
   // Merging requires both ends registered (no tolerant fallback here — a typo

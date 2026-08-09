@@ -1,5 +1,5 @@
 {
-  "name": "@graft/auth",
+  "name": "@usegraft/auth",
   "version": "0.0.0",
   "license": "MIT",
   "files": [
@@ -26,8 +26,8 @@
     "lint": "oxlint ."
   },
   "dependencies": {
-    "@graft/contracts": "workspace:*",
-    "@graft/core": "workspace:*",
+    "@usegraft/contracts": "workspace:*",
+    "@usegraft/core": "workspace:*",
     "jose": "^6.0.0"
   }
 }

@@ -1,5 +1,5 @@
 /**
- * @graft/cli — the `graft` command.
+ * @usegraft/cli — the `graft` command.
  *
  * `init`/`compile`/`dev` (Phase 2), the approval + migration operator loops
  * (Phase 3), `branch`/`merge` (Phase 4), `add` (Phase 5), and `mcp` (Phase 6
@@ -195,7 +195,7 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
           [
             "",
             "Next steps:",
-            "  1. Install the runtime: add @graft/core and zod (plus @graft/cli as a dev dep)",
+            "  1. Install the runtime: add @usegraft/core and zod (plus @usegraft/cli as a dev dep)",
             "  2. Put DATABASE_URL=postgres://… in .env",
             "  3. Run `graft compile` once, or keep `graft dev` running while you edit",
           ].join("\n"),
@@ -429,7 +429,7 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
     }
     // Loaded at catch time: contracts pulls in Zod, and `--help`/`--version`/
     // usage errors should not pay for it.
-    const { GraftError } = await import("@graft/contracts");
+    const { GraftError } = await import("@usegraft/contracts");
     if (error instanceof GraftError) {
       printGraftError(error);
       return 1;

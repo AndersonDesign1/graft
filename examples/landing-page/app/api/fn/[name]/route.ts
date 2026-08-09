@@ -3,7 +3,7 @@
  * by graft.config.ts. Invoke: POST /api/fn/<name> with a JSON object body.
  * Success → { data }; failure → GraftError JSON with an agent-actionable fix.
  *
- * Who is calling is decided by @graft/auth (lib/actor.ts): Better Auth JWTs or
+ * Who is calling is decided by @usegraft/auth (lib/actor.ts): Better Auth JWTs or
  * GRAFT_DEV_TOKEN; no token → anonymous, which mutations reject by default.
  *
  * P3.4: every invocation writes an audit_log row (actor + correlation + git
@@ -11,8 +11,8 @@
  * are human-gated (`graft approve`, then retry with x-graft-approval).
  */
 import { execFileSync } from "node:child_process";
-import { createFunctionsHandler, type GraftFunctionsHandler } from "@graft/core";
-import { createDb } from "@graft/db";
+import { createFunctionsHandler, type GraftFunctionsHandler } from "@usegraft/core";
+import { createDb } from "@usegraft/db";
 import { functions } from "@/graft.config";
 import { resolveActor } from "@/lib/actor";
 

@@ -1,14 +1,14 @@
 /**
  * Typed operational data — the write/read path for db-authoritative collections.
  *
- * Rows live in @graft/db's `data_records` (Postgres owns them; the invariant:
+ * Rows live in @usegraft/db's `data_records` (Postgres owns them; the invariant:
  * operational data is accessed only through typed functions). These helpers are
  * what function handlers call: they enforce the collection's authority, validate
  * against its Zod schema (the same one Zod layer collections already carry), and
  * stamp actor + correlationId — the pre-audit-log breadcrumb trail.
  */
-import { GraftError } from "@graft/contracts";
-import { and, dataRecords, desc, eq, searchData } from "@graft/db";
+import { GraftError } from "@usegraft/contracts";
+import { and, dataRecords, desc, eq, searchData } from "@usegraft/db";
 import type { AnyCollection, DocumentData } from "./collection";
 import type { FunctionContext } from "./function";
 

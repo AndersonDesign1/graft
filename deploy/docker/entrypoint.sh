@@ -6,7 +6,7 @@
 #
 # Project: /project when mounted (graft.config.ts + content/), else the baked
 # example. Mounted projects get a node_modules symlink into the workspace's
-# resolution shim (deploy/docker/project) — pre-1.0 the @graft/* packages are
+# resolution shim (deploy/docker/project) — pre-1.0 the @usegraft/* packages are
 # unpublished, so the image provides them.
 set -euo pipefail
 
@@ -57,7 +57,7 @@ if [ -f /project/graft.config.ts ]; then
   PROJECT_DIR=/project
   if [ ! -e /project/node_modules ]; then
     ln -s /opt/graft/deploy/docker/project/node_modules /project/node_modules
-    log "linked /project/node_modules → the image's @graft/* packages (pre-1.0: unpublished)"
+    log "linked /project/node_modules → the image's @usegraft/* packages (pre-1.0: unpublished)"
   fi
 else
   PROJECT_DIR=/opt/graft/examples/landing-page

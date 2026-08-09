@@ -1,5 +1,5 @@
 /**
- * @graft/auth
+ * @usegraft/auth
  *
  * Graft verifies identity; it doesn't mint it. This package turns a request
  * into a FunctionActor (createActorResolver) by verifying bearer JWTs against

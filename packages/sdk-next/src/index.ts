@@ -1,5 +1,5 @@
 /**
- * @graft/sdk-next
+ * @usegraft/sdk-next
  * Next.js (RSC) adapter: createGraft → request-deduped (or Data-Cached), fully
  * typed content reads for Server Components, revalidateContent (cache-tag write
  * side), and MdxBody (real MDX evaluation for authored bodies + block components).
@@ -24,4 +24,4 @@ export {
   type ReadOptions,
   type SearchHit,
   type SearchOptions,
-} from "@graft/sdk-core";
+} from "@usegraft/sdk-core";

@@ -1,5 +1,5 @@
 {
-  "name": "@graft/sdk-astro",
+  "name": "@usegraft/sdk-astro",
   "version": "0.0.0",
   "license": "MIT",
   "files": [
@@ -26,9 +26,9 @@
     "lint": "oxlint ."
   },
   "dependencies": {
-    "@graft/sdk-core": "workspace:*"
+    "@usegraft/sdk-core": "workspace:*"
   },
   "devDependencies": {
-    "@graft/core": "workspace:*"
+    "@usegraft/core": "workspace:*"
   }
 }

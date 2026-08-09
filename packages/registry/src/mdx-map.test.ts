@@ -12,7 +12,7 @@ describe("componentExportName", () => {
 describe("mdxComponentsSource", () => {
   it("emits an empty typed map when there are no components", () => {
     const src = mdxComponentsSource([]);
-    expect(src).toContain('import type { MdxComponents } from "@graft/sdk-next"');
+    expect(src).toContain('import type { MdxComponents } from "@usegraft/sdk-next"');
     expect(src).toContain("export const mdxComponents: MdxComponents = {};");
     expect(src).not.toContain("import {");
   });

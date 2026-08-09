@@ -1,6 +1,6 @@
 /**
- * SvelteKit adapter over @graft/sdk-core — the same `getContent` /
- * `listContent` / `searchContent` surface as @graft/sdk-next, so a schema
+ * SvelteKit adapter over @usegraft/sdk-core — the same `getContent` /
+ * `listContent` / `searchContent` surface as @usegraft/sdk-next, so a schema
  * types every read identically across frameworks.
  *
  * No request-level memo (sdk-next's React.cache has no SvelteKit
@@ -24,7 +24,7 @@ import {
   type ReadOptions,
   type SearchHit,
   type SearchOptions,
-} from "@graft/sdk-core";
+} from "@usegraft/sdk-core";
 
 export interface Graft<TCollections extends Record<string, AnyCollection>> {
   /** Typed getDocument. */

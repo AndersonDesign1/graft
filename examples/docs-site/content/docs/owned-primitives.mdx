@@ -7,7 +7,7 @@ order: 1
 
 A primitive is owned, copy-in code. `graft add comments` drops TypeScript under
 `graft/`, regenerates the barrel, and leaves the files yours to edit. There is
-no `@graft/comments` runtime dependency and no plugin API boundary.
+no `@usegraft/comments` runtime dependency and no plugin API boundary.
 
 ```sh
 graft add                # list available items
@@ -48,7 +48,7 @@ MCP: list_registry → describe_item
 
 ## Registry shape
 
-Items live in `@graft/registry` as local manifests (`block` / `field` /
+Items live in `@usegraft/registry` as local manifests (`block` / `field` /
 `access` / `bundle`). Remote HTTP registries are format-compatible later. Today
 the registry is in-repo, versioned with core, and testable.
 

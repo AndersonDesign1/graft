@@ -12,7 +12,7 @@ import {
   field,
   insertRecord,
   mergePrimitives,
-} from "@graft/core";
+} from "@usegraft/core";
 import * as primitives from "./graft";
 
 /** Marketing/landing pages (/, /why). */

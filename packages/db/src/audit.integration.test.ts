@@ -5,7 +5,7 @@
  */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { decideApproval, createDbApprovalStore, listPendingApprovals } from "./approvals";
 import { createDbAuditStore } from "./audit";

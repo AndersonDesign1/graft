@@ -1,13 +1,13 @@
 /**
  * Unit tests: search_content is overlay-aware. `searchContent` itself is
- * chain-aware and integration-tested in @graft/db (P4.1); what these tests pin
+ * chain-aware and integration-tested in @usegraft/db (P4.1); what these tests pin
  * is the MCP wiring — the server must hand it the resolved ancestor chain
  * (from the caller's scope, or lazily from the branch registry), never the
  * bare configured branch id. searchContent is mocked so no query shape is
  * simulated; the db stub only speaks the registry parent lookup.
  */
-import { defineCollection, field } from "@graft/core";
-import type { ContentSearchHit, Database } from "@graft/db";
+import { defineCollection, field } from "@usegraft/core";
+import type { ContentSearchHit, Database } from "@usegraft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,8 +16,8 @@ import { createGraftMcp, type GraftMcpOptions } from "./server";
 // vi.hoisted: the mock factory runs while modules import, before this file's
 // top-level consts initialize.
 const searchContentMock = vi.hoisted(() => vi.fn());
-vi.mock("@graft/db", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@graft/db")>();
+vi.mock("@usegraft/db", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@usegraft/db")>();
   return {
     ...actual,
     searchContent: (...args: unknown[]) => searchContentMock(...args),

@@ -14,7 +14,7 @@ import {
   insertRecord,
   listRecords,
   updateRecord,
-} from "@graft/core";
+} from "@usegraft/core";
 import { requireModerator } from "./scoped-access";
 
 export const comments = defineCollection({

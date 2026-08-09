@@ -3,7 +3,7 @@
  * regenerates on every add.
  *
  * It statically imports every primitive module under `graft/` and merges their
- * collections/functions via @graft/core's `mergePrimitives`, so the app bundler
+ * collections/functions via @usegraft/core's `mergePrimitives`, so the app bundler
  * (which imports graft.config.ts statically) and the CLI (jiti) see the SAME
  * merged config through one mechanism. This is generated infra — header-marked,
  * never hand-edited. (docs/design-notes/registry.md § Wiring.)
@@ -31,7 +31,7 @@ export function barrelSource(basenames: readonly string[]): string {
   const list = entries.map((e) => e.id).join(", ");
   return [
     ...HEADER,
-    'import { mergePrimitives } from "@graft/core";',
+    'import { mergePrimitives } from "@usegraft/core";',
     ...imports,
     "",
     `export const { collections, functions } = mergePrimitives([${list}]);`,

@@ -2,9 +2,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compile } from "@graft/compiler";
-import { defineCollection, field } from "@graft/core";
-import { createDb, type DbHandle } from "@graft/db";
+import { compile } from "@usegraft/compiler";
+import { defineCollection, field } from "@usegraft/core";
+import { createDb, type DbHandle } from "@usegraft/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient } from "./client";
 

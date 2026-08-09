@@ -1,5 +1,5 @@
-import { GraftError } from "@graft/contracts";
-import type { ApprovalStore, AuditEntry, AuditStore, Database } from "@graft/db";
+import { GraftError } from "@usegraft/contracts";
+import type { ApprovalStore, AuditEntry, AuditStore, Database } from "@usegraft/db";
 import { describe, expect, it } from "vitest";
 import { field } from "./field";
 import { defineFunction, type FunctionContext } from "./function";

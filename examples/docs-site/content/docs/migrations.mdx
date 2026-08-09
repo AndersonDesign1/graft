@@ -20,7 +20,7 @@ would be overwritten on the next compile.
 
 ```ts
 // migrations/0001-pages-description.ts
-import { defineContentMigration } from "@graft/content-migrations";
+import { defineContentMigration } from "@usegraft/content-migrations";
 
 export default defineContentMigration({
   collection: "pages",
@@ -37,7 +37,7 @@ in place, and fails all-or-nothing. Review the diff and commit it.
 
 ## Data backfills
 
-For db-authoritative collections, use `defineDataMigration` from `@graft/core`.
+For db-authoritative collections, use `defineDataMigration` from `@usegraft/core`.
 Updates and the ledger row commit in one transaction. A second apply loses the
 unique race and becomes a no-op.
 

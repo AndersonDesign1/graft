@@ -4,7 +4,7 @@
  * local-dev credential; add OIDC issuers here when the site grows accounts.
  * No token → anonymous; a bad token → TOKEN_INVALID, never a silent downgrade.
  */
-import { createActorResolver } from "@graft/auth";
+import { createActorResolver } from "@usegraft/auth";
 
 export const resolveActor = createActorResolver({
   issuers: [],

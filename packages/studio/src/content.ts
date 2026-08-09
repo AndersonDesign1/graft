@@ -4,10 +4,10 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { compile, parseDocument, type ProjectedDoc } from "@graft/compiler";
-import { GraftError } from "@graft/contracts";
-import type { AnyCollection } from "@graft/core";
-import type { Database } from "@graft/db";
+import { compile, parseDocument, type ProjectedDoc } from "@usegraft/compiler";
+import { GraftError } from "@usegraft/contracts";
+import type { AnyCollection } from "@usegraft/core";
+import type { Database } from "@usegraft/db";
 import matter from "gray-matter";
 
 export function requireCollection(

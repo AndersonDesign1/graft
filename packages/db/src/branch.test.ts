@@ -4,7 +4,7 @@
  * (Overlay read semantics need a live DB — see branch.integration.test.ts;
  * the neon lifecycle needs the live API — see neon.integration.test.ts.)
  */
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { describe, expect, it } from "vitest";
 import { createBranch, dropBranch, neonBranchUrl, scopeChain, scopeWriteBranch } from "./branch";
 import type { Database } from "./client";

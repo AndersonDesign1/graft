@@ -11,8 +11,8 @@
  *   previews inherit content, never operational data. Drop deletes the Neon
  *   branch + endpoint, then the registry row.
  */
-import { GraftError } from "@graft/contracts";
-import type { BranchMeta, DropBranchResult } from "@graft/db";
+import { GraftError } from "@usegraft/contracts";
+import type { BranchMeta, DropBranchResult } from "@usegraft/db";
 import { loadProjectEnv, requireDatabaseUrl } from "../config";
 
 export interface BranchCommandOptions {
@@ -27,7 +27,7 @@ export interface BranchCommandOptions {
 export async function branchListCommand(options: BranchCommandOptions): Promise<BranchMeta[]> {
   loadProjectEnv(options.cwd);
   const url = requireDatabaseUrl();
-  const { createDb, listBranches } = await import("@graft/db");
+  const { createDb, listBranches } = await import("@usegraft/db");
   const handle = createDb(url);
   try {
     return await listBranches(handle.db);
@@ -51,7 +51,7 @@ export async function branchCreateCommand(
 
   loadProjectEnv(options.cwd);
   const url = requireDatabaseUrl();
-  const db = await import("@graft/db");
+  const db = await import("@usegraft/db");
   const handle = db.createDb(url);
   try {
     if (backend === "neon") {
@@ -73,7 +73,7 @@ export async function branchDropCommand(
 ): Promise<DropBranchResult & { backend: string }> {
   loadProjectEnv(options.cwd);
   const url = requireDatabaseUrl();
-  const db = await import("@graft/db");
+  const db = await import("@usegraft/db");
   const handle = db.createDb(url);
   try {
     const meta = await db.getBranch(handle.db, options.name);

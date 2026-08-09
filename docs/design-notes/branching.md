@@ -1,6 +1,6 @@
 # Copy-on-write branching (Spike B findings)
 
-Hand-off from the Phase 1 spike to the real `@graft/db` branching abstraction.
+Hand-off from the Phase 1 spike to the real `@usegraft/db` branching abstraction.
 
 ## Question
 
@@ -51,11 +51,11 @@ Per-branch schema with `CREATE TABLE (LIKE … INCLUDING ALL)` + `INSERT … SEL
   (including sequences), no app-level overlay. **✅ VALIDATED live 2026-07-07** — see
   "Live Neon CoW validation" below for measurements.
 - **Self-host fallback: `branch_id` overlay (Strategy 1).** Instant, space-efficient,
-  isolated. Accept the read-overlay complexity and hide it entirely inside `@graft/db`.
+  isolated. Accept the read-overlay complexity and hide it entirely inside `@usegraft/db`.
 - **Schema clone is not the primary path** — keep only as an option for small datasets;
   the sequence entanglement + O(data) cost rule it out at scale.
 
-## Implications for `@graft/db`
+## Implications for `@usegraft/db`
 
 1. A branching abstraction with two backends behind one interface: `neon` (storage CoW)
    and `overlay` (branch_id). The query layer is written **once** against the abstraction.
@@ -92,7 +92,7 @@ So a branch handle can't just be "a `Database`". It is **a `Database` + a scopin
 That is the whole abstraction:
 
 ```ts
-// @graft/db — the seam every read/write goes through in Phase 4.
+// @usegraft/db — the seam every read/write goes through in Phase 4.
 type BranchScope =
   | { kind: "overlay"; chain: string[]; writeBranch: string } // chain leaf-first
   | { kind: "physical" }; // neon: no WHERE scoping
@@ -152,8 +152,8 @@ WHERE deleted = false;                                 -- a branch tombstone hid
 
 Writes stamp `scope.writeBranch` (the branch's own id) — **never** a parent's. `data_records`
 gets the identical treatment. `neon` runs both unscoped. This lands as branch-aware read
-helpers in `@graft/db` that the current `eq(branch_id, …)` call sites migrate onto; no caller
-outside `@graft/db` ever writes overlay SQL.
+helpers in `@usegraft/db` that the current `eq(branch_id, …)` call sites migrate onto; no caller
+outside `@usegraft/db` ever writes overlay SQL.
 
 _Gotcha to handle:_ `projectBranchContent`'s pre-write diff currently reads only the branch's
 own rows, so the **first** compile on a fresh overlay branch sees everything as "added" and
@@ -265,7 +265,7 @@ never reads), and `createNeonBranch` rejects it.
 
 ## Shipped shape (P4.3)
 
-`@graft/db`: `neon.ts` (`createNeonBranch` / `dropNeonBranch` / `neonConfigFromEnv` —
+`@usegraft/db`: `neon.ts` (`createNeonBranch` / `dropNeonBranch` / `neonConfigFromEnv` —
 `NEON_API_KEY` + `GRAFT_NEON_PROJECT_ID`, project id always from config) and
 `resolveBranchHandle` — the `resolve()` seam from the abstraction above: name → connection
 (shared for overlay, endpoint-host-swapped `createDb` for neon) + scope. The CLI routes

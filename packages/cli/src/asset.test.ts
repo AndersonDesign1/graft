@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { describe, expect, it } from "vitest";
 import { assetPutCommand, contentTypeFor, defaultKeyFor } from "./commands/asset";
 

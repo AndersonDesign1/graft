@@ -2,12 +2,12 @@
  * scoped-access — owned access helpers (edit freely).
  *
  * Name the token scopes your functions check in one place, then gate a function
- * with the matching rule. `requireScopes` (from @graft/auth) verifies the
+ * with the matching rule. `requireScopes` (from @usegraft/auth) verifies the
  * caller's token carries the scope; anonymous or unscoped callers are rejected
  * with UNAUTHORIZED. Point the scope strings at whatever your token issuer
  * actually emits.
  */
-import { requireScopes } from "@graft/auth";
+import { requireScopes } from "@usegraft/auth";
 
 /** The scopes this project's functions check. Rename or extend to match your issuer. */
 export const SCOPES = {

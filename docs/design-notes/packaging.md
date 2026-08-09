@@ -72,7 +72,7 @@ process to an agent.
   services — the compare-page claim, kept honest.
 - **Mounted projects:** `/project` (graft.config.ts + content/) is served
   instead; the entrypoint symlinks `/project/node_modules` to the
-  `deploy/docker/project` workspace shim so `@graft/core`/`zod` imports
+  `deploy/docker/project` workspace shim so `@usegraft/core`/`zod` imports
   resolve (pre-1.0: unpublished packages — the image supplies them). MCP
   writes land in the mounted tree; git stays authoritative on the host.
 - **Hardened mode:** `GRAFT_RUNTIME_PASSWORD` makes boot create the role,
@@ -87,7 +87,7 @@ process to an agent.
 - The monorepo is unpublished (pre-1.0), so the image builds the workspace
   itself (packages-only turbo build — the example app's Next build has no
   business in the image); when packages publish, the Dockerfile slims to
-  `npm i @graft/cli` + the user's project. The Dockerfile is in
+  `npm i @usegraft/cli` + the user's project. The Dockerfile is in
   `.dockerignore` so editing it doesn't bust the workspace-install cache.
 
 **Verified live (2026-07-11, Docker Desktop 29.5.3):** all-in-one boots to
@@ -116,7 +116,7 @@ runtime, and `graft harden` covers Graft's tables only — app-owned tables
 
 ## Astro / SvelteKit SDKs (P7.4 — SHIPPED)
 
-`@graft/sdk-astro` and `@graft/sdk-sveltekit`: the identical
+`@usegraft/sdk-astro` and `@usegraft/sdk-sveltekit`: the identical
 `createGraft` → `getContent`/`listContent`/`searchContent` surface as
 sdk-next (same type-inference pins), plus `graftRoute` — the handler mount,
 which is one property access because both frameworks' endpoints are already

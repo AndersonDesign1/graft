@@ -7,8 +7,8 @@
  */
 import { createHash } from "node:crypto";
 import { basename } from "node:path";
-import { GraftError } from "@graft/contracts";
-import type { AnyCollection } from "@graft/core";
+import { GraftError } from "@usegraft/contracts";
+import type { AnyCollection } from "@usegraft/core";
 import matter from "gray-matter";
 
 /** Kebab-case: URL-safe, unambiguous in paths, and stable as a primary-key part. */

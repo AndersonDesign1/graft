@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { MdxBody } from "@graft/sdk-next";
+import { MdxBody } from "@usegraft/sdk-next";
 import { OrderForm } from "@/components/order-form";
 import { mdxComponents } from "@/components/mdx-components";
 import { getGraft } from "@/lib/graft";

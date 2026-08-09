@@ -17,10 +17,10 @@ kept out of the repo.)
 data, auth, branching, cache tags), Graft now ships **owned primitives** and a real content body
 model:
 
-- **Real MDX bodies.** Authored `*.mdx` is compiled and rendered via `@graft/sdk-next`
+- **Real MDX bodies.** Authored `*.mdx` is compiled and rendered via `@usegraft/sdk-next`
   `MdxBody` with a generated `components/mdx-components.ts` map — registry **blocks** are real
   React components, not markdown-only fakes.
-- **`graft add`.** Local-first registry (`@graft/registry`): Tier-1 `seo` / `callout` / `faq` /
+- **`graft add`.** Local-first registry (`@usegraft/registry`): Tier-1 `seo` / `callout` / `faq` /
   `scoped-access` / `comments`, Tier-2 **`commerce`** (file-authoritative products + db-authoritative
   orders + place/list/update/cancel). Pure file-drop + generated `graft/` barrel; zero config
   edits.
@@ -62,7 +62,7 @@ generated bearer (anonymous MCP is never exposed); mount your project at `/proje
 adds the deploy adapters ([`deploy/`](deploy/README.md)): Railway, Fly, and VPS run the
 container; Vercel deploys embedded (compile as a build step; the example app is the
 reference) — every adapter carries the runtime-credential harden recipe. **P7.4** ships
-`@graft/sdk-astro` and `@graft/sdk-sveltekit`: the same typed `getContent`/`listContent`/
+`@usegraft/sdk-astro` and `@usegraft/sdk-sveltekit`: the same typed `getContent`/`listContent`/
 `searchContent` surface as sdk-next plus `graftRoute` — mounting the function/MCP handlers is
 one property access because both frameworks' endpoints are already Web-standard; cache
 invalidation maps the tag contract onto CDN surrogate keys. Next: docs site + compare page.
@@ -130,28 +130,28 @@ The gate holds against the agent itself, not just accidents: approver == request
 server-side), and consuming an approval rides a `SECURITY DEFINER` function — so a hardened
 deployment can give its app/agent a runtime role with **no UPDATE on `approvals`**, making
 `pending → approved` unreachable even with raw SQL against the app's own `DATABASE_URL`
-(`runtimeRoleGrantsSql` / `hardenRuntimeRole` in `@graft/db` emit the grants; see
+(`runtimeRoleGrantsSql` / `hardenRuntimeRole` in `@usegraft/db` emit the grants; see
 [`docs/design-notes/approval-hardening.md`](docs/design-notes/approval-hardening.md)).
 
 ## Monorepo layout
 
 | Package                     | Purpose                                                             |
 | --------------------------- | ------------------------------------------------------------------- |
-| `@graft/core`               | Schema (`defineCollection`), function runtime, access, migrations   |
-| `@graft/compiler`           | Authored content → Postgres index + typegen + validation            |
-| `@graft/content-migrations` | Codemod-style authored-content transforms                           |
-| `@graft/db`                 | Postgres + Drizzle + branching abstraction                          |
-| `@graft/assets`             | S3/MinIO storage, transforms, agent upload primitives               |
-| `@graft/auth`               | OIDC token verification, actor resolver, scope-based access         |
-| `@graft/contracts`          | Shared types, error codes, introspection schemas                    |
-| `@graft/mcp`                | Project MCP (content + functions + introspection)                   |
-| `@graft/cli`                | Human + agent CLI (`graft`, including `graft mcp` + `graft serve`)  |
-| `@graft/studio`             | Opt-in Studio UI (`graft studio` / `serve --studio`; OpenAPI-first) |
-| `@graft/registry`           | shadcn-style owned-primitive registry                               |
-| `@graft/sdk-core`           | Framework-agnostic client + cache contract                          |
-| `@graft/sdk-next`           | Next.js adapter + `MdxBody`                                         |
-| `@graft/sdk-astro`          | Astro adapter (typed reads + endpoint mounts)                       |
-| `@graft/sdk-sveltekit`      | SvelteKit adapter (typed reads + endpoint mounts)                   |
+| `@usegraft/core`               | Schema (`defineCollection`), function runtime, access, migrations   |
+| `@usegraft/compiler`           | Authored content → Postgres index + typegen + validation            |
+| `@usegraft/content-migrations` | Codemod-style authored-content transforms                           |
+| `@usegraft/db`                 | Postgres + Drizzle + branching abstraction                          |
+| `@usegraft/assets`             | S3/MinIO storage, transforms, agent upload primitives               |
+| `@usegraft/auth`               | OIDC token verification, actor resolver, scope-based access         |
+| `@usegraft/contracts`          | Shared types, error codes, introspection schemas                    |
+| `@usegraft/mcp`                | Project MCP (content + functions + introspection)                   |
+| `@usegraft/cli`                | Human + agent CLI (`graft`, including `graft mcp` + `graft serve`)  |
+| `@usegraft/studio`             | Opt-in Studio UI (`graft studio` / `serve --studio`; OpenAPI-first) |
+| `@usegraft/registry`           | shadcn-style owned-primitive registry                               |
+| `@usegraft/sdk-core`           | Framework-agnostic client + cache contract                          |
+| `@usegraft/sdk-next`           | Next.js adapter + `MdxBody`                                         |
+| `@usegraft/sdk-astro`          | Astro adapter (typed reads + endpoint mounts)                       |
+| `@usegraft/sdk-sveltekit`      | SvelteKit adapter (typed reads + endpoint mounts)                   |
 
 ## Conventions
 

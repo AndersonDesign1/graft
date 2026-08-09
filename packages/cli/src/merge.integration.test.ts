@@ -13,7 +13,7 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createBranch, createDb, dataRecords, migrationsApplied, type DbHandle } from "@graft/db";
+import { createBranch, createDb, dataRecords, migrationsApplied, type DbHandle } from "@usegraft/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { mergeCommand } from "./commands/merge";
 
@@ -31,11 +31,11 @@ const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.en
 const TEST_TIMEOUT = 120_000;
 const TARGET = "cli-merge-it-target";
 const SRC = "cli-merge-it-preview";
-// Inside the package so the project's @graft/* imports resolve.
+// Inside the package so the project's @usegraft/* imports resolve.
 const projectDir = resolve(here, "../.test-tmp/merge-project");
 
 const CONFIG = `
-import { defineCollection, field } from "@graft/core";
+import { defineCollection, field } from "@usegraft/core";
 
 export const pages = defineCollection({
   name: "pages",
@@ -52,7 +52,7 @@ export const collections = { pages, submissions };
 `;
 
 const CONTENT_MIGRATION = `
-import { defineContentMigration } from "@graft/content-migrations";
+import { defineContentMigration } from "@usegraft/content-migrations";
 import { pages } from "../graft.config";
 
 export default defineContentMigration({
@@ -65,7 +65,7 @@ export default defineContentMigration({
 `;
 
 const DATA_MIGRATION = `
-import { defineDataMigration } from "@graft/core";
+import { defineDataMigration } from "@usegraft/core";
 import { submissions } from "../graft.config";
 
 export default defineDataMigration({
@@ -95,7 +95,7 @@ describe.skipIf(!runIntegration)("graft merge end to end", () => {
 
     // Topology: TARGET is its own root; SRC forked from it.
     await handle.db
-      .insert((await import("@graft/db")).branches)
+      .insert((await import("@usegraft/db")).branches)
       .values({ name: TARGET, parent: null, backend: "overlay" });
     await createBranch(handle.db, { name: SRC, from: TARGET });
 

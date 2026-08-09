@@ -4,8 +4,8 @@
  * Errors keep the same agent-actionable shape the MCP surface returns: the code,
  * the message, and the `fix` — printed instead of JSON-encoded.
  */
-import type { CompileResult } from "@graft/compiler";
-import type { GraftError } from "@graft/contracts";
+import type { CompileResult } from "@usegraft/compiler";
+import type { GraftError } from "@usegraft/contracts";
 
 export function printGraftError(error: GraftError): void {
   console.error(`error ${error.code}: ${error.message}`);

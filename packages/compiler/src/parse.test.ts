@@ -1,5 +1,5 @@
-import { GraftError } from "@graft/contracts";
-import { defineCollection, field } from "@graft/core";
+import { GraftError } from "@usegraft/contracts";
+import { defineCollection, field } from "@usegraft/core";
 import { describe, expect, it } from "vitest";
 import { parseDocument } from "./parse";
 

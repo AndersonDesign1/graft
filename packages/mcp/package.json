@@ -1,5 +1,5 @@
 {
-  "name": "@graft/mcp",
+  "name": "@usegraft/mcp",
   "version": "0.0.0",
   "license": "MIT",
   "files": [
@@ -26,12 +26,12 @@
     "lint": "oxlint ."
   },
   "dependencies": {
-    "@graft/assets": "workspace:*",
-    "@graft/compiler": "workspace:*",
-    "@graft/contracts": "workspace:*",
-    "@graft/core": "workspace:*",
-    "@graft/db": "workspace:*",
-    "@graft/registry": "workspace:*",
+    "@usegraft/assets": "workspace:*",
+    "@usegraft/compiler": "workspace:*",
+    "@usegraft/contracts": "workspace:*",
+    "@usegraft/core": "workspace:*",
+    "@usegraft/db": "workspace:*",
+    "@usegraft/registry": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "gray-matter": "^4.0.3",
     "zod": "^4.1.0"

@@ -2,13 +2,13 @@
  * defineCollection — the core "everything is code" primitive.
  *
  * A collection is a content type defined entirely in code: its fields (Zod), its
- * content-authority mode, and a describe() that yields a @graft/contracts
+ * content-authority mode, and a describe() that yields a @usegraft/contracts
  * CollectionDescriptor so MCP `describe_schema` and the CLI all agree on shape.
  *
  * The collection is generic over its fields, so the document type is inferred —
  * `DocumentData<typeof posts>` is the exact frontmatter shape, no codegen needed.
  */
-import type { CollectionDescriptor, ContentAuthority } from "@graft/contracts";
+import type { CollectionDescriptor, ContentAuthority } from "@usegraft/contracts";
 import { z } from "zod";
 import { toFieldDescriptor, type FieldDefinition } from "./field";
 

@@ -11,7 +11,7 @@
  * Nested structure (object / array) is first-class so SEO groups, FAQ lists, and
  * commerce line items stay typed — not opaque field.json blobs.
  */
-import type { FieldDescriptor } from "@graft/contracts";
+import type { FieldDescriptor } from "@usegraft/contracts";
 import { z } from "zod";
 
 export type ScalarFieldType =

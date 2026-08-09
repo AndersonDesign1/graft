@@ -90,7 +90,7 @@ export interface CompilationList {
 }
 
 /**
- * Result of an operator-triggered compile. Named `…Dto` because @graft/compiler
+ * Result of an operator-triggered compile. Named `…Dto` because @usegraft/compiler
  * exports its own richer `CompileResult`; this is the flattened wire shape.
  */
 export interface CompileResultDto {

@@ -82,7 +82,7 @@ Generic projects can also run `graft mcp` (stdio) with DATABASE_URL.
 ## MDX bodies + blocks
 
 Page bodies are **real MDX** (not markdown-only). Rendered by
-`@graft/sdk-next` `MdxBody` with the generated map at
+`@usegraft/sdk-next` `MdxBody` with the generated map at
 `components/mdx-components.ts`. Registry blocks land as PascalCase
 components under `components/` and are auto-registered by `graft add`.
 
@@ -166,7 +166,7 @@ Destructive functions never run directly. The workflow:
 ## Authentication (who is calling a function)
 
 Callers are identified by `Authorization: Bearer <token>`, resolved by
-`@graft/auth` (`app/api/fn/[name]/route.ts`). Two kinds of tokens work:
+`@usegraft/auth` (`app/api/fn/[name]/route.ts`). Two kinds of tokens work:
 
 - **JWTs from this app's Better Auth instance** (`lib/auth.ts`, mounted at
   `/api/auth`). Sign in (`POST /api/auth/sign-in/email`), then mint a JWT at
@@ -217,14 +217,14 @@ filename order. The filename is the migration's identity in the
 
 - **Content migration** (file-authoritative collections):
   `export default defineContentMigration({ collection, description,
-  transform })` from `@graft/content-migrations`. The transform gets each
+  transform })` from `@usegraft/content-migrations`. The transform gets each
   document's OLD `{ slug, data, body }` and returns the NEW `{ data, body? }`;
   output is validated against the current schema, files are rewritten in
   place, and the run compiles — the whole migration is a reviewable git
   commit. See `migrations/0001-pages-description.ts`.
 - **Data migration** (db-authoritative collections):
   `export default defineDataMigration({ collection, description, transform })`
-  from `@graft/core`. The transform maps each row's OLD `data` to the new
+  from `@usegraft/core`. The transform maps each row's OLD `data` to the new
   shape; updates + ledger commit in ONE transaction. See
   `migrations/0002-submissions-email-lowercase.ts`.
 
@@ -270,10 +270,10 @@ compile — no cache, no revalidation needed. Graft ships the cache-tag contract
 for when you want cached/ISR rendering instead:
 
 - **Tag reads** with Next 16 `'use cache'` + `cacheTag`, using the helpers from
-  `@graft/sdk-next` (re-exported from sdk-core):
+  `@usegraft/sdk-next` (re-exported from sdk-core):
   ```ts
   import { cacheTag, cacheLife } from "next/cache";
-  import { documentTag } from "@graft/sdk-next";
+  import { documentTag } from "@usegraft/sdk-next";
   async function getPage(slug: string) {
     "use cache";
     cacheTag(documentTag("main", "pages", slug)); // list reads: collectionTag(...)
@@ -320,7 +320,7 @@ a preview never busts main's cache.
   `content:moderate` scope may run it (anonymous/unscoped → 401 UNAUTHORIZED).
 - Edit the `SCOPES` map to match what your token issuer emits, then reuse the
   rules on any function's `access:`.
-- Requires `@graft/auth` in the project (mint/verify tokens there).
+- Requires `@usegraft/auth` in the project (mint/verify tokens there).
 
 ## comments (primitive)
 

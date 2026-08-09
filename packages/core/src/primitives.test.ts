@@ -1,4 +1,4 @@
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { defineCollection } from "./collection";
 import { field } from "./field";

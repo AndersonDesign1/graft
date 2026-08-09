@@ -4,15 +4,15 @@
  * `readDocs` walks the content directory, maps each top-level folder to a registered
  * collection, validates every file, and enforces slug uniqueness — surfacing problems
  * as agent-actionable GraftErrors. `compile` then projects the result into Postgres via
- * @graft/db's atomic hash-diff projection and reports exactly what changed, recording
+ * @usegraft/db's atomic hash-diff projection and reports exactly what changed, recording
  * the git SHA it compiled from (the "git is authoritative" audit trail).
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { GraftError } from "@graft/contracts";
-import type { AnyCollection } from "@graft/core";
-import { projectBranchContent, type ChangeSet, type Database } from "@graft/db";
+import { GraftError } from "@usegraft/contracts";
+import type { AnyCollection } from "@usegraft/core";
+import { projectBranchContent, type ChangeSet, type Database } from "@usegraft/db";
 import { parseDocument, type ProjectedDoc } from "./parse";
 
 export interface CompileOptions {

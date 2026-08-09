@@ -1,10 +1,10 @@
 /**
- * @graft/studio — optional, opt-in Studio (Drizzle-style).
+ * @usegraft/studio — optional, opt-in Studio (Drizzle-style).
  *
  * Headless parity: the UI is only a client of the OpenAPI read surface;
  * the same operations exist on MCP and CLI.
  *
- * React panels: import from `@graft/studio/panels`.
+ * React panels: import from `@usegraft/studio/panels`.
  */
 export { createStudioApiHandler, type StudioApiOptions, type StudioFetchHandler } from "./api";
 export { createStudioHandler, type StudioHandlerOptions } from "./handler";
@@ -22,4 +22,4 @@ export type {
   PendingApprovalDto,
 } from "./types";
 
-export const PACKAGE = "@graft/studio" as const;
+export const PACKAGE = "@usegraft/studio" as const;

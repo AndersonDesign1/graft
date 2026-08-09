@@ -3,8 +3,8 @@
  * must not need the S3_* env. Private bucket → presigned GETs (fine here: every
  * page is force-dynamic); set S3_PUBLIC_URL for stable public URLs instead.
  */
-import { createStorage, type Storage } from "@graft/assets";
-import type { AssetRef } from "@graft/core";
+import { createStorage, type Storage } from "@usegraft/assets";
+import type { AssetRef } from "@usegraft/core";
 
 let storage: Storage | null = null;
 

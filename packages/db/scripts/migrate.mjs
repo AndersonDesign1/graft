@@ -1,6 +1,6 @@
 /**
  * Apply pending Drizzle migrations from ./drizzle to DATABASE_URL.
- * Run: pnpm --filter @graft/db db:migrate   (loads repo-root .env)
+ * Run: pnpm --filter @usegraft/db db:migrate   (loads repo-root .env)
  */
 import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/postgres-js";

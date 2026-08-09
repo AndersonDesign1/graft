@@ -1,4 +1,4 @@
-import type { Database } from "@graft/db";
+import type { Database } from "@usegraft/db";
 import { describe, expect, it } from "vitest";
 import { defineCollection } from "./collection";
 import { defineDataMigration, runDataMigration } from "./data-migrations";

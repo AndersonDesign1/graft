@@ -8,7 +8,7 @@
  * Callers never hand-write the overlay SQL — they call `readContent`/`searchContent`
  * with a scope and get rows back. See docs/design-notes/branching.md.
  */
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { and, asc, count, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { createDb, type Database } from "./client";
 import {

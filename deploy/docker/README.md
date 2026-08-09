@@ -2,7 +2,7 @@
 
 Two topologies, one image, decided in
 [`docs/design-notes/packaging.md`](../../docs/design-notes/packaging.md).
-Pre-1.0 the `@graft/*` packages are unpublished, so the image builds the
+Pre-1.0 the `@usegraft/*` packages are unpublished, so the image builds the
 workspace itself — build from the **repo root**:
 
 ```sh
@@ -33,7 +33,7 @@ docker run --init -p 3903:3903 -v ./my-site:/project -v graft_pg:/var/lib/postgr
 ```
 
 The entrypoint symlinks `/project/node_modules` to the image's packages (the
-`deploy/docker/project` shim) so your config's `@graft/core` / `zod` imports
+`deploy/docker/project` shim) so your config's `@usegraft/core` / `zod` imports
 resolve. Content written over MCP lands in your mounted tree — commit it from
 the host; git stays authoritative.
 

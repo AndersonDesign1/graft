@@ -10,8 +10,8 @@
  */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createDb } from "@graft/db";
-import { createGraftMcp, serveStdio } from "@graft/mcp";
+import { createDb } from "@usegraft/db";
+import { createGraftMcp, serveStdio } from "@usegraft/mcp";
 import { collections, functions } from "../graft.config";
 import { resolveActor } from "../lib/actor";
 

@@ -1,4 +1,4 @@
-import { MdxBody, type Document } from "@graft/sdk-next";
+import { MdxBody, type Document } from "@usegraft/sdk-next";
 import type { pages } from "@/graft.config";
 import { assetUrl } from "@/lib/assets";
 import { Faq } from "./Faq";

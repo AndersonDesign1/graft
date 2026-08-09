@@ -7,7 +7,7 @@
  * Primitives from `graft add` live under graft/ and merge via the barrel.
  * Field helpers (seo, faq) are composed into collections below.
  */
-import { requireScopes } from "@graft/auth";
+import { requireScopes } from "@usegraft/auth";
 import {
   defineCollection,
   defineFunction,
@@ -17,7 +17,7 @@ import {
   listRecords,
   mergePrimitives,
   searchRecords,
-} from "@graft/core";
+} from "@usegraft/core";
 import * as primitives from "./graft";
 import { faqFields } from "./graft/fields/faq";
 import { seoFields } from "./graft/fields/seo";

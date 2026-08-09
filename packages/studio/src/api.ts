@@ -3,8 +3,8 @@
  * Shared by `graft studio` and `graft serve --studio`.
  * Reads + mutations (edit content, decide approvals) — same ops as MCP/CLI.
  */
-import { compile } from "@graft/compiler";
-import type { AnyCollection } from "@graft/core";
+import { compile } from "@usegraft/compiler";
+import type { AnyCollection } from "@usegraft/core";
 import {
   decideApproval,
   listBranches,
@@ -13,8 +13,8 @@ import {
   readContent,
   resolveBranchScope,
   type Database,
-} from "@graft/db";
-import { GraftError } from "@graft/contracts";
+} from "@usegraft/db";
+import { GraftError } from "@usegraft/contracts";
 import matter from "gray-matter";
 import { readCollectionDocs, readRawDocument, requireCollection, writeDocument } from "./content";
 import { STUDIO_OPENAPI } from "./openapi";

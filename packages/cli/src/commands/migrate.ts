@@ -11,13 +11,13 @@
  */
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import {
   runContentMigration,
   type AnyContentMigration,
   type ContentMigrationReport,
-} from "@graft/content-migrations";
-import { runDataMigration, type AnyDataMigration, type DataMigrationReport } from "@graft/core";
+} from "@usegraft/content-migrations";
+import { runDataMigration, type AnyDataMigration, type DataMigrationReport } from "@usegraft/core";
 import { createJiti } from "jiti";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 
@@ -85,7 +85,7 @@ export async function discoverMigrations(migrationsDir: string): Promise<Discove
       throw new GraftError({
         code: "MIGRATION_FAILED",
         message: `${basename(file)} does not default-export a migration.`,
-        fix: `Add \`export default defineContentMigration({ … })\` (from "@graft/content-migrations") or \`export default defineDataMigration({ … })\` (from "@graft/core").`,
+        fix: `Add \`export default defineContentMigration({ … })\` (from "@usegraft/content-migrations") or \`export default defineDataMigration({ … })\` (from "@usegraft/core").`,
         details: { file, exports: Object.keys(mod) },
       });
     }
@@ -120,7 +120,7 @@ export async function migrateCommand(
       resolveBranchHandle,
       scopeWriteBranch,
     },
-  ] = await Promise.all([import("@graft/compiler"), import("@graft/db")]);
+  ] = await Promise.all([import("@usegraft/compiler"), import("@usegraft/db")]);
   const control = createDb(url);
   // Overlay branches (and unregistered ids) run against the shared DB under
   // their branch_id; a neon branch runs against its own database.

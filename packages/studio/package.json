@@ -1,5 +1,5 @@
 {
-  "name": "@graft/studio",
+  "name": "@usegraft/studio",
   "version": "0.0.0",
   "license": "MIT",
   "files": [
@@ -35,10 +35,10 @@
     "clean:lib": "node ./scripts/clean-lib.mjs"
   },
   "dependencies": {
-    "@graft/compiler": "workspace:*",
-    "@graft/contracts": "workspace:*",
-    "@graft/core": "workspace:*",
-    "@graft/db": "workspace:*",
+    "@usegraft/compiler": "workspace:*",
+    "@usegraft/contracts": "workspace:*",
+    "@usegraft/core": "workspace:*",
+    "@usegraft/db": "workspace:*",
     "gray-matter": "^4.0.3"
   },
   "devDependencies": {
@@ -54,7 +54,7 @@
     "@fontsource-variable/instrument-sans": "^5.2.8",
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/instrument-serif": "^5.2.8",
-    "@graft/tokens": "workspace:*",
+    "@usegraft/tokens": "workspace:*",
     "@lezer/highlight": "^1.2.3",
     "@milkdown/core": "^7.22.0",
     "@milkdown/crepe": "^7.22.0",

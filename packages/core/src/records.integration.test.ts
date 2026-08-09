@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createDb, type DbHandle } from "@graft/db";
+import { createDb, type DbHandle } from "@usegraft/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { defineCollection } from "./collection";
 import { field } from "./field";

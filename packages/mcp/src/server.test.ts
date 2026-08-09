@@ -6,9 +6,9 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ErrorCodes, RegistryItemDescriptor, SchemaDescription } from "@graft/contracts";
-import { defineCollection, defineFunction, field } from "@graft/core";
-import type { Database } from "@graft/db";
+import { ErrorCodes, RegistryItemDescriptor, SchemaDescription } from "@usegraft/contracts";
+import { defineCollection, defineFunction, field } from "@usegraft/core";
+import type { Database } from "@usegraft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

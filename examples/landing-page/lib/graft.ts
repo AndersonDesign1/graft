@@ -2,8 +2,8 @@
  * The app's Graft handle — lazy so `next build` never needs a database
  * (all pages are dynamic; the first request initializes the connection).
  */
-import { createDb } from "@graft/db";
-import { createGraft, type Graft } from "@graft/sdk-next";
+import { createDb } from "@usegraft/db";
+import { createGraft, type Graft } from "@usegraft/sdk-next";
 import { collections } from "@/graft.config";
 
 let graft: Graft<typeof collections> | null = null;

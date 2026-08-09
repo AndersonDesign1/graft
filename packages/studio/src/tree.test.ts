@@ -6,14 +6,14 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { defineCollection, field } from "@graft/core";
-import { parseDocument } from "@graft/compiler";
+import { defineCollection, field } from "@usegraft/core";
+import { parseDocument } from "@usegraft/compiler";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Rows the fake `readContent` will return, keyed by collection. */
 let indexRows: Record<string, Array<Record<string, unknown>>> = {};
 
-vi.mock("@graft/db", () => ({
+vi.mock("@usegraft/db", () => ({
   resolveBranchScope: vi.fn(async (_db: unknown, branch: string) => ({
     kind: "overlay",
     chain: [branch],

@@ -1,5 +1,5 @@
 /**
- * @graft/mcp
+ * @usegraft/mcp
  * MCP server: content ops + schema/function introspection + run_function +
  * registry browse (list_registry / describe_item) + agent-actionable errors.
  * `createGraftMcp` builds the server; `serveStdio`

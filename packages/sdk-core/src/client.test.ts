@@ -1,6 +1,6 @@
-import { GraftError } from "@graft/contracts";
-import { defineCollection, field } from "@graft/core";
-import type { ContentRow } from "@graft/db";
+import { GraftError } from "@usegraft/contracts";
+import { defineCollection, field } from "@usegraft/core";
+import type { ContentRow } from "@usegraft/db";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { createClient, toDocument, type Document, type SearchHit } from "./client";
 

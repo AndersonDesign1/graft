@@ -1,4 +1,4 @@
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { exportJWK, generateKeyPair, SignJWT, type JSONWebKeySet } from "jose";
 import { beforeAll, describe, expect, it } from "vitest";
 import { betterAuthIssuer, createOidcVerifier, type TrustedIssuer } from "./oidc";

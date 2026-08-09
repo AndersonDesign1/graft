@@ -23,8 +23,8 @@
  */
 import { execFileSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createActorResolver, type TrustedIssuer } from "@graft/auth";
-import { GraftError } from "@graft/contracts";
+import { createActorResolver, type TrustedIssuer } from "@usegraft/auth";
+import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 
 export type FetchHandler = (request: Request) => Promise<Response>;
@@ -176,10 +176,10 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     { createDb, resolveBranchHandle, scopeWriteBranch, sql },
     studioMod,
   ] = await Promise.all([
-    import("@graft/core"),
-    import("@graft/mcp"),
-    import("@graft/db"),
-    enableStudio ? import("@graft/studio") : Promise.resolve(null),
+    import("@usegraft/core"),
+    import("@usegraft/mcp"),
+    import("@usegraft/db"),
+    enableStudio ? import("@usegraft/studio") : Promise.resolve(null),
   ]);
 
   const control = createDb(url);

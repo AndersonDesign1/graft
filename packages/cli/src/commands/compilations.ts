@@ -2,7 +2,7 @@
  * graft compilations — list recent content projection trail rows.
  * Same data as GET /api/studio/v1/compilations and MCP list_compilations.
  */
-import type { CompilationRow } from "@graft/db";
+import type { CompilationRow } from "@usegraft/db";
 import { loadProjectEnv, requireDatabaseUrl } from "../config";
 
 export interface CompilationsCommandOptions {
@@ -16,7 +16,7 @@ export async function compilationsListCommand(
 ): Promise<CompilationRow[]> {
   loadProjectEnv(options.cwd);
   const url = requireDatabaseUrl();
-  const { createDb, listCompilations } = await import("@graft/db");
+  const { createDb, listCompilations } = await import("@usegraft/db");
   const handle = createDb(url);
   try {
     return await listCompilations(handle.db, {

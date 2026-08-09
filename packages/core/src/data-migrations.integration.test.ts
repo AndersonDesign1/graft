@@ -4,7 +4,7 @@
  */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createDb, dataRecords, listAppliedMigrations, type DbHandle } from "@graft/db";
+import { createDb, dataRecords, listAppliedMigrations, type DbHandle } from "@usegraft/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { defineCollection } from "./collection";
 import { defineDataMigration, runDataMigration } from "./data-migrations";

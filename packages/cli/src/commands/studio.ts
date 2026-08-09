@@ -5,7 +5,7 @@
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { userInfo } from "node:os";
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { createNodeListener } from "./serve";
 
@@ -43,7 +43,7 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
   const url = requireDatabaseUrl();
 
   const [{ createStudioHandler }, { createDb, resolveBranchHandle, scopeWriteBranch }] =
-    await Promise.all([import("@graft/studio"), import("@graft/db")]);
+    await Promise.all([import("@usegraft/studio"), import("@usegraft/db")]);
 
   const control = createDb(url);
   const branchName = options.branchId ?? "main";

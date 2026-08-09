@@ -4,11 +4,11 @@ Foundational conventions for the Graft monorepo. Keep this short and current.
 
 ## Packages
 
-- All packages live under `packages/*` and are named `@graft/<name>`.
+- All packages live under `packages/*` and are named `@usegraft/<name>`.
 - Each package: `package.json`, `tsconfig.json` (extends `../../tsconfig.base.json`),
   and a `src/` directory with `src/index.ts` as the entry point.
 - Libraries build with `tsup` to `dist/` (ESM + `.d.ts`). Apps (CLI, Studio) may differ.
-- Cross-package imports use the package name (`@graft/contracts`), never relative paths
+- Cross-package imports use the package name (`@usegraft/contracts`), never relative paths
   across package boundaries.
 
 ## Source of truth (invariants)
@@ -28,7 +28,7 @@ Foundational conventions for the Graft monorepo. Keep this short and current.
   - Drop the dual install when tsup (and peers) support the TS 7 API (expected ~7.1 era).
 - `strict` everywhere (see `tsconfig.base.json`). Target ES2022, ESM, `moduleResolution: Bundler`.
 - Prefer explicit return types on exported functions.
-- Errors thrown across boundaries are `GraftError` (from `@graft/contracts`) and must carry a `fix`.
+- Errors thrown across boundaries are `GraftError` (from `@usegraft/contracts`) and must carry a `fix`.
 
 ## Scripts (run from the repo root)
 
@@ -59,6 +59,6 @@ Foundational conventions for the Graft monorepo. Keep this short and current.
 
 ## Adding a package
 
-1. Create `packages/<name>/` with `package.json` (`@graft/<name>`), `tsconfig.json`, `src/index.ts`.
+1. Create `packages/<name>/` with `package.json` (`@usegraft/<name>`), `tsconfig.json`, `src/index.ts`.
 2. Copy the build/test/typecheck/lint scripts from an existing package.
 3. `pnpm install` to register it in the workspace.

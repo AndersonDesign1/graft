@@ -4,8 +4,8 @@
  * hit the fake db) and the graftRoute mount (a real Request round-trips
  * through the structural RequestEvent shape).
  */
-import { defineCollection, field } from "@graft/core";
-import type { Document, SearchHit } from "@graft/sdk-core";
+import { defineCollection, field } from "@usegraft/core";
+import type { Document, SearchHit } from "@usegraft/sdk-core";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { createGraft } from "./graft";
 import { graftRoute } from "./routes";

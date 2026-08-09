@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { withGraft } from "@graft/sdk-next/config";
+import { withGraft } from "@usegraft/sdk-next/config";
 import type { NextConfig } from "next";
 
 // Dev convenience: pull DATABASE_URL from the repo-root .env so the example
@@ -10,7 +10,7 @@ try {
   /* no root .env — rely on the ambient environment */
 }
 
-// withGraft keeps @graft/registry server-external (it reads its bundled
+// withGraft keeps @usegraft/registry server-external (it reads its bundled
 // primitives from disk at runtime) plus any future Graft bundler requirements.
 const nextConfig: NextConfig = withGraft({});
 

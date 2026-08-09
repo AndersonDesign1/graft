@@ -9,8 +9,8 @@
  * that fails verification is TOKEN_INVALID (401) — a bad credential is an
  * error to fix, never a silent downgrade to anonymous.
  */
-import { GraftError } from "@graft/contracts";
-import type { FunctionActor } from "@graft/core";
+import { GraftError } from "@usegraft/contracts";
+import type { FunctionActor } from "@usegraft/core";
 import { createOidcVerifier, type TrustedIssuer } from "./oidc";
 
 export interface ActorResolverOptions {

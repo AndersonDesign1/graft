@@ -1,4 +1,4 @@
-import { CollectionDescriptor } from "@graft/contracts";
+import { CollectionDescriptor } from "@usegraft/contracts";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { defineCollection, type DocumentData } from "./collection";
 import { field, type JsonValue } from "./field";
@@ -27,7 +27,7 @@ describe("defineCollection", () => {
     expect(() => page.schema.parse({ published: true })).toThrow(); // title is required
   });
 
-  it("produces a descriptor that satisfies the @graft/contracts contract", () => {
+  it("produces a descriptor that satisfies the @usegraft/contracts contract", () => {
     const desc = page.describe();
     expect(() => CollectionDescriptor.parse(desc)).not.toThrow();
     expect(desc.fields.find((f) => f.name === "description")?.optional).toBe(true);

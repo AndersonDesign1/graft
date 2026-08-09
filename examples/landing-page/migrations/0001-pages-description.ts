@@ -6,8 +6,8 @@
  *
  * Dry-run with `graft migrate`; execute with `graft migrate --apply`.
  */
-import type { DocumentData } from "@graft/core";
-import { defineContentMigration } from "@graft/content-migrations";
+import type { DocumentData } from "@usegraft/core";
+import { defineContentMigration } from "@usegraft/content-migrations";
 import { pages } from "../graft.config";
 
 export default defineContentMigration({

@@ -35,10 +35,10 @@ export default defineConfig({
     // landing + tokens stay hand-written CSS).
     plugins: [tailwindcss()],
     ssr: {
-      // @graft/registry reads its bundled primitives from disk at runtime
+      // @usegraft/registry reads its bundled primitives from disk at runtime
       // (path-form registryRoot()) — never inline it into the SSR bundle.
       // Same reason sdk-next's withGraft sets serverExternalPackages.
-      external: ["@graft/registry"],
+      external: ["@usegraft/registry"],
     },
   },
 });

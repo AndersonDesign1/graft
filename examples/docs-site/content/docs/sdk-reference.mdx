@@ -5,15 +5,15 @@ section: Reference
 order: 2
 ---
 
-Reads flow through `@graft/sdk-core`. Framework packages re-export the surface
+Reads flow through `@usegraft/sdk-core`. Framework packages re-export the surface
 with local ergonomics. The same `graft.config.ts` types every package.
 
 | Package | For | Notes |
 | --- | --- | --- |
-| `@graft/sdk-core` | any JS | `getDocument` / `listDocuments` / `searchDocuments`; branch-aware; cache-tag helpers |
-| `@graft/sdk-next` | Next (RSC) | `React.cache` memo; `MdxBody`; `revalidateContent` / `updateContent` |
-| `@graft/sdk-astro` | Astro | No request memo; `graftRoute` for endpoint mounts |
-| `@graft/sdk-sveltekit` | SvelteKit | `graftRoute` for `+server.ts`; CDN surrogate keys for tags |
+| `@usegraft/sdk-core` | any JS | `getDocument` / `listDocuments` / `searchDocuments`; branch-aware; cache-tag helpers |
+| `@usegraft/sdk-next` | Next (RSC) | `React.cache` memo; `MdxBody`; `revalidateContent` / `updateContent` |
+| `@usegraft/sdk-astro` | Astro | No request memo; `graftRoute` for endpoint mounts |
+| `@usegraft/sdk-sveltekit` | SvelteKit | `graftRoute` for `+server.ts`; CDN surrogate keys for tags |
 
 ## Shared surface
 
@@ -61,5 +61,5 @@ nothing. Preview branches do not bust main.
 - Astro / SvelteKit have no `MdxBody` (React-specific). Author bodies for
   `@astrojs/mdx` or mdsvex.
 - No React.cache equivalent outside Next — call sites own memoization.
-- Next apps should use `withGraft(nextConfig)` so `@graft/registry` stays
+- Next apps should use `withGraft(nextConfig)` so `@usegraft/registry` stays
   externalized for the server.

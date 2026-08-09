@@ -17,7 +17,7 @@ Add the Railway Postgres plugin (or use Neon) and run the schema migrations
 once from your machine with the plugin's connection string:
 
 ```sh
-DATABASE_URL=<railway-postgres-url> pnpm --filter @graft/db db:migrate
+DATABASE_URL=<railway-postgres-url> pnpm --filter @usegraft/db db:migrate
 ```
 
 ## 3. Environment

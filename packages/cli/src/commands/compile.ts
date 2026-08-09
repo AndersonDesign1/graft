@@ -7,7 +7,7 @@
  * their branch_id; a `neon` branch compiles into its own database (rows there
  * keep the default id — the fork IS the branch).
  */
-import type { CompileResult } from "@graft/compiler";
+import type { CompileResult } from "@usegraft/compiler";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { formatCompileResult } from "../report";
 
@@ -25,8 +25,8 @@ export async function compileCommand(options: CompileCommandOptions): Promise<Co
   // The compiler pulls in the database driver (~1s of import) — load both only
   // once the project is known to be valid, so config errors return in milliseconds.
   const [{ compile }, { createDb, resolveBranchHandle, scopeWriteBranch }] = await Promise.all([
-    import("@graft/compiler"),
-    import("@graft/db"),
+    import("@usegraft/compiler"),
+    import("@usegraft/db"),
   ]);
   const control = createDb(url);
   try {

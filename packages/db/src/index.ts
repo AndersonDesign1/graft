@@ -1,5 +1,5 @@
 /**
- * @graft/db
+ * @usegraft/db
  * Postgres + Drizzle client and schema. The Phase 4 branching abstraction lives in
  * ./branch: `resolveBranchScope` + overlay-aware `readContent`/`searchContent`.
  */

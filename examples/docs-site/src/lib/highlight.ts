@@ -145,7 +145,7 @@ export async function highlightSession(
 }
 
 /**
- * The wow loop, verbatim from what @graft/cli actually prints — split across
+ * The wow loop, verbatim from what @usegraft/cli actually prints — split across
  * the two places it is told. The hero shows the graft taking (`init`); the
  * stage shows the loop running (`compile`). Together they are one transcript,
  * so neither surface repeats the other.

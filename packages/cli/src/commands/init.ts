@@ -4,8 +4,8 @@
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { GraftError } from "@graft/contracts";
-import { barrelSource } from "@graft/registry";
+import { GraftError } from "@usegraft/contracts";
+import { barrelSource } from "@usegraft/registry";
 import { CONFIG_FILENAMES } from "../config";
 
 const CONFIG_TEMPLATE = `/**
@@ -16,7 +16,7 @@ const CONFIG_TEMPLATE = `/**
  * Primitives you add with \`graft add\` live under graft/ and are merged in via
  * the generated graft/index.ts barrel — you never edit the import below.
  */
-import { defineCollection, field, mergePrimitives } from "@graft/core";
+import { defineCollection, field, mergePrimitives } from "@usegraft/core";
 import * as primitives from "./graft";
 
 export const pages = defineCollection({

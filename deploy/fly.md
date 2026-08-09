@@ -48,7 +48,7 @@ identically (swap the endpoint). Run migrations once from your machine with
 the operator URL:
 
 ```sh
-DATABASE_URL=<operator-url> pnpm --filter @graft/db db:migrate
+DATABASE_URL=<operator-url> pnpm --filter @usegraft/db db:migrate
 ```
 
 ## Harden (recommended)

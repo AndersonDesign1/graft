@@ -22,7 +22,7 @@ export async function contentListCommand(
   loadProjectEnv(options.cwd);
   const config = await loadConfig(findConfig(options.cwd));
   const url = requireDatabaseUrl();
-  const { createDb, readContent, resolveBranchScope } = await import("@graft/db");
+  const { createDb, readContent, resolveBranchScope } = await import("@usegraft/db");
   const handle = createDb(url);
   const branch = options.branchId ?? "main";
   try {

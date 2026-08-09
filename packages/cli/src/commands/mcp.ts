@@ -13,7 +13,7 @@
  * createActorResolver — the CLI stays issuer-free (verify-don't-mint only for
  * static dev tokens). See docs/design-notes/agent-mcp.md.
  */
-import { createActorResolver } from "@graft/auth";
+import { createActorResolver } from "@usegraft/auth";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 
 export interface McpCommandOptions {
@@ -27,7 +27,7 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
   const url = requireDatabaseUrl();
 
   const [{ createGraftMcp, serveStdio }, { createDb, resolveBranchHandle, scopeWriteBranch }] =
-    await Promise.all([import("@graft/mcp"), import("@graft/db")]);
+    await Promise.all([import("@usegraft/mcp"), import("@usegraft/db")]);
 
   const control = createDb(url);
   const branchName = options.branchId ?? "main";

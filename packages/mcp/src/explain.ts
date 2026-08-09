@@ -1,12 +1,12 @@
 /**
  * The self-teaching error knowledge base behind the `explain_error` tool.
  *
- * Every ErrorCode in @graft/contracts has an entry: what the failure means, what
+ * Every ErrorCode in @usegraft/contracts has an entry: what the failure means, what
  * usually causes it, and how to recover. A GraftError's `fix` is specific to one
  * failure; this registry is the general lesson an agent can apply next time.
  * A test asserts the registry stays in lockstep with ErrorCodes.
  */
-import { ErrorCodes, type ErrorCode } from "@graft/contracts";
+import { ErrorCodes, type ErrorCode } from "@usegraft/contracts";
 
 export interface ErrorExplanation {
   code: ErrorCode;
@@ -58,7 +58,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "A collections entry that was not created with defineCollection",
     ],
     howToRecover:
-      "Fix graft.config.ts so it imports defineCollection/field from @graft/core and exports `collections` as a record of defineCollection results — the error message names exactly what failed to load or validate.",
+      "Fix graft.config.ts so it imports defineCollection/field from @usegraft/core and exports `collections` as a record of defineCollection results — the error message names exactly what failed to load or validate.",
   },
   ALREADY_INITIALIZED: {
     code: "ALREADY_INITIALIZED",
@@ -213,7 +213,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "A database schema change is pending",
     ],
     howToRecover:
-      "Run the pending migration (content migrations update the files; DB migrations via @graft/db), then retry the operation.",
+      "Run the pending migration (content migrations update the files; DB migrations via @usegraft/db), then retry the operation.",
   },
   MIGRATION_FAILED: {
     code: "MIGRATION_FAILED",
@@ -356,14 +356,14 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
   REGISTRY_ITEM_INVALID: {
     code: "REGISTRY_ITEM_INVALID",
     meaning:
-      "A registry item's manifest is malformed, or the item requires a different @graft/core version than the one installed.",
+      "A registry item's manifest is malformed, or the item requires a different @usegraft/core version than the one installed.",
     typicalCauses: [
       "registry.item.json does not match the manifest schema",
       "The item's `graftVersion` range does not include the installed core version",
       "A file the manifest lists is missing from the item directory",
     ],
     howToRecover:
-      "The error names what failed (a manifest field or the version mismatch). For a version mismatch, move @graft/core to the range the item needs; a malformed manifest is a registry bug — fix the item or report it.",
+      "The error names what failed (a manifest field or the version mismatch). For a version mismatch, move @usegraft/core to the range the item needs; a malformed manifest is a registry bug — fix the item or report it.",
   },
   REGISTRY_FILE_EXISTS: {
     code: "REGISTRY_FILE_EXISTS",

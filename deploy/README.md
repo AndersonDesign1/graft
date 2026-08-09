@@ -48,7 +48,7 @@ embedded auth provider's) get granted separately.
 
 ## Pre-1.0 note
 
-`@graft/*` is unpublished, so container deploys build from this workspace: your
+`@usegraft/*` is unpublished, so container deploys build from this workspace: your
 project either mounts at `/project`, or bakes in via a derived image —
 
 ```dockerfile
@@ -57,4 +57,4 @@ COPY my-site /project
 ```
 
 (the entrypoint links `/project/node_modules` to the image's packages at boot).
-When packages publish, this collapses to `npm i @graft/cli` + your project.
+When packages publish, this collapses to `npm i @usegraft/cli` + your project.

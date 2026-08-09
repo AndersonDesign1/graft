@@ -3,7 +3,7 @@
  *
  * A registry item is a unit of owned, copy-in code (a shadcn-style primitive):
  * some files, the npm/registry things it needs first, a semver range against
- * @graft/core, and an optional llms.txt teaching fragment. Validated by this
+ * @usegraft/core, and an optional llms.txt teaching fragment. Validated by this
  * Zod schema on load, so a malformed item is a REGISTRY_ITEM_INVALID up front —
  * never a half-written project. (See docs/design-notes/registry.md.)
  */
@@ -37,7 +37,7 @@ export const registryItemSchema = z.object({
   name: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be lowercase kebab-case"),
   type: z.enum(ITEM_TYPES),
   description: z.string().min(1),
-  /** Semver range against the installed @graft/core. "*" = any (pre-1.0 default). */
+  /** Semver range against the installed @usegraft/core. "*" = any (pre-1.0 default). */
   graftVersion: z.string().default("*"),
   /** npm packages the target needs; printed for the operator to install (not run). */
   dependencies: z.record(z.string(), z.string()).default({}),

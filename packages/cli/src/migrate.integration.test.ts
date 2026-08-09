@@ -6,7 +6,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createDb, type DbHandle } from "@graft/db";
+import { createDb, type DbHandle } from "@usegraft/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { migrateCommand } from "./commands/migrate";
 
@@ -21,11 +21,11 @@ try {
 const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
 const TEST_TIMEOUT = 60_000;
 const BRANCH = "cli-migrate-it";
-// Inside the package so the project's @graft/* imports resolve.
+// Inside the package so the project's @usegraft/* imports resolve.
 const projectDir = resolve(here, "../.test-tmp/migrate-project");
 
 const CONFIG = `
-import { defineCollection, field } from "@graft/core";
+import { defineCollection, field } from "@usegraft/core";
 
 export const pages = defineCollection({
   name: "pages",
@@ -42,7 +42,7 @@ export const collections = { pages, submissions };
 `;
 
 const CONTENT_MIGRATION = `
-import { defineContentMigration } from "@graft/content-migrations";
+import { defineContentMigration } from "@usegraft/content-migrations";
 import { pages } from "../graft.config";
 
 export default defineContentMigration({
@@ -55,7 +55,7 @@ export default defineContentMigration({
 `;
 
 const DATA_MIGRATION = `
-import { defineDataMigration } from "@graft/core";
+import { defineDataMigration } from "@usegraft/core";
 import { submissions } from "../graft.config";
 
 export default defineDataMigration({
@@ -83,7 +83,7 @@ describe.skipIf(!runIntegration)("graft migrate end to end", () => {
     writeFileSync(join(projectDir, "migrations", "0001-pages-description.ts"), CONTENT_MIGRATION);
     writeFileSync(join(projectDir, "migrations", "0002-lowercase-emails.ts"), DATA_MIGRATION);
 
-    await handle.db.insert((await import("@graft/db")).dataRecords).values({
+    await handle.db.insert((await import("@usegraft/db")).dataRecords).values({
       branchId: BRANCH,
       collection: "submissions",
       data: { email: "ADA@Example.com" },

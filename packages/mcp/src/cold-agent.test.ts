@@ -15,15 +15,15 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ErrorCodes, SchemaDescription } from "@graft/contracts";
-import { defineCollection, field } from "@graft/core";
-import type { ChangeSet, Database } from "@graft/db";
+import { ErrorCodes, SchemaDescription } from "@usegraft/contracts";
+import { defineCollection, field } from "@usegraft/core";
+import type { ChangeSet, Database } from "@usegraft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@graft/db", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@graft/db")>();
+vi.mock("@usegraft/db", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@usegraft/db")>();
   return {
     ...actual,
     projectBranchContent: vi.fn(

@@ -1,6 +1,6 @@
 # The registry & `graft add` (Phase 5 design)
 
-Hand-off from the Phase 5 kickoff to the real `@graft/registry` + `graft add`
+Hand-off from the Phase 5 kickoff to the real `@usegraft/registry` + `graft add`
 implementation. Locks the item format, the registry source, and — the load-bearing
 call — **how an added primitive wires itself into a project**.
 
@@ -11,7 +11,7 @@ call — **how an added primitive wires itself into a project**.
 
 A **primitive** is a unit of **owned, copy-in code** an agent adds to a project and then
 edits freely — the shadcn model, not the npm-dependency model. `graft add comments` copies
-real source files into the repo; there is no `@graft/comments` black box to fight. This is
+real source files into the repo; there is no `@usegraft/comments` black box to fight. This is
 the moat: _owned primitives the agent rewrites_, which an incumbent can't adopt without
 un-shipping its plugin system.
 
@@ -45,7 +45,7 @@ drops it into _any_ project.
 
 Each item is a directory under `packages/registry/registry/<name>/` with a
 `registry.item.json` manifest + the source files it ships. Manifest shape (validated by a
-Zod schema in `@graft/registry`, so a malformed item is a `REGISTRY_ITEM_INVALID`, never a
+Zod schema in `@usegraft/registry`, so a malformed item is a `REGISTRY_ITEM_INVALID`, never a
 half-written project):
 
 ```jsonc
@@ -53,7 +53,7 @@ half-written project):
   "name": "comments",
   "type": "bundle", // block | field | access | bundle
   "description": "Moderated comments: a db-authoritative collection + post/list/delete fns.",
-  "graftVersion": ">=0.1.0 <0.2.0", // semver range checked against @graft/core
+  "graftVersion": ">=0.1.0 <0.2.0", // semver range checked against @usegraft/core
   "dependencies": {
     // npm deps to add to the target (if any)
     // "some-lib": "^1.0.0"
@@ -87,7 +87,7 @@ access rules at once. Prove the mechanism against a bundle and `block`/`field` a
 
 ## Registry source — local-first
 
-Phase 5's registry is **bundled inside `@graft/registry`** (`registry/<name>/…`), read from
+Phase 5's registry is **bundled inside `@usegraft/registry`** (`registry/<name>/…`), read from
 disk (or from the built package). No network. The manifest already carries everything a
 remote registry would serve as JSON, so "point `graft add` at a URL" is a later, additive
 change — not a rewrite. Governance (PRD): Tier-1 primitives + the Tier-2 commerce foundation
@@ -114,7 +114,7 @@ barrel) and spreads its `collections`/`functions` alongside the project's own, p
 initial `graft/index.ts`. `graft add comments` writes `graft/comments.ts` (+ deps) and
 **regenerates `graft/index.ts`**; the primitive is live on the next `graft compile` with
 **zero edits to `graft.config.ts`**. The barrel calls `mergePrimitives()` (new, in
-`@graft/core`), which throws **`CONFIG_INVALID`** on a duplicate `collections`/`functions`
+`@usegraft/core`), which throws **`CONFIG_INVALID`** on a duplicate `collections`/`functions`
 key across modules — deterministic, greppable. Load order is alphabetical by filename.
 
 _Why a generated barrel, not a load-time glob:_ the first draft had the config **loader**
@@ -137,7 +137,7 @@ Resolve → plan → write:
 
 1. **Resolve** the item + its `registryDependencies` (transitive, deduped, dependency-first
    order). Unknown name → `REGISTRY_ITEM_NOT_FOUND` (fix lists available items).
-2. **Version-check** each item's `graftVersion` against the installed `@graft/core`. Mismatch
+2. **Version-check** each item's `graftVersion` against the installed `@usegraft/core`. Mismatch
    → `REGISTRY_ITEM_INVALID` (fix: which version the item needs).
 3. **Plan** the file writes to their conventional targets. An existing target file →
    `REGISTRY_FILE_EXISTS` **unless `--overwrite`** (the only guard — everything else is
@@ -151,7 +151,7 @@ Resolve → plan → write:
 files in a git-tracked tree — reversible, so the `REGISTRY_FILE_EXISTS` guard + `--dry-run`
 are enough. Keeping the common path a single no-flag command matters for agents.
 
-## Error codes (new, in `@graft/contracts`)
+## Error codes (new, in `@usegraft/contracts`)
 
 - `REGISTRY_ITEM_NOT_FOUND` — unknown item name; fix lists what's available.
 - `REGISTRY_ITEM_INVALID` — malformed manifest **or** `graftVersion` mismatch; fix names the
@@ -159,7 +159,7 @@ are enough. Keeping the common path a single no-flag command matters for agents.
 - `REGISTRY_FILE_EXISTS` — a target file already exists; fix: re-run with `--overwrite` or
   remove the file.
 
-Each ships an `explain_error` entry (the `@graft/mcp` knowledge base is test-enforced to
+Each ships an `explain_error` entry (the `@usegraft/mcp` knowledge base is test-enforced to
 cover every code).
 
 ## Self-teaching
@@ -190,7 +190,7 @@ bundles on the same rails.
 ## Build sequence
 
 - **P5.0** — this note (lock the format + wiring). ✅
-- **P5.1** — `@graft/registry` + `graft add` + comments/scoped-access. ✅
+- **P5.1** — `@usegraft/registry` + `graft add` + comments/scoped-access. ✅
 - **P5.2** — real MDX (`MdxBody` + generated mdx-components map) · `field.object` /
   `field.array` · Tier-1 `seo` / `callout` / `faq` · Tier-2 `commerce`. ✅ **Phase 5 closed.**
 - **P6+** — MCP `list_registry` / `describe_item`; remote registry; cold-agent CI (P6.1

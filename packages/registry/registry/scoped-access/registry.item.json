@@ -4,7 +4,7 @@
   "description": "Name your token scopes once and gate functions with them (a requireScopes preset).",
   "graftVersion": "*",
   "dependencies": {
-    "@graft/auth": "workspace:*"
+    "@usegraft/auth": "workspace:*"
   },
   "registryDependencies": [],
   "files": [

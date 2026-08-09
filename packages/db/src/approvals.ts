@@ -16,7 +16,7 @@
  * approver == requester (separation of duties).
  */
 import { and, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import type { Database } from "./client";
 import { approvals, type ApprovalRow } from "./schema";
 

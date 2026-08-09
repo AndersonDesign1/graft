@@ -1,5 +1,5 @@
 {
-  "name": "@graft/sdk-next",
+  "name": "@usegraft/sdk-next",
   "version": "0.0.0",
   "license": "MIT",
   "files": [
@@ -31,12 +31,12 @@
     "lint": "oxlint ."
   },
   "dependencies": {
-    "@graft/sdk-core": "workspace:*",
+    "@usegraft/sdk-core": "workspace:*",
     "@mdx-js/mdx": "^3.1.1",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@graft/core": "workspace:*",
+    "@usegraft/core": "workspace:*",
     "@types/mdx": "^2.0.14",
     "@types/react": "^19.0.0",
     "next": "^16.0.0",

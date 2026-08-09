@@ -13,14 +13,14 @@
  * process serving this handler must see a writable content tree (dev server or
  * self-host). Reads only need the files + database.
  */
-import { GraftError } from "@graft/contracts";
-import type { FunctionActor } from "@graft/core";
+import { GraftError } from "@usegraft/contracts";
+import type { FunctionActor } from "@usegraft/core";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createGraftMcp, type GraftMcpOptions } from "./server";
 
 export interface GraftMcpHandlerOptions extends GraftMcpOptions {
   /**
-   * Resolve the caller — the same @graft/auth `createActorResolver` seam the
+   * Resolve the caller — the same @usegraft/auth `createActorResolver` seam the
    * functions handler uses. A resolver that throws (TOKEN_INVALID) rejects the
    * request with 401; per-tool authorization lands with function introspection.
    */

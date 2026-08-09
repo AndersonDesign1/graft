@@ -10,7 +10,7 @@ import "@fontsource-variable/geist-mono";
 // the editor at our tokens instead.
 import "@milkdown/crepe/theme/common/style.css";
 
-import "@graft/tokens/tokens.css";
+import "@usegraft/tokens/tokens.css";
 import "./styles/palette.css";
 import "./styles/roles.css";
 import "./styles/type.css";

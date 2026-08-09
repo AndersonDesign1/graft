@@ -1,16 +1,16 @@
 /**
  * MCP over HTTP — the same tools as `graft mcp`, for agents that can't spawn
  * a stdio process. Endpoint: POST /api/mcp (Streamable HTTP, stateless),
- * mounted through @graft/sdk-astro's graftRoute.
+ * mounted through @usegraft/sdk-astro's graftRoute.
  *
  * Set GRAFT_MCP_REQUIRE_AUTH=1 to reject anonymous callers — do that for
  * anything reachable from outside. Writes need this process to see the repo
  * checkout (dev / self-host).
  */
 import { resolve } from "node:path";
-import { createDb } from "@graft/db";
-import { createGraftMcpHandler, type GraftMcpHandler } from "@graft/mcp";
-import { graftRoute } from "@graft/sdk-astro";
+import { createDb } from "@usegraft/db";
+import { createGraftMcpHandler, type GraftMcpHandler } from "@usegraft/mcp";
+import { graftRoute } from "@usegraft/sdk-astro";
 import { collections, functions } from "../../../graft.config";
 import { resolveActor } from "../../lib/actor";
 

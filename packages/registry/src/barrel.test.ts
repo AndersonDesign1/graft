@@ -16,7 +16,7 @@ describe("moduleIdentifier", () => {
 describe("barrelSource", () => {
   it("imports each module and merges them (sorted, deduped)", () => {
     const src = barrelSource(["comments", "scoped-access", "comments"]);
-    expect(src).toContain('import { mergePrimitives } from "@graft/core";');
+    expect(src).toContain('import { mergePrimitives } from "@usegraft/core";');
     expect(src).toContain('import * as comments from "./comments";');
     expect(src).toContain('import * as scopedAccess from "./scoped-access";');
     expect(src).toContain(

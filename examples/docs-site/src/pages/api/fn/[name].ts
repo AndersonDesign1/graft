@@ -1,13 +1,13 @@
 /**
- * Typed function runtime over HTTP, mounted through @graft/sdk-astro's
+ * Typed function runtime over HTTP, mounted through @usegraft/sdk-astro's
  * graftRoute — the handlers are Web-standard, so the adapter is one property
  * access. Invoke: POST /api/fn/<name> with a JSON object body.
  * Success → { data }; failure → GraftError JSON with an agent-actionable fix.
  */
 import { execFileSync } from "node:child_process";
-import { createFunctionsHandler, type GraftFunctionsHandler } from "@graft/core";
-import { createDb } from "@graft/db";
-import { graftRoute } from "@graft/sdk-astro";
+import { createFunctionsHandler, type GraftFunctionsHandler } from "@usegraft/core";
+import { createDb } from "@usegraft/db";
+import { graftRoute } from "@usegraft/sdk-astro";
 import { functions } from "../../../../graft.config";
 import { resolveActor } from "../../../lib/actor";
 

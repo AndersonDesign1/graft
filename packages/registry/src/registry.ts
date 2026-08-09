@@ -9,7 +9,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GraftError, type RegistryItemDescriptor } from "@graft/contracts";
+import { GraftError, type RegistryItemDescriptor } from "@usegraft/contracts";
 import { registryItemSchema, type RegistryItem } from "./manifest";
 import { satisfies } from "./version";
 
@@ -89,7 +89,7 @@ export function loadItem(name: string, root = registryRoot()): RegistryItem {
 export interface ResolveOptions {
   /** Registry root override (tests point this at a fixture dir). */
   root?: string;
-  /** Installed @graft/core version, to gate each item's graftVersion. Skipped if omitted. */
+  /** Installed @usegraft/core version, to gate each item's graftVersion. Skipped if omitted. */
   coreVersion?: string;
 }
 
@@ -114,8 +114,8 @@ export function resolveItems(
     if (options.coreVersion && !satisfies(options.coreVersion, item.graftVersion)) {
       throw new GraftError({
         code: "REGISTRY_ITEM_INVALID",
-        message: `Item "${name}" needs @graft/core ${item.graftVersion}, but ${options.coreVersion} is installed.`,
-        fix: `Move @graft/core into ${item.graftVersion}, or use a version of "${name}" compatible with ${options.coreVersion}.`,
+        message: `Item "${name}" needs @usegraft/core ${item.graftVersion}, but ${options.coreVersion} is installed.`,
+        fix: `Move @usegraft/core into ${item.graftVersion}, or use a version of "${name}" compatible with ${options.coreVersion}.`,
         details: { name, needs: item.graftVersion, installed: options.coreVersion },
       });
     }

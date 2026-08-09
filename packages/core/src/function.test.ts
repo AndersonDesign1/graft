@@ -1,4 +1,4 @@
-import { FunctionDescriptor } from "@graft/contracts";
+import { FunctionDescriptor } from "@usegraft/contracts";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { field } from "./field";
 import { defineFunction, type FunctionInput, type FunctionOutput } from "./function";

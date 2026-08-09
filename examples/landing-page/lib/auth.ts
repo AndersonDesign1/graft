@@ -1,7 +1,7 @@
 /**
- * Better Auth — the identity engine this example hosts (the @graft/auth
+ * Better Auth — the identity engine this example hosts (the @usegraft/auth
  * default). It owns its own tables in the same Neon database (user, session,
- * account, verification, jwks) and mints the JWTs that @graft/auth verifies:
+ * account, verification, jwks) and mints the JWTs that @usegraft/auth verifies:
  *
  *   1. sign in        → POST /api/auth/sign-in/email  (session cookie)
  *   2. mint a JWT     → GET  /api/auth/token          → { token }
@@ -23,7 +23,7 @@ export const auth = betterAuth({
     jwt({
       jwt: {
         // Scopes ride the standard OAuth2 `scope` claim (space-separated),
-        // which @graft/auth reads into actor.scopes. Every signed-in account
+        // which @usegraft/auth reads into actor.scopes. Every signed-in account
         // gets submissions:read here — an example-sized policy; real
         // deployments derive scopes from roles/grants (P3.4).
         definePayload: ({ user }) => ({

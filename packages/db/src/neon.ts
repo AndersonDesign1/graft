@@ -17,7 +17,7 @@
  *   would not mark the parent's copy consumed — clearing prevents a gated
  *   destructive op from executing once per fork. `audit_log` stays: history.
  */
-import { GraftError } from "@graft/contracts";
+import { GraftError } from "@usegraft/contracts";
 import {
   assertBranchCreatable,
   assertBranchDroppable,

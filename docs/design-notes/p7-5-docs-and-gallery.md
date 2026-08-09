@@ -3,7 +3,7 @@
 **Status: PLANNED (2026-07-11); operator decisions locked below.** The last
 Phase 7 unit. After this ships, Phase 7 closes and the packaging / deploy /
 framework story is end-to-end. Everything runtime-side already exists; P7.5 is
-the **public-facing surface** over it — no new invariants, no new `@graft/*`
+the **public-facing surface** over it — no new invariants, no new `@usegraft/*`
 runtime packages.
 
 Pairs with `packaging.md` (which parks "docs site" as the remaining item).
@@ -16,7 +16,7 @@ Pairs with `packaging.md` (which parks "docs site" as the remaining item).
    page framed entirely around what it does and how it feels.
 2. **Stack: Astro + React, using Graft.** Both the landing page and the docs are
    one Astro app with React islands where interactivity is warranted, reading its
-   own content through Graft (`@graft/sdk-astro`). Dogfood, not a static brochure.
+   own content through Graft (`@usegraft/sdk-astro`). Dogfood, not a static brochure.
 3. **Deploy target: Vercel** (for now). Build for Vercel's Astro adapter. The
    whole point is portability — migrating later is cheap, so don't over-abstract
    the host now.
@@ -31,7 +31,7 @@ Pairs with `packaging.md` (which parks "docs site" as the remaining item).
    green is dead; operator: "black and something"). Docs UI: **Fumadocs**
    (officially supports Astro + React) powered by Graft as the source.
 5. **Build order: docs shell → studio → landing.** Docs force the design system
-   against real content. `@graft/studio` is an **opt-in Studio** (Drizzle-style
+   against real content. `@usegraft/studio` is an **opt-in Studio** (Drizzle-style
    `graft studio` locally; hostable via `graft serve --studio`) whose UI is only
    a client of an **OpenAPI read surface** — every operation also on MCP + CLI
    (headless dashboard parity). React panels are exported for landing embeds;
@@ -178,7 +178,7 @@ a leaf app, not a package others import.
 ## Stack & location (locked)
 
 **Astro app + React islands** at `examples/docs-site/` (workspace already globs
-`examples/*`). The site reads its own content through `@graft/sdk-astro` +
+`examples/*`). The site reads its own content through `@usegraft/sdk-astro` +
 `graftRoute`, so building it **closes the P7.4 "Astro example app" gap** in the
 same breath — one app earns two checkboxes. React is used for the interactive
 bits (nav, code-tabs, any live demo island); Astro carries the static shell.
@@ -205,7 +205,7 @@ examples/
   gallery-sveltekit/     # NEW — minimal SvelteKit app proving sdk-sveltekit
 ```
 
-Docs _content_ is authored MDX compiled by `@graft/compiler` and read back
+Docs _content_ is authored MDX compiled by `@usegraft/compiler` and read back
 through `sdk-astro` where it earns the round-trip; prose that genuinely doesn't
 need the DB may use Astro content collections directly. Dogfood where it's
 honest, not performative.
@@ -245,9 +245,9 @@ exercises, "run it" instructions, screenshot/live link.
 
 | Example             | SDK                    | Proves                                                             |
 | ------------------- | ---------------------- | ------------------------------------------------------------------ |
-| `landing-page`      | `@graft/sdk-next`      | RSC reads, MdxBody, revalidate webhook, functions, MCP route       |
-| `docs-site`         | `@graft/sdk-astro`     | typed reads (no memo) + `graftRoute` endpoint mount, React islands |
-| `gallery-sveltekit` | `@graft/sdk-sveltekit` | typed reads + `graftRoute` `+server.ts` mount                      |
+| `landing-page`      | `@usegraft/sdk-next`      | RSC reads, MdxBody, revalidate webhook, functions, MCP route       |
+| `docs-site`         | `@usegraft/sdk-astro`     | typed reads (no memo) + `graftRoute` endpoint mount, React islands |
+| `gallery-sveltekit` | `@usegraft/sdk-sveltekit` | typed reads + `graftRoute` `+server.ts` mount                      |
 
 Each example must **actually boot** against a Graft runtime — no faked
 screenshots. The gallery is the visual proof that identical-bytes packaging holds
@@ -259,7 +259,7 @@ across three frameworks.
 
 Grounded in what already exists, so writing = surfacing, not inventing:
 
-- **Getting started** — `graft init` → `compile` → `dev` (`@graft/cli`).
+- **Getting started** — `graft init` → `compile` → `dev` (`@usegraft/cli`).
 - **The model** — git authoritative, Postgres derived index, one Zod layer.
 - **Reading content** — sdk-core → sdk-next/astro/sveltekit; cache-tag contract.
 - **Functions & access** — `defineFunction`, stateless-handler invariant, access
@@ -307,7 +307,7 @@ READMEs — the risk is drift, so prefer links/transclusion over copy-paste.
    `graft serve --studio`; OpenAPI at `/api/studio/v1/openapi.json`; MCP/CLI
    parity; read-only panels (ContentTree, Compilations, Branches, Approvals list)
 5. **Landing + "Why Graft"** — the bento embeds live studio panels (from
-   `@graft/studio/panels`); animated SVGs; benefits-only story with receipts.
+   `@usegraft/studio/panels`); animated SVGs; benefits-only story with receipts.
    **← next**
 6. **`examples/gallery-sveltekit`** minimal app (closes SvelteKit example gap).
 7. **Gallery index** linking all three; boot-check each example.

@@ -10,8 +10,8 @@
  *
  * The cache/invalidation contract (subscribe, revalidateTag) lands in Phase 4.
  */
-import { GraftError } from "@graft/contracts";
-import type { AnyCollection, DocumentData } from "@graft/core";
+import { GraftError } from "@usegraft/contracts";
+import type { AnyCollection, DocumentData } from "@usegraft/core";
 import {
   readContent,
   resolveBranchScope,
@@ -20,7 +20,7 @@ import {
   type BranchScope,
   type ContentRow,
   type Database,
-} from "@graft/db";
+} from "@usegraft/db";
 
 export interface ClientOptions<TCollections extends Record<string, AnyCollection>> {
   db: Database;

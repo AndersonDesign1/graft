@@ -8,8 +8,8 @@
  */
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { GraftError } from "@graft/contracts";
-import type { AnyCollection, AnyGraftFunction } from "@graft/core";
+import { GraftError } from "@usegraft/contracts";
+import type { AnyCollection, AnyGraftFunction } from "@usegraft/core";
 import { createJiti } from "jiti";
 
 export const CONFIG_FILENAMES = [
@@ -95,7 +95,7 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
     throw new GraftError({
       code: "CONFIG_INVALID",
       message: `${configPath} does not export a \`collections\` record.`,
-      fix: 'Add `export const collections = { … }` where each value is a defineCollection result from "@graft/core".',
+      fix: 'Add `export const collections = { … }` where each value is a defineCollection result from "@usegraft/core".',
     });
   }
   const entries = Object.entries(collections as Record<string, unknown>);
@@ -111,7 +111,7 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
       throw new GraftError({
         code: "CONFIG_INVALID",
         message: `collections.${key} in ${configPath} is not a collection.`,
-        fix: `Create it with defineCollection from "@graft/core" (it must have a name, a schema, and describe()).`,
+        fix: `Create it with defineCollection from "@usegraft/core" (it must have a name, a schema, and describe()).`,
         details: { key },
       });
     }
@@ -137,7 +137,7 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
         throw new GraftError({
           code: "CONFIG_INVALID",
           message: `functions.${key} in ${configPath} is not a function.`,
-          fix: `Create it with defineFunction from "@graft/core" (it must have a name, a schema, a handler, and describe()).`,
+          fix: `Create it with defineFunction from "@usegraft/core" (it must have a name, a schema, a handler, and describe()).`,
           details: { key },
         });
       }

@@ -9,8 +9,8 @@
  * are rewritten in place, so the migration lands as a reviewable git commit —
  * git stays authoritative; the index catches up on the next compile.
  */
-import { GraftError } from "@graft/contracts";
-import type { AnyCollection, DocumentData } from "@graft/core";
+import { GraftError } from "@usegraft/contracts";
+import type { AnyCollection, DocumentData } from "@usegraft/core";
 
 /** What the transform sees per document: the old, pre-migration shape. */
 export interface ContentMigrationDoc {
@@ -57,7 +57,7 @@ export function defineContentMigration<TCollection extends AnyCollection>(
     throw new GraftError({
       code: "AUTHORITY_MISMATCH",
       message: `Content migrations transform files, but collection "${options.collection.name}" is db-authoritative — its records are Postgres rows.`,
-      fix: `Use defineDataMigration from "@graft/core" for db-authoritative collections; defineContentMigration is only for collections whose documents are files.`,
+      fix: `Use defineDataMigration from "@usegraft/core" for db-authoritative collections; defineContentMigration is only for collections whose documents are files.`,
       details: { collection: options.collection.name, authority: options.collection.authority },
     });
   }

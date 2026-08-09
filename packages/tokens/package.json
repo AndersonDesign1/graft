@@ -1,5 +1,5 @@
 {
-  "name": "@graft/tokens",
+  "name": "@usegraft/tokens",
   "version": "0.0.0",
   "description": "Graft design tokens — one stylesheet, consumed by the docs site and the Studio.",
   "license": "MIT",
