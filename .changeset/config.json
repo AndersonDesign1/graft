@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.2.0/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [["@graft/*"]],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "feat/core",
+  "updateInternalDependencies": "patch",
+  "ignore": [],
+  "privatePackages": { "version": false, "tag": false }
+}

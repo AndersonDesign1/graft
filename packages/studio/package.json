@@ -1,7 +1,7 @@
 {
   "name": "@graft/studio",
   "version": "0.0.0",
-  "private": true,
+  "license": "MIT",
   "files": [
     "dist",
     "openapi.yaml"
@@ -19,6 +19,9 @@
       "types": "./dist/panels-entry.d.ts",
       "import": "./dist/panels-entry.js"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "pnpm run build:lib && pnpm run build:ui",

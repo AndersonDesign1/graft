@@ -1,9 +1,10 @@
 {
   "name": "@graft/db",
   "version": "0.0.0",
-  "private": true,
+  "license": "MIT",
   "files": [
-    "dist"
+    "dist",
+    "drizzle"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -14,6 +15,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",

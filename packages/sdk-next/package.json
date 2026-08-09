@@ -1,7 +1,7 @@
 {
   "name": "@graft/sdk-next",
   "version": "0.0.0",
-  "private": true,
+  "license": "MIT",
   "files": [
     "dist"
   ],
@@ -19,6 +19,9 @@
       "import": "./dist/next-config.js",
       "default": "./dist/next-config.js"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsup src/index.ts src/next-config.ts --format esm --dts --clean --external react --external react/jsx-runtime --external next",

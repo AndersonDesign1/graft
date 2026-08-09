@@ -1,7 +1,7 @@
 {
   "name": "@graft/cli",
   "version": "0.0.0",
-  "private": true,
+  "license": "MIT",
   "bin": {
     "graft": "./dist/index.js"
   },
@@ -9,6 +9,9 @@
     "dist"
   ],
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
