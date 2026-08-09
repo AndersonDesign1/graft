@@ -13,7 +13,13 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createBranch, createDb, dataRecords, migrationsApplied, type DbHandle } from "@usegraft/db";
+import {
+  createBranch,
+  createDb,
+  dataRecords,
+  migrationsApplied,
+  type DbHandle,
+} from "@usegraft/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { mergeCommand } from "./commands/merge";
 

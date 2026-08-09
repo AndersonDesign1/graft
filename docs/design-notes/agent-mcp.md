@@ -197,12 +197,12 @@ is the documented default.
 
 ## Auth model (reminder)
 
-| Layer           | Responsibility                                         |
-| --------------- | ------------------------------------------------------ |
-| App / host      | Mint tokens (Better Auth example, company IdP, etc.)   |
-| `@usegraft/auth`   | Verify JWT / map dev tokens → `FunctionActor` + scopes |
-| Functions / MCP | Enforce `access`, scopes, public, destructive gate     |
-| Humans          | `graft approvals` / `approve` / `deny` for gated ops   |
+| Layer            | Responsibility                                         |
+| ---------------- | ------------------------------------------------------ |
+| App / host       | Mint tokens (Better Auth example, company IdP, etc.)   |
+| `@usegraft/auth` | Verify JWT / map dev tokens → `FunctionActor` + scopes |
+| Functions / MCP  | Enforce `access`, scopes, public, destructive gate     |
+| Humans           | `graft approvals` / `approve` / `deny` for gated ops   |
 
 Graft never becomes the identity provider of record.
 

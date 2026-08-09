@@ -31,14 +31,14 @@
     "lint": "oxlint ."
   },
   "dependencies": {
-    "@usegraft/sdk-core": "workspace:*",
     "@mdx-js/mdx": "^3.1.1",
+    "@usegraft/sdk-core": "workspace:*",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@usegraft/core": "workspace:*",
     "@types/mdx": "^2.0.14",
     "@types/react": "^19.0.0",
+    "@usegraft/core": "workspace:*",
     "next": "^16.0.0",
     "react": "^19.0.0"
   },

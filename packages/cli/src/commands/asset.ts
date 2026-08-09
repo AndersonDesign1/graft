@@ -4,7 +4,12 @@
  * upload, paste the printed snippet into a document, compile.
  */
 import { readFileSync, statSync } from "node:fs";
-import { contentTypeFor, createStorage, defaultKeyFor, storageConfigFromEnv } from "@usegraft/assets";
+import {
+  contentTypeFor,
+  createStorage,
+  defaultKeyFor,
+  storageConfigFromEnv,
+} from "@usegraft/assets";
 import { GraftError } from "@usegraft/contracts";
 import { loadProjectEnv } from "../config";
 

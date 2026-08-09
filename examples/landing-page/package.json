@@ -29,13 +29,13 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@usegraft/cli": "workspace:*",
     "@usegraft/compiler": "workspace:*",
     "@usegraft/content-migrations": "workspace:*",
     "@usegraft/mcp": "workspace:*",
-    "@types/pg": "^8.20.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
     "tsx": "^4.20.0"
   }
 }

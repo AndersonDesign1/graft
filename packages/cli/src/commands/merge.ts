@@ -97,7 +97,11 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
       scopeWriteBranch,
     },
     { runDataMigration },
-  ] = await Promise.all([import("@usegraft/compiler"), import("@usegraft/db"), import("@usegraft/core")]);
+  ] = await Promise.all([
+    import("@usegraft/compiler"),
+    import("@usegraft/db"),
+    import("@usegraft/core"),
+  ]);
   const control = createDb(url);
 
   // Merging requires both ends registered (no tolerant fallback here — a typo

@@ -135,8 +135,8 @@ deployment can give its app/agent a runtime role with **no UPDATE on `approvals`
 
 ## Monorepo layout
 
-| Package                     | Purpose                                                             |
-| --------------------------- | ------------------------------------------------------------------- |
+| Package                        | Purpose                                                             |
+| ------------------------------ | ------------------------------------------------------------------- |
 | `@usegraft/core`               | Schema (`defineCollection`), function runtime, access, migrations   |
 | `@usegraft/compiler`           | Authored content → Postgres index + typegen + validation            |
 | `@usegraft/content-migrations` | Codemod-style authored-content transforms                           |

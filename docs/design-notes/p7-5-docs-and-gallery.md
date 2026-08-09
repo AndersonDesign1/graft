@@ -243,8 +243,8 @@ so the page can't drift from reality). No feature-matrix, no logos, no "vs."
 Index page cards each runnable example: framework, SDK package, features it
 exercises, "run it" instructions, screenshot/live link.
 
-| Example             | SDK                    | Proves                                                             |
-| ------------------- | ---------------------- | ------------------------------------------------------------------ |
+| Example             | SDK                       | Proves                                                             |
+| ------------------- | ------------------------- | ------------------------------------------------------------------ |
 | `landing-page`      | `@usegraft/sdk-next`      | RSC reads, MdxBody, revalidate webhook, functions, MCP route       |
 | `docs-site`         | `@usegraft/sdk-astro`     | typed reads (no memo) + `graftRoute` endpoint mount, React islands |
 | `gallery-sveltekit` | `@usegraft/sdk-sveltekit` | typed reads + `graftRoute` `+server.ts` mount                      |

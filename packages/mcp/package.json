@@ -26,13 +26,13 @@
     "lint": "oxlint ."
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@usegraft/assets": "workspace:*",
     "@usegraft/compiler": "workspace:*",
     "@usegraft/contracts": "workspace:*",
     "@usegraft/core": "workspace:*",
     "@usegraft/db": "workspace:*",
     "@usegraft/registry": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "gray-matter": "^4.0.3",
     "zod": "^4.1.0"
   }
