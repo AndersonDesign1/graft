@@ -1,6 +1,12 @@
 /**
  * graft init — scaffold a Graft project: schema as owned code, content as files,
  * and an llms.txt so the next agent that opens the directory knows the loop.
+ *
+ * The default is the **static index**: `graft compile` writes a SQLite artifact
+ * and the project runs with no database and no environment variables at all.
+ * `--postgres` scaffolds the Postgres tier instead (operational data, typed
+ * functions, DB branching). A static project that later needs those is taught
+ * the upgrade by NEEDS_DATABASE at the moment it needs it.
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -8,7 +14,9 @@ import { GraftError } from "@usegraft/contracts";
 import { barrelSource } from "@usegraft/registry";
 import { CONFIG_FILENAMES } from "../config";
 
-const CONFIG_TEMPLATE = `/**
+export type InitDriver = "static" | "postgres";
+
+const configTemplate = (driver: InitDriver): string => `/**
  * The schema for this project — collections defined as owned code.
  * Agents: this is the single source of truth for what content exists.
  * Add fields here, then author documents in content/<collection>/<slug>.mdx.
@@ -18,6 +26,17 @@ const CONFIG_TEMPLATE = `/**
  */
 import { defineCollection, field, mergePrimitives } from "@usegraft/core";
 import * as primitives from "./graft";
+
+${
+  driver === "static"
+    ? `// Where the content index lives. "static" compiles to .graft/index.db —
+// no database, no env vars. Switch to "postgres" (with DATABASE_URL) when you
+// need operational data, typed functions, or database branching.
+export const index = "static";`
+    : `// The content index lives in Postgres (DATABASE_URL). Content-only projects
+// can use \`export const index = "static"\` instead and drop the database.
+export const index = "postgres";`
+}
 
 export const pages = defineCollection({
   name: "pages",
@@ -33,27 +52,46 @@ export const pages = defineCollection({
 export const { collections, functions } = mergePrimitives([{ collections: { pages } }, primitives]);
 `;
 
-const HOME_TEMPLATE = `---
+const homeTemplate = (driver: InitDriver): string => `---
 title: Hello, Graft
-tagline: Content lives in git; Postgres is the index.
+tagline: ${driver === "static" ? "Content lives in git; the index is a file." : "Content lives in git; Postgres is the index."}
 ---
 
 Edit this file, then run \`graft compile\` (or keep \`graft dev\` running) to
 project it into the content index.
 `;
 
-const LLMS_TEMPLATE = `# Graft project — agent guide
+const GITIGNORE_TEMPLATE = `# The compiled content index — derived from the files in git.
+# Rebuild it any time with \`graft compile\`; build it in CI before your app builds.
+.graft/
+`;
 
-Everything is code. Content lives in MDX files; git is authoritative; Postgres
-is a derived index. If they disagree, git wins — recompile.
+const llmsTemplate = (driver: InitDriver): string => `# Graft project — agent guide
+
+Everything is code. Content lives in MDX files; git is authoritative; the
+content index is derived. If they disagree, git wins — recompile.
 
 - Schema: graft.config.ts (defineCollection/field over Zod). The single source of truth.
 - Documents: content/<collection>/<slug>.mdx — frontmatter must satisfy the collection schema.
 - Slugs are kebab-case; a frontmatter \`slug:\` overrides the filename.
 - Project into the index: \`graft compile\` (one-shot) or \`graft dev\` (watch mode).
-  Both need DATABASE_URL in .env (any parent directory works).
+${
+  driver === "static"
+    ? `- This project uses the **static index** (\`index = "static"\` in graft.config):
+  compile writes .graft/index.db — a SQLite artifact. No database, no env vars.
+- The artifact is derived, so it is git-ignored. Run \`graft compile\` before your
+  app builds (e.g. build command: \`graft compile && next build\`) so it ships with
+  the deploy.
+- Read it from your app with \`openStaticIndex(".graft/index.db")\` from
+  "@usegraft/db", passed to \`createClient({ index, collections })\`.
+- Branches here are just **git branches**: each checkout compiles its own artifact.
+- Operational data (form submissions, orders, comments), typed functions, and
+  database branching need the Postgres tier. Adding one fails with NEEDS_DATABASE,
+  whose \`fix\` is the upgrade: set DATABASE_URL and \`export const index = "postgres"\`.`
+    : `- Both need DATABASE_URL in .env (any parent directory works).
 - One project = one database. Never point DATABASE_URL at another project's
-  index — compile refuses with INDEX_OWNERSHIP rather than purge its documents.
+  index — compile refuses with INDEX_OWNERSHIP rather than purge its documents.`
+}
 - Primitives: add owned building blocks with \`graft add <item>\` — they land under
   graft/ and wire in automatically (the generated graft/index.ts barrel; no config
   edit). Run \`graft add\` with no name to list what's available.
@@ -61,22 +99,29 @@ is a derived index. If they disagree, git wins — recompile.
 - Ship changes as git commits; every projection records the git SHA it compiled from.
 `;
 
-const SCAFFOLD: Record<string, string> = {
-  "graft.config.ts": CONFIG_TEMPLATE,
-  // The generated barrel graft add regenerates; empty until the first `graft add`.
-  [join("graft", "index.ts")]: barrelSource([]),
-  [join("content", "pages", "home.mdx")]: HOME_TEMPLATE,
-  "llms.txt": LLMS_TEMPLATE,
-};
+function scaffoldFor(driver: InitDriver): Record<string, string> {
+  const files: Record<string, string> = {
+    "graft.config.ts": configTemplate(driver),
+    // The generated barrel graft add regenerates; empty until the first `graft add`.
+    [join("graft", "index.ts")]: barrelSource([]),
+    [join("content", "pages", "home.mdx")]: homeTemplate(driver),
+    "llms.txt": llmsTemplate(driver),
+  };
+  // Only static mode produces a build artifact worth ignoring.
+  if (driver === "static") files[".gitignore"] = GITIGNORE_TEMPLATE;
+  return files;
+}
 
 export interface InitResult {
   projectDir: string;
+  driver: InitDriver;
   /** Relative paths written (existing files are left untouched and not listed). */
   created: string[];
 }
 
-export function initCommand(options: { targetDir: string }): InitResult {
+export function initCommand(options: { targetDir: string; driver?: InitDriver }): InitResult {
   const projectDir = resolve(options.targetDir);
+  const driver = options.driver ?? "static";
 
   for (const name of CONFIG_FILENAMES) {
     if (existsSync(join(projectDir, name))) {
@@ -89,7 +134,7 @@ export function initCommand(options: { targetDir: string }): InitResult {
   }
 
   const created: string[] = [];
-  for (const [relPath, body] of Object.entries(SCAFFOLD)) {
+  for (const [relPath, body] of Object.entries(scaffoldFor(driver))) {
     const absPath = join(projectDir, relPath);
     if (existsSync(absPath)) continue;
     mkdirSync(dirname(absPath), { recursive: true });
@@ -97,5 +142,5 @@ export function initCommand(options: { targetDir: string }): InitResult {
     created.push(relPath);
   }
 
-  return { projectDir, created };
+  return { projectDir, driver, created };
 }

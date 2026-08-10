@@ -31,5 +31,8 @@
     "@usegraft/registry": "workspace:*",
     "@usegraft/studio": "workspace:*",
     "jiti": "^2.4.0"
+  },
+  "devDependencies": {
+    "@usegraft/sdk-core": "workspace:*"
   }
 }

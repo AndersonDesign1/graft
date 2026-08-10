@@ -19,23 +19,50 @@ afterAll(() => {
 });
 
 describe("initCommand", () => {
-  it("scaffolds config, content, and llms.txt", () => {
+  it("scaffolds a static project by default — config, content, llms.txt, .gitignore", () => {
     const dir = mkdtempSync(join(tmpdir(), "graft-init-"));
     try {
       const result = initCommand({ targetDir: dir });
+      expect(result.driver).toBe("static");
       expect(result.created.sort()).toEqual(
         [
           "graft.config.ts",
           join("graft", "index.ts"),
           join("content", "pages", "home.mdx"),
           "llms.txt",
+          ".gitignore",
         ].sort(),
       );
-      expect(readFileSync(join(dir, "graft.config.ts"), "utf8")).toContain("defineCollection");
+      const config = readFileSync(join(dir, "graft.config.ts"), "utf8");
+      expect(config).toContain("defineCollection");
+      expect(config).toContain('export const index = "static"');
       // The barrel is scaffolded so the config's `import … from "./graft"` resolves.
       expect(readFileSync(join(dir, "graft", "index.ts"), "utf8")).toContain("mergePrimitives");
-      expect(readFileSync(join(dir, "llms.txt"), "utf8")).toContain("graft compile");
       expect(existsSync(join(dir, "content", "pages", "home.mdx"))).toBe(true);
+      // The artifact is derived — it must never be committed.
+      expect(readFileSync(join(dir, ".gitignore"), "utf8")).toContain(".graft/");
+      // llms.txt teaches the static loop and the upgrade path, not DATABASE_URL.
+      const llms = readFileSync(join(dir, "llms.txt"), "utf8");
+      expect(llms).toContain("graft compile");
+      expect(llms).toContain("NEEDS_DATABASE");
+      expect(llms).not.toContain("DATABASE_URL in .env");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("scaffolds the Postgres tier with --postgres (no .gitignore, teaches DATABASE_URL)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "graft-init-pg-"));
+    try {
+      const result = initCommand({ targetDir: dir, driver: "postgres" });
+      expect(result.driver).toBe("postgres");
+      expect(result.created).not.toContain(".gitignore");
+      expect(readFileSync(join(dir, "graft.config.ts"), "utf8")).toContain(
+        'export const index = "postgres"',
+      );
+      const llms = readFileSync(join(dir, "llms.txt"), "utf8");
+      expect(llms).toContain("DATABASE_URL");
+      expect(llms).toContain("INDEX_OWNERSHIP");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -11,6 +11,37 @@ Design decisions from the de-risking spikes live in
 [`docs/design-notes/`](docs/design-notes/). (The PRD and phase tracker are private planning docs,
 kept out of the repo.)
 
+## Quickstart — no database required
+
+A content project needs **no services at all**. `graft compile` writes the content index to a
+SQLite artifact, and your app reads it embedded:
+
+```bash
+npx graft init          # scaffolds schema, content/, llms.txt (static index by default)
+npx graft compile       # → .graft/index.db — no DATABASE_URL, no containers
+```
+
+```ts
+import { openStaticIndex } from "@usegraft/db";
+import { createClient } from "@usegraft/sdk-core";
+import { collections } from "./graft.config";
+
+const index = await openStaticIndex(".graft/index.db");
+const graft = createClient({ index, collections });
+const home = await graft.getDocument("pages", "home"); // fully typed, zero codegen
+```
+
+The artifact is derived from the files in git, so it is git-ignored and rebuilt in your build
+command (`graft compile && next build`). Preview branches are just git branches — each checkout
+compiles its own index. Full-text search works too; it is a property of the artifact.
+
+**When you need more**, add `DATABASE_URL` and switch one line
+(`export const index = "postgres"`). Postgres unlocks operational data (form submissions, orders,
+comments), typed functions with auth/audit/approvals, and copy-on-write database branches — and
+Graft tells you the moment you need it: reaching for one of those in static mode fails with
+`NEEDS_DATABASE`, whose `fix` is the upgrade. Design note:
+[`docs/design-notes/static-index.md`](docs/design-notes/static-index.md).
+
 ## Status
 
 **Phase 5 — Registry + commerce vertical: complete.** On top of Phases 2–4 (wow loop, runtime

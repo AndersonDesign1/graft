@@ -120,12 +120,27 @@ describe("run", () => {
     expect(errors.join("\n")).toContain("--branch requires a value");
   });
 
-  it("init scaffolds into the target directory and prints next steps", async () => {
+  it("init scaffolds a static project and its next steps mention no database", async () => {
     const dir = mkdtempSync(join(tmpdir(), "graft-cli-init-"));
     try {
       expect(await run(["init", dir])).toBe(0);
       expect(existsSync(join(dir, "graft.config.ts"))).toBe(true);
-      expect(logs.join("\n")).toContain("Next steps:");
+      const output = logs.join("\n");
+      expect(output).toContain("static index");
+      expect(output).toContain("no database, no environment variables");
+      expect(output).not.toContain("DATABASE_URL=postgres");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("init --postgres scaffolds the database tier and says to set DATABASE_URL", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "graft-cli-init-pg-"));
+    try {
+      expect(await run(["init", dir, "--postgres"])).toBe(0);
+      const output = logs.join("\n");
+      expect(output).toContain("postgres index");
+      expect(output).toContain("DATABASE_URL=postgres");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

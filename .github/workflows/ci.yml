@@ -30,3 +30,7 @@ jobs:
       # Runs again explicitly so the gate is visible in CI logs (also covered by pnpm test).
       - name: Cold-agent self-teaching gate
         run: pnpm test:cold-agent
+      # L1 — the adoption promise: an empty directory to typed reads with no
+      # database and no environment. Explicit so a regression is obvious in logs.
+      - name: Zero-service quickstart gate
+        run: pnpm test:quickstart

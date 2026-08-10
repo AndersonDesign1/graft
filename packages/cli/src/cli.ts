@@ -27,7 +27,9 @@ function printHelp(): void {
     "Usage: graft <command> [options]",
     "",
     "Commands:",
-    "  init [dir]   Scaffold a Graft project (graft.config.ts, content/, llms.txt)",
+    "  init [dir]   Scaffold a Graft project (graft.config.ts, content/, llms.txt).",
+    "               Static index by default — no database, no env. --postgres for the",
+    "               Postgres tier (operational data, functions, DB branching)",
     "  compile      Project the content tree into the content index once",
     "  dev          Watch content/ + graft.config.ts and recompile on change",
     "  asset put <file> [key]   Upload a binary to the asset store (S3_* env)",
@@ -63,6 +65,8 @@ function printHelp(): void {
     "  --into <name>    Merge target (merge; default: main)",
     "  --backend <kind> Branch backend: overlay (default) or neon (branch create)",
     "  --apply          Execute pending migrations / the merge (default is a dry-run report)",
+    "  --postgres       Scaffold `graft init` for the Postgres index (default: static)",
+    "  --static         Scaffold `graft init` for the static index (the default)",
     "  --dry-run        Preview `graft add` without writing",
     "  --overwrite      Let `graft add` replace files that differ",
     "  --prune-unknown  Let `graft compile` remove index rows in collections this schema",
@@ -86,6 +90,8 @@ interface ParsedArgs {
   overwrite: boolean;
   pruneUnknown: boolean;
   studio: boolean;
+  /** `graft init` index driver; undefined = the default (static). */
+  initDriver?: "static" | "postgres";
 }
 
 class UsageError extends Error {}
@@ -104,6 +110,7 @@ function parseArgs(rest: string[]): ParsedArgs {
   let overwrite = false;
   let pruneUnknown = false;
   let studio = false;
+  let initDriver: "static" | "postgres" | undefined;
 
   const value = (flag: string, raw: string | undefined): string => {
     if (!raw || raw.startsWith("-")) {
@@ -141,6 +148,10 @@ function parseArgs(rest: string[]): ParsedArgs {
       pruneUnknown = true;
     } else if (arg === "--studio") {
       studio = true;
+    } else if (arg === "--postgres") {
+      initDriver = "postgres";
+    } else if (arg === "--static") {
+      initDriver = "static";
     } else if (arg.startsWith("-")) {
       throw new UsageError(`unknown option "${arg}"`);
     } else {
@@ -160,6 +171,7 @@ function parseArgs(rest: string[]): ParsedArgs {
     overwrite,
     pruneUnknown,
     studio,
+    initDriver,
   };
 }
 
@@ -186,19 +198,34 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
     switch (command) {
       case "init": {
         const { initCommand } = await import("./commands/init");
-        const result = initCommand({ targetDir: args.positionals[0] ?? cwd });
+        const result = initCommand({
+          targetDir: args.positionals[0] ?? cwd,
+          driver: args.initDriver,
+        });
         console.log(
-          `Initialized a Graft project in ${result.projectDir} (${result.created.length} file(s)):`,
+          `Initialized a Graft project in ${result.projectDir} (${result.driver} index, ${result.created.length} file(s)):`,
         );
         for (const file of result.created) console.log(`  created ${file}`);
         console.log(
-          [
-            "",
-            "Next steps:",
-            "  1. Install the runtime: add @usegraft/core and zod (plus @usegraft/cli as a dev dep)",
-            "  2. Put DATABASE_URL=postgres://… in .env",
-            "  3. Run `graft compile` once, or keep `graft dev` running while you edit",
-          ].join("\n"),
+          result.driver === "static"
+            ? [
+                "",
+                "Next steps — no database, no environment variables:",
+                "  1. Install the runtime: add @usegraft/core and zod (plus @usegraft/cli as a dev dep)",
+                "  2. Run `graft compile` once, or keep `graft dev` running while you edit",
+                "",
+                "The index compiles to .graft/index.db (git-ignored — it is derived from your",
+                "files). Run `graft compile` before your app builds so it ships with the deploy.",
+                "Need operational data, typed functions, or DB branching? Switch `index` to",
+                '"postgres" in graft.config.ts and set DATABASE_URL.',
+              ].join("\n")
+            : [
+                "",
+                "Next steps:",
+                "  1. Install the runtime: add @usegraft/core and zod (plus @usegraft/cli as a dev dep)",
+                "  2. Put DATABASE_URL=postgres://… in .env",
+                "  3. Run `graft compile` once, or keep `graft dev` running while you edit",
+              ].join("\n"),
         );
         return 0;
       }
