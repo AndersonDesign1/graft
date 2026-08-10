@@ -290,6 +290,20 @@
   padding: 0;
 }
 
+/* Give the operator their cursor back.
+   Crepe's structural CSS sets `caret-color: transparent` on
+   `.ProseMirror.virtual-cursor-enabled`, because Milkdown's virtual-cursor
+   plugin is meant to paint a replacement — and that replacement is styled by
+   Crepe's *theme* CSS, which we deliberately do not import (it brings a second
+   palette and type scale). So the native caret was hidden with nothing drawing
+   in its place: the canvas was fully editable, autosaved correctly, and showed
+   no text cursor at all, which reads exactly like an editor you cannot type in.
+   Restoring the platform caret is the honest fix — we are not running the
+   plugin's rendering, so we should not be running its concealment either. */
+.rich .ProseMirror.virtual-cursor-enabled {
+  caret-color: var(--ink);
+}
+
 /* Editing type is publishing type. The docs site sets body at --text-md and
    h1 at --text-xl (the token is literally labelled "doc h1"); the editor used
    to render 16px body and a 24px h1, so the canvas was both flat and a lie
