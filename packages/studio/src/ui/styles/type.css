@@ -48,6 +48,14 @@
      rhythm instead of each picking its own padding. */
   --row-height: 2rem;
   --control-height: 2.125rem;
+
+  /* The one exception to "no serif here". Chrome is a dashboard and stays
+     Geist; the editing canvas is a document, and the strongest signal that it
+     is a *page* rather than another panel is that it wears the face the site
+     publishes with. Scoped by name so nothing outside the sheet can reach for
+     it by accident — --font-display stays mapped to the sans above. */
+  --font-editorial: "Instrument Serif", "Iowan Old Style", georgia, serif;
+  --editorial-tracking: -0.01em;
 }
 
 /* Variable-font weights: Geist Variable exposes the full axis, so UI weight

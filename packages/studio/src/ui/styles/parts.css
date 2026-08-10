@@ -197,20 +197,45 @@
    Document sheet — one column, frontmatter above body
    ========================================================================== */
 
+/* The sheet. Raised off the desk, squared to the house geometry, and wide
+   enough that the body inside lands near a 68ch measure at 18px. Elevation is
+   a hairline plus one soft shadow rather than a heavy drop: the page should
+   look like paper, not like a floating dialog. */
+/* 48rem minus 2×48px padding leaves a ~672px column: about 72 characters at
+   18px, the middle of the 60–75 range prose wants. The page width is the
+   measure — there is no second cap fighting it. */
 .doc-sheet {
   width: 100%;
   max-width: 48rem;
   margin-inline: auto;
-  padding: var(--space-6) var(--space-6) var(--space-16);
+  padding: var(--space-12) var(--space-12) var(--space-16);
+  background: var(--paper-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-outer);
+  box-shadow:
+    0 1px 2px light-dark(rgb(0 0 0 / 4%), rgb(0 0 0 / 30%)),
+    0 8px 24px -12px light-dark(rgb(0 0 0 / 10%), rgb(0 0 0 / 50%));
 }
 
+@media (width < 48rem) {
+  .doc-sheet {
+    padding: var(--space-6) var(--space-4) var(--space-12);
+  }
+}
+
+/* Settings, not content. A sunken well inside the sheet says "this is the
+   document's metadata" without a heading announcing it, and the contrast
+   against the white body is what lets the body read as the writing surface.
+   Radius is concentric: sheet 10px at 48px padding leaves the well at 6px. */
 .doc-frontmatter {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding-bottom: var(--space-4);
-  margin-bottom: var(--space-4);
-  border-bottom: 1px solid var(--hairline);
+  gap: var(--space-2);
+  padding: var(--space-4);
+  margin-bottom: var(--space-8);
+  background: var(--paper-sunken);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
 }
 
 /* Label beside the value, not above it. Frontmatter is a short list of
@@ -257,10 +282,24 @@
   outline: none;
 }
 
+/* Crepe ships `padding: 60px 120px` on the editor for its own standalone
+   layout. The sheet owns padding now, and leaving both in place inset the text
+   168px from the page edge — a ~40-character measure inside an 832px page,
+   which is most of why the canvas read as a narrow grey column. */
+.rich .milkdown .ProseMirror {
+  padding: 0;
+}
+
+/* Editing type is publishing type. The docs site sets body at --text-md and
+   h1 at --text-xl (the token is literally labelled "doc h1"); the editor used
+   to render 16px body and a 24px h1, so the canvas was both flat and a lie
+   about what the page would look like. The measure itself is the sheet's
+   width minus its padding — see .doc-sheet. */
 .rich .ProseMirror {
-  font-size: var(--text-base);
+  font-size: var(--text-md);
   line-height: var(--leading-body);
   color: var(--ink);
+  text-wrap: pretty;
 }
 
 .rich .ProseMirror > * + * {
@@ -271,21 +310,36 @@
 .rich .ProseMirror h2,
 .rich .ProseMirror h3,
 .rich .ProseMirror h4 {
-  font-weight: var(--display-weight);
-  letter-spacing: var(--display-tracking);
+  font-family: var(--font-editorial);
+  /* Instrument Serif ships one weight; asking for 560 would synthesise a
+     smeared fake bold. Size and the face itself carry the hierarchy. */
+  font-weight: 400;
+  letter-spacing: var(--editorial-tracking);
   line-height: var(--leading-snug);
-  margin-top: var(--space-6);
+  text-wrap: balance;
+  /* Space above a heading belongs to the section it opens, so it is larger
+     than the space below it. Collapsed at the top of the document. */
+  margin-top: var(--space-12);
+  margin-bottom: calc(var(--space-4) * -1 + var(--space-6));
+}
+
+.rich .ProseMirror > :first-child {
+  margin-top: 0;
 }
 
 .rich .ProseMirror h1 {
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
+  line-height: var(--leading-tight);
 }
 
 .rich .ProseMirror h2 {
+  font-size: var(--text-lg);
+}
+
+.rich .ProseMirror h3 {
   font-size: var(--text-md);
 }
 
-.rich .ProseMirror h3,
 .rich .ProseMirror h4 {
   font-size: var(--text-base);
 }

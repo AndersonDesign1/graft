@@ -4,6 +4,11 @@
 // reference this design follows.
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
+// The chrome is a dashboard and stays Geist. The editing canvas is a document,
+// and it is the one place that should look like what the site publishes — so
+// the docs' display face is loaded for headings inside the sheet, and nowhere
+// else. (It was already a dependency and simply never imported.)
+import "@fontsource/instrument-serif";
 // Crepe's structural CSS only — block handles, the slash menu, the link
 // tooltip. Its visual themes (nord/frame/classic) are deliberately not
 // imported: those bring a second palette and typography, and parts.css points
