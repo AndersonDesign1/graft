@@ -1334,45 +1334,9 @@ h3 {
   text-wrap: pretty;
 }
 
-/* ---- sync banner: the Overview's lede ---- */
-
-.banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-outer);
-  background: var(--paper-sunken);
-}
-
-.banner[data-tone="drifted"] {
-  border-color: var(--state-drifted-border);
-  background: var(--state-drifted-bg);
-}
-
-.banner[data-tone="unindexed"] {
-  border-color: var(--hairline-strong);
-}
-
-.banner h2 {
-  font-size: var(--text-base);
-  font-weight: var(--weight-medium);
-}
-
-.banner p {
-  margin: 0.25rem 0 0;
-  max-width: 64ch;
-  color: var(--ink-muted);
-  font-size: var(--text-xs);
-  line-height: var(--leading-body);
-  text-wrap: pretty;
-}
-
-.banner[data-tone="drifted"] h2 {
-  color: var(--state-drifted-text);
-}
+/* The sync banner's styles lived here. It is gone: the top bar's compile
+   control says the same thing on every view, and the stat tiles below already
+   break the count down. */
 
 /* ---- stat tiles: hairline-gap grid ---- */
 

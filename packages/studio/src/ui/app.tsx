@@ -122,15 +122,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
   else if (route.view === "settings") {
     main = <SettingsView branch={branch} theme={theme} setTheme={setTheme} tree={tree.data} />;
   } else {
-    main = (
-      <OverviewView
-        branch={branch}
-        tree={tree}
-        compiling={compiling}
-        onCompile={() => void compile()}
-        navigate={navigate}
-      />
-    );
+    main = <OverviewView branch={branch} tree={tree} navigate={navigate} />;
   }
 
   const railItem = ({ id, label, Icon }: NavItem, badge?: React.ReactNode) => (

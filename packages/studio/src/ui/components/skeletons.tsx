@@ -160,24 +160,13 @@ export function ChartSkeleton({ rows = 4 }: { rows?: number }) {
 }
 
 /**
- * The whole Overview above the fold — the sync banner and the stat strip.
- * Both are always there once loaded, so their absence should not make the
- * page grow under the operator as data arrives.
+ * The Overview above the fold — now just the stat strip. The sync banner it
+ * used to reserve space for is gone (the top bar owns that job), and a
+ * skeleton for a block that never arrives is a guaranteed layout jump rather
+ * than protection from one.
  */
 export function OverviewSkeleton() {
-  return (
-    <>
-      <div className="banner" aria-hidden="true">
-        {/* Heights are the h2 and p line boxes, not their font sizes — the
-            banner must not change height when the real text lands. */}
-        <div className="sk-banner-main">
-          <Bar w="14rem" h="1.3rem" />
-          <Bar w="26rem" h="1.35rem" />
-        </div>
-      </div>
-      <TilesSkeleton />
-    </>
-  );
+  return <TilesSkeleton />;
 }
 
 /** Stacked cards — Approvals, Schema, Branches. */

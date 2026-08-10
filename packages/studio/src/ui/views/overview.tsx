@@ -7,25 +7,21 @@ import {
   StatTile,
   Status,
 } from "../components/primitives";
-import { IconCompile } from "../components/icons";
 import { ChartSkeleton, MiniListSkeleton, OverviewSkeleton } from "../components/skeletons";
-import { Button } from "../components/ui/button";
 import { qs } from "../lib/api";
 import { relativeTime, shortSha, plural } from "../lib/format";
 import type { Route } from "../lib/route";
 import { useResource } from "../lib/use-resource";
 
+// Compiling is not this view's job any more — the top bar owns that control, so
+// the props that drove the removed banner are gone with it.
 export function OverviewView({
   branch,
   tree,
-  compiling,
-  onCompile,
   navigate,
 }: {
   branch: string;
   tree: { data: ContentTree | null; error: string | null; loading: boolean };
-  compiling: boolean;
-  onCompile: () => void;
   navigate: (route: Route) => void;
 }) {
   const compilations = useResource<CompilationList>(`/compilations${qs({ branch, limit: 30 })}`);
@@ -33,9 +29,7 @@ export function OverviewView({
   const branches = useResource<BranchList>("/branches");
 
   const summary = tree.data?.summary;
-  const drift = summary?.drift ?? 0;
   const neverCompiled = (compilations.data?.compilations.length ?? 0) === 0;
-  const latest = compilations.data?.compilations[0];
   const pending = approvals.data?.approvals.length ?? 0;
 
   return (
@@ -57,49 +51,13 @@ export function OverviewView({
 
       {tree.data ? (
         <>
-          {/* The sync banner is the page's lede: it is the one thing an
-              operator opens the Studio to find out. */}
-          <section
-            className="banner"
-            data-tone={neverCompiled ? "unindexed" : drift > 0 ? "drifted" : "synced"}
-          >
-            <div className="banner-main">
-              <h2>
-                {neverCompiled
-                  ? "This branch has never been compiled"
-                  : drift > 0
-                    ? `${plural(drift, "document")} out of sync`
-                    : "Index is current"}
-              </h2>
-              <p>
-                {neverCompiled ? (
-                  <>
-                    {plural(summary?.documents ?? 0, "document")} on disk, none in the index.
-                    Compiling projects them into Postgres so the typed read side can serve them.
-                  </>
-                ) : drift > 0 ? (
-                  <>
-                    {summary?.drifted ? `${summary.drifted} edited since the last compile. ` : ""}
-                    {summary?.unindexed ? `${summary.unindexed} never indexed. ` : ""}
-                    {summary?.orphaned ? `${summary.orphaned} indexed with no file. ` : ""}
-                    Compile to bring the index back in line with disk.
-                  </>
-                ) : (
-                  <>
-                    Every document on disk matches the index
-                    {latest ? <> · last compiled {relativeTime(latest.createdAt)}</> : null}.
-                  </>
-                )}
-              </p>
-            </div>
-            {drift > 0 || neverCompiled ? (
-              <Button variant="primary" onClick={onCompile} disabled={compiling}>
-                <IconCompile size={14} />
-                {compiling ? "Compiling…" : "Compile"}
-              </Button>
-            ) : null}
-          </section>
-
+          {/* No sync banner here. It said the same thing as the "N changes to
+              compile" control in the top bar — which is always on screen, on
+              every view, and runs the same compile — and then repeated the
+              breakdown that the stat tiles directly below already give as
+              numbers. Three copies of one fact pushed the actual dashboard
+              below the fold. The tiles are the breakdown; the top bar is the
+              call to action. */}
           <section className="tiles">
             <StatTile
               label="On disk"
