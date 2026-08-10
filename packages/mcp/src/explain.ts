@@ -185,6 +185,37 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Each project needs its own database or branch: set DATABASE_URL in a .env next to graft.config.ts (it overrides parent .envs). If the schema really did drop or rename a collection, a human runs `graft compile --prune-unknown` once — the override is CLI-only by design.",
   },
+  NEEDS_DATABASE: {
+    code: "NEEDS_DATABASE",
+    meaning:
+      'This project runs in static index mode (index = "static" in graft.config), and the requested feature is Postgres-tier: db-authoritative collections, typed functions, or database branching.',
+    typicalCauses: [
+      "A db-authoritative collection or a defineFunction was added to a static-mode project",
+      "graft compile --branch <name> was run in static mode (branches are git branches there)",
+    ],
+    howToRecover:
+      'Either stay static (content-only: use git branches for previews) or upgrade: set DATABASE_URL in .env and switch graft.config to `export const index = "postgres"`, then re-run `graft compile`.',
+  },
+  STATIC_INDEX_NOT_FOUND: {
+    code: "STATIC_INDEX_NOT_FOUND",
+    meaning:
+      "A read tried to open the static index artifact (.graft/index.db by default), but the file does not exist — the project has not been compiled yet.",
+    typicalCauses: [
+      "graft compile has never run in this checkout",
+      "The artifact path in graft.config's `index` setting does not match where compile wrote it",
+      "A deploy shipped the app without running graft compile in the build step",
+    ],
+    howToRecover:
+      "Run `graft compile` (or add it before the framework build in the deploy's build command). The artifact must be deployed with the app.",
+  },
+  STATIC_INDEX_UNSUPPORTED: {
+    code: "STATIC_INDEX_UNSUPPORTED",
+    meaning:
+      "Static index mode needs the node:sqlite built-in, which this Node runtime does not provide (it shipped in Node 22.5, stable options from 22.12).",
+    typicalCauses: ["Node older than 22.12 running the CLI or the app server"],
+    howToRecover:
+      'Upgrade Node to 22.12+ (24 LTS recommended), or switch the project to the Postgres index (DATABASE_URL + `export const index = "postgres"`).',
+  },
   SLUG_NOT_UNIQUE: {
     code: "SLUG_NOT_UNIQUE",
     meaning: "Two documents in the same collection resolve to the same slug.",

@@ -16,6 +16,7 @@ import {
   type ProjectConfig,
 } from "../config";
 import { formatCompileResult, printGraftError } from "../report";
+import { assertNoStaticBranch } from "./compile";
 
 const DEBOUNCE_MS = 150;
 
@@ -38,19 +39,25 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
     });
   }
 
-  const url = requireDatabaseUrl();
+  // Static mode: no env, no connections — the compile target is the artifact.
+  const isStatic = config.index.driver === "static";
+  if (isStatic) assertNoStaticBranch(options.branchId);
+
+  const url = isStatic ? undefined : requireDatabaseUrl();
   // Heavy imports (compiler → database driver) only after the project checks out.
-  const [{ compile }, { createDb, resolveBranchHandle, scopeWriteBranch }] = await Promise.all([
+  const [compiler, { createDb, resolveBranchHandle, scopeWriteBranch }] = await Promise.all([
     import("@usegraft/compiler"),
     import("@usegraft/db"),
   ]);
-  const control = createDb(url);
+  const { compile, compileStatic } = compiler;
   // Resolved once at startup: a neon branch gets its own connection; overlay
-  // (registered or not) shares the control one.
-  const branch = await resolveBranchHandle(control.db, options.branchId ?? "main", {
-    databaseUrl: url,
-  });
-  const writeBranch = scopeWriteBranch(branch.scope);
+  // (registered or not) shares the control one. Static mode opens nothing.
+  const control = url !== undefined ? createDb(url) : undefined;
+  const branch =
+    control !== undefined && url !== undefined
+      ? await resolveBranchHandle(control.db, options.branchId ?? "main", { databaseUrl: url })
+      : undefined;
+  const writeBranch = branch !== undefined ? scopeWriteBranch(branch.scope) : "main";
   let timer: NodeJS.Timeout | undefined;
   let compiling = false;
   let dirty = false;
@@ -68,12 +75,19 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
         config = await loadConfig(configPath);
         console.log(`reloaded ${basename(configPath)}`);
       }
-      const result = await compile({
-        db: branch.db,
-        contentDir: config.contentDir,
-        collections: config.collections,
-        branchId: writeBranch,
-      });
+      const result =
+        branch !== undefined
+          ? await compile({
+              db: branch.db,
+              contentDir: config.contentDir,
+              collections: config.collections,
+              branchId: writeBranch,
+            })
+          : await compileStatic({
+              contentDir: config.contentDir,
+              collections: config.collections,
+              indexPath: (config.index as { driver: "static"; path: string }).path,
+            });
       console.log(formatCompileResult(result));
     } catch (error) {
       // Keep watching: the next save is the retry.
@@ -105,7 +119,11 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
 
   const watchedContent = relative(options.cwd, config.contentDir) || ".";
   const branchLabel =
-    branch.scope.kind === "physical" ? `${branch.name} (neon)` : (options.branchId ?? "main");
+    branch === undefined
+      ? "static index"
+      : branch.scope.kind === "physical"
+        ? `${branch.name} (neon)`
+        : (options.branchId ?? "main");
   console.log(
     `Watching ${watchedContent} + ${basename(configPath)} (branch: ${branchLabel}). Ctrl+C to stop.`,
   );
@@ -120,6 +138,6 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
     process.once("SIGTERM", stop);
   });
 
-  await branch.close();
-  await control.close();
+  await branch?.close();
+  await control?.close();
 }

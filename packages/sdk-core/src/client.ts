@@ -13,17 +13,21 @@
 import { GraftError } from "@usegraft/contracts";
 import type { AnyCollection, DocumentData } from "@usegraft/core";
 import {
-  readContent,
-  resolveBranchScope,
-  scopeChain,
-  searchContent,
-  type BranchScope,
+  createDbIndexReader,
+  type ContentIndexReader,
   type ContentRow,
   type Database,
 } from "@usegraft/db";
 
 export interface ClientOptions<TCollections extends Record<string, AnyCollection>> {
-  db: Database;
+  /** The Postgres index. Provide either `db` or `index`. */
+  db?: Database;
+  /**
+   * A ContentIndexReader — e.g. `await openStaticIndex(path)` for static
+   * (zero-service) projects, or any custom driver. Wins over `db` when both
+   * are set.
+   */
+  index?: ContentIndexReader;
   collections: TCollections;
   /** Default branch for all reads; per-call `branch` overrides. Defaults to "main". */
   branch?: string;
@@ -92,18 +96,17 @@ export function createClient<TCollections extends Record<string, AnyCollection>>
 ): GraftClient<TCollections> {
   const defaultBranch = options.branch ?? "main";
 
-  // Resolve each branch to its overlay scope once per client, sharing the
-  // in-flight promise so concurrent reads don't each pay a topology lookup.
-  // A client is typically request-scoped (sdk-next dedupes it via React.cache);
-  // a topology change (new/dropped branch) is picked up by the next client.
-  const scopeCache = new Map<string, Promise<BranchScope>>();
-  function scopeFor(branch: string): Promise<BranchScope> {
-    let cached = scopeCache.get(branch);
-    if (cached === undefined) {
-      cached = resolveBranchScope(options.db, branch);
-      scopeCache.set(branch, cached);
-    }
-    return cached;
+  // The index driver: an explicit reader (static SQLite, custom), or the
+  // Postgres reader over the given db handle (which owns the per-branch
+  // overlay-scope memo that used to live here).
+  const reader =
+    options.index ?? (options.db !== undefined ? createDbIndexReader(options.db) : undefined);
+  if (reader === undefined) {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message: "createClient needs an index to read from: pass `db` or `index`.",
+      fix: 'Pass `db` (a @usegraft/db Database, Postgres index) or `index` (a ContentIndexReader — e.g. `await openStaticIndex(".graft/index.db")` for static mode).',
+    });
   }
 
   function resolve<K extends keyof TCollections & string>(name: K): TCollections[K] {
@@ -125,31 +128,34 @@ export function createClient<TCollections extends Record<string, AnyCollection>>
 
     async getDocument(collection, slug, opts) {
       const def = resolve(collection);
-      const scope = await scopeFor(opts?.branch ?? defaultBranch);
-      const rows = await readContent(options.db, scope, { collection: def.name, slug, limit: 1 });
+      const rows = await reader.readContent({
+        collection: def.name,
+        slug,
+        limit: 1,
+        branch: opts?.branch ?? defaultBranch,
+      });
       const row = rows[0];
       return row ? toDocument(def, row) : null;
     },
 
     async listDocuments(collection, opts) {
       const def = resolve(collection);
-      const scope = await scopeFor(opts?.branch ?? defaultBranch);
-      const rows = await readContent(options.db, scope, {
+      const rows = await reader.readContent({
         collection: def.name,
         limit: opts?.limit,
         offset: opts?.offset,
+        branch: opts?.branch ?? defaultBranch,
       });
       return rows.map((row) => toDocument(def, row));
     },
 
     async searchDocuments(collection, query, opts) {
       const def = resolve(collection);
-      const scope = await scopeFor(opts?.branch ?? defaultBranch);
-      const hits = await searchContent(options.db, {
+      const hits = await reader.searchContent({
         query,
-        chain: scopeChain(scope),
         collections: [def.name],
         limit: opts?.limit,
+        branch: opts?.branch ?? defaultBranch,
       });
       return hits.map(({ row, rank, snippet }) => ({
         ...toDocument(def, row),

@@ -19,6 +19,11 @@ export const CONFIG_FILENAMES = [
   "graft.config.mjs",
 ] as const;
 
+/** Where the content index lives: Postgres (DATABASE_URL) or a SQLite artifact. */
+export type IndexConfig =
+  | { driver: "postgres" }
+  | { driver: "static"; /** Absolute artifact path. */ path: string };
+
 export interface ProjectConfig {
   configPath: string;
   /** The project root — the directory holding graft.config. */
@@ -27,6 +32,8 @@ export interface ProjectConfig {
   contentDir: string;
   /** Absolute path to the migrations directory (may not exist yet). */
   migrationsDir: string;
+  /** From the optional `index` export; defaults to { driver: "postgres" }. */
+  index: IndexConfig;
   collections: Record<string, AnyCollection>;
   /**
    * Typed functions exported from graft.config (optional). Used by `graft mcp`
@@ -146,6 +153,7 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
   }
 
   const projectDir = dirname(configPath);
+  const index = parseIndexConfig(mod.index, projectDir, configPath);
   const contentDirSetting = typeof mod.contentDir === "string" ? mod.contentDir : "content";
   const migrationsDirSetting =
     typeof mod.migrationsDir === "string" ? mod.migrationsDir : "migrations";
@@ -154,9 +162,34 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
     projectDir,
     contentDir: resolve(projectDir, contentDirSetting),
     migrationsDir: resolve(projectDir, migrationsDirSetting),
+    index,
     collections: collections as Record<string, AnyCollection>,
     functions,
   };
+}
+
+/** Default artifact path for static mode, relative to the project root. */
+const STATIC_INDEX_DEFAULT = ".graft/index.db";
+
+function parseIndexConfig(value: unknown, projectDir: string, configPath: string): IndexConfig {
+  if (value === undefined || value === "postgres") return { driver: "postgres" };
+  if (value === "static") {
+    return { driver: "static", path: resolve(projectDir, STATIC_INDEX_DEFAULT) };
+  }
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    const driver = (value as { driver?: unknown }).driver;
+    const path = (value as { path?: unknown }).path;
+    if (driver === "postgres") return { driver: "postgres" };
+    if (driver === "static" && (path === undefined || typeof path === "string")) {
+      return { driver: "static", path: resolve(projectDir, path ?? STATIC_INDEX_DEFAULT) };
+    }
+  }
+  throw new GraftError({
+    code: "CONFIG_INVALID",
+    message: `${configPath} exports an invalid \`index\` setting.`,
+    fix: `Use \`export const index = "static"\` (SQLite artifact, zero services), \`"postgres"\` (DATABASE_URL — the default when omitted), or { driver: "static", path: "…" }.`,
+    details: { index: value },
+  });
 }
 
 /**

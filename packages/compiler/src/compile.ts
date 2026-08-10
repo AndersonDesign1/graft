@@ -12,7 +12,12 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { GraftError } from "@usegraft/contracts";
 import type { AnyCollection } from "@usegraft/core";
-import { projectBranchContent, type ChangeSet, type Database } from "@usegraft/db";
+import {
+  projectBranchContent,
+  projectStaticContent,
+  type ChangeSet,
+  type Database,
+} from "@usegraft/db";
 import { parseDocument, type ProjectedDoc } from "./parse";
 
 export interface CompileOptions {
@@ -131,6 +136,37 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
       knownCollections: Object.keys(options.collections),
       pruneUnknown: options.pruneUnknown,
     },
+  );
+  return { count: docs.length, docs, changes, gitSha };
+}
+
+export interface CompileStaticOptions {
+  contentDir: string;
+  collections: Record<string, AnyCollection>;
+  /** Artifact path, e.g. <project>/.graft/index.db. */
+  indexPath: string;
+  /** As in CompileOptions: omit to auto-resolve, null to skip. */
+  gitSha?: string | null;
+}
+
+/**
+ * The static-mode sibling of `compile`: same validate step (readDocs), but the
+ * projection target is the SQLite artifact — no database, no env. Branching is
+ * git's job here, so there is no branchId; the artifact records "main".
+ */
+export async function compileStatic(options: CompileStaticOptions): Promise<CompileResult> {
+  const docs = readDocs(options.contentDir, options.collections);
+  const gitSha = options.gitSha === undefined ? resolveGitSha(options.contentDir) : options.gitSha;
+  const changes = await projectStaticContent(
+    docs.map((doc) => ({
+      collection: doc.collection,
+      slug: doc.slug,
+      data: doc.data,
+      body: doc.body,
+      contentHash: doc.contentHash,
+      sourcePath: doc.sourcePath,
+    })),
+    { path: options.indexPath, gitSha },
   );
   return { count: docs.length, docs, changes, gitSha };
 }
