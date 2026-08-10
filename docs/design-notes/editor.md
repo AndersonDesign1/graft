@@ -80,6 +80,37 @@ Staged deliberately:
   the editor. Structural editing of children belongs here too, and is the point at
   which a real mdast tree earns its cost.
 
+## The renderer contract: declarations, owned like the component
+
+A component author should be able to say how their block looks in the canvas.
+Two constraints decide the shape of that.
+
+**The Studio is a prebuilt bundle.** There is no bundler in the loop at runtime,
+so it cannot import `components/Callout.tsx` from the project and render it. The
+only way to let a third party control presentation with _code_ would be to
+evaluate code they authored inside the editor, which is not something to ship.
+So the contract is **declarative data the editor interprets** —
+`EditorComponentSpec` in `@usegraft/contracts`: which prop is the title, which is
+a link, which prop maps to which tone, which props are already implied.
+
+**It is owned, not resolved.** A registry item ships `editor/<Component>.json`
+with file role `editor`, and `graft add` copies it to `graft/editor/` beside the
+component — so from that moment it is the operator's file. Rename a prop, retone
+it, delete it. The Studio reads `graft/editor/*.json` **from the project, never
+from `@usegraft/registry`**: reading the registry's copy would silently ignore
+those edits and reintroduce exactly the plugin-black-box coupling the
+shadcn-style owned model exists to avoid. It also means a third-party registry
+needs no runtime reachability — the file is already in the repo.
+
+Tones are a **closed set** (`info`/`warn`/`danger`/`success`/`neutral`) mapped to
+theme roles. A declaration chooses a _meaning_, never a colour, so no
+third-party component can introduce a hue the theme does not own or land
+unreadable in one scheme.
+
+Everything is optional and failure is local: a component with no declaration
+gets the generic card, and a malformed declaration is skipped rather than fatal —
+one bad file costs one styled card, not the editor.
+
 **Refusing is a feature.** The parser returns null — and the block keeps its old raw
 rendering — for anything it does not fully understand: spread props, expressions in
 children, several roots in one block, lowercase HTML tags, malformed markup. A card

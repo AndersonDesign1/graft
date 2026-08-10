@@ -15,6 +15,7 @@
 // and @milkdown/core mixes two module instances and breaks Slice identity; type
 // imports are erased at build time, so the kit path is safe here — and it is
 // the one @milkdown/prose subpath this package can resolve.
+import type { EditorComponentSpec } from "@usegraft/contracts";
 import type { Node as ProseNode } from "@milkdown/kit/prose/model";
 import type { EditorView, NodeView, NodeViewConstructor } from "@milkdown/kit/prose/view";
 import {
@@ -29,6 +30,29 @@ import {
 const TITLE_ATTRS = ["title", "label", "name", "heading"];
 /** Attributes worth showing as a destination chip. */
 const LINK_ATTRS = ["href", "to", "url"];
+
+/**
+ * The project's own declarations, by component name.
+ *
+ * A registry item ships one alongside its component and `graft add` copies both
+ * in, so this is the operator's file by the time we read it. It replaces the
+ * heuristics above with the component author's actual intent: which prop is the
+ * title, which value means "warning". Absent, the heuristics stand — every
+ * component rendered fine before declarations existed and still does.
+ *
+ * Module-level rather than threaded through: node views are constructed by
+ * ProseMirror, which has nowhere to put application state, and the alternative
+ * is rebuilding the editor whenever the map loads.
+ */
+let specs: ReadonlyMap<string, EditorComponentSpec> = new Map();
+
+export function setEditorComponentSpecs(list: readonly EditorComponentSpec[]): void {
+  specs = new Map(list.map((spec) => [spec.component, spec]));
+}
+
+function specFor(name: string): EditorComponentSpec | undefined {
+  return specs.get(name);
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -57,13 +81,48 @@ function pick(element: MdxElement, names: string[]): string | undefined {
   return element.attributes.find((a) => names.includes(a.name) && !a.expression)?.value;
 }
 
-/** Attributes that are not already shown as the title or the link. */
+/** The declared title prop when the project named one, else the heuristic. */
+function titleOf(element: MdxElement): string | undefined {
+  const declared = specFor(element.name)?.titleProp;
+  if (declared) return pick(element, [declared]);
+  return pick(element, TITLE_ATTRS);
+}
+
+function linkOf(element: MdxElement): string | undefined {
+  const declared = specFor(element.name)?.linkProp;
+  if (declared) return pick(element, [declared]);
+  return pick(element, LINK_ATTRS);
+}
+
+/** The card's chip text — the declared label, else the component's own name. */
+function labelOf(element: MdxElement): string {
+  return specFor(element.name)?.label ?? element.name;
+}
+
+/**
+ * The tone a declaration assigns from one of the element's props, so
+ * `type="warning"` on a Callout actually looks like a warning. Unmapped values
+ * get no tone rather than a guessed one.
+ */
+function toneOf(element: MdxElement): string | undefined {
+  const tone = specFor(element.name)?.tone;
+  if (!tone) return undefined;
+  const value = pick(element, [tone.prop]);
+  return value ? tone.map[value] : undefined;
+}
+
+/** Attributes that are not already shown as the title, the link, or hidden by declaration. */
 function restAttributes(element: MdxElement): MdxElement["attributes"] {
-  const shown = new Set<string>();
-  const title = element.attributes.find((a) => TITLE_ATTRS.includes(a.name) && !a.expression);
-  const link = element.attributes.find((a) => LINK_ATTRS.includes(a.name) && !a.expression);
-  if (title) shown.add(title.name);
-  if (link) shown.add(link.name);
+  const shown = new Set<string>(specFor(element.name)?.hideProps ?? []);
+  const declared = specFor(element.name);
+  const titleName =
+    declared?.titleProp ??
+    element.attributes.find((a) => TITLE_ATTRS.includes(a.name) && !a.expression)?.name;
+  const linkName =
+    declared?.linkProp ??
+    element.attributes.find((a) => LINK_ATTRS.includes(a.name) && !a.expression)?.name;
+  if (titleName && pick(element, [titleName]) !== undefined) shown.add(titleName);
+  if (linkName && pick(element, [linkName]) !== undefined) shown.add(linkName);
   return element.attributes.filter((a) => !shown.has(a.name));
 }
 
@@ -71,19 +130,21 @@ function renderChild(node: MdxNode): HTMLElement {
   if (node.kind === "text") return textBlock("mdx-card-text", node.value);
 
   const card = el("div", "mdx-card-item");
-  const title = pick(node, TITLE_ATTRS);
+  const tone = toneOf(node);
+  if (tone) card.dataset.tone = tone;
+  const title = titleOf(node);
   const head = el("div", "mdx-card-item-head");
-  head.append(el("span", "mdx-card-item-name", title ?? node.name));
-  if (title) head.append(el("span", "mdx-card-tag", node.name));
+  head.append(el("span", "mdx-card-item-name", title ?? labelOf(node)));
+  if (title) head.append(el("span", "mdx-card-tag", labelOf(node)));
   card.append(head);
 
-  const link = pick(node, LINK_ATTRS);
+  const link = linkOf(node);
   if (link) card.append(el("span", "mdx-card-link", link));
 
   const summary = elementSummary(node);
   if (summary) card.append(textBlock("mdx-card-text", summary));
 
-  const rest = restAttributes(node).filter((a) => !LINK_ATTRS.includes(a.name));
+  const rest = restAttributes(node);
   if (rest.length > 0) card.append(renderAttributes(rest));
 
   for (const child of node.children) {
@@ -119,6 +180,8 @@ class MdxCardView implements NodeView {
   ) {
     this.dom = el("div", "mdx-card");
     this.dom.setAttribute("data-mdx-component", element.name);
+    const tone = toneOf(element);
+    if (tone) this.dom.dataset.tone = tone;
     // An atom's interior is not editable text; without this ProseMirror would
     // try to place a cursor inside the card's markup.
     this.dom.contentEditable = "false";
@@ -138,7 +201,7 @@ class MdxCardView implements NodeView {
     const wrap = el("div", "mdx-card-body");
 
     const head = el("div", "mdx-card-head");
-    head.append(el("span", "mdx-card-name", this.element.name));
+    head.append(el("span", "mdx-card-name", labelOf(this.element)));
     const edit = el("button", "mdx-card-edit", "Edit source");
     edit.type = "button";
     edit.addEventListener("click", () => {
@@ -162,7 +225,7 @@ class MdxCardView implements NodeView {
   private renderEditor(): HTMLElement {
     const wrap = el("div", "mdx-card-body");
     const head = el("div", "mdx-card-head");
-    head.append(el("span", "mdx-card-name", this.element.name));
+    head.append(el("span", "mdx-card-name", labelOf(this.element)));
 
     const area = el("textarea", "mdx-card-source");
     area.value = this.source();
@@ -221,6 +284,10 @@ class MdxCardView implements NodeView {
     const changed = node.attrs.value !== this.node.attrs.value;
     this.node = node;
     this.element = parsed;
+    // An edit can change the prop the tone reads from, so re-derive it.
+    const tone = toneOf(parsed);
+    if (tone) this.dom.dataset.tone = tone;
+    else delete this.dom.dataset.tone;
     // Re-render on a real change. Without this the DOM kept whatever it was
     // showing when the transaction was dispatched — which, after an edit, is
     // the source textarea, leaving the card stuck in editing state.

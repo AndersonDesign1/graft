@@ -89,8 +89,57 @@ export type SchemaDescription = z.infer<typeof SchemaDescription>;
 export const RegistryItemType = z.enum(["block", "field", "access", "bundle"]);
 export type RegistryItemType = z.infer<typeof RegistryItemType>;
 
-export const RegistryFileRole = z.enum(["module", "component", "content", "env"]);
+export const RegistryFileRole = z.enum(["module", "component", "content", "env", "editor"]);
 export type RegistryFileRole = z.infer<typeof RegistryFileRole>;
+
+/**
+ * How a component presents in the Studio canvas — the editor's half of an
+ * owned primitive.
+ *
+ * Data, not code, and that is the load-bearing decision. The Studio ships as a
+ * prebuilt bundle with no bundler in the loop, so it cannot import a component
+ * from the project and render it; the only other way to let a third party
+ * control presentation would be to evaluate code they authored inside the
+ * editor, which is not a thing to ship. A declaration the editor interprets
+ * keeps the extension point open without that.
+ *
+ * It is copied into the project by `graft add`, exactly like the component it
+ * describes: owned, editable, no runtime dependency on the registry it came
+ * from. Renaming a prop means editing a file you already have.
+ *
+ * Everything is optional. A component with no declaration still renders — it
+ * gets the generic card, which is what every component got before this existed.
+ */
+export const EditorComponentSpec = z.object({
+  /** The JSX name this describes, e.g. "Callout". */
+  component: z.string().min(1),
+  /** Display name for the card's chip. Defaults to `component`. */
+  label: z.string().min(1).optional(),
+  /** Prop to show as the card's heading instead of guessing. */
+  titleProp: z.string().optional(),
+  /** Prop holding a destination, shown as a chip. */
+  linkProp: z.string().optional(),
+  /**
+   * Colour the card by one of its props — `type="warning"` on a Callout should
+   * look like a warning. Values map to the editor's own tone roles, so a
+   * third-party component cannot introduce a colour the theme does not have.
+   */
+  tone: z
+    .object({
+      prop: z.string().min(1),
+      map: z.record(z.string(), z.enum(["info", "warn", "danger", "success", "neutral"])),
+    })
+    .optional(),
+  /** Props already implied by the card's shape, not worth listing again. */
+  hideProps: z.array(z.string()).default([]),
+  /** Declarations for the children this component expects, e.g. DocCard inside DocCards. */
+  children: z.array(z.string()).default([]),
+});
+export type EditorComponentSpec = z.infer<typeof EditorComponentSpec>;
+
+/** What `GET /api/studio/v1/editor-components` returns: the project's own declarations. */
+export const EditorComponentList = z.object({ components: z.array(EditorComponentSpec) });
+export type EditorComponentList = z.infer<typeof EditorComponentList>;
 
 /** One file an item writes — the target path (relative to project root) and its role. */
 export const RegistryFileDescriptor = z.object({

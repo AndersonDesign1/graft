@@ -110,6 +110,23 @@
   --mdx-component-bg: var(--c-purple-bg);
   --mdx-component-border: var(--c-purple-border);
 
+  /* ---- component card tones ----------------------------------------------
+     The fixed vocabulary a project's `graft/editor/*.json` declaration may map
+     one of its component's props onto — `type="warning"` becoming a warning
+     card. Deliberately a closed set: a third-party declaration chooses a
+     meaning, never a colour, so the theme keeps control of the palette and a
+     card can never land unreadable in one scheme. */
+  --tone-info-bg: var(--c-blue-bg);
+  --tone-info-border: var(--c-blue-border);
+  --tone-warn-bg: var(--c-amber-bg);
+  --tone-warn-border: var(--c-amber-border);
+  --tone-danger-bg: var(--c-red-bg);
+  --tone-danger-border: var(--c-red-border);
+  --tone-success-bg: var(--c-green-bg);
+  --tone-success-border: var(--c-green-border);
+  --tone-neutral-bg: var(--paper-sunken);
+  --tone-neutral-border: var(--hairline-strong);
+
   --field-required: var(--c-amber-text);
   --field-required-bg: var(--c-amber-bg);
   --field-optional: var(--ink-faint);

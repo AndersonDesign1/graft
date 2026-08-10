@@ -6,7 +6,8 @@
   "dependencies": {},
   "registryDependencies": [],
   "files": [
-    { "source": "components/Callout.tsx", "target": "components/Callout.tsx", "role": "component" }
+    { "source": "components/Callout.tsx", "target": "components/Callout.tsx", "role": "component" },
+    { "source": "editor/Callout.json", "target": "graft/editor/Callout.json", "role": "editor" }
   ],
   "llms": "components/callout.llms.txt"
 }

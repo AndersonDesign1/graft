@@ -1,0 +1,14 @@
+{
+  "component": "Callout",
+  "label": "Callout",
+  "titleProp": "title",
+  "tone": {
+    "prop": "type",
+    "map": {
+      "info": "info",
+      "warning": "warn",
+      "tip": "success"
+    }
+  },
+  "hideProps": ["type"]
+}

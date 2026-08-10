@@ -1,0 +1,6 @@
+{
+  "component": "DocCard",
+  "label": "Card",
+  "titleProp": "title",
+  "linkProp": "href"
+}

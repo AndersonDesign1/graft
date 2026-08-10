@@ -1,7 +1,9 @@
 import { IconContext } from "@phosphor-icons/react";
 import { Toaster, toast } from "sonner";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { EditorComponentList } from "@usegraft/contracts";
 import type { BranchList, CompileResultDto, ContentTree } from "../types";
+import { setEditorComponentSpecs } from "./components/mdx-card";
 import { CommandPalette } from "./components/palette";
 import {
   IconApprovals,
@@ -64,6 +66,14 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
   const tree = useResource<ContentTree>(`/tree${qs({ branch })}`);
   const branches = useResource<BranchList>("/branches");
   const approvals = useResource<{ approvals: unknown[] }>("/approvals");
+
+  // How this project's components present in the canvas. Loaded once and handed
+  // to the node view rather than passed down: ProseMirror constructs node views
+  // itself, so there is no prop to thread them through.
+  const editorComponents = useResource<EditorComponentList>("/editor-components");
+  useEffect(() => {
+    setEditorComponentSpecs(editorComponents.data?.components ?? []);
+  }, [editorComponents.data]);
 
   const selectBranch = useCallback((name: string) => {
     setBranch(name);

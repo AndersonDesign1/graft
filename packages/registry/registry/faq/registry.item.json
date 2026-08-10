@@ -7,7 +7,8 @@
   "registryDependencies": [],
   "files": [
     { "source": "components/Faq.tsx", "target": "components/Faq.tsx", "role": "component" },
-    { "source": "graft/fields/faq.ts", "target": "graft/fields/faq.ts", "role": "module" }
+    { "source": "graft/fields/faq.ts", "target": "graft/fields/faq.ts", "role": "module" },
+    { "source": "editor/Faq.json", "target": "graft/editor/Faq.json", "role": "editor" }
   ],
   "llms": "components/faq.llms.txt"
 }

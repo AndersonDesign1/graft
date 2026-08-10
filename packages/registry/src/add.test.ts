@@ -87,7 +87,13 @@ describe("planAdd / applyPlan", () => {
   it("adds callout, writes the component, and regenerates the MDX map", () => {
     const plan = planAdd(["callout"], { targetDir: dir });
     expect(plan.items.map((i) => i.name)).toEqual(["callout"]);
-    expect(plan.files.map((f) => f.relPath)).toEqual(["components/Callout.tsx"]);
+    // The editor declaration ships with the component, not instead of it: the
+    // Studio reads how a Callout presents from the project, so `graft add` has
+    // to leave that file behind too or the card falls back to the generic one.
+    expect(plan.files.map((f) => f.relPath)).toEqual([
+      "components/Callout.tsx",
+      "graft/editor/Callout.json",
+    ]);
     expect(plan.mdxMap?.relPath.replace(/\\/g, "/")).toBe("components/mdx-components.ts");
     expect(plan.mdxMap?.content).toContain('import { Callout } from "./Callout"');
 
@@ -96,6 +102,15 @@ describe("planAdd / applyPlan", () => {
     expect(existsSync(join(dir, "components", "Callout.tsx"))).toBe(true);
     const map = readFileSync(join(dir, "components", "mdx-components.ts"), "utf8");
     expect(map).toContain("Callout");
+
+    // Owned, so it is a plain file in the project — editable, and the only copy
+    // that counts from here on.
+    const spec = JSON.parse(
+      readFileSync(join(dir, "graft", "editor", "Callout.json"), "utf8"),
+    ) as Record<string, unknown>;
+    expect(spec).toMatchObject({ component: "Callout", titleProp: "title" });
+    // An editor declaration is not a graft/ module, so it must not reach the barrel.
+    expect(plan.barrel?.content ?? "").not.toContain("editor/Callout");
   });
 
   it("refuses to overwrite a DIFFERING file unless --overwrite, then replaces it", () => {

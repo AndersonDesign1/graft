@@ -781,6 +781,40 @@
   text-wrap: initial;
 }
 
+/* A component's declaration can map one of its own props to a tone, so
+   `<Callout type="warning">` reads as a warning in the canvas instead of as
+   another purple box. The five tones are fixed and theme-owned: a third-party
+   declaration picks from them, it cannot introduce a colour. */
+.rich .ProseMirror .mdx-card[data-tone="info"],
+.mdx-card-item[data-tone="info"] {
+  border-color: var(--tone-info-border);
+  background: var(--tone-info-bg);
+}
+
+.rich .ProseMirror .mdx-card[data-tone="warn"],
+.mdx-card-item[data-tone="warn"] {
+  border-color: var(--tone-warn-border);
+  background: var(--tone-warn-bg);
+}
+
+.rich .ProseMirror .mdx-card[data-tone="danger"],
+.mdx-card-item[data-tone="danger"] {
+  border-color: var(--tone-danger-border);
+  background: var(--tone-danger-bg);
+}
+
+.rich .ProseMirror .mdx-card[data-tone="success"],
+.mdx-card-item[data-tone="success"] {
+  border-color: var(--tone-success-border);
+  background: var(--tone-success-bg);
+}
+
+.rich .ProseMirror .mdx-card[data-tone="neutral"],
+.mdx-card-item[data-tone="neutral"] {
+  border-color: var(--tone-neutral-border);
+  background: var(--tone-neutral-bg);
+}
+
 .mdx-card-body {
   display: flex;
   flex-direction: column;

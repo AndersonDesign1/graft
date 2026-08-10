@@ -14,7 +14,9 @@ import {
   resolveBranchScope,
   type Database,
 } from "@usegraft/db";
-import { GraftError } from "@usegraft/contracts";
+import { EditorComponentSpec, GraftError, type EditorComponentList } from "@usegraft/contracts";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import matter from "gray-matter";
 import { readCollectionDocs, readRawDocument, requireCollection, writeDocument } from "./content";
 import { STUDIO_OPENAPI } from "./openapi";
@@ -43,6 +45,12 @@ export interface StudioApiOptions {
   collections: Record<string, AnyCollection>;
   /** Absolute content root — required for get/put document. */
   contentDir: string;
+  /**
+   * Absolute project root — where `graft/` lives. Used to read the project's
+   * own `graft/editor/*.json` component declarations. Defaults to the content
+   * directory's parent, which is the layout `graft init` scaffolds.
+   */
+  projectRoot?: string;
   /** Branch used for compile + tree default. */
   defaultBranch?: string;
   /** Who stamps approval decisions (defaults to "studio"). */
@@ -277,6 +285,38 @@ function toSchemaField(field: {
 }
 
 /**
+ * The project's own component declarations, from `graft/editor/*.json`.
+ *
+ * Read from the project, never from `@usegraft/registry`. That is the whole
+ * point of the owned-primitive model: `graft add callout` copies the
+ * declaration in alongside the component, and from then on it is the
+ * operator's file — rename a prop, retone it, delete it. A Studio that read
+ * the registry's copy instead would silently ignore those edits and reintroduce
+ * exactly the plugin-black-box coupling `graft add` exists to avoid.
+ *
+ * A malformed file is skipped rather than fatal: one bad declaration should
+ * cost you one styled card, not the editor.
+ */
+function readEditorComponents(projectRoot: string): EditorComponentList {
+  const dir = join(projectRoot, "graft", "editor");
+  if (!existsSync(dir)) return { components: [] };
+
+  const components: EditorComponentSpec[] = [];
+  for (const entry of readdirSync(dir).sort()) {
+    if (!entry.endsWith(".json")) continue;
+    try {
+      const parsed = EditorComponentSpec.safeParse(
+        JSON.parse(readFileSync(join(dir, entry), "utf8")),
+      );
+      if (parsed.success) components.push(parsed.data);
+    } catch {
+      // Unreadable or not JSON — same treatment as invalid.
+    }
+  }
+  return { components };
+}
+
+/**
  * A loadable URL for an asset key, or null with the reason.
  *
  * The storage client is built per request and the module imported lazily: most
@@ -359,6 +399,12 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
       // no S3 credentials by design, and an asset field there is a key the
       // author maintains by hand. `url: null` lets the form show the key and
       // move on — a 500 would make an unconfigured project look broken.
+      // How the project's components present in the canvas. Owned files, so
+      // read per request: editing one should show up on reload, not on restart.
+      if (pathname === "/api/studio/v1/editor-components" && method === "GET") {
+        return json(readEditorComponents(options.projectRoot ?? dirname(options.contentDir)));
+      }
+
       if (pathname === "/api/studio/v1/asset-url" && method === "GET") {
         const key = url.searchParams.get("key")?.trim() ?? "";
         if (!key) return json({ key, url: null, reason: "no key" });

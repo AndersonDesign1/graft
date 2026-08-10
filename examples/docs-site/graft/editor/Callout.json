@@ -1,0 +1,14 @@
+{
+  "component": "Callout",
+  "label": "Callout",
+  "titleProp": "label",
+  "tone": {
+    "prop": "label",
+    "map": {
+      "invariant": "info",
+      "gotcha": "warn",
+      "note": "neutral"
+    }
+  },
+  "hideProps": ["label"]
+}

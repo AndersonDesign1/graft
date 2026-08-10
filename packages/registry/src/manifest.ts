@@ -19,8 +19,12 @@ export type ItemType = (typeof ITEM_TYPES)[number];
  * - `component`→ a UI component (e.g. under components/)
  * - `content` → an authored MDX file
  * - `env`     → an env-var sample (printed, not merged, for now)
+ * - `editor`  → an `EditorComponentSpec` JSON saying how the component presents
+ *               in the Studio canvas. Owned like everything else an item ships:
+ *               it lands in `graft/editor/` and the Studio reads it from the
+ *               project, never from the registry it came from.
  */
-export const FILE_ROLES = ["module", "component", "content", "env"] as const;
+export const FILE_ROLES = ["module", "component", "content", "env", "editor"] as const;
 export type FileRole = (typeof FILE_ROLES)[number];
 
 export const registryFileSchema = z.object({
