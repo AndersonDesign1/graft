@@ -30,5 +30,8 @@
     "@usegraft/core": "workspace:*",
     "@usegraft/db": "workspace:*",
     "gray-matter": "^4.0.3"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

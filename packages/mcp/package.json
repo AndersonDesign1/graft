@@ -35,5 +35,8 @@
     "@usegraft/registry": "workspace:*",
     "gray-matter": "^4.0.3",
     "zod": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

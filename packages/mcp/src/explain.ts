@@ -196,6 +196,18 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       'Either stay static (content-only: use git branches for previews) or upgrade: set DATABASE_URL in .env and switch graft.config to `export const index = "postgres"`, then re-run `graft compile`.',
   },
+  CONTENT_TREE_READ_ONLY: {
+    code: "CONTENT_TREE_READ_ONLY",
+    meaning:
+      "A write reached the content tree, but the filesystem refused it. Authored content is files, so writing requires a writable checkout — serverless platforms deploy a read-only filesystem.",
+    typicalCauses: [
+      "Studio or an MCP write served from a serverless deployment (Vercel, Netlify, Cloudflare)",
+      "A container with the project mounted read-only",
+      "File permissions on the content directory",
+    ],
+    howToRecover:
+      "Run the writing surface where the checkout is writable — local `graft studio` / `graft mcp`, or a self-hosted container with the project mounted read-write — and let the deployment serve reads only. Writes then arrive as git commits, which is the model: git is authoritative for authored content.",
+  },
   STATIC_INDEX_NOT_FOUND: {
     code: "STATIC_INDEX_NOT_FOUND",
     meaning:

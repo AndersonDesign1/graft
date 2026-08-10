@@ -17,7 +17,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # 22.12 is the floor (node:sqlite, used by the default static index).
+          # Pinning the minor keeps CI honest about the version we advertise.
+          node-version: 22.12
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile

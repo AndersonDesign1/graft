@@ -108,9 +108,16 @@ reference) — every adapter carries the runtime-credential harden recipe. **P7.
 one property access because both frameworks' endpoints are already Web-standard; cache
 invalidation maps the tag contract onto CDN surrogate keys. Next: docs site + compare page.
 
+## Telemetry
+
+**None.** Graft collects no analytics, sends no usage pings, and phones home from no command.
+The only network calls it makes are the ones your project configures: your database, your asset
+store, and (if you use them) Neon's branching API and your OIDC issuer.
+
 ## Requirements
 
-- Node `>=20` (developed on 24)
+- Node `>=22.12` (developed on 24). The static index uses the built-in `node:sqlite`, which is
+  stable from 22.12; Node 20 reached end-of-life in April 2026.
 - TypeScript **7** (native `tsc`; monorepo dual-install keeps TS 6 API for tsup DTS until tooling catches up)
 - [pnpm](https://pnpm.io) `11.x` (pinned via `packageManager`)
 - Docker (for the self-host Postgres + MinIO stack)

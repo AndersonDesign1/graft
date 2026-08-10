@@ -10,7 +10,7 @@
  *
  * See docs/design-notes/agent-mcp.md for the product bar and non-goals.
  */
-import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -20,7 +20,14 @@ import {
   storageConfigFromEnv,
   type Storage,
 } from "@usegraft/assets";
-import { compile, compileStatic, parseDocument, type CompileResult } from "@usegraft/compiler";
+import {
+  compile,
+  compileStatic,
+  composeDocument,
+  parseDocument,
+  writeDocumentFile,
+  type CompileResult,
+} from "@usegraft/compiler";
 import {
   GraftError,
   type ErrorCode,
@@ -60,7 +67,6 @@ import {
 } from "@usegraft/db";
 import { describeItem, listItems, loadItem } from "@usegraft/registry";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import matter from "gray-matter";
 import { z } from "zod";
 import { findDoc, readCollectionDocs, requireCollection } from "./content-files";
 import { ERROR_KNOWLEDGE, explainCode } from "./explain";
@@ -667,14 +673,17 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
         }
 
         const sourcePath = `${name}/${slug}.mdx`;
-        const raw = matter.stringify(body ?? "", data);
+        const fullPath = join(contentDir, ...sourcePath.split("/"));
+        // Updating an existing document must not rewrite frontmatter the author
+        // (or an earlier agent) wrote — only a real data change re-serialises.
+        const existingRaw = existsSync(fullPath) ? readFileSync(fullPath, "utf8") : undefined;
+        const raw = composeDocument(existingRaw, data as Record<string, unknown>, body ?? "");
         // Validate before touching disk: schema + slug shape, same path compile uses.
         parseDocument(raw, collection, sourcePath);
 
         assertSlugFree(contentDir, name, collection, slug, sourcePath);
 
-        mkdirSync(join(contentDir, name), { recursive: true });
-        writeFileSync(join(contentDir, ...sourcePath.split("/")), raw);
+        writeDocumentFile(fullPath, raw);
 
         const result = await projectContent();
         return {

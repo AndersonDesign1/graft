@@ -34,5 +34,8 @@
   },
   "devDependencies": {
     "@usegraft/sdk-core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

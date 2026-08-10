@@ -29,5 +29,8 @@
     "@usegraft/contracts": "workspace:*",
     "@usegraft/db": "workspace:*",
     "zod": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

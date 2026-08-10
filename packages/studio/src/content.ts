@@ -2,9 +2,15 @@
  * File-authoritative content read/write for Studio — same model as MCP:
  * git owns the MDX; compile refreshes the index.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { compile, parseDocument, type ProjectedDoc } from "@usegraft/compiler";
+import {
+  compile,
+  composeDocument,
+  parseDocument,
+  writeDocumentFile,
+  type ProjectedDoc,
+} from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import type { AnyCollection } from "@usegraft/core";
 import type { Database } from "@usegraft/db";
@@ -113,11 +119,14 @@ export async function writeDocument(options: {
   }
 
   const sourcePath = `${options.collection}/${options.slug}.mdx`;
-  const raw = matter.stringify(options.body ?? "", options.data);
+  const fullPath = join(options.contentDir, ...sourcePath.split("/"));
+  // Preserve the author's frontmatter bytes when only the body changed —
+  // re-serialising would rewrite their quoting and spacing on every save.
+  const existingRaw = existsSync(fullPath) ? readFileSync(fullPath, "utf8") : undefined;
+  const raw = composeDocument(existingRaw, options.data, options.body ?? "");
   parseDocument(raw, collection, sourcePath);
 
-  mkdirSync(join(options.contentDir, options.collection), { recursive: true });
-  writeFileSync(join(options.contentDir, ...sourcePath.split("/")), raw);
+  writeDocumentFile(fullPath, raw);
 
   const result = await compile({
     contentDir: options.contentDir,

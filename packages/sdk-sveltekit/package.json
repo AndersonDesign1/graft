@@ -30,5 +30,8 @@
   },
   "devDependencies": {
     "@usegraft/core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

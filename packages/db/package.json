@@ -35,5 +35,8 @@
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.10"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

@@ -27,5 +27,8 @@
   },
   "dependencies": {
     "zod": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

@@ -9,7 +9,7 @@ type Props = ComponentPropsWithoutRef<"code">;
 /** Split a CLI-ish string into colored spans. */
 function tokenize(text: string): ReactNode[] {
   // Paths keep a trailing `/`; bare `/` between commands stays a separator.
-  const re = /(\s+)|(--[\w-]+)|(-[\w])|(<[^>\s]+>)|(\[[^\]]+\])|([\w@.-]+\/)|(\/)|([^\s/<\[\]]+)/g;
+  const re = /(\s+)|(--[\w-]+)|(-[\w])|(<[^>\s]+>)|(\[[^\]]+\])|([\w@.-]+\/)|(\/)|([^\s/<[\]]+)/g;
   const out: ReactNode[] = [];
   let i = 0;
   let atCommandHead = true;
