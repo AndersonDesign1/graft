@@ -20,7 +20,7 @@ import {
   storageConfigFromEnv,
   type Storage,
 } from "@usegraft/assets";
-import { compile, parseDocument } from "@usegraft/compiler";
+import { compile, compileStatic, parseDocument, type CompileResult } from "@usegraft/compiler";
 import {
   GraftError,
   type ErrorCode,
@@ -40,13 +40,20 @@ import {
   type GraftFunctionsHandler,
   type RateLimit,
 } from "@usegraft/core";
-import type { ApprovalStore, AuditStore, BranchScope, Database } from "@usegraft/db";
+import type {
+  ApprovalStore,
+  AuditStore,
+  BranchScope,
+  ContentSearchHit,
+  Database,
+} from "@usegraft/db";
 import {
   assertSearchQuery,
   decideApproval,
   listBranches,
   listCompilations,
   listPendingApprovals,
+  openStaticIndex,
   resolveBranchScope,
   scopeChain,
   searchContent,
@@ -62,7 +69,19 @@ export interface GraftMcpOptions {
   /** Absolute path to the content root (documents live at <contentDir>/<collection>/<slug>.mdx). */
   contentDir: string;
   collections: Record<string, AnyCollection>;
-  db: Database;
+  /**
+   * The Postgres content index. Omit only when serving a static project via
+   * `staticIndexPath` — `db` wins if both are somehow set.
+   */
+  db?: Database;
+  /**
+   * Path to a compiled static index artifact (.graft/index.db) — the
+   * zero-service tier. Authoring works exactly as it does on Postgres (files
+   * are the truth, write_content recompiles), and the Postgres-tier tools
+   * (functions, branches, approvals, the gated delete) answer NEEDS_DATABASE
+   * with the upgrade rather than being silently absent.
+   */
+  staticIndexPath?: string;
   /**
    * Typed functions from graft.config — enables list_functions / describe_function
    * / run_function and fills describe_schema.functions. Optional so content-only
@@ -156,8 +175,65 @@ async function guarded(body: () => Promise<unknown> | unknown): Promise<ToolResu
 }
 
 export function createGraftMcp(options: GraftMcpOptions): McpServer {
-  const { contentDir, collections, db } = options;
+  const { contentDir, collections } = options;
   const branchId = options.branchId ?? "main";
+
+  // Which index this server serves. Static projects have no database at all, so
+  // every Postgres-tier tool routes through requireDb() and teaches the upgrade
+  // instead of throwing something opaque about a missing connection.
+  const staticIndexPath = options.db === undefined ? options.staticIndexPath : undefined;
+  const maybeDb = options.db;
+  if (maybeDb === undefined && staticIndexPath === undefined) {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message: "createGraftMcp needs an index: pass `db` (Postgres) or `staticIndexPath`.",
+      fix: "Pass `db` from createDb(DATABASE_URL), or `staticIndexPath` pointing at the compiled artifact (.graft/index.db) for a static project.",
+    });
+  }
+
+  /** The Postgres handle, or a NEEDS_DATABASE that names the tool that wanted it. */
+  const requireDb = (feature: string, insteadDo: string): Database => {
+    if (maybeDb !== undefined) return maybeDb;
+    throw new GraftError({
+      code: "NEEDS_DATABASE",
+      message: `${feature} needs the Postgres index; this project serves a static index (${staticIndexPath}).`,
+      fix: `${insteadDo} To move this project to the Postgres tier: set DATABASE_URL, change graft.config to \`export const index = "postgres"\`, run \`graft db migrate\`, then \`graft compile\`.`,
+      details: { feature, index: "static" },
+    });
+  };
+
+  /**
+   * Project the content tree into whichever index this server serves. Static
+   * artifacts are opened per operation and closed immediately — a SQLite file
+   * open is sub-millisecond, and holding no handle keeps the server as
+   * stateless as the Postgres path.
+   */
+  const projectContent = async (): Promise<CompileResult> =>
+    staticIndexPath === undefined
+      ? compile({ contentDir, collections, db: requireDb("compile", ""), branchId })
+      : compileStatic({ contentDir, collections, indexPath: staticIndexPath });
+
+  /** Search whichever index this server serves; the static artifact is opened per call. */
+  const searchIndex = async (query: {
+    query: string;
+    chain: string[];
+    collections: string[];
+    limit?: number;
+  }): Promise<ContentSearchHit[]> => {
+    if (staticIndexPath === undefined) {
+      return searchContent(requireDb("search_content", ""), query);
+    }
+    const index = await openStaticIndex(staticIndexPath);
+    try {
+      return await index.searchContent({
+        query: query.query,
+        collections: query.collections,
+        limit: query.limit,
+      });
+    } finally {
+      await index.close();
+    }
+  };
   const functions = options.functions ?? {};
   const functionsByName = new Map<string, AnyGraftFunction>();
   for (const fn of Object.values(functions)) functionsByName.set(fn.name, fn);
@@ -172,7 +248,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
   const getScope = (): Promise<BranchScope> => {
     scopePromise ??= options.scope
       ? Promise.resolve(options.scope)
-      : resolveBranchScope(db, branchId);
+      : resolveBranchScope(requireDb("Branch scope resolution", ""), branchId);
     return scopePromise;
   };
 
@@ -181,7 +257,10 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
   const getFunctionsHandler = (): GraftFunctionsHandler => {
     functionsHandler ??= createFunctionsHandler({
       functions,
-      db,
+      db: requireDb(
+        "run_function",
+        "Typed functions read and write operational data in Postgres, so a static project has none.",
+      ),
       branch: branchId,
       actor: options.actor,
       approvalPolicy: options.approvalPolicy,
@@ -220,7 +299,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
       const collection = requireCollection(collections, input.collection);
       const doc = findDoc(contentDir, input.collection, collection, input.slug);
       unlinkSync(join(contentDir, ...doc.sourcePath.split("/")));
-      const result = await compile({ contentDir, collections, db, branchId });
+      const result = await projectContent();
       return {
         deleted: doc.sourcePath,
         branch: branchId,
@@ -232,8 +311,14 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
   let deleteHandler: GraftFunctionsHandler | undefined;
   const getDeleteHandler = (): GraftFunctionsHandler => {
     deleteHandler ??= createFunctionsHandler({
+      // The one-shot, input-bound human approval lives in Postgres. Rather than
+      // silently downgrading to an ungated delete, a static project is told to
+      // do it the way git already makes safe: delete the file and recompile.
+      db: requireDb(
+        "delete_content",
+        "Its human approval gate is a Postgres table, and dropping the gate would make the delete ungated. In a static project, delete the file and recompile — git is authoritative, so the file IS the document and git history is the undo.",
+      ),
       functions: { delete_content: deleteContentFn },
-      db,
       branch: branchId,
       actor: options.actor,
       rateLimit: options.rateLimit,
@@ -518,16 +603,13 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
         if (name !== undefined) requireCollection(collections, name);
         // Cheap input gates first — an invalid query never pays scope resolution.
         assertSearchQuery(query);
-        // Search the resolved chain (leaf-first), the same effective content
-        // readContent serves: inherited parent docs are found, branch overrides
-        // win, tombstones hide (P4.1 overlay semantics).
-        const chain = scopeChain(await getScope());
-        const hits = await searchContent(db, {
-          query,
-          chain,
-          collections: name === undefined ? Object.keys(collections) : [name],
-          limit,
-        });
+        const collectionNames = name === undefined ? Object.keys(collections) : [name];
+        // A static artifact is a single compiled branch, so its "chain" is just
+        // this branch; Postgres searches the resolved chain (leaf-first), the
+        // same effective content readContent serves: inherited parent docs are
+        // found, branch overrides win, tombstones hide (P4.1 overlay semantics).
+        const chain = staticIndexPath === undefined ? scopeChain(await getScope()) : [branchId];
+        const hits = await searchIndex({ query, chain, collections: collectionNames, limit });
         return {
           branch: branchId,
           chain,
@@ -594,7 +676,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
         mkdirSync(join(contentDir, name), { recursive: true });
         writeFileSync(join(contentDir, ...sourcePath.split("/")), raw);
 
-        const result = await compile({ contentDir, collections, db, branchId });
+        const result = await projectContent();
         return {
           written: sourcePath,
           branch: branchId,
@@ -761,7 +843,14 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     },
     () =>
       guarded(async () => ({
-        branches: (await listBranches(db)).map((row) => ({
+        branches: (
+          await listBranches(
+            requireDb(
+              "list_branches",
+              "Copy-on-write preview branches are a database feature; in a static project a branch is simply a git branch, and each checkout compiles its own artifact.",
+            ),
+          )
+        ).map((row) => ({
           name: row.name,
           parent: row.parent,
           backend: row.backend,
@@ -786,10 +875,16 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     ({ branch, limit }) =>
       guarded(async () => ({
         compilations: (
-          await listCompilations(db, {
-            branchId: branch,
-            limit,
-          })
+          await listCompilations(
+            requireDb(
+              "list_compilations",
+              "The Postgres index keeps the full projection trail; a static artifact carries only the runs that built it.",
+            ),
+            {
+              branchId: branch,
+              limit,
+            },
+          )
         ).map((row) => ({
           id: row.id,
           branchId: row.branchId,
@@ -813,7 +908,14 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     },
     () =>
       guarded(async () => ({
-        approvals: (await listPendingApprovals(db)).map((row) => ({
+        approvals: (
+          await listPendingApprovals(
+            requireDb(
+              "list_approvals",
+              "Approvals gate destructive operations on operational data, which a static project does not have.",
+            ),
+          )
+        ).map((row) => ({
           id: row.id,
           branchId: row.branchId,
           functionName: row.functionName,
@@ -843,7 +945,15 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     },
     ({ id, decision, decidedBy }) =>
       guarded(async () => {
-        const row = await decideApproval(db, id, decision, decidedBy?.trim() || "mcp-operator");
+        const row = await decideApproval(
+          requireDb(
+            "decide_approval",
+            "Approvals gate destructive operations on operational data, which a static project does not have.",
+          ),
+          id,
+          decision,
+          decidedBy?.trim() || "mcp-operator",
+        );
         if (!row) {
           throw new GraftError({
             code: "APPROVAL_INVALID",

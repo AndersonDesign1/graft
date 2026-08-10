@@ -30,6 +30,18 @@ describe("createGraft type inference", () => {
     // Unknown collection names are compile errors, not runtime surprises.
     expectTypeOf(graft.getContent).parameter(0).toEqualTypeOf<"pages">();
   });
+
+  it("keeps the same inference when reading a static index instead of a database", () => {
+    // Zero-service projects pass a ContentIndexReader; the typed surface and
+    // the no-codegen contract must not depend on which index is behind it.
+    const graft = createGraft({ index: {} as never, collections: { pages } });
+    expectTypeOf(graft.getContent<"pages">).returns.resolves.toEqualTypeOf<Document<
+      typeof pages
+    > | null>();
+    expectTypeOf(graft.searchContent<"pages">).returns.resolves.toEqualTypeOf<
+      SearchHit<typeof pages>[]
+    >();
+  });
 });
 
 describe("graftRoute", () => {

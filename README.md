@@ -35,11 +35,21 @@ The artifact is derived from the files in git, so it is git-ignored and rebuilt 
 command (`graft compile && next build`). Preview branches are just git branches — each checkout
 compiles its own index. Full-text search works too; it is a property of the artifact.
 
-**When you need more**, add `DATABASE_URL` and switch one line
-(`export const index = "postgres"`). Postgres unlocks operational data (form submissions, orders,
-comments), typed functions with auth/audit/approvals, and copy-on-write database branches — and
-Graft tells you the moment you need it: reaching for one of those in static mode fails with
-`NEEDS_DATABASE`, whose `fix` is the upgrade. Design note:
+Agents get the same surface here — `graft mcp` serves a static project, so an agent can author,
+read, and search content with no database attached.
+
+**When you need more:**
+
+```bash
+# 1. set DATABASE_URL in .env, 2. flip one line: export const index = "postgres"
+npx graft db migrate    # applies the schema that ships with @usegraft/db
+npx graft compile
+```
+
+Postgres unlocks operational data (form submissions, orders, comments), typed functions with
+auth/audit/approvals, and copy-on-write database branches — and Graft tells you the moment you
+need it: reaching for one of those in static mode fails with `NEEDS_DATABASE`, whose `fix` is the
+upgrade above. Design note:
 [`docs/design-notes/static-index.md`](docs/design-notes/static-index.md).
 
 ## Status

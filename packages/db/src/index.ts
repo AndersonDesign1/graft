@@ -12,6 +12,7 @@ export * from "./content";
 export * from "./diff";
 export * from "./harden";
 export * from "./ledger";
+export * from "./migrate";
 export * from "./neon";
 export * from "./reader";
 export * from "./schema";

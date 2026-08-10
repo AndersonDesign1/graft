@@ -32,6 +32,8 @@ function printHelp(): void {
     "               Postgres tier (operational data, functions, DB branching)",
     "  compile      Project the content tree into the content index once",
     "  dev          Watch content/ + graft.config.ts and recompile on change",
+    "  db migrate   Apply the Postgres schema migrations that ship with @usegraft/db",
+    "               (the first command a Postgres-tier project runs; --dry-run lists them)",
     "  asset put <file> [key]   Upload a binary to the asset store (S3_* env)",
     "  approvals    List pending approvals for human-gated (destructive) function calls",
     "  approve <id> Approve a pending approval (the caller retries with x-graft-approval)",
@@ -67,7 +69,7 @@ function printHelp(): void {
     "  --apply          Execute pending migrations / the merge (default is a dry-run report)",
     "  --postgres       Scaffold `graft init` for the Postgres index (default: static)",
     "  --static         Scaffold `graft init` for the static index (the default)",
-    "  --dry-run        Preview `graft add` without writing",
+    "  --dry-run        Preview `graft add` without writing; list pending `graft db migrate`",
     "  --overwrite      Let `graft add` replace files that differ",
     "  --prune-unknown  Let `graft compile` remove index rows in collections this schema",
     "                   doesn't know (default: refuse — the shared-DATABASE_URL guard)",
@@ -237,6 +239,20 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
       case "dev": {
         const { devCommand } = await import("./commands/dev");
         await devCommand({ cwd, branchId: args.branchId });
+        return 0;
+      }
+      case "db": {
+        const [subcommand] = args.positionals;
+        if (subcommand !== "migrate") {
+          throw new UsageError(
+            subcommand
+              ? `unknown db subcommand "${subcommand}" — the only one is \`graft db migrate\``
+              : "usage: graft db migrate [--dry-run]",
+          );
+        }
+        const { dbMigrateCommand, formatMigrateResult } = await import("./commands/db");
+        const result = await dbMigrateCommand({ cwd, dryRun: args.dryRun });
+        console.log(formatMigrateResult(result));
         return 0;
       }
       case "asset": {

@@ -154,6 +154,7 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
 
   const projectDir = dirname(configPath);
   const index = parseIndexConfig(mod.index, projectDir, configPath);
+  assertStaticSupports(index, collections as Record<string, AnyCollection>, functions, configPath);
   const contentDirSetting = typeof mod.contentDir === "string" ? mod.contentDir : "content";
   const migrationsDirSetting =
     typeof mod.migrationsDir === "string" ? mod.migrationsDir : "migrations";
@@ -166,6 +167,44 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
     collections: collections as Record<string, AnyCollection>,
     functions,
   };
+}
+
+/**
+ * The static/Postgres boundary, enforced where a project is loaded rather than
+ * where it eventually breaks. Static mode indexes authored content only:
+ * operational data (db-authoritative collections) and typed functions are
+ * Postgres-tier by construction, so declaring them alongside a static index is
+ * a project that cannot work — and the moment to teach the upgrade.
+ */
+function assertStaticSupports(
+  index: IndexConfig,
+  collections: Record<string, AnyCollection>,
+  functions: Record<string, AnyGraftFunction>,
+  configPath: string,
+): void {
+  if (index.driver !== "static") return;
+
+  const dbCollections = Object.values(collections)
+    .filter((collection) => collection.authority === "db-authoritative")
+    .map((collection) => collection.name);
+  const functionNames = Object.keys(functions);
+  if (dbCollections.length === 0 && functionNames.length === 0) return;
+
+  const needs = [
+    dbCollections.length > 0
+      ? `db-authoritative collection(s) ${dbCollections.map((n) => `"${n}"`).join(", ")}`
+      : "",
+    functionNames.length > 0
+      ? `typed function(s) ${functionNames.map((n) => `"${n}"`).join(", ")}`
+      : "",
+  ].filter(Boolean);
+
+  throw new GraftError({
+    code: "NEEDS_DATABASE",
+    message: `${configPath} uses the static index, but declares ${needs.join(" and ")} — those live in Postgres, not in the compiled artifact.`,
+    fix: 'Upgrade this project to the Postgres tier: set DATABASE_URL in .env, change graft.config to `export const index = "postgres"`, run `graft db migrate`, then `graft compile`. To stay service-free instead, remove the db-authoritative collections and functions (a `graft add` primitive that brought them can be deleted from graft/).',
+    details: { dbCollections, functions: functionNames },
+  });
 }
 
 /** Default artifact path for static mode, relative to the project root. */

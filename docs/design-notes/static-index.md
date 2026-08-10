@@ -100,11 +100,55 @@ contract survives).
 - `STATIC_INDEX_NOT_FOUND` — reads before the first compile. Fix: `graft compile`.
 - `STATIC_INDEX_UNSUPPORTED` — Node < 22.12 (no `node:sqlite`). Fix: upgrade Node.
 
+## The agent surface is not a Postgres-tier feature
+
+Graft's thesis is that an agent is the primary operator, so `graft mcp` serves
+a static project too: `db` on `createGraftMcp` is optional, and
+`staticIndexPath` selects the artifact. Authoring is identical — files are the
+truth, `write_content` validates and recompiles — and `search_content` reads
+the artifact. The static artifact is opened **per operation and closed**, which
+keeps the server as stateless as the Postgres path (no handle to leak, no
+lifetime question for the HTTP handler).
+
+Postgres-tier tools stay registered rather than disappearing, and answer
+`NEEDS_DATABASE` naming what they needed and how to upgrade — an absent tool
+teaches nothing. Two calls deserve their reasons recorded:
+
+- **`delete_content` refuses.** Its one-shot, input-bound human approval lives
+  in Postgres. Serving it without that would silently downgrade a gated
+  destructive op to an ungated one. The fix points at the honest static answer:
+  delete the file and recompile — git is authoritative, so the file _is_ the
+  document and git history is the undo.
+- **`list_compilations` refuses** even though the artifact carries recent runs:
+  the Postgres trail is the full history, and returning a truncated one under
+  the same name would be a quieter lie than a clear error. Exposing it as its
+  own artifact-scoped surface is open.
+
+## Boundary enforcement
+
+A static project that declares typed functions or db-authoritative collections
+cannot work, so `loadConfig` refuses it with `NEEDS_DATABASE` — at load, not at
+the point it eventually breaks. The message names the offending collections and
+functions; the fix gives the order: set DATABASE_URL, switch `index`, run
+`graft db migrate`, then `graft compile`.
+
+## `graft db migrate`
+
+The Postgres tier must be installable from npm alone. The generated SQL ships
+inside `@usegraft/db` (`files: ["dist", "drizzle"]`), and `runMigrations`
+resolves it path-form (the P6.3 `registryRoot()` lesson) so a consumer needs no
+drizzle-kit and no checked-out migrations. **It applies by default** — a
+deliberate divergence from `graft migrate` / `graft merge`, whose `--apply`
+consent exists because they transform authored bytes and rows. This is
+generated, additive, idempotent DDL and the prerequisite for anything working;
+`--dry-run` lists what is pending. The container entrypoint has always run it
+unattended for the same reason.
+
 ## Out of scope (this unit)
 
-- `graft init` scaffolding static-by-default + zero-service quickstart (L1
-  follow-up, with the CI time-to-first-render check).
-- MCP/serve/studio over a static index (they require DATABASE_URL today and
-  fail with the existing self-teaching envs; wiring them to the reader is a
-  follow-up).
+- `graft serve` over a static index: serve exists to run typed functions and
+  the HTTP MCP endpoint, and functions are Postgres-tier by construction.
+  Static projects deploy as built sites, not as a Graft server.
+- Studio over a static index — Studio work is the next milestone (L2); its
+  read path already merges disk with the index, so this is a driver swap there.
 - Remote SQLite backends (Turso/D1) — same dialect by construction, later.

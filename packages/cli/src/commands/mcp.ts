@@ -15,6 +15,7 @@
  */
 import { createActorResolver } from "@usegraft/auth";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
+import { assertNoStaticBranch } from "./compile";
 
 export interface McpCommandOptions {
   cwd: string;
@@ -24,14 +25,22 @@ export interface McpCommandOptions {
 export async function mcpCommand(options: McpCommandOptions): Promise<void> {
   loadProjectEnv(options.cwd);
   const config = await loadConfig(findConfig(options.cwd));
-  const url = requireDatabaseUrl();
+  // Static projects get the same agent surface for authored content — the
+  // Postgres-tier tools answer NEEDS_DATABASE with the upgrade instead of the
+  // server refusing to start. Being agent-native is not a Postgres-tier feature.
+  const isStatic = config.index.driver === "static";
+  if (isStatic) assertNoStaticBranch(options.branchId);
+  const url = isStatic ? undefined : requireDatabaseUrl();
 
   const [{ createGraftMcp, serveStdio }, { createDb, resolveBranchHandle, scopeWriteBranch }] =
     await Promise.all([import("@usegraft/mcp"), import("@usegraft/db")]);
 
-  const control = createDb(url);
+  const control = url !== undefined ? createDb(url) : undefined;
   const branchName = options.branchId ?? "main";
-  const branch = await resolveBranchHandle(control.db, branchName, { databaseUrl: url });
+  const branch =
+    control !== undefined && url !== undefined
+      ? await resolveBranchHandle(control.db, branchName, { databaseUrl: url })
+      : undefined;
 
   try {
     const devToken = process.env.GRAFT_DEV_TOKEN;
@@ -58,11 +67,15 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
       contentDir: config.contentDir,
       collections: config.collections,
       functions: config.functions,
-      db: branch.db,
-      branchId: scopeWriteBranch(branch.scope),
-      // The handle's resolved scope makes search_content overlay-aware: an
-      // overlay branch searches its full parent chain, not just its own rows.
-      scope: branch.scope,
+      ...(branch !== undefined
+        ? {
+            db: branch.db,
+            branchId: scopeWriteBranch(branch.scope),
+            // The handle's resolved scope makes search_content overlay-aware: an
+            // overlay branch searches its full parent chain, not just its own rows.
+            scope: branch.scope,
+          }
+        : { staticIndexPath: (config.index as { driver: "static"; path: string }).path }),
       actor: resolveActor,
       defaultAuthorization: devToken,
     });
@@ -71,7 +84,7 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
     // Errors before connect go to stderr via the CLI runner.
     await serveStdio(server);
   } finally {
-    await branch.close();
-    await control.close();
+    await branch?.close();
+    await control?.close();
   }
 }

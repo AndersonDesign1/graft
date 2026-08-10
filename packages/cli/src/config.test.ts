@@ -72,6 +72,29 @@ describe("loadConfig", () => {
   });
 });
 
+describe("index config", () => {
+  it("defaults to postgres when the config omits `index`", async () => {
+    const config = await loadConfig(findConfig(join(fixtures, "basic")));
+    expect(config.index).toEqual({ driver: "postgres" });
+  });
+
+  it('resolves `index = "static"` to the default artifact path', async () => {
+    const dir = join(fixtures, "static-basic");
+    const config = await loadConfig(findConfig(dir));
+    expect(config.index).toEqual({ driver: "static", path: join(dir, ".graft", "index.db") });
+  });
+
+  it("refuses a static project that declares functions or db-authoritative collections", async () => {
+    const load = () => loadConfig(findConfig(join(fixtures, "static-with-functions")));
+    expect(await graftErrorCodeAsync(load)).toBe("NEEDS_DATABASE");
+    // The message must name what forced the upgrade, and the fix the order to do it in.
+    const error = (await load().catch((e: unknown) => e)) as GraftError;
+    expect(error.message).toContain('"orders"');
+    expect(error.message).toContain('"countPages"');
+    expect(error.fix).toContain("graft db migrate");
+  });
+});
+
 describe("requireDatabaseUrl", () => {
   it("throws ENV_VAR_MISSING when DATABASE_URL is unset", () => {
     const previous = process.env.DATABASE_URL;

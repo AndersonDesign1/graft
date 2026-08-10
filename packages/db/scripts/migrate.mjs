@@ -1,11 +1,11 @@
 /**
- * Apply pending Drizzle migrations from ./drizzle to DATABASE_URL.
+ * Apply pending schema migrations to DATABASE_URL.
  * Run: pnpm --filter @usegraft/db db:migrate   (loads repo-root .env)
+ *
+ * Thin wrapper over the same `runMigrations` that `graft db migrate` calls, so
+ * the monorepo exercises the path npm consumers get rather than a parallel one.
  */
-import { fileURLToPath } from "node:url";
-import { drizzle } from "drizzle-orm/postgres-js";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
-import postgres from "postgres";
+import { runMigrations } from "../dist/index.js";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -13,21 +13,14 @@ if (!url) {
   process.exit(1);
 }
 
-const isNeon = /\.neon\.tech/.test(url);
-const sql = postgres(url, {
-  ssl: isNeon || /sslmode=require/.test(url) ? "require" : false,
-  prepare: !isNeon,
-  max: 1,
-});
-
 try {
-  await migrate(drizzle(sql), {
-    migrationsFolder: fileURLToPath(new URL("../drizzle", import.meta.url)),
-  });
-  console.log("✅ migrations applied");
+  const { applied } = await runMigrations(url);
+  console.log(
+    applied.length === 0
+      ? "✅ schema already up to date"
+      : `✅ applied ${applied.length} migration(s): ${applied.join(", ")}`,
+  );
 } catch (err) {
-  console.error("migration failed:", err);
+  console.error("migration failed:", err instanceof Error ? err.message : err);
   process.exitCode = 1;
-} finally {
-  await sql.end();
 }
