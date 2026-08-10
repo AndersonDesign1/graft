@@ -197,12 +197,12 @@
    Document sheet — one column, frontmatter above body
    ========================================================================== */
 
-/* The sheet. Raised off the desk, squared to the house geometry, and wide
-   enough that the body inside lands near a 68ch measure at 18px. Elevation is
-   a hairline plus one soft shadow rather than a heavy drop: the page should
-   look like paper, not like a floating dialog. */
-/* 48rem minus 2×48px padding leaves a ~672px column: about 72 characters at
-   18px, the middle of the 60–75 range prose wants. The page width is the
+/* The sheet: a page raised off the desk, squared to the house geometry.
+   Elevation is a hairline plus one soft shadow rather than a heavy drop —
+   this should look like paper, not like a floating dialog.
+
+   48rem minus 2×48px padding leaves a ~672px column: about 72 characters at
+   18px, the middle of the 60–75 range prose wants. The page width *is* the
    measure — there is no second cap fighting it. */
 .doc-sheet {
   width: 100%;
@@ -552,4 +552,159 @@
     border-color: var(--hairline-strong);
     color: var(--ink-muted);
   }
+}
+
+/* ==========================================================================
+   MDX component blocks — cards, not source
+   ========================================================================== */
+
+/* The block is an inline atom, so it must be told to occupy its own line.
+   Margins match the prose rhythm above it. */
+.rich .ProseMirror .mdx-card {
+  display: block;
+  margin-block: var(--space-4);
+  border: 1px solid var(--mdx-component-border);
+  border-radius: var(--radius);
+  background: var(--mdx-component-bg);
+  /* Prose sets `pretty`; inside the card the content is UI, not paragraphs. */
+  text-wrap: initial;
+}
+
+.mdx-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.mdx-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The component's name, in the chrome voice — this is the one label that says
+   "you are looking at a component, not at prose". */
+.mdx-card-name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--mdx-component-text);
+}
+
+.mdx-card-edit {
+  flex-shrink: 0;
+  padding: 0.25rem 0.5rem;
+  /* Concentric: the card is 6px at 12px padding, so its controls sit at 3px. */
+  border: 1px solid transparent;
+  border-radius: var(--radius-inner);
+  background: none;
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mdx-card-edit:hover {
+    color: var(--ink);
+    border-color: var(--hairline-strong);
+  }
+}
+
+.mdx-card-edit:active {
+  transform: scale(0.96);
+}
+
+.mdx-card-children {
+  display: grid;
+  /* Two across when there is room, one when there is not — the same shape the
+     rendered DocCards take on the site. */
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-2);
+}
+
+.mdx-card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: var(--space-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-inner);
+  background: var(--paper-raised);
+}
+
+.mdx-card-item-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.mdx-card-item-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+
+.mdx-card-tag {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--ink-faint);
+}
+
+.mdx-card-link {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--ink-faint);
+  overflow-wrap: anywhere;
+}
+
+.mdx-card-text {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+  color: var(--ink-muted);
+}
+
+.mdx-card-attrs {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.15rem var(--space-2);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+}
+
+.mdx-card-attrs dt {
+  color: var(--ink-faint);
+}
+
+.mdx-card-attrs dd {
+  margin: 0;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.mdx-card-attrs dd.is-expression {
+  color: var(--prose-code);
+}
+
+.mdx-card-source {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-inner);
+  background: var(--paper-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+  resize: vertical;
 }

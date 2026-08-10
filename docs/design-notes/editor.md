@@ -1,6 +1,8 @@
 # Studio editor v2 — the authoring canvas (L2)
 
-> Decided 2026-08-10. Pairs with the launch plan (phases.md). Status: building.
+> Decided 2026-08-10. Pairs with the launch plan (phases.md).
+> Status: **canvas + typography shipped** (`46cf092`); **generic component cards
+> shipped**. Next: the Zod-driven frontmatter form.
 
 ## The complaint, stated precisely
 
@@ -24,7 +26,7 @@ and only one of them is taste:
 3. **Frontmatter reads as a debug panel.** Small-caps mono labels over bare inputs,
    flush against the body, with no sense of being _settings_ rather than content.
 
-## Library decision: keep Milkdown, add remark-mdx
+## Library decision: keep Milkdown; no new parser
 
 **Liveblocks is rejected.** It is a commercial hosted service (paid past a free
 tier), which fails the open-source constraint outright. It also solves a problem we
@@ -39,10 +41,19 @@ rewrites the author's file, so that property is not negotiable — and it is exa
 what Slate/Plate, TipTap, and BlockNote would each require us to rebuild, because
 their document models are not mdast.
 
-**What we add is `remark-mdx`** (MIT, the unified/MDX ecosystem — the same parser
-MDX itself uses). With it, `<DocCards>` stops being an opaque `html` node and becomes
-a real `mdxJsxFlowElement` in the tree: tag name, attributes, and children, all
-addressable. That is the difference between showing source and showing a component.
+**`remark-mdx` was planned and then not needed** — recorded here because the reason
+is the better design, not a shortcut. Reading the live document model showed
+Milkdown stores an unbroken JSX block as an inline **atom** node whose `value`
+attribute holds the block's exact source bytes. A ProseMirror **node view** can
+therefore change what that block _looks_ like while the node itself is untouched,
+so the serialiser still writes the author's original bytes: **fidelity is preserved
+by construction rather than by a probe.** Adding remark-mdx would have replaced that
+guarantee with a second parse/serialise round trip over every component in the
+project — strictly more risk, for a tree we do not need in order to draw a card.
+
+The trade is explicit: display-only cards cannot offer structural editing of
+children (that is v2, and it is what would justify the real mdast tree). What they
+buy is that no rendering path can corrupt a file.
 
 ## The innovation: components as cards, backed by the schema
 
@@ -52,22 +63,36 @@ primitives into the repo and generates `components/mdx-components.ts`, and the
 registry knows each item's shape.
 
 So the canvas renders an MDX element as a **card**: the component name as a chip,
-its attributes as a small typed form, and its children as editable content. No
+its attributes listed as name/value pairs, and its children as titled sub-cards. No
 component is special-cased. An unknown component still gets a card — named, with its
 props listed — rather than falling back to source.
 
 Staged deliberately:
 
-- **v1 (this unit):** generic cards for every MDX element, driven by the parsed
-  tree. Attributes editable as text. Children edit in place.
+- **v1 (this unit, shipped):** generic cards for every component the block parser
+  fully understands, driven by the block's own source. Display-only, with **Edit
+  source** swapping in a textarea over that one block — a far smaller surface than
+  sending the operator to the whole-document Raw MDX tab to change one prop. Inline
+  markdown inside card text renders (`**bold**`, `` `code` ``, links) so a card never
+  looks half-finished.
 - **v2 (follow-up):** the registry teaches the card its prop types, so `href` gets a
   document picker and an enum gets a select — the same "one Zod layer" idea reaching
-  the editor.
+  the editor. Structural editing of children belongs here too, and is the point at
+  which a real mdast tree earns its cost.
+
+**Refusing is a feature.** The parser returns null — and the block keeps its old raw
+rendering — for anything it does not fully understand: spread props, expressions in
+children, several roots in one block, lowercase HTML tags, malformed markup. A card
+that quietly omitted a prop or dropped a child would be worse than the soup it
+replaced, and the fallback costs nothing because it is the pre-existing behaviour.
 
 ## Fidelity is the constraint, not a feature
 
-The existing fidelity probe stays and gets stricter, because the failure mode it
-guards is silent file corruption. The discipline proven in `composeDocument`
+The existing fidelity probe stays exactly as it is — it did not need to get
+stricter, because cards never enter its path. The probe governs what remark
+serialises; a node view changes only what the browser paints. A document that Rich
+mode would rewrite (`the-model.mdx`, whose table row Milkdown reflows) still opens
+in Raw MDX, cards and all. The discipline proven in `composeDocument`
 applies here too: **a document that is opened and not edited must serialise back
 byte-identically.** That is a test over the repo's real documents, not a unit
 fixture — the composeDocument fix shipped only after all 27 authored docs

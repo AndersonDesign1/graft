@@ -24,9 +24,10 @@ import { Crepe } from "@milkdown/crepe";
 // Vite's dep pre-bundling, and a Slice is identified by object identity — so
 // the ctx update would look up a slice that Crepe's copy of core never
 // injected and throw `contextNotFound`. vite.config.ts dedupes these too.
-import { remarkStringifyOptionsCtx } from "@milkdown/core";
+import { editorViewOptionsCtx, remarkStringifyOptionsCtx } from "@milkdown/core";
 import { useEffect, useRef } from "react";
 import { watchEditIntent } from "../lib/edit-intent";
+import { mdxNodeViews } from "./mdx-card";
 
 export function RichEditor({
   value,
@@ -83,6 +84,16 @@ export function RichEditor({
     // repository the first time someone touched a document — churn with no
     // meaning behind it. The fidelity check forgives marker style, but not
     // creating the diff at all is better than forgiving it.
+    // MDX components render as cards rather than as their own source. This is
+    // presentation only: the `html` node keeps its exact `value`, so what gets
+    // serialised is unchanged and the fidelity probe below still governs.
+    instance.editor.config((ctx) => {
+      ctx.update(editorViewOptionsCtx, (options) => ({
+        ...options,
+        nodeViews: { ...options.nodeViews, ...mdxNodeViews },
+      }));
+    });
+
     instance.editor.config((ctx) => {
       ctx.update(remarkStringifyOptionsCtx, (options) => ({
         ...options,

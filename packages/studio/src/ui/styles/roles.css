@@ -102,6 +102,14 @@
   --type-json: var(--c-blue-text-loud);
   --type-unknown: var(--ink-muted);
 
+  /* ---- MDX components in the canvas ---------------------------------------
+     Identity, not state: a component block is neither good nor bad news. It
+     borrows the purple the schema layer already spends on container types,
+     because that is what a component is — something with contents. */
+  --mdx-component-text: var(--c-purple-text-loud);
+  --mdx-component-bg: var(--c-purple-bg);
+  --mdx-component-border: var(--c-purple-border);
+
   --field-required: var(--c-amber-text);
   --field-required-bg: var(--c-amber-bg);
   --field-optional: var(--ink-faint);
