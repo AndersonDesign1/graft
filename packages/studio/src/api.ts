@@ -276,6 +276,28 @@ function toSchemaField(field: {
   };
 }
 
+/**
+ * A loadable URL for an asset key, or null with the reason.
+ *
+ * The storage client is built per request and the module imported lazily: most
+ * Studio sessions never open a document with an asset field, and a static-tier
+ * project has no credentials to build one from at all. Both the missing-config
+ * throw and a signing failure resolve to `url: null` — the form degrades to
+ * showing the key, which is what it had before this endpoint existed.
+ */
+async function resolveAssetUrl(key: string): Promise<{
+  key: string;
+  url: string | null;
+  reason?: string;
+}> {
+  try {
+    const { createStorage } = await import("@usegraft/assets");
+    return { key, url: await createStorage().url(key) };
+  } catch (error) {
+    return { key, url: null, reason: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 function buildSchema(collections: Record<string, AnyCollection>): SchemaList {
   const out: SchemaCollectionDto[] = Object.values(collections).map((collection) => {
     const descriptor = collection.describe();
@@ -328,6 +350,19 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
 
       if (pathname === "/api/studio/v1/collections" && method === "GET") {
         return json(buildSchema(options.collections));
+      }
+
+      // Resolve an asset key to something an <img> can load, so the frontmatter
+      // form can show what the document actually points at instead of a path.
+      //
+      // Never an error when no store is configured: a static-tier project has
+      // no S3 credentials by design, and an asset field there is a key the
+      // author maintains by hand. `url: null` lets the form show the key and
+      // move on — a 500 would make an unconfigured project look broken.
+      if (pathname === "/api/studio/v1/asset-url" && method === "GET") {
+        const key = url.searchParams.get("key")?.trim() ?? "";
+        if (!key) return json({ key, url: null, reason: "no key" });
+        return json(await resolveAssetUrl(key));
       }
 
       // Operator-triggered compile. The Studio surfaces drift, so it has to be

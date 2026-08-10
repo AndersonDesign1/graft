@@ -36,6 +36,16 @@ export const STUDIO_OPENAPI = {
         responses: { "200": { description: "Collections → fields" } },
       },
     },
+    "/api/studio/v1/asset-url": {
+      get: {
+        operationId: "resolveAssetUrl",
+        summary: "Loadable URL for an asset key (public URL, else presigned GET)",
+        description:
+          "Returns `{ key, url }`. `url` is null with a `reason` when no asset store is configured — a static-tier project has no credentials by design, so an unresolved key is a normal state, not an error.",
+        parameters: [{ name: "key", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Resolved URL, or null with a reason" } },
+      },
+    },
     "/api/studio/v1/compile": {
       post: {
         operationId: "compileBranch",

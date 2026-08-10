@@ -35,6 +35,7 @@
     "clean:lib": "node ./scripts/clean-lib.mjs"
   },
   "dependencies": {
+    "@usegraft/assets": "workspace:*",
     "@usegraft/compiler": "workspace:*",
     "@usegraft/contracts": "workspace:*",
     "@usegraft/core": "workspace:*",

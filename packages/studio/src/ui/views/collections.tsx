@@ -1,60 +1,43 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { ContentTree, ContentTreeCollection, DocumentDto, DocumentState } from "../../types";
+import type {
+  ContentTree,
+  ContentTreeCollection,
+  DocumentDto,
+  DocumentState,
+  SchemaList,
+} from "../../types";
 import { MdxEditor } from "../components/editor";
 import { RichEditor } from "../components/rich-editor";
+import { FrontmatterForm } from "../components/frontmatter-form";
 import { IconDatabase, IconFile, IconWarning } from "../components/icons";
 import { DocumentSkeleton } from "../components/skeletons";
 import { EmptyState, Pill, StatePill, Status } from "../components/primitives";
-import { Field, FieldLabel, Input, NumberField, Switch, Textarea } from "../components/ui/field";
 import { Tabs, TabsIndicator, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { api, qs } from "../lib/api";
 import { useAutosave } from "../lib/autosave";
 import { hasUnsavedChanges } from "../lib/draft";
 import { compareRoundTrip, describeFidelity, type FidelityResult } from "../lib/fidelity";
 import type { Route } from "../lib/route";
+import { buildForm, composeData } from "../lib/schema-form";
+import { useResource } from "../lib/use-resource";
 
 type EditorMode = "rich" | "raw";
 
-type Scalar = {
-  key: string;
-  value: string | number | boolean;
-  kind: "string" | "number" | "boolean";
-};
-
-function scalars(data: Record<string, unknown>): Scalar[] {
-  const out: Scalar[] = [];
-  for (const [key, value] of Object.entries(data)) {
-    if (typeof value === "string") out.push({ key, value, kind: "string" });
-    else if (typeof value === "number") out.push({ key, value, kind: "number" });
-    else if (typeof value === "boolean") out.push({ key, value, kind: "boolean" });
-  }
-  const order = ["title", "description", "section", "order", "tagline"];
-  out.sort((a, b) => {
-    const ai = order.indexOf(a.key);
-    const bi = order.indexOf(b.key);
-    if (ai === -1 && bi === -1) return a.key.localeCompare(b.key);
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
-  });
-  return out;
-}
-
-function buildRaw(data: Record<string, unknown>, body: string): string {
-  const lines = ["---"];
-  for (const [key, value] of Object.entries(data)) {
-    if (value === null || value === undefined) continue;
-    if (typeof value === "string") {
-      const needsQuote = value.includes(":") || value.includes("#") || value.includes("\n");
-      lines.push(needsQuote ? `${key}: ${JSON.stringify(value)}` : `${key}: ${value}`);
-    } else if (typeof value === "number" || typeof value === "boolean") {
-      lines.push(`${key}: ${value}`);
-    }
-  }
-  lines.push("---", "");
-  return `${lines.join("\n")}${body.replace(/^\n/, "")}`;
-}
+/*
+ * `buildRaw` used to live here: it rebuilt the whole file from a JS object when
+ * the operator switched to Raw MDX. It handled string, number and boolean, and
+ * silently skipped everything else — so switching tabs on a document with an
+ * `image` asset or a `faqs` array dropped those keys from the buffer, and the
+ * next keystroke autosaved the result. On `examples/landing-page/content/pages/
+ * home.mdx` that is 589 bytes of authored frontmatter gone.
+ *
+ * It is deleted rather than fixed. `composeDocument` in @usegraft/compiler is
+ * already the single write path and already preserves frontmatter bytes
+ * verbatim; a second serialiser in the browser could only ever be a worse copy
+ * of it. Switching tabs now flushes and re-reads, so Raw MDX always shows the
+ * bytes that are actually on disk.
+ */
 
 const SAVE_LABEL: Record<string, string> = {
   idle: "Saved",
@@ -78,7 +61,10 @@ export function CollectionsView({
   onSaved: () => void;
 }) {
   const [doc, setDoc] = useState<DocumentDto | null>(null);
-  const [fields, setFields] = useState<Record<string, string | number | boolean>>({});
+  // Edited frontmatter, keyed by field. `unknown` because an asset field holds
+  // an object — the old `string | number | boolean` is exactly the assumption
+  // that made assets and arrays invisible.
+  const [fields, setFields] = useState<Record<string, unknown>>({});
   const [body, setBody] = useState("");
   const [raw, setRaw] = useState("");
   const [mode, setMode] = useState<EditorMode>("rich");
@@ -89,6 +75,11 @@ export function CollectionsView({
   const active: ContentTreeCollection | undefined =
     collections.find((c) => c.name === route.collection) ?? collections[0];
   const readOnly = active?.authority === "db";
+
+  // The declared shape of the active collection. Fetched once for the session:
+  // a schema change means editing graft/ and restarting the server anyway.
+  const schema = useResource<SchemaList>("/collections");
+  const schemaFields = schema.data?.collections.find((c) => c.name === active?.name)?.fields;
 
   // Whether rich editing is safe is measured, not guessed: the editor
   // re-serialises the document on mount and we compare that against the bytes
@@ -109,18 +100,26 @@ export function CollectionsView({
   }, [active, route.collection, navigate]);
 
   // Latest values, so the debounced save never writes a stale snapshot.
-  const latest = useRef({ fields, body, raw, mode: effectiveMode, doc });
-  latest.current = { fields, body, raw, mode: effectiveMode, doc };
+  const latest = useRef({ fields, body, raw, mode: effectiveMode, doc, schemaFields });
+  latest.current = { fields, body, raw, mode: effectiveMode, doc, schemaFields };
 
   const persist = useCallback(async () => {
     const { collection, slug } = route;
     const snapshot = latest.current;
     if (!collection || !slug || !snapshot.doc || readOnly) return;
 
+    // Compose once: the same object is both what the guard compares and what
+    // gets written, so they can never disagree about what a save would do.
+    const data = composeData(
+      snapshot.doc.data,
+      snapshot.fields,
+      buildForm(snapshot.schemaFields, snapshot.doc.data),
+    );
+
     // Second guard against writing a file nobody edited — see draft.ts.
     const changed = hasUnsavedChanges({
       mode: snapshot.mode,
-      fields: snapshot.fields,
+      data,
       body: snapshot.body,
       raw: snapshot.raw,
       loaded: snapshot.doc,
@@ -130,13 +129,7 @@ export function CollectionsView({
     const payload =
       snapshot.mode === "raw"
         ? { collection, slug, raw: snapshot.raw, branch }
-        : {
-            collection,
-            slug,
-            data: { ...snapshot.doc.data, ...snapshot.fields },
-            body: snapshot.body,
-            branch,
-          };
+        : { collection, slug, data, body: snapshot.body, branch };
     await api<{ written: string; gitSha: string | null }>("/document", {
       method: "PUT",
       body: JSON.stringify(payload),
@@ -175,7 +168,10 @@ export function CollectionsView({
       setDoc(next);
       setRaw(next.raw);
       setBody(next.body);
-      setFields(Object.fromEntries(scalars(next.data).map((f) => [f.key, f.value])));
+      // Seeded from the file, not from the schema: a field the document does
+      // not have starts absent, so merely opening a document can never add a
+      // key to it. `composeData` enforces the same rule on the way out.
+      setFields({ ...next.data });
     } catch (err) {
       setDoc(null);
       setRaw("");
@@ -214,18 +210,30 @@ export function CollectionsView({
     return () => window.removeEventListener("keydown", onKey);
   }, [autosave]);
 
-  function switchMode(next: EditorMode): void {
+  /**
+   * Switch editors by going through the file.
+   *
+   * Flush whatever is pending, then re-read the document, so each tab opens on
+   * the bytes that are actually on disk. The alternative — translating one
+   * buffer into the other in the browser — is what `buildRaw` did, and a
+   * client-side serialiser can only ever be a lossier copy of the
+   * `composeDocument` the server already runs. Going through the file also
+   * means the Raw tab is honest: what it shows is what is in git.
+   */
+  async function switchMode(next: EditorMode): Promise<void> {
     if (next === mode) return;
-    if (next === "raw" && doc) setRaw(buildRaw({ ...doc.data, ...fields }, body));
-    if (next === "rich" && doc) {
-      // Raw is authoritative while it is open, so re-split it on the way back.
-      const match = /^---\n([\s\S]*?)\n---\n?/.exec(raw);
-      setBody(match ? raw.slice(match[0].length) : raw);
+    try {
+      await autosave.flush();
+    } catch {
+      // The flush already surfaced its own error toast. Staying put is the
+      // right failure: switching would show a buffer that disagrees with disk.
+      return;
     }
+    if (route.collection && route.slug) await openDoc(route.collection, route.slug);
     setMode(next);
   }
 
-  const setField = (key: string, value: string | number | boolean): void => {
+  const setField = (key: string, value: unknown): void => {
     setFields((prev) => ({ ...prev, [key]: value }));
     autosave.touch();
   };
@@ -287,7 +295,7 @@ export function CollectionsView({
           </span>
           {readOnly ? <Pill tone="db">db</Pill> : null}
           {selectedState ? <StatePill state={selectedState} /> : null}
-          <Tabs value={effectiveMode} onValueChange={(v) => switchMode(v as EditorMode)}>
+          <Tabs value={effectiveMode} onValueChange={(v) => void switchMode(v as EditorMode)}>
             <TabsList>
               <TabsIndicator />
               {/* Never disabled up front. A document is only refused rich
@@ -319,44 +327,16 @@ export function CollectionsView({
           <DocumentSkeleton />
         ) : (
           <article className="doc-sheet">
-            <div className="doc-frontmatter">
-              {doc &&
-                scalars(doc.data).map((field) => (
-                  <Field key={field.key} disabled={readOnly} className="doc-field">
-                    <FieldLabel>{field.key}</FieldLabel>
-                    {field.kind === "boolean" ? (
-                      <Switch
-                        checked={Boolean(fields[field.key])}
-                        onCheckedChange={(next) => setField(field.key, next)}
-                        disabled={readOnly}
-                      />
-                    ) : field.kind === "number" ? (
-                      <NumberField
-                        value={Number(fields[field.key] ?? 0)}
-                        onValueChange={(next) => setField(field.key, next ?? 0)}
-                        disabled={readOnly}
-                      />
-                    ) : String(fields[field.key] ?? "").length > 72 ||
-                      field.key === "description" ? (
-                      <Textarea
-                        rows={2}
-                        value={String(fields[field.key] ?? "")}
-                        disabled={readOnly}
-                        onChange={(e) => setField(field.key, e.target.value)}
-                      />
-                    ) : (
-                      <Input
-                        value={String(fields[field.key] ?? "")}
-                        disabled={readOnly}
-                        onChange={(e) => setField(field.key, e.target.value)}
-                      />
-                    )}
-                  </Field>
-                ))}
-              {doc && scalars(doc.data).length === 0 ? (
-                <p className="muted">No frontmatter fields.</p>
-              ) : null}
-            </div>
+            {doc ? (
+              <FrontmatterForm
+                data={doc.data}
+                schemaFields={schemaFields}
+                values={fields}
+                onChange={setField}
+                disabled={readOnly}
+                onEditRaw={() => void switchMode("raw")}
+              />
+            ) : null}
 
             {fidelity && !fidelity.lossless ? (
               <p className="notice" data-tone="warn">

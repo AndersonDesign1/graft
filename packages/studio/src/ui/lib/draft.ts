@@ -10,6 +10,8 @@
  * merely opened.
  */
 
+import { sameValue } from "./schema-form";
+
 export type DraftMode = "rich" | "raw";
 
 /** What was on disk when the document was opened. */
@@ -21,8 +23,14 @@ export interface LoadedDocument {
 
 export interface DocumentDraft {
   mode: DraftMode;
-  /** Frontmatter scalars, as edited. Keys are a subset of `loaded.data`. */
-  fields: Record<string, string | number | boolean>;
+  /**
+   * The frontmatter exactly as it would be written — the whole object, not a
+   * patch. It used to be a scalar-only subset compared key by key, which could
+   * not see a *removed* key (clearing an optional field) and compared nested
+   * values by identity, so an asset field rebuilt on render always looked
+   * edited. Composing first and comparing structurally answers both.
+   */
+  data: Record<string, unknown>;
   body: string;
   raw: string;
   loaded: LoadedDocument | null;
@@ -38,5 +46,5 @@ export function hasUnsavedChanges(draft: DocumentDraft): boolean {
   if (draft.mode === "raw") return draft.raw !== loaded.raw;
 
   if (draft.body !== loaded.body) return true;
-  return Object.entries(draft.fields).some(([key, value]) => loaded.data[key] !== value);
+  return !sameValue(draft.data, loaded.data);
 }

@@ -183,16 +183,6 @@
   min-width: 0;
 }
 
-/* The banner's own box is reused; only its text block is a placeholder.
-   The gap is the `p`'s margin-top, so the two stacks measure the same. */
-.sk-banner-main {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--space-1);
-  max-width: 40rem;
-}
-
 /* ==========================================================================
    Document sheet — one column, frontmatter above body
    ========================================================================== */
@@ -223,14 +213,15 @@
   }
 }
 
+/* ==========================================================================
+   Page settings (schema-driven frontmatter)
+   ========================================================================== */
+
 /* Settings, not content. A sunken well inside the sheet says "this is the
    document's metadata" without a heading announcing it, and the contrast
    against the white body is what lets the body read as the writing surface.
    Radius is concentric: sheet 10px at 48px padding leaves the well at 6px. */
-.doc-frontmatter {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+.settings-card {
   padding: var(--space-4);
   margin-bottom: var(--space-8);
   background: var(--paper-sunken);
@@ -238,14 +229,220 @@
   border-radius: var(--radius);
 }
 
+.settings-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+/* Chrome, so it stays mono and small however editorial the canvas gets. */
+.settings-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.settings-count {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  /* The count changes as fields come and go; fixed-width digits keep the
+     header from twitching. */
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+}
+
+.settings-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 /* Label beside the value, not above it. Frontmatter is a short list of
    properties; stacking each one doubled the height of the block sitting
    between the operator and the thing they came to write. */
-.doc-field {
+.settings-field {
   display: grid;
-  grid-template-columns: 7rem minmax(0, 1fr);
-  gap: var(--space-3);
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: var(--space-1) var(--space-3);
+  align-items: start;
+}
+
+/* The label column carries the name, the type chip and the required marker,
+   stacked — three facts about one field, reading top to bottom. */
+.settings-field-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  /* Optical: line the label up with the first line of a control that has its
+     own border, rather than with the control's box. */
+  padding-top: 5px;
+}
+
+.settings-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--field-label);
+  overflow-wrap: anywhere;
+}
+
+.settings-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
   align-items: center;
+}
+
+.settings-required {
+  padding: 1px 5px;
+  border-radius: var(--radius-inner);
+  background: var(--field-required-bg);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--field-required);
+}
+
+/* Help text comes from the schema's own `description`, so the thing that
+   teaches an agent in describe_schema teaches the operator here. */
+.settings-help {
+  grid-column: 2;
+  font-size: var(--text-2xs);
+  line-height: var(--leading-tight);
+  color: var(--ink-faint);
+  text-wrap: pretty;
+}
+
+.settings-empty {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+}
+
+.settings-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.settings-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--hairline);
+}
+
+/* ---- structured values (object / array) --------------------------------- */
+
+.settings-structured {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 1.75rem;
+}
+
+.settings-structured.is-empty {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+}
+
+.settings-structured-summary {
+  padding: 2px 6px;
+  border-radius: var(--radius-inner);
+  background: var(--mdx-component-bg);
+  border: 1px solid var(--mdx-component-border);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--mdx-component-text);
+}
+
+.settings-structured-edit {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--radius-inner);
+  background: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--ink-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.settings-structured-edit:hover {
+  color: var(--ink);
+}
+
+/* ---- asset ---------------------------------------------------------------
+   The whole field used to render as nothing: `typeof value === "object"` fell
+   through every branch of the old value-driven form. */
+
+.asset-field {
+  display: flex;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.asset-preview {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 3rem;
+  height: 3rem;
+  overflow: hidden;
+  border-radius: var(--radius-inner);
+  background: var(--paper-raised);
+  /* A hairline outline rather than a border: it sits over the image edge
+     without changing the box, and pure black/white keeps it from reading as
+     dirt on the picture. */
+  outline: 1px solid light-dark(rgb(0 0 0 / 10%), rgb(255 255 255 / 10%));
+  outline-offset: -1px;
+}
+
+.asset-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.asset-preview-fallback {
+  color: var(--ink-faint);
+}
+
+.asset-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1;
+}
+
+@media (width < 40rem) {
+  .settings-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-field-head {
+    flex-direction: row;
+    align-items: center;
+    padding-top: 0;
+  }
+
+  .settings-help {
+    grid-column: 1;
+  }
 }
 
 .save-state {

@@ -448,6 +448,9 @@ importers:
 
   packages/studio:
     dependencies:
+      '@usegraft/assets':
+        specifier: workspace:*
+        version: link:../assets
       '@usegraft/compiler':
         specifier: workspace:*
         version: link:../compiler

@@ -68,6 +68,92 @@ A rewritten body.
     expect(out).not.toContain("description:");
   });
 
+  it("rewrites only the key that changed, leaving its neighbours' bytes alone", () => {
+    // The Studio's frontmatter form makes this the common case: one field
+    // edited, everything else untouched. Re-serialising the whole block would
+    // quote `description` and drop the blank line after `---` — churn in a diff
+    // the operator never asked for.
+    const raw = `---
+title: What is Graft
+description: The open-source, self-hostable CMS for agents.
+section: Start here
+order: 0
+---
+
+Body.
+`;
+    const data = matter(raw).data as Record<string, unknown>;
+    const out = composeDocument(raw, { ...data, order: 7 }, "Body.\n");
+
+    expect(out).toBe(`---
+title: What is Graft
+description: The open-source, self-hostable CMS for agents.
+section: Start here
+order: 7
+---
+
+Body.
+`);
+    expect(out).not.toContain("description: '");
+  });
+
+  it("preserves a multi-line folded value that sits next to an edited key", () => {
+    // `alt: >-` spans three lines; a line-for-line patcher that only replaced
+    // the key's own line would strand the continuation.
+    const raw = `---
+title: Home
+image:
+  key: pages/home/hero.svg
+  alt: >-
+    A branch grafted onto a trunk — MDX in git, validated, projected,
+    rendered.
+order: 1
+---
+
+Body.
+`;
+    const data = matter(raw).data as Record<string, unknown>;
+    const out = composeDocument(raw, { ...data, order: 2 }, "Body.\n");
+
+    expect(out).toContain("  alt: >-\n    A branch grafted onto a trunk");
+    expect(out).toContain("order: 2");
+    expect(matter(out).data).toEqual({ ...data, order: 2 });
+  });
+
+  it("adds a new key without disturbing the existing ones", () => {
+    const data = matter(AUTHORED).data as Record<string, unknown>;
+    const out = composeDocument(AUTHORED, { ...data, order: 3 }, "Graft is the open-source CMS.\n");
+    expect(out).toContain("description: The open-source, self-hostable CMS for agents.");
+    expect(out).toContain("order: 3");
+    expect(matter(out).data).toEqual({ ...data, order: 3 });
+  });
+
+  it("removes a key the caller dropped", () => {
+    const out = composeDocument(
+      AUTHORED,
+      { title: "What is Graft" },
+      "Graft is the open-source CMS.\n",
+    );
+    expect(out).not.toContain("description:");
+    expect(out).toContain("title: What is Graft");
+    // The untouched key keeps its authored form rather than being requoted.
+    expect(out).not.toContain("title: '");
+  });
+
+  it("falls back to a full rewrite rather than mangle YAML it cannot model", () => {
+    // A leading comment is not attached to any key; patching around it would
+    // have to guess where it belongs.
+    const withComment = `---
+# generated — do not edit by hand
+title: T
+---
+
+Body.
+`;
+    const out = composeDocument(withComment, { title: "U" }, "Body.\n");
+    expect(matter(out).data).toEqual({ title: "U" });
+  });
+
   it("detects nested and array changes, not just top-level ones", () => {
     const raw = `---
 title: T

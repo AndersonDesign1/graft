@@ -14,7 +14,7 @@ const loaded = {
 
 const draft = (over: Partial<DocumentDraft> = {}): DocumentDraft => ({
   mode: "rich",
-  fields: { title: "Quickstart", order: 2, draft: false },
+  data: { title: "Quickstart", order: 2, draft: false },
   body: loaded.body,
   raw: loaded.raw,
   loaded,
@@ -30,7 +30,7 @@ describe("hasUnsavedChanges", () => {
   it("never reports changes before a document has loaded", () => {
     // The window where an editor is mounted but the fetch has not landed —
     // saving here would overwrite the file with an empty buffer.
-    expect(hasUnsavedChanges(draft({ loaded: null, body: "", raw: "", fields: {} }))).toBe(false);
+    expect(hasUnsavedChanges(draft({ loaded: null, body: "", raw: "", data: {} }))).toBe(false);
   });
 
   it("catches a body edit", () => {
@@ -44,14 +44,27 @@ describe("hasUnsavedChanges", () => {
       { draft: true }, // boolean
     ];
     for (const change of cases) {
-      expect(hasUnsavedChanges(draft({ fields: { ...draft().fields, ...change } }))).toBe(true);
+      expect(hasUnsavedChanges(draft({ data: { ...draft().data, ...change } }))).toBe(true);
     }
   });
 
   it("does not mistake a same-valued field for an edit", () => {
     // Typing a character and deleting it again must not leave a dirty file.
-    const fields = { ...draft().fields, title: String(loaded.data.title) };
-    expect(hasUnsavedChanges(draft({ fields }))).toBe(false);
+    const data = { ...draft().data, title: String(loaded.data.title) };
+    expect(hasUnsavedChanges(draft({ data }))).toBe(false);
+  });
+
+  it("catches a cleared optional field, which a per-key comparison could not", () => {
+    const { order: _dropped, ...withoutOrder } = draft().data;
+    expect(hasUnsavedChanges(draft({ data: withoutOrder }))).toBe(true);
+  });
+
+  it("does not call a structurally identical nested value an edit", () => {
+    // The asset widget rebuilds `{ key, alt }` on every render; comparing by
+    // identity would mark the document dirty just for looking at it.
+    const withAsset = { ...loaded, data: { ...loaded.data, image: { key: "a/b.png" } } };
+    const same = { ...draft().data, image: { key: "a/b.png" } };
+    expect(hasUnsavedChanges(draft({ data: same, loaded: withAsset }))).toBe(false);
   });
 
   it("compares the whole file in raw mode", () => {
