@@ -1,4 +1,5 @@
 {
   "component": "DocCards",
-  "label": "Doc cards"
+  "label": "Doc cards",
+  "snippet": "<DocCards>\n  <DocCard title=\"First\" href=\"/docs/first\">What it covers.</DocCard>\n  <DocCard title=\"Second\" href=\"/docs/second\">What it covers.</DocCard>\n</DocCards>"
 }

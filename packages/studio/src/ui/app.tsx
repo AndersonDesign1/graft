@@ -307,6 +307,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
           onOpenChange={setPaletteOpen}
           tree={tree.data}
           branches={branches.data}
+          components={editorComponents.data?.components ?? []}
           navigate={navigate}
           onSelectBranch={selectBranch}
           onCompile={() => void compile()}

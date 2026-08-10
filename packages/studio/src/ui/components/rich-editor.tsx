@@ -24,9 +24,15 @@ import { Crepe } from "@milkdown/crepe";
 // Vite's dep pre-bundling, and a Slice is identified by object identity — so
 // the ctx update would look up a slice that Crepe's copy of core never
 // injected and throw `contextNotFound`. vite.config.ts dedupes these too.
-import { editorViewOptionsCtx, remarkStringifyOptionsCtx } from "@milkdown/core";
+import {
+  editorViewCtx,
+  editorViewOptionsCtx,
+  parserCtx,
+  remarkStringifyOptionsCtx,
+} from "@milkdown/core";
 import { useEffect, useRef } from "react";
 import { watchEditIntent } from "../lib/edit-intent";
+import { registerInserter } from "../lib/editor-insert";
 import { mdxNodeViews } from "./mdx-card";
 
 export function RichEditor({
@@ -124,15 +130,48 @@ export function RichEditor({
       });
     });
 
+    let unregister: (() => void) | undefined;
+
     void instance.create().then(() => {
       if (disposed) return;
       instance.setReadonly(readOnly);
       crepe.current = instance;
+
+      // Offer this editor to the palette. Inserting is a real edit, so it goes
+      // through the same `markdownUpdated` path typing does — which means the
+      // edit-intent guard has to be told a human asked for it, or the change is
+      // suppressed exactly the way a mount-time re-serialisation is.
+      if (!readOnly) {
+        unregister = registerInserter((mdx) => {
+          intent.mark();
+          instance.editor.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            const parsed = ctx.get(parserCtx)(mdx);
+            if (!parsed) return;
+            // `replaceSelection` with the parsed document's own slice, rather
+            // than `replaceWith` over the selection's range. The difference is
+            // not cosmetic: replaceWith inserts *beside* the cursor's block and
+            // leaves the block it was in behind, so inserting into an empty
+            // paragraph stranded that paragraph — and remark serialises an
+            // empty paragraph as `<br />`, quietly adding a line break to the
+            // author's file on every insert. replaceSelection uses the slice's
+            // open depths to fit the content into the block structure, which is
+            // what "put this here" actually means.
+            //
+            // `node.slice(0)` rather than constructing a Slice: it avoids a
+            // value import from @milkdown/kit — see the note at the top of this
+            // file about duplicate module instances.
+            view.dispatch(view.state.tr.replaceSelection(parsed.slice(0)).scrollIntoView());
+            view.focus();
+          });
+        });
+      }
     });
 
     return () => {
       disposed = true;
       crepe.current = null;
+      unregister?.();
       intent.dispose();
       void instance.destroy();
     };

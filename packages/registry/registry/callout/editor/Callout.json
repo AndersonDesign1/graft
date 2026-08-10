@@ -10,5 +10,6 @@
       "tip": "success"
     }
   },
-  "hideProps": ["type"]
+  "hideProps": ["type"],
+  "snippet": "<Callout type=\"info\">\nSomething worth pulling out of the paragraph.\n</Callout>"
 }

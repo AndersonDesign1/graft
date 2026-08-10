@@ -10,5 +10,6 @@
       "note": "neutral"
     }
   },
-  "hideProps": ["label"]
+  "hideProps": ["label"],
+  "snippet": "<Callout label=\"note\">\nSomething worth pulling out of the paragraph.\n</Callout>"
 }

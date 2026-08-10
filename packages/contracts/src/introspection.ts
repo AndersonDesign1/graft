@@ -134,6 +134,21 @@ export const EditorComponentSpec = z.object({
   hideProps: z.array(z.string()).default([]),
   /** Declarations for the children this component expects, e.g. DocCard inside DocCards. */
   children: z.array(z.string()).default([]),
+  /**
+   * The exact MDX inserted when the operator picks this component from the
+   * palette. Authored by whoever wrote the component, because only they know
+   * which props are required and what a sensible starting body is — a guess
+   * assembled from the other fields would produce blocks that do not compile.
+   * Without one the component is still rendered, just not offered for insert.
+   *
+   * **Put the opening tag on a line of its own.** Markdown only treats JSX as
+   * one HTML *block* when nothing else shares the opening tag's line; write
+   * `<Callout>text</Callout>` on a single line and remark splits it into an
+   * open tag, a text node and a close tag, which renders as three pieces of
+   * raw source rather than one card. Every authored component in this repo is
+   * written the block way for exactly this reason.
+   */
+  snippet: z.string().min(1).optional(),
 });
 export type EditorComponentSpec = z.infer<typeof EditorComponentSpec>;
 

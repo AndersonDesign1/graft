@@ -1,9 +1,11 @@
 import { Command } from "cmdk";
 import { useEffect, useMemo } from "react";
+import type { EditorComponentSpec } from "@usegraft/contracts";
 import type { BranchList, ContentTree } from "../../types";
 import {
   IconBranches,
   IconCompile,
+  IconComponentBlock,
   IconFile,
   IconOverview,
   IconSchema,
@@ -13,6 +15,7 @@ import {
   type IconComponent,
 } from "./icons";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
+import { canInsert, insertBlock } from "../lib/editor-insert";
 import type { Route, ViewId } from "../lib/route";
 
 const NAV: Array<[ViewId, string, IconComponent]> = [
@@ -40,6 +43,7 @@ export function CommandPalette({
   onOpenChange,
   tree,
   branches,
+  components,
   navigate,
   onSelectBranch,
   onCompile,
@@ -48,10 +52,17 @@ export function CommandPalette({
   onOpenChange: (open: boolean) => void;
   tree: ContentTree | null;
   branches: BranchList | null;
+  /** The project's component declarations, for the insert group. */
+  components: readonly EditorComponentSpec[];
   navigate: (route: Route) => void;
   onSelectBranch: (name: string) => void;
   onCompile: () => void;
 }) {
+  // Recomputed on open rather than memoised on `components`: whether an editor
+  // is mounted changes as the operator moves around, and `canInsert()` is not
+  // React state the memo could depend on.
+  const insertable = open ? components.filter((spec) => spec.snippet && canInsert()) : [];
+
   const documents = useMemo(
     () =>
       (tree?.collections ?? []).flatMap((collection) =>
@@ -96,6 +107,26 @@ export function CommandPalette({
                 </Command.Item>
               ))}
             </Command.Group>
+
+            {/* Only when a rich editor is mounted and the component declared a
+                snippet. Crepe's own `/` menu covers markdown structure; what it
+                cannot know is this project's components, which is the gap. */}
+            {insertable.length > 0 ? (
+              <Command.Group heading="Insert into document" className="palette-group">
+                {insertable.map((spec) => (
+                  <Command.Item
+                    key={spec.component}
+                    value={`insert ${spec.component} ${spec.label ?? ""}`}
+                    className="palette-item"
+                    onSelect={() => go(() => insertBlock(spec.snippet ?? ""))}
+                  >
+                    <IconComponentBlock size={14} />
+                    <span className="palette-item-label">{spec.label ?? spec.component}</span>
+                    <span className="palette-item-hint">{`<${spec.component}>`}</span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            ) : null}
 
             <Command.Group heading="Actions" className="palette-group">
               <Command.Item

@@ -22,6 +22,7 @@ export { GearSix as IconSettings } from "@phosphor-icons/react/dist/icons/GearSi
 
 // actions
 export { ArrowsClockwise as IconCompile } from "@phosphor-icons/react/dist/icons/ArrowsClockwise";
+export { Cube as IconComponentBlock } from "@phosphor-icons/react/dist/icons/Cube";
 export { MagnifyingGlass as IconSearch } from "@phosphor-icons/react/dist/icons/MagnifyingGlass";
 export { CaretRight as IconChevron } from "@phosphor-icons/react/dist/icons/CaretRight";
 export { CaretDown as IconCaretDown } from "@phosphor-icons/react/dist/icons/CaretDown";

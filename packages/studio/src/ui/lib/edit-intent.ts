@@ -38,6 +38,13 @@ export const HUMAN_EDIT_EVENTS = [
 export interface EditIntent {
   /** Has a human interacted with this node since it was mounted? */
   readonly touched: boolean;
+  /**
+   * Record intent for an edit that did not arrive as a DOM event on this node
+   * — the palette inserting a block, for instance. The operator asked for it
+   * just as plainly as if they had typed; it simply happened somewhere else.
+   * Only ever call this from a path a person initiated.
+   */
+  mark(): void;
   /** Detach the listeners. Safe to call twice. */
   dispose(): void;
 }
@@ -65,6 +72,7 @@ export function watchEditIntent(node: Listenable): EditIntent {
     get touched() {
       return touched;
     },
+    mark,
     dispose() {
       if (disposed) return;
       disposed = true;

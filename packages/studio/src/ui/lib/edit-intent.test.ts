@@ -16,6 +16,17 @@ describe("watchEditIntent", () => {
     expect(watchEditIntent(node()).touched).toBe(false);
   });
 
+  it("marks touched when told to, for edits that arrive off-node", () => {
+    // The palette inserting a component is an edit the operator asked for, but
+    // it lands as a ProseMirror transaction rather than a DOM event here.
+    // Without this the change would be suppressed exactly like a mount-time
+    // re-serialisation, and the insert would silently not save.
+    const intent = watchEditIntent(node());
+    expect(intent.touched).toBe(false);
+    intent.mark();
+    expect(intent.touched).toBe(true);
+  });
+
   it("stays untouched for events the editor raises on its own", () => {
     const host = node();
     const intent = watchEditIntent(host);
