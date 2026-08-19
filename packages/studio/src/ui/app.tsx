@@ -2,13 +2,14 @@ import { IconContext } from "@phosphor-icons/react";
 import { Toaster, toast } from "sonner";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { EditorComponentList } from "@usegraft/contracts";
-import type { BranchList, CompileResultDto, ContentTree } from "../types";
+import type { BranchList, CompileResultDto, ContentTree, GitChangesDto } from "../types";
 import { setEditorComponentSpecs } from "./components/mdx-card";
 import { CommandPalette } from "./components/palette";
 import {
   IconApprovals,
   IconBranches,
   IconCaretUpDown,
+  IconChanges,
   IconSidebar,
   IconHistory,
   IconMoon,
@@ -20,6 +21,7 @@ import {
   IconWarning,
   type IconComponent,
 } from "./components/icons";
+import { ChangesDrawer } from "./components/changes-drawer";
 import { ContentExplorer } from "./components/content-tree";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from "./components/ui/menu";
 import { api, qs } from "./lib/api";
@@ -59,6 +61,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
   const [route, navigate] = useRoute();
   const [theme, setTheme] = useTheme();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [changesOpen, setChangesOpen] = useState(false);
   const [compiling, setCompiling] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const sidebar = useSidebarWidth();
@@ -66,6 +69,10 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
   const tree = useResource<ContentTree>(`/tree${qs({ branch })}`);
   const branches = useResource<BranchList>("/branches");
   const approvals = useResource<{ approvals: unknown[] }>("/approvals");
+  // Uncommitted work. Read at the top level because the count belongs in the
+  // top bar whether or not the drawer has ever been opened — "Changes (3)" is
+  // the reminder; the drawer is only where you act on it.
+  const changes = useResource<GitChangesDto>("/changes");
 
   // How this project's components present in the canvas. Loaded once and handed
   // to the node view rather than passed down: ProseMirror constructs node views
@@ -74,6 +81,16 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
   useEffect(() => {
     setEditorComponentSpecs(editorComponents.data?.components ?? []);
   }, [editorComponents.data]);
+
+  const openChanges = useCallback(() => {
+    changes.refresh();
+    setChangesOpen(true);
+  }, [changes]);
+
+  const onDocumentSaved = useCallback(() => {
+    tree.refresh();
+    changes.refresh();
+  }, [changes, tree]);
 
   const selectBranch = useCallback((name: string) => {
     setBranch(name);
@@ -109,6 +126,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
   }, []);
 
   const drift = tree.data?.summary.drift ?? 0;
+  const uncommitted = changes.data?.files.length ?? 0;
   const pending = approvals.data?.approvals.length ?? 0;
   const collections = useMemo(() => tree.data?.collections ?? [], [tree.data]);
   const themeMeta = THEME_META[theme];
@@ -121,7 +139,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
         route={route}
         navigate={navigate}
         tree={tree}
-        onSaved={tree.refresh}
+        onSaved={onDocumentSaved}
       />
     );
   } else if (route.view === "schema") main = <SchemaView />;
@@ -204,6 +222,23 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
           </div>
 
           <div className="topbar-right">
+            {/* Always present, unlike the drift alarm: "have I saved my work?"
+                is a question worth being able to ask at any time, and a control
+                that only exists once something is wrong cannot be learned. */}
+            <button
+              type="button"
+              className="changes-trigger"
+              onClick={openChanges}
+              title="Review and commit your content changes"
+            >
+              <IconChanges size={14} />
+              Changes
+              {uncommitted > 0 ? (
+                <span className="count" data-numeric="">
+                  {uncommitted}
+                </span>
+              ) : null}
+            </button>
             {drift > 0 ? (
               <button
                 type="button"
@@ -302,6 +337,15 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
             than shipping its own palette. */}
         <Toaster position="bottom-right" closeButton toastOptions={{ className: "sonner-toast" }} />
 
+        <ChangesDrawer
+          open={changesOpen}
+          onOpenChange={setChangesOpen}
+          changes={changes}
+          tree={tree.data}
+          navigate={navigate}
+          onCommitted={tree.refresh}
+        />
+
         <CommandPalette
           open={paletteOpen}
           onOpenChange={setPaletteOpen}
@@ -311,6 +355,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
           navigate={navigate}
           onSelectBranch={selectBranch}
           onCompile={() => void compile()}
+          onReviewChanges={openChanges}
         />
       </div>
     </IconContext.Provider>

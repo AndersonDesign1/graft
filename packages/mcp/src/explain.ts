@@ -208,6 +208,30 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Run the writing surface where the checkout is writable — local `graft studio` / `graft mcp`, or a self-hosted container with the project mounted read-write — and let the deployment serve reads only. Writes then arrive as git commits, which is the model: git is authoritative for authored content.",
   },
+  GIT_UNAVAILABLE: {
+    code: "GIT_UNAVAILABLE",
+    meaning:
+      "An operation needed git and could not reach it: either the `git` binary is not on PATH, or the content directory is not inside a git work tree.",
+    typicalCauses: [
+      "The project was scaffolded but `git init` was never run",
+      "Studio or the CLI running in a container image that ships no git binary",
+      "The content directory lives outside the repository (a mount, a symlink target)",
+    ],
+    howToRecover:
+      "Run `git init` at the project root and make a first commit, or install git. Nothing else in Graft requires it — content still compiles and serves — but the change history, `graft compile`'s recorded SHA, and reverting all depend on it.",
+  },
+  COMMIT_FAILED: {
+    code: "COMMIT_FAILED",
+    meaning: "git refused to record the commit. The working tree is untouched by the refusal.",
+    typicalCauses: [
+      "No committer identity configured (user.name / user.email)",
+      "A pre-commit or commit-msg hook rejected the change",
+      "Nothing to commit — the selected paths match the last commit already",
+      "The repository is mid-merge or mid-rebase",
+    ],
+    howToRecover:
+      'The error\'s `details.stderr` carries git\'s own words. For an unset identity, run `git config user.name "…"` and `git config user.email "…"`. Selected files may already be staged; `git status` shows the current state, and committing from a terminal always remains available.',
+  },
   STATIC_INDEX_NOT_FOUND: {
     code: "STATIC_INDEX_NOT_FOUND",
     meaning:

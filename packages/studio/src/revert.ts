@@ -16,16 +16,8 @@
  * It restores paths under contentDir only. Never the whole tree — the
  * operator asked to revert content, not their source.
  */
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { GraftError } from "@usegraft/contracts";
-
-const run = promisify(execFile);
-
-async function git(cwd: string, args: string[]): Promise<string> {
-  const { stdout } = await run("git", args, { cwd, encoding: "utf8" });
-  return stdout.trim();
-}
+import { git } from "./git";
 
 /**
  * Paths out of `git status --porcelain`.

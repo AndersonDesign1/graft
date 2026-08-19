@@ -2652,6 +2652,430 @@ kbd {
 }
 
 /* ==========================================================================
+   Changes drawer — review and commit
+   ========================================================================== */
+
+/* The top-bar entry. Deliberately not the drift alarm's shape: that one is a
+   state that wants resolving, this one is a place you can always go. */
+.changes-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.28rem 0.5rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-inner);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .changes-trigger:hover {
+    background: var(--nav-hover-bg);
+    border-color: var(--hairline-strong);
+    color: var(--ink);
+  }
+}
+
+.changes-trigger:active {
+  transform: scale(var(--press-scale));
+}
+
+/* A side sheet rather than a centred modal: it is a panel about the document
+   you were just looking at, and arriving from the edge keeps that
+   relationship legible. Overrides the centred .dialog geometry. */
+.drawer {
+  top: 0;
+  right: 0;
+  left: auto;
+  translate: none;
+  width: min(46rem, calc(100vw - 3rem));
+  height: 100vh;
+  max-height: 100vh;
+  gap: 0;
+  padding: 0;
+  border-radius: 0;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  overflow: hidden;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    translate var(--duration-base) var(--ease-out);
+}
+
+.drawer[data-starting-style],
+.drawer[data-ending-style] {
+  opacity: 0;
+  scale: 1;
+  translate: 2rem 0;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-shrink: 0;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.drawer-sub {
+  margin: 0.2rem 0 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.drawer-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-inner);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+
+.drawer-branch code {
+  color: var(--ink-faint);
+}
+
+.drawer-body {
+  flex: 1;
+  /* Without this a long diff pushes the footer off-screen: an overflowing
+     flex item's automatic minimum is its content, not zero. */
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-4);
+}
+
+.drawer-foot {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-top: 1px solid var(--hairline);
+  background: var(--paper-sunken);
+}
+
+.drawer-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.drawer-message textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-inner);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.drawer-message textarea:focus {
+  border-color: var(--focus-ring);
+}
+
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.drawer-hint {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: var(--text-2xs);
+}
+
+/* ---- the change list ---- */
+
+.change-group + .change-group {
+  margin-top: var(--space-4);
+}
+
+.change-group-title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--field-label);
+}
+
+.change-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-outer);
+  overflow: hidden;
+}
+
+.change + .change {
+  border-top: 1px solid var(--hairline);
+}
+
+.change-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-2);
+}
+
+.change-check {
+  display: grid;
+  place-items: center;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  cursor: pointer;
+}
+
+/* Native input, custom paint: a checkbox needs no roving focus and no portal,
+   so the platform control is the whole behaviour and only its look is ours. */
+.change-check input {
+  appearance: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  margin: 0;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 4px;
+  background: var(--paper);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.change-check input:checked {
+  border-color: var(--mark);
+  background: var(--mark);
+}
+
+/* The tick is clipped, not a glyph: it stays crisp at 15px and takes the
+   surface colour rather than needing a token of its own. */
+.change-check input:checked::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--paper);
+  clip-path: polygon(20% 52%, 42% 72%, 80% 28%, 88% 38%, 43% 86%, 12% 60%);
+}
+
+.change-check input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.change-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.55rem 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.change-caret {
+  flex-shrink: 0;
+  color: var(--ink-faint);
+  transition: rotate var(--duration-fast) var(--ease-out);
+}
+
+.change[data-expanded="true"] .change-caret {
+  rotate: 90deg;
+}
+
+.change-title {
+  flex-shrink: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The path is supporting evidence, so it yields first when space runs out —
+   and it truncates from the left, because the file name is the end of it. */
+.change-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+}
+
+.change-status {
+  flex-shrink: 0;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: var(--text-2xs);
+}
+
+.change-status[data-status="added"] {
+  background: var(--change-added-bg);
+  color: var(--change-added-text);
+}
+
+.change-status[data-status="modified"] {
+  background: var(--change-modified-bg);
+  color: var(--change-modified-text);
+}
+
+.change-status[data-status="deleted"] {
+  background: var(--change-deleted-bg);
+  color: var(--change-deleted-text);
+}
+
+.change-status[data-status="renamed"] {
+  background: var(--change-renamed-bg);
+  color: var(--change-renamed-text);
+}
+
+/* The second axis (disk vs index) rides along quietly — it is a different
+   job from committing, and must not compete with the status chip. */
+.change-index {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--ink-faint);
+  font-size: var(--text-2xs);
+}
+
+.change-open {
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.change:hover .change-open,
+.change-open:focus-visible {
+  opacity: 1;
+}
+
+/* Hover cannot reveal anything on a touch screen. */
+@media (hover: none) {
+  .change-open {
+    opacity: 1;
+  }
+}
+
+/* ---- the diff ---- */
+
+.diff {
+  border-top: 1px solid var(--hairline);
+  background: var(--paper-sunken);
+}
+
+.diff-hunk + .diff-hunk {
+  border-top: 1px solid var(--hairline);
+}
+
+.diff-hunk-head {
+  display: flex;
+  gap: var(--space-3);
+  padding: 0.3rem var(--space-3);
+  background: var(--diff-hunk-bg);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+}
+
+.diff-hunk-heading {
+  color: var(--ink-muted);
+}
+
+.diff-line {
+  display: flex;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.7;
+}
+
+.diff-line[data-kind="add"] {
+  background: var(--diff-add-bg);
+}
+
+.diff-line[data-kind="remove"] {
+  background: var(--diff-remove-bg);
+}
+
+.diff-gutter {
+  flex-shrink: 0;
+  width: 2.6rem;
+  padding-right: var(--space-2);
+  color: var(--diff-gutter);
+  text-align: right;
+  user-select: none;
+}
+
+.diff-mark {
+  flex-shrink: 0;
+  width: 1.1rem;
+  text-align: center;
+  user-select: none;
+}
+
+.diff-line[data-kind="add"] .diff-mark {
+  color: var(--diff-add-text);
+}
+
+.diff-line[data-kind="remove"] .diff-mark {
+  color: var(--diff-remove-text);
+}
+
+/* pre-wrap, not nowrap: a long markdown line is prose, and truncating it
+   hides the very word that changed. */
+.diff-text {
+  flex: 1;
+  min-width: 0;
+  padding-right: var(--space-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-note {
+  margin: 0;
+  padding: var(--space-3);
+  border-top: 1px solid var(--hairline);
+  background: var(--paper-sunken);
+  color: var(--ink-faint);
+  font-size: var(--text-2xs);
+}
+
+/* ==========================================================================
    Responsive
    ========================================================================== */
 

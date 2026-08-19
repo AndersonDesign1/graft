@@ -70,6 +70,36 @@ export const STUDIO_OPENAPI = {
         responses: { "200": { description: "Write + compile result" } },
       },
     },
+    "/api/studio/v1/changes": {
+      get: {
+        operationId: "getChanges",
+        summary: "Uncommitted content changes (git status, scoped to the content directory)",
+        description:
+          'Content is git-authoritative, so this is the Studio\'s real answer to "what have I changed?" — no draft table involved. Returns `tracked: false` with a reason rather than failing when the project is not a git repository.',
+        responses: {
+          "200": { description: "Changed files + the git branch a commit would land on" },
+        },
+      },
+    },
+    "/api/studio/v1/changes/diff": {
+      get: {
+        operationId: "getChangeDiff",
+        summary: "Diff of one changed file against the last commit",
+        description:
+          "Parsed into hunks and numbered lines. A file git has never seen is returned as all-added; binary files return `binary: true` with no hunks.",
+        parameters: [{ name: "path", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Hunks + added/removed counts" } },
+      },
+    },
+    "/api/studio/v1/changes/commit": {
+      post: {
+        operationId: "commitChanges",
+        summary: "Commit selected content files (local only — never pushes)",
+        description:
+          "Commits the work-tree state of exactly the given paths, leaving anything else the operator had staged alone. Paths must appear in the current change set. Fails with COMMIT_FAILED when git has no committer identity, and with GIT_UNAVAILABLE when the content directory is not in a work tree.",
+        responses: { "200": { description: "The new commit" } },
+      },
+    },
     "/api/studio/v1/compilations": {
       get: {
         operationId: "listCompilations",

@@ -4,6 +4,7 @@ import type { EditorComponentSpec } from "@usegraft/contracts";
 import type { BranchList, ContentTree } from "../../types";
 import {
   IconBranches,
+  IconChanges,
   IconCompile,
   IconComponentBlock,
   IconFile,
@@ -47,6 +48,7 @@ export function CommandPalette({
   navigate,
   onSelectBranch,
   onCompile,
+  onReviewChanges,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -57,6 +59,7 @@ export function CommandPalette({
   navigate: (route: Route) => void;
   onSelectBranch: (name: string) => void;
   onCompile: () => void;
+  onReviewChanges: () => void;
 }) {
   // Recomputed on open rather than memoised on `components`: whether an editor
   // is mounted changes as the operator moves around, and `canInsert()` is not
@@ -129,6 +132,15 @@ export function CommandPalette({
             ) : null}
 
             <Command.Group heading="Actions" className="palette-group">
+              <Command.Item
+                value="changes commit git review diff"
+                className="palette-item"
+                onSelect={() => go(onReviewChanges)}
+              >
+                <IconChanges size={14} />
+                <span className="palette-item-label">Review changes</span>
+                <span className="palette-item-hint">Diff and commit your edits</span>
+              </Command.Item>
               <Command.Item
                 value="compile branch index"
                 className="palette-item"

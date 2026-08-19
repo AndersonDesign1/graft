@@ -20,10 +20,12 @@ import { dirname, join } from "node:path";
 import matter from "gray-matter";
 import { readCollectionDocs, readRawDocument, requireCollection, writeDocument } from "./content";
 import { STUDIO_OPENAPI } from "./openapi";
+import { commitChanges, readChanges, readFileDiff } from "./git";
 import { preflightRevert, revertContentTo } from "./revert";
 import type {
   ApprovalList,
   BranchList,
+  CommitResultDto,
   CompilationList,
   CompileResultDto,
   ContentTree,
@@ -86,6 +88,11 @@ function statusFor(error: GraftError): number {
       return 405;
     case "APPROVAL_SELF_DECISION":
       return 403;
+    // Neither is a malformed request nor a server fault: the repository is in
+    // a state that cannot satisfy it, which is what 409 is for.
+    case "GIT_UNAVAILABLE":
+    case "COMMIT_FAILED":
+      return 409;
     case "SCHEMA_VALIDATION_FAILED":
     case "INPUT_VALIDATION_FAILED":
     case "INVALID_SLUG":
@@ -433,6 +440,43 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
           docCount: result.count,
         };
         return json(body);
+      }
+
+      // The Changes drawer: git surfaced in the editor's language.
+      //
+      // Reading never fails for the absence of git — a project without a
+      // repository is unusual but legitimate, and `tracked: false` lets the
+      // drawer explain instead of the pane erroring. Committing does fail,
+      // loudly, because there the operator asked for something specific.
+      if (pathname === "/api/studio/v1/changes" && method === "GET") {
+        return json(await readChanges(options.contentDir));
+      }
+
+      if (pathname === "/api/studio/v1/changes/diff" && method === "GET") {
+        const path = url.searchParams.get("path")?.trim() ?? "";
+        if (!path) {
+          throw new GraftError({
+            code: "INPUT_VALIDATION_FAILED",
+            message: "path query param is required.",
+            fix: "GET /api/studio/v1/changes/diff?path=docs/getting-started.mdx",
+          });
+        }
+        return json(await readFileDiff(options.contentDir, path));
+      }
+
+      if (pathname === "/api/studio/v1/changes/commit" && method === "POST") {
+        const payload = (await request.json().catch(() => ({}))) as {
+          paths?: unknown;
+          message?: unknown;
+        };
+        const paths = Array.isArray(payload.paths)
+          ? payload.paths.filter((path): path is string => typeof path === "string")
+          : [];
+        const result: CommitResultDto = await commitChanges(options.contentDir, {
+          paths,
+          message: typeof payload.message === "string" ? payload.message : "",
+        });
+        return json(result);
       }
 
       if (pathname === "/api/studio/v1/compilations" && method === "GET") {

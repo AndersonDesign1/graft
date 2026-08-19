@@ -152,4 +152,105 @@ generous margins and editorial type — and the chrome stays quiet.
 - The registry-typed prop widgets (v2 above).
 - Slash-command insertion of blocks — reuses the existing ⌘K palette; lands after
   cards exist to insert.
-- The "Changes" diff drawer (git status → reviewable diff before commit).
+- The "Changes" diff drawer (git status → reviewable diff before commit) —
+  **shipped in L2.6; see the section below.**
+
+## The Changes drawer (L2.6) — shipped
+
+Listed above as out of scope for L2.1; this is the record of building it.
+
+**What it is.** `git status` for the content directory, rendered as documents
+rather than paths, with a per-file diff and one button that commits. Reached
+from a `Changes (N)` control in the top bar and from ⌘K.
+
+**Why it exists at all.** Every other CMS answers "what have I changed?" with a
+draft table it maintains itself. Graft's content is git-authoritative, so the
+answer already exists, is already durable, and is already true before any UI
+renders it. The drawer adds legibility, not state. That is the whole argument
+for the feature and the reason it is small.
+
+### Decisions
+
+**Commit, don't push.** A local commit needs no credentials, reaches nobody and
+is reversible. Pushing is a remote write with its own consent story — the
+GitHub App, post-launch roadmap item #1 — and folding it into a button labelled
+"Commit" would be a surprise of exactly the wrong kind. The footer says so in
+words: *Commits locally. Nothing is pushed.*
+
+**Scoped to `contentDir`.** The same line `revert.ts` draws. The operator asked
+about their content, not their source; a Studio that offered to commit `src/`
+would be a git client. Enforced twice over — `git status -- .` from the content
+directory, and a pathspec-scoped `git commit` — and pinned by a test that
+leaves an unrelated source edit in the working tree and proves it survives.
+
+**No compile button in the drawer.** Committing and compiling are different
+jobs, and the top bar already owns compile. A second control for it here is the
+duplication the Overview sync banner was deleted for. Instead each row carries
+its index state (`Drifted`, `Not indexed`) beside its git status, so both axes
+stay visible without competing for the same action.
+
+**Two counts in the top bar, deliberately.** `Changes (N)` and `N changes to
+compile` will often show the same number, which looks like the banner mistake
+and is not: they are different facts with different remedies, and after a
+commit or a compile they diverge. They are shaped differently on purpose — the
+drift control is an alarm that appears when something is wrong, the Changes
+control is a place that is always there. *Worth an operator look in L2.7:* if
+it reads as noise, merging them is a small change, and this note is the record
+of why they are separate.
+
+**Headless parity without a new command.** The Studio's rule is that nothing is
+only doable in the Studio. Here the headless equivalent is git itself — no
+`graft changes` was added, because `git status` and `git commit` already are it.
+
+### Findings
+
+- **`git status` reports from the repository root, not the working directory.**
+  Assuming otherwise produces paths that open nothing, silently. The offset is
+  `git rev-parse --show-prefix`, and re-basing every path onto the content
+  directory is a pure function with its own tests.
+- **`-z` instead of the newline format.** Newline output quotes and escapes any
+  path with a space or a non-ASCII character, so parsing it means
+  re-implementing git's C quoting. `-z` emits bytes verbatim, separated by a
+  character no path can contain. A rename appends its source as the *next*
+  record — consuming it as a record of its own invents a change out of a path
+  fragment.
+- **Four process spawns became two.** `readChanges` runs on every save to keep
+  the count live, and on Windows a spawn is expensive enough to feel: `rev-parse
+  --show-prefix --short HEAD` answers two questions at once, and `status -b`
+  carries the branch that would otherwise be a third call. The one trap:
+  `--show-prefix` prints an empty first line when content *is* the repository
+  root, so the output must be split before it is trimmed — the same
+  trim-eats-machine-output bug class as `parsePorcelainPaths`.
+- **A synthesised diff was showing a byte git never will.** A file git has never
+  seen has no blob to diff against, so the "all added" diff is built from the
+  file itself — and splitting on `\n` left the `\r` of a CRLF file at the end of
+  every line, where the tracked diff of that same file shows none (git
+  normalises on commit). Split on the terminator, CR included.
+- **Identity is checked before anything is staged.** `git commit` failing on an
+  unset `user.email` *after* a successful `git add` leaves the index mutated by
+  a request that reported failure. The preflight makes the refusal total, and
+  a test asserts nothing is staged on the way out.
+- **The commit takes the work tree, not the index.** `git commit -- <paths>`
+  bypasses staging, which is the behaviour the drawer promises: you commit what
+  you reviewed, and a half-staged earlier version cannot arrive behind it.
+
+### Verification
+
+Unit and real-repository tests (39 in `git.test.ts`, 11 in `changes.test.ts`)
+cover the parsers and every safety property against a real git repository in a
+temp directory — a fixture cannot falsify a claim about git's behaviour.
+
+Live: driven against `examples/docs-site` (a Postgres-tier project, 20 real
+documents) with a modified, a new and a deleted document — titles, both status
+axes, and all three diff shapes rendered correctly, and the drawer listed
+nothing from the 15 uncommitted files elsewhere in the same repository. The
+commit path was driven end to end in a throwaway project: the resulting commit
+carried the typed message, the repository's own committer identity, and exactly
+the two selected files.
+
+Two caveats about that environment, recorded so they are not re-investigated:
+synthetic pointer input was not delivered to the page at all (a pre-existing
+shipped control registered zero clicks either), and CSS transitions never
+complete, so a dialog keeps `data-starting-style`/`data-ending-style` forever —
+which is why geometry had to be measured with the transition disabled, and why
+a closed drawer still appears in the DOM.

@@ -176,6 +176,36 @@
   --delta-change: var(--c-amber-text-loud);
   --delta-remove: var(--c-red-text-loud);
 
+  /* ---- line diffs (the Changes drawer) ------------------------------------
+     The same three meanings as the deltas above, one level down: a delta
+     counts changes, a diff shows them. Text reuses the delta roles so a "+3"
+     in History and a `+` line in the drawer cannot drift apart; the tinted
+     rows are new, because a line needs a background to be scannable at speed.
+
+     Kept low — a diff is mostly context, and a page of saturated stripes is
+     harder to read than the text it is decorating. */
+  --diff-add-text: var(--delta-add);
+  --diff-add-bg: var(--c-green-bg);
+  --diff-remove-text: var(--delta-remove);
+  --diff-remove-bg: var(--c-red-bg);
+  --diff-gutter: var(--ink-faint);
+  --diff-hunk-bg: var(--paper-sunken);
+
+  /* ---- git change status --------------------------------------------------
+     What happened to a file since the last commit. A *different* axis from
+     document state (disk vs index) and deliberately quieter: a new document
+     is not news the way a drifted one is, so these are chips, not alarms.
+     Only deletion takes a warning hue, because it is the one that cannot be
+     glanced past. */
+  --change-added-text: var(--c-green-text);
+  --change-added-bg: var(--c-green-bg);
+  --change-modified-text: var(--c-blue-text);
+  --change-modified-bg: var(--c-blue-bg);
+  --change-deleted-text: var(--c-red-text);
+  --change-deleted-bg: var(--c-red-bg);
+  --change-renamed-text: var(--c-purple-text);
+  --change-renamed-bg: var(--c-purple-bg);
+
   /* ---- chrome ------------------------------------------------------------
      Deliberately neutral. "Monochrome chrome, color is state" is the whole
      thesis, and pointing these at neutrals is how it's enforced — by a token

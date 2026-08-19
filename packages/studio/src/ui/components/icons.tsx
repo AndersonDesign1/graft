@@ -18,6 +18,7 @@ export { TreeStructure as IconSchema } from "@phosphor-icons/react/dist/icons/Tr
 export { SealCheck as IconApprovals } from "@phosphor-icons/react/dist/icons/SealCheck";
 export { GitBranch as IconBranches } from "@phosphor-icons/react/dist/icons/GitBranch";
 export { ClockCounterClockwise as IconHistory } from "@phosphor-icons/react/dist/icons/ClockCounterClockwise";
+export { GitDiff as IconChanges } from "@phosphor-icons/react/dist/icons/GitDiff";
 export { GearSix as IconSettings } from "@phosphor-icons/react/dist/icons/GearSix";
 
 // actions

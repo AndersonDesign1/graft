@@ -127,6 +127,79 @@ export interface RevertResultDto {
   docCount: number;
 }
 
+/* ---- git: the Changes drawer --------------------------------------------
+   Content is git-authoritative, so "what have I changed?" has a real answer
+   that no draft table has to invent. These shapes are that answer in the
+   editor's vocabulary — git's two status columns collapse to one verb, and
+   the index/work-tree split never reaches the wire. */
+
+/** What happened to a file, as an editor would say it. */
+export type ChangeStatus = "added" | "modified" | "deleted" | "renamed";
+
+export interface ChangedFileDto {
+  /** Relative to the content directory, forward slashes. */
+  path: string;
+  status: ChangeStatus;
+  /** Previous path, on a rename. */
+  from?: string;
+  /** Part of this change is already in git's index. Shown, never required. */
+  staged: boolean;
+}
+
+export interface GitChangesDto {
+  /**
+   * False when git is unavailable or the content directory is not in a work
+   * tree. Not an error: content still compiles and serves without git, so the
+   * drawer explains rather than the request failing.
+   */
+  tracked: boolean;
+  /** Why not, when `tracked` is false. */
+  reason?: string;
+  /** The git branch a commit would land on; null when HEAD is detached. */
+  gitBranch: string | null;
+  /** Short SHA of HEAD; null in a repository with no commits yet. */
+  head: string | null;
+  files: ChangedFileDto[];
+}
+
+export interface DiffLineDto {
+  kind: "context" | "add" | "remove";
+  text: string;
+  oldLine?: number;
+  newLine?: number;
+}
+
+export interface DiffHunkDto {
+  /** The function/section context git prints after the @@ marker, if any. */
+  heading: string;
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  lines: DiffLineDto[];
+}
+
+export interface FileDiffDto {
+  path: string;
+  /** No diff is shown for binary files; there is nothing to review line by line. */
+  binary: boolean;
+  hunks: DiffHunkDto[];
+  added: number;
+  removed: number;
+  /** The diff was longer than the drawer renders. */
+  truncated: boolean;
+}
+
+export interface CommitResultDto {
+  /** Null only if HEAD could not be read back after a successful commit. */
+  sha: string | null;
+  shortSha: string;
+  message: string;
+  gitBranch: string | null;
+  /** Content-relative paths recorded in the commit. */
+  files: string[];
+}
+
 export interface BranchDto {
   name: string;
   parent: string | null;
