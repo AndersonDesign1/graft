@@ -247,10 +247,10 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
   STATIC_INDEX_UNSUPPORTED: {
     code: "STATIC_INDEX_UNSUPPORTED",
     meaning:
-      "Static index mode needs the node:sqlite built-in, which this Node runtime does not provide (it shipped in Node 22.5, stable options from 22.12).",
-    typicalCauses: ["Node older than 22.13 running the CLI or the app server"],
+      "Static index mode needs the node:sqlite built-in with FTS5, which this Node runtime does not provide (FTS5 ships in the bundled SQLite only from Node 22.16).",
+    typicalCauses: ["Node older than 22.16 running the CLI or the app server"],
     howToRecover:
-      'Upgrade Node to 22.13+ (24 LTS recommended), or switch the project to the Postgres index (DATABASE_URL + `export const index = "postgres"`).',
+      'Upgrade Node to 22.16+ (24 LTS recommended), or switch the project to the Postgres index (DATABASE_URL + `export const index = "postgres"`).',
   },
   SLUG_NOT_UNIQUE: {
     code: "SLUG_NOT_UNIQUE",

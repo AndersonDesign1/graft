@@ -116,9 +116,9 @@ store, and (if you use them) Neon's branching API and your OIDC issuer.
 
 ## Requirements
 
-- Node `>=22.13` (developed on 24). The static index uses the built-in `node:sqlite`
-  (stable since 22.12); the extra patch is pnpm 11's requirement, so one floor
-  covers dev and runtime. Node 20 reached end-of-life in April 2026.
+- Node `>=22.16` (developed on 24). The static index's FTS5 search needs the
+  `node:sqlite` build that ships from 22.16.0 — also comfortably above pnpm 11's
+  own floor. Node 20 reached end-of-life in April 2026.
 - TypeScript **7** (native `tsc`; monorepo dual-install keeps TS 6 API for tsup DTS until tooling catches up)
 - [pnpm](https://pnpm.io) `11.x` (pinned via `packageManager`)
 - Docker (for the self-host Postgres + MinIO stack)
