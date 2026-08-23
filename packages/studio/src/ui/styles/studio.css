@@ -2696,8 +2696,10 @@ kbd {
   left: auto;
   translate: none;
   width: min(46rem, calc(100vw - 3rem));
-  height: 100vh;
-  max-height: 100vh;
+  /* dvh, not vh: on mobile Safari 100vh includes the collapsed URL bar's
+     space, so a full-height sheet would overflow the visible viewport. */
+  height: 100dvh;
+  max-height: 100dvh;
   gap: 0;
   padding: 0;
   border-radius: 0;
@@ -2839,6 +2841,16 @@ kbd {
   align-items: center;
   gap: var(--space-2);
   padding-right: var(--space-2);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+/* The whole head row answers — the checkbox gutter included — because it
+   reads as one list row, the way every file-list UI does. Scoped to real
+   pointers so a touch tap doesn't leave a stuck highlight behind. */
+@media (hover: hover) and (pointer: fine) {
+  .change-head:hover {
+    background: var(--nav-hover-bg);
+  }
 }
 
 .change-check {
@@ -3196,7 +3208,11 @@ kbd {
   .btn:active,
   .icon-btn:active,
   .branch-trigger:active,
-  .drift:active {
+  .drift:active,
+  .changes-trigger:active,
+  .set-copy:active,
+  .theme-choice:active,
+  .mdx-card-edit:active {
     transform: none;
   }
 }

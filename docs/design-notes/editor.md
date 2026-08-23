@@ -162,7 +162,6 @@ Listed above as out of scope for L2.1; this is the record of building it.
 **What it is.** `git status` for the content directory, rendered as documents
 rather than paths, with a per-file diff and one button that commits. Reached
 from a `Changes (N)` control in the top bar and from ⌘K.
-
 **Why it exists at all.** Every other CMS answers "what have I changed?" with a
 draft table it maintains itself. Graft's content is git-authoritative, so the
 answer already exists, is already durable, and is already true before any UI
@@ -254,3 +253,39 @@ shipped control registered zero clicks either), and CSS transitions never
 complete, so a dialog keeps `data-starting-style`/`data-ending-style` forever —
 which is why geometry had to be measured with the transition disabled, and why
 a closed drawer still appears in the DOM.
+
+## L2.7 — the polish pass (decisions + record)
+
+The last L2 unit. Two decisions were parked for it, both now closed.
+
+**Two counts in the top bar: kept, operator decision (2026-08-23).** `Changes
+(N)` and `N changes to compile` stay separate. They are different facts —
+uncommitted work versus index drift — with different remedies, and they diverge
+the moment a commit or a compile lands; merging them would make one of the two
+states unlearnable. The shapes already differ on purpose (an outlined chip that
+is always there, versus a filled alarm that only exists when something is
+wrong), so no restyle was needed beyond what shipped in L2.6.
+
+**Table fidelity: style normalisation stays, operator delegated the call.**
+A Rich-mode save may canonicalise markdown *style* (table cell padding widths,
+bullet markers) and must never change content — the P7.5.3d line, unchanged.
+Three reasons this is the sustainable side of the line: the normalisation is
+stable (a document reformats once into the canonical form, then stops churning,
+which is the same contract a code formatter offers); byte-exact tables would
+pin custom serialisation against Milkdown's internals, making every library
+upgrade a silent-corruption risk for a cosmetic win; and the invariant that
+actually protects operators — content is never touched — is already tested.
+
+Findings fixed during the pass:
+
+- **`.change-main` had no hover feedback.** The primary row button in the brand-new
+  drawer gave zero affordance that the whole row expands — only the caret hinted at
+  it. The head row now washes on hover (`--nav-hover-bg`, real-pointer-gated like
+  every other row, matching `.tree-doc`'s convention).
+- **Reduced-motion press suppression was incomplete.** The `prefers-reduced-motion`
+  block removed the `:active` scale from four chrome controls but left five others
+  still scaling (`changes-trigger`, `set-copy`, `theme-choice`, `mdx-card-edit`).
+  One policy, applied everywhere: under reduced motion no control transforms on press.
+- **The drawer used `100vh`, which overflows on mobile Safari** (the collapsed URL
+  bar's height is included). Now `100dvh`.
+
