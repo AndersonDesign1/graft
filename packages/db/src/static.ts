@@ -9,7 +9,7 @@
  * side: a ContentIndexReader over the file, opened read-only so read-only
  * deployed filesystems (serverless) work.
  *
- * Engine: the `node:sqlite` built-in (Node ≥ 22.12) — zero npm dependencies,
+ * Engine: the `node:sqlite` built-in (Node ≥ 22.13) — zero npm dependencies,
  * FTS5 with porter stemming for search. The SQL is deliberately portable
  * SQLite so a remote backend (libsql/Turso/D1) later is an adapter, not a
  * port. Operational data (Job B: data_records, audit, approvals) is out of
@@ -35,7 +35,7 @@ const SNIPPET = `snippet(content_fts, 2, '<b>', '</b>', '…', 20)`;
 
 // ---------------------------------------------------------------------------
 // node:sqlite loading — lazy, so merely importing @usegraft/db never requires
-// Node 22.12; only actually using static mode does.
+// Node 22.13 (node:sqlite is usable from 22.12); only actually using static mode does.
 // ---------------------------------------------------------------------------
 
 // Minimal structural types for the slice of node:sqlite we use (its own types
@@ -62,7 +62,7 @@ async function loadSqlite(): Promise<SqliteCtor> {
     throw new GraftError({
       code: "STATIC_INDEX_UNSUPPORTED",
       message: `Static index mode needs the node:sqlite built-in, which this Node (${process.version}) does not provide.`,
-      fix: `Upgrade Node to 22.12+ (24 LTS recommended), or switch the project to the Postgres index (set DATABASE_URL and \`export const index = "postgres"\` in graft.config).`,
+      fix: `Upgrade Node to 22.13+ (24 LTS recommended), or switch the project to the Postgres index (set DATABASE_URL and \`export const index = "postgres"\` in graft.config).`,
       details: { node: process.version },
     });
   }

@@ -174,7 +174,7 @@ for the feature and the reason it is small.
 is reversible. Pushing is a remote write with its own consent story — the
 GitHub App, post-launch roadmap item #1 — and folding it into a button labelled
 "Commit" would be a surprise of exactly the wrong kind. The footer says so in
-words: *Commits locally. Nothing is pushed.*
+words: _Commits locally. Nothing is pushed._
 
 **Scoped to `contentDir`.** The same line `revert.ts` draws. The operator asked
 about their content, not their source; a Studio that offered to commit `src/`
@@ -193,7 +193,7 @@ compile` will often show the same number, which looks like the banner mistake
 and is not: they are different facts with different remedies, and after a
 commit or a compile they diverge. They are shaped differently on purpose — the
 drift control is an alarm that appears when something is wrong, the Changes
-control is a place that is always there. *Worth an operator look in L2.7:* if
+control is a place that is always there. _Worth an operator look in L2.7:_ if
 it reads as noise, merging them is a small change, and this note is the record
 of why they are separate.
 
@@ -210,14 +210,14 @@ only doable in the Studio. Here the headless equivalent is git itself — no
 - **`-z` instead of the newline format.** Newline output quotes and escapes any
   path with a space or a non-ASCII character, so parsing it means
   re-implementing git's C quoting. `-z` emits bytes verbatim, separated by a
-  character no path can contain. A rename appends its source as the *next*
+  character no path can contain. A rename appends its source as the _next_
   record — consuming it as a record of its own invents a change out of a path
   fragment.
 - **Four process spawns became two.** `readChanges` runs on every save to keep
   the count live, and on Windows a spawn is expensive enough to feel: `rev-parse
-  --show-prefix --short HEAD` answers two questions at once, and `status -b`
+--show-prefix --short HEAD` answers two questions at once, and `status -b`
   carries the branch that would otherwise be a third call. The one trap:
-  `--show-prefix` prints an empty first line when content *is* the repository
+  `--show-prefix` prints an empty first line when content _is_ the repository
   root, so the output must be split before it is trimmed — the same
   trim-eats-machine-output bug class as `parsePorcelainPaths`.
 - **A synthesised diff was showing a byte git never will.** A file git has never
@@ -226,7 +226,7 @@ only doable in the Studio. Here the headless equivalent is git itself — no
   every line, where the tracked diff of that same file shows none (git
   normalises on commit). Split on the terminator, CR included.
 - **Identity is checked before anything is staged.** `git commit` failing on an
-  unset `user.email` *after* a successful `git add` leaves the index mutated by
+  unset `user.email` _after_ a successful `git add` leaves the index mutated by
   a request that reported failure. The preflight makes the refusal total, and
   a test asserts nothing is staged on the way out.
 - **The commit takes the work tree, not the index.** `git commit -- <paths>`
@@ -267,7 +267,7 @@ is always there, versus a filled alarm that only exists when something is
 wrong), so no restyle was needed beyond what shipped in L2.6.
 
 **Table fidelity: style normalisation stays, operator delegated the call.**
-A Rich-mode save may canonicalise markdown *style* (table cell padding widths,
+A Rich-mode save may canonicalise markdown _style_ (table cell padding widths,
 bullet markers) and must never change content — the P7.5.3d line, unchanged.
 Three reasons this is the sustainable side of the line: the normalisation is
 stable (a document reformats once into the canonical form, then stops churning,
@@ -288,4 +288,3 @@ Findings fixed during the pass:
   One policy, applied everywhere: under reduced motion no control transforms on press.
 - **The drawer used `100vh`, which overflows on mobile Safari** (the collapsed URL
   bar's height is included). Now `100dvh`.
-

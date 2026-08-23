@@ -17,9 +17,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # 22.12 is the floor (node:sqlite, used by the default static index).
+          # 22.13 is the floor: node:sqlite (static index) is stable since
+          # 22.12, and pnpm 11 requires >= 22.13. One number everywhere.
           # Pinning the minor keeps CI honest about the version we advertise.
-          node-version: 22.12
+          node-version: 22.13
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
