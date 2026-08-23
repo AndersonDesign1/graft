@@ -2161,3 +2161,250 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------------------------------------------------------- security page --- */
+
+/* §01 — the gate transcript. Same surface family as .terminal (paper-sunken,
+   hairline chrome) but static: the sequence teaches, it does not perform. */
+.sec-flow {
+  display: flex;
+  flex-direction: column;
+  max-width: 44rem;
+  margin: 0 auto;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-outer);
+  background: var(--paper-sunken);
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
+}
+
+.sec-flow-line {
+  display: grid;
+  grid-template-columns: 4.2rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.9rem;
+  padding: 0.6rem 1.1rem;
+}
+
+.sec-flow-line + .sec-flow-line {
+  border-top: 1px solid var(--hairline);
+}
+
+/* The human's line is the one that matters — it gets the vermilion. */
+.sec-flow-who {
+  font: 500 var(--text-xs) / 1.6 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.sec-flow-who[data-who="human"] {
+  color: var(--mark);
+}
+
+.sec-flow-text {
+  font: 400 0.9rem / 1.5 var(--font-mono);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.sec-flow-note {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  text-align: right;
+}
+
+.sec-props {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  max-width: 44rem;
+  margin: 1px auto 0;
+  background: var(--hairline-strong);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-outer);
+  overflow: hidden;
+}
+
+.sec-prop {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.85rem 1rem;
+  background: var(--paper-sunken);
+}
+
+.sec-prop dt {
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--mark);
+}
+
+.sec-prop dd {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+/* §02 — the operator row carries a cannot-list; runtime gets both lists.
+   The cannot marks are vermilion ×'s: refusals are the feature. */
+.sec-role-sub {
+  margin: -0.6rem 0 1rem;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.sec-role-cannot {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--hairline-strong);
+}
+
+.sec-role-cannot li {
+  color: var(--ink-muted);
+}
+
+.sec-role-cannot li::before {
+  width: 0.45rem;
+  height: 1px;
+  background: var(--mark);
+  top: 0.62em;
+}
+
+.sec-hardening {
+  margin: 1.4rem auto 0;
+  max-width: 44rem;
+  text-align: center;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.sec-hardening code {
+  margin-left: 0.4rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-inner);
+  background: var(--paper-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink);
+}
+
+/* §03 — one audit row, laid out as the receipt it is. */
+.sec-audit {
+  max-width: 44rem;
+  margin: 0 auto;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-outer);
+  background: var(--paper-sunken);
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
+}
+
+.sec-audit-table {
+  margin: 0;
+  padding: 0.55rem 1.1rem;
+  border-bottom: 1px solid var(--hairline);
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.sec-audit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sec-audit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.85rem 1.1rem;
+  border-top: 1px solid var(--hairline);
+  margin: 0;
+}
+
+/* The label's own bottom hairline separates it from row one, so the first
+   three fields (the top grid row) carry no top border of their own. */
+.sec-audit-grid .sec-audit-field:nth-child(-n + 3) {
+  border-top: none;
+}
+
+.sec-audit-field dt {
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--mark);
+}
+
+.sec-audit-field dd {
+  margin: 0;
+  font: 400 0.85rem / 1.4 var(--font-mono);
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+/* §04 — a diff is the whole argument; render it like git does. */
+.sec-diff {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 0;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-outer);
+  background: var(--paper-sunken);
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
+}
+
+.sec-diff code {
+  display: block;
+  padding: 0.9rem 1.1rem;
+  font: 400 0.9rem / 1.9 var(--font-mono);
+}
+
+.sec-diff code span {
+  display: block;
+}
+
+.sec-diff-meta {
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.sec-diff-del {
+  color: color-mix(in oklch, var(--mark) 70%, var(--ink));
+}
+
+.sec-diff-add {
+  color: var(--ink);
+}
+
+@media (max-width: 820px) {
+  .sec-props,
+  .sec-audit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Rows re-stack; restore separators the 3-up grid could assume away. */
+  .sec-audit-grid .sec-audit-field {
+    border-top: 1px solid var(--hairline);
+  }
+
+  .sec-audit-grid .sec-audit-field:first-child {
+    border-top: none;
+  }
+
+  .sec-flow-line {
+    grid-template-columns: 4.2rem minmax(0, 1fr);
+  }
+
+  .sec-flow-note {
+    grid-column: 2;
+    text-align: left;
+  }
+}

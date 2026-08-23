@@ -1,0 +1,34 @@
+---
+title: Security
+tagline: >-
+  Graft assumes the operator is an autonomous agent. The safety story is
+  structural, not a promise.
+description: >-
+  Approvals, Postgres role separation, audit receipts, git-authoritative
+  content. Why it is safe to let an agent run your CMS.
+faqs:
+  - question: Can an agent delete my content?
+    answer: >-
+      Deletes are destructive functions, so the first call never executes — it
+      files a one-shot, input-bound approval and returns 403 with its id. Only
+      after you run graft approve does the retry succeed, and the deletion is
+      still a commit in your history.
+  - question: What stops the agent approving itself?
+    answer: >-
+      Postgres role separation. The runtime credential can request and consume
+      approvals only through a SECURITY DEFINER function; flipping pending to
+      approved is an operator-role UPDATE stamped server-side with decided_role.
+      Even raw SQL with the runtime credential cannot self-approve.
+  - question: Does Graft phone home?
+    answer: >-
+      No telemetry. Content lives in your repository, operational data in your
+      Postgres, assets in your bucket. There is no Graft cloud in the path.
+  - question: What happens when a token leaks?
+    answer: >-
+      Tokens are verified against your OIDC issuer, carry only the scopes you
+      granted, and expire on the issuer's schedule. Everything the token did is
+      in the audit log keyed by actor and correlation id, so the blast radius is
+      knowable — and revocation happens at your issuer, not ours.
+---
+
+Body rendered by the Security page layout; fields above drive the story.
