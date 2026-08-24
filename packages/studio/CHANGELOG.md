@@ -1,0 +1,12 @@
+# @usegraft/studio
+
+## 0.1.0
+
+### Patch Changes
+
+- Updated dependencies [8d8eda0]
+  - @usegraft/core@0.1.0
+  - @usegraft/compiler@0.1.0
+  - @usegraft/assets@0.1.0
+  - @usegraft/contracts@0.1.0
+  - @usegraft/db@0.1.0
