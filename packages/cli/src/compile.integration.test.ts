@@ -35,7 +35,10 @@ describe.skipIf(!runIntegration)("graft compile projects a scaffolded project", 
     await handle.sql`delete from content_index where branch_id = ${BRANCH}`;
     rmSync(projectDir, { recursive: true, force: true });
     mkdirSync(projectDir, { recursive: true });
-    initCommand({ targetDir: projectDir });
+    // `init` defaults to the static index (the zero-service quickstart), which
+    // has no DB branches — compiling with --branch there fails NEEDS_DATABASE.
+    // This suite asserts against live content_index rows, so it needs Postgres.
+    initCommand({ targetDir: projectDir, driver: "postgres" });
   }, TEST_TIMEOUT);
 
   afterAll(async () => {

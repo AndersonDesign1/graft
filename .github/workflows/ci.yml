@@ -15,18 +15,20 @@ jobs:
       # fallback inside the example itself.
       BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           # 22.16 is the floor: node:sqlite bundles FTS5 (the static index's
           # search) from 22.16.0, which is also >= pnpm 11's 22.13 requirement.
           # One number everywhere; pinning keeps CI honest about what we advertise.
           node-version: 22.16
+          # Explicit: setup-node v5 began auto-caching from `packageManager`
+          # and v6 narrowed that to npm only. Naming pnpm pins the behaviour.
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile

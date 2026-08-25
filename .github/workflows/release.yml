@@ -49,7 +49,7 @@ jobs:
       # The warning is correct behaviour at runtime; it is only noise at build.
       BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # pnpm — not npm — performs the OIDC exchange. changesets picks its
       # publish tool from the lockfile and spawns `pnpm publish`; pnpm 11
@@ -58,20 +58,26 @@ jobs:
       # pinned in package.json's `packageManager` (read by action-setup), and
       # npm's version is irrelevant to authentication here.
       #
-      # The floor matters: early pnpm 11.x returned a 404 under OIDC when
-      # setup-node wrote an .npmrc holding an unresolved ${NODE_AUTH_TOKEN}
-      # placeholder (pnpm#11513) — exactly the shape below, since we set
-      # registry-url and deliberately provide no token. Later 11.x treats the
-      # unresolved placeholder as empty; stay current.
+      # v6 is the release that added pnpm 11 support — the major we pin.
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
+      # setup-node v7 removed the dummy NODE_AUTH_TOKEN export, which is what
+      # made registry-url hazardous here: earlier majors wrote an .npmrc holding
+      # an unresolved ${NODE_AUTH_TOKEN} placeholder, and early pnpm 11 read
+      # that placeholder literally and 404'd under OIDC (pnpm#11513). We set
+      # registry-url and deliberately supply no token, so that was exactly our
+      # shape. v7 no longer writes it, and v7 is the first major documenting
+      # trusted publishing (OIDC) as a supported path.
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           # Release tooling runs on the LTS, not the advertised floor.
           # CI (ci.yml) keeps testing the 22.16 floor.
           node-version: 24
+          # Explicit, and load-bearing: setup-node v5 began auto-caching from
+          # the `packageManager` field and v6 narrowed that to npm only. Naming
+          # pnpm keeps the cache working regardless of those defaults.
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
