@@ -4,13 +4,53 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      // Turbo 2 runs tasks in strict env mode: a variable that is not declared
+      // here never reaches the task process at all. Undeclared vars are not
+      // merely uncached — they are absent, silently.
+      //
+      // `env` participates in the cache key (the value changes the output).
+      // `passThroughEnv` reaches the process without busting the cache (the
+      // value is needed at runtime but does not change what gets built).
+      "env": [
+        // Standard build-mode switch; read by sdk-next's MDX path.
+        "NODE_ENV",
+        // Baked into the Studio bundle by packages/studio/vite.config.ts.
+        "GRAFT_STUDIO_ORIGIN"
+      ],
+      "passThroughEnv": [
+        // Better Auth is constructed at module scope in examples/landing-page,
+        // so `next build` evaluates it and warns when no secret is present.
+        // Server-side only and never inlined, so it cannot change build output.
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        // Read by the examples' graft/auth clients and API routes. Server-side
+        // only (no NEXT_PUBLIC_ prefix), so Next will not inline it.
+        "DATABASE_URL",
+        "GRAFT_DEV_TOKEN",
+        "GRAFT_MCP_REQUIRE_AUTH",
+        // Deployment provenance, read per-request by the functions handler.
+        "VERCEL_GIT_COMMIT_SHA",
+        "GITHUB_SHA"
+      ],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "typecheck": {
       "dependsOn": ["^build"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      // All cache-keyed rather than passed through: these decide *which* tests
+      // run, so a cached pass from a skipped run must never satisfy a real one.
+      // Without RUN_INTEGRATION declared, `RUN_INTEGRATION=1 pnpm test` was
+      // silently running the unit suite and reporting green.
+      "env": [
+        "RUN_INTEGRATION",
+        "DATABASE_URL",
+        "NEON_API_KEY",
+        "GRAFT_NEON_PROJECT_ID",
+        "S3_ENDPOINT",
+        "S3_ACCESS_KEY"
+      ]
     },
     "lint": {},
     "dev": {
