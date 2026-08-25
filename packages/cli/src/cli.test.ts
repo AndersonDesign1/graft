@@ -1,4 +1,5 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,7 +26,11 @@ afterEach(() => {
 describe("run", () => {
   it("prints the version", async () => {
     expect(await run(["--version"])).toBe(0);
-    expect(logs.join("\n")).toContain("0.0.0");
+    // Assert against the manifest, not a literal: a hardcoded expectation is
+    // what let `graft --version` ship as "0.0.0" in 0.1.0.
+    const { version } = createRequire(import.meta.url)("../package.json");
+    expect(logs.join("\n")).toContain(version);
+    expect(version).not.toBe("0.0.0");
   });
 
   it("prints help when called bare", async () => {

@@ -6,9 +6,15 @@
  * project MCP over stdio) are real. Every failure crossing this boundary is a
  * GraftError printed with its agent-actionable `fix`.
  */
+import { createRequire } from "node:module";
+
 import { printGraftError } from "./report";
 
-const VERSION = "0.0.0";
+// Read from the manifest rather than a literal: changesets bumps package.json,
+// and a hardcoded constant silently ships the wrong number (0.1.0 shipped as
+// "0.0.0"). `../package.json` resolves identically from src/ under vitest and
+// from dist/ in the published tarball, where npm always includes the manifest.
+const VERSION: string = createRequire(import.meta.url)("../package.json").version;
 
 interface PlannedCommand {
   name: string;
