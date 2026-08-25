@@ -1,18 +1,31 @@
 name: Release
 
 # Publishes @usegraft/* to npm via changesets.
-# feat/core is the working mainline (operator decision 2026-07-11);
-# main is listed for the eventual post-launch branch model.
+#
+# Publishing authenticates through GitHub Actions OIDC (trusted publishing,
+# configured per package on npmjs.com), not a long-lived token — there is no
+# NPM_TOKEN in this repo and no bypass-2FA credential, per npm's 2026 token
+# policy changes. The npm CLI detects the OIDC environment and exchanges a
+# short-lived, workflow-scoped token at publish time; `id-token: write` below
+# is what makes that possible.
+#
+# feat/core is the working mainline (operator decision 2026-07-11); main is
+# listed for the eventual post-launch branch model.
 on:
   push:
     branches: [feat/core, main]
+  # Retry surface. With no pending changesets, dispatching re-runs `publish`,
+  # which is idempotent — changesets skips versions the registry already has.
+  # A package can register only ONE trusted-publisher workflow filename, so
+  # retries must come from this file rather than a separate workflow.
+  workflow_dispatch:
 
 concurrency: release-${{ github.ref }}
 
 permissions:
   contents: write
   pull-requests: write
-  id-token: write
+  id-token: write # OIDC — the credential trusted publishing validates
 
 jobs:
   release:
@@ -26,9 +39,17 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Release tooling runs on the LTS, not the advertised floor: trusted
+          # publishing needs npm >= 11.5.1, which Node 22's bundled npm (10.x)
+          # does not satisfy. CI (ci.yml) keeps testing the 22.16 floor.
+          node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
+
+      # The npm CLI performs the OIDC exchange, so its version is load-bearing.
+      # Install explicitly rather than trusting the Node bundler to be current.
+      - name: Use latest npm
+        run: npm install -g npm@latest
 
       - run: pnpm install --frozen-lockfile
 
@@ -41,4 +62,3 @@ jobs:
           title: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

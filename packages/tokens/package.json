@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "Graft design tokens — one stylesheet, consumed by the docs site and the Studio.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndersonDesign1/graft.git",
+    "directory": "packages/tokens"
+  },
   "files": [
     "*.css"
   ],

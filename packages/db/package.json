@@ -2,6 +2,11 @@
   "name": "@usegraft/db",
   "version": "0.1.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndersonDesign1/graft.git",
+    "directory": "packages/db"
+  },
   "files": [
     "dist",
     "drizzle"

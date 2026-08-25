@@ -2,6 +2,11 @@
   "name": "@usegraft/assets",
   "version": "0.1.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndersonDesign1/graft.git",
+    "directory": "packages/assets"
+  },
   "files": [
     "dist"
   ],
