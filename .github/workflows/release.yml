@@ -30,6 +30,24 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      # Trusted publishing proves WHO published; provenance proves WHAT was
+      # built and from where. Signs each tarball with an attestation tying it
+      # to this commit, workflow and runner, which npm surfaces as the
+      # "Provenance" badge. Relies on the id-token: write permission above —
+      # the same OIDC identity that authenticates the publish.
+      NPM_CONFIG_PROVENANCE: "true"
+
+      # examples/landing-page constructs Better Auth at module scope, so
+      # `next build` evaluates it and warns that no secret is set. Nothing
+      # signed during a build is ever used, so a throwaway value keeps release
+      # logs clean.
+      #
+      # Deliberately set HERE and not as a fallback inside the example: an
+      # example that quietly substitutes its own secret would let someone
+      # deploy unconfigured with a publicly-known signing key and no warning.
+      # The warning is correct behaviour at runtime; it is only noise at build.
+      BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
     steps:
       - uses: actions/checkout@v4
 

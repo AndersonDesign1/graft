@@ -8,6 +8,12 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      # `pnpm build` builds examples/landing-page, which constructs Better Auth
+      # at module scope and warns when no secret is set. Build-time only — see
+      # the longer note in release.yml for why this lives here rather than as a
+      # fallback inside the example itself.
+      BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
     steps:
       - uses: actions/checkout@v4
 
