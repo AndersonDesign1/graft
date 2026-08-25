@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/tokens",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Graft design tokens — one stylesheet, consumed by the docs site and the Studio.",
   "license": "MIT",
   "repository": {

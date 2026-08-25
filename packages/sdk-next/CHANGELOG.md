@@ -1,5 +1,11 @@
 # @usegraft/sdk-next
 
+## 0.1.1
+
+### Patch Changes
+
+- @usegraft/sdk-core@0.1.1
+
 ## 0.1.0
 
 ### Patch Changes
