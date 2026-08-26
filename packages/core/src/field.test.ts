@@ -112,3 +112,35 @@ describe("defineField", () => {
     expectTypeOf(parsed[0]!.productSlug).toEqualTypeOf<string>();
   });
 });
+
+describe("bounds", () => {
+  it("caps string and text length", () => {
+    const short = field.string({ maxLength: 5 });
+    expect(short.zod.safeParse("abcde").success).toBe(true);
+    expect(short.zod.safeParse("abcdef").success).toBe(false);
+
+    const body = field.text({ maxLength: 3 });
+    expect(body.zod.safeParse("abcd").success).toBe(false);
+  });
+
+  it("bounds numbers, including the integer case", () => {
+    const qty = field.number({ int: true, min: 1, max: 100 });
+    expect(qty.zod.safeParse(50).success).toBe(true);
+    expect(qty.zod.safeParse(0).success).toBe(false);
+    expect(qty.zod.safeParse(101).success).toBe(false);
+    expect(qty.zod.safeParse(1.5).success).toBe(false);
+    // The case that silently corrupted order totals: an unbounded quantity
+    // multiplied by a price exceeds Number.MAX_SAFE_INTEGER.
+    expect(qty.zod.safeParse(Number.MAX_SAFE_INTEGER).success).toBe(false);
+  });
+
+  it("caps array length", () => {
+    const items = field.array({ of: field.string(), maxItems: 2 });
+    expect(items.zod.safeParse(["a", "b"]).success).toBe(true);
+    expect(items.zod.safeParse(["a", "b", "c"]).success).toBe(false);
+  });
+
+  it("leaves fields unbounded when no bound is given", () => {
+    expect(field.string().zod.safeParse("x".repeat(10_000)).success).toBe(true);
+  });
+});

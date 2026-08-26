@@ -40,11 +40,20 @@ export const products = defineCollection({
   name: "products",
   description: "Sellable catalog items (file-authoritative). Author under content/products/.",
   fields: {
-    title: field.string({ description: "Product name." }),
-    description: field.text({ description: "Short product description." }),
-    priceCents: field.number({ description: "Price in the smallest currency unit (e.g. cents)." }),
+    title: field.string({ maxLength: 200, description: "Product name." }),
+    description: field.text({ maxLength: 2000, description: "Short product description." }),
+    priceCents: field.number({
+      int: true,
+      min: 0,
+      max: 100_000_000,
+      description: "Price in the smallest currency unit (e.g. cents).",
+    }),
     currency: field.string({
       optional: true,
+      // Exactly three letters: Intl.NumberFormat throws a RangeError on
+      // anything else, and one malformed product used to break the whole
+      // catalog page at render time.
+      pattern: /^[A-Za-z]{3}$/,
       description: 'ISO currency code (default "USD").',
     }),
     image: field.asset({ optional: true, description: "Product image." }),
@@ -64,21 +73,25 @@ export const orders = defineCollection({
   authority: "db-authoritative",
   description: "Customer orders. Place via placeOrder; admin via list/update/cancel.",
   fields: {
-    email: field.string({ description: "Buyer email." }),
+    email: field.string({ maxLength: 320, description: "Buyer email." }),
     items: field.array({
       description: "Line items snapshotted at order time (price locked).",
       of: field.object({
         fields: {
-          productSlug: field.string({ description: "Catalog product slug." }),
-          qty: field.number({ description: "Quantity (>= 1)." }),
-          unitPriceCents: field.number({ description: "Unit price at order time." }),
+          productSlug: field.string({ maxLength: 200, description: "Catalog product slug." }),
+          qty: field.number({ int: true, min: 1, max: 10_000, description: "Quantity (1-10000)." }),
+          unitPriceCents: field.number({
+            int: true,
+            min: 0,
+            description: "Unit price at order time.",
+          }),
         },
       }),
     }),
     status: field.string({
       description: "pending | paid | cancelled | fulfilled",
     }),
-    totalCents: field.number({ description: "Sum of qty * unitPriceCents." }),
+    totalCents: field.number({ int: true, min: 0, description: "Sum of qty * unitPriceCents." }),
   },
 });
 
@@ -96,25 +109,31 @@ async function loadProducts(
 ): Promise<Map<string, ProductRow>> {
   const unique = [...new Set(slugs)];
   const out = new Map<string, ProductRow>();
-  for (const slug of unique) {
-    const row = await ctx.db.query.contentIndex.findFirst({
-      where: (t, ops) =>
-        ops.and(
-          ops.eq(t.branchId, ctx.branch),
-          ops.eq(t.collection, "products"),
-          ops.eq(t.slug, slug),
-          ops.eq(t.deleted, false),
-        ),
-    });
-    if (!row) continue;
+  if (unique.length === 0) return out;
+
+  // One query, not one per slug. The loop this replaces ran before unknown
+  // slugs were rejected, so a request carrying thousands of bogus slugs held a
+  // pooled connection for that many serial round-trips and only then failed
+  // validation — starving every other function sharing the pool.
+  const rows = await ctx.db.query.contentIndex.findMany({
+    where: (t, ops) =>
+      ops.and(
+        ops.eq(t.branchId, ctx.branch),
+        ops.eq(t.collection, "products"),
+        ops.inArray(t.slug, unique),
+        ops.eq(t.deleted, false),
+      ),
+  });
+
+  for (const row of rows) {
     const data = row.data as {
       title?: string;
       priceCents?: number;
       active?: boolean;
     };
     if (typeof data.priceCents !== "number" || typeof data.title !== "string") continue;
-    out.set(slug, {
-      slug,
+    out.set(row.slug, {
+      slug: row.slug,
       title: data.title,
       priceCents: data.priceCents,
       active: data.active !== false,
@@ -133,13 +152,21 @@ export const placeOrder = defineFunction({
     "Place an order for active products. Snapshots unit prices; status starts as pending. 10/min per caller.",
   returns: "{ id: string; totalCents: number; status: string; receivedAt: string }",
   input: {
-    email: field.string({ description: "Buyer email." }),
+    email: field.string({ maxLength: 320, description: "Buyer email." }),
     items: field.array({
       description: "What to buy.",
+      // Capped: each entry drives catalog work, so an uncapped array is a
+      // per-request amplifier.
+      maxItems: 100,
       of: field.object({
         fields: {
-          productSlug: field.string({ description: "Product slug from content/products/." }),
-          qty: field.number({ description: "Quantity (>= 1)." }),
+          productSlug: field.string({
+            maxLength: 200,
+            description: "Product slug from content/products/.",
+          }),
+          // Bounded so price x qty cannot exceed Number.MAX_SAFE_INTEGER and
+          // silently store a wrong total.
+          qty: field.number({ int: true, min: 1, max: 10_000, description: "Quantity (1-10000)." }),
         },
       }),
     }),
@@ -224,7 +251,13 @@ export const listOrders = defineFunction({
   description: "List recent orders, newest first. Requires commerce:orders:read.",
   returns: "{ orders: { id, email, status, totalCents, items, receivedAt }[] }",
   input: {
-    limit: field.number({ optional: true, description: "Max rows (default 50)." }),
+    limit: field.number({
+      optional: true,
+      int: true,
+      min: 1,
+      max: 200,
+      description: "Max rows (default 50).",
+    }),
   },
   access: requireOrdersRead,
   handler: async (ctx) => {
@@ -250,8 +283,8 @@ export const updateOrderStatus = defineFunction({
     "Set an order's status (pending|paid|cancelled|fulfilled). Requires commerce:orders:write.",
   returns: "{ id: string; status: string }",
   input: {
-    id: field.string({ description: "Order row id (uuid)." }),
-    status: field.string({ description: "pending | paid | cancelled | fulfilled" }),
+    id: field.string({ maxLength: 64, description: "Order row id (uuid)." }),
+    status: field.string({ maxLength: 32, description: "pending | paid | cancelled | fulfilled" }),
   },
   access: requireOrdersWrite,
   handler: async (ctx) => {

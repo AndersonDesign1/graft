@@ -50,8 +50,14 @@ export const submissions = defineCollection({
   authority: "db-authoritative",
   description: "Contact-form submissions. Write via submitContact; read via listSubmissions.",
   fields: {
-    email: field.string({ description: "Sender address." }),
-    message: field.text({ optional: true, description: "What they wrote." }),
+    // Bounded: this is an anonymous public form writing into an unbounded jsonb
+    // column, so an unbounded string is a storage-exhaustion vector.
+    email: field.string({
+      maxLength: 320,
+      pattern: /^[^@\s]+@[^@\s]+\.[^@\s]+$/,
+      description: "Sender address.",
+    }),
+    message: field.text({ maxLength: 4000, optional: true, description: "What they wrote." }),
   },
 });
 

@@ -70,6 +70,36 @@ const jsonValue: z.ZodType<JsonValue> = z.lazy(() =>
 export interface FieldOptions {
   optional?: boolean;
   description?: string;
+  /**
+   * Maximum length for `string` / `text`.
+   *
+   * There was no way to bound a field at all, so every authored string and
+   * every public form input compiled to a bare `z.string()` and was written
+   * verbatim into an unbounded jsonb column. A single anonymous request could
+   * store megabytes.
+   */
+  maxLength?: number;
+  /** Minimum value for `number`. */
+  min?: number;
+  /**
+   * Maximum value for `number`.
+   *
+   * Worth setting on anything that gets multiplied: an unbounded quantity times
+   * a price silently exceeds `Number.MAX_SAFE_INTEGER` and the stored total is
+   * wrong rather than rejected.
+   */
+  max?: number;
+  /** Require an integer (`number` only). */
+  int?: boolean;
+  /**
+   * Pattern a `string` / `text` value must match.
+   *
+   * For values that are consumed by something stricter than "a string" — an
+   * ISO currency code handed to `Intl.NumberFormat`, for instance, which throws
+   * a RangeError on anything that is not exactly three letters and takes the
+   * whole page down with it.
+   */
+  pattern?: RegExp;
 }
 
 export interface FieldDefinition<TZod extends z.ZodType = z.ZodType> {
@@ -111,12 +141,32 @@ type MaybeOptional<TZod extends z.ZodType, TOptions extends FieldOptions> = TOpt
   ? z.ZodOptional<TZod>
   : TZod;
 
+/** Apply the option-driven constraints a scalar type supports. */
+function constrain(type: ScalarFieldType, base: z.ZodType, options?: FieldOptions): z.ZodType {
+  if (options === undefined) return base;
+  let out = base;
+  if (type === "string" || type === "text") {
+    let str = out as z.ZodString;
+    if (options.maxLength !== undefined) str = str.max(options.maxLength);
+    if (options.pattern !== undefined) str = str.regex(options.pattern);
+    out = str;
+  }
+  if (type === "number") {
+    let n = out as z.ZodNumber;
+    if (options.int === true) n = n.int();
+    if (options.min !== undefined) n = n.min(options.min);
+    if (options.max !== undefined) n = n.max(options.max);
+    out = n;
+  }
+  return out;
+}
+
 export function defineField<
   TType extends ScalarFieldType,
   const TOptions extends FieldOptions = Record<never, never>,
 >(type: TType, options?: TOptions): FieldDefinition<MaybeOptional<ScalarZodMap[TType], TOptions>> {
   const optional = options?.optional ?? false;
-  const base = BASE_ZOD[type]();
+  const base = constrain(type, BASE_ZOD[type](), options) as ScalarZodMap[TType];
   return {
     type,
     zod: (optional ? base.optional() : base) as MaybeOptional<ScalarZodMap[TType], TOptions>,
@@ -131,6 +181,14 @@ export interface ObjectFieldOptions extends FieldOptions {
 
 export interface ArrayFieldOptions extends FieldOptions {
   of: FieldDefinition;
+  /**
+   * Maximum element count.
+   *
+   * An uncapped array is a per-request amplifier: one call carrying tens of
+   * thousands of entries can drive that many database round-trips before
+   * anything rejects it.
+   */
+  maxItems?: number;
 }
 
 type FieldsToZodShape<TFields extends Record<string, FieldDefinition>> = {
@@ -164,12 +222,19 @@ export function defineObjectField<
 /** Array field — items validated by the nested field def. */
 export function defineArrayField<
   TItemZod extends z.ZodType,
-  const TOptions extends { optional?: boolean; description?: string } = Record<never, never>,
+  const TOptions extends {
+    optional?: boolean;
+    description?: string;
+    maxItems?: number;
+  } = Record<never, never>,
 >(
   options: { of: FieldDefinition<TItemZod> } & TOptions,
 ): FieldDefinition<MaybeOptional<z.ZodArray<TItemZod>, TOptions>> {
   const optional = options.optional ?? false;
-  const base = z.array(options.of.zod);
+  const base =
+    options.maxItems === undefined
+      ? z.array(options.of.zod)
+      : z.array(options.of.zod).max(options.maxItems);
   return {
     type: "array",
     zod: (optional ? base.optional() : base) as MaybeOptional<z.ZodArray<TItemZod>, TOptions>,

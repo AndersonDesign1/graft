@@ -22,9 +22,12 @@ export const comments = defineCollection({
   authority: "db-authoritative",
   description: "Visitor comments, held for moderation until approved.",
   fields: {
-    pageSlug: field.string({ description: "Slug of the page the comment belongs to." }),
-    author: field.string({ description: "Commenter's display name." }),
-    body: field.text({ description: "The comment text." }),
+    pageSlug: field.string({
+      maxLength: 200,
+      description: "Slug of the page the comment belongs to.",
+    }),
+    author: field.string({ maxLength: 80, description: "Commenter's display name." }),
+    body: field.text({ maxLength: 4000, description: "The comment text." }),
     approved: field.boolean({ description: "Only approved comments list publicly." }),
   },
 });
@@ -39,9 +42,9 @@ export const postComment = defineFunction({
     "Post a comment (public; held unapproved until a moderator approves it). 5/min per caller.",
   returns: "{ id: string; receivedAt: string }",
   input: {
-    pageSlug: field.string({ description: "Page the comment is on." }),
-    author: field.string({ description: "Display name." }),
-    body: field.text({ description: "The comment text." }),
+    pageSlug: field.string({ maxLength: 200, description: "Page the comment is on." }),
+    author: field.string({ maxLength: 80, description: "Display name." }),
+    body: field.text({ maxLength: 4000, description: "The comment text." }),
   },
   handler: async (ctx) => {
     const record = await insertRecord(ctx, comments, { ...ctx.input, approved: false });
@@ -55,21 +58,32 @@ export const listComments = defineFunction({
   kind: "query",
   description: "List approved comments for a page, newest first.",
   returns: "{ comments: { id: string; author: string; body: string; receivedAt: string }[] }",
+  rateLimit: { limit: 60, windowSeconds: 60 },
   input: {
-    pageSlug: field.string({ description: "Page to list comments for." }),
-    limit: field.number({ optional: true, description: "Max rows scanned (default 100)." }),
+    pageSlug: field.string({ maxLength: 200, description: "Page to list comments for." }),
+    limit: field.number({
+      optional: true,
+      int: true,
+      min: 1,
+      max: 100,
+      description: "Max comments to return (default 100).",
+    }),
   },
   handler: async (ctx) => {
-    const records = await listRecords(ctx, comments, { limit: ctx.input.limit ?? 100 });
+    // Both predicates run in SQL. Filtering after the row cap meant unapproved
+    // comments consumed the window, so posting enough of them hid every
+    // approved comment on every page — silently, with no error.
+    const records = await listRecords(ctx, comments, {
+      limit: ctx.input.limit ?? 100,
+      match: { approved: true, pageSlug: ctx.input.pageSlug },
+    });
     return {
-      comments: records
-        .filter((r) => r.data.approved && r.data.pageSlug === ctx.input.pageSlug)
-        .map((r) => ({
-          id: r.id,
-          author: r.data.author,
-          body: r.data.body,
-          receivedAt: r.createdAt.toISOString(),
-        })),
+      comments: records.map((r) => ({
+        id: r.id,
+        author: r.data.author,
+        body: r.data.body,
+        receivedAt: r.createdAt.toISOString(),
+      })),
     };
   },
 });

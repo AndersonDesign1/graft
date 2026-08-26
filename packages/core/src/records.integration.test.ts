@@ -69,4 +69,32 @@ describe.skipIf(!runIntegration)("records -> data_records (integration)", () => 
       message: "hello from the integration test",
     });
   }, 60_000);
+
+  it("applies match filters in SQL, so the cap does not hide matching rows", async () => {
+    await handle.sql`delete from data_records where branch_id = ${BRANCH}`;
+
+    const wanted = await insertRecord(ctx, submissions, { email: "wanted@example.com" });
+    // Newer, unwanted rows. Filtering AFTER the cap meant these consumed the
+    // window and the matching row vanished from the result entirely.
+    for (let i = 0; i < 5; i++) {
+      await insertRecord(ctx, submissions, { email: "noise@example.com" });
+    }
+
+    const listed = await listRecords(ctx, submissions, {
+      match: { email: "wanted@example.com" },
+      limit: 3,
+    });
+
+    expect(listed.map((r) => r.id)).toEqual([wanted.id]);
+  }, 60_000);
+
+  it("clamps a caller-supplied limit instead of passing it to Postgres", async () => {
+    await handle.sql`delete from data_records where branch_id = ${BRANCH}`;
+    await insertRecord(ctx, submissions, { email: "a@example.com" });
+
+    // A billion used to reach LIMIT directly; a negative one made Postgres
+    // error out. Both are now clamped into range.
+    await expect(listRecords(ctx, submissions, { limit: 1_000_000_000 })).resolves.toHaveLength(1);
+    await expect(listRecords(ctx, submissions, { limit: -1 })).resolves.toHaveLength(1);
+  }, 60_000);
 });

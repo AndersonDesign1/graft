@@ -8,7 +8,7 @@
  * stamp actor + correlationId — the pre-audit-log breadcrumb trail.
  */
 import { GraftError } from "@usegraft/contracts";
-import { and, dataRecords, desc, eq, searchData } from "@usegraft/db";
+import { and, dataRecords, desc, eq, searchData, sql } from "@usegraft/db";
 import type { AnyCollection, DocumentData } from "./collection";
 import type { FunctionContext } from "./function";
 
@@ -26,9 +26,39 @@ export interface DataRecord<TData> {
   createdAt: Date;
 }
 
+/** Hard ceiling on rows any single read may scan. */
+export const MAX_RECORD_LIMIT = 500;
+
 export interface ListRecordsOptions {
-  /** Newest-first row cap. Defaults to 50. */
+  /**
+   * Newest-first row cap. Defaults to 50, clamped to {@link MAX_RECORD_LIMIT}.
+   *
+   * Clamped rather than trusted: this value routinely comes from a function
+   * input, and an unclamped one reached Postgres directly — so a public query
+   * could ask for a billion rows and have every one of them read into memory
+   * and re-validated through Zod.
+   */
   limit?: number;
+  /**
+   * Equality filters on `data` fields, applied in SQL.
+   *
+   * Filtering after the fact is a correctness bug, not just a slow path: the
+   * cap applies to the scan, so rows that do not match still consume the
+   * window. A public "list approved comments for this page" that filtered in
+   * JavaScript could be emptied site-wide by posting enough newer unapproved
+   * rows to fill it.
+   */
+  match?: Record<string, string | number | boolean>;
+}
+
+/**
+ * A caller-supplied row cap, made safe: positive, integral, and bounded.
+ * Nonsense values fall back to the default rather than failing the call, since
+ * the cap is a performance hint and not part of the query's meaning.
+ */
+function safeLimit(limit: number | undefined): number {
+  if (limit === undefined || !Number.isFinite(limit)) return 50;
+  return Math.min(Math.max(1, Math.floor(limit)), MAX_RECORD_LIMIT);
 }
 
 function assertDbAuthoritative(collection: AnyCollection, operation: string): void {
@@ -90,9 +120,19 @@ export async function listRecords<TCollection extends AnyCollection>(
   const rows = await ctx.db
     .select()
     .from(dataRecords)
-    .where(and(eq(dataRecords.branchId, ctx.branch), eq(dataRecords.collection, collection.name)))
+    .where(
+      and(
+        eq(dataRecords.branchId, ctx.branch),
+        eq(dataRecords.collection, collection.name),
+        // Filter in SQL, not after the cap. Values are parameterised, and the
+        // key rides `->>` as a bound argument too, so neither is interpolated.
+        ...Object.entries(options.match ?? {}).map(
+          ([key, value]) => sql`${dataRecords.data}->>${key} = ${String(value)}`,
+        ),
+      ),
+    )
     .orderBy(desc(dataRecords.createdAt))
-    .limit(options.limit ?? 50);
+    .limit(safeLimit(options.limit));
 
   return rows.map((row) => parseStoredRow(collection, row));
 }
