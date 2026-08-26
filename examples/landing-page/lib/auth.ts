@@ -15,6 +15,26 @@ import { betterAuth } from "better-auth";
 import { jwt } from "better-auth/plugins";
 import { Pool } from "pg";
 
+/**
+ * Accounts that receive operator scopes, by email, from the environment.
+ *
+ * Sign-up is open (that is the point of the demo), so scopes cannot ride on
+ * "is signed in". This example previously stamped EVERY self-registered
+ * account with `submissions:read commerce:orders:read commerce:orders:write`,
+ * which meant one free signup could dump every contact submission and mark
+ * arbitrary orders paid or fulfilled. A real deployment reads roles or grants
+ * from its own tables; an allowlist keeps that idea legible without a schema.
+ */
+const OPERATOR_EMAILS = new Set(
+  (process.env.GRAFT_OPERATOR_EMAILS ?? "")
+    .split(/[,\s]+/)
+    .filter(Boolean)
+    .map((email) => email.toLowerCase()),
+);
+
+/** Operator scopes. Content authoring and approvals are NOT among them. */
+const OPERATOR_SCOPE = "submissions:read commerce:orders:read commerce:orders:write";
+
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
   database: new Pool({ connectionString: process.env.DATABASE_URL }),
@@ -23,14 +43,13 @@ export const auth = betterAuth({
     jwt({
       jwt: {
         // Scopes ride the standard OAuth2 `scope` claim (space-separated),
-        // which @usegraft/auth reads into actor.scopes. Every signed-in account
-        // gets submissions:read here — an example-sized policy; real
-        // deployments derive scopes from roles/grants (P3.4).
+        // which @usegraft/auth reads into actor.scopes. Being signed in earns
+        // nothing: an account gets scopes only by being named in
+        // GRAFT_OPERATOR_EMAILS. Consider also requiring email verification
+        // before minting tokens once this app has a mail sender.
         definePayload: ({ user }) => ({
           email: user.email,
-          // Example-sized policy: signed-in users can read submissions + orders.
-          // Real deployments derive scopes from roles/grants.
-          scope: "submissions:read commerce:orders:read commerce:orders:write",
+          scope: OPERATOR_EMAILS.has(user.email.toLowerCase()) ? OPERATOR_SCOPE : "",
         }),
       },
     }),

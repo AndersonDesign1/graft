@@ -16,13 +16,44 @@ describe("createStudioApiHandler", () => {
     expect(await res.json()).toEqual(STUDIO_OPENAPI);
   });
 
-  it("401s when authorize returns false", async () => {
-    const handler = createStudioApiHandler({
-      ...baseOpts,
-      authorize: () => false,
-    });
+  it("401s when authenticate refuses the request", async () => {
+    const handler = createStudioApiHandler({ ...baseOpts, authenticate: () => null });
     const res = await handler(new Request("http://localhost/api/studio/v1/branches"));
     expect(res.status).toBe(401);
+  });
+
+  it("401s an authenticated caller whose credential lacks the route's scope", async () => {
+    // The whole point: authenticated is not authorized. `graft serve` used to
+    // admit anyone whose kind !== "anonymous", which is every agent.
+    const handler = createStudioApiHandler({
+      ...baseOpts,
+      authenticate: () => ({ kind: "agent", id: "agent-1", scopes: ["studio:read"] }),
+    });
+    const res = await handler(
+      new Request("http://localhost/api/studio/v1/changes/commit", { method: "POST" }),
+    );
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({ details: { required: "studio:write" } });
+  });
+
+  it("separates deciding approvals from writing content", async () => {
+    // A credential that may commit content still may not decide the human gate.
+    const handler = createStudioApiHandler({
+      ...baseOpts,
+      authenticate: () => ({
+        kind: "agent",
+        id: "agent-1",
+        scopes: ["studio:read", "studio:write"],
+      }),
+    });
+    const res = await handler(
+      new Request("http://localhost/api/studio/v1/approvals/abc/decide", {
+        method: "POST",
+        body: JSON.stringify({ decision: "approved" }),
+      }),
+    );
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({ details: { required: "approvals:decide" } });
   });
 
   it("404s unknown studio paths", async () => {

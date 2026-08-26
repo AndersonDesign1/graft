@@ -67,7 +67,8 @@ const functions = {
 const AGENT_TOKEN = "remote-agent-token";
 const resolveActor = (request: Request) =>
   request.headers.get("authorization") === `Bearer ${AGENT_TOKEN}`
-    ? ({ kind: "agent", id: "remote-cold-agent" } as const)
+    ? // A remote authoring agent: scoped for content, never for the human gate.
+      ({ kind: "agent", id: "remote-cold-agent", scopes: ["content:write"] } as const)
     : ({ kind: "anonymous" } as const);
 
 let dir: string;

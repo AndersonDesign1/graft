@@ -50,7 +50,16 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    const cliActor = { kind: "agent", id: "graft-cli", scopes } as const;
+    // `graft mcp` runs on the developer's own machine at their invitation, so
+    // it carries the content scopes its tools need. GRAFT_DEV_SCOPES adds to
+    // this for run_function's access rules; it is not what grants authoring.
+    // Note `approvals:decide` is deliberately absent — the CLI files approvals,
+    // `graft approve` decides them, and those must stay different identities.
+    const cliActor = {
+      kind: "agent",
+      id: "graft-cli",
+      scopes: [...new Set(["content:write", ...scopes])],
+    } as const;
     const resolveActor = createActorResolver({
       issuers: [],
       devTokens: devToken ? { [devToken]: cliActor } : undefined,

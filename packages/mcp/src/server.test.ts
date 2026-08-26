@@ -146,6 +146,58 @@ describe("introspection", () => {
   });
 });
 
+describe("tool scopes", () => {
+  async function connectAs(scopes: readonly string[]) {
+    const server = createGraftMcp({
+      contentDir: dir,
+      collections,
+      db: untouchableDb,
+      connectionActor: { kind: "human", id: "site-user", scopes },
+    });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const c = new Client({ name: "scoped", version: "0.0.0" });
+    await c.connect(clientTransport);
+    return c;
+  }
+
+  const call = async (c: Client, name: string, args: Record<string, unknown>) => {
+    const r = (await c.callTool({ name, arguments: args })) as {
+      isError?: boolean;
+      content: { type: string; text: string }[];
+    };
+    return { isError: r.isError === true, payload: JSON.parse(r.content[0]?.text ?? "null") };
+  };
+
+  it("refuses content authoring to a credential scoped only for reads", async () => {
+    // The landing-page example hands every self-registered account a token
+    // scoped for reads. Scopes were consulted ONLY inside run_function's access
+    // rules, so such a user reached write_content, put_asset and delete_content
+    // unchecked — a read token was a content-admin token.
+    const c = await connectAs(["submissions:read"]);
+
+    for (const [tool, args] of [
+      ["write_content", { collection: "pages", slug: "x", data: { title: "T" }, body: "b" }],
+      ["put_asset", { key: "a/b.png", base64: "AA==" }],
+      ["delete_content", { collection: "pages", slug: "home" }],
+    ] as const) {
+      const { isError, payload } = await call(c, tool, args);
+      expect(isError, tool).toBe(true);
+      expect(payload, tool).toMatchObject({ details: { required: "content:write" } });
+    }
+  });
+
+  it("separates authoring from deciding the human gate", async () => {
+    const c = await connectAs(["content:write"]);
+    const { isError, payload } = await call(c, "decide_approval", {
+      id: "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+      decision: "approved",
+    });
+    expect(isError).toBe(true);
+    expect(payload).toMatchObject({ details: { required: "approvals:decide" } });
+  });
+});
+
 describe("decide_approval attribution", () => {
   async function connect(options: Parameters<typeof createGraftMcp>[0]) {
     const server = createGraftMcp(options);
@@ -189,7 +241,7 @@ describe("decide_approval attribution", () => {
     const c = await connect({
       contentDir: dir,
       collections,
-      connectionActor: { kind: "human", id: "reviewer-1" },
+      connectionActor: { kind: "human", id: "reviewer-1", scopes: ["approvals:decide"] },
       db: {
         update: () => ({
           set: (values: { decidedBy: string; decidedByKind: string }) => {

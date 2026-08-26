@@ -67,7 +67,42 @@ export interface StudioApiOptions {
    * service identity it runs as.
    */
   decider?: ApprovalDecider | (() => ApprovalDecider);
-  authorize?: (request: Request) => boolean | Promise<boolean>;
+  /**
+   * Resolve who is calling, or `null` to refuse the request.
+   *
+   * Deliberately not `(request) => boolean`. "May this actor do *this
+   * particular thing*" cannot be expressed in one boolean decided per handler,
+   * so callers of the boolean version invented their own policy — and what
+   * `graft serve` invented was `actor.kind !== "anonymous"`, which admitted
+   * every agent to the approve/deny surface.
+   *
+   * Omitted means the mount is unauthenticated, which is only appropriate on
+   * loopback.
+   */
+  authenticate?: (request: Request) => StudioPrincipal | null | Promise<StudioPrincipal | null>;
+}
+
+/** The identity a Studio request authenticated as. */
+export interface StudioPrincipal {
+  kind: string;
+  id: string;
+  /** Scopes the credential carries. Absent means none — not "all". */
+  scopes?: readonly string[];
+}
+
+/**
+ * The scope a route demands, decided in one place so a new route cannot be
+ * added without one. Phase 3 turns this into a column of the route table.
+ *
+ * Reads and writes are separated because an agent that may read the content
+ * tree has no business committing it, and deciding approvals is separated from
+ * both: it is the human gate, and no agent runtime token should ever carry it.
+ */
+function requiredScope(method: string, pathname: string): string {
+  if (/^\/api\/studio\/v1\/approvals\/[^/]+\/decide$/.test(pathname)) {
+    return "approvals:decide";
+  }
+  return method === "GET" ? "studio:read" : "studio:write";
 }
 
 function json(data: unknown, status = 200): Response {
@@ -370,7 +405,13 @@ function buildSchema(collections: Record<string, AnyCollection>): SchemaList {
   return { collections: out };
 }
 
-function operator(options: StudioApiOptions): ApprovalDecider {
+/**
+ * Who a decision is attributed to: the authenticated caller when there is one,
+ * otherwise the identity the Studio was mounted for (a loopback mount has no
+ * caller identity — it is the operator at their own machine).
+ */
+function operator(options: StudioApiOptions, principal?: StudioPrincipal): ApprovalDecider {
+  if (principal) return { kind: principal.kind, id: principal.id };
   if (typeof options.decider === "function") return options.decider();
   return options.decider ?? { kind: "human", id: "studio" };
 }
@@ -381,20 +422,32 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
 
   return async (request) => {
     try {
-      if (options.authorize) {
-        const ok = await options.authorize(request);
-        if (!ok) {
+      const url = new URL(request.url);
+      const { pathname } = url;
+      const method = request.method;
+
+      let principal: StudioPrincipal | undefined;
+      if (options.authenticate) {
+        const resolved = await options.authenticate(request);
+        if (resolved === null) {
           throw new GraftError({
             code: "UNAUTHORIZED",
             message: "Studio API requires authentication on this host.",
             fix: "Send Authorization: Bearer <token>, or bind to loopback.",
           });
         }
-      }
+        principal = resolved;
 
-      const url = new URL(request.url);
-      const { pathname } = url;
-      const method = request.method;
+        const scope = requiredScope(method, pathname);
+        if (!(resolved.scopes ?? []).includes(scope)) {
+          throw new GraftError({
+            code: "UNAUTHORIZED",
+            message: `${method} ${pathname} requires the "${scope}" scope, and this credential does not carry it.`,
+            fix: `Mint a token whose scope claim includes "${scope}" (for \`graft serve\`, add it to GRAFT_DEV_SCOPES). Studio read, Studio write and approval decisions are deliberately separate: a runtime token that can read content should not be able to commit it, and no agent token should be able to decide the human gate.`,
+            details: { pathname, method, required: scope, held: resolved.scopes ?? [] },
+          });
+        }
+      }
 
       if (pathname === "/api/studio/v1/openapi.json" && method === "GET") {
         return json(STUDIO_OPENAPI);
@@ -558,7 +611,12 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
             fix: 'POST { "decision": "approved" } or { "decision": "denied" }.',
           });
         }
-        const row = await decideApproval(options.db, id, payload.decision, operator(options));
+        const row = await decideApproval(
+          options.db,
+          id,
+          payload.decision,
+          operator(options, principal),
+        );
         if (!row) {
           throw new GraftError({
             code: "APPROVAL_INVALID",

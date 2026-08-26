@@ -76,14 +76,21 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
     );
   }
 
-  const authorize =
+  // `graft studio` is the operator's own tool, so the dev token identifies the
+  // operator rather than an agent — it carries the full operator scope set.
+  // Anything else is refused; this command has no notion of a lesser caller.
+  const authenticate =
     !loopback && devToken
       ? (request: Request) => {
           const header = request.headers.get("authorization") ?? "";
-          return header === `Bearer ${devToken}`;
+          if (header !== `Bearer ${devToken}`) return null;
+          return {
+            ...operatorIdentity(),
+            scopes: ["studio:read", "studio:write", "approvals:decide"],
+          };
         }
       : !loopback
-        ? () => false
+        ? () => null
         : undefined;
 
   const handler = createStudioHandler({
@@ -92,7 +99,7 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
     contentDir: config.contentDir,
     defaultBranch: writeBranch,
     decider: operatorIdentity,
-    authorize,
+    authenticate,
   });
 
   const server = createServer(createNodeListener(handler));

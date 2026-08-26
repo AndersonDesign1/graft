@@ -219,6 +219,31 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
   };
 
   /**
+   * Refuse a tool the connection's credential is not scoped for.
+   *
+   * Scopes were only ever consulted inside `run_function`'s access rules, so
+   * every other tool — write_content, put_asset, delete_content,
+   * decide_approval — was available to ANY authenticated caller regardless of
+   * what their token permitted. An app that hands every signed-up user a
+   * narrow read token was thereby handing out content-admin rights.
+   *
+   * An unauthenticated connection is only possible where the mount opted into
+   * it (loopback dev), and there it is unscoped by construction: nothing to
+   * check against, so nothing is refused.
+   */
+  const requireScope = (tool: string, scope: string): void => {
+    const actor = options.connectionActor;
+    if (actor === undefined || actor.kind === "anonymous") return;
+    if ((actor.scopes ?? []).includes(scope)) return;
+    throw new GraftError({
+      code: "UNAUTHORIZED",
+      message: `${tool} requires the "${scope}" scope, and this credential does not carry it.`,
+      fix: `Mint a token whose scope claim includes "${scope}" (for \`graft serve\`, add it to GRAFT_DEV_SCOPES). Content authoring, asset upload and approval decisions are deliberately separate from ordinary read scopes.`,
+      details: { tool, required: scope, held: actor.scopes ?? [] },
+    });
+  };
+
+  /**
    * The identity a decision is attributed to, or a refusal naming why there is
    * none. Deliberately derived from the connection rather than the tool call:
    * `decided_by` is the value the separation-of-duties predicate compares
@@ -682,6 +707,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     },
     ({ collection: name, slug, data, body }) =>
       guarded(async () => {
+        requireScope("write_content", "content:write");
         const collection = requireCollection(collections, name);
 
         if (collection.authority === "db-authoritative") {
@@ -745,6 +771,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     },
     ({ collection: name, slug, approval }) =>
       guarded(async () => {
+        requireScope("delete_content", "content:write");
         const collection = requireCollection(collections, name);
         if (collection.authority === "db-authoritative") {
           throw new GraftError({
@@ -801,6 +828,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     },
     ({ key: keyArg, path, base64, contentType, overwrite }) =>
       guarded(async () => {
+        requireScope("put_asset", "content:write");
         if ((path === undefined) === (base64 === undefined)) {
           throw new GraftError({
             code: "INPUT_VALIDATION_FAILED",
@@ -981,6 +1009,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     },
     ({ id, decision }) =>
       guarded(async () => {
+        requireScope("decide_approval", "approvals:decide");
         const row = await decideApproval(
           requireDb(
             "decide_approval",

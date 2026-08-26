@@ -28,6 +28,8 @@
         "DATABASE_URL",
         "GRAFT_DEV_TOKEN",
         "GRAFT_MCP_ALLOW_ANONYMOUS",
+        // Which accounts the landing-page example grants operator scopes to.
+        "GRAFT_OPERATOR_EMAILS",
         // Deployment provenance, read per-request by the functions handler.
         "VERCEL_GIT_COMMIT_SHA",
         "GITHUB_SHA"

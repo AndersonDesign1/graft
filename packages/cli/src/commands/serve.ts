@@ -301,25 +301,31 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
 
   let studioHandler: FetchHandler | undefined;
   if (studioMod) {
-    const authorize =
+    // Resolve the caller and hand the Studio their scopes; the Studio decides
+    // per route what each one permits. This used to return
+    // `actor.kind !== "anonymous"`, which admitted ANY authenticated principal
+    // — including the agent tokens GRAFT_DEV_TOKEN and OIDC issuers mint — to
+    // approve/deny, document writes, commits and reverts.
+    const authenticate =
       !loopback && (devToken || issuers.length > 0)
         ? async (request: Request) => {
             const actor = await resolveActor(request);
-            return actor.kind !== "anonymous";
+            if (actor.kind === "anonymous" || !actor.id) return null;
+            return { kind: actor.kind, id: actor.id, scopes: actor.scopes ?? [] };
           }
         : !loopback
-          ? () => false
+          ? () => null
           : undefined;
     studioHandler = studioMod.createStudioHandler({
       db: branch.db,
       collections: config.collections,
       contentDir: config.contentDir,
       defaultBranch: writeBranch,
-      // The service identity this mount runs as. Phase 1C replaces it with
-      // the authenticated caller once `authorize` resolves an actor.
+      // Only reached on a loopback mount, where there is no caller identity to
+      // attribute to. Off loopback the authenticated principal is used instead.
       decider: { kind: "agent", id: "studio-serve" },
       uiBasePath: "/studio",
-      authorize,
+      authenticate,
     });
   }
 

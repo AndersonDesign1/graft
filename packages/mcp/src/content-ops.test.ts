@@ -171,7 +171,8 @@ beforeEach(async () => {
     // A gated call records who asked for it, so the caller needs an identity.
     // This mirrors `graft mcp`, which resolves the CLI's own agent identity.
     actor: () => ({ kind: "agent", id: "graft-cli" }),
-    connectionActor: { kind: "agent", id: "graft-cli" },
+    // The scopes `graft mcp` grants on the operator's own machine.
+    connectionActor: { kind: "agent", id: "graft-cli", scopes: ["content:write"] },
   });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
