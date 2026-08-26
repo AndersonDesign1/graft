@@ -29,6 +29,7 @@ import {
   type CompileResult,
   resolveContained,
 } from "@usegraft/compiler";
+import { assertSafeMdx } from "@usegraft/mdx-safety";
 import {
   GraftError,
   type ErrorCode,
@@ -749,6 +750,11 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
         const fullPath = join(contentDir, ...sourcePath.split("/"));
         // Updating an existing document must not rewrite frontmatter the author
         // (or an earlier agent) wrote — only a real data change re-serialises.
+        // Content arriving over the wire is not operator-authored, and MDX is
+        // code: rendering evaluates `{…}` and `import` as JavaScript on the
+        // server. Refuse it here, before it is stored.
+        assertSafeMdx(body ?? "", { label: `${name}/${slug}` });
+
         const existingRaw = existsSync(fullPath) ? readFileSync(fullPath, "utf8") : undefined;
         const raw = composeDocument(existingRaw, data as Record<string, unknown>, body ?? "");
         // Validate before touching disk: schema + slug shape, same path compile uses.

@@ -366,6 +366,9 @@ importers:
       '@usegraft/db':
         specifier: workspace:*
         version: link:../db
+      '@usegraft/mdx-safety':
+        specifier: workspace:*
+        version: link:../mdx-safety
       '@usegraft/registry':
         specifier: workspace:*
         version: link:../registry
@@ -375,6 +378,24 @@ importers:
       zod:
         specifier: ^4.1.0
         version: 4.4.3
+
+  packages/mdx-safety:
+    dependencies:
+      '@usegraft/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      remark-mdx:
+        specifier: ^3.1.1
+        version: 3.1.1
+      remark-parse:
+        specifier: ^11.0.0
+        version: 11.0.0
+      unified:
+        specifier: ^11.0.5
+        version: 11.0.5
+      unist-util-visit:
+        specifier: ^5.1.0
+        version: 5.1.0
 
   packages/registry:
     dependencies:
@@ -416,6 +437,9 @@ importers:
       '@mdx-js/mdx':
         specifier: ^3.1.1
         version: 3.1.1
+      '@usegraft/mdx-safety':
+        specifier: workspace:*
+        version: link:../mdx-safety
       '@usegraft/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
@@ -466,6 +490,9 @@ importers:
       '@usegraft/db':
         specifier: workspace:*
         version: link:../db
+      '@usegraft/mdx-safety':
+        specifier: workspace:*
+        version: link:../mdx-safety
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3

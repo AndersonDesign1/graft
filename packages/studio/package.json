@@ -44,6 +44,7 @@
     "@usegraft/contracts": "workspace:*",
     "@usegraft/core": "workspace:*",
     "@usegraft/db": "workspace:*",
+    "@usegraft/mdx-safety": "workspace:*",
     "gray-matter": "^4.0.3"
   },
   "devDependencies": {

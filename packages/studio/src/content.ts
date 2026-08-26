@@ -14,6 +14,7 @@ import {
   SLUG_RE,
 } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
+import { assertSafeMdx } from "@usegraft/mdx-safety";
 import type { AnyCollection } from "@usegraft/core";
 import type { Database } from "@usegraft/db";
 import matter from "gray-matter";
@@ -132,6 +133,10 @@ export async function writeDocument(options: {
       details: { slug: options.slug, pattern: SLUG_RE.source },
     });
   }
+  // Same trust boundary as MCP write_content: a Studio save is content the
+  // operator may not have written, and rendering evaluates MDX as JavaScript.
+  assertSafeMdx(options.body ?? "", { label: `${options.collection}/${options.slug}` });
+
   const sourcePath = `${options.collection}/${options.slug}.mdx`;
   const fullPath = resolveContained(options.contentDir, sourcePath, {
     label: "document",
