@@ -43,7 +43,10 @@ const SNIPPET = `snippet(content_fts, 2, '<b>', '</b>', '…', 20)`;
 interface SqliteStatement {
   all(...params: Array<string | number | null>): Record<string, unknown>[];
   get(...params: Array<string | number | null>): Record<string, unknown> | undefined;
-  run(...params: Array<string | number | null>): unknown;
+  run(...params: Array<string | number | null>): {
+    changes: number | bigint;
+    lastInsertRowid: number | bigint;
+  };
 }
 interface SqliteDatabase {
   exec(sql: string): void;
@@ -353,19 +356,19 @@ export async function openStaticIndex(path: string): Promise<StaticIndexReader> 
     compiledAt: new Date(Number(meta.get("compiledAt") ?? 0)),
   };
 
-  const toContentRow = (r: Record<string, unknown>): ContentRow =>
-    ({
-      branchId: info.branch,
-      collection: r.collection as string,
-      slug: r.slug as string,
-      data: JSON.parse(r.data as string) as unknown,
-      body: r.body as string,
-      contentHash: r.content_hash as string,
-      sourcePath: r.source_path as string,
-      deleted: false,
-      updatedAt: new Date(r.updated_at as number),
-      search: null,
-    }) as unknown as ContentRow;
+  const toContentRow = (r: Record<string, unknown>): ContentRow => ({
+    branchId: info.branch,
+    collection: r.collection as string,
+    slug: r.slug as string,
+    data: JSON.parse(r.data as string) as Record<string, unknown>,
+    body: r.body as string,
+    contentHash: r.content_hash as string,
+    sourcePath: r.source_path as string,
+    deleted: false,
+    updatedAt: new Date(r.updated_at as number),
+    // No tsvector in the static index — FTS5 owns search here.
+    search: null,
+  });
 
   return {
     info,

@@ -14,6 +14,7 @@ Thumbs.db
 
 # Local / not part of the Graft source (private planning — see phases.md / PRD.md)
 .claude/
+.codex/
 ideas.md
 phases.md
 PRD.md

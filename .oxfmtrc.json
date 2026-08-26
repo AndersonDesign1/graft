@@ -1,3 +1,9 @@
 {
-  "ignorePatterns": ["examples/*/content/**", ".agents/**", ".claude/**"]
+  "ignorePatterns": [
+    "examples/*/content/**",
+    ".agents/**",
+    ".claude/**",
+    "tools/oxlint/anti-slop/**",
+    ".codex/**"
+  ]
 }

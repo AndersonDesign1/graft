@@ -45,3 +45,55 @@ jobs:
       # database and no environment. Explicit so a regression is obvious in logs.
       - name: Zero-service quickstart gate
         run: pnpm test:quickstart
+
+  # The integration suite is opt-in (RUN_INTEGRATION=1 + DATABASE_URL) and was
+  # therefore never running here — including the only test that proves a
+  # requester cannot approve their own destructive operation. A throwaway
+  # Postgres makes the human gate a CI-enforced invariant rather than a claim.
+  #
+  # Neon (NEON_API_KEY) and R2/S3 (S3_*) stay opt-in: those hit real external
+  # services and are not appropriate on every pull request.
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: graft_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/graft_test
+      BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.16
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      # Not `pnpm --filter @usegraft/db db:migrate`: that wrapper passes
+      # --env-file=../../.env, and there is no .env in CI. Same entrypoint,
+      # environment supplied by the job instead of a file.
+      - name: Apply schema
+        run: node packages/db/scripts/migrate.mjs
+
+      - name: Integration suite
+        run: pnpm test
+        env:
+          RUN_INTEGRATION: "1"

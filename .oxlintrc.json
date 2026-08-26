@@ -1,3 +1,45 @@
 {
-  "ignorePatterns": ["**/dist/**", "**/.turbo/**"]
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/.turbo/**",
+    "**/.next/**",
+    "**/.astro/**",
+    "**/.vercel/**",
+    ".agents/**",
+    ".claude/**",
+    ".codex/**",
+    "tools/oxlint/anti-slop/**"
+  ],
+  "jsPlugins": [
+    {
+      "name": "anti-slop",
+      "specifier": "./tools/oxlint/anti-slop/index.ts"
+    }
+  ],
+  "rules": {
+    "anti-slop/no-chained-type-assertions": "error",
+    "anti-slop/no-module-mocking": "error",
+    "anti-slop/no-widen-then-assert": "error",
+    "anti-slop/no-reflect-apply": "error",
+    "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-object-parameters": "error",
+    "anti-slop/no-unknown-returns": "error",
+    "anti-slop/require-safety-comment-for-type-assertion": "warn",
+    "anti-slop/no-conditional-empty-object-spread": "warn",
+    "anti-slop/no-known-value-widening": "warn",
+    "anti-slop/no-shape-in-symbol-names": "warn",
+    "anti-slop/no-unsafe-dictionary-type": "off",
+    "anti-slop/no-runtime-typeof": "off",
+    "anti-slop/no-unknown-parameters": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"],
+      "rules": {
+        "anti-slop/no-chained-type-assertions": "warn",
+        "anti-slop/no-module-mocking": "warn",
+        "anti-slop/no-unknown-returns": "warn"
+      }
+    }
+  ]
 }

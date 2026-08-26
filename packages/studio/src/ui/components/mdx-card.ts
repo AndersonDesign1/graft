@@ -300,14 +300,22 @@ class MdxCardView implements NodeView {
  * ProseMirror node views for the editor. Returns a card only for `html` nodes
  * that parse as exactly one component; everything else gets the default view.
  */
-export const mdxNodeViews: Record<string, NodeViewConstructor> = {
-  html: (node: ProseNode, view: EditorView, getPos: () => number | undefined) => {
+// ProseMirror falls back to its default rendering when a node-view constructor
+// returns a falsy value, which is exactly what an unparseable block should get.
+// `NodeViewConstructor` does not admit that, so the real contract is declared
+// here and narrowed once on export rather than lied about at every return.
+type FallbackNodeViewConstructor = (
+  node: ProseNode,
+  view: EditorView,
+  getPos: () => number | undefined,
+) => NodeView | null;
+
+const nodeViews: Record<string, FallbackNodeViewConstructor> = {
+  html: (node, view, getPos) => {
     const parsed = parseMdxElement(String(node.attrs.value ?? ""));
-    // ProseMirror falls back to its default rendering when a node-view
-    // constructor returns a falsy value, which is exactly what an unparseable
-    // block should get. The published type is narrower than that behaviour, so
-    // the cast records the gap rather than pretending a card was built.
-    if (!parsed) return null as unknown as NodeView;
+    if (!parsed) return null;
     return new MdxCardView(node, view, getPos, parsed);
   },
 };
+
+export const mdxNodeViews = nodeViews as Record<string, NodeViewConstructor>;

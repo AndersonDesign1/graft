@@ -1,0 +1,21 @@
+#!/bin/sh
+# Format and lint before a commit exists, not after it reaches CI.
+# Both run over the whole repo: oxfmt and oxlint together take a few seconds,
+# and staged-file-only checks miss breakage that spans files.
+#
+# Installed by the root `prepare` script (git config core.hooksPath .githooks).
+# Bypass for a genuine emergency with `git commit --no-verify`.
+set -e
+
+if ! pnpm exec oxfmt --check; then
+  echo ""
+  echo "pre-commit: formatting check failed. Run: pnpm format"
+  exit 1
+fi
+
+if ! pnpm exec oxlint; then
+  echo ""
+  echo "pre-commit: lint failed. Fix the errors above, or adjust .oxlintrc.json"
+  echo "and record why in CONVENTIONS.md (see 'Lint calibration')."
+  exit 1
+fi

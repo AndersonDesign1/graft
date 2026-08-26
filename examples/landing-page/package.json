@@ -11,8 +11,7 @@
     "migrate": "graft migrate",
     "watch": "graft dev",
     "mcp": "tsx scripts/mcp.ts",
-    "typecheck": "tsc --noEmit",
-    "lint": "oxlint ."
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@usegraft/assets": "workspace:*",

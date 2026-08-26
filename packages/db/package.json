@@ -29,7 +29,6 @@
     "dev": "tsup src/index.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "lint": "oxlint .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file=../../.env ./scripts/migrate.mjs"
   },

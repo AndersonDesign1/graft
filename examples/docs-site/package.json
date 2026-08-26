@@ -11,8 +11,7 @@
     "compile": "graft compile",
     "watch": "graft dev",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "lint": "oxlint ."
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@astrojs/react": "^6.0.1",

@@ -36,7 +36,6 @@
     "dev:ui": "vite",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "lint": "oxlint .",
     "clean:lib": "node ./scripts/clean-lib.mjs"
   },
   "dependencies": {

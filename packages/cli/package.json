@@ -21,8 +21,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "lint": "oxlint ."
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@usegraft/assets": "workspace:*",

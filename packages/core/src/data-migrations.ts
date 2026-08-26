@@ -12,6 +12,12 @@ import { GraftError } from "@usegraft/contracts";
 import { and, asc, dataRecords, eq, migrationsApplied, type Database } from "@usegraft/db";
 import type { AnyCollection, DocumentData } from "./collection";
 
+/**
+ * What a migration step runs against: the pool, or a transaction opened on it.
+ * Derived from `Database` so the two can never drift apart.
+ */
+type MigrationDb = Database | Parameters<Parameters<Database["transaction"]>[0]>[0];
+
 /** What the transform sees per record: the old, pre-migration shape. */
 export interface DataMigrationRow {
   id: string;
@@ -85,7 +91,7 @@ export async function runDataMigration(
   const collection = migration.collection;
   const branchId = options.branchId ?? "main";
 
-  const execute = async (tx: Database): Promise<DataMigrationReport> => {
+  const execute = async (tx: MigrationDb): Promise<DataMigrationReport> => {
     const rows = await tx
       .select({
         id: dataRecords.id,
@@ -159,7 +165,5 @@ export async function runDataMigration(
   };
 
   // Dry-run reads outside a transaction; apply commits updates + ledger together.
-  return options.apply
-    ? options.db.transaction((tx) => execute(tx as unknown as Database))
-    : execute(options.db);
+  return options.apply ? options.db.transaction((tx) => execute(tx)) : execute(options.db);
 }

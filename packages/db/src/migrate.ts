@@ -80,9 +80,9 @@ export async function migrationStatus(
   const entries = readJournal(folder);
   let appliedAt = new Set<number>();
   try {
-    const rows = (await sql`
+    const rows = await sql<Array<{ created_at: string | number | null }>>`
       SELECT created_at FROM drizzle.__drizzle_migrations
-    `) as unknown as Array<{ created_at: string | number | null }>;
+    `;
     appliedAt = new Set(rows.map((row) => Number(row.created_at)));
   } catch {
     // No ledger table yet (fresh database) — everything is pending.

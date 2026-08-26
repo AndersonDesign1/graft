@@ -41,6 +41,28 @@ Foundational conventions for the Graft monorepo. Keep this short and current.
 | `pnpm typecheck`                    | `tsc --noEmit` across packages |
 | `pnpm format` / `pnpm format:check` | oxfmt write / check            |
 
+## Lint calibration
+
+`pnpm lint` runs `oxlint` **once from the repo root**, so `.oxlintrc.json` is the only
+lint config that applies. (Running `oxlint .` inside a package silently uses oxlint's
+defaults and ignores this file — do not add per-package lint scripts.)
+
+On top of oxlint's defaults we vendor the [anti-slop](https://github.com/dmmulroy/anti-slop)
+plugin at `tools/oxlint/anti-slop/`. Its 15 rules are calibrated rather than switched on
+wholesale, because three of them contradict what this codebase does for a living:
+
+| Rule                                                                                        | Setting | Why                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `no-unsafe-dictionary-type`                                                                 | off     | `Record<string, unknown>` is the correct type for a JSONB column and for authored frontmatter. The shape is per-collection and enforced by Zod at the boundary, not by the column type.                         |
+| `no-runtime-typeof`                                                                         | off     | The rule says "parse at the I/O boundary and branch on the domain value". Our `typeof` checks _are_ the boundary parse — reading a JWT claim that may be a string or an array, or sniffing untyped frontmatter. |
+| `no-unknown-parameters`                                                                     | off     | `catch (e: unknown)` is correct TypeScript, and our error helpers take `unknown` by design.                                                                                                                     |
+| `require-safety-comment-for-type-assertion`                                                 | warn    | 378 assertions is a real signal worth watching, but a `SAFETY:` comment on each is churn, not safety. Ratchet the count down; do not bulk-annotate.                                                             |
+| `no-conditional-empty-object-spread`, `no-known-value-widening`, `no-shape-in-symbol-names` | warn    | Style, not correctness.                                                                                                                                                                                         |
+| everything else                                                                             | error   | These catch real defects: chained assertions that lie to the type checker, and module mocking that stubs out the thing under test.                                                                              |
+
+Never silence a rule to get a green run. Either fix the finding, or change the setting
+here and write down why.
+
 ## Testing
 
 - **Unit tests** (pure logic, no network/DB) run in `pnpm test` and CI — keep them

@@ -171,7 +171,7 @@ function fail(error: GraftError): ToolResult {
 }
 
 /** Run a tool body, translating GraftErrors into agent-actionable tool failures. */
-async function guarded(body: () => Promise<unknown> | unknown): Promise<ToolResult> {
+async function guarded<T>(body: () => Promise<T> | T): Promise<ToolResult> {
   try {
     return ok(await body());
   } catch (error) {
