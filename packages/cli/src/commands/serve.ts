@@ -287,7 +287,9 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
       collections: config.collections,
       contentDir: config.contentDir,
       defaultBranch: writeBranch,
-      decidedBy: "studio-serve",
+      // The service identity this mount runs as. Phase 1C replaces it with
+      // the authenticated caller once `authorize` resolves an actor.
+      decider: { kind: "agent", id: "studio-serve" },
       uiBasePath: "/studio",
       authorize,
     });

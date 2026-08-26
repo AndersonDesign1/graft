@@ -23,6 +23,8 @@ try {
 const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
 const TEST_TIMEOUT = 30_000;
 const BRANCH = "db-audit-it";
+/** A verified operator identity — what every deciding surface derives. */
+const OPERATOR = { kind: "human", id: "it-operator" } as const;
 
 describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () => {
   let handle: DbHandle;
@@ -89,10 +91,10 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
       expect(pendingRows.some((row) => row.id === id)).toBe(true);
       expect(await store.consume(id, match)).toEqual({ ok: false, reason: "pending" });
 
-      const decided = await decideApproval(handle.db, id, "approved", "it-operator");
+      const decided = await decideApproval(handle.db, id, "approved", OPERATOR);
       expect(decided).toMatchObject({ id, status: "approved", decidedBy: "it-operator" });
       // Deciding again is a no-op: only pending rows can be decided.
-      expect(await decideApproval(handle.db, id, "denied", "it-operator")).toBeUndefined();
+      expect(await decideApproval(handle.db, id, "denied", OPERATOR)).toBeUndefined();
 
       expect(await store.consume(id, { ...match, inputCanonical: '{"id":"row-2"}' })).toEqual({
         ok: false,
@@ -124,19 +126,55 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
       const id = await store.request(request);
 
       // Separation of duties: the requesting identity cannot decide.
-      await expect(decideApproval(handle.db, id, "approved", "it-agent")).rejects.toMatchObject({
-        code: "APPROVAL_SELF_DECISION",
-      });
-      await expect(decideApproval(handle.db, id, "denied", "it-agent")).rejects.toBeInstanceOf(
-        GraftError,
-      );
+      await expect(
+        decideApproval(handle.db, id, "approved", { kind: "agent", id: "it-agent" }),
+      ).rejects.toMatchObject({ code: "APPROVAL_SELF_DECISION" });
+      await expect(
+        decideApproval(handle.db, id, "denied", { kind: "agent", id: "it-agent" }),
+      ).rejects.toBeInstanceOf(GraftError);
 
       // The refusal filed nothing: the row is still pending for a real reviewer.
-      const decided = await decideApproval(handle.db, id, "approved", "someone-else");
-      expect(decided).toMatchObject({ id, status: "approved", decidedBy: "someone-else" });
+      const decided = await decideApproval(handle.db, id, "approved", {
+        kind: "human",
+        id: "someone-else",
+      });
+      expect(decided).toMatchObject({
+        id,
+        status: "approved",
+        decidedBy: "someone-else",
+        decidedByKind: "human",
+      });
       // decided_role is current_user, stamped inside the UPDATE — not client input.
       const [{ current_user: expectedRole }] = await handle.sql`select current_user`;
       expect(decided?.decidedRole).toBe(expectedRole as string);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "refuses to decide an approval filed by an unidentified caller",
+    async () => {
+      const store = createDbApprovalStore(handle.db);
+      // Legacy/anonymous filing: no stable requester id. Previously the
+      // `requestedById IS NULL` arm of the WHERE clause made these decidable by
+      // anyone — including whoever filed them.
+      const id = await store.request({
+        branch: BRANCH,
+        functionName: "itFn",
+        input: { id: "row-anon" },
+        inputCanonical: '{"id":"row-anon"}',
+        requestedByKind: "anonymous",
+        requestedById: null,
+        correlationId: "it-corr-anon",
+      });
+
+      await expect(
+        decideApproval(handle.db, id, "approved", { kind: "human", id: "any-operator" }),
+      ).rejects.toMatchObject({ code: "APPROVAL_UNATTRIBUTED" });
+
+      // Still pending — the refusal decided nothing either way.
+      const pending = await listPendingApprovals(handle.db);
+      expect(pending.map((row) => row.id)).toContain(id);
     },
     TEST_TIMEOUT,
   );
@@ -177,7 +215,7 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
         ).rejects.toThrow(/permission denied for table approvals/i);
 
         // Still pending — now approve as the operator (owner connection).
-        await decideApproval(handle.db, id, "approved", "it-operator");
+        await decideApproval(handle.db, id, "approved", OPERATOR);
 
         // The runtime role CAN consume — via the SECURITY DEFINER function,
         // the one status flip it is granted.

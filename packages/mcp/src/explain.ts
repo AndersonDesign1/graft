@@ -352,6 +352,18 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "pending → wait for the human decision; denied → do not retry, ask the operator; already_consumed or not_found → call again without the approval id to file a fresh request; mismatch → retry with exactly the approved input.",
   },
+  APPROVAL_UNATTRIBUTED: {
+    code: "APPROVAL_UNATTRIBUTED",
+    meaning:
+      "The approval was filed by a caller with no stable identity, so there is nobody the request can be held to and no meaningful separation of duties to enforce. It cannot be decided by anyone.",
+    typicalCauses: [
+      "An unauthenticated caller reached a destructive function (an MCP mount or functions route serving anonymous actors)",
+      "A trusted issuer minted a token with no `sub` claim, so the actor authenticated but carried no id",
+      "A row left over from before approvals required an identified requester",
+    ],
+    howToRecover:
+      "Fix the filing surface, not the row: require authentication where the approval was requested (GRAFT_MCP_REQUIRE_AUTH, an actor resolver, or a token that carries `sub`), then have the caller request the operation again so the approval records who wants it. A stale row can be resolved directly in the database.",
+  },
   APPROVAL_SELF_DECISION: {
     code: "APPROVAL_SELF_DECISION",
     meaning:

@@ -15,7 +15,7 @@
  * Decisions also stamp `decided_role` (`current_user`) server-side and refuse
  * approver == requester (separation of duties).
  */
-import { and, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { GraftError } from "@usegraft/contracts";
 import type { Database } from "./client";
 import { approvals, type ApprovalRow } from "./schema";
@@ -115,28 +115,49 @@ export async function listPendingApprovals(db: Database): Promise<ApprovalRow[]>
 }
 
 /**
- * Record a human decision on a pending approval. Only pending rows can be
- * decided (conditional UPDATE — deciding an already-decided approval is a
- * no-op returning undefined).
+ * Who is deciding an approval.
+ *
+ * Deliberately not a plain string: `id` is the value the separation-of-duties
+ * predicate compares against `requested_by_id`, so it must come from a verified
+ * actor at the deciding surface. Every caller derives it from the identity the
+ * request authenticated as — no surface accepts a decider as user input.
+ */
+export interface ApprovalDecider {
+  /** Actor kind, e.g. "human" or "agent". */
+  kind: string;
+  /** Stable actor id. Never a display name and never caller-supplied. */
+  id: string;
+}
+
+/**
+ * Record a decision on a pending approval. Only pending rows can be decided
+ * (conditional UPDATE — deciding an already-decided approval is a no-op
+ * returning undefined).
  *
  * Separation of duties: the identity that requested the approval can never be
  * the identity that decides it — approver == requester throws
  * `APPROVAL_SELF_DECISION` (enforced in the UPDATE's WHERE, not just checked
  * first). The decision also records `decided_role` = the Postgres
  * `current_user` it ran as, stamped server-side so it cannot be self-reported.
+ *
+ * An approval whose requester is unknown (`requested_by_id IS NULL`) is
+ * **undecidable**. There is no identity to hold the request to, so there is no
+ * meaningful separation of duties to enforce — the old `IS NULL` arm let anyone,
+ * including the filer, approve it.
  */
 export async function decideApproval(
   db: Database,
   id: string,
   decision: "approved" | "denied",
-  decidedBy: string,
+  decider: ApprovalDecider,
 ): Promise<ApprovalRow | undefined> {
   if (!UUID_RE.test(id)) return undefined;
   const [row] = await db
     .update(approvals)
     .set({
       status: decision,
-      decidedBy,
+      decidedBy: decider.id,
+      decidedByKind: decider.kind,
       decidedRole: sql`current_user`,
       decidedAt: new Date(),
     })
@@ -144,26 +165,34 @@ export async function decideApproval(
       and(
         eq(approvals.id, id),
         eq(approvals.status, "pending"),
-        or(isNull(approvals.requestedById), ne(approvals.requestedById, decidedBy)),
+        ne(approvals.requestedById, decider.id),
       ),
     )
     .returning();
   if (row) return row;
 
-  // Nothing updated — if a pending row exists, the WHERE's separation-of-duties
-  // clause is what blocked it; say so instead of "not pending".
+  // Nothing updated. If a pending row exists, the WHERE clause is what blocked
+  // it — say which arm, instead of the misleading "not pending".
   const [pending] = await db
     .select()
     .from(approvals)
     .where(and(eq(approvals.id, id), eq(approvals.status, "pending")))
     .limit(1);
-  if (pending) {
+  if (!pending) return undefined;
+
+  if (pending.requestedById === null) {
     throw new GraftError({
-      code: "APPROVAL_SELF_DECISION",
-      message: `Approval "${id}" was requested by "${decidedBy}" — a requester can never decide their own approval.`,
-      fix: "Have a DIFFERENT operator review it: `graft approve <id>` (or `graft deny <id>`) under their own identity. Separation of duties is deliberate; do not retry as the requester.",
-      details: { id, requestedBy: pending.requestedById, decision },
+      code: "APPROVAL_UNATTRIBUTED",
+      message: `Approval "${id}" was filed by an unidentified caller, so no one can be held to it and it cannot be decided.`,
+      fix: "Require authentication on the surface that files approvals so every request carries a stable actor id, then have the caller request it again. Deny-by-deletion is not available: resolve the row directly in the database if it is genuinely stale.",
+      details: { id, requestedByKind: pending.requestedByKind, decision },
     });
   }
-  return undefined;
+
+  throw new GraftError({
+    code: "APPROVAL_SELF_DECISION",
+    message: `Approval "${id}" was requested by "${pending.requestedById}" — a requester can never decide their own approval.`,
+    fix: "Have a DIFFERENT operator review it: `graft approve <id>` (or `graft deny <id>`) under their own identity. Separation of duties is deliberate; do not retry as the requester.",
+    details: { id, requestedBy: pending.requestedById, decision },
+  });
 }

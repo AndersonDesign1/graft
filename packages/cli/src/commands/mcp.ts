@@ -14,6 +14,7 @@
  * static dev tokens). See docs/design-notes/agent-mcp.md.
  */
 import { createActorResolver } from "@usegraft/auth";
+import type { FunctionActor } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { assertNoStaticBranch } from "./compile";
 
@@ -49,18 +50,22 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
       .map((s) => s.trim())
       .filter(Boolean);
 
+    const cliActor = { kind: "agent", id: "graft-cli", scopes } as const;
     const resolveActor = createActorResolver({
       issuers: [],
-      devTokens: devToken
-        ? {
-            [devToken]: {
-              kind: "agent",
-              id: "graft-cli",
-              scopes,
-            },
-          }
-        : undefined,
+      devTokens: devToken ? { [devToken]: cliActor } : undefined,
     });
+
+    // stdio is a local process the developer started, so there is no untrusted
+    // caller to authenticate — it is the CLI acting as an agent. Giving it a
+    // stable identity (rather than anonymous) is what lets a destructive op
+    // file an approval that `graft approve` can then decide as the OS user:
+    // two different identities, so separation of duties holds locally too.
+    // A dev token adds scopes on top; it is not what confers identity.
+    const resolveStdioActor = async (request: Request): Promise<FunctionActor> => {
+      const resolved = await resolveActor(request);
+      return resolved.kind === "anonymous" ? cliActor : resolved;
+    };
 
     const server = createGraftMcp({
       name: "graft",
@@ -76,7 +81,8 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
             scope: branch.scope,
           }
         : { staticIndexPath: (config.index as { driver: "static"; path: string }).path }),
-      actor: resolveActor,
+      actor: resolveStdioActor,
+      connectionActor: cliActor,
       defaultAuthorization: devToken,
     });
 

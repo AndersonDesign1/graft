@@ -624,6 +624,21 @@ describe("destructive-op human gate (P3.4)", () => {
     expect(await json(gated)).toMatchObject({ error: "DESTRUCTIVE_OP_REQUIRES_APPROVAL" });
   });
 
+  it("refuses to file an approval for a caller with no stable identity", async () => {
+    const stores = memoryStores();
+    // A trusted issuer can mint a token with no `sub`, and an unauthenticated
+    // mount resolves anonymous — both reach here with no id.
+    const handler = p34handler(stores, { actor: () => ({ kind: "agent" }) });
+
+    const res = await handler(post("nuke", { target: "row-1" }));
+
+    expect(res.status).toBe(401);
+    expect(await json(res)).toMatchObject({ error: "UNAUTHORIZED" });
+    // The point: nothing was filed. An approval with a null requester is
+    // decidable by anyone, including whoever asked for it.
+    expect(stores.approvalRows.size).toBe(0);
+  });
+
   it("approvalPolicy 'none' (default) leaves non-destructive mutations ungated", async () => {
     const stores = memoryStores();
     const handler = p34handler(stores);

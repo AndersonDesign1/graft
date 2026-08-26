@@ -180,8 +180,14 @@ export const approvals = pgTable(
     requestedById: text("requested_by_id"),
     correlationId: text("correlation_id").notNull(),
     status: text("status").notNull().default("pending"),
-    /** Who decided (OS user / operator handle) — set on approve/deny. */
+    /**
+     * Who decided — derived from the verified actor at the deciding surface,
+     * never from caller input. `decided_by` is the identity the
+     * separation-of-duties predicate compares against `requested_by_id`, so a
+     * caller-supplied value would make that check meaningless.
+     */
     decidedBy: text("decided_by"),
+    decidedByKind: text("decided_by_kind"),
     /**
      * Postgres role the decision ran as (`current_user`), stamped inside the
      * UPDATE itself — unlike `decided_by` it cannot be self-reported.

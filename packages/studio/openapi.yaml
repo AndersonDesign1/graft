@@ -218,8 +218,10 @@ paths:
                 decision:
                   type: string
                   enum: [approved, denied]
-                decidedBy:
-                  type: string
       responses:
         "200":
-          description: Decision recorded
+          description: >-
+            Decision recorded. Attribution comes from the identity the Studio
+            was mounted for, never from the request: `decided_by` is what the
+            requester-cannot-decide check compares against, so a caller able to
+            name it could always approve their own destructive operation.

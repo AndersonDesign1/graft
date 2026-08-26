@@ -314,13 +314,28 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
         const inputCanonical = canonicalJson(parsed.data);
         const approvalId = request.headers.get(APPROVAL_HEADER);
         if (!approvalId) {
+          // Refuse before filing rather than after. An approval whose requester
+          // has no stable id cannot be held to anyone, which makes the
+          // requester-cannot-decide check vacuous for that row — so the gate is
+          // strictly weaker than it looks. Better a clear 401 than a queue of
+          // approvals nobody can be accountable for.
+          if (!actor.id) {
+            return fail(
+              new GraftError({
+                code: "UNAUTHORIZED",
+                message: `"${name}" is human-gated, and this caller has no identity to file the request under.`,
+                fix: "Send `Authorization: Bearer <token>` from a trusted issuer whose tokens carry a `sub` claim. A gated operation records who asked for it, so an unidentified caller cannot request one.",
+                details: { function: name, actor: actor.kind },
+              }),
+            );
+          }
           const id = await stores.approvals.request({
             branch,
             functionName: name,
             input: parsed.data as Record<string, unknown>,
             inputCanonical,
             requestedByKind: actor.kind,
-            requestedById: actor.id ?? null,
+            requestedById: actor.id,
             correlationId,
           });
           const why = fn.destructive

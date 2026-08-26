@@ -146,6 +146,76 @@ describe("introspection", () => {
   });
 });
 
+describe("decide_approval attribution", () => {
+  async function connect(options: Parameters<typeof createGraftMcp>[0]) {
+    const server = createGraftMcp(options);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const c = new Client({ name: "decider", version: "0.0.0" });
+    await c.connect(clientTransport);
+    return c;
+  }
+
+  it("offers no way to name the decider", async () => {
+    const c = await connect({ contentDir: dir, collections, db: untouchableDb });
+    const { tools } = await c.listTools();
+    const decide = tools.find((t) => t.name === "decide_approval");
+
+    expect(decide).toBeDefined();
+    // `decided_by` is what the requester-cannot-decide check compares against,
+    // so a caller who can set it can always approve their own request by
+    // naming somebody else. The argument must not exist at all.
+    expect(Object.keys(decide?.inputSchema.properties ?? {})).toEqual(["id", "decision"]);
+  });
+
+  it("refuses an unauthenticated connection before reaching the database", async () => {
+    // untouchableDb throws on any property access, so this also proves the
+    // refusal happens before any query — an anonymous caller cannot even probe.
+    const c = await connect({ contentDir: dir, collections, db: untouchableDb });
+
+    const result = (await c.callTool({
+      name: "decide_approval",
+      arguments: { id: "3f2504e0-4f89-11d3-9a0c-0305e82c3301", decision: "approved" },
+    })) as { isError?: boolean; content: { type: string; text: string }[] };
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0]?.text ?? "null")).toMatchObject({
+      error: "UNAUTHORIZED",
+    });
+  });
+
+  it("attributes the decision to the connection's identity, not the caller's claim", async () => {
+    let seen: { kind: string; id: string } | undefined;
+    const c = await connect({
+      contentDir: dir,
+      collections,
+      connectionActor: { kind: "human", id: "reviewer-1" },
+      db: {
+        update: () => ({
+          set: (values: { decidedBy: string; decidedByKind: string }) => {
+            seen = { kind: values.decidedByKind, id: values.decidedBy };
+            return {
+              where: () => ({ returning: async () => [{ id: "row", status: "approved" }] }),
+            };
+          },
+        }),
+      } as unknown as Database,
+    });
+
+    await c.callTool({
+      name: "decide_approval",
+      arguments: {
+        id: "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+        decision: "approved",
+        // Ignored: not in the schema, and nothing reads it.
+        decidedBy: "someone-else",
+      },
+    });
+
+    expect(seen).toEqual({ kind: "human", id: "reviewer-1" });
+  });
+});
+
 describe("function tools (P6.2)", () => {
   let fnClient: Client;
 

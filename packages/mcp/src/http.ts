@@ -56,8 +56,8 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
       });
     }
 
+    let actor: FunctionActor | undefined;
     if (resolveActor) {
-      let actor: FunctionActor;
       try {
         actor = await resolveActor(request);
       } catch (err) {
@@ -89,6 +89,10 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
     const server = createGraftMcp({
       ...serverOptions,
       actor: resolveActor,
+      // Tools that need to know WHO is calling (rather than forward a
+      // credential) read this. It is the same identity the check above just
+      // verified, so a tool can never be told a different one.
+      ...(actor === undefined ? {} : { connectionActor: actor }),
       defaultAuthorization:
         request.headers.get("authorization") ?? serverOptions.defaultAuthorization,
     });

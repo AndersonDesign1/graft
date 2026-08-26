@@ -7,6 +7,7 @@ import { compile } from "@usegraft/compiler";
 import type { AnyCollection } from "@usegraft/core";
 import {
   decideApproval,
+  type ApprovalDecider,
   listBranches,
   listCompilations,
   listPendingApprovals,
@@ -55,8 +56,17 @@ export interface StudioApiOptions {
   projectRoot?: string;
   /** Branch used for compile + tree default. */
   defaultBranch?: string;
-  /** Who stamps approval decisions (defaults to "studio"). */
-  decidedBy?: string | (() => string);
+  /**
+   * Identity that approval decisions are attributed to, resolved when the
+   * Studio is mounted — never from the request.
+   *
+   * `decided_by` is the value the separation-of-duties predicate compares
+   * against `requested_by_id`, so a request that could name it could always
+   * name someone other than itself and approve its own destructive operation.
+   * `graft studio` passes the OS user; `graft serve --studio` passes the
+   * service identity it runs as.
+   */
+  decider?: ApprovalDecider | (() => ApprovalDecider);
   authorize?: (request: Request) => boolean | Promise<boolean>;
 }
 
@@ -360,9 +370,9 @@ function buildSchema(collections: Record<string, AnyCollection>): SchemaList {
   return { collections: out };
 }
 
-function operator(options: StudioApiOptions): string {
-  if (typeof options.decidedBy === "function") return options.decidedBy();
-  return options.decidedBy ?? "studio";
+function operator(options: StudioApiOptions): ApprovalDecider {
+  if (typeof options.decider === "function") return options.decider();
+  return options.decider ?? { kind: "human", id: "studio" };
 }
 
 /** Implements /api/studio/v1/* from openapi.yaml. */
@@ -537,10 +547,10 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
       const decideMatch = /^\/api\/studio\/v1\/approvals\/([^/]+)\/decide$/.exec(pathname);
       if (decideMatch && method === "POST") {
         const id = decodeURIComponent(decideMatch[1] ?? "");
-        const payload = (await request.json()) as {
-          decision?: string;
-          decidedBy?: string;
-        };
+        // Note there is no `decidedBy` here: the decision is attributed to the
+        // identity this Studio was mounted for, so a caller cannot name a
+        // decider other than itself and defeat the requester-cannot-decide check.
+        const payload = (await request.json()) as { decision?: string };
         if (payload.decision !== "approved" && payload.decision !== "denied") {
           throw new GraftError({
             code: "INPUT_VALIDATION_FAILED",
@@ -548,12 +558,7 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
             fix: 'POST { "decision": "approved" } or { "decision": "denied" }.',
           });
         }
-        const row = await decideApproval(
-          options.db,
-          id,
-          payload.decision,
-          payload.decidedBy?.trim() || operator(options),
-        );
+        const row = await decideApproval(options.db, id, payload.decision, operator(options));
         if (!row) {
           throw new GraftError({
             code: "APPROVAL_INVALID",

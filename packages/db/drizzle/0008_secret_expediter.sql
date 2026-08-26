@@ -1,0 +1,1 @@
+ALTER TABLE "approvals" ADD COLUMN "decided_by_kind" text;

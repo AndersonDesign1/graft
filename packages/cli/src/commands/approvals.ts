@@ -17,8 +17,6 @@ export interface DecideCommandOptions {
   cwd: string;
   id: string;
   decision: "approved" | "denied";
-  /** Who is deciding. Defaults to the OS username. */
-  decidedBy?: string;
 }
 
 function operatorName(): string {
@@ -52,12 +50,12 @@ export async function decideCommand(options: DecideCommandOptions): Promise<Appr
   ]);
   const handle = createDb(url);
   try {
-    const row = await decideApproval(
-      handle.db,
-      options.id,
-      options.decision,
-      options.decidedBy ?? operatorName(),
-    );
+    // The decider is the OS user this process runs as — the strongest identity
+    // available locally, and not something the caller can pass in.
+    const row = await decideApproval(handle.db, options.id, options.decision, {
+      kind: "human",
+      id: operatorName(),
+    });
     if (!row) {
       throw new GraftError({
         code: "APPROVAL_INVALID",

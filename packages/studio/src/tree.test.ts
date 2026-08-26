@@ -25,7 +25,6 @@ vi.mock("@usegraft/db", () => ({
   listBranches: vi.fn(async () => []),
   listCompilations: vi.fn(async () => []),
   listPendingApprovals: vi.fn(async () => []),
-  decideApproval: vi.fn(async () => null),
 }));
 
 const { createStudioApiHandler } = await import("./api");

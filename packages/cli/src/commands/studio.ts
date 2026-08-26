@@ -20,11 +20,16 @@ function isLoopback(host: string): boolean {
   return host === "127.0.0.1" || host === "localhost" || host === "::1";
 }
 
-function operatorName(): string {
+/**
+ * Who approval decisions are attributed to: the OS user running `graft studio`.
+ * A local Studio is a person at a terminal, so this is the real identity — and
+ * unlike a request field, the caller cannot choose it.
+ */
+function operatorIdentity(): { kind: string; id: string } {
   try {
-    return userInfo().username;
+    return { kind: "human", id: userInfo().username };
   } catch {
-    return process.env.USERNAME ?? process.env.USER ?? "operator";
+    return { kind: "human", id: process.env.USERNAME ?? process.env.USER ?? "operator" };
   }
 }
 
@@ -86,7 +91,7 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
     collections: config.collections,
     contentDir: config.contentDir,
     defaultBranch: writeBranch,
-    decidedBy: operatorName,
+    decider: operatorIdentity,
     authorize,
   });
 

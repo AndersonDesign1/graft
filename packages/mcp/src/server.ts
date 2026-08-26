@@ -113,6 +113,16 @@ export interface GraftMcpOptions {
    * createFunctionsHandler / createGraftMcpHandler. Defaults to anonymous.
    */
   actor?: (request: Request) => FunctionActor | Promise<FunctionActor>;
+  /**
+   * The identity this connection authenticated as, already resolved.
+   *
+   * `actor` above resolves a *Request*, which tools do not have — they are
+   * JSON-RPC calls on an established connection. Tools that need to know who
+   * is calling (rather than merely forwarding a credential) read this instead.
+   * The HTTP handler sets it from the bearer it already verified; `graft mcp`
+   * sets it from the dev-token identity. Absent means anonymous.
+   */
+  connectionActor?: FunctionActor;
   /** Forwarded to createFunctionsHandler for run_function. */
   approvalPolicy?: "none" | "human";
   rateLimit?: RateLimit;
@@ -206,6 +216,27 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
       fix: `${insteadDo} To move this project to the Postgres tier: set DATABASE_URL, change graft.config to \`export const index = "postgres"\`, run \`graft db migrate\`, then \`graft compile\`.`,
       details: { feature, index: "static" },
     });
+  };
+
+  /**
+   * The identity a decision is attributed to, or a refusal naming why there is
+   * none. Deliberately derived from the connection rather than the tool call:
+   * `decided_by` is the value the separation-of-duties predicate compares
+   * against `requested_by_id`, so a caller who could name it could always name
+   * someone else and approve their own request.
+   */
+  const requireDecider = (): { kind: string; id: string } => {
+    const actor = options.connectionActor;
+    if (actor === undefined || actor.kind === "anonymous" || !actor.id) {
+      throw new GraftError({
+        code: "UNAUTHORIZED",
+        message:
+          "decide_approval needs to know who is deciding, and this connection is not authenticated as anyone.",
+        fix: "Connect with `Authorization: Bearer <token>` from a trusted issuer (or set GRAFT_DEV_TOKEN for `graft mcp`). Deciding anonymously would make the requester-cannot-decide check meaningless, so it is refused rather than attributed to a placeholder.",
+        details: { tool: "decide_approval", actor: actor?.kind ?? "anonymous" },
+      });
+    }
+    return { kind: actor.kind, id: actor.id };
   };
 
   /**
@@ -942,17 +973,13 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     {
       title: "Approve or deny a pending approval",
       description:
-        "Record a human decision on a pending approval (same as Studio Approve/Deny and `graft approve` / `graft deny`). Requires an owner DB role that can UPDATE approvals. The requester cannot decide their own approval.",
+        "Record a decision on a pending approval (same as Studio Approve/Deny and `graft approve` / `graft deny`). The decision is attributed to the identity THIS connection authenticated as — there is no way to name a different decider — and a requester can never decide their own approval. Requires an authenticated caller and an owner DB role that can UPDATE approvals.",
       inputSchema: {
         id: z.string().describe("Pending approval id from list_approvals"),
         decision: z.enum(["approved", "denied"]).describe("approved or denied"),
-        decidedBy: z
-          .string()
-          .optional()
-          .describe("Operator identity stamp (defaults to mcp-operator)"),
       },
     },
-    ({ id, decision, decidedBy }) =>
+    ({ id, decision }) =>
       guarded(async () => {
         const row = await decideApproval(
           requireDb(
@@ -961,7 +988,7 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
           ),
           id,
           decision,
-          decidedBy?.trim() || "mcp-operator",
+          requireDecider(),
         );
         if (!row) {
           throw new GraftError({
