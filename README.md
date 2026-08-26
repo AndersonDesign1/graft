@@ -93,7 +93,8 @@ over Streamable HTTP, `/healthz` with a real DB round-trip) to a plain Node serv
 self-host container runs. Identity is env-driven (`GRAFT_DEV_TOKEN`, `GRAFT_TRUSTED_ISSUERS`
 for OIDC via discovery, `GRAFT_MCP_ALLOW_ANONYMOUS`, `GRAFT_APPROVAL_POLICY`), and
 `graft harden <role>` applies the runtime privilege split so the deployed credential can
-request and consume approvals but never decide them. Topology decisions in
+request and consume approvals but never decide them — opt-in, and applied to nothing by
+default. Topology decisions in
 [`docs/design-notes/packaging.md`](docs/design-notes/packaging.md). **P7.2** ships the
 container ([`deploy/docker/`](deploy/docker/README.md)): one image = Postgres 18 + MinIO +
 `graft serve` — `docker run -p 3903:3903 graft` boots migrate → compile → serve and logs a
@@ -174,11 +175,19 @@ that id — an `x-graft-approval: <id>` header over HTTP, or the `approval` tool
 MCP. See [`llms.txt`](examples/landing-page/llms.txt) for the full surface, including MCP
 tools and Better Auth token minting.
 
-The gate holds against the agent itself, not just accidents: approver == requester is refused
-(`APPROVAL_SELF_DECISION`), decisions record the Postgres role they ran as (stamped
-server-side), and consuming an approval rides a `SECURITY DEFINER` function — so a hardened
-deployment can give its app/agent a runtime role with **no UPDATE on `approvals`**, making
-`pending → approved` unreachable even with raw SQL against the app's own `DATABASE_URL`
+The gate holds against the agent itself, not just accidents. **The identity that decides is
+derived from the verified caller, never from the request** — there is no `decidedBy` argument
+on any surface — so approver == requester is a comparison between two server-established
+facts and is refused with `APPROVAL_SELF_DECISION`. An approval whose requester has no stable
+identity cannot be decided by anyone (`APPROVAL_UNATTRIBUTED`), and a human-gated call from an
+unidentified caller is refused rather than filed. Decisions also record the Postgres role they
+ran as, stamped server-side.
+
+Consuming an approval rides a `SECURITY DEFINER` function, so a deployment can additionally
+give its app/agent a runtime role with **no UPDATE on `approvals`**, making `pending → approved`
+unreachable even with raw SQL against the app's own `DATABASE_URL`. That split is **opt-in**:
+run `graft harden <role>` and serve under that role. It is defence in depth beneath the
+application-level control above, not a substitute for it
 (`runtimeRoleGrantsSql` / `hardenRuntimeRole` in `@usegraft/db` emit the grants; see
 [`docs/design-notes/approval-hardening.md`](docs/design-notes/approval-hardening.md)).
 
@@ -193,6 +202,7 @@ deployment can give its app/agent a runtime role with **no UPDATE on `approvals`
 | `@usegraft/assets`             | S3/MinIO storage, transforms, agent upload primitives               |
 | `@usegraft/auth`               | OIDC token verification, actor resolver, scope-based access         |
 | `@usegraft/contracts`          | Shared types, error codes, introspection schemas                    |
+| `@usegraft/mdx-safety`         | Refuses executable constructs in authored MDX                       |
 | `@usegraft/mcp`                | Project MCP (content + functions + introspection)                   |
 | `@usegraft/cli`                | Human + agent CLI (`graft`, including `graft mcp` + `graft serve`)  |
 | `@usegraft/studio`             | Opt-in Studio UI (`graft studio` / `serve --studio`; OpenAPI-first) |

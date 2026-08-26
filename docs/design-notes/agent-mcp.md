@@ -64,12 +64,12 @@ createGraftMcp(options)  →  McpServer (tools)
         └── createGraftMcpHandler(options)  # remote agents, POST /api/mcp
 ```
 
-|        | Stdio (`graft mcp`)                                                                          | HTTP (`createGraftMcpHandler`)                                                                      |
-| ------ | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Who    | IDE agents, CLI agents, local CI                                                             | Hosted / eve agents                                                                                 |
-| Auth   | `GRAFT_DEV_TOKEN` is the server's default identity (secret never enters the agent's context) | `actor` resolver; optional `requireActor`; the connection's bearer is forwarded into `run_function` |
-| Writes | Writable checkout                                                                            | Same (dev/self-host tree)                                                                           |
-| Config | Loads `graft.config.ts` from cwd                                                             | App wires collections/functions                                                                     |
+|        | Stdio (`graft mcp`)                                                                          | HTTP (`createGraftMcpHandler`)                                                                                |
+| ------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Who    | IDE agents, CLI agents, local CI                                                             | Hosted / eve agents                                                                                           |
+| Auth   | `GRAFT_DEV_TOKEN` is the server's default identity (secret never enters the agent's context) | `actor` resolver (required unless `allowAnonymous`); the connection's bearer is forwarded into `run_function` |
+| Writes | Writable checkout                                                                            | Same (dev/self-host tree)                                                                                     |
+| Config | Loads `graft.config.ts` from cwd                                                             | App wires collections/functions                                                                               |
 
 ## Tool surface (target)
 
@@ -193,7 +193,9 @@ is the documented default.
 4. **Rate limits** and **audit_log** apply to `run_function` exactly as HTTP
    (unless the host disables audit for a test harness).
 5. **No silent auth downgrade** — bad bearer → `TOKEN_INVALID`, not anonymous.
-6. **MCP HTTP** may set `requireActor` for any network-exposed endpoint.
+6. **MCP HTTP** refuses anonymous callers by default; `allowAnonymous: true` is a
+   local-development opt-in and constructing a handler without either that or an
+   `actor` resolver throws. See [ADR 0002](../adr/0002-security-defaults-fail-closed.md).
 
 ## Auth model (reminder)
 

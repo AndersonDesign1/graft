@@ -1,7 +1,7 @@
 ---
 "@usegraft/studio": patch
 "@usegraft/core": patch
-"@usegraft/auth": patch
+"@usegraft/auth": minor
 "@usegraft/registry": patch
 "@usegraft/db": patch
 ---

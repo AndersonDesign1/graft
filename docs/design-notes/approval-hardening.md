@@ -2,6 +2,13 @@
 
 **Status: SHIPPED** (migration `0007`; `@usegraft/db` `approvals.ts` + `harden.ts`).
 
+> **Superseded in part — see the correction below.** The premise this note was
+> written on ("no approve surface exists over MCP/HTTP") stopped being true when
+> `decide_approval` shipped as an MCP tool, and nothing re-checked it. The role
+> separation described here is real and still in place; what it was defending
+> was no longer the only way in. Read [§ Correction](#correction-2026-08-26)
+> before relying on anything above it.
+
 ## The gap this closes
 
 The P3.4 destructive-op gate was structurally sound for **remote** agents — no
@@ -92,3 +99,48 @@ grants before `DROP ROLE`.
   `decided_role`. Needs a CLI-side resolver config story.
 - **Out-of-band approval UX** (Studio / notifications) — rides the deferred
   Studio work.
+
+---
+
+## Correction (2026-08-26)
+
+Everything above is preserved as written. This section records what turned out
+to be false, because how it went false matters more than the fact that it did.
+
+**The premise was true when written and stopped being true without anyone
+noticing.** This note opens by saying "no approve surface exists over MCP/HTTP;
+`decideApproval` is CLI-only", and builds its whole threat model on that. Then
+`decide_approval` shipped as an MCP tool. The premise was never re-examined,
+because nothing pointed at it — no test asserted it, and the note has no field
+that would have gone stale visibly.
+
+**The consequence.** `decideApproval` took `decidedBy` as a plain string, and
+every surface let the caller supply it. Since separation of duties was the SQL
+predicate `requestedById != decidedBy`, an agent that filed an approval could
+approve it by naming anyone else. The `decided_role` stamp described below is
+accurate and was doing its job; it just records the _credential_, and both sides
+of the gate ran under the same one.
+
+**What changed** (`61b9ac4`):
+
+- `decideApproval` takes an `ApprovalDecider` (`{ kind, id }`) derived from the
+  verified caller. No surface accepts a decider as input.
+- The `requested_by_id IS NULL` arm of the WHERE clause is gone. It made an
+  anonymously-filed approval decidable by anyone, including its filer.
+- A human-gated call from an actor with no stable id is refused rather than
+  filed, so an unattributable approval cannot exist in the first place.
+- MCP `decide_approval` requires the `approvals:decide` scope, which no agent
+  runtime token carries.
+
+**What this changes about the model above.** The two-credential table is still
+correct and the role split is still worth applying. What it is _not_ is the
+primary control — it is opt-in (`graft harden`), applied to nothing by default,
+and a deployment that never runs it was relying entirely on the application-level
+check. That check is now real. Treat the role split as defence in depth beneath
+it, in that order.
+
+**The process lesson**, which is why this is a correction rather than a rewrite:
+a design note that states a premise should state what would falsify it. This one
+said "CLI-only" as an observation about the code at that moment, not as an
+invariant anything was obliged to maintain. New decisions go in `docs/adr/`
+instead, where the premise is a required field.

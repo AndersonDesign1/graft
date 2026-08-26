@@ -3,6 +3,11 @@
   "version": "0.1.1",
   "description": "Refuse executable constructs in authored MDX — the write-side control for content Graft did not author.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndersonDesign1/graft.git",
+    "directory": "packages/mdx-safety"
+  },
   "files": [
     "dist"
   ],
@@ -12,6 +17,9 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
@@ -25,5 +33,8 @@
     "remark-parse": "^11.0.0",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=22.16"
   }
 }
