@@ -5,7 +5,7 @@
  * tested by @usegraft/core and @usegraft/mcp. Full-stack behavior is covered by the
  * live smoke against the example app.
  */
-import { createServer, type Server } from "node:http";
+import { createServer, request, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { createNodeListener, createServeRouter, type FetchHandler } from "./commands/serve";
@@ -74,12 +74,57 @@ describe("createNodeListener", () => {
     }
   });
 
-  async function listen(handler: FetchHandler): Promise<string> {
-    server = createServer(createNodeListener(handler));
+  async function listen(
+    handler: FetchHandler,
+    options?: Parameters<typeof createNodeListener>[1],
+  ): Promise<string> {
+    server = createServer(createNodeListener(handler, options));
     await new Promise<void>((resolve) => (server as Server).listen(0, "127.0.0.1", resolve));
     const { port } = (server as Server).address() as AddressInfo;
     return `http://127.0.0.1:${port}`;
   }
+
+  it("refuses a Host it does not answer to", async () => {
+    // The adapter builds the request URL from req.headers.host, so an
+    // attacker-chosen Host reaches every handler — and the Studio's shell
+    // redirect reflects it in Location before any authorization runs. It is
+    // also what makes DNS rebinding work against a loopback bind: a browser
+    // will resolve any name to 127.0.0.1.
+    const base = await listen(async () => new Response("ok"), {
+      allowedHosts: ["127.0.0.1", "localhost"],
+    });
+
+    // undici forbids setting Host via fetch, so drive the socket directly.
+    const status = (host: string): Promise<number> =>
+      new Promise((resolve, reject) => {
+        const { port } = (server as Server).address() as AddressInfo;
+        const req = request(
+          { host: "127.0.0.1", port, path: "/", method: "GET", headers: { host } },
+          (res) => {
+            res.resume();
+            resolve(res.statusCode ?? 0);
+          },
+        );
+        req.on("error", reject);
+        req.end();
+      });
+
+    expect(await status("evil.example")).toBe(400);
+    // The real host still works, port and all.
+    expect((await fetch(base)).status).toBe(200);
+  });
+
+  it("sets the peer header from the socket, ignoring any inbound copy", async () => {
+    const base = await listen(
+      async (request) =>
+        new Response(request.headers.get("x-graft-peer") ?? "none", { status: 200 }),
+    );
+
+    // A client that could write this header would be choosing its own
+    // rate-limit identity.
+    const res = await fetch(base, { headers: { "x-graft-peer": "1.2.3.4" } });
+    expect(await res.text()).not.toBe("1.2.3.4");
+  });
 
   it("round-trips method, path, headers, and body", async () => {
     const base = await listen(async (request) => {

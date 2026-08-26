@@ -72,7 +72,16 @@ export default defineConfig({
     port: 5173,
     // Dev server holds the UI; the API stays on a real `graft studio` process.
     proxy: {
-      "/api/studio": { target: apiTarget, changeOrigin: true },
+      "/api/studio": {
+        target: apiTarget,
+        changeOrigin: true,
+        // The API refuses cross-origin state-changing requests (CSRF: a
+        // loopback Studio has no auth, so any page could POST to it). In dev
+        // the browser's Origin is this Vite server, so rewrite it to the API's
+        // own origin — the request really is the Studio's, it just took a
+        // detour. Dev-only: nothing in production proxies through Vite.
+        headers: { origin: apiTarget },
+      },
     },
   },
 });

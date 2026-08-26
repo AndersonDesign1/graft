@@ -134,7 +134,14 @@ export function createStudioHandler(options: StudioHandlerOptions): StudioFetchH
       if (needsSlash || needsBranch) {
         if (needsSlash) url.pathname = `${uiBase}/`;
         if (needsBranch) url.searchParams.set("branch", options.defaultBranch as string);
-        return Response.redirect(url.toString(), 302);
+        // no-store because this URL is built from the request's own Host. The
+        // adapter validates Host against the bind address, so it should already
+        // be ours — but a cached 302 keyed on path alone would outlive that
+        // check, and this redirect fires before any authorization runs.
+        return new Response(null, {
+          status: 302,
+          headers: { location: url.toString(), "cache-control": "no-store" },
+        });
       }
     }
 

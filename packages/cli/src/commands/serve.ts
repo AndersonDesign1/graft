@@ -89,9 +89,68 @@ const HOP_BY_HOP = new Set([
  * Request/Response. Bodies are buffered — every mounted handler speaks small
  * JSON payloads, not streams.
  */
-export function createNodeListener(handler: FetchHandler) {
+export interface NodeListenerOptions {
+  /**
+   * Host values this server answers to. A request whose `Host` is not one of
+   * them is refused with 400.
+   *
+   * The adapter builds the request URL from `req.headers.host`, so without this
+   * an attacker-chosen Host flows into every handler — and into the Studio's
+   * shell redirect, which reflects it in `Location` before any authorization
+   * runs. It is also what makes DNS rebinding work against a loopback bind: the
+   * browser resolves an attacker's domain to 127.0.0.1 and the server happily
+   * answers to that name.
+   *
+   * Omitted means answer to anything, which is only appropriate behind a proxy
+   * that already validates Host.
+   */
+  allowedHosts?: readonly string[];
+}
+
+/**
+ * Host values a server bound to `host` should answer to.
+ *
+ * A loopback bind is reachable only from this machine, but a browser will
+ * happily resolve any name to 127.0.0.1 — which is exactly how DNS rebinding
+ * turns a drive-by page into a client of the local Studio. Naming the hosts we
+ * answer to closes that, and stops an attacker-chosen Host being reflected in
+ * the shell redirect's Location.
+ *
+ * Binding to a wildcard means "reachable however the operator arranged it", so
+ * there is no meaningful allowlist to build.
+ */
+export function allowedHostsFor(host: string): readonly string[] | undefined {
+  if (host === "0.0.0.0" || host === "::" || host === "") return undefined;
+  if (host === "127.0.0.1" || host === "localhost" || host === "::1") {
+    return ["127.0.0.1", "localhost", "[::1]"];
+  }
+  return [host];
+}
+
+/** `Host` may carry a port; compare on the hostname alone. */
+function hostname(host: string): string {
+  const trimmed = host.trim().toLowerCase();
+  // IPv6 literals are bracketed: [::1]:4983
+  if (trimmed.startsWith("[")) return trimmed.slice(0, trimmed.indexOf("]") + 1);
+  const colon = trimmed.lastIndexOf(":");
+  return colon === -1 ? trimmed : trimmed.slice(0, colon);
+}
+
+export function createNodeListener(handler: FetchHandler, options: NodeListenerOptions = {}) {
+  const allowed = options.allowedHosts?.map(hostname);
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     try {
+      if (allowed && !allowed.includes(hostname(req.headers.host ?? ""))) {
+        res.writeHead(400, { "content-type": "application/json" });
+        res.end(
+          JSON.stringify({
+            error: "INPUT_VALIDATION_FAILED",
+            message: `This server does not answer to Host "${req.headers.host ?? ""}".`,
+            fix: `Reach it at one of: ${allowed.join(", ")}. A mismatched Host is either a misconfigured proxy or a DNS-rebinding attempt.`,
+          }),
+        );
+        return;
+      }
       const chunks: Buffer[] = [];
       for await (const chunk of req) chunks.push(chunk as Buffer);
       const body = Buffer.concat(chunks);
@@ -339,6 +398,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   const server = createServer(
     createNodeListener(
       createServeRouter({ fn: fnHandler, mcp: mcpHandler, health, studio: studioHandler }),
+      { allowedHosts: allowedHostsFor(host) },
     ),
   );
   await new Promise<void>((resolve, reject) => {

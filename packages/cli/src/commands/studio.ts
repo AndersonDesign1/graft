@@ -7,7 +7,7 @@ import { createServer } from "node:http";
 import { userInfo } from "node:os";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
-import { createNodeListener } from "./serve";
+import { allowedHostsFor, createNodeListener } from "./serve";
 
 export interface StudioCommandOptions {
   cwd: string;
@@ -102,7 +102,7 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
     authenticate,
   });
 
-  const server = createServer(createNodeListener(handler));
+  const server = createServer(createNodeListener(handler, { allowedHosts: allowedHostsFor(host) }));
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(requestedPort, host, () => resolve());

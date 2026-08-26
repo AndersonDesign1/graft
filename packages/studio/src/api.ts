@@ -91,6 +91,46 @@ export interface StudioPrincipal {
 }
 
 /**
+ * Refuse a state-changing request that a foreign page drove.
+ *
+ * On a loopback mount there is no authentication by design, so anything that
+ * can reach 127.0.0.1 can act. Browsers let a page do exactly that: every
+ * mutation here is a plain POST/PUT parsed with `request.json()`, and
+ * `Request.json()` does not care about Content-Type — so a cross-origin
+ * "simple request" carrying `text/plain` executes without a CORS preflight.
+ * The response is unreadable to the attacker, but the side effect already
+ * happened: an approval decided, a document overwritten, a commit made.
+ *
+ * Two checks, because either alone has a gap. Origin catches the browser cases
+ * and is present on every cross-origin fetch. Requiring JSON Content-Type
+ * forces a preflight for anything that omits Origin, which the browser will
+ * then refuse on our behalf.
+ */
+function assertSameOrigin(request: Request, url: URL): void {
+  if (request.method === "GET" || request.method === "HEAD") return;
+
+  const origin = request.headers.get("origin");
+  if (origin !== null && origin !== url.origin) {
+    throw new GraftError({
+      code: "UNAUTHORIZED",
+      message: `Refusing a ${request.method} from origin "${origin}".`,
+      fix: "The Studio API only accepts state-changing requests from its own origin. If you are calling it from a script, omit the Origin header or send it from the same origin.",
+      details: { origin, expected: url.origin },
+    });
+  }
+
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `${request.method} ${url.pathname} requires \`Content-Type: application/json\`.`,
+      fix: "Send `Content-Type: application/json`. This is a CSRF control as much as a parsing one: a cross-origin form or text/plain POST is a simple request that browsers dispatch without a preflight, and requiring JSON forces one.",
+      details: { contentType },
+    });
+  }
+}
+
+/**
  * The scope a route demands, decided in one place so a new route cannot be
  * added without one. Phase 3 turns this into a column of the route table.
  *
@@ -425,6 +465,8 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
       const url = new URL(request.url);
       const { pathname } = url;
       const method = request.method;
+
+      assertSameOrigin(request, url);
 
       let principal: StudioPrincipal | undefined;
       if (options.authenticate) {
