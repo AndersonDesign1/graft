@@ -26,6 +26,7 @@
     "@oxlint/plugins": "1.79.0",
     "@types/node": "^22.0.0",
     "@typescript/native": "npm:typescript@^7.0.2",
+    "@vitest/coverage-v8": "2.1.9",
     "oxfmt": "^0.56.0",
     "oxlint": "^1.79.0",
     "tsup": "^8.0.0",

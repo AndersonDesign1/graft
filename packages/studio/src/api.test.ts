@@ -74,6 +74,52 @@ describe("createStudioApiHandler", () => {
     expect(res.status).toBe(401);
   });
 
+  it("accepts a mutation behind an HTTPS-terminating proxy", async () => {
+    // The adapter synthesises the request URL as http://<host>, so a
+    // whole-origin comparison saw https:// from the browser and rejected every
+    // save, compile, commit and approval decision in that topology. Caught by
+    // an independent review, not by me.
+    const handler = createStudioApiHandler(baseOpts);
+    const res = await handler(
+      new Request("http://studio.example.com/api/studio/v1/approvals/abc/decide", {
+        method: "POST",
+        headers: {
+          origin: "https://studio.example.com",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ decision: "approved" }),
+      }),
+    );
+    // Past the CSRF gate: it fails later, on the approval not existing.
+    expect(res.status).not.toBe(401);
+  });
+
+  it("still refuses a different host on the same scheme", async () => {
+    const handler = createStudioApiHandler(baseOpts);
+    const res = await handler(
+      new Request("http://studio.example.com/api/studio/v1/approvals/abc/decide", {
+        method: "POST",
+        headers: { origin: "http://evil.example.com", "content-type": "application/json" },
+        body: JSON.stringify({ decision: "approved" }),
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("refuses an opaque origin", async () => {
+    // Sandboxed iframes and some redirect chains send `Origin: null`. It has no
+    // host, so it can never match — and must not be read as "no Origin sent".
+    const handler = createStudioApiHandler(baseOpts);
+    const res = await handler(
+      new Request("http://studio.example.com/api/studio/v1/approvals/abc/decide", {
+        method: "POST",
+        headers: { origin: "null", "content-type": "application/json" },
+        body: JSON.stringify({ decision: "approved" }),
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
+
   it("refuses a state-changing request that is not JSON", async () => {
     // `Request.json()` parses regardless of Content-Type, so a cross-origin
     // text/plain POST is a "simple request" browsers send with no preflight.

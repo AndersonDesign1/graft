@@ -5,6 +5,7 @@ next-env.d.ts
 .turbo/
 .test-tmp/
 coverage/
+.cov/
 *.tsbuildinfo
 .env
 .env.local

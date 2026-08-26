@@ -8,7 +8,8 @@
     ".agents/**",
     ".claude/**",
     ".codex/**",
-    "tools/oxlint/anti-slop/**"
+    "tools/oxlint/anti-slop/**",
+    "**/.cov/**"
   ],
   "jsPlugins": [
     {

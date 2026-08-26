@@ -131,13 +131,33 @@ function assertSameOrigin(request: Request, url: URL): void {
   if (request.method === "GET" || request.method === "HEAD") return;
 
   const origin = request.headers.get("origin");
-  if (origin !== null && origin !== url.origin) {
-    throw new GraftError({
-      code: "UNAUTHORIZED",
-      message: `Refusing a ${request.method} from origin "${origin}".`,
-      fix: "The Studio API only accepts state-changing requests from its own origin. If you are calling it from a script, omit the Origin header or send it from the same origin.",
-      details: { origin, expected: url.origin },
-    });
+  if (origin !== null) {
+    // Compare HOST, not the whole origin.
+    //
+    // The Node adapter synthesises the request URL as `http://<host>`, because
+    // that is all a plain HTTP server knows. Behind an HTTPS-terminating proxy
+    // the browser's Origin is `https://…`, so comparing whole origins rejected
+    // every legitimate save, compile, commit and approval decision in that
+    // topology. The scheme here is an artifact of how the URL was built, not a
+    // fact about the request; the host is the part that says who is calling,
+    // and a cross-origin attacker necessarily has a different one.
+    //
+    // `Origin: null` — a sandboxed iframe, some redirect chains — has no host
+    // and is refused rather than treated as absent.
+    let originHost: string | null = null;
+    try {
+      originHost = new URL(origin).host || null;
+    } catch {
+      originHost = null;
+    }
+    if (originHost !== url.host) {
+      throw new GraftError({
+        code: "UNAUTHORIZED",
+        message: `Refusing a ${request.method} from origin "${origin}".`,
+        fix: "The Studio API only accepts state-changing requests from its own host. If you are calling it from a script, omit the Origin header or send it from the same host.",
+        details: { origin, expected: url.host },
+      });
+    }
   }
 
   const contentType = request.headers.get("content-type") ?? "";
