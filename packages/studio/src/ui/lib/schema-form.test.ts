@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SchemaFieldDto } from "../../types";
-import { buildForm, composeData, isEditable, isFormDirty, sameValue } from "./schema-form";
+import { buildForm, composeData, isEditable, sameValue } from "./schema-form";
 
 const field = (
   name: string,
@@ -126,7 +126,7 @@ describe("composeData", () => {
   });
 });
 
-describe("sameValue / isFormDirty", () => {
+describe("sameValue", () => {
   it("compares nested structures by value, not identity", () => {
     expect(sameValue({ a: [1, { b: 2 }] }, { a: [1, { b: 2 }] })).toBe(true);
     expect(sameValue({ a: [1, { b: 2 }] }, { a: [1, { b: 3 }] })).toBe(false);
@@ -136,11 +136,11 @@ describe("sameValue / isFormDirty", () => {
     // The form rebuilds this object on every render; identity would say dirty.
     const original = { image: { key: "a/b.png", alt: "x" } };
     const composed = { image: { key: "a/b.png", alt: "x" } };
-    expect(isFormDirty(original, composed)).toBe(false);
+    expect(sameValue(original, composed)).toBe(true);
   });
 
   it("notices an added or removed key", () => {
-    expect(isFormDirty({ a: 1 }, { a: 1, b: 2 })).toBe(true);
-    expect(isFormDirty({ a: 1, b: 2 }, { a: 1 })).toBe(true);
+    expect(sameValue({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+    expect(sameValue({ a: 1, b: 2 }, { a: 1 })).toBe(false);
   });
 });

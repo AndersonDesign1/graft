@@ -8,7 +8,7 @@
  */
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { GraftError } from "@usegraft/contracts";
+import { GraftError, STATIC_INDEX_DEFAULT_PATH } from "@usegraft/contracts";
 import type { AnyCollection, AnyGraftFunction } from "@usegraft/core";
 import { createJiti } from "jiti";
 
@@ -207,20 +207,17 @@ function assertStaticSupports(
   });
 }
 
-/** Default artifact path for static mode, relative to the project root. */
-const STATIC_INDEX_DEFAULT = ".graft/index.db";
-
 function parseIndexConfig(value: unknown, projectDir: string, configPath: string): IndexConfig {
   if (value === undefined || value === "postgres") return { driver: "postgres" };
   if (value === "static") {
-    return { driver: "static", path: resolve(projectDir, STATIC_INDEX_DEFAULT) };
+    return { driver: "static", path: resolve(projectDir, STATIC_INDEX_DEFAULT_PATH) };
   }
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     const driver = (value as { driver?: unknown }).driver;
     const path = (value as { path?: unknown }).path;
     if (driver === "postgres") return { driver: "postgres" };
     if (driver === "static" && (path === undefined || typeof path === "string")) {
-      return { driver: "static", path: resolve(projectDir, path ?? STATIC_INDEX_DEFAULT) };
+      return { driver: "static", path: resolve(projectDir, path ?? STATIC_INDEX_DEFAULT_PATH) };
     }
   }
   throw new GraftError({

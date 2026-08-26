@@ -1,5 +1,6 @@
 /**
- * Header names shared between Graft's HTTP adapters and the handlers they feed.
+ * Constants shared across packages that must agree on an exact value, where
+ * neither side owns the other.
  *
  * They live here because both sides must agree on the exact string and neither
  * owns the other: the Node adapter ships in @usegraft/cli, the handler that
@@ -18,3 +19,13 @@
  * (`trustedProxyHops`).
  */
 export const PEER_HEADER = "x-graft-peer";
+
+/**
+ * Where a static-tier project's compiled index lives, relative to the project
+ * root.
+ *
+ * Here rather than in @usegraft/db because the CLI resolves it while loading a
+ * config and deliberately lazy-loads the database package — a static import
+ * just to read one string would pull Postgres into every `graft` invocation.
+ */
+export const STATIC_INDEX_DEFAULT_PATH = ".graft/index.db";

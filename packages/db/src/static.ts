@@ -24,8 +24,9 @@ import type { ContentRow } from "./schema";
 import { assertSearchQuery, type ContentSearchHit } from "./search";
 
 export const STATIC_INDEX_FORMAT_VERSION = 1;
-/** Default artifact path, relative to the project root. */
-export const STATIC_INDEX_DEFAULT_PATH = ".graft/index.db";
+// Lives in @usegraft/contracts so the CLI can read it without loading this
+// package; re-exported here because this is where consumers look for it.
+export { STATIC_INDEX_DEFAULT_PATH } from "@usegraft/contracts";
 /** Compilation history carried across rebuilds (Studio parity, not an audit log). */
 const COMPILATIONS_KEPT = 50;
 

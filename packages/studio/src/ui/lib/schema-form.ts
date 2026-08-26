@@ -198,11 +198,3 @@ export function composeData(
 
   return out;
 }
-
-/** Has the form changed the document's frontmatter? */
-export function isFormDirty(
-  original: Record<string, unknown>,
-  composed: Record<string, unknown>,
-): boolean {
-  return !sameValue(original, composed);
-}
