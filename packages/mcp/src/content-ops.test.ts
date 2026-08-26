@@ -173,6 +173,8 @@ beforeEach(async () => {
     actor: () => ({ kind: "agent", id: "graft-cli" }),
     // The scopes `graft mcp` grants on the operator's own machine.
     connectionActor: { kind: "agent", id: "graft-cli", scopes: ["content:write"] },
+    // Local stdio grants put_asset's `path` argument, rooted at the project.
+    localUploadRoot: dir,
   });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
@@ -397,6 +399,19 @@ describe("put_asset", () => {
     });
     expect(replaced.isError).toBe(false);
     expect(store.puts).toHaveLength(1);
+  });
+
+  it("refuses to read a file outside the upload root", async () => {
+    // The whole finding: `path` went straight to readFileSync with no
+    // containment, the bytes were stored under a caller-chosen key, and the
+    // response carried a fetchable URL — so one call read .env off the server.
+    const { isError, payload } = await callTool("put_asset", {
+      path: join(dir, "..", "..", "etc", "passwd"),
+      key: "assets/x.png",
+    });
+    expect(isError).toBe(true);
+    expect(payload.error).toBe(ErrorCodes.INPUT_VALIDATION_FAILED);
+    expect(store.puts).toHaveLength(0);
   });
 
   it("reports a missing server-local file as DOCUMENT_NOT_FOUND", async () => {

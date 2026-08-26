@@ -10,6 +10,8 @@ import {
   parseDocument,
   writeDocumentFile,
   type ProjectedDoc,
+  resolveContained,
+  SLUG_RE,
 } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import type { AnyCollection } from "@usegraft/core";
@@ -118,8 +120,24 @@ export async function writeDocument(options: {
     });
   }
 
+  // Validate the slug's SHAPE, then contain the path it produces. The check in
+  // parseDocument below does not help: it validates `basename(sourcePath)`,
+  // which strips exactly the `..` segments that make a path dangerous, so
+  // "../../../../tmp/pwn" reached writeDocumentFile as a clean-looking "pwn".
+  if (!SLUG_RE.test(options.slug)) {
+    throw new GraftError({
+      code: "INVALID_SLUG",
+      message: `Slug "${options.slug}" is not URL-safe.`,
+      fix: 'Slugs are kebab-case: lowercase letters, digits and single hyphens, e.g. "getting-started". They name one document inside a collection, so they cannot contain "/", "\\" or "..".',
+      details: { slug: options.slug, pattern: SLUG_RE.source },
+    });
+  }
   const sourcePath = `${options.collection}/${options.slug}.mdx`;
-  const fullPath = join(options.contentDir, ...sourcePath.split("/"));
+  const fullPath = resolveContained(options.contentDir, sourcePath, {
+    label: "document",
+    // The editor writes real files; a symlinked target would redirect the save
+    // somewhere the author never chose.
+  });
   // Preserve the author's frontmatter bytes when only the body changed —
   // re-serialising would rewrite their quoting and spacing on every save.
   const existingRaw = existsSync(fullPath) ? readFileSync(fullPath, "utf8") : undefined;

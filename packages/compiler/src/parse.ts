@@ -12,7 +12,8 @@ import type { AnyCollection } from "@usegraft/core";
 import matter from "gray-matter";
 
 /** Kebab-case: URL-safe, unambiguous in paths, and stable as a primary-key part. */
-const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** URL-safe kebab-case: the only shape a slug may take. */
+export const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** One asset reference found in a document's frontmatter. */
 export interface DocAsset {

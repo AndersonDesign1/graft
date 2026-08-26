@@ -36,7 +36,23 @@ export function listItemNames(root = registryRoot()): string[] {
 }
 
 /** Load + validate one item by name. Throws REGISTRY_ITEM_NOT_FOUND / _INVALID. */
+/** The shape a registry item name may take — the same one manifests declare. */
+const ITEM_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 export function loadItem(name: string, root = registryRoot()): RegistryItem {
+  // Validate before joining. `describe_item` passes a raw MCP argument through
+  // to here, so "../../../../etc" used to reach existsSync and the error
+  // branches then told the caller apart: NOT_FOUND, a JSON parse message
+  // quoting the probed file's first bytes, or a schema failure. That is a
+  // filesystem existence and content-shape oracle driven by client input.
+  if (!ITEM_NAME_RE.test(name)) {
+    throw new GraftError({
+      code: "REGISTRY_ITEM_INVALID",
+      message: `"${name}" is not a registry item name.`,
+      fix: 'Item names are kebab-case: lowercase letters, digits and single hyphens, e.g. "comments". Call list_registry to see what is available.',
+      details: { name, pattern: ITEM_NAME_RE.source },
+    });
+  }
   const dir = join(root, name);
   const manifestPath = join(dir, MANIFEST_FILE);
   if (!existsSync(manifestPath)) {

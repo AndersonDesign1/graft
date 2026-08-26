@@ -18,9 +18,10 @@
  * equivalent of this surface is git itself.
  */
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, normalize, resolve, sep } from "node:path";
+import { closeSync, existsSync, openSync, readFileSync, readSync, statSync } from "node:fs";
+import { relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
+import { resolveContained } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import type {
   ChangeStatus,
@@ -360,12 +361,22 @@ function addedFileDiff(fullPath: string): { hunks: DiffHunkDto[]; truncated: boo
   };
 }
 
+const SNIFF_BYTES = 8000;
+
 /** Cheap binary sniff: a NUL byte in the first block, which is git's own test. */
 function looksBinary(fullPath: string): boolean {
-  const size = statSync(fullPath).size;
-  if (size === 0) return false;
-  const buffer = readFileSync(fullPath);
-  return buffer.subarray(0, 8000).includes(0);
+  if (statSync(fullPath).size === 0) return false;
+  // Reads only the first block. This used to readFileSync the WHOLE file to
+  // inspect 8KB of it, so one large file in the content tree made every diff
+  // render allocate all of it.
+  const buffer = Buffer.alloc(SNIFF_BYTES);
+  const fd = openSync(fullPath, "r");
+  try {
+    const read = readSync(fd, buffer, 0, SNIFF_BYTES, 0);
+    return buffer.subarray(0, read).includes(0);
+  } finally {
+    closeSync(fd);
+  }
 }
 
 /**
@@ -418,25 +429,11 @@ export async function readFileDiff(contentDir: string, path: string): Promise<Fi
  * Windows separators in one check rather than three greps.
  */
 export function safeContentPath(contentDir: string, path: string): string {
-  const root = resolve(contentDir);
-  if (!path || path.includes("\0") || isAbsolute(path)) {
-    throw new GraftError({
-      code: "INPUT_VALIDATION_FAILED",
-      message: `"${path}" is not a path inside the content directory.`,
-      fix: "Pass a path exactly as the changes list reported it, relative to the content directory.",
-      details: { path },
-    });
-  }
-  const candidate = resolve(root, normalize(path));
-  if (candidate !== root && !candidate.startsWith(root + sep)) {
-    throw new GraftError({
-      code: "INPUT_VALIDATION_FAILED",
-      message: `"${path}" resolves outside the content directory.`,
-      fix: "The Studio only reads and commits content; edit anything else with git directly.",
-      details: { path },
-    });
-  }
-  return candidate;
+  // Was lexical only (resolve + prefix check), which a symlink INSIDE the tree
+  // defeats: the string stays contained and readFileSync then follows the link
+  // out. Git can commit symlinks, so a cloned template could point a .mdx entry
+  // at ~/.ssh/id_rsa and read it back through the diff endpoint.
+  return resolveContained(contentDir, path, { label: "content path" });
 }
 
 export interface CommitOptions {

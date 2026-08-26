@@ -27,6 +27,7 @@ import {
   parseDocument,
   writeDocumentFile,
   type CompileResult,
+  resolveContained,
 } from "@usegraft/compiler";
 import {
   GraftError,
@@ -123,6 +124,21 @@ export interface GraftMcpOptions {
    * sets it from the dev-token identity. Absent means anonymous.
    */
   connectionActor?: FunctionActor;
+  /**
+   * Directory `put_asset`'s `path` argument may read from, enabling that
+   * argument at all.
+   *
+   * Unset — which is every remote mount — means `put_asset` has no `path`
+   * argument: a remote agent sends bytes as base64 or nothing. It used to pass
+   * the raw string to readFileSync with no containment whatsoever, upload the
+   * result under a key of the caller's choosing, and return a fetchable URL, so
+   * `{ path: "/srv/app/.env" }` was a one-call read of DATABASE_URL, dev tokens
+   * and S3 credentials on any HTTP-mounted server.
+   *
+   * `graft mcp` sets it to the project directory: a local agent uploading a
+   * hero image from the repo is the case the argument exists for.
+   */
+  localUploadRoot?: string;
   /** Forwarded to createFunctionsHandler for run_function. */
   approvalPolicy?: "none" | "human";
   rateLimit?: RateLimit;
@@ -795,12 +811,17 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
       }),
   );
 
+  const uploadRoot = options.localUploadRoot;
+
   server.registerTool(
     "put_asset",
     {
       title: "Upload an asset (image / binary)",
       description:
-        "Upload a binary to the asset store and get the frontmatter reference for an `asset` field. Pass `path` (a file on the machine running this MCP server — the stdio case) OR `base64` + `key` (remote agents send the bytes). Refuses to overwrite an existing key unless overwrite: true — the store keeps no version history. Then reference the returned key from an asset field via write_content.",
+        (uploadRoot
+          ? "Upload a binary to the asset store and get the frontmatter reference for an `asset` field. Pass `path` (a file inside this project) OR `base64` + `key`. "
+          : "Upload a binary to the asset store and get the frontmatter reference for an `asset` field. Pass `base64` + `key` — this server reads no files from its own disk. ") +
+        "Refuses to overwrite an existing key unless overwrite: true — the store keeps no version history. Then reference the returned key from an asset field via write_content.",
       inputSchema: {
         key: z
           .string()
@@ -811,7 +832,11 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
         path: z
           .string()
           .optional()
-          .describe("Path to a file on the MCP server's machine (local/stdio agents)."),
+          .describe(
+            uploadRoot
+              ? `Path to a file inside ${uploadRoot} (local/stdio agents).`
+              : "Not available on this server — send the bytes as `base64` instead.",
+          ),
         base64: z
           .string()
           .optional()
@@ -840,8 +865,23 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
 
         let bytes: Uint8Array;
         if (path !== undefined) {
+          if (uploadRoot === undefined) {
+            throw new GraftError({
+              code: "UNAUTHORIZED",
+              message: "This server does not read files from its own disk.",
+              fix: "Read the file yourself and send its bytes as `base64` with a `key`. Reading server-local paths is only available to a local stdio server, which grants it explicitly.",
+              details: { tool: "put_asset" },
+            });
+          }
+          // Contained, and symlinks refused: the argument exists so a local
+          // agent can upload a file from the project, not so any caller can
+          // read whatever the server process can.
+          const full = resolveContained(uploadRoot, path, {
+            label: "asset source",
+            allowAbsolute: true,
+          });
           try {
-            bytes = readFileSync(path);
+            bytes = readFileSync(full);
           } catch {
             throw new GraftError({
               code: "DOCUMENT_NOT_FOUND",

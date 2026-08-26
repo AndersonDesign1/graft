@@ -92,6 +92,9 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
         : { staticIndexPath: (config.index as { driver: "static"; path: string }).path }),
       actor: resolveStdioActor,
       connectionActor: cliActor,
+      // Local agents may upload a file from the project; remote mounts get no
+      // `path` argument at all.
+      localUploadRoot: config.projectDir,
       defaultAuthorization: devToken,
     });
 
