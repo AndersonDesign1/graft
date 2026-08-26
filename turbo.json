@@ -27,7 +27,7 @@
         // only (no NEXT_PUBLIC_ prefix), so Next will not inline it.
         "DATABASE_URL",
         "GRAFT_DEV_TOKEN",
-        "GRAFT_MCP_REQUIRE_AUTH",
+        "GRAFT_MCP_ALLOW_ANONYMOUS",
         // Deployment provenance, read per-request by the functions handler.
         "VERCEL_GIT_COMMIT_SHA",
         "GITHUB_SHA"

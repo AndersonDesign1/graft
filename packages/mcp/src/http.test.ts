@@ -53,7 +53,14 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "graft-mcp-http-"));
   mkdirSync(join(dir, "pages"));
   writeFileSync(join(dir, "pages", "home.mdx"), "---\ntitle: Home\n---\nWelcome");
-  handler = createGraftMcpHandler({ contentDir: dir, collections, db: untouchableDb });
+  // These cover transport shape, not auth — opt in explicitly so the
+  // constructor guard does not fail the whole file.
+  handler = createGraftMcpHandler({
+    contentDir: dir,
+    collections,
+    db: untouchableDb,
+    allowAnonymous: true,
+  });
 });
 
 afterEach(() => {
@@ -99,7 +106,6 @@ describe("actor gate", () => {
       collections,
       db: untouchableDb,
       actor: resolver,
-      requireActor: true,
     });
 
   const post = (handler: GraftMcpHandler, headers: Record<string, string> = {}) =>
@@ -111,7 +117,7 @@ describe("actor gate", () => {
       }),
     );
 
-  it("rejects anonymous callers with 401 when requireActor is set", async () => {
+  it("rejects anonymous callers with 401 by default", async () => {
     const response = await post(gated());
     expect(response.status).toBe(401);
     const body = (await response.json()) as { error: { message: string } };
@@ -125,25 +131,38 @@ describe("actor gate", () => {
     expect(body.error.message).toContain("could not be verified");
   });
 
-  it("allows anonymous callers when requireActor is off (resolver still vets tokens)", async () => {
+  it("refuses to construct with no way to authenticate anyone", () => {
+    // This used to be the DEFAULT: a handler with no resolver served
+    // write_content, put_asset, delete_content and decide_approval to whoever
+    // found the URL. Failing here means a deployer who forgets gets a startup
+    // crash instead of an open endpoint.
+    expect(() =>
+      createGraftMcpHandler({ contentDir: dir, collections, db: untouchableDb }),
+    ).toThrowError(/authenticate/i);
+  });
+
+  it("serves anonymous callers only when explicitly opted in", async () => {
     const open = createGraftMcpHandler({
       contentDir: dir,
       collections,
       db: untouchableDb,
       actor: resolver,
+      allowAnonymous: true,
     });
     expect((await post(open)).status).not.toBe(401);
+    // Opting in to anonymous does not stop the resolver vetting real tokens:
+    // a bad credential is still an error to fix, never a downgrade.
     expect((await post(open, { authorization: "Bearer wrong" })).status).toBe(401);
   });
 
-  it("fails closed when requireActor is set without a resolver", async () => {
-    const misconfigured = createGraftMcpHandler({
+  it("allowAnonymous with no resolver is a valid local-dev handler", async () => {
+    const local = createGraftMcpHandler({
       contentDir: dir,
       collections,
       db: untouchableDb,
-      requireActor: true,
+      allowAnonymous: true,
     });
-    expect((await post(misconfigured)).status).toBe(401);
+    expect((await post(local)).status).not.toBe(401);
   });
 
   it("accepts a resolved actor end-to-end", async () => {
@@ -264,10 +283,10 @@ describe("tools over HTTP", () => {
       };
     };
 
-    // Anonymous connection → the gated mutation still fails closed.
-    const anonymous = await call();
-    expect(anonymous.isError).toBe(true);
-    expect(anonymous.payload.error).toBe("UNAUTHORIZED");
+    // Anonymous connection → refused at the door now, before any tool call.
+    // It used to connect and fail per-tool, which meant every tool WITHOUT an
+    // access rule (write_content, put_asset, decide_approval) was reachable.
+    await expect(call()).rejects.toThrow();
 
     // Authenticated connection → the same tool call succeeds with no authorization argument.
     const authed = await call({ authorization: "Bearer s3cret" });

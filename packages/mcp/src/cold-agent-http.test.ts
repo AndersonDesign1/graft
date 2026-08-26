@@ -112,7 +112,6 @@ beforeEach(() => {
     db: { __stub: true } as unknown as Database,
     audit: false,
     actor: resolveActor,
-    requireActor: true,
     name: "graft-remote-cold-agent",
   });
 });

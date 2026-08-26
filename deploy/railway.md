@@ -34,8 +34,7 @@ GRAFT_ENSURE_BUCKET=0            # R2 buckets are managed in Cloudflare
 GRAFT_DEV_TOKEN=…                # or GRAFT_TRUSTED_ISSUERS=https://your-idp
 ```
 
-`GRAFT_MCP_REQUIRE_AUTH` already defaults to `1` in the image — the MCP
-endpoint rejects anonymous callers unless you opt out.
+Anonymous MCP callers are refused by default; the container never opts in.
 
 ## 4. Harden (recommended)
 

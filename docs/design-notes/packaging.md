@@ -37,7 +37,7 @@ Env contract (same names the example app already taught):
 neon-backed branch serves its fork transparently); `GRAFT_DEV_TOKEN` /
 `GRAFT_DEV_SCOPES` (static local identity); **`GRAFT_TRUSTED_ISSUERS`**
 (comma-separated OIDC issuer URLs, verified via discovery — the
-Connect/Passport-shaped enterprise path); `GRAFT_MCP_REQUIRE_AUTH=1`;
+Connect/Passport-shaped enterprise path); anonymous MCP refused by default;
 `GRAFT_APPROVAL_POLICY=human`; `PORT`/`HOST` (default loopback:3903 — binding
 wider with no identity configured warns loudly).
 
@@ -67,7 +67,7 @@ process to an agent.
   `dl.min.io` doesn't resolve on every network). Boot:
   [infra] → bucket → migrate → compile → [harden] → serve. With nothing
   mounted it serves the baked-in example project and **generates + logs a dev
-  token** (`GRAFT_MCP_REQUIRE_AUTH` defaults to `1` — the container never
+  token** (anonymous MCP is refused by default — the container never
   exposes anonymous MCP). One `docker run`, full backend, no external
   services — the compare-page claim, kept honest.
 - **Mounted projects:** `/project` (graft.config.ts + content/) is served

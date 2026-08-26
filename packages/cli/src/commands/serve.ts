@@ -17,9 +17,14 @@
  * Identity: the same env contract as `graft mcp` (GRAFT_DEV_TOKEN /
  * GRAFT_DEV_SCOPES) plus GRAFT_TRUSTED_ISSUERS — comma/space-separated OIDC
  * issuer URLs verified via discovery, so a deployed server accepts
- * externally-minted agent tokens without new code. GRAFT_MCP_REQUIRE_AUTH=1
- * rejects anonymous MCP callers; GRAFT_APPROVAL_POLICY=human gates every
- * mutation. Binding beyond loopback without any of those prints a warning.
+ * externally-minted agent tokens without new code.
+ *
+ * Anonymous MCP callers are served on loopback (zero-config local dev) and
+ * refused anywhere else, with no env var to remember. Off loopback it takes a
+ * deliberate GRAFT_MCP_ALLOW_ANONYMOUS=1, which warns.
+ * GRAFT_APPROVAL_POLICY=human gates every mutation. Binding beyond loopback
+ * with no identity configured prints a warning, because MCP will then refuse
+ * every caller.
  */
 import { execFileSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -199,7 +204,22 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   });
 
   const approvalPolicy = process.env.GRAFT_APPROVAL_POLICY === "human" ? "human" : "none";
-  const requireMcpActor = process.env.GRAFT_MCP_REQUIRE_AUTH === "1";
+
+  const host = options.host ?? process.env.HOST ?? "127.0.0.1";
+  const loopback = host === "127.0.0.1" || host === "localhost" || host === "::1";
+
+  // The bind host decides, not an env var an operator has to remember: on
+  // loopback the endpoint is reachable only from this machine, so anonymous MCP
+  // is the zero-config local-dev default. Anywhere else it takes a deliberate
+  // GRAFT_MCP_ALLOW_ANONYMOUS=1 (for an operator who fronts this with their own
+  // auth proxy), and that choice is warned about below.
+  //
+  // Replaces GRAFT_MCP_REQUIRE_AUTH, which defaulted to off *everywhere*: a
+  // bare `graft serve --host 0.0.0.0` published the whole tool surface to the
+  // network unless someone remembered to set it. Deployments that already set
+  // it to 1 were choosing today's default, so they are unaffected.
+  const anonymousOptIn = process.env.GRAFT_MCP_ALLOW_ANONYMOUS === "1";
+  const allowAnonymousMcp = loopback || anonymousOptIn;
   const functions = config.functions ?? {};
   const gitSha = localGitSha(options.cwd);
 
@@ -223,7 +243,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     branchId: writeBranch,
     scope: branch.scope,
     actor: resolveActor,
-    requireActor: requireMcpActor,
+    allowAnonymous: allowAnonymousMcp,
   });
 
   const health: FetchHandler = async () => {
@@ -250,7 +270,6 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     );
   };
 
-  const host = options.host ?? process.env.HOST ?? "127.0.0.1";
   const requestedPort = options.port ?? Number(process.env.PORT ?? 3903);
   if (!Number.isInteger(requestedPort) || requestedPort < 0 || requestedPort > 65535) {
     await branch.close();
@@ -262,12 +281,21 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     });
   }
 
-  const loopback = host === "127.0.0.1" || host === "localhost" || host === "::1";
-  if (!loopback && !requireMcpActor && issuers.length === 0 && !devToken) {
+  // Test what is ENFORCED, not what is configured. The old condition treated
+  // "a dev token exists" as sufficient, so setting GRAFT_DEV_TOKEN silenced the
+  // warning while anonymous callers kept reaching decide_approval — configuring
+  // a resolver is not the same as requiring one to be used.
+  if (!loopback && anonymousOptIn) {
+    console.warn(
+      "[graft serve] WARNING: GRAFT_MCP_ALLOW_ANONYMOUS=1 while bound beyond loopback — " +
+        "unauthenticated callers can write content, upload assets and decide approvals. " +
+        "Only do this behind an auth proxy you control.",
+    );
+  } else if (!loopback && issuers.length === 0 && !devToken) {
     console.warn(
       "[graft serve] WARNING: binding beyond loopback with no identity configured — " +
-        "set GRAFT_MCP_REQUIRE_AUTH=1 and provide GRAFT_DEV_TOKEN or GRAFT_TRUSTED_ISSUERS " +
-        "before exposing this to a network.",
+        "MCP will refuse every caller, because there is nothing to authenticate them against. " +
+        "Set GRAFT_DEV_TOKEN or GRAFT_TRUSTED_ISSUERS.",
     );
   }
 

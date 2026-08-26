@@ -262,7 +262,7 @@ Graft never becomes the identity provider of record.
 The banked "fully cold" gate ran for real: a fresh agent with **no repo checkout
 and no llms.txt** — MCP tool descriptions, schemas, and error messages were its
 only teachers — drove the running example app over network Streamable HTTP
-(`POST /api/mcp`, `GRAFT_MCP_REQUIRE_AUTH=1`, bearer token as its sole context).
+(`POST /api/mcp`, anonymous refused, bearer token as its sole context).
 
 - [x] Cold discovery: 4 calls from zero to fully oriented (tools → collections → schema → content).
 - [x] Authored `pages/changelog` end-to-end: hand-wrote an SVG, uploaded via `put_asset` (base64 + key; key convention inferred from existing docs), referenced it as `{ key, alt }`, verified via `get_content` **and** a rendered HTTP 200 with the R2-hosted hero loaded.

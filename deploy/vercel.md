@@ -25,7 +25,7 @@ Plus `withGraft()` in `next.config.ts` (ships the registry server-external so
 
 ## Identity
 
-Set `GRAFT_MCP_REQUIRE_AUTH=1` for any publicly reachable deployment. Tokens:
+Anonymous MCP callers are refused by default. Tokens:
 `GRAFT_DEV_TOKEN` for a static bearer, or verified OIDC — the example hosts
 Better Auth and mints JWTs the resolver verifies; an external IdP
 (Vercel Connect / Passport shape) plugs into the same `createActorResolver`

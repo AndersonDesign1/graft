@@ -26,10 +26,19 @@ export interface GraftMcpHandlerOptions extends GraftMcpOptions {
    */
   actor?: (request: Request) => FunctionActor | Promise<FunctionActor>;
   /**
-   * Reject anonymous callers with 401. Off by default (a dev server on
-   * localhost); turn it on for anything reachable from outside.
+   * Serve callers who did not authenticate.
+   *
+   * Off by default, and deliberately phrased as an opt-*in* to insecurity: this
+   * handler is built to be embedded in a Next.js route, a self-host container,
+   * Vercel Fluid, or a Worker, and the previous `requireActor` flag defaulted to
+   * off — so forgetting it silently published write_content, put_asset,
+   * delete_content and decide_approval to anyone who found the URL.
+   *
+   * Constructing a handler with neither `actor` nor `allowAnonymous: true`
+   * throws, so a deployer who forgets gets a startup failure with a fix line
+   * rather than an open endpoint.
    */
-  requireActor?: boolean;
+  allowAnonymous?: boolean;
 }
 
 export type GraftMcpHandler = (request: Request) => Promise<Response>;
@@ -44,7 +53,20 @@ function jsonRpcError(
 }
 
 export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcpHandler {
-  const { actor: resolveActor, requireActor, ...serverOptions } = options;
+  const { actor: resolveActor, allowAnonymous, ...serverOptions } = options;
+
+  // Fail at construction, not per request: an endpoint that cannot authenticate
+  // anyone should never come up at all, and a startup crash is the one signal a
+  // deployer cannot miss. (`graft serve` and `graft studio` warn on an insecure
+  // bind; a library embedding got no signal whatsoever.)
+  if (resolveActor === undefined && allowAnonymous !== true) {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message:
+        "createGraftMcpHandler was given no way to authenticate callers, and this endpoint serves content writes, asset uploads and approval decisions.",
+      fix: "Pass `actor` — the @usegraft/auth `createActorResolver` seam, the same one the functions route uses. For a local dev server with no auth at all, pass `allowAnonymous: true` explicitly; never do that on anything reachable from a network.",
+    });
+  }
 
   return async (request: Request): Promise<Response> => {
     // Stateless mode is POST-only: no sessions, so no SSE stream to GET and no
@@ -66,19 +88,13 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
           err instanceof GraftError ? `${err.message} ${err.fix ?? ""}`.trim() : "Unauthorized";
         return jsonRpcError(401, -32001, message);
       }
-      if (requireActor && actor.kind === "anonymous") {
+      if (allowAnonymous !== true && actor.kind === "anonymous") {
         return jsonRpcError(
           401,
           -32001,
           "Unauthorized: this MCP endpoint requires authentication. Send `Authorization: Bearer <token>` from a trusted issuer.",
         );
       }
-    } else if (requireActor) {
-      return jsonRpcError(
-        401,
-        -32001,
-        "Unauthorized: requireActor is set but no actor resolver is configured — the server cannot authenticate anyone.",
-      );
     }
 
     // The caller already authenticated to this endpoint — forward their bearer

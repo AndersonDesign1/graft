@@ -3,9 +3,9 @@
  * a stdio process. Endpoint: POST /api/mcp (Streamable HTTP, stateless),
  * mounted through @usegraft/sdk-astro's graftRoute.
  *
- * Set GRAFT_MCP_REQUIRE_AUTH=1 to reject anonymous callers — do that for
- * anything reachable from outside. Writes need this process to see the repo
- * checkout (dev / self-host).
+ * Anonymous callers are refused by default. GRAFT_MCP_ALLOW_ANONYMOUS=1 opts
+ * back in for local development only — never set it on a deployed instance.
+ * Writes need this process to see the repo checkout (dev / self-host).
  */
 import { resolve } from "node:path";
 import { createDb } from "@usegraft/db";
@@ -31,7 +31,12 @@ function getHandler(): GraftMcpHandler {
       functions,
       db: createDb(url).db,
       actor: resolveActor,
-      requireActor: process.env.GRAFT_MCP_REQUIRE_AUTH === "1",
+      // Anonymous callers are refused unless GRAFT_MCP_ALLOW_ANONYMOUS is set,
+      // which is for local development only: this endpoint serves content
+      // writes, asset uploads and approval decisions. A deployed instance must
+      // never set it — the previous default was the other way round, so
+      // forgetting one env var published the whole tool surface.
+      allowAnonymous: process.env.GRAFT_MCP_ALLOW_ANONYMOUS === "1",
     });
   }
   return handler;

@@ -362,7 +362,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "A row left over from before approvals required an identified requester",
     ],
     howToRecover:
-      "Fix the filing surface, not the row: require authentication where the approval was requested (GRAFT_MCP_REQUIRE_AUTH, an actor resolver, or a token that carries `sub`), then have the caller request the operation again so the approval records who wants it. A stale row can be resolved directly in the database.",
+      "Fix the filing surface, not the row: require authentication where the approval was requested (an actor resolver, or a token that carries `sub`), then have the caller request the operation again so the approval records who wants it. A stale row can be resolved directly in the database.",
   },
   APPROVAL_SELF_DECISION: {
     code: "APPROVAL_SELF_DECISION",

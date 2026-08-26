@@ -45,7 +45,7 @@ as plain files under `content/`; commit them like any other change.
 
 Remote agents (no stdio): the same tools are served over Streamable HTTP at
 `POST /api/mcp` while the app is running (`pnpm dev`). Stateless, JSON
-responses; set `GRAFT_MCP_REQUIRE_AUTH=1` to require a non-anonymous actor.
+responses; anonymous callers are refused unless GRAFT_MCP_ALLOW_ANONYMOUS=1.
 Generic projects can also run `graft mcp` (stdio) with DATABASE_URL.
 
 ## How to change content (by hand)

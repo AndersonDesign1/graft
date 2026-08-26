@@ -94,7 +94,9 @@ if [ -n "${GRAFT_RUNTIME_PASSWORD:-}" ]; then
 fi
 
 # ── Identity defaults: never expose an unauthenticated MCP surface ──────────
-export GRAFT_MCP_REQUIRE_AUTH="${GRAFT_MCP_REQUIRE_AUTH:-1}"
+# Anonymous MCP is refused unless explicitly allowed; the container never
+# opts in. (Replaces GRAFT_MCP_REQUIRE_AUTH=1, which is now the default.)
+export GRAFT_MCP_ALLOW_ANONYMOUS="${GRAFT_MCP_ALLOW_ANONYMOUS:-0}"
 if [ -z "${GRAFT_DEV_TOKEN:-}" ] && [ -z "${GRAFT_TRUSTED_ISSUERS:-}" ]; then
   export GRAFT_DEV_TOKEN="$(openssl rand -hex 24)"
   log "no identity configured — generated a dev token for this run:"

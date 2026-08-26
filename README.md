@@ -91,7 +91,7 @@ approval errors). See [`docs/design-notes/agent-mcp.md`](docs/design-notes/agent
 `graft serve` binds the same stateless handlers the example app mounts (typed functions, MCP
 over Streamable HTTP, `/healthz` with a real DB round-trip) to a plain Node server — what a
 self-host container runs. Identity is env-driven (`GRAFT_DEV_TOKEN`, `GRAFT_TRUSTED_ISSUERS`
-for OIDC via discovery, `GRAFT_MCP_REQUIRE_AUTH`, `GRAFT_APPROVAL_POLICY`), and
+for OIDC via discovery, `GRAFT_MCP_ALLOW_ANONYMOUS`, `GRAFT_APPROVAL_POLICY`), and
 `graft harden <role>` applies the runtime privilege split so the deployed credential can
 request and consume approvals but never decide them. Topology decisions in
 [`docs/design-notes/packaging.md`](docs/design-notes/packaging.md). **P7.2** ships the
