@@ -49,8 +49,13 @@ export function runtimeRoleGrantsSql(role: string): string[] {
     `GRANT SELECT ON TABLE content_index, compilations, data_records, audit_log, approvals, migrations_applied, branches TO ${role}`,
     // Operational data is the runtime's to mutate (typed functions).
     `GRANT INSERT, UPDATE, DELETE ON TABLE data_records TO ${role}`,
-    // Every invocation audits itself.
+    // Every invocation audits itself. The row is reserved before the call runs
+    // (that is what makes rate limiting immune to concurrency), then settled
+    // with its outcome — so the runtime needs UPDATE as well as INSERT.
+    // Column-scoped deliberately: it may stamp how a call ENDED, never rewrite
+    // who made it, which function it was, or what it counted against.
     `GRANT INSERT ON TABLE audit_log TO ${role}`,
+    `GRANT UPDATE (status, duration_ms) ON TABLE audit_log TO ${role}`,
     // It may FILE approval requests — deciding them requires UPDATE, which is
     // deliberately absent; consuming rides the SECURITY DEFINER function.
     `GRANT INSERT ON TABLE approvals TO ${role}`,

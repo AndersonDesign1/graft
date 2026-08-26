@@ -1,4 +1,6 @@
 import { GraftError } from "@usegraft/contracts";
+import { PEER_HEADER } from "@usegraft/contracts";
+import { AUDIT_IN_FLIGHT } from "@usegraft/db";
 import type { ApprovalStore, AuditEntry, AuditStore, Database } from "@usegraft/db";
 import { describe, expect, it } from "vitest";
 import { field } from "./field";
@@ -301,15 +303,25 @@ const limited = defineFunction({
 const p34functions = { echo, whoami, guardedMutation, publicMutation, nuke, limited };
 
 interface MemoryAuditEntry extends AuditEntry {
+  id: string;
   at: number;
 }
 
 /** In-memory stand-ins for the db-backed stores — same contracts, no Postgres. */
 function memoryStores() {
   const auditRows: MemoryAuditEntry[] = [];
+  let auditSeq = 0;
   const audit: AuditStore = {
-    record: async (entry) => {
-      auditRows.push({ ...entry, at: Date.now() });
+    // Same shape as the db store: the row exists from the moment the
+    // invocation is admitted, so countSince sees it immediately.
+    reserve: async (entry) => {
+      const id = `audit-${++auditSeq}`;
+      auditRows.push({ ...entry, id, status: AUDIT_IN_FLIGHT, durationMs: 0, at: Date.now() });
+      return id;
+    },
+    settle: async (id, outcome) => {
+      const row = auditRows.find((e) => e.id === id);
+      if (row) Object.assign(row, outcome);
     },
     countSince: async (rateKey, functionName, since) =>
       auditRows.filter(
@@ -416,11 +428,77 @@ describe("audit log (P3.4)", () => {
     ]);
   });
 
-  it("keys anonymous callers by client IP", async () => {
+  it("ignores x-forwarded-for unless the deployment declares trusted proxies", async () => {
+    // This used to read `x-forwarded-for.split(",")[0]` — the LEFTMOST entry,
+    // which is whatever the original client wrote. Rotating the header minted a
+    // fresh rate bucket per request, defeating every limit in the product.
     const stores = memoryStores();
     const anonymous = p34handler(stores, { actor: () => ({ kind: "anonymous" }) });
-    await anonymous(postWith("echo", { message: "x" }, { "x-forwarded-for": "10.0.0.9, proxy" }));
-    expect(stores.auditRows[0]?.rateKey).toBe("ip:10.0.0.9");
+
+    await anonymous(
+      postWith(
+        "echo",
+        { message: "x" },
+        { "x-forwarded-for": "1.2.3.4", [PEER_HEADER]: "10.0.0.9" },
+      ),
+    );
+    await anonymous(
+      postWith(
+        "echo",
+        { message: "x" },
+        { "x-forwarded-for": "5.6.7.8", [PEER_HEADER]: "10.0.0.9" },
+      ),
+    );
+
+    // Same caller, two spoofed headers, one bucket.
+    expect(stores.auditRows.map((r) => r.rateKey)).toEqual(["ip:10.0.0.9", "ip:10.0.0.9"]);
+  });
+
+  it("reads the trusted hop from the right when proxies are declared", async () => {
+    const stores = memoryStores();
+    const behindProxy = p34handler(stores, {
+      actor: () => ({ kind: "anonymous" }),
+      trustedProxyHops: 1,
+    });
+
+    // The client prepended a lie; our own proxy appended the truth.
+    await behindProxy(
+      postWith("echo", { message: "x" }, { "x-forwarded-for": "1.2.3.4, 203.0.113.7" }),
+    );
+
+    expect(stores.auditRows[0]?.rateKey).toBe("ip:203.0.113.7");
+  });
+
+  it("admits exactly the limit when calls arrive in order", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores, {
+      actor: () => ({ kind: "anonymous" }),
+      rateLimit: { limit: 2, windowSeconds: 60 },
+    });
+
+    expect((await handler(post("echo", { message: "a" }))).status).toBe(200);
+    expect((await handler(post("echo", { message: "b" }))).status).toBe(200);
+    expect((await handler(post("echo", { message: "c" }))).status).toBe(429);
+  });
+
+  it("never admits more than the limit under a concurrent burst", async () => {
+    // The old count-then-execute-then-record window: N concurrent requests all
+    // read the same count, all saw room, and all ran — so a burst exceeded any
+    // limit in proportion to its concurrency. Reserving before the check makes
+    // over-admission impossible. A simultaneous burst may under-admit (every
+    // request sees every other request's row), which is the safe direction:
+    // callers retry, and nothing gets through that should not have.
+    const stores = memoryStores();
+    const handler = p34handler(stores, {
+      actor: () => ({ kind: "anonymous" }),
+      rateLimit: { limit: 2, windowSeconds: 60 },
+    });
+
+    const results = await Promise.all(
+      Array.from({ length: 20 }, (_, i) => handler(post("echo", { message: String(i) }))),
+    );
+
+    expect(results.filter((r) => r.status === 200).length).toBeLessThanOrEqual(2);
   });
 
   it("does not audit 404s or 405s (no function was targeted)", async () => {
@@ -434,7 +512,10 @@ describe("audit log (P3.4)", () => {
   it("a broken audit store never breaks the response", async () => {
     const stores = memoryStores();
     const broken: AuditStore = {
-      record: async () => {
+      reserve: async () => {
+        throw new Error("audit db down");
+      },
+      settle: async () => {
         throw new Error("audit db down");
       },
       countSince: stores.audit.countSince,

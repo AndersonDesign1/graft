@@ -29,7 +29,7 @@
 import { execFileSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createActorResolver, type TrustedIssuer } from "@usegraft/auth";
-import { GraftError } from "@usegraft/contracts";
+import { GraftError, PEER_HEADER } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 
 export type FetchHandler = (request: Request) => Promise<Response>;
@@ -99,9 +99,16 @@ export function createNodeListener(handler: FetchHandler) {
       const headers = new Headers();
       for (const [key, value] of Object.entries(req.headers)) {
         if (value === undefined || HOP_BY_HOP.has(key)) continue;
+        // Strip any inbound copy before setting our own: a client that could
+        // write this header would be choosing its own rate-limit identity.
+        if (key.toLowerCase() === PEER_HEADER) continue;
         if (Array.isArray(value)) for (const v of value) headers.append(key, v);
         else headers.set(key, value);
       }
+      // The real socket peer. Handlers rate-limit on this rather than on
+      // x-forwarded-for, which the client writes.
+      const peer = req.socket.remoteAddress;
+      if (peer) headers.set(PEER_HEADER, peer);
       const method = req.method ?? "GET";
       const request = new Request(`http://${req.headers.host ?? "localhost"}${req.url ?? "/"}`, {
         method,

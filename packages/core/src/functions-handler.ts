@@ -17,7 +17,7 @@
  * route, the self-host container, Vercel Fluid, or a Worker — the Phase 3
  * runtime invariant, locked here before the first mutation function exists.
  */
-import { GraftError, type ErrorCode } from "@usegraft/contracts";
+import { GraftError, PEER_HEADER, type ErrorCode } from "@usegraft/contracts";
 import {
   createDbApprovalStore,
   createDbAuditStore,
@@ -63,6 +63,24 @@ export interface FunctionsHandlerOptions {
    * served them). Defaults to VERCEL_GIT_COMMIT_SHA / GITHUB_SHA when present.
    */
   gitSha?: string;
+  /**
+   * How many proxy hops in front of this handler you actually control.
+   *
+   * Defaults to **0**: `x-forwarded-for` is ignored entirely and the rate
+   * identity comes from the peer address the adapter reports. Anything else
+   * trusts a header the client writes.
+   *
+   * `x-forwarded-for` is append-ordered — the leftmost entry is the value the
+   * ORIGINAL client supplied, which is why reading `split(",")[0]` (the
+   * previous behaviour) let an attacker mint a fresh rate bucket per request by
+   * rotating the header. With `trustedProxyHops: n`, the nth entry from the
+   * RIGHT is used: that is the address your own nearest proxy observed, and a
+   * client cannot forge past it.
+   *
+   * Set it to the number of proxies you run, not the number you have. Behind a
+   * single nginx or one CDN layer, that is 1.
+   */
+  trustedProxyHops?: number;
 }
 
 export type GraftFunctionsHandler = (request: Request) => Promise<Response>;
@@ -111,11 +129,28 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(value) ?? "null";
 }
 
-/** Best-effort client IP — the rate identity for anonymous callers. */
-function clientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]!.trim();
-  return request.headers.get("x-real-ip") ?? "local";
+/**
+ * The rate identity for anonymous callers.
+ *
+ * Never reads `x-forwarded-for` unless the deployment declares how many proxies
+ * it controls. See `trustedProxyHops`.
+ */
+function clientIp(request: Request, trustedProxyHops: number): string {
+  if (trustedProxyHops > 0) {
+    const forwarded = request.headers.get("x-forwarded-for");
+    if (forwarded) {
+      const hops = forwarded
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      // Count from the right: entries are appended, so the rightmost were added
+      // by infrastructure closest to us. A client can prepend anything it likes
+      // and never reach this far.
+      const trusted = hops[hops.length - trustedProxyHops];
+      if (trusted) return trusted;
+    }
+  }
+  return request.headers.get(PEER_HEADER) ?? "local";
 }
 
 function defaultGitSha(): string | undefined {
@@ -205,8 +240,10 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
     // From here the request targets a real function — everything below lands
     // in the audit log, whatever the outcome.
     const startedAt = Date.now();
-    const ip = clientIp(request);
+    const ip = clientIp(request, options.trustedProxyHops ?? 0);
     let actor: FunctionActor | undefined;
+    /** Id of this invocation's audit row, reserved before the handler runs. */
+    let auditId: string | undefined;
 
     const fail = (err: GraftError, extraHeaders?: Record<string, string>) => ({
       status: err.code as string,
@@ -221,6 +258,27 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
       const db = await getDb();
       const stores = await getStores();
       actor = options.actor ? await options.actor(request) : ANONYMOUS;
+
+      // Reserve before anything can refuse the call. Every attempt counts,
+      // including denied and malformed ones — that is what makes the limit an
+      // anti-brute-force control and not just a throughput cap. Best-effort:
+      // a broken audit store degrades the limiter, it does not fail the request.
+      if (stores.audit && options.audit !== false) {
+        try {
+          auditId = await stores.audit.reserve({
+            correlationId,
+            branch,
+            functionName: name,
+            functionKind: fn.kind,
+            actorKind: actor.kind,
+            actorId: actor.id ?? null,
+            rateKey: rateKey(),
+            gitSha,
+          });
+        } catch (auditErr) {
+          console.error(`graft audit reserve failed (correlationId ${correlationId}):`, auditErr);
+        }
+      }
 
       let raw: unknown;
       try {
@@ -285,11 +343,19 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
 
       // Rate limit — a count of this caller's recent audit rows for this
       // function (every attempt counts, including failed ones).
+      //
+      // This attempt's own row already exists — it was reserved as soon as the
+      // caller was known — so the count includes it and the comparison is
+      // strict. Counting first and recording last left a window spanning the
+      // entire invocation: N concurrent requests all read the same count, all
+      // saw room, and all ran.
       const rateLimit = fn.rateLimit ?? options.rateLimit;
       if (rateLimit && stores.audit) {
         const since = new Date(Date.now() - rateLimit.windowSeconds * 1000);
         const used = await stores.audit.countSince(rateKey(), name, since);
-        if (used >= rateLimit.limit) {
+        // `used` includes this attempt's own reserved row, so the comparison is
+        // strict: at the limit, the row we just inserted is the one over it.
+        if (used > rateLimit.limit) {
           return fail(
             new GraftError({
               code: "RATE_LIMITED",
@@ -392,23 +458,33 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
       }
     }
 
-    // Audit is best-effort: a broken audit store must not take the runtime
-    // down with it, but it should be loud in the logs.
+    // Settling is best-effort: a broken audit store must not take the runtime
+    // down with it, but it should be loud in the logs. The row already exists —
+    // it was reserved before the handler ran — so a failure here loses the
+    // outcome, never the fact that the call happened. A row left `in_flight` is
+    // a crashed or still-running invocation, which is worth being able to see.
     if (options.audit !== false) {
       try {
         const { audit } = await getStores();
-        await audit?.record({
-          correlationId,
-          branch,
-          functionName: name,
-          functionKind: fn.kind,
-          actorKind: actor?.kind ?? "unknown",
-          actorId: actor?.id ?? null,
-          rateKey: rateKey(),
-          status: outcome.status,
-          durationMs: Date.now() - startedAt,
-          gitSha,
-        });
+        if (audit) {
+          const durationMs = Date.now() - startedAt;
+          // No reservation means we failed before the caller was known — a
+          // resolver throw, typically. Leave the trail anyway: an unauditable
+          // attempt is exactly the one worth being able to see.
+          const id =
+            auditId ??
+            (await audit.reserve({
+              correlationId,
+              branch,
+              functionName: name,
+              functionKind: fn.kind,
+              actorKind: actor?.kind ?? "unknown",
+              actorId: actor?.id ?? null,
+              rateKey: rateKey(),
+              gitSha,
+            }));
+          await audit.settle(id, { status: outcome.status, durationMs });
+        }
       } catch (auditErr) {
         console.error(`graft audit write failed (correlationId ${correlationId}):`, auditErr);
       }

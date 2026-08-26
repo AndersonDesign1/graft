@@ -26,6 +26,19 @@ const BRANCH = "db-audit-it";
 /** A verified operator identity — what every deciding surface derives. */
 const OPERATOR = { kind: "human", id: "it-operator" } as const;
 
+/** reserve + settle in one call — what `record` used to do in a single step. */
+async function settleOne(
+  store: ReturnType<typeof createDbAuditStore>,
+  entry: Record<string, unknown>,
+): Promise<void> {
+  const { status, durationMs, ...reservation } = entry as {
+    status: string;
+    durationMs: number;
+  } & Record<string, unknown>;
+  const id = await store.reserve(reservation as never);
+  await store.settle(id, { status, durationMs });
+}
+
 describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () => {
   let handle: DbHandle;
 
@@ -55,9 +68,9 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
         durationMs: 12,
         gitSha: "it-sha",
       };
-      await store.record({ ...base, correlationId: "it-corr-1", status: "ok" });
-      await store.record({ ...base, correlationId: "it-corr-2", status: "RATE_LIMITED" });
-      await store.record({
+      await settleOne(store, { ...base, correlationId: "it-corr-1", status: "ok" });
+      await settleOne(store, { ...base, correlationId: "it-corr-2", status: "RATE_LIMITED" });
+      await settleOne(store, {
         ...base,
         correlationId: "it-corr-3",
         status: "ok",
@@ -226,6 +239,37 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
           return row?.reason;
         });
         expect(consumed).toBe("ok");
+
+        // Audit: the runtime reserves a row before a call runs and settles it
+        // after, so it needs UPDATE as well as INSERT — but only on the outcome
+        // columns. It may record how a call ended; it may not rewrite who made
+        // it or what it counted against.
+        const auditStore = createDbAuditStore(handle.db);
+        const auditId = await auditStore.reserve({
+          branch: BRANCH,
+          functionName: "itFn",
+          functionKind: "mutation",
+          actorKind: "agent",
+          actorId: "it-agent",
+          rateKey: "agent:it-agent",
+          correlationId: "it-corr-hard-audit",
+        });
+
+        // Permitted: settling the outcome. A throw here fails the test.
+        await handle.sql.begin(async (tx) => {
+          await tx.unsafe(`set local role ${role}`);
+          await tx`update audit_log set status = 'ok', duration_ms = 5 where id = ${auditId}::uuid`;
+        });
+        const [settled] =
+          await handle.sql`select status from audit_log where id = ${auditId}::uuid`;
+        expect(settled?.status).toBe("ok");
+
+        await expect(
+          handle.sql.begin(async (tx) => {
+            await tx.unsafe(`set local role ${role}`);
+            await tx`update audit_log set rate_key = 'someone-else' where id = ${auditId}::uuid`;
+          }),
+        ).rejects.toThrow(/permission denied/i);
       } finally {
         // DROP OWNED is refused on Neon (it touches objects the owner role
         // cannot drop); revoke the explicit grants instead, then drop.
