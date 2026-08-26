@@ -11,6 +11,7 @@
 import { GraftError } from "@usegraft/contracts";
 import { and, asc, dataRecords, eq, migrationsApplied, type Database } from "@usegraft/db";
 import type { AnyCollection, DocumentData } from "./collection";
+import { canonicalJson } from "./functions-handler";
 
 /**
  * What a migration step runs against: the pool, or a transaction opened on it.
@@ -125,8 +126,17 @@ export async function runDataMigration(
         failures.push({ id: row.id, reason: `transformed data fails the schema — ${issues}` });
         continue;
       }
-      if (JSON.stringify(next) === JSON.stringify(row.data)) unchanged++;
-      else updates.push({ id: row.id, data: next });
+      // Persist what the SCHEMA produced, not the raw transform output: Zod
+      // defaults, coercions and transforms are part of the new shape, and
+      // storing `next` meant migrated rows never actually reached it.
+      //
+      // Compare canonically too. JSON.stringify is key-order sensitive, and
+      // Postgres jsonb normalises key order on write — so a transform that
+      // rebuilt an object in authoring order compared unequal to the identical
+      // round-tripped row and was rewritten for nothing.
+      const validatedData = validated.data as Record<string, unknown>;
+      if (canonicalJson(validatedData) === canonicalJson(row.data)) unchanged++;
+      else updates.push({ id: row.id, data: validatedData });
     }
 
     if (failures.length > 0) {

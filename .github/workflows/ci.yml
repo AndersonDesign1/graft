@@ -15,13 +15,13 @@ jobs:
       # fallback inside the example itself.
       BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
 
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           # 22.16 is the floor: node:sqlite bundles FTS5 (the static index's
           # search) from 22.16.0, which is also >= pnpm 11's 22.13 requirement.
@@ -77,13 +77,13 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/graft_test
       BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
 
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22.16
           cache: pnpm

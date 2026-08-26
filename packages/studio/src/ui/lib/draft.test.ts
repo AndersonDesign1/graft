@@ -4,7 +4,7 @@
  * operator's edit silently dropped.
  */
 import { describe, expect, it } from "vitest";
-import { type DocumentDraft, hasUnsavedChanges } from "./draft";
+import { type DocumentDraft, hasUnsavedChanges, buildSavePayload } from "./draft";
 
 const loaded = {
   data: { title: "Quickstart", order: 2, draft: false },
@@ -78,5 +78,57 @@ describe("hasUnsavedChanges", () => {
     // difference, so this returns true — which is why the write path also
     // needs `watchEditIntent` to never hand us the normalised text unasked.
     expect(hasUnsavedChanges(draft({ body: loaded.body.replace(/\n\n/g, "\n") }))).toBe(true);
+  });
+});
+
+describe("buildSavePayload", () => {
+  const loaded = { data: { title: "A" }, body: "A body", raw: "---\ntitle: A\n---\nA body" };
+
+  it("returns null when nothing changed", () => {
+    expect(
+      buildSavePayload(
+        { collection: "docs", slug: "a" },
+        { mode: "rich", data: { title: "A" }, body: "A body", raw: loaded.raw, loaded },
+      ),
+    ).toBeNull();
+  });
+
+  it("writes the edited bytes to the document they were loaded from", () => {
+    // The cross-document overwrite: the editor took collection/slug from the
+    // current route while taking the bytes from a ref, so a flush during an
+    // A -> B navigation wrote A's content to B's path and destroyed it.
+    // Identity is now an argument, from the same snapshot as the content.
+    const payload = buildSavePayload(
+      { collection: "docs", slug: "a" },
+      { mode: "rich", data: { title: "A edited" }, body: "A body", raw: loaded.raw, loaded },
+      "main",
+    );
+
+    expect(payload).toEqual({
+      collection: "docs",
+      slug: "a",
+      branch: "main",
+      data: { title: "A edited" },
+      body: "A body",
+    });
+  });
+
+  it("sends raw source in raw mode and nothing else", () => {
+    const payload = buildSavePayload(
+      { collection: "docs", slug: "a" },
+      { mode: "raw", data: { title: "A" }, body: "A body", raw: "changed", loaded },
+    );
+    expect(payload).toMatchObject({ collection: "docs", slug: "a", raw: "changed" });
+    expect(payload).not.toHaveProperty("body");
+    expect(payload).not.toHaveProperty("data");
+  });
+
+  it("refuses to write a document that was never loaded", () => {
+    expect(
+      buildSavePayload(
+        { collection: "docs", slug: "a" },
+        { mode: "rich", data: { title: "X" }, body: "b", raw: "r", loaded: null },
+      ),
+    ).toBeNull();
   });
 });

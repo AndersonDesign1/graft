@@ -49,7 +49,16 @@ function contentType(path: string): string {
  */
 function resolveUiFile(rel: string): string | null {
   const root = resolve(uiRoot());
-  const cleaned = decodeURIComponent(rel).replace(/^\/+/, "");
+  // A malformed escape used to throw URIError straight out of the handler, and
+  // the adapter reported it as a 500 "the adapter should never throw". It is a
+  // bad request for a file that cannot exist: 404.
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(rel);
+  } catch {
+    return null;
+  }
+  const cleaned = decoded.replace(/^\/+/, "");
   if (!cleaned || cleaned.includes("\0")) return null;
   const candidate = resolve(root, normalize(cleaned));
   if (candidate !== root && !candidate.startsWith(root + sep)) return null;

@@ -28,8 +28,23 @@ export interface Route {
 }
 
 /** `#/collections/docs/getting-started` */
+/**
+ * `decodeURIComponent` throws URIError on malformed escapes ("%", "%ZZ", "%FF",
+ * lone surrogates). parseHash runs inside useRoute's useState initialiser, so
+ * that throw happened during the first render and white-screened the whole
+ * Studio — from a link anyone could send. A segment we cannot decode is far
+ * better shown as-is than not shown at all.
+ */
+function safeDecode(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
 export function parseHash(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
+  const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(safeDecode);
   const view = parts[0] as ViewId | undefined;
   if (!view || !VIEWS.includes(view)) return { view: "overview" };
   return {

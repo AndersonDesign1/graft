@@ -91,6 +91,27 @@ export interface StudioPrincipal {
 }
 
 /**
+ * Decode a path segment, or refuse the request.
+ *
+ * A malformed escape used to throw URIError past the GraftError catch (URIError
+ * is not a GraftError, so it was rethrown) and surfaced as a generic 500. A
+ * route id that cannot be decoded is a bad request, and saying so is more
+ * useful than "the adapter should never throw".
+ */
+function decodeRouteId(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `"${raw}" is not a valid id — it contains malformed percent-encoding.`,
+      fix: "Use an id exactly as the API reported it; percent-escapes must be well formed.",
+      details: { id: raw },
+    });
+  }
+}
+
+/**
  * Refuse a state-changing request that a foreign page drove.
  *
  * On a loopback mount there is no authentication by design, so anything that
@@ -641,7 +662,7 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
 
       const decideMatch = /^\/api\/studio\/v1\/approvals\/([^/]+)\/decide$/.exec(pathname);
       if (decideMatch && method === "POST") {
-        const id = decodeURIComponent(decideMatch[1] ?? "");
+        const id = decodeRouteId(decideMatch[1] ?? "");
         // Note there is no `decidedBy` here: the decision is attributed to the
         // identity this Studio was mounted for, so a caller cannot name a
         // decider other than itself and defeat the requester-cannot-decide check.
@@ -680,7 +701,7 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
       // replaying an undo stack. GET previews whether it is safe; POST does it.
       const revertMatch = /^\/api\/studio\/v1\/compilations\/([^/]+)\/revert$/.exec(pathname);
       if (revertMatch && (method === "GET" || method === "POST")) {
-        const id = decodeURIComponent(revertMatch[1] ?? "");
+        const id = decodeRouteId(revertMatch[1] ?? "");
         const rows = await listCompilations(options.db, { limit: 500 });
         const row = rows.find((candidate) => candidate.id === id);
         if (!row) {

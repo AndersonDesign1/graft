@@ -22,14 +22,23 @@ on:
 
 concurrency: release-${{ github.ref }}
 
+# Least privilege at the workflow level; the publish job widens it to what it
+# actually needs. `id-token: write` mints the npm trusted-publishing credential,
+# so it stays out of the default set: a compromised step elsewhere in this
+# workflow should not be able to reach for it.
 permissions:
-  contents: write
-  pull-requests: write
-  id-token: write # OIDC — the credential trusted publishing validates
+  contents: read
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Scoped here rather than workflow-wide. changesets/action both opens the
+    # version PR (contents + pull-requests) and publishes (id-token), so this
+    # one job genuinely needs all three — but nothing else in the file does.
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write # OIDC — the credential trusted publishing validates
     env:
       # Trusted publishing proves WHO published; provenance proves WHAT was
       # built and from where. Signs each tarball with an attestation tying it
@@ -49,7 +58,7 @@ jobs:
       # The warning is correct behaviour at runtime; it is only noise at build.
       BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # pnpm — not npm — performs the OIDC exchange. changesets picks its
       # publish tool from the lockfile and spawns `pnpm publish`; pnpm 11
@@ -60,7 +69,7 @@ jobs:
       #
       # v6 is the release that added pnpm 11 support — the major we pin.
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
 
       # setup-node v7 removed the dummy NODE_AUTH_TOKEN export, which is what
       # made registry-url hazardous here: earlier majors wrote an .npmrc holding
@@ -70,7 +79,7 @@ jobs:
       # shape. v7 no longer writes it, and v7 is the first major documenting
       # trusted publishing (OIDC) as a supported path.
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           # Release tooling runs on the LTS, not the advertised floor.
           # CI (ci.yml) keeps testing the 22.16 floor.
@@ -84,7 +93,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Create release PR or publish
-        uses: changesets/action@v1
+        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
         with:
           version: pnpm version-packages
           publish: pnpm release

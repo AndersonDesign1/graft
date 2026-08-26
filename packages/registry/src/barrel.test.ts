@@ -30,3 +30,28 @@ describe("barrelSource", () => {
     expect(barrelSource([])).toContain("mergePrimitives([]);");
   });
 });
+
+describe("identifier collisions", () => {
+  it("refuses filenames that collapse onto one identifier", () => {
+    // `my-mod.ts` and `myMod.ts` both become `myMod`, and the barrel emitted
+    // two imports binding the same name — a syntax error in a file marked
+    // "do not edit", so the operator had no sanctioned way out.
+    expect(() => barrelSource(["my-mod", "myMod"])).toThrowError(/collide/i);
+    expect(() => barrelSource(["a_b", "aB"])).toThrowError(/collide/i);
+  });
+
+  it("names both offenders so the operator knows what to rename", () => {
+    let message = "";
+    try {
+      barrelSource(["my-mod", "myMod"]);
+    } catch (err) {
+      message = (err as { message: string }).message;
+    }
+    expect(message).toContain("my-mod.ts");
+    expect(message).toContain("myMod.ts");
+  });
+
+  it("leaves distinct identifiers alone", () => {
+    expect(() => barrelSource(["comments", "commerce"])).not.toThrow();
+  });
+});

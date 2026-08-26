@@ -16,7 +16,7 @@ import { EmptyState, Pill, StatePill, Status } from "../components/primitives";
 import { Tabs, TabsIndicator, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { api, qs } from "../lib/api";
 import { useAutosave } from "../lib/autosave";
-import { hasUnsavedChanges } from "../lib/draft";
+import { buildSavePayload } from "../lib/draft";
 import { compareRoundTrip, describeFidelity, type FidelityResult } from "../lib/fidelity";
 import type { Route } from "../lib/route";
 import { buildForm, composeData } from "../lib/schema-form";
@@ -104,9 +104,18 @@ export function CollectionsView({
   latest.current = { fields, body, raw, mode: effectiveMode, doc, schemaFields };
 
   const persist = useCallback(async () => {
-    const { collection, slug } = route;
     const snapshot = latest.current;
-    if (!collection || !slug || !snapshot.doc || readOnly) return;
+    if (!snapshot.doc || readOnly) return;
+
+    // Identity comes from the same snapshot as the bytes, NOT from the route.
+    //
+    // On an A -> B navigation React re-renders with route=B before the swap
+    // effect flushes, so `persist` closed over B while `latest.current` still
+    // held A's fields, body and loaded document — and the pending edit was
+    // written to B's file, destroying it. `snapshot.doc` is the document these
+    // buffers were loaded from, so taking both from one place makes the save
+    // self-consistent by construction.
+    const { collection, slug } = snapshot.doc;
 
     // Compose once: the same object is both what the guard compares and what
     // gets written, so they can never disagree about what a save would do.
@@ -116,20 +125,15 @@ export function CollectionsView({
       buildForm(snapshot.schemaFields, snapshot.doc.data),
     );
 
-    // Second guard against writing a file nobody edited — see draft.ts.
-    const changed = hasUnsavedChanges({
-      mode: snapshot.mode,
-      data,
-      body: snapshot.body,
-      raw: snapshot.raw,
-      loaded: snapshot.doc,
-    });
-    if (!changed) return;
+    // Second guard against writing a file nobody edited — see draft.ts. Null
+    // means nothing changed, so nothing is written.
+    const payload = buildSavePayload(
+      { collection, slug },
+      { mode: snapshot.mode, data, body: snapshot.body, raw: snapshot.raw, loaded: snapshot.doc },
+      branch,
+    );
+    if (!payload) return;
 
-    const payload =
-      snapshot.mode === "raw"
-        ? { collection, slug, raw: snapshot.raw, branch }
-        : { collection, slug, data, body: snapshot.body, branch };
     await api<{ written: string; gitSha: string | null }>("/document", {
       method: "PUT",
       body: JSON.stringify(payload),
@@ -145,7 +149,9 @@ export function CollectionsView({
       duration: 1600,
     });
     onSaved();
-  }, [route.collection, route.slug, branch, readOnly, onSaved]);
+    // `route` is deliberately absent: this callback must not change identity
+    // when the route does, or the bug above comes back.
+  }, [branch, readOnly, onSaved]);
 
   const autosave = useAutosave({ save: persist, enabled: !readOnly });
 
@@ -157,7 +163,16 @@ export function CollectionsView({
     }
   }, [autosave.state, autosave.error]);
 
+  /**
+   * Sequence number for document loads. Two quick navigations start two
+   * unsequenced fetches, and if they resolve out of order the editor shows one
+   * document's bytes under another's route — after which the next save writes
+   * them across.
+   */
+  const openSeq = useRef(0);
+
   const openDoc = useCallback(async (collection: string, slug: string) => {
+    const seq = ++openSeq.current;
     setDocError(null);
     setDocLoading(true);
     // Fidelity is a property of the document, not of the session — a new file
@@ -165,6 +180,7 @@ export function CollectionsView({
     setFidelity(null);
     try {
       const next = await api<DocumentDto>(`/document${qs({ collection, slug })}`);
+      if (seq !== openSeq.current) return; // a newer load won
       setDoc(next);
       setRaw(next.raw);
       setBody(next.body);
@@ -173,13 +189,14 @@ export function CollectionsView({
       // key to it. `composeData` enforces the same rule on the way out.
       setFields({ ...next.data });
     } catch (err) {
+      if (seq !== openSeq.current) return;
       setDoc(null);
       setRaw("");
       setBody("");
       setFields({});
       setDocError(err instanceof Error ? err.message : String(err));
     } finally {
-      setDocLoading(false);
+      if (seq === openSeq.current) setDocLoading(false);
     }
   }, []);
 

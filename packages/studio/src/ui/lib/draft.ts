@@ -48,3 +48,40 @@ export function hasUnsavedChanges(draft: DocumentDraft): boolean {
   if (draft.body !== loaded.body) return true;
   return !sameValue(draft.data, loaded.data);
 }
+
+/** Identity of the document a draft was loaded from. */
+export interface DocumentIdentity {
+  collection: string;
+  slug: string;
+}
+
+/** The PUT body a save sends, or null when there is nothing to write. */
+export interface SavePayload extends DocumentIdentity {
+  branch?: string;
+  data?: Record<string, unknown>;
+  body?: string;
+  raw?: string;
+}
+
+/**
+ * Build the save payload from one snapshot, so identity and content cannot
+ * disagree.
+ *
+ * This is extracted for a reason. The editor previously took `collection` and
+ * `slug` from the current route closure while taking the bytes from a ref, and
+ * on an A -> B navigation React re-renders with route=B before the pending
+ * flush runs — so document A's content was written to document B's path,
+ * destroying it. Composing the payload from a single `identity` argument makes
+ * that class of mismatch unrepresentable, and testable without a DOM.
+ */
+export function buildSavePayload(
+  identity: DocumentIdentity,
+  draft: DocumentDraft,
+  branch?: string,
+): SavePayload | null {
+  if (!hasUnsavedChanges(draft)) return null;
+  const base = { collection: identity.collection, slug: identity.slug, branch };
+  return draft.mode === "raw"
+    ? { ...base, raw: draft.raw }
+    : { ...base, data: draft.data, body: draft.body };
+}

@@ -211,6 +211,32 @@ describe("betterAuthIssuer", () => {
   });
 });
 
+describe("subject claim", () => {
+  it("refuses a signature-valid token that carries no sub", async () => {
+    // jose treats `sub` as optional, so such a token used to authenticate as an
+    // actor with id: undefined — which collapsed into an IP-keyed rate bucket,
+    // wrote null actor ids to the audit log, and filed approvals nobody could
+    // be held to.
+    const noSubject = await new SignJWT({})
+      .setProtectedHeader({ alg: "RS256", kid: "test" })
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setIssuedAt()
+      .setExpirationTime("5m")
+      .sign(privateKey);
+
+    const verify = createOidcVerifier([issuerWithInlineJwks()]);
+    await expect(verify(noSubject)).rejects.toMatchObject({ code: "TOKEN_INVALID" });
+  });
+
+  it("still accepts a token that has one", async () => {
+    const verify = createOidcVerifier([issuerWithInlineJwks()]);
+    await expect(verify(await mint({ subject: "agent-7" }))).resolves.toMatchObject({
+      id: "agent-7",
+    });
+  });
+});
+
 describe("createOidcVerifier", () => {
   it("verifies directly given a token (unit seam for the MCP handler)", async () => {
     const verify = createOidcVerifier([issuerWithInlineJwks()]);

@@ -27,7 +27,14 @@ export default defineContentMigration({
     return {
       data: {
         ...data,
-        description: existing ?? tagline ?? firstSentence ?? title,
+        // `??` only falls through on null/undefined, so an empty string short-
+        // circuited the chain and the documented "else the title" fallback was
+        // never reached — body-less pages were backfilled with description: "".
+        // Pick the first value that is actually present.
+        description:
+          [existing, tagline, firstSentence, title].find(
+            (candidate) => typeof candidate === "string" && candidate.trim() !== "",
+          ) ?? "",
       } as DocumentData<typeof pages>,
     };
   },

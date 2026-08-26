@@ -310,11 +310,30 @@ export async function projectStaticContent(
     db.close();
   }
 
-  // Replace the previous artifact. rename-over-existing fails on Windows, so
-  // remove first — the window is fine for a build artifact (readers open a
-  // fully-written file or the old one; a torn read is not possible).
-  rmSync(options.path, { force: true });
-  renameSync(tmpPath, options.path);
+  // Replace the previous artifact atomically where the platform allows it.
+  //
+  // This used to rmSync first and then rename, which left a window where the
+  // artifact did not exist at all — a concurrent reader got
+  // STATIC_INDEX_NOT_FOUND rather than "stale or new", and a crash between the
+  // two destroyed the index until the next successful compile. The comment
+  // claiming readers "open a fully-written file or the old one" described the
+  // intent, not the code.
+  //
+  // rename(2) replaces the destination atomically on POSIX. Windows rejects
+  // rename-over-existing, so fall back there — and only there.
+  try {
+    renameSync(tmpPath, options.path);
+  } catch (error) {
+    if (
+      (error as NodeJS.ErrnoException).code !== "EEXIST" &&
+      (error as NodeJS.ErrnoException).code !== "EPERM" &&
+      (error as NodeJS.ErrnoException).code !== "EACCES"
+    ) {
+      throw error;
+    }
+    rmSync(options.path, { force: true });
+    renameSync(tmpPath, options.path);
+  }
 
   return changes;
 }

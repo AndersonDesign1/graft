@@ -59,6 +59,8 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
       : undefined;
   const writeBranch = branch !== undefined ? scopeWriteBranch(branch.scope) : "main";
   let timer: NodeJS.Timeout | undefined;
+  /** Set once the watchers exist; recompiles are scheduled before that. */
+  let rewatchContent: ((dir: string) => void) | undefined;
   let compiling = false;
   let dirty = false;
   let configDirty = false;
@@ -72,8 +74,14 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
     try {
       if (configDirty) {
         configDirty = false;
+        const previousContentDir = config.contentDir;
         config = await loadConfig(configPath);
         console.log(`reloaded ${basename(configPath)}`);
+        // Watchers were created once at startup against the ORIGINAL
+        // contentDir, so a config edit that relocated it left compile reading
+        // one directory while the watcher polled another: every later save was
+        // invisible and `graft dev` silently stopped recompiling.
+        if (config.contentDir !== previousContentDir) rewatchContent?.(config.contentDir);
       }
       const result =
         branch !== undefined
@@ -110,12 +118,18 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
 
   await runCompile();
 
+  let contentWatcher = watch(config.contentDir, { recursive: true }, () => schedule());
   const watchers: FSWatcher[] = [
-    watch(config.contentDir, { recursive: true }, () => schedule()),
     watch(config.projectDir, (_event, filename) => {
       if (filename && (CONFIG_FILENAMES as readonly string[]).includes(filename)) schedule(true);
     }),
   ];
+
+  rewatchContent = (dir: string): void => {
+    contentWatcher.close();
+    contentWatcher = watch(dir, { recursive: true }, () => schedule());
+    console.log(`now watching ${relative(options.cwd, dir) || "."}`);
+  };
 
   const watchedContent = relative(options.cwd, config.contentDir) || ".";
   const branchLabel =
@@ -131,6 +145,7 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
   await new Promise<void>((resolveStopped) => {
     const stop = (): void => {
       clearTimeout(timer);
+      contentWatcher.close();
       for (const watcher of watchers) watcher.close();
       resolveStopped();
     };

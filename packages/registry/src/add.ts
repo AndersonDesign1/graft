@@ -177,9 +177,27 @@ export function applyPlan(plan: AddPlan, options: { overwrite?: boolean } = {}):
   const written: string[] = [];
   const skipped: string[] = [];
   for (const file of plan.files) {
-    if (file.identical) {
+    // Re-check disk immediately before writing, rather than trusting the plan.
+    //
+    // `plan.conflicts` and `file.identical` were computed when the plan was
+    // built. planAdd and applyPlan are exported separately so a caller can
+    // preview and then apply, which makes that gap unbounded — and Graft treats
+    // agents as first-class concurrent actors on the same project. A file that
+    // appeared or changed in between was overwritten without the guard firing,
+    // even though the user never passed --overwrite.
+    const current = existsSync(file.targetPath) ? readFileSync(file.targetPath, "utf8") : undefined;
+
+    if (current === file.content) {
       skipped.push(file.relPath);
       continue;
+    }
+    if (current !== undefined && !options.overwrite) {
+      throw new GraftError({
+        code: "REGISTRY_FILE_EXISTS",
+        message: `"${file.relPath}" changed on disk after the plan was made, and adding would overwrite it.`,
+        fix: "Re-run `graft add` to plan against the current tree, or pass --overwrite if replacing that file is the intent.",
+        details: { path: file.relPath },
+      });
     }
     mkdirSync(dirname(file.targetPath), { recursive: true });
     writeFileSync(file.targetPath, file.content, "utf8");

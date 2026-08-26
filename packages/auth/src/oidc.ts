@@ -97,10 +97,19 @@ class IssuerVerifier {
       ({ payload } = await jwtVerify(token, getKey, {
         issuer: this.config.issuer,
         audience: this.config.audience,
+        // jose treats `sub` as optional, so a signature-valid token without one
+        // used to authenticate as an actor with `id: undefined` — which then
+        // collapsed into an IP-keyed rate bucket, wrote null actor ids to the
+        // audit log, and filed approvals nobody could be held to.
+        requiredClaims: ["sub"],
       }));
     } catch (err) {
       const code = (err as { code?: string }).code ?? "verification failed";
       throw tokenInvalid(`${code} (issuer "${this.config.issuer}")`);
+    }
+    // requiredClaims guarantees `sub` is present; this narrows it for the type.
+    if (payload.sub === undefined) {
+      throw tokenInvalid(`token carries no "sub" claim (issuer "${this.config.issuer}")`);
     }
     return {
       kind: this.config.actorKind ?? "agent",

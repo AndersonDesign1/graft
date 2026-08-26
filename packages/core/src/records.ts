@@ -238,54 +238,77 @@ export async function updateRecord<TCollection extends AnyCollection>(
 ): Promise<DataRecord<DocumentData<TCollection>>> {
   assertDbAuthoritative(collection, "updateRecord");
 
-  const [existing] = await ctx.db
-    .select()
-    .from(dataRecords)
-    .where(
-      and(
-        eq(dataRecords.id, id),
-        eq(dataRecords.branchId, ctx.branch),
-        eq(dataRecords.collection, collection.name),
-      ),
-    )
-    .limit(1);
-  if (!existing) {
-    throw new GraftError({
-      code: "DOCUMENT_NOT_FOUND",
-      message: `No record "${id}" exists in "${collection.name}" on branch "${ctx.branch}".`,
-      fix: "List the collection's records to find a valid id — it may already have been deleted.",
-      details: { collection: collection.name, id, branch: ctx.branch },
-    });
-  }
+  // Read, merge and write in ONE transaction, with the row locked.
+  //
+  // This is patch semantics over a document, so the merge happens in
+  // JavaScript against a baseline read moments earlier. Without a lock two
+  // concurrent callers both read the same baseline, both merge their own patch
+  // over it, and the second write silently erases the first — with no error to
+  // either side. That is exactly the primitive this function advertises
+  // (approve a comment, advance an order), where concurrent transitions are
+  // expected rather than exotic.
+  return ctx.db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(dataRecords)
+      .where(
+        and(
+          eq(dataRecords.id, id),
+          eq(dataRecords.branchId, ctx.branch),
+          eq(dataRecords.collection, collection.name),
+        ),
+      )
+      .limit(1)
+      .for("update");
+    if (!existing) {
+      throw new GraftError({
+        code: "DOCUMENT_NOT_FOUND",
+        message: `No record "${id}" exists in "${collection.name}" on branch "${ctx.branch}".`,
+        fix: "List the collection's records to find a valid id — it may already have been deleted.",
+        details: { collection: collection.name, id, branch: ctx.branch },
+      });
+    }
 
-  const merged = { ...(existing.data as Record<string, unknown>), ...patch };
-  const parsed = collection.schema.safeParse(merged);
-  if (!parsed.success) {
-    const issues = parsed.error.issues.map((i) => ({
-      path: i.path.join("."),
-      message: i.message,
-    }));
-    throw new GraftError({
-      code: "SCHEMA_VALIDATION_FAILED",
-      message: `Updated record ${id} in "${collection.name}" does not satisfy the collection schema.`,
-      fix: "Fix the fields listed in details.issues — describe_schema shows exactly what this collection stores.",
-      details: { collection: collection.name, id, issues },
-    });
-  }
+    const merged = { ...(existing.data as Record<string, unknown>), ...patch };
+    const parsed = collection.schema.safeParse(merged);
+    if (!parsed.success) {
+      const issues = parsed.error.issues.map((i) => ({
+        path: i.path.join("."),
+        message: i.message,
+      }));
+      throw new GraftError({
+        code: "SCHEMA_VALIDATION_FAILED",
+        message: `Updated record ${id} in "${collection.name}" does not satisfy the collection schema.`,
+        fix: "Fix the fields listed in details.issues — describe_schema shows exactly what this collection stores.",
+        details: { collection: collection.name, id, issues },
+      });
+    }
 
-  const [row] = await ctx.db
-    .update(dataRecords)
-    .set({ data: parsed.data as Record<string, unknown> })
-    .where(
-      and(
-        eq(dataRecords.id, id),
-        eq(dataRecords.branchId, ctx.branch),
-        eq(dataRecords.collection, collection.name),
-      ),
-    )
-    .returning();
-  if (!row) throw new Error("update returned no row"); // unreachable; satisfies noUncheckedIndexedAccess
-  return toRecord<DocumentData<TCollection>>(row, parsed.data as DocumentData<TCollection>);
+    const [row] = await tx
+      .update(dataRecords)
+      .set({ data: parsed.data as Record<string, unknown> })
+      .where(
+        and(
+          eq(dataRecords.id, id),
+          eq(dataRecords.branchId, ctx.branch),
+          eq(dataRecords.collection, collection.name),
+        ),
+      )
+      .returning();
+    // Reachable, despite the comment this replaces calling it unreachable: the
+    // row can be deleted between the select and the update. Inside a locking
+    // transaction it should not happen, but a raw Error surfacing as a 500 was
+    // the wrong answer either way.
+    if (!row) {
+      throw new GraftError({
+        code: "DOCUMENT_NOT_FOUND",
+        message: `Record "${id}" in "${collection.name}" disappeared while it was being updated.`,
+        fix: "It was deleted concurrently. List the collection to confirm, then retry against a record that still exists.",
+        details: { collection: collection.name, id, branch: ctx.branch },
+      });
+    }
+    return toRecord<DocumentData<TCollection>>(row, parsed.data as DocumentData<TCollection>);
+  });
 }
 
 function toRecord<TData>(row: typeof dataRecords.$inferSelect, data: TData): DataRecord<TData> {

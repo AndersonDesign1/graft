@@ -74,11 +74,22 @@ function stubDb(
           orderBy: () => ({
             limit: async () => selectRows,
           }),
-          limit: async () => selectRows,
+          // `.for("update")` is how updateRecord locks the row it is about to
+          // merge into; the stub records nothing but must offer the shape.
+          limit: () =>
+            Object.assign(Promise.resolve(selectRows), {
+              for: async () => selectRows,
+            }),
         }),
       }),
     }),
   } as unknown as Database;
+  // updateRecord runs inside a transaction so its read-merge-write is atomic.
+  // The stub passes itself through, which is what a real transaction handle
+  // does from the caller's point of view.
+  (db as unknown as { transaction: unknown }).transaction = async (
+    fn: (tx: Database) => Promise<unknown>,
+  ) => fn(db);
   return { db, calls };
 }
 
