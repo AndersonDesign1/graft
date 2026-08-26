@@ -152,19 +152,13 @@ function assertSameOrigin(request: Request, url: URL): void {
 }
 
 /**
- * The scope a route demands, decided in one place so a new route cannot be
- * added without one. Phase 3 turns this into a column of the route table.
+ * What a route permits.
  *
  * Reads and writes are separated because an agent that may read the content
  * tree has no business committing it, and deciding approvals is separated from
- * both: it is the human gate, and no agent runtime token should ever carry it.
+ * both: it is the human gate, and no agent runtime token should carry it.
  */
-function requiredScope(method: string, pathname: string): string {
-  if (/^\/api\/studio\/v1\/approvals\/[^/]+\/decide$/.test(pathname)) {
-    return "approvals:decide";
-  }
-  return method === "GET" ? "studio:read" : "studio:write";
-}
+export type StudioScope = "studio:read" | "studio:write" | "approvals:decide";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -477,6 +471,426 @@ function operator(options: StudioApiOptions, principal?: StudioPrincipal): Appro
   return options.decider ?? { kind: "human", id: "studio" };
 }
 
+/** Everything a route handler is given. */
+interface RouteContext {
+  request: Request;
+  url: URL;
+  options: StudioApiOptions;
+  defaultBranch: string;
+  principal: StudioPrincipal | undefined;
+  /** The captured segment, for parameterised routes; "" otherwise. */
+  id: string;
+}
+
+/**
+ * One mounted route.
+ *
+ * `scope` is a required field rather than something derived from the method, so
+ * a route cannot be added without deciding what it permits — and the whole
+ * authorization surface reads as a table instead of being spread through a
+ * sixteen-branch if/else chain. That absence is what let
+ * `actor.kind !== "anonymous"` stand in for authorization for as long as it did.
+ */
+interface Route {
+  method: "GET" | "POST" | "PUT";
+  /** Exact pathname, or a pattern with exactly one capture group. */
+  path: string | RegExp;
+  scope: StudioScope;
+  handle: (ctx: RouteContext) => Promise<Response> | Response;
+}
+
+const V1 = "/api/studio/v1";
+const APPROVAL_DECIDE_PATH = /^\/api\/studio\/v1\/approvals\/([^/]+)\/decide$/;
+const COMPILATION_REVERT_PATH = /^\/api\/studio\/v1\/compilations\/([^/]+)\/revert$/;
+
+/** The compilation a revert route names, or a miss the operator can act on. */
+async function requireCompilation(
+  options: StudioApiOptions,
+  id: string,
+): Promise<Awaited<ReturnType<typeof listCompilations>>[number]> {
+  const rows = await listCompilations(options.db, { limit: 500 });
+  const row = rows.find((candidate) => candidate.id === id);
+  if (!row) {
+    throw new GraftError({
+      code: "DOCUMENT_NOT_FOUND",
+      message: `No compilation "${id}".`,
+      fix: "Refresh History; the trail may have been pruned.",
+      details: { id },
+    });
+  }
+  return row;
+}
+
+const ROUTES: readonly Route[] = [
+  {
+    method: "GET",
+    path: `${V1}/openapi.json`,
+    scope: "studio:read",
+    handle: () => json(STUDIO_OPENAPI),
+  },
+  {
+    method: "GET",
+    path: `${V1}/tree`,
+    scope: "studio:read",
+    handle: async ({ options, url, defaultBranch }) => {
+      const branch = url.searchParams.get("branch")?.trim() || defaultBranch;
+      return json(await buildTree(options.db, options.collections, options.contentDir, branch));
+    },
+  },
+  {
+    method: "GET",
+    path: `${V1}/collections`,
+    scope: "studio:read",
+    handle: ({ options }) => json(buildSchema(options.collections)),
+  },
+  {
+    // How the project's components present in the canvas. Owned files, so read
+    // per request: editing one should show up on reload, not on restart.
+    method: "GET",
+    path: `${V1}/editor-components`,
+    scope: "studio:read",
+    handle: ({ options }) =>
+      json(readEditorComponents(options.projectRoot ?? dirname(options.contentDir))),
+  },
+  {
+    // Resolve an asset key to something an <img> can load, so the frontmatter
+    // form shows what the document points at instead of a path.
+    //
+    // Never an error when no store is configured: a static-tier project has no
+    // S3 credentials by design, and an asset field there is a key the author
+    // maintains by hand. `url: null` lets the form show the key and move on — a
+    // 500 would make an unconfigured project look broken.
+    method: "GET",
+    path: `${V1}/asset-url`,
+    scope: "studio:read",
+    handle: async ({ url }) => {
+      const key = url.searchParams.get("key")?.trim() ?? "";
+      if (!key) return json({ key, url: null, reason: "no key" });
+      return json(await resolveAssetUrl(key));
+    },
+  },
+  {
+    // Operator-triggered compile. The Studio surfaces drift, so it has to be
+    // able to resolve it too — sending someone to a terminal to fix a thing the
+    // dashboard just told them about is a dead end.
+    method: "POST",
+    path: `${V1}/compile`,
+    scope: "studio:write",
+    handle: async ({ request, url, options, defaultBranch }) => {
+      const payload = (await request.json().catch(() => ({}))) as { branch?: string };
+      const branch =
+        payload.branch?.trim() || url.searchParams.get("branch")?.trim() || defaultBranch;
+      const result = await compile({
+        contentDir: options.contentDir,
+        collections: options.collections,
+        db: options.db,
+        branchId: branch,
+      });
+      const body: CompileResultDto = {
+        branch,
+        gitSha: result.gitSha ?? null,
+        added: result.changes.added.length,
+        changed: result.changes.changed.length,
+        removed: result.changes.removed.length,
+        docCount: result.count,
+      };
+      return json(body);
+    },
+  },
+  {
+    // The Changes drawer: git surfaced in the editor's language.
+    //
+    // Reading never fails for the absence of git — a project without a
+    // repository is unusual but legitimate, and `tracked: false` lets the
+    // drawer explain instead of the pane erroring. Committing does fail,
+    // loudly, because there the operator asked for something specific.
+    method: "GET",
+    path: `${V1}/changes`,
+    scope: "studio:read",
+    handle: async ({ options }) => json(await readChanges(options.contentDir)),
+  },
+  {
+    method: "GET",
+    path: `${V1}/changes/diff`,
+    scope: "studio:read",
+    handle: async ({ url, options }) => {
+      const path = url.searchParams.get("path")?.trim() ?? "";
+      if (!path) {
+        throw new GraftError({
+          code: "INPUT_VALIDATION_FAILED",
+          message: "path query param is required.",
+          fix: "GET /api/studio/v1/changes/diff?path=docs/getting-started.mdx",
+        });
+      }
+      return json(await readFileDiff(options.contentDir, path));
+    },
+  },
+  {
+    method: "POST",
+    path: `${V1}/changes/commit`,
+    scope: "studio:write",
+    handle: async ({ request, options }) => {
+      const payload = (await request.json().catch(() => ({}))) as {
+        paths?: unknown;
+        message?: unknown;
+      };
+      const paths = Array.isArray(payload.paths)
+        ? payload.paths.filter((path): path is string => typeof path === "string")
+        : [];
+      const result: CommitResultDto = await commitChanges(options.contentDir, {
+        paths,
+        message: typeof payload.message === "string" ? payload.message : "",
+      });
+      return json(result);
+    },
+  },
+  {
+    method: "GET",
+    path: `${V1}/compilations`,
+    scope: "studio:read",
+    handle: async ({ url, options }) => {
+      const branch = url.searchParams.get("branch")?.trim() || undefined;
+      const limitRaw = url.searchParams.get("limit");
+      const limit = limitRaw ? Number(limitRaw) : undefined;
+      const rows = await listCompilations(options.db, {
+        branchId: branch,
+        limit: Number.isFinite(limit) ? limit : undefined,
+      });
+      const body: CompilationList = {
+        compilations: rows.map((row) => ({
+          id: row.id,
+          branchId: row.branchId,
+          gitSha: row.gitSha,
+          docCount: row.docCount,
+          added: row.added,
+          changed: row.changed,
+          removed: row.removed,
+          createdAt: row.createdAt.toISOString(),
+        })),
+      };
+      return json(body);
+    },
+  },
+  {
+    method: "GET",
+    path: `${V1}/branches`,
+    scope: "studio:read",
+    handle: async ({ options }) => {
+      const rows = await listBranches(options.db);
+      const body: BranchList = {
+        branches: rows.map((row) => ({
+          name: row.name,
+          parent: row.parent,
+          backend: row.backend,
+          status: row.status,
+          createdAt: row.createdAt.toISOString(),
+          endpointHost: row.endpointHost,
+        })),
+      };
+      return json(body);
+    },
+  },
+  {
+    method: "GET",
+    path: `${V1}/approvals`,
+    scope: "studio:read",
+    handle: async ({ options }) => {
+      const rows = await listPendingApprovals(options.db);
+      const body: ApprovalList = {
+        approvals: rows.map((row) => ({
+          id: row.id,
+          branchId: row.branchId,
+          functionName: row.functionName,
+          input: row.input,
+          requestedByKind: row.requestedByKind,
+          requestedById: row.requestedById,
+          correlationId: row.correlationId,
+          createdAt: row.createdAt.toISOString(),
+        })),
+      };
+      return json(body);
+    },
+  },
+  {
+    method: "POST",
+    path: APPROVAL_DECIDE_PATH,
+    scope: "approvals:decide",
+    handle: async ({ request, options, principal, id }) => {
+      // Note there is no `decidedBy` here: the decision is attributed to the
+      // identity this Studio was mounted for, so a caller cannot name a decider
+      // other than itself and defeat the requester-cannot-decide check.
+      const payload = (await request.json()) as { decision?: string };
+      if (payload.decision !== "approved" && payload.decision !== "denied") {
+        throw new GraftError({
+          code: "INPUT_VALIDATION_FAILED",
+          message: `decision must be "approved" or "denied".`,
+          fix: 'POST { "decision": "approved" } or { "decision": "denied" }.',
+        });
+      }
+      const row = await decideApproval(
+        options.db,
+        id,
+        payload.decision,
+        operator(options, principal),
+      );
+      if (!row) {
+        throw new GraftError({
+          code: "APPROVAL_INVALID",
+          message: `No PENDING approval "${id}" exists.`,
+          fix: "Refresh the approvals list; only pending rows can be decided.",
+          details: { id },
+        });
+      }
+      return json({
+        id: row.id,
+        status: row.status,
+        decidedBy: row.decidedBy,
+        functionName: row.functionName,
+      });
+    },
+  },
+  {
+    // Revert is the payoff of git-authoritative content: a compilation records
+    // the SHA it read, so "go back" restores real files rather than replaying an
+    // undo stack. GET previews whether it is safe; POST does it — which is why
+    // they are two routes carrying two different scopes.
+    method: "GET",
+    path: COMPILATION_REVERT_PATH,
+    scope: "studio:read",
+    handle: async ({ options, id }) => {
+      const row = await requireCompilation(options, id);
+      const pre = await preflightRevert(options.contentDir, row.gitSha);
+      const body: RevertPreviewDto = {
+        compilationId: row.id,
+        gitSha: row.gitSha,
+        shortSha: pre.shortSha,
+        reachable: pre.reachable,
+        dirty: pre.dirty,
+        canRevert: pre.reachable && pre.dirty.length === 0,
+        createdAt: row.createdAt.toISOString(),
+      };
+      return json(body);
+    },
+  },
+  {
+    method: "POST",
+    path: COMPILATION_REVERT_PATH,
+    scope: "studio:write",
+    handle: async ({ options, id }) => {
+      const row = await requireCompilation(options, id);
+      const changed = await revertContentTo(options.contentDir, row.gitSha as string);
+      // Recompile only after the files landed, so the index can never describe
+      // content that failed to write.
+      const result = await compile({
+        contentDir: options.contentDir,
+        collections: options.collections,
+        db: options.db,
+        branchId: row.branchId,
+      });
+      const body: RevertResultDto = {
+        compilationId: row.id,
+        gitSha: row.gitSha,
+        branch: row.branchId,
+        filesChanged: changed,
+        added: result.changes.added.length,
+        changed: result.changes.changed.length,
+        removed: result.changes.removed.length,
+        docCount: result.count,
+      };
+      return json(body);
+    },
+  },
+  {
+    method: "GET",
+    path: `${V1}/document`,
+    scope: "studio:read",
+    handle: ({ url, options }) => {
+      const collection = url.searchParams.get("collection")?.trim();
+      const slug = url.searchParams.get("slug")?.trim();
+      if (!collection || !slug) {
+        throw new GraftError({
+          code: "INPUT_VALIDATION_FAILED",
+          message: "collection and slug query params are required.",
+          fix: "GET /api/studio/v1/document?collection=docs&slug=getting-started",
+        });
+      }
+      const coll = requireCollection(options.collections, collection);
+      const doc = readRawDocument(options.contentDir, collection, coll, slug);
+      const body: DocumentDto = {
+        collection,
+        slug,
+        sourcePath: doc.sourcePath,
+        data: doc.data,
+        body: doc.body,
+        raw: doc.raw,
+      };
+      return json(body);
+    },
+  },
+  {
+    method: "PUT",
+    path: `${V1}/document`,
+    scope: "studio:write",
+    handle: async ({ request, options, defaultBranch }) => {
+      const payload = (await request.json()) as {
+        collection?: string;
+        slug?: string;
+        data?: Record<string, unknown>;
+        body?: string;
+        /** Full MDX source; when set, parsed with gray-matter (Studio editor). */
+        raw?: string;
+        branch?: string;
+      };
+      if (!payload.collection || !payload.slug) {
+        throw new GraftError({
+          code: "INPUT_VALIDATION_FAILED",
+          message: "collection and slug are required.",
+          fix: 'PUT { "collection", "slug", "raw" } or { "collection", "slug", "data", "body?" }.',
+        });
+      }
+      let data = payload.data;
+      let body = payload.body ?? "";
+      if (typeof payload.raw === "string") {
+        const parsed = matter(payload.raw);
+        data = parsed.data as Record<string, unknown>;
+        body = parsed.content.replace(/^\n/, "");
+      }
+      if (!data) {
+        throw new GraftError({
+          code: "INPUT_VALIDATION_FAILED",
+          message: "data or raw is required.",
+          fix: 'PUT { "collection", "slug", "raw" } from the Studio editor.',
+        });
+      }
+      const result = await writeDocument({
+        contentDir: options.contentDir,
+        collections: options.collections,
+        db: options.db,
+        branchId: payload.branch?.trim() || defaultBranch,
+        collection: payload.collection,
+        slug: payload.slug,
+        data,
+        body,
+      });
+      return json(result);
+    },
+  },
+];
+
+/** The route this request targets, with any captured segment decoded. */
+function matchRoute(method: string, pathname: string): { route: Route; id: string } | undefined {
+  for (const route of ROUTES) {
+    if (route.method !== method) continue;
+    if (typeof route.path === "string") {
+      if (route.path === pathname) return { route, id: "" };
+      continue;
+    }
+    const captured = route.path.exec(pathname);
+    if (captured) return { route, id: decodeRouteId(captured[1] ?? "") };
+  }
+  return undefined;
+}
+
 /** Implements /api/studio/v1/* from openapi.yaml. */
 export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHandler {
   const defaultBranch = options.defaultBranch ?? "main";
@@ -488,6 +902,16 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
       const method = request.method;
 
       assertSameOrigin(request, url);
+
+      const matched = matchRoute(method, pathname);
+      if (!matched) {
+        throw new GraftError({
+          code: "ROUTE_NOT_FOUND",
+          message: `Nothing is mounted at ${method} ${pathname}.`,
+          fix: "See GET /api/studio/v1/openapi.json for the Studio surface.",
+          details: { pathname, method },
+        });
+      }
 
       let principal: StudioPrincipal | undefined;
       if (options.authenticate) {
@@ -501,326 +925,28 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
         }
         principal = resolved;
 
-        const scope = requiredScope(method, pathname);
-        if (!(resolved.scopes ?? []).includes(scope)) {
+        if (!(resolved.scopes ?? []).includes(matched.route.scope)) {
           throw new GraftError({
             code: "UNAUTHORIZED",
-            message: `${method} ${pathname} requires the "${scope}" scope, and this credential does not carry it.`,
-            fix: `Mint a token whose scope claim includes "${scope}" (for \`graft serve\`, add it to GRAFT_DEV_SCOPES). Studio read, Studio write and approval decisions are deliberately separate: a runtime token that can read content should not be able to commit it, and no agent token should be able to decide the human gate.`,
-            details: { pathname, method, required: scope, held: resolved.scopes ?? [] },
+            message: `${method} ${pathname} requires the "${matched.route.scope}" scope, and this credential does not carry it.`,
+            fix: `Mint a token whose scope claim includes "${matched.route.scope}" (for \`graft serve\`, add it to GRAFT_DEV_SCOPES). Studio read, Studio write and approval decisions are deliberately separate: a runtime token that can read content should not be able to commit it, and no agent token should be able to decide the human gate.`,
+            details: {
+              pathname,
+              method,
+              required: matched.route.scope,
+              held: resolved.scopes ?? [],
+            },
           });
         }
       }
 
-      if (pathname === "/api/studio/v1/openapi.json" && method === "GET") {
-        return json(STUDIO_OPENAPI);
-      }
-
-      if (pathname === "/api/studio/v1/tree" && method === "GET") {
-        const branch = url.searchParams.get("branch")?.trim() || defaultBranch;
-        return json(await buildTree(options.db, options.collections, options.contentDir, branch));
-      }
-
-      if (pathname === "/api/studio/v1/collections" && method === "GET") {
-        return json(buildSchema(options.collections));
-      }
-
-      // Resolve an asset key to something an <img> can load, so the frontmatter
-      // form can show what the document actually points at instead of a path.
-      //
-      // Never an error when no store is configured: a static-tier project has
-      // no S3 credentials by design, and an asset field there is a key the
-      // author maintains by hand. `url: null` lets the form show the key and
-      // move on — a 500 would make an unconfigured project look broken.
-      // How the project's components present in the canvas. Owned files, so
-      // read per request: editing one should show up on reload, not on restart.
-      if (pathname === "/api/studio/v1/editor-components" && method === "GET") {
-        return json(readEditorComponents(options.projectRoot ?? dirname(options.contentDir)));
-      }
-
-      if (pathname === "/api/studio/v1/asset-url" && method === "GET") {
-        const key = url.searchParams.get("key")?.trim() ?? "";
-        if (!key) return json({ key, url: null, reason: "no key" });
-        return json(await resolveAssetUrl(key));
-      }
-
-      // Operator-triggered compile. The Studio surfaces drift, so it has to be
-      // able to resolve it too — sending someone to a terminal to fix a thing
-      // the dashboard just told them about is a dead end.
-      if (pathname === "/api/studio/v1/compile" && method === "POST") {
-        const payload = (await request.json().catch(() => ({}))) as { branch?: string };
-        const branch =
-          payload.branch?.trim() || url.searchParams.get("branch")?.trim() || defaultBranch;
-        const result = await compile({
-          contentDir: options.contentDir,
-          collections: options.collections,
-          db: options.db,
-          branchId: branch,
-        });
-        const body: CompileResultDto = {
-          branch,
-          gitSha: result.gitSha ?? null,
-          added: result.changes.added.length,
-          changed: result.changes.changed.length,
-          removed: result.changes.removed.length,
-          docCount: result.count,
-        };
-        return json(body);
-      }
-
-      // The Changes drawer: git surfaced in the editor's language.
-      //
-      // Reading never fails for the absence of git — a project without a
-      // repository is unusual but legitimate, and `tracked: false` lets the
-      // drawer explain instead of the pane erroring. Committing does fail,
-      // loudly, because there the operator asked for something specific.
-      if (pathname === "/api/studio/v1/changes" && method === "GET") {
-        return json(await readChanges(options.contentDir));
-      }
-
-      if (pathname === "/api/studio/v1/changes/diff" && method === "GET") {
-        const path = url.searchParams.get("path")?.trim() ?? "";
-        if (!path) {
-          throw new GraftError({
-            code: "INPUT_VALIDATION_FAILED",
-            message: "path query param is required.",
-            fix: "GET /api/studio/v1/changes/diff?path=docs/getting-started.mdx",
-          });
-        }
-        return json(await readFileDiff(options.contentDir, path));
-      }
-
-      if (pathname === "/api/studio/v1/changes/commit" && method === "POST") {
-        const payload = (await request.json().catch(() => ({}))) as {
-          paths?: unknown;
-          message?: unknown;
-        };
-        const paths = Array.isArray(payload.paths)
-          ? payload.paths.filter((path): path is string => typeof path === "string")
-          : [];
-        const result: CommitResultDto = await commitChanges(options.contentDir, {
-          paths,
-          message: typeof payload.message === "string" ? payload.message : "",
-        });
-        return json(result);
-      }
-
-      if (pathname === "/api/studio/v1/compilations" && method === "GET") {
-        const branch = url.searchParams.get("branch")?.trim() || undefined;
-        const limitRaw = url.searchParams.get("limit");
-        const limit = limitRaw ? Number(limitRaw) : undefined;
-        const rows = await listCompilations(options.db, {
-          branchId: branch,
-          limit: Number.isFinite(limit) ? limit : undefined,
-        });
-        const body: CompilationList = {
-          compilations: rows.map((row) => ({
-            id: row.id,
-            branchId: row.branchId,
-            gitSha: row.gitSha,
-            docCount: row.docCount,
-            added: row.added,
-            changed: row.changed,
-            removed: row.removed,
-            createdAt: row.createdAt.toISOString(),
-          })),
-        };
-        return json(body);
-      }
-
-      if (pathname === "/api/studio/v1/branches" && method === "GET") {
-        const rows = await listBranches(options.db);
-        const body: BranchList = {
-          branches: rows.map((row) => ({
-            name: row.name,
-            parent: row.parent,
-            backend: row.backend,
-            status: row.status,
-            createdAt: row.createdAt.toISOString(),
-            endpointHost: row.endpointHost,
-          })),
-        };
-        return json(body);
-      }
-
-      if (pathname === "/api/studio/v1/approvals" && method === "GET") {
-        const rows = await listPendingApprovals(options.db);
-        const body: ApprovalList = {
-          approvals: rows.map((row) => ({
-            id: row.id,
-            branchId: row.branchId,
-            functionName: row.functionName,
-            input: row.input,
-            requestedByKind: row.requestedByKind,
-            requestedById: row.requestedById,
-            correlationId: row.correlationId,
-            createdAt: row.createdAt.toISOString(),
-          })),
-        };
-        return json(body);
-      }
-
-      const decideMatch = /^\/api\/studio\/v1\/approvals\/([^/]+)\/decide$/.exec(pathname);
-      if (decideMatch && method === "POST") {
-        const id = decodeRouteId(decideMatch[1] ?? "");
-        // Note there is no `decidedBy` here: the decision is attributed to the
-        // identity this Studio was mounted for, so a caller cannot name a
-        // decider other than itself and defeat the requester-cannot-decide check.
-        const payload = (await request.json()) as { decision?: string };
-        if (payload.decision !== "approved" && payload.decision !== "denied") {
-          throw new GraftError({
-            code: "INPUT_VALIDATION_FAILED",
-            message: `decision must be "approved" or "denied".`,
-            fix: 'POST { "decision": "approved" } or { "decision": "denied" }.',
-          });
-        }
-        const row = await decideApproval(
-          options.db,
-          id,
-          payload.decision,
-          operator(options, principal),
-        );
-        if (!row) {
-          throw new GraftError({
-            code: "APPROVAL_INVALID",
-            message: `No PENDING approval "${id}" exists.`,
-            fix: "Refresh the approvals list; only pending rows can be decided.",
-            details: { id },
-          });
-        }
-        return json({
-          id: row.id,
-          status: row.status,
-          decidedBy: row.decidedBy,
-          functionName: row.functionName,
-        });
-      }
-
-      // Revert is the payoff of git-authoritative content: a compilation
-      // records the SHA it read, so "go back" restores real files rather than
-      // replaying an undo stack. GET previews whether it is safe; POST does it.
-      const revertMatch = /^\/api\/studio\/v1\/compilations\/([^/]+)\/revert$/.exec(pathname);
-      if (revertMatch && (method === "GET" || method === "POST")) {
-        const id = decodeRouteId(revertMatch[1] ?? "");
-        const rows = await listCompilations(options.db, { limit: 500 });
-        const row = rows.find((candidate) => candidate.id === id);
-        if (!row) {
-          throw new GraftError({
-            code: "DOCUMENT_NOT_FOUND",
-            message: `No compilation "${id}".`,
-            fix: "Refresh History; the trail may have been pruned.",
-            details: { id },
-          });
-        }
-
-        if (method === "GET") {
-          const pre = await preflightRevert(options.contentDir, row.gitSha);
-          const body: RevertPreviewDto = {
-            compilationId: row.id,
-            gitSha: row.gitSha,
-            shortSha: pre.shortSha,
-            reachable: pre.reachable,
-            dirty: pre.dirty,
-            canRevert: pre.reachable && pre.dirty.length === 0,
-            createdAt: row.createdAt.toISOString(),
-          };
-          return json(body);
-        }
-
-        const changed = await revertContentTo(options.contentDir, row.gitSha as string);
-        // Recompile only after the files landed, so the index can never
-        // describe content that failed to write.
-        const result = await compile({
-          contentDir: options.contentDir,
-          collections: options.collections,
-          db: options.db,
-          branchId: row.branchId,
-        });
-        const body: RevertResultDto = {
-          compilationId: row.id,
-          gitSha: row.gitSha,
-          branch: row.branchId,
-          filesChanged: changed,
-          added: result.changes.added.length,
-          changed: result.changes.changed.length,
-          removed: result.changes.removed.length,
-          docCount: result.count,
-        };
-        return json(body);
-      }
-
-      if (pathname === "/api/studio/v1/document" && method === "GET") {
-        const collection = url.searchParams.get("collection")?.trim();
-        const slug = url.searchParams.get("slug")?.trim();
-        if (!collection || !slug) {
-          throw new GraftError({
-            code: "INPUT_VALIDATION_FAILED",
-            message: "collection and slug query params are required.",
-            fix: "GET /api/studio/v1/document?collection=docs&slug=getting-started",
-          });
-        }
-        const coll = requireCollection(options.collections, collection);
-        const doc = readRawDocument(options.contentDir, collection, coll, slug);
-        const body: DocumentDto = {
-          collection,
-          slug,
-          sourcePath: doc.sourcePath,
-          data: doc.data,
-          body: doc.body,
-          raw: doc.raw,
-        };
-        return json(body);
-      }
-
-      if (pathname === "/api/studio/v1/document" && method === "PUT") {
-        const payload = (await request.json()) as {
-          collection?: string;
-          slug?: string;
-          data?: Record<string, unknown>;
-          body?: string;
-          /** Full MDX source; when set, parsed with gray-matter (Studio editor). */
-          raw?: string;
-          branch?: string;
-        };
-        if (!payload.collection || !payload.slug) {
-          throw new GraftError({
-            code: "INPUT_VALIDATION_FAILED",
-            message: "collection and slug are required.",
-            fix: 'PUT { "collection", "slug", "raw" } or { "collection", "slug", "data", "body?" }.',
-          });
-        }
-        let data = payload.data;
-        let body = payload.body ?? "";
-        if (typeof payload.raw === "string") {
-          const parsed = matter(payload.raw);
-          data = parsed.data as Record<string, unknown>;
-          body = parsed.content.replace(/^\n/, "");
-        }
-        if (!data) {
-          throw new GraftError({
-            code: "INPUT_VALIDATION_FAILED",
-            message: "data or raw is required.",
-            fix: 'PUT { "collection", "slug", "raw" } from the Studio editor.',
-          });
-        }
-        const result = await writeDocument({
-          contentDir: options.contentDir,
-          collections: options.collections,
-          db: options.db,
-          branchId: payload.branch?.trim() || defaultBranch,
-          collection: payload.collection,
-          slug: payload.slug,
-          data,
-          body,
-        });
-        return json(result);
-      }
-
-      throw new GraftError({
-        code: "ROUTE_NOT_FOUND",
-        message: `Nothing is mounted at ${method} ${pathname}.`,
-        fix: "See GET /api/studio/v1/openapi.json for the Studio surface.",
-        details: { pathname, method },
+      return await matched.route.handle({
+        request,
+        url,
+        options,
+        defaultBranch,
+        principal,
+        id: matched.id,
       });
     } catch (error) {
       if (error instanceof GraftError) {
