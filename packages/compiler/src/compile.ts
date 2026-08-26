@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { GraftError } from "@usegraft/contracts";
+import { walkContentFiles } from "./content-files";
 import type { AnyCollection } from "@usegraft/core";
 import {
   projectBranchContent,
@@ -65,7 +66,7 @@ export function readDocs(
   const docs: ProjectedDoc[] = [];
   const seen = new Map<string, string>();
 
-  for (const file of walk(contentDir)) {
+  for (const file of walkContentFiles(contentDir)) {
     const sourcePath = relative(contentDir, file).split(sep).join("/");
     const segments = sourcePath.split("/");
     const collectionName = segments.length > 1 ? (segments[0] ?? "") : "";
@@ -182,14 +183,4 @@ export function resolveGitSha(cwd: string): string | null {
   } catch {
     return null;
   }
-}
-
-function walk(dir: string): string[] {
-  const out: string[] = [];
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name);
-    if (statSync(full).isDirectory()) out.push(...walk(full));
-    else if (/\.mdx?$/.test(name)) out.push(full);
-  }
-  return out.sort();
 }

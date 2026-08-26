@@ -2,16 +2,18 @@
  * File-authoritative content read/write for Studio — same model as MCP:
  * git owns the MDX; compile refreshes the index.
  */
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   compile,
   composeDocument,
+  findDoc as findDocIn,
   parseDocument,
-  writeDocumentFile,
-  type ProjectedDoc,
+  requireCollection as requireCollectionIn,
   resolveContained,
   SLUG_RE,
+  writeDocumentFile,
+  type ProjectedDoc,
 } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { assertSafeMdx } from "@usegraft/mdx-safety";
@@ -19,46 +21,19 @@ import type { AnyCollection } from "@usegraft/core";
 import type { Database } from "@usegraft/db";
 import matter from "gray-matter";
 
+/**
+ * How the Studio surface tells an operator to fix a content miss. The readers
+ * themselves live in @usegraft/compiler — three copies of them existed, two
+ * byte-identical, which is how a containment fix reaches one caller and misses
+ * the rest. Only the guidance differs per surface.
+ */
+const STUDIO_HINTS = { authorDocument: "or create it in the editor." } as const;
+
 export function requireCollection(
   collections: Record<string, AnyCollection>,
   name: string,
 ): AnyCollection {
-  const collection = collections[name];
-  if (!collection) {
-    const known = Object.keys(collections).join(", ") || "(none registered)";
-    throw new GraftError({
-      code: "COLLECTION_NOT_FOUND",
-      message: `No collection named "${name}" is registered`,
-      fix: `Use one of: ${known}.`,
-      details: { collection: name, registered: Object.keys(collections) },
-    });
-  }
-  return collection;
-}
-
-function walk(dir: string): string[] {
-  const out: string[] = [];
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name);
-    if (statSync(full).isDirectory()) out.push(...walk(full));
-    else if (/\.mdx?$/.test(name)) out.push(full);
-  }
-  return out.sort();
-}
-
-export function readCollectionDocs(
-  contentDir: string,
-  collectionName: string,
-  collection: AnyCollection,
-): ProjectedDoc[] {
-  const dir = join(contentDir, collectionName);
-  if (!existsSync(dir) || !statSync(dir).isDirectory()) return [];
-  const docs: ProjectedDoc[] = [];
-  for (const file of walk(dir)) {
-    const sourcePath = relative(contentDir, file).split(sep).join("/");
-    docs.push(parseDocument(readFileSync(file, "utf8"), collection, sourcePath));
-  }
-  return docs.sort((a, b) => a.slug.localeCompare(b.slug));
+  return requireCollectionIn(collections, name, STUDIO_HINTS);
 }
 
 export function findDoc(
@@ -67,23 +42,11 @@ export function findDoc(
   collection: AnyCollection,
   slug: string,
 ): ProjectedDoc {
-  const docs = readCollectionDocs(contentDir, collectionName, collection);
-  const doc = docs.find((candidate) => candidate.slug === slug);
-  if (!doc) {
-    throw new GraftError({
-      code: "DOCUMENT_NOT_FOUND",
-      message: `No document with slug "${slug}" in collection "${collectionName}"`,
-      fix:
-        docs.length > 0
-          ? `Existing slugs: ${docs.map((d) => d.slug).join(", ")}.`
-          : `Author the first document in "${collectionName}".`,
-      details: { collection: collectionName, slug },
-    });
-  }
-  return doc;
+  return findDocIn(contentDir, collectionName, collection, slug, STUDIO_HINTS);
 }
 
-/** Raw file text for the editor (frontmatter + body as authored). */
+export { readCollectionDocs } from "@usegraft/compiler";
+
 export function readRawDocument(
   contentDir: string,
   collectionName: string,
