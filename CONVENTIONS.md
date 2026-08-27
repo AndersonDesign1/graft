@@ -60,6 +60,12 @@ wholesale, because three of them contradict what this codebase does for a living
 | `no-conditional-empty-object-spread`, `no-known-value-widening`, `no-shape-in-symbol-names` | warn    | Style, not correctness.                                                                                                                                                                                         |
 | everything else                                                                             | error   | These catch real defects: chained assertions that lie to the type checker, and module mocking that stubs out the thing under test.                                                                              |
 
+The plugin is TypeScript, and oxlint loads it through Node's ESM loader. Node
+strips types by default from **22.18**; the repo's floor is 22.16 (node:sqlite
+bundles FTS5 from there), so on 22.16–22.17 `pnpm lint` needs
+`NODE_OPTIONS=--experimental-strip-types`. CI sets it. The symptom without it is
+`ERR_UNKNOWN_FILE_EXTENSION ".ts"`, which reads like a config error and is not.
+
 Never silence a rule to get a green run. Either fix the finding, or change the setting
 here and write down why.
 
