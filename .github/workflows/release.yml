@@ -122,10 +122,18 @@ jobs:
       # The version bump is never committed. `changeset version --snapshot`
       # rewrites package.json in the runner's checkout and that checkout is
       # thrown away, which is the point: a snapshot is a build, not a release.
+      #
+      # The guard between the two commands is load-bearing. With no unreleased
+      # changesets, `changeset version --snapshot` only WARNS and exits 0,
+      # leaving real versions in place — and `changeset publish --tag canary`
+      # would then push a stable version to the canary tag, or make it a
+      # package's first release under the wrong tag. The job would report
+      # success either way. assert-canary-snapshot.mjs refuses that.
       - name: Publish a canary snapshot
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.canary }}
         run: |
           pnpm version:canary
+          node scripts/assert-canary-snapshot.mjs
           pnpm release:canary
 
       - name: Create release PR or publish
