@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/core",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Schema and typed functions as owned code: defineCollection, field, defineFunction.",
   "keywords": [
     "agent",
