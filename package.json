@@ -19,6 +19,9 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm build && changeset publish",
+    "version:canary": "changeset version --snapshot canary",
+    "release:canary": "pnpm build && changeset publish --tag canary --no-git-tag",
+    "check:canary-snapshot": "node scripts/assert-canary-snapshot.mjs",
     "check:registry-drift": "node scripts/check-registry-drift.mjs",
     "coverage": "node scripts/coverage.mjs",
     "coverage:update": "node scripts/coverage.mjs --update"
