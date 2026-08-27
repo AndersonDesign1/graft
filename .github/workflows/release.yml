@@ -14,11 +14,19 @@ name: Release
 on:
   push:
     branches: [feat/core, main]
-  # Retry surface. With no pending changesets, dispatching re-runs `publish`,
-  # which is idempotent — changesets skips versions the registry already has.
+  # Retry surface, and the canary surface. With no pending changesets and
+  # `canary` unchecked, dispatching re-runs `publish`, which is idempotent —
+  # changesets skips versions the registry already has.
+  #
   # A package can register only ONE trusted-publisher workflow filename, so
-  # retries must come from this file rather than a separate workflow.
+  # both retries and canaries must come from this file. A separate canary.yml
+  # would authenticate against nothing.
   workflow_dispatch:
+    inputs:
+      canary:
+        description: "Publish a snapshot to the canary dist-tag instead of running the normal release"
+        type: boolean
+        default: false
 
 concurrency: release-${{ github.ref }}
 
@@ -92,7 +100,36 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # ── Canary: a snapshot of whatever is on this ref, right now ──────────
+      #
+      # Snapshot releases, NOT changesets prerelease mode. Prerelease mode is
+      # stateful (.changeset/pre.json), it accumulates -canary.0, .1, .2 toward
+      # one eventual version, and the changesets docs recommend running it from
+      # a branch other than the default. feat/core IS the default branch here,
+      # so entering pre mode would put every ordinary push into prerelease
+      # versioning until someone remembered to exit.
+      #
+      # Snapshots have none of that. `--snapshot canary` produces
+      # 0.0.0-canary-<timestamp> from the current tree, publishes it, and leaves
+      # no state behind. Real version numbers never move, `latest` never moves,
+      # and the next ordinary release is unaffected.
+      #
+      # `--tag canary` is load-bearing, not cosmetic. Without it changesets
+      # publishes the snapshot as `latest`, which would point every plain
+      # `npm i @usegraft/cli` at a 0.0.0 build. That is the one way this job
+      # can do real damage, so it is the one flag to check when editing it.
+      #
+      # The version bump is never committed. `changeset version --snapshot`
+      # rewrites package.json in the runner's checkout and that checkout is
+      # thrown away, which is the point: a snapshot is a build, not a release.
+      - name: Publish a canary snapshot
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.canary }}
+        run: |
+          pnpm version:canary
+          pnpm release:canary
+
       - name: Create release PR or publish
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.canary }}
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
         with:
           version: pnpm version-packages
