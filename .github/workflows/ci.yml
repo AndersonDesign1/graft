@@ -113,3 +113,21 @@ jobs:
       # stops coverage sliding, and floors are raised when they are earned.
       - name: Coverage floors
         run: pnpm coverage
+
+  # The container is the "one `docker run`, full backend" claim, and nothing
+  # here built it. That is how `prepare` (added in 0d2fe7b) broke the image for
+  # a day without a single failing check: it runs `git config`, .dockerignore
+  # excludes .git, and pnpm install died with exit 128 inside the builder.
+  #
+  # Build only. Booting the all-in-one image needs embedded Postgres + MinIO and
+  # a minute of startup, which belongs in a slower job than every push.
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Plain `docker build`, not docker/build-push-action: every other action
+      # here is SHA-pinned, and adding one more supply-chain dependency to prove
+      # a Dockerfile still parses is a poor trade. The runner ships buildx.
+      - name: Build the self-host image
+        run: docker build -f deploy/docker/Dockerfile -t graft:ci .
