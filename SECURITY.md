@@ -23,6 +23,19 @@ outside what the controls below cover.
   works single-credential, and `graft harden <role>` splits them. The container
   applies the split by default wherever it owns its own database. The split is
   defence in depth beneath the application-level controls, not a substitute.
+- **A stolen runtime credential can rewrite and hide content.** The hardened
+  role holds `INSERT`/`UPDATE` on `content_index` because projection needs it,
+  so raw SQL under that credential can change any document or set `deleted`.
+  The human gate on MCP `delete_content` is an application control against an
+  agent misusing the tool. It is not a database control against a stolen
+  credential, and no grant list short of refusing content writes entirely would
+  make it one.
+
+  **The approval gate is the exception, deliberately.** It holds even against a
+  stolen runtime credential: no `UPDATE` on `approvals`, and a column-scoped
+  `INSERT` that cannot name `status` or `decided_by`. Both halves are needed.
+  Withholding `UPDATE` alone leaves the credential able to file a row that is
+  already approved, which is cheaper than flipping a pending one.
 
 ## What is enforced
 

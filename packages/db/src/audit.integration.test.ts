@@ -231,6 +231,51 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
           }),
         ).rejects.toThrow(/permission denied for table approvals/i);
 
+        // The runtime never needs to FLIP a pending row, so proving it cannot
+        // is not proving the gate holds. A table-level INSERT grant lets the
+        // grantee name every column, and `status` is plain text with a default
+        // rather than a constraint — so the cheaper attack is to mint a row
+        // that is already approved and consume it. `decideApproval` never runs,
+        // which means the separation-of-duties check never runs either.
+        await expect(
+          handle.sql.begin(async (tx) => {
+            await tx.unsafe(`set local role ${role}`);
+            await tx`insert into approvals
+                       (branch_id, function_name, input, input_canonical,
+                        requested_by_kind, correlation_id, status)
+                     values (${BRANCH}, 'itFn', '{}'::jsonb, '{}', 'agent',
+                             'it-corr-mint', 'approved')`;
+          }),
+        ).rejects.toThrow(/permission denied/i);
+
+        // Same door, one step further in: naming `decided_by` would forge who
+        // approved it, which is the column the requester/approver comparison
+        // reads.
+        await expect(
+          handle.sql.begin(async (tx) => {
+            await tx.unsafe(`set local role ${role}`);
+            await tx`insert into approvals
+                       (branch_id, function_name, input, input_canonical,
+                        requested_by_kind, correlation_id, decided_by)
+                     values (${BRANCH}, 'itFn', '{}'::jsonb, '{}', 'agent',
+                             'it-corr-forge', 'someone-else')`;
+          }),
+        ).rejects.toThrow(/permission denied/i);
+
+        // Filing an ordinary request still works: the grant is narrowed, not
+        // removed. Status falls back to its default.
+        const filed = await handle.sql.begin(async (tx) => {
+          await tx.unsafe(`set local role ${role}`);
+          const [row] = await tx`insert into approvals
+                       (branch_id, function_name, input, input_canonical,
+                        requested_by_kind, requested_by_id, correlation_id)
+                     values (${BRANCH}, 'itFn', '{}'::jsonb, '{}', 'agent',
+                             'it-agent', 'it-corr-filed')
+                     returning id, status`;
+          return row;
+        });
+        expect(filed?.status).toBe("pending");
+
         // Still pending — now approve as the operator (owner connection).
         await decideApproval(handle.db, id, "approved", OPERATOR);
 

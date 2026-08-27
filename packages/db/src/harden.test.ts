@@ -20,17 +20,34 @@ describe("runtimeRoleGrantsSql — what the runtime may never do", () => {
     }
   });
 
-  it("grants approvals INSERT and the SECURITY DEFINER consume, and nothing else", () => {
+  it("grants approvals INSERT column-scoped, and the SECURITY DEFINER consume", () => {
     const approvalGrants = runtimeRoleGrantsSql("graft_runtime").filter((s) =>
       /\bapprovals\b/.test(s),
     );
     expect(approvalGrants).toEqual([
       "GRANT SELECT ON TABLE content_index, compilations, data_records, audit_log, approvals, migrations_applied, branches TO graft_runtime",
-      "GRANT INSERT ON TABLE approvals TO graft_runtime",
+      "GRANT INSERT (branch_id, function_name, input, input_canonical, requested_by_kind, requested_by_id, correlation_id) ON TABLE approvals TO graft_runtime",
     ]);
     expect(grants()).toContain(
       "GRANT EXECUTE ON FUNCTION graft_consume_approval(uuid, text, text) TO graft_runtime",
     );
+  });
+
+  it("never lets the runtime name status, so it cannot file an approved approval", () => {
+    // Withholding UPDATE is not enough on its own. A table-level INSERT lets
+    // the grantee supply every column, and `status` is plain text with a
+    // DEFAULT rather than a CHECK, so the runtime would mint a row that is
+    // already 'approved' instead of flipping a pending one. decideApproval
+    // never runs on that path, so its separation-of-duties predicate never
+    // runs either. Proven against live Postgres in audit.integration.test.ts.
+    const insert = runtimeRoleGrantsSql("graft_runtime").find(
+      (s) => /^GRANT INSERT \(/.test(s) && /ON TABLE approvals/.test(s),
+    );
+    expect(insert, "the approvals INSERT grant must be column-scoped").toBeDefined();
+    for (const forbidden of ["status", "decided_by", "decided_at", "decided_role"]) {
+      expect(insert).not.toContain(forbidden);
+    }
+    expect(grants()).not.toMatch(/GRANT INSERT ON TABLE approvals\b/);
   });
 
   it("grants no DDL, no schema ownership, and no migrations_applied write", () => {
@@ -54,7 +71,10 @@ describe("runtimeRoleGrantsSql — what the runtime must be able to do", () => {
     expect(grants()).toContain("GRANT INSERT ON TABLE compilations TO graft_runtime");
   });
 
-  it("soft-deletes content rather than removing rows, so DELETE stays ungranted", () => {
+  it("needs no DELETE on content_index, since removal is an UPDATE of deleted", () => {
+    // Asserted because nothing needs the privilege, NOT because withholding it
+    // protects removals. It does not: removal is the UPDATE granted above. See
+    // the comment on that grant for what content-write access actually costs.
     expect(grants()).not.toMatch(/\bDELETE\b[^\n]*\bcontent_index\b/);
   });
 

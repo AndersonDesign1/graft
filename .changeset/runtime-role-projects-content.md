@@ -20,6 +20,19 @@ The property worth enforcing is narrower and untouched: no `UPDATE` on
 raw SQL. Removals are a soft delete, so `DELETE` on `content_index` stays
 ungranted, and `migrations_applied` stays operator-only.
 
+**Security fix, found reviewing the above.** The `approvals` INSERT grant was
+table-level, and `status` is plain text with a `DEFAULT` rather than a `CHECK`.
+Postgres lets a table-level `INSERT` grantee name every column, so the runtime
+credential never needed to flip a pending row: it could file one that was
+already `'approved'` and consume it, and `decideApproval` (with its
+separation-of-duties predicate) would never run. Withholding `UPDATE` alone was
+not the control it read as. The grant is now column-scoped to the seven columns
+an approval request actually writes, so `status`, `decided_by`, `decided_at` and
+`decided_role` fall back to their defaults.
+
+This predates the changes above, but shipped dormant behind an opt-in nobody
+ran. Turning hardening on by default is what would have made it live.
+
 **Breaking:**
 
 - `runtimeRoleGrantsSql` emits two more `GRANT` statements. Re-run

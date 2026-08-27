@@ -16,7 +16,7 @@ docker run --init -p 3903:3903 -v graft_pg:/var/lib/postgresql -v graft_minio:/d
 ```
 
 Boot order: embedded Postgres 18 + MinIO → schema migrations → `graft compile`
-→ (optional hardening) → `graft serve`. With no project mounted it serves the
+→ harden → `graft serve`. With no project mounted it serves the
 baked-in example project — the logs print a generated `GRAFT_DEV_TOKEN`; use it
 as a bearer:
 
@@ -36,6 +36,23 @@ The entrypoint symlinks `/project/node_modules` to the image's packages (the
 `deploy/docker/project` shim) so your config's `@usegraft/core` / `zod` imports
 resolve. Content written over MCP lands in your mounted tree — commit it from
 the host; git stays authoritative.
+
+### Deciding approvals from the box
+
+The container serves under the hardened `graft_runtime` role, which **cannot
+decide an approval**. That is the point of the layer, and it means `graft
+approve` needs the operator credential explicitly:
+
+```sh
+docker exec <container> graft approvals
+docker exec <container> env DATABASE_URL=postgres://graft:graft@127.0.0.1:5432/graft graft approve <id>
+```
+
+The operator user, password and database come from `POSTGRES_USER`,
+`POSTGRES_PASSWORD` and `POSTGRES_DB` (`graft`/`graft`/`graft` unless you
+override them). Set `GRAFT_HARDEN=0` to serve under the operator credential
+instead, which makes `graft approve` work with no extra argument and gives up
+the layer.
 
 ## Split compose (scale)
 
