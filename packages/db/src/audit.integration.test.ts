@@ -390,4 +390,57 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
     },
     TEST_TIMEOUT,
   );
+
+  it(
+    "an approval is filed pending by construction, even for the owner",
+    async () => {
+      // The grant is one control and this is the other. Column-scoping the
+      // runtime role's INSERT stops that role naming `status`, but a grant list
+      // is a thing someone edits. Migration 0009 puts the same rule in the
+      // table, so it holds for every role including this owner connection, and
+      // a future widening of runtimeRoleGrantsSql cannot quietly reopen it.
+      await expect(
+        handle.sql`insert into approvals
+                     (branch_id, function_name, input, input_canonical,
+                      requested_by_kind, correlation_id, status)
+                   values (${BRANCH}, 'itFn', '{}'::jsonb, '{}', 'agent',
+                           'it-corr-trig-1', 'approved')`,
+      ).rejects.toThrow(/filed pending/i);
+
+      await expect(
+        handle.sql`insert into approvals
+                     (branch_id, function_name, input, input_canonical,
+                      requested_by_kind, correlation_id, decided_by)
+                   values (${BRANCH}, 'itFn', '{}'::jsonb, '{}', 'agent',
+                           'it-corr-trig-2', 'someone-else')`,
+      ).rejects.toThrow(/decision already recorded/i);
+
+      // A status outside the known set is refused by the CHECK, so a typo in a
+      // future UPDATE cannot park a row in a state nothing reads.
+      await expect(
+        handle.sql`update approvals set status = 'aproved'
+                   where branch_id = ${BRANCH}`,
+      ).rejects.toThrow(/approvals_status_known/i);
+
+      // The ordinary path is untouched.
+      const store = createDbApprovalStore(handle.db);
+      const id = await store.request({
+        branch: BRANCH,
+        functionName: "itFn",
+        input: { id: "row-trig" },
+        inputCanonical: '{"id":"row-trig"}',
+        requestedByKind: "agent",
+        requestedById: "it-agent",
+        correlationId: "it-corr-trig-ok",
+      });
+      const [row] = await handle.sql`select status from approvals where id = ${id}::uuid`;
+      expect(row?.status).toBe("pending");
+
+      // And deciding still works, because deciding is an UPDATE.
+      await decideApproval(handle.db, id, "approved", OPERATOR);
+      const [decided] = await handle.sql`select status from approvals where id = ${id}::uuid`;
+      expect(decided?.status).toBe("approved");
+    },
+    TEST_TIMEOUT,
+  );
 });
