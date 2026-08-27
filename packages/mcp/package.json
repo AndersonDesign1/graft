@@ -1,6 +1,20 @@
 {
   "name": "@usegraft/mcp",
   "version": "0.1.1",
+  "description": "An MCP server over your content, schema and typed functions, with errors an agent can act on.",
+  "keywords": [
+    "agent",
+    "agent-tools",
+    "ai",
+    "cms",
+    "graft",
+    "headless-cms",
+    "llm",
+    "mcp",
+    "model-context-protocol",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -1,6 +1,21 @@
 {
   "name": "@usegraft/studio",
   "version": "0.1.1",
+  "description": "Graft's optional editing UI. Headless-first: every operation also exists on MCP and the CLI.",
+  "keywords": [
+    "admin-ui",
+    "agent",
+    "ai",
+    "cms",
+    "editor",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "openapi",
+    "studio",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

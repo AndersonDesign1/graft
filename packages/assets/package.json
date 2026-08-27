@@ -1,6 +1,22 @@
 {
   "name": "@usegraft/assets",
   "version": "0.1.1",
+  "description": "S3-compatible object storage for binary assets: Cloudflare R2, MinIO, Tigris.",
+  "keywords": [
+    "agent",
+    "ai",
+    "assets",
+    "cms",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "minio",
+    "r2",
+    "s3",
+    "storage",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

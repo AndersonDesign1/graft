@@ -1,6 +1,21 @@
 {
   "name": "@usegraft/compiler",
   "version": "0.1.1",
+  "description": "Validate authored MDX against your collections and project it into the content index.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "compiler",
+    "content-index",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "mdx",
+    "typescript",
+    "validation"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

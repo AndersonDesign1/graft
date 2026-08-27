@@ -1,6 +1,22 @@
 {
   "name": "@usegraft/cli",
   "version": "0.1.1",
+  "description": "The graft CLI: scaffold, compile authored content, serve the runtime, and split your database credentials.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cli",
+    "cms",
+    "content",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "postgres",
+    "scaffolding",
+    "static-site",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

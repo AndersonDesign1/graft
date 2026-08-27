@@ -1,6 +1,22 @@
 {
   "name": "@usegraft/sdk-next",
   "version": "0.1.1",
+  "description": "Next.js App Router adapter: typed content reads in Server Components, cache-tag invalidation, and real MDX rendering.",
+  "keywords": [
+    "agent",
+    "ai",
+    "app-router",
+    "cms",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "mdx",
+    "nextjs",
+    "react",
+    "rsc",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -1,6 +1,20 @@
 {
   "name": "@usegraft/contracts",
   "version": "0.1.1",
+  "description": "Shared error codes and introspection schemas: the vocabulary every Graft package speaks.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "errors",
+    "graft",
+    "headless-cms",
+    "introspection",
+    "mcp",
+    "schemas",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",
