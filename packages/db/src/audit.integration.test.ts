@@ -46,11 +46,15 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
     handle = createDb(process.env.DATABASE_URL as string);
     await handle.sql`delete from audit_log where branch_id = ${BRANCH}`;
     await handle.sql`delete from approvals where branch_id = ${BRANCH}`;
+    await handle.sql`delete from content_index where branch_id = ${BRANCH}`;
+    await handle.sql`delete from compilations where branch_id = ${BRANCH}`;
   }, TEST_TIMEOUT);
 
   afterAll(async () => {
     await handle.sql`delete from audit_log where branch_id = ${BRANCH}`;
     await handle.sql`delete from approvals where branch_id = ${BRANCH}`;
+    await handle.sql`delete from content_index where branch_id = ${BRANCH}`;
+    await handle.sql`delete from compilations where branch_id = ${BRANCH}`;
     await handle.close();
   }, TEST_TIMEOUT);
 
@@ -268,6 +272,49 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
           handle.sql.begin(async (tx) => {
             await tx.unsafe(`set local role ${role}`);
             await tx`update audit_log set rate_key = 'someone-else' where id = ${auditId}::uuid`;
+          }),
+        ).rejects.toThrow(/permission denied/i);
+
+        // Content projection: the half that makes hardening free. MCP
+        // write_content writes the file and then compiles, and compile is what
+        // reaches Postgres — so a runtime role that cannot project content
+        // cannot serve write_content at all. Granting it costs nothing the
+        // application does not already expose, and the approval denial above
+        // is untouched by it.
+        await handle.sql.begin(async (tx) => {
+          await tx.unsafe(`set local role ${role}`);
+          await tx`insert into content_index (branch_id, collection, slug, data, body, content_hash, source_path)
+                   values (${BRANCH}, 'itDocs', 'hardened-projection', '{"title":"x"}'::jsonb, 'body', 'hash-1', 'itDocs/hardened-projection.mdx')`;
+          await tx`insert into compilations (branch_id, git_sha, doc_count, added, changed, removed)
+                   values (${BRANCH}, null, 1, 1, 0, 0)`;
+        });
+
+        // Removal is a soft delete, which is why UPDATE is granted and DELETE
+        // is not. Both halves are asserted so a future widening of the grant
+        // list fails here rather than in production.
+        await handle.sql.begin(async (tx) => {
+          await tx.unsafe(`set local role ${role}`);
+          await tx`update content_index set deleted = true
+                   where branch_id = ${BRANCH} and collection = 'itDocs' and slug = 'hardened-projection'`;
+        });
+        const [projected] = await handle.sql`select deleted from content_index
+          where branch_id = ${BRANCH} and collection = 'itDocs' and slug = 'hardened-projection'`;
+        expect(projected?.deleted).toBe(true);
+
+        await expect(
+          handle.sql.begin(async (tx) => {
+            await tx.unsafe(`set local role ${role}`);
+            await tx`delete from content_index where branch_id = ${BRANCH} and collection = 'itDocs'`;
+          }),
+        ).rejects.toThrow(/permission denied/i);
+
+        // Schema changes stay operator work: projecting content must not imply
+        // being able to claim a migration was applied.
+        await expect(
+          handle.sql.begin(async (tx) => {
+            await tx.unsafe(`set local role ${role}`);
+            await tx`insert into migrations_applied (branch_id, migration_id, kind, collection, doc_count)
+                     values (${BRANCH}, '9999-fake', 'content', 'itDocs', 0)`;
           }),
         ).rejects.toThrow(/permission denied/i);
       } finally {

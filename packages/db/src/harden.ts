@@ -6,10 +6,15 @@
  *   merges, and DECIDES approvals (`graft approve` — a plain UPDATE on
  *   `approvals`).
  * - **Runtime** (what a deployed app / autonomous agent holds): serves reads,
- *   runs functions, files approval requests, and consumes approved ones via
- *   the SECURITY DEFINER `graft_consume_approval` (migration 0007). It has NO
- *   UPDATE on `approvals`, so `pending → approved` is unreachable for it —
- *   even with raw SQL against its own DATABASE_URL.
+ *   runs functions, projects authored content, files approval requests, and
+ *   consumes approved ones via the SECURITY DEFINER `graft_consume_approval`
+ *   (migration 0007). It has NO UPDATE on `approvals`, so `pending → approved`
+ *   is unreachable for it, even with raw SQL against its own DATABASE_URL.
+ *
+ * That one denial is the whole point of the split. The grants are otherwise
+ * wide enough that hardening costs a deployment nothing, which is why the
+ * container can apply it by default rather than as an opt-in that trades a
+ * working feature for a second layer.
  *
  * `runtimeRoleGrantsSql` emits the grants for such a role;
  * `hardenRuntimeRole` applies them over an operator connection. Creating the
@@ -36,9 +41,11 @@ function assertRoleName(role: string): void {
 
 /**
  * The grant statements that make `role` a runtime credential: serve content,
- * run functions, write operational data, audit itself, request + consume
- * approvals — but never decide them and never rewrite authored-content
- * projections (compile/migrate/merge are operator work).
+ * run functions, project authored content, write operational data, audit
+ * itself, request and consume approvals. It may never decide an approval.
+ *
+ * Schema changes stay operator work: no CREATE, no DDL, no `migrations_applied`
+ * write. Branch create/merge stays operator work too.
  */
 export function runtimeRoleGrantsSql(role: string): string[] {
   assertRoleName(role);
@@ -49,6 +56,14 @@ export function runtimeRoleGrantsSql(role: string): string[] {
     `GRANT SELECT ON TABLE content_index, compilations, data_records, audit_log, approvals, migrations_applied, branches TO ${role}`,
     // Operational data is the runtime's to mutate (typed functions).
     `GRANT INSERT, UPDATE, DELETE ON TABLE data_records TO ${role}`,
+    // Content projection. `write_content`/`delete_content` write the MDX file
+    // and then compile, and compile is the step that reaches Postgres. The
+    // application already exposes that to whoever holds the runtime
+    // credential, so withholding it here never removed the capability — it
+    // only broke MCP content writes for anyone who hardened. Removals are a
+    // soft delete (an UPDATE of `deleted`), so DELETE stays ungranted.
+    `GRANT INSERT, UPDATE ON TABLE content_index TO ${role}`,
+    `GRANT INSERT ON TABLE compilations TO ${role}`,
     // Every invocation audits itself. The row is reserved before the call runs
     // (that is what makes rate limiting immune to concurrency), then settled
     // with its outcome — so the runtime needs UPDATE as well as INSERT.
