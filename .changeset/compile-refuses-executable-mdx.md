@@ -4,6 +4,7 @@
 "@usegraft/studio": minor
 "@usegraft/mcp": minor
 "@usegraft/cli": minor
+"@usegraft/sdk-next": minor
 ---
 
 `graft compile` refuses executable MDX, and the project declares its own trust.
@@ -36,7 +37,8 @@ compile's error names both.
 **New:** `readDocs` takes a third options argument; `CompileOptions`,
 `CompileStaticOptions`, `GraftMcpOptions` and `StudioApiOptions` gain an
 optional `mdxTrust`. All default to `"restricted"`, so a call site that omits it
-is safe rather than permissive. `MdxTrust` is now exported from
-`@usegraft/mdx-safety`.
+is safe rather than permissive. `MdxTrust` is declared in `@usegraft/mdx-safety` and
+re-exported from `@usegraft/sdk-next`, which used to declare its own copy of
+the same union. Same name, same shape, so nothing importing it has to change.
 
 See `docs/adr/0006-compile-refuses-executable-mdx.md`.

@@ -10,7 +10,7 @@
  * `components/mdx-components.ts` map that `graft add` regenerates.
  */
 import { compile, run } from "@mdx-js/mdx";
-import { assertSafeMdx } from "@usegraft/mdx-safety";
+import { assertSafeMdx, type MdxTrust } from "@usegraft/mdx-safety";
 import type { MDXComponents } from "mdx/types";
 import type { ReactElement } from "react";
 import * as runtime from "react/jsx-runtime";
@@ -18,7 +18,7 @@ import remarkGfm from "remark-gfm";
 
 export type MdxComponents = MDXComponents;
 
-export type MdxTrust = "restricted" | "full";
+export type { MdxTrust };
 
 export interface MdxBodyProps {
   /** Raw MDX body (the string stored on the document / content_index row). */
@@ -36,6 +36,11 @@ export interface MdxBodyProps {
    *
    * `"restricted"` refuses executable constructs before compiling. Pass
    * `"full"` only for bodies you know came from your own repository.
+   *
+   * `graft compile` applies the same rule to the authored tree, from
+   * `mdxTrust` in graft.config.ts. The two have to agree: a project that sets
+   * `mdxTrust = "full"` and leaves this at the default indexes bodies that then
+   * fail to render.
    */
   trust?: MdxTrust;
 }
