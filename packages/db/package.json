@@ -1,6 +1,21 @@
 {
   "name": "@usegraft/db",
   "version": "0.1.1",
+  "description": "Postgres client, schema, copy-on-write content branches, and the privilege split behind Graft's approval gate.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "database-branching",
+    "drizzle",
+    "graft",
+    "headless-cms",
+    "least-privilege",
+    "mcp",
+    "postgres",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

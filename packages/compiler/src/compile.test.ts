@@ -96,3 +96,83 @@ describe("readDocs", () => {
     }
   });
 });
+
+describe("readDocs — executable MDX in authored content", () => {
+  it("refuses an expression body, naming the file and the line", () => {
+    write("pages/home.mdx", "---\ntitle: Home\n---\nHello\n\n{process.env.DATABASE_URL}\n");
+    try {
+      readDocs(dir, collections);
+      expect.unreachable("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(GraftError);
+      expect((err as GraftError).code).toBe("INPUT_VALIDATION_FAILED");
+      expect((err as GraftError).message).toContain("pages/home.mdx");
+      expect((err as GraftError).message).toContain("line");
+    }
+  });
+
+  it("refuses an import, which is the same capability by another route", () => {
+    write("pages/home.mdx", '---\ntitle: Home\n---\nimport fs from "node:fs";\n\nHi\n');
+    const err = (() => {
+      try {
+        readDocs(dir, collections);
+      } catch (e) {
+        return e;
+      }
+    })();
+    // SAFETY: readDocs throws GraftError for every refusal path it owns, and the
+    // assertion below fails the test if this one did not throw at all.
+    expect((err as GraftError).code).toBe("INPUT_VALIDATION_FAILED");
+  });
+
+  it("reports every offending document at once, not the first", () => {
+    write("pages/home.mdx", "---\ntitle: Home\n---\n{a}\n");
+    write("pages/about.mdx", "---\ntitle: About\n---\n{b}\n");
+    write("posts/hello.mdx", "---\ntitle: Hello\n---\n{c}\n");
+    try {
+      readDocs(dir, collections);
+      expect.unreachable("should have thrown");
+    } catch (err) {
+      const e = err as GraftError;
+      expect(e.message).toContain("3 document(s)");
+      for (const f of ["pages/home.mdx", "pages/about.mdx", "posts/hello.mdx"]) {
+        expect(e.message).toContain(f);
+      }
+      expect((e.details as { documents: number }).documents).toBe(3);
+    }
+  });
+
+  it("leaves prose, GFM and literal-attribute components alone", () => {
+    write(
+      "pages/home.mdx",
+      '---\ntitle: Home\n---\n# Hi\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n<Callout tone="warn">Careful</Callout>\n',
+    );
+    expect(readDocs(dir, collections)).toHaveLength(1);
+  });
+
+  it('accepts executable MDX when the project declares mdxTrust: "full"', () => {
+    write("pages/home.mdx", "---\ntitle: Home\n---\n{1 + 1}\n");
+    const docs = readDocs(dir, collections, { mdxTrust: "full" });
+    expect(docs).toHaveLength(1);
+    expect(docs[0]?.slug).toBe("home");
+  });
+
+  it('defaults to "restricted", matching MdxBody, so compiling implies rendering', () => {
+    write("pages/home.mdx", "---\ntitle: Home\n---\n{1 + 1}\n");
+    expect(() => readDocs(dir, collections)).toThrow();
+    expect(() => readDocs(dir, collections, {})).toThrow();
+    expect(() => readDocs(dir, collections, { mdxTrust: "restricted" })).toThrow();
+  });
+
+  it("teaches the two settings together, because both have to agree", () => {
+    write("pages/home.mdx", "---\ntitle: Home\n---\n{a}\n");
+    try {
+      readDocs(dir, collections);
+      expect.unreachable("should have thrown");
+    } catch (err) {
+      const fix = (err as GraftError).fix ?? "";
+      expect(fix).toContain("mdxTrust");
+      expect(fix).toContain("MdxBody");
+    }
+  });
+});

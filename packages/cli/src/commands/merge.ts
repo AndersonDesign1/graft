@@ -223,6 +223,7 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
         db: target.db,
         contentDir: config.contentDir,
         collections: config.collections,
+        mdxTrust: config.mdxTrust,
         branchId: targetWrite,
         gitSha,
       });

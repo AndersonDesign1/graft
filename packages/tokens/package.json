@@ -1,7 +1,20 @@
 {
   "name": "@usegraft/tokens",
   "version": "0.1.1",
-  "description": "Graft design tokens — one stylesheet, consumed by the docs site and the Studio.",
+  "description": "Graft design tokens as plain CSS custom properties.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "css",
+    "design-tokens",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "theming",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

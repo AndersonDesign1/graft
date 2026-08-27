@@ -97,6 +97,7 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
     db: branch.db,
     collections: config.collections,
     contentDir: config.contentDir,
+    mdxTrust: config.mdxTrust,
     defaultBranch: writeBranch,
     decider: operatorIdentity,
     authenticate,

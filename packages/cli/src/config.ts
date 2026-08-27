@@ -10,6 +10,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { GraftError, STATIC_INDEX_DEFAULT_PATH } from "@usegraft/contracts";
 import type { AnyCollection, AnyGraftFunction } from "@usegraft/core";
+import type { MdxTrust } from "@usegraft/mdx-safety";
 import { createJiti } from "jiti";
 
 export const CONFIG_FILENAMES = [
@@ -40,6 +41,12 @@ export interface ProjectConfig {
    * for list_functions / run_function. Empty when the project has none.
    */
   functions: Record<string, AnyGraftFunction>;
+  /**
+   * From the optional `mdxTrust` export; defaults to "restricted". Governs what
+   * `graft compile` accepts in an authored body, and matches MdxBody's own
+   * default so a document that compiles is a document that renders.
+   */
+  mdxTrust: MdxTrust;
 }
 
 /** Walk up from `cwd` to the first directory containing a graft.config. */
@@ -155,6 +162,7 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
   const projectDir = dirname(configPath);
   const index = parseIndexConfig(mod.index, projectDir, configPath);
   assertStaticSupports(index, collections as Record<string, AnyCollection>, functions, configPath);
+  const mdxTrust = parseMdxTrust(mod.mdxTrust, configPath);
   const contentDirSetting = typeof mod.contentDir === "string" ? mod.contentDir : "content";
   const migrationsDirSetting =
     typeof mod.migrationsDir === "string" ? mod.migrationsDir : "migrations";
@@ -166,7 +174,24 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
     index,
     collections: collections as Record<string, AnyCollection>,
     functions,
+    mdxTrust,
   };
+}
+
+/**
+ * Read the optional `mdxTrust` export. Anything other than the two known values
+ * is refused rather than defaulted: a typo here would silently re-enable the
+ * restriction someone was deliberately turning off, or the reverse.
+ */
+function parseMdxTrust(value: unknown, configPath: string): MdxTrust {
+  if (value === undefined) return "restricted";
+  if (value === "restricted" || value === "full") return value;
+  throw new GraftError({
+    code: "CONFIG_INVALID",
+    message: `${configPath} exports \`mdxTrust\` as ${JSON.stringify(value)}, which is not "restricted" or "full".`,
+    fix: 'Export `mdxTrust = "restricted"` (the default: `{…}` expressions and `import` are refused in authored bodies) or `mdxTrust = "full"` (every author has commit access, so code review is the control). Omit the export to keep the default.',
+    details: { mdxTrust: value },
+  });
 }
 
 /**

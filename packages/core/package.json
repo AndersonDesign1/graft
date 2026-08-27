@@ -1,6 +1,21 @@
 {
   "name": "@usegraft/core",
   "version": "0.1.1",
+  "description": "Schema and typed functions as owned code: defineCollection, field, defineFunction.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "content-modeling",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "schema",
+    "typed-functions",
+    "typescript",
+    "zod"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

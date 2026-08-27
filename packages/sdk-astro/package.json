@@ -1,6 +1,20 @@
 {
   "name": "@usegraft/sdk-astro",
   "version": "0.1.1",
+  "description": "Astro adapter: typed content reads and endpoint mounts over Graft's stateless handlers.",
+  "keywords": [
+    "agent",
+    "ai",
+    "astro",
+    "cms",
+    "content",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "ssr",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -31,20 +31,22 @@ graft harden graft_runtime
 # Keep the operator URL local/CI-only: graft compile / migrate / approve.
 ```
 
-The container automates this: set `GRAFT_RUNTIME_PASSWORD` and boot creates,
-hardens, and serves under the role. Two things to know: the hardened
-credential cannot project content, so MCP `write_content`/`delete_content`
-need the operator credential — hardened deployments are functions/reads-first;
-and `graft harden` grants Graft's tables only — tables your app adds (e.g. an
-embedded auth provider's) get granted separately.
+The container automates this. In all-in-one it is the default: boot creates the
+role, hardens it, and serves under it, generating a password when you supply
+none. In `GRAFT_MODE=serve` the database is yours rather than the container's,
+so set `GRAFT_HARDEN=1` or `GRAFT_RUNTIME_PASSWORD` to opt in. `GRAFT_HARDEN=0`
+turns it off anywhere.
+
+One thing to know: `graft harden` grants Graft's own tables. Tables your app
+adds, such as an embedded auth provider's, need granting separately.
 
 ## Who runs what
 
-| Task                                                      | Credential         | Where                                                    |
-| --------------------------------------------------------- | ------------------ | -------------------------------------------------------- |
-| `graft compile` / `graft migrate --apply` / `graft merge` | operator           | CI or your machine (the container also compiles at boot) |
-| `graft approve` / `graft deny`                            | operator (a human) | your machine                                             |
-| serve functions, MCP, reads, approval request/consume     | runtime            | the deployment                                           |
+| Task                                                                         | Credential         | Where                                                    |
+| ---------------------------------------------------------------------------- | ------------------ | -------------------------------------------------------- |
+| `graft compile` / `graft migrate --apply` / `graft merge`                    | operator           | CI or your machine (the container also compiles at boot) |
+| `graft approve` / `graft deny`                                               | operator (a human) | your machine                                             |
+| serve functions, MCP (incl. content writes), reads, approval request/consume | runtime            | the deployment                                           |
 
 ## Pre-1.0 note
 

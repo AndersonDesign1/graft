@@ -1,6 +1,20 @@
 {
   "name": "@usegraft/content-migrations",
   "version": "0.1.1",
+  "description": "Codemod-style transforms for authored content when the schema changes.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "codemod",
+    "content",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "migrations",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

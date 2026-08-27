@@ -1,6 +1,21 @@
 {
   "name": "@usegraft/sdk-core",
   "version": "0.1.1",
+  "description": "Framework-agnostic typed read client over the Graft content index, plus the cache-tag contract.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cache-tags",
+    "cms",
+    "content-api",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "sdk",
+    "typed-client",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

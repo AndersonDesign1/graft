@@ -2,6 +2,19 @@
   "name": "@usegraft/sdk-sveltekit",
   "version": "0.1.0",
   "private": true,
+  "description": "SvelteKit adapter for Graft. Private while the surface is being shaped.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "svelte",
+    "sveltekit",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

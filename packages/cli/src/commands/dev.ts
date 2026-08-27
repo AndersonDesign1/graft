@@ -89,11 +89,13 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
               db: branch.db,
               contentDir: config.contentDir,
               collections: config.collections,
+              mdxTrust: config.mdxTrust,
               branchId: writeBranch,
             })
           : await compileStatic({
               contentDir: config.contentDir,
               collections: config.collections,
+              mdxTrust: config.mdxTrust,
               indexPath: (config.index as { driver: "static"; path: string }).path,
             });
       console.log(formatCompileResult(result));

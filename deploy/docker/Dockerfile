@@ -38,7 +38,15 @@ COPY --from=minio /usr/bin/minio /usr/local/bin/minio
 COPY --from=mc /usr/bin/mc /usr/local/bin/mc
 
 COPY --from=builder /opt/graft /opt/graft
+# The CR strip is not paranoia. On Windows, core.autocrlf beats this repo
+# .gitattributes eol=lf, so entrypoint.sh can sit in the working tree with CRLF
+# while git status reports it clean (git normalises on read). docker build
+# copies the working tree, not git, so the image gets a shebang ending in CR
+# and the container exits 127: env: 'bash\r': No such file or directory.
+# The committed blob is LF and CI checks out on Linux, so this only bites a
+# local build, which is exactly where a confusing failure costs most.
 RUN printf '#!/bin/sh\nexec node /opt/graft/packages/cli/dist/index.js "$@"\n' > /usr/local/bin/graft \
+  && sed -i 's/\r$//' /opt/graft/deploy/docker/entrypoint.sh \
   && chmod +x /usr/local/bin/graft /opt/graft/deploy/docker/entrypoint.sh
 
 # Embedded-infra defaults; every one of these is overridable (and DATABASE_URL /

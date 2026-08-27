@@ -1,7 +1,21 @@
 {
   "name": "@usegraft/mdx-safety",
   "version": "0.1.1",
-  "description": "Refuse executable constructs in authored MDX — the write-side control for content Graft did not author.",
+  "description": "Refuse executable MDX before it is stored or rendered. MDX is code, and rendering evaluates it on the server.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "content-security",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "mdx",
+    "sandbox",
+    "security",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",

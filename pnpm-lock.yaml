@@ -274,6 +274,9 @@ importers:
       '@usegraft/mcp':
         specifier: workspace:*
         version: link:../mcp
+      '@usegraft/mdx-safety':
+        specifier: workspace:*
+        version: link:../mdx-safety
       '@usegraft/registry':
         specifier: workspace:*
         version: link:../registry
@@ -299,6 +302,9 @@ importers:
       '@usegraft/db':
         specifier: workspace:*
         version: link:../db
+      '@usegraft/mdx-safety':
+        specifier: workspace:*
+        version: link:../mdx-safety
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3

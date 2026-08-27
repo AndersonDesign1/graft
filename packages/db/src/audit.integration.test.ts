@@ -5,6 +5,7 @@
  */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sql } from "drizzle-orm";
 import { GraftError } from "@usegraft/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { decideApproval, createDbApprovalStore, listPendingApprovals } from "./approvals";
@@ -46,11 +47,15 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
     handle = createDb(process.env.DATABASE_URL as string);
     await handle.sql`delete from audit_log where branch_id = ${BRANCH}`;
     await handle.sql`delete from approvals where branch_id = ${BRANCH}`;
+    await handle.sql`delete from content_index where branch_id = ${BRANCH}`;
+    await handle.sql`delete from compilations where branch_id = ${BRANCH}`;
   }, TEST_TIMEOUT);
 
   afterAll(async () => {
     await handle.sql`delete from audit_log where branch_id = ${BRANCH}`;
     await handle.sql`delete from approvals where branch_id = ${BRANCH}`;
+    await handle.sql`delete from content_index where branch_id = ${BRANCH}`;
+    await handle.sql`delete from compilations where branch_id = ${BRANCH}`;
     await handle.close();
   }, TEST_TIMEOUT);
 
@@ -227,6 +232,67 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
           }),
         ).rejects.toThrow(/permission denied for table approvals/i);
 
+        // The runtime never needs to FLIP a pending row, so proving it cannot
+        // is not proving the gate holds. A table-level INSERT grant lets the
+        // grantee name every column, and `status` is plain text with a default
+        // rather than a constraint — so the cheaper attack is to mint a row
+        // that is already approved and consume it. `decideApproval` never runs,
+        // which means the separation-of-duties check never runs either.
+        await expect(
+          handle.sql.begin(async (tx) => {
+            await tx.unsafe(`set local role ${role}`);
+            await tx`insert into approvals
+                       (branch_id, function_name, input, input_canonical,
+                        requested_by_kind, correlation_id, status)
+                     values (${BRANCH}, 'itFn', '{}'::jsonb, '{}', 'agent',
+                             'it-corr-mint', 'approved')`;
+          }),
+        ).rejects.toThrow(/permission denied/i);
+
+        // Same door, one step further in: naming `decided_by` would forge who
+        // approved it, which is the column the requester/approver comparison
+        // reads.
+        await expect(
+          handle.sql.begin(async (tx) => {
+            await tx.unsafe(`set local role ${role}`);
+            await tx`insert into approvals
+                       (branch_id, function_name, input, input_canonical,
+                        requested_by_kind, correlation_id, decided_by)
+                     values (${BRANCH}, 'itFn', '{}'::jsonb, '{}', 'agent',
+                             'it-corr-forge', 'someone-else')`;
+          }),
+        ).rejects.toThrow(/permission denied/i);
+
+        // Filing an ordinary request still works: the grant is narrowed, not
+        // removed. Status falls back to its default.
+        //
+        // Through createDbApprovalStore, NOT hand-written SQL. That distinction
+        // is the whole point of this assertion. An earlier version of this test
+        // inserted by hand, which passed while the real path was broken: Drizzle's
+        // insert builder names every column of the table and passes `default` for
+        // the ones it was not given, and Postgres checks INSERT privilege on the
+        // columns a statement NAMES. So the narrow grant refused the builder's
+        // statement for naming `status`, and `delete_content` could not file an
+        // approval at all. Caught by booting the container, not by this suite.
+        const filedId = await handle.db.transaction(async (tx) => {
+          await tx.execute(sql.raw(`set local role ${role}`));
+          // SAFETY: a PostgresJsTransaction exposes the same query surface the
+          // store uses; running the store against it is what puts the real
+          // statement under `set local role`.
+          const store = createDbApprovalStore(tx as unknown as typeof handle.db);
+          return store.request({
+            branch: BRANCH,
+            functionName: "itFn",
+            input: { id: "row-filed" },
+            inputCanonical: '{"id":"row-filed"}',
+            requestedByKind: "agent",
+            requestedById: "it-agent",
+            correlationId: "it-corr-filed",
+          });
+        });
+        const [filed] = await handle.sql`select status from approvals where id = ${filedId}::uuid`;
+        expect(filed?.status).toBe("pending");
+
         // Still pending — now approve as the operator (owner connection).
         await decideApproval(handle.db, id, "approved", OPERATOR);
 
@@ -270,6 +336,49 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
             await tx`update audit_log set rate_key = 'someone-else' where id = ${auditId}::uuid`;
           }),
         ).rejects.toThrow(/permission denied/i);
+
+        // Content projection: the half that makes hardening free. MCP
+        // write_content writes the file and then compiles, and compile is what
+        // reaches Postgres — so a runtime role that cannot project content
+        // cannot serve write_content at all. Granting it costs nothing the
+        // application does not already expose, and the approval denial above
+        // is untouched by it.
+        await handle.sql.begin(async (tx) => {
+          await tx.unsafe(`set local role ${role}`);
+          await tx`insert into content_index (branch_id, collection, slug, data, body, content_hash, source_path)
+                   values (${BRANCH}, 'itDocs', 'hardened-projection', '{"title":"x"}'::jsonb, 'body', 'hash-1', 'itDocs/hardened-projection.mdx')`;
+          await tx`insert into compilations (branch_id, git_sha, doc_count, added, changed, removed)
+                   values (${BRANCH}, null, 1, 1, 0, 0)`;
+        });
+
+        // Removal is a soft delete, which is why UPDATE is granted and DELETE
+        // is not. Both halves are asserted so a future widening of the grant
+        // list fails here rather than in production.
+        await handle.sql.begin(async (tx) => {
+          await tx.unsafe(`set local role ${role}`);
+          await tx`update content_index set deleted = true
+                   where branch_id = ${BRANCH} and collection = 'itDocs' and slug = 'hardened-projection'`;
+        });
+        const [projected] = await handle.sql`select deleted from content_index
+          where branch_id = ${BRANCH} and collection = 'itDocs' and slug = 'hardened-projection'`;
+        expect(projected?.deleted).toBe(true);
+
+        await expect(
+          handle.sql.begin(async (tx) => {
+            await tx.unsafe(`set local role ${role}`);
+            await tx`delete from content_index where branch_id = ${BRANCH} and collection = 'itDocs'`;
+          }),
+        ).rejects.toThrow(/permission denied/i);
+
+        // Schema changes stay operator work: projecting content must not imply
+        // being able to claim a migration was applied.
+        await expect(
+          handle.sql.begin(async (tx) => {
+            await tx.unsafe(`set local role ${role}`);
+            await tx`insert into migrations_applied (branch_id, migration_id, kind, collection, doc_count)
+                     values (${BRANCH}, '9999-fake', 'content', 'itDocs', 0)`;
+          }),
+        ).rejects.toThrow(/permission denied/i);
       } finally {
         // DROP OWNED is refused on Neon (it touches objects the owner role
         // cannot drop); revoke the explicit grants instead, then drop.
@@ -278,6 +387,59 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
         await handle.sql.unsafe(`revoke all on schema public from ${role}`);
         await handle.sql.unsafe(`drop role if exists ${role}`);
       }
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "an approval is filed pending by construction, even for the owner",
+    async () => {
+      // The grant is one control and this is the other. Column-scoping the
+      // runtime role's INSERT stops that role naming `status`, but a grant list
+      // is a thing someone edits. Migration 0009 puts the same rule in the
+      // table, so it holds for every role including this owner connection, and
+      // a future widening of runtimeRoleGrantsSql cannot quietly reopen it.
+      await expect(
+        handle.sql`insert into approvals
+                     (branch_id, function_name, input, input_canonical,
+                      requested_by_kind, correlation_id, status)
+                   values (${BRANCH}, 'itFn', '{}'::jsonb, '{}', 'agent',
+                           'it-corr-trig-1', 'approved')`,
+      ).rejects.toThrow(/filed pending/i);
+
+      await expect(
+        handle.sql`insert into approvals
+                     (branch_id, function_name, input, input_canonical,
+                      requested_by_kind, correlation_id, decided_by)
+                   values (${BRANCH}, 'itFn', '{}'::jsonb, '{}', 'agent',
+                           'it-corr-trig-2', 'someone-else')`,
+      ).rejects.toThrow(/decision already recorded/i);
+
+      // A status outside the known set is refused by the CHECK, so a typo in a
+      // future UPDATE cannot park a row in a state nothing reads.
+      await expect(
+        handle.sql`update approvals set status = 'aproved'
+                   where branch_id = ${BRANCH}`,
+      ).rejects.toThrow(/approvals_status_known/i);
+
+      // The ordinary path is untouched.
+      const store = createDbApprovalStore(handle.db);
+      const id = await store.request({
+        branch: BRANCH,
+        functionName: "itFn",
+        input: { id: "row-trig" },
+        inputCanonical: '{"id":"row-trig"}',
+        requestedByKind: "agent",
+        requestedById: "it-agent",
+        correlationId: "it-corr-trig-ok",
+      });
+      const [row] = await handle.sql`select status from approvals where id = ${id}::uuid`;
+      expect(row?.status).toBe("pending");
+
+      // And deciding still works, because deciding is an UPDATE.
+      await decideApproval(handle.db, id, "approved", OPERATOR);
+      const [decided] = await handle.sql`select status from approvals where id = ${id}::uuid`;
+      expect(decided?.status).toBe("approved");
     },
     TEST_TIMEOUT,
   );

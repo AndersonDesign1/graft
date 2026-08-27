@@ -52,10 +52,13 @@ services:
       S3_ACCESS_KEY: graft
       S3_SECRET_KEY: graftsecret
       S3_BUCKET: graft-assets
-      # Uncomment for a stable identity / hardened runtime credential:
+      # Uncomment for a stable identity. GRAFT_HARDEN is opt-in here because
+      # GRAFT_MODE=serve means this database is yours, not the container's;
+      # the single all-in-one container hardens by default.
       # GRAFT_DEV_TOKEN: change-me
       # GRAFT_DEV_SCOPES: submissions:read
-      # GRAFT_RUNTIME_PASSWORD: change-me-too
+      # GRAFT_HARDEN: "1"
+      # GRAFT_RUNTIME_PASSWORD: change-me-too   # optional: pick the secret yourself
     ports:
       - "3903:3903"
     # volumes:

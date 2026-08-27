@@ -305,6 +305,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     contentDir: config.contentDir,
     collections: config.collections,
     functions,
+    mdxTrust: config.mdxTrust,
     db: branch.db,
     branchId: writeBranch,
     scope: branch.scope,
@@ -386,6 +387,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
       db: branch.db,
       collections: config.collections,
       contentDir: config.contentDir,
+      mdxTrust: config.mdxTrust,
       defaultBranch: writeBranch,
       // Only reached on a loopback mount, where there is no caller identity to
       // attribute to. Off loopback the authenticated principal is used instead.

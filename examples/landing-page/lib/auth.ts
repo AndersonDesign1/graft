@@ -35,6 +35,35 @@ const OPERATOR_EMAILS = new Set(
 /** Operator scopes. Content authoring and approvals are NOT among them. */
 const OPERATOR_SCOPE = "submissions:read commerce:orders:read commerce:orders:write";
 
+/**
+ * Explain the empty scope once, when it is first earned.
+ *
+ * The default is correct and stays: an unset GRAFT_OPERATOR_EMAILS grants
+ * nobody anything. It is also the single most confusing thing about demoing
+ * this app, because the symptom is a bare 401 from a function that looks like
+ * it should work, and nothing connects that to a variable you did not set.
+ *
+ * Deliberately not a module-scope warning. This file is evaluated during
+ * `next build`, where the variable is legitimately absent and a warning is
+ * noise — the same reason BETTER_AUTH_SECRET is set to a throwaway in CI.
+ * Firing here means it fires exactly when a real person signs in and gets
+ * nothing.
+ */
+let explainedEmptyScope = false;
+function explainEmptyScope(email: string): void {
+  if (explainedEmptyScope) return;
+  explainedEmptyScope = true;
+  const configured = OPERATOR_EMAILS.size > 0;
+  console.warn(
+    `[graft] minted a token for ${email} with no scopes, so gated functions will answer 401.\n` +
+      (configured
+        ? `[graft] GRAFT_OPERATOR_EMAILS is set but does not list this address.\n`
+        : `[graft] GRAFT_OPERATOR_EMAILS is unset, so no account has scopes.\n`) +
+      `[graft] To grant them: GRAFT_OPERATOR_EMAILS=${email}\n` +
+      `[graft] Scopes granted: ${OPERATOR_SCOPE}`,
+  );
+}
+
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
   database: new Pool({ connectionString: process.env.DATABASE_URL }),
@@ -47,10 +76,11 @@ export const auth = betterAuth({
         // nothing: an account gets scopes only by being named in
         // GRAFT_OPERATOR_EMAILS. Consider also requiring email verification
         // before minting tokens once this app has a mail sender.
-        definePayload: ({ user }) => ({
-          email: user.email,
-          scope: OPERATOR_EMAILS.has(user.email.toLowerCase()) ? OPERATOR_SCOPE : "",
-        }),
+        definePayload: ({ user }) => {
+          const operator = OPERATOR_EMAILS.has(user.email.toLowerCase());
+          if (!operator) explainEmptyScope(user.email);
+          return { email: user.email, scope: operator ? OPERATOR_SCOPE : "" };
+        },
       },
     }),
   ],

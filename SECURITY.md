@@ -20,21 +20,37 @@ outside what the controls below cover.
   They may not decide their own destructive operations, and no agent runtime
   token should carry `approvals:decide`.
 - **The operator credential is separate from the runtime credential.** Graft
-  works single-credential, and `graft harden <role>` splits them. The split is
+  works single-credential, and `graft harden <role>` splits them. The container
+  applies the split by default wherever it owns its own database. The split is
   defence in depth beneath the application-level controls, not a substitute.
+- **A stolen runtime credential can rewrite and hide content.** The hardened
+  role holds `INSERT`/`UPDATE` on `content_index` because projection needs it,
+  so raw SQL under that credential can change any document or set `deleted`.
+  The human gate on MCP `delete_content` is an application control against an
+  agent misusing the tool. It is not a database control against a stolen
+  credential, and no grant list short of refusing content writes entirely would
+  make it one.
+
+  **The approval gate is the exception, deliberately.** It holds even against a
+  stolen runtime credential: no `UPDATE` on `approvals`, and a column-scoped
+  `INSERT` that cannot name `status` or `decided_by`. Both halves are needed.
+  Withholding `UPDATE` alone leaves the credential able to file a row that is
+  already approved, which is cheaper than flipping a pending one.
 
 ## What is enforced
 
-| Control                                                             | Where                                  |
-| ------------------------------------------------------------------- | -------------------------------------- |
-| Anonymous MCP callers refused unless explicitly allowed             | `@usegraft/mcp`, `graft serve`         |
-| Approval decider derived from the verified caller, never from input | `@usegraft/db`, every deciding surface |
-| A requester can never decide their own approval                     | `decideApproval`                       |
-| Per-route scopes on the Studio API and MCP tools                    | `@usegraft/studio`, `@usegraft/mcp`    |
-| Path containment with symlink refusal on every filesystem sink      | `@usegraft/compiler`                   |
-| Rate identity from the connection peer, not a client header         | `@usegraft/core`                       |
-| Authored MDX refused unless the renderer opts into full MDX         | `@usegraft/mdx-safety`                 |
-| Host validation and cross-origin refusal on the local Studio        | `graft serve`, `graft studio`          |
+| Control                                                                 | Where                                  |
+| ----------------------------------------------------------------------- | -------------------------------------- |
+| Anonymous MCP callers refused unless explicitly allowed                 | `@usegraft/mcp`, `graft serve`         |
+| Approval decider derived from the verified caller, never from input     | `@usegraft/db`, every deciding surface |
+| A requester can never decide their own approval                         | `decideApproval`                       |
+| Per-route scopes on the Studio API and MCP tools                        | `@usegraft/studio`, `@usegraft/mcp`    |
+| Path containment with symlink refusal on every filesystem sink          | `@usegraft/compiler`                   |
+| Rate identity from the connection peer, not a client header             | `@usegraft/core`                       |
+| Authored MDX refused unless the renderer opts into full MDX             | `@usegraft/mdx-safety`                 |
+| Executable MDX refused at compile, across the whole content tree        | `graft compile`, `mdxTrust`            |
+| Host validation and cross-origin refusal on the local Studio            | `graft serve`, `graft studio`          |
+| Runtime credential has no `UPDATE` on `approvals`, enforced by Postgres | `graft harden`, container by default   |
 
 The decisions behind these live in [`docs/adr/`](docs/adr/), each stating the
 premise it depends on. If you are reporting something that shows a premise is
@@ -44,11 +60,15 @@ false, say which one — that is the most useful kind of report.
 
 - Do not set `GRAFT_MCP_ALLOW_ANONYMOUS=1` on anything reachable from a network.
 - Give agent tokens `content:write` at most. Never `approvals:decide`.
-- Run `graft harden <role>` and serve under that role.
+- Run `graft harden <role>` and serve under that role. The all-in-one container
+  already does; `GRAFT_MODE=serve` needs `GRAFT_HARDEN=1` because that database
+  is yours, not the container's.
 - Set `trustedProxyHops` to the number of proxies you actually run. The default,
   `0`, ignores `x-forwarded-for` entirely, which is correct when nothing is in
   front of you.
 - Leave `MdxBody` at `trust: "restricted"` unless every author has commit access.
+  `mdxTrust` in graft.config.ts is the compile-side half of the same decision, and
+  the two have to agree.
 
 ## Supported versions
 

@@ -140,8 +140,19 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
    */
   const projectContent = async (): Promise<CompileResult> =>
     staticIndexPath === undefined
-      ? compile({ contentDir, collections, db: requireDb("compile", ""), branchId })
-      : compileStatic({ contentDir, collections, indexPath: staticIndexPath });
+      ? compile({
+          contentDir,
+          collections,
+          db: requireDb("compile", ""),
+          branchId,
+          mdxTrust: options.mdxTrust,
+        })
+      : compileStatic({
+          contentDir,
+          collections,
+          indexPath: staticIndexPath,
+          mdxTrust: options.mdxTrust,
+        });
 
   /** Search whichever index this server serves; the static artifact is opened per call. */
   const searchIndex = async (query: {

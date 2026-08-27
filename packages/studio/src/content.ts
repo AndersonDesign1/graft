@@ -16,7 +16,7 @@ import {
   type ProjectedDoc,
 } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
-import { assertSafeMdx } from "@usegraft/mdx-safety";
+import { assertSafeMdx, type MdxTrust } from "@usegraft/mdx-safety";
 import type { AnyCollection } from "@usegraft/core";
 import type { Database } from "@usegraft/db";
 import matter from "gray-matter";
@@ -70,6 +70,8 @@ export async function writeDocument(options: {
   collections: Record<string, AnyCollection>;
   db: Database;
   branchId: string;
+  /** Passed through to the recompile; see StudioApiOptions.mdxTrust. */
+  mdxTrust?: MdxTrust;
   collection: string;
   slug: string;
   data: Record<string, unknown>;
@@ -118,6 +120,7 @@ export async function writeDocument(options: {
     contentDir: options.contentDir,
     collections: options.collections,
     db: options.db,
+    mdxTrust: options.mdxTrust,
     branchId: options.branchId,
   });
   return {

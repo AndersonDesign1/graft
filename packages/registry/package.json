@@ -1,6 +1,21 @@
 {
   "name": "@usegraft/registry",
   "version": "0.1.1",
+  "description": "The shadcn-style registry behind `graft add`. Primitives are copied into your repository, not imported from ours.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "codegen",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "primitives",
+    "registry",
+    "shadcn",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
   "license": "MIT",
   "repository": {
     "type": "git",
