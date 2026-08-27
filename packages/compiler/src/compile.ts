@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { GraftError } from "@usegraft/contracts";
+import { findExecutableMdx, UncheckableMdxError, type MdxTrust } from "@usegraft/mdx-safety";
 import { walkContentFiles } from "./content-files";
 import type { AnyCollection } from "@usegraft/core";
 import {
@@ -38,6 +39,12 @@ export interface CompileOptions {
    * unless this is set (legitimate after a collection rename/delete).
    */
   pruneUnknown?: boolean;
+  /**
+   * How much of MDX authored bodies may be. Defaults to "restricted", matching
+   * MdxBody, so a document that compiles is a document that renders. From
+   * `export const mdxTrust` in graft.config.ts.
+   */
+  mdxTrust?: MdxTrust;
 }
 
 export interface CompileResult {
@@ -49,10 +56,20 @@ export interface CompileResult {
   gitSha: string | null;
 }
 
+export interface ReadDocsOptions {
+  /**
+   * How much of MDX authored bodies may be. Defaults to "restricted", which is
+   * also MdxBody's default, so a document that compiles is a document that
+   * renders. Set "full" only where every author has commit access.
+   */
+  mdxTrust?: MdxTrust;
+}
+
 /** Read + validate the content tree into normalized docs. Pure of the database. */
 export function readDocs(
   contentDir: string,
   collections: Record<string, AnyCollection>,
+  options: ReadDocsOptions = {},
 ): ProjectedDoc[] {
   if (!existsSync(contentDir) || !statSync(contentDir).isDirectory()) {
     throw new GraftError({
@@ -65,6 +82,12 @@ export function readDocs(
 
   const docs: ProjectedDoc[] = [];
   const seen = new Map<string, string>();
+  // Collected rather than thrown per file: an author fixing one document at a
+  // time learns the rule slowly and resents it. Same reasoning assertSafeMdx
+  // applies within one body, applied across the tree.
+  const executable: { sourcePath: string; found: number; first: string }[] = [];
+  const unreadable: { sourcePath: string; reason: string }[] = [];
+  const mdxTrust: MdxTrust = options.mdxTrust ?? "restricted";
 
   for (const file of walkContentFiles(contentDir)) {
     const sourcePath = relative(contentDir, file).split(sep).join("/");
@@ -97,6 +120,31 @@ export function readDocs(
     }
 
     const doc = parseDocument(readFileSync(file, "utf8"), collection, sourcePath);
+
+    // MdxBody refuses executable bodies at render, and content can reach the
+    // index without passing a write handler, so that check stays where it is.
+    // This one exists so the refusal happens at build time on the authored
+    // path, instead of per-request in production on the page itself.
+    if (mdxTrust !== "full") {
+      try {
+        const found = findExecutableMdx(doc.body);
+        if (found.length > 0) {
+          const first = found[0];
+          executable.push({
+            sourcePath,
+            found: found.length,
+            first: first?.line === undefined ? "" : `line ${first.line}`,
+          });
+        }
+      } catch (error) {
+        // Source the checker cannot parse is refused, not waved through: the
+        // renderer's parser is not this one, and the gap between them is
+        // exactly where executable source would sit.
+        if (!(error instanceof UncheckableMdxError)) throw error;
+        unreadable.push({ sourcePath, reason: error.message });
+      }
+    }
+
     const key = `${doc.collection}/${doc.slug}`;
     const existing = seen.get(key);
     if (existing) {
@@ -111,6 +159,30 @@ export function readDocs(
     docs.push(doc);
   }
 
+  if (unreadable.length > 0) {
+    const listed = unreadable.map((u) => `${u.sourcePath} (${u.reason})`).join(", ");
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `${unreadable.length} document(s) could not be checked for executable MDX: ${listed}.`,
+      fix: "Fix the MDX syntax so it parses. Unparseable source is refused rather than indexed, because the renderer's parser is not this one and the difference between them is where executable source would hide.",
+      details: { unreadable },
+    });
+  }
+
+  if (executable.length > 0) {
+    const listed = executable
+      .slice(0, 10)
+      .map((e) => (e.first === "" ? e.sourcePath : `${e.sourcePath} (${e.first})`))
+      .join(", ");
+    const more = executable.length > 10 ? ` …and ${executable.length - 10} more` : "";
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `Executable MDX in ${executable.length} document(s): ${listed}${more}.`,
+      fix: 'Rendering evaluates `{…}` and `import` as JavaScript on the server, and MdxBody refuses them by default, so these documents would fail per-request rather than here. Write prose, Markdown and components with literal attributes. If every author of this repository has commit access, set `export const mdxTrust = "full"` in graft.config.ts and pass trust="full" to MdxBody. Code review is the control in that case, which is what ADR 0004 assumes.',
+      details: { documents: executable.length, offenders: executable.slice(0, 20) },
+    });
+  }
+
   return docs.sort((a, b) =>
     a.collection === b.collection
       ? a.slug.localeCompare(b.slug)
@@ -119,7 +191,9 @@ export function readDocs(
 }
 
 export async function compile(options: CompileOptions): Promise<CompileResult> {
-  const docs = readDocs(options.contentDir, options.collections);
+  const docs = readDocs(options.contentDir, options.collections, {
+    mdxTrust: options.mdxTrust,
+  });
   const gitSha = options.gitSha === undefined ? resolveGitSha(options.contentDir) : options.gitSha;
   const changes = await projectBranchContent(
     options.db,
@@ -148,6 +222,12 @@ export interface CompileStaticOptions {
   indexPath: string;
   /** As in CompileOptions: omit to auto-resolve, null to skip. */
   gitSha?: string | null;
+  /**
+   * How much of MDX authored bodies may be. Defaults to "restricted", matching
+   * MdxBody, so a document that compiles is a document that renders. From
+   * `export const mdxTrust` in graft.config.ts.
+   */
+  mdxTrust?: MdxTrust;
 }
 
 /**
@@ -156,7 +236,9 @@ export interface CompileStaticOptions {
  * git's job here, so there is no branchId; the artifact records "main".
  */
 export async function compileStatic(options: CompileStaticOptions): Promise<CompileResult> {
-  const docs = readDocs(options.contentDir, options.collections);
+  const docs = readDocs(options.contentDir, options.collections, {
+    mdxTrust: options.mdxTrust,
+  });
   const gitSha = options.gitSha === undefined ? resolveGitSha(options.contentDir) : options.gitSha;
   const changes = await projectStaticContent(
     docs.map((doc) => ({

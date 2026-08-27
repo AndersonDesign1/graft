@@ -5,6 +5,7 @@
  */
 import { compile } from "@usegraft/compiler";
 import type { AnyCollection } from "@usegraft/core";
+import type { MdxTrust } from "@usegraft/mdx-safety";
 import {
   decideApproval,
   type ApprovalDecider,
@@ -54,6 +55,13 @@ export interface StudioApiOptions {
    * directory's parent, which is the layout `graft init` scaffolds.
    */
   projectRoot?: string;
+  /**
+   * How much of MDX authored bodies may be, from `mdxTrust` in graft.config.ts.
+   * Defaults to "restricted". A Studio save is already checked on the way in;
+   * this governs the whole-tree recompile that follows, which re-reads every
+   * authored file including the ones that came from git.
+   */
+  mdxTrust?: MdxTrust;
   /** Branch used for compile + tree default. */
   defaultBranch?: string;
   /**
@@ -604,6 +612,7 @@ const ROUTES: readonly Route[] = [
         contentDir: options.contentDir,
         collections: options.collections,
         db: options.db,
+        mdxTrust: options.mdxTrust,
         branchId: branch,
       });
       const body: CompileResultDto = {
@@ -805,6 +814,7 @@ const ROUTES: readonly Route[] = [
         contentDir: options.contentDir,
         collections: options.collections,
         db: options.db,
+        mdxTrust: options.mdxTrust,
         branchId: row.branchId,
       });
       const body: RevertResultDto = {
@@ -886,6 +896,7 @@ const ROUTES: readonly Route[] = [
         contentDir: options.contentDir,
         collections: options.collections,
         db: options.db,
+        mdxTrust: options.mdxTrust,
         branchId: payload.branch?.trim() || defaultBranch,
         collection: payload.collection,
         slug: payload.slug,

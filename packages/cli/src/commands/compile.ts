@@ -41,6 +41,7 @@ export async function compileCommand(options: CompileCommandOptions): Promise<Co
     const result = await compileStatic({
       contentDir: config.contentDir,
       collections: config.collections,
+      mdxTrust: config.mdxTrust,
       indexPath: config.index.path,
     });
     console.log(formatCompileResult(result));
@@ -67,6 +68,7 @@ export async function compileCommand(options: CompileCommandOptions): Promise<Co
         db: branch.db,
         contentDir: config.contentDir,
         collections: config.collections,
+        mdxTrust: config.mdxTrust,
         branchId: scopeWriteBranch(branch.scope),
         pruneUnknown: options.pruneUnknown,
       });

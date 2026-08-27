@@ -117,3 +117,37 @@ describe("requireDatabaseUrl", () => {
     }
   });
 });
+
+describe("loadConfig — mdxTrust", () => {
+  it('defaults to "restricted" when the project does not export it', async () => {
+    const config = await loadConfig(join(fixtures, "basic", "graft.config.ts"));
+    expect(config.mdxTrust).toBe("restricted");
+  });
+
+  it('reads "full" from the project', async () => {
+    const config = await loadConfig(join(fixtures, "mdx-full", "graft.config.ts"));
+    expect(config.mdxTrust).toBe("full");
+  });
+
+  it("refuses an unrecognised value rather than defaulting it", async () => {
+    // A typo that fell back to the default would silently re-impose the
+    // restriction someone was deliberately lifting, and the failure would show
+    // up as a compile error in content they had just been told was allowed.
+    expect(
+      await graftErrorCodeAsync(() => loadConfig(join(fixtures, "mdx-bad", "graft.config.ts"))),
+    ).toBe("CONFIG_INVALID");
+  });
+
+  it("names both valid values in the fix", async () => {
+    try {
+      await loadConfig(join(fixtures, "mdx-bad", "graft.config.ts"));
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      // SAFETY: parseMdxTrust throws GraftError on this fixture, and the
+      // unreachable() above fails the test if it threw nothing at all.
+      const fix = (error as GraftError).fix ?? "";
+      expect(fix).toContain("restricted");
+      expect(fix).toContain("full");
+    }
+  });
+});

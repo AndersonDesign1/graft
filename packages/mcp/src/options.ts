@@ -7,6 +7,7 @@
 import type { Storage } from "@usegraft/assets";
 import type { AnyCollection, AnyGraftFunction, FunctionActor, RateLimit } from "@usegraft/core";
 import type { ApprovalStore, AuditStore, BranchScope, Database } from "@usegraft/db";
+import type { MdxTrust } from "@usegraft/mdx-safety";
 
 export interface GraftMcpOptions {
   /** Absolute path to the content root (documents live at <contentDir>/<collection>/<slug>.mdx). */
@@ -31,6 +32,13 @@ export interface GraftMcpOptions {
    * projects still work.
    */
   functions?: Record<string, AnyGraftFunction>;
+  /**
+   * How much of MDX authored bodies may be, from `mdxTrust` in graft.config.ts.
+   * Defaults to "restricted". Applies to the whole tree on every projection,
+   * not just to bodies arriving through write_content, because compile re-reads
+   * every authored file including the ones that came from git.
+   */
+  mdxTrust?: MdxTrust;
   /** Content branch to project into. Defaults to "main". */
   branchId?: string;
   /**

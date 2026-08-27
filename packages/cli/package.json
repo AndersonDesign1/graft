@@ -32,6 +32,7 @@
     "@usegraft/core": "workspace:*",
     "@usegraft/db": "workspace:*",
     "@usegraft/mcp": "workspace:*",
+    "@usegraft/mdx-safety": "workspace:*",
     "@usegraft/registry": "workspace:*",
     "@usegraft/studio": "workspace:*",
     "jiti": "^2.4.0"

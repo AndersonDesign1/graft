@@ -190,6 +190,17 @@ export function findExecutableMdx(source: string): ExecutableNode[] {
   return found;
 }
 
+/**
+ * How much of MDX a body is allowed to be.
+ *
+ * `"restricted"` refuses executable constructs. `"full"` accepts them, and is
+ * only correct where every author has commit access, because rendering
+ * evaluates `{…}` and `import` as JavaScript on the server. The name is
+ * declared here so the compiler, the SDKs and `graft.config.ts` all mean the
+ * same thing by it.
+ */
+export type MdxTrust = "restricted" | "full";
+
 export interface AssertSafeMdxOptions {
   /** What is being checked, for the error message (e.g. "pages/home"). */
   label?: string;
@@ -199,9 +210,14 @@ export interface AssertSafeMdxOptions {
  * Throw unless the body is free of executable constructs.
  *
  * Called on the surfaces that accept content from someone who is not the
- * operator — MCP `write_content`, Studio document saves. Content already in git
- * is not checked here: it arrived through code review, which is the control
- * that applies to code.
+ * operator — MCP `write_content`, Studio document saves.
+ *
+ * Content already in git is checked too, by `graft compile` via
+ * {@link findExecutableMdx}, unless the project sets `mdxTrust = "full"`. That
+ * setting is what "code review is the control" looks like when a project
+ * actually claims it. Compile checks because `MdxBody` refuses executable
+ * bodies at render by default, so an unchecked tree fails per-request in
+ * production instead of at build time.
  */
 export function assertSafeMdx(source: string, options: AssertSafeMdxOptions = {}): void {
   const found = findExecutableMdx(source);

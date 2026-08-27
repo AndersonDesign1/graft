@@ -35,6 +35,7 @@ outside what the controls below cover.
 | Path containment with symlink refusal on every filesystem sink          | `@usegraft/compiler`                   |
 | Rate identity from the connection peer, not a client header             | `@usegraft/core`                       |
 | Authored MDX refused unless the renderer opts into full MDX             | `@usegraft/mdx-safety`                 |
+| Executable MDX refused at compile, across the whole content tree        | `graft compile`, `mdxTrust`            |
 | Host validation and cross-origin refusal on the local Studio            | `graft serve`, `graft studio`          |
 | Runtime credential has no `UPDATE` on `approvals`, enforced by Postgres | `graft harden`, container by default   |
 
@@ -53,6 +54,8 @@ false, say which one — that is the most useful kind of report.
   `0`, ignores `x-forwarded-for` entirely, which is correct when nothing is in
   front of you.
 - Leave `MdxBody` at `trust: "restricted"` unless every author has commit access.
+  `mdxTrust` in graft.config.ts is the compile-side half of the same decision, and
+  the two have to agree.
 
 ## Supported versions
 

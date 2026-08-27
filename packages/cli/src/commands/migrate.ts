@@ -160,6 +160,7 @@ export async function migrateCommand(
             db: branch.db,
             contentDir: config.contentDir,
             collections: config.collections,
+            mdxTrust: config.mdxTrust,
             branchId: writeBranch,
             gitSha,
           });

@@ -49,6 +49,40 @@ Commands and runtimes walk up from the working directory for `.env`.
 | `NEON_API_KEY` | Create / drop physical CoW branches |
 | `GRAFT_NEON_PROJECT_ID` | Neon project id (required; keys may be project-scoped) |
 
+## graft.config.ts exports
+
+The config is TypeScript you own, loaded at runtime. Only `collections` is
+required.
+
+| Export | Default | Purpose |
+| --- | --- | --- |
+| `collections` | required | Record of `defineCollection` results |
+| `functions` | `{}` | Record of `defineFunction` results; enables `list_functions` and `run_function` |
+| `contentDir` | `"content"` | Content root, relative to the config file |
+| `migrationsDir` | `"migrations"` | Migrations directory, relative to the config file |
+| `index` | `"postgres"` | `"static"` for the zero-service tier |
+| `mdxTrust` | `"restricted"` | How much of MDX an authored body may be |
+
+### mdxTrust
+
+`"restricted"` refuses `{…}` expressions, `import`, `export` and spread
+attributes in authored bodies. `graft compile` checks every document and reports
+all offenders at once, so the refusal happens at build time rather than
+per-request.
+
+Set `"full"` only when every author of the repository has commit access. Rendering
+evaluates MDX as JavaScript on the server, so on a Studio hosted for writers,
+"can author a page" would otherwise mean "can execute code on the render host".
+
+```ts
+// graft.config.ts
+export const mdxTrust = "full";
+```
+
+`MdxBody` has its own `trust` prop with the same default, and the two have to
+agree: set `mdxTrust` here and pass `trust="full"` at the render site. Compile
+says so in the error when it refuses a document.
+
 ## Operator vs runtime
 
 Keep two URLs in production:

@@ -81,6 +81,7 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
       contentDir: config.contentDir,
       collections: config.collections,
       functions: config.functions,
+      mdxTrust: config.mdxTrust,
       ...(branch !== undefined
         ? {
             db: branch.db,
