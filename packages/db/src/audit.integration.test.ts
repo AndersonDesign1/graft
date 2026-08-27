@@ -5,6 +5,7 @@
  */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sql } from "drizzle-orm";
 import { GraftError } from "@usegraft/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { decideApproval, createDbApprovalStore, listPendingApprovals } from "./approvals";
@@ -264,16 +265,32 @@ describe.skipIf(!runIntegration)("db-backed audit + approval stores (live)", () 
 
         // Filing an ordinary request still works: the grant is narrowed, not
         // removed. Status falls back to its default.
-        const filed = await handle.sql.begin(async (tx) => {
-          await tx.unsafe(`set local role ${role}`);
-          const [row] = await tx`insert into approvals
-                       (branch_id, function_name, input, input_canonical,
-                        requested_by_kind, requested_by_id, correlation_id)
-                     values (${BRANCH}, 'itFn', '{}'::jsonb, '{}', 'agent',
-                             'it-agent', 'it-corr-filed')
-                     returning id, status`;
-          return row;
+        //
+        // Through createDbApprovalStore, NOT hand-written SQL. That distinction
+        // is the whole point of this assertion. An earlier version of this test
+        // inserted by hand, which passed while the real path was broken: Drizzle's
+        // insert builder names every column of the table and passes `default` for
+        // the ones it was not given, and Postgres checks INSERT privilege on the
+        // columns a statement NAMES. So the narrow grant refused the builder's
+        // statement for naming `status`, and `delete_content` could not file an
+        // approval at all. Caught by booting the container, not by this suite.
+        const filedId = await handle.db.transaction(async (tx) => {
+          await tx.execute(sql.raw(`set local role ${role}`));
+          // SAFETY: a PostgresJsTransaction exposes the same query surface the
+          // store uses; running the store against it is what puts the real
+          // statement under `set local role`.
+          const store = createDbApprovalStore(tx as unknown as typeof handle.db);
+          return store.request({
+            branch: BRANCH,
+            functionName: "itFn",
+            input: { id: "row-filed" },
+            inputCanonical: '{"id":"row-filed"}',
+            requestedByKind: "agent",
+            requestedById: "it-agent",
+            correlationId: "it-corr-filed",
+          });
         });
+        const [filed] = await handle.sql`select status from approvals where id = ${filedId}::uuid`;
         expect(filed?.status).toBe("pending");
 
         // Still pending — now approve as the operator (owner connection).

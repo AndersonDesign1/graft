@@ -65,20 +65,33 @@ const CONSUME_REASONS = new Set<string>([
 export function createDbApprovalStore(db: Database): ApprovalStore {
   return {
     async request(req: ApprovalRequest): Promise<string> {
-      const [row] = await db
-        .insert(approvals)
-        .values({
-          branchId: req.branch,
-          functionName: req.functionName,
-          input: req.input,
-          inputCanonical: req.inputCanonical,
-          requestedByKind: req.requestedByKind,
-          requestedById: req.requestedById ?? null,
-          correlationId: req.correlationId,
-        })
-        .returning({ id: approvals.id });
-      if (!row) throw new Error("approval insert returned no row");
-      return row.id;
+      // Deliberately not db.insert(approvals).values({…}): Drizzle emits every
+      // column of the table and passes `default` for the ones it was not given,
+      // and Postgres checks INSERT privilege on the columns a statement NAMES,
+      // even where the value is DEFAULT. A hardened runtime role is granted
+      // INSERT on the seven request columns only, so the builder's statement is
+      // refused for naming `status` and the decided_* columns it never sets.
+      //
+      // Naming them here keeps the narrow grant usable. `status` falls back to
+      // its 'pending' default, which is the point: filing a request must not be
+      // able to express a decision. See runtimeRoleGrantsSql in ./harden.
+      //
+      // `input` is stringified explicitly: the builder serialises jsonb columns
+      // for you, and a raw template does not — postgres-js refuses a plain
+      // object with ERR_INVALID_ARG_TYPE.
+      const rows = await db.execute<{ id: string }>(sql`
+        insert into approvals
+          (branch_id, function_name, input, input_canonical,
+           requested_by_kind, requested_by_id, correlation_id)
+        values
+          (${req.branch}, ${req.functionName}, ${JSON.stringify(req.input)}::jsonb,
+           ${req.inputCanonical}, ${req.requestedByKind},
+           ${req.requestedById ?? null}, ${req.correlationId})
+        returning id
+      `);
+      const id = rows[0]?.id;
+      if (id === undefined) throw new Error("approval insert returned no row");
+      return id;
     },
 
     async consume(
