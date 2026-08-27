@@ -17,7 +17,7 @@
  * route, the self-host container, Vercel Fluid, or a Worker — the Phase 3
  * runtime invariant, locked here before the first mutation function exists.
  */
-import { GraftError, PEER_HEADER, type ErrorCode } from "@usegraft/contracts";
+import { GraftError, type ErrorCode } from "@usegraft/contracts";
 import {
   createDbApprovalStore,
   createDbAuditStore,
@@ -26,6 +26,7 @@ import {
   type Database,
 } from "@usegraft/db";
 import type { AnyGraftFunction, FunctionActor, RateLimit } from "./function";
+import { getRequestPeer } from "./peer";
 
 export interface FunctionsHandlerOptions {
   /** The functions to serve, routed by each function's `name` (not the record key). */
@@ -150,7 +151,12 @@ function clientIp(request: Request, trustedProxyHops: number): string {
       if (trusted) return trusted;
     }
   }
-  return request.headers.get(PEER_HEADER) ?? "local";
+  // No header fallback. A peer is something an adapter registers in-process;
+  // anything arriving over the wire is the caller's word for it. "unknown"
+  // shares one bucket across every unidentified caller, which is strict rather
+  // than permissive — a deployment that wants per-caller limits declares its
+  // proxy depth instead.
+  return getRequestPeer(request) ?? "unknown";
 }
 
 function defaultGitSha(): string | undefined {

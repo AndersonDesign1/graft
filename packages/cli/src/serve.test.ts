@@ -7,6 +7,7 @@
  */
 import { createServer, request, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { getRequestPeer } from "@usegraft/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { createNodeListener, createServeRouter, type FetchHandler } from "./commands/serve";
 
@@ -114,16 +115,23 @@ describe("createNodeListener", () => {
     expect((await fetch(base)).status).toBe(200);
   });
 
-  it("sets the peer header from the socket, ignoring any inbound copy", async () => {
+  it("registers the socket peer where no header can reach it", async () => {
+    // The peer is recorded against the Request object in-process, not written
+    // as a header. An earlier version DID use a header, which the adapter
+    // stripped and re-set — sound here, and worthless in a Next.js or Astro
+    // route that passes the browser's Request straight through, where a client
+    // could send it and choose its own rate-limit bucket.
     const base = await listen(
-      async (request) =>
-        new Response(request.headers.get("x-graft-peer") ?? "none", { status: 200 }),
+      async (request) => new Response(getRequestPeer(request) ?? "none", { status: 200 }),
     );
 
-    // A client that could write this header would be choosing its own
-    // rate-limit identity.
     const res = await fetch(base, { headers: { "x-graft-peer": "1.2.3.4" } });
-    expect(await res.text()).not.toBe("1.2.3.4");
+    const peer = await res.text();
+
+    expect(peer).not.toBe("1.2.3.4");
+    expect(peer).not.toBe("none");
+    // Loopback, however this platform spells it.
+    expect(peer).toMatch(/127\.0\.0\.1|::1|::ffff:127\.0\.0\.1/);
   });
 
   it("round-trips method, path, headers, and body", async () => {

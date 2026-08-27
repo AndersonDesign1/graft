@@ -187,6 +187,53 @@ describe("tool scopes", () => {
     }
   });
 
+  it("refuses a write tool when a resolver is wired but the identity is not", async () => {
+    // The combination that shipped in one of our own examples: `actor` set,
+    // `connectionActor` forgotten. Every scope check silently passed, so
+    // write_content / put_asset / delete_content were ungated on a server whose
+    // whole point was that ordinary users may not author content.
+    const server = createGraftMcp({
+      contentDir: dir,
+      collections,
+      db: untouchableDb,
+      actor: () => ({ kind: "agent", id: "agent-1", scopes: [] }),
+    });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const c = new Client({ name: "miswired", version: "0.0.0" });
+    await c.connect(clientTransport);
+
+    const { isError, payload } = await call(c, "write_content", {
+      collection: "pages",
+      slug: "x",
+      data: { title: "T" },
+      body: "b",
+    });
+    expect(isError).toBe(true);
+    expect(payload).toMatchObject({ error: "CONFIG_INVALID" });
+  });
+
+  it("still serves an unauthenticated mount that opted into anonymous", async () => {
+    // No resolver at all is a deliberate local-dev mount. There is nothing to
+    // check a scope against, and refusing would break it for no gain.
+    const server = createGraftMcp({ contentDir: dir, collections, db: untouchableDb });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const c = new Client({ name: "anon", version: "0.0.0" });
+    await c.connect(clientTransport);
+
+    const result = (await c.callTool({
+      name: "write_content",
+      arguments: { collection: "pages", slug: "x", data: { title: "T" }, body: "b" },
+    })) as { content: { text: string }[] };
+
+    // It gets past the scope gate and reaches the tripwire database, which is
+    // exactly the proof: the refusal it would have hit is not there.
+    const text = result.content[0]?.text ?? "";
+    expect(text).not.toContain("CONFIG_INVALID");
+    expect(text).toContain("touched the database");
+  });
+
   it("separates authoring from deciding the human gate", async () => {
     const c = await connectAs(["content:write"]);
     const { isError, payload } = await call(c, "decide_approval", {
@@ -579,7 +626,11 @@ describe("search_content", () => {
     expect(payload.fix).toBeTruthy();
   });
 
-  it("returns ranked hits pointing at source files", async () => {
+  // Ranking itself is proven against a live database in
+  // packages/db/src/search.integration.test.ts ("ranks slug/title matches above
+  // body-only matches"). What THIS test owns is the mapping: which columns of a
+  // hit reach the agent, and — more to the point — which do not.
+  it("maps a hit to the agent's shape and leaks no internal columns", async () => {
     // A separate server over a stub db: search is the one read that goes to
     // the compiled index, not the files.
     const stubDb = {
@@ -641,6 +692,15 @@ describe("search_content", () => {
         data: { title: "Home" },
       },
     ]);
+
+    // toEqual above is exact, so this is belt-and-braces — but it names the
+    // property, which is the part a future edit would otherwise weaken without
+    // anyone noticing. The stored row carries branch ids, content hashes, the
+    // tsvector and a deletion flag; none of that is the agent's business.
+    const hit = payload.hits[0] as Record<string, unknown>;
+    for (const internal of ["branchId", "contentHash", "search", "deleted", "updatedAt"]) {
+      expect(hit, internal).not.toHaveProperty(internal);
+    }
   });
 });
 

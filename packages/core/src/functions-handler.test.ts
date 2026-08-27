@@ -1,6 +1,6 @@
 import { GraftError } from "@usegraft/contracts";
-import { PEER_HEADER } from "@usegraft/contracts";
 import { AUDIT_IN_FLIGHT } from "@usegraft/db";
+import { setRequestPeer } from "./peer";
 import type { ApprovalStore, AuditEntry, AuditStore, Database } from "@usegraft/db";
 import { describe, expect, it } from "vitest";
 import { field } from "./field";
@@ -435,23 +435,38 @@ describe("audit log (P3.4)", () => {
     const stores = memoryStores();
     const anonymous = p34handler(stores, { actor: () => ({ kind: "anonymous" }) });
 
-    await anonymous(
-      postWith(
-        "echo",
-        { message: "x" },
-        { "x-forwarded-for": "1.2.3.4", [PEER_HEADER]: "10.0.0.9" },
-      ),
-    );
-    await anonymous(
-      postWith(
-        "echo",
-        { message: "x" },
-        { "x-forwarded-for": "5.6.7.8", [PEER_HEADER]: "10.0.0.9" },
-      ),
-    );
+    await anonymous(postWith("echo", { message: "x" }, { "x-forwarded-for": "1.2.3.4" }));
+    await anonymous(postWith("echo", { message: "x" }, { "x-forwarded-for": "5.6.7.8" }));
 
     // Same caller, two spoofed headers, one bucket.
-    expect(stores.auditRows.map((r) => r.rateKey)).toEqual(["ip:10.0.0.9", "ip:10.0.0.9"]);
+    expect(stores.auditRows.map((r) => r.rateKey)).toEqual(["ip:unknown", "ip:unknown"]);
+  });
+
+  it("cannot be told its own peer address by a client", async () => {
+    // The first fix for this moved rate identity from `x-forwarded-for` to a
+    // `x-graft-peer` header that Graft's Node adapter stripped and re-set. That
+    // is sound for `graft serve` and worthless in a Next.js or Astro route,
+    // which hands the handler the browser's Request untouched — so a client
+    // could send the header and pick its own bucket. The peer is now registered
+    // against the Request object in-process, which nothing over the wire can do.
+    const stores = memoryStores();
+    const handler = p34handler(stores, { actor: () => ({ kind: "anonymous" }) });
+
+    await handler(postWith("echo", { message: "x" }, { "x-graft-peer": "1.2.3.4" }));
+    await handler(postWith("echo", { message: "x" }, { "x-graft-peer": "5.6.7.8" }));
+
+    expect(stores.auditRows.map((r) => r.rateKey)).toEqual(["ip:unknown", "ip:unknown"]);
+  });
+
+  it("uses a peer an adapter registered", async () => {
+    const stores = memoryStores();
+    const handler = p34handler(stores, { actor: () => ({ kind: "anonymous" }) });
+
+    const request = post("echo", { message: "x" });
+    setRequestPeer(request, "203.0.113.7");
+    await handler(request);
+
+    expect(stores.auditRows[0]?.rateKey).toBe("ip:203.0.113.7");
   });
 
   it("reads the trusted hop from the right when proxies are declared", async () => {

@@ -1,0 +1,9 @@
+{
+  "core": 95,
+  "mcp": 85,
+  "auth": 77,
+  "compiler": 73,
+  "db": 37,
+  "registry": 34,
+  "studio": 18
+}

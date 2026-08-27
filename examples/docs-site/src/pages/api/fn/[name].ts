@@ -39,6 +39,13 @@ function getHandler(): GraftFunctionsHandler {
       return createDb(url).db;
     },
     actor: resolveActor,
+    // This app runs behind Vercel's edge, which overwrites x-forwarded-for with
+    // the real client address — so exactly one hop in front of us is ours to
+    // trust, and the rightmost entry is the one it wrote. Without this the
+    // handler has no way to tell callers apart (no adapter registers a socket
+    // peer here, unlike `graft serve`) and every anonymous caller would share a
+    // single bucket. Set this to the number of proxies you actually run.
+    trustedProxyHops: 1,
     rateLimit: { limit: 60, windowSeconds: 60 },
     gitSha: process.env.VERCEL_GIT_COMMIT_SHA ?? localGitSha(),
   });

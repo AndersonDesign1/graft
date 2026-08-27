@@ -51,8 +51,46 @@ describe("resolveItems", () => {
     expect(items.map((i) => i.name)).toEqual(["scoped-access", "comments"]);
   });
 
-  it("passes the version gate for a '*' item", () => {
-    expect(() => resolveItems(["comments"], { coreVersion: "0.0.0" })).not.toThrow();
+  it("passes the version gate for a '*' item, and still resolves it", () => {
+    // Was a bare `.not.toThrow()`, which said nothing about what came back —
+    // a resolveItems that silently returned [] would have passed it.
+    const items = resolveItems(["comments"], { coreVersion: "0.0.0" });
+    expect(items.map((i) => i.name)).toEqual(["scoped-access", "comments"]);
+  });
+
+  it("refuses an item whose graftVersion excludes the installed core", () => {
+    // Every bundled item declares "*", so the gate can only be exercised
+    // against a fixture. `satisfies()` has its own tests; what is proven here
+    // is that resolveItems actually consults it — the wiring, not the predicate.
+    const root = mkdtempSync(join(tmpdir(), "graft-reg-fixture-"));
+    try {
+      mkdirSync(join(root, "needs-newer", "graft"), { recursive: true });
+      writeFileSync(
+        join(root, "needs-newer", "registry.item.json"),
+        JSON.stringify({
+          name: "needs-newer",
+          type: "access",
+          description: "Fixture: requires a core newer than the one installed.",
+          graftVersion: ">=9.0.0",
+          dependencies: {},
+          registryDependencies: [],
+          files: [{ source: "graft/x.ts", target: "graft/x.ts", role: "module" }],
+        }),
+      );
+      writeFileSync(join(root, "needs-newer", "graft", "x.ts"), "export const x = 1;");
+
+      expect(() => resolveItems(["needs-newer"], { root, coreVersion: "0.2.0" })).toThrowError(
+        /needs @usegraft\/core >=9\.0\.0/,
+      );
+
+      // And the same item resolves once the installed version satisfies it,
+      // so the test above is failing for the reason it claims.
+      expect(
+        resolveItems(["needs-newer"], { root, coreVersion: "9.1.0" }).map((i) => i.name),
+      ).toEqual(["needs-newer"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

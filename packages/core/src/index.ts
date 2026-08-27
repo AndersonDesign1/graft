@@ -11,3 +11,4 @@ export * from "./function";
 export * from "./functions-handler";
 export * from "./primitives";
 export * from "./records";
+export * from "./peer";

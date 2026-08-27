@@ -82,7 +82,26 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
    */
   const requireScope = (tool: string, scope: string): void => {
     const actor = options.connectionActor;
-    if (actor === undefined || actor.kind === "anonymous") return;
+    if (actor === undefined) {
+      // No connection identity. That means one of two very different things.
+      //
+      // No actor resolver either: an unauthenticated mount that opted into
+      // serving anonymous callers. There is nothing to check a scope against,
+      // and refusing would break local development for no gain.
+      if (options.actor === undefined) return;
+
+      // A resolver IS configured, so this mount intends to authenticate — but
+      // whoever wired it did not forward the resolved identity, and every
+      // scope check would silently pass. That is a wiring bug, and it shipped
+      // in one of our own examples, so it fails closed rather than quietly.
+      throw new GraftError({
+        code: "CONFIG_INVALID",
+        message: `${tool} cannot be authorized: this server has an actor resolver but was given no connectionActor.`,
+        fix: "Pass `connectionActor` alongside `actor` when building the server — createGraftMcpHandler does this for you from the bearer it verified. Without it every scope check passes and write tools are ungated.",
+        details: { tool, required: scope },
+      });
+    }
+    if (actor.kind === "anonymous") return;
     if ((actor.scopes ?? []).includes(scope)) return;
     throw new GraftError({
       code: "UNAUTHORIZED",

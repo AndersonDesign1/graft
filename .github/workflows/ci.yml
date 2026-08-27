@@ -101,3 +101,9 @@ jobs:
         run: pnpm test
         env:
           RUN_INTEGRATION: "1"
+
+      # Per-package floors, not one repo-wide number — a single figure hides
+      # that `core` is above 95% while `studio` is far lower. A ratchet: it
+      # stops coverage sliding, and floors are raised when they are earned.
+      - name: Coverage floors
+        run: pnpm coverage

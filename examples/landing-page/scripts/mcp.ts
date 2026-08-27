@@ -37,6 +37,13 @@ const server = createGraftMcp({
   functions,
   db: handle.db,
   actor: resolveActor,
+  // The identity THIS connection has, as opposed to the resolver that vets
+  // tokens on run_function's synthetic requests. Without it the scope checks on
+  // write_content / put_asset / delete_content have nothing to compare against.
+  // This is a local stdio server the developer started, so it carries the same
+  // content scope `graft mcp` grants — and deliberately not approvals:decide,
+  // so filing and deciding stay separate identities.
+  connectionActor: { kind: "agent", id: "landing-page-mcp", scopes: ["content:write"] },
 });
 
 await serveStdio(server);

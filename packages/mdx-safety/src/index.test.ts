@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertSafeMdx, findExecutableMdx } from "./index";
+import { assertSafeMdx, findExecutableMdx, UncheckableMdxError } from "./index";
 
 describe("findExecutableMdx", () => {
   it("accepts prose, Markdown and components with literal attributes", () => {
@@ -38,12 +38,6 @@ describe("findExecutableMdx", () => {
     const found = findExecutableMdx("# Title\n\nSome prose.\n\n{danger}");
     expect(found[0]?.line).toBe(5);
   });
-
-  it("treats unparseable source as nothing to execute", () => {
-    // A body that will not parse cannot run either, and the compile step
-    // reports the syntax error with far better context than this would.
-    expect(findExecutableMdx("<Unclosed")).toEqual([]);
-  });
 });
 
 describe("assertSafeMdx", () => {
@@ -64,5 +58,53 @@ describe("assertSafeMdx", () => {
     });
     expect(String((error as { message: string }).message)).toContain("pages/home");
     expect(String((error as { fix: string }).fix)).toContain("code review");
+  });
+});
+
+describe("non-expression execution", () => {
+  it("refuses elements that load or run code", () => {
+    // No `{}` anywhere, so the expression checks never see these — and MDX
+    // renders an unknown lowercase tag straight through to HTML.
+    for (const source of [
+      "<script>alert(1)</script>",
+      '<iframe src="https://evil.example"></iframe>',
+      '<object data="x.swf"></object>',
+      '<base href="https://evil.example/" />',
+    ]) {
+      expect(findExecutableMdx(source)[0]?.kind, source).toBe("scripting-element");
+    }
+  });
+
+  it("refuses HTML-style void elements too, by failing to parse them", () => {
+    // `<base href="…">` without a self-close is not valid MDX. It is still
+    // refused — just as unparseable rather than as recognised — which is the
+    // point of failing closed on a parse error.
+    expect(() => findExecutableMdx('<base href="https://evil.example/">')).toThrowError(
+      UncheckableMdxError,
+    );
+  });
+
+  it("refuses inline event handlers, even with a string value", () => {
+    const found = findExecutableMdx('<img src="x" onerror="fetch(\'//evil.example\')" />');
+    expect(found[0]?.kind).toBe("event-handler");
+  });
+
+  it("leaves ordinary components and attributes alone", () => {
+    expect(findExecutableMdx('<Callout tone="warn">Careful.</Callout>')).toEqual([]);
+    expect(findExecutableMdx('<img src="/hero.png" alt="Hero" />')).toEqual([]);
+  });
+});
+
+describe("parser agreement", () => {
+  it("parses the GFM the renderer parses", () => {
+    // The renderer compiles with remark-gfm. If this parser did not, a table or
+    // footnote could fail here and compile there — and the old "unparseable
+    // means nothing to execute" shortcut would have waved it through.
+    expect(findExecutableMdx("| a | b |\n| - | - |\n| 1 | 2 |")).toEqual([]);
+    expect(findExecutableMdx("~~struck~~ and https://example.com")).toEqual([]);
+  });
+
+  it("refuses what it cannot parse, rather than assuming it is safe", () => {
+    expect(() => findExecutableMdx("<Unclosed")).toThrowError(UncheckableMdxError);
   });
 });

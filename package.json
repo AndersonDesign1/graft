@@ -19,7 +19,9 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm build && changeset publish",
-    "check:registry-drift": "node scripts/check-registry-drift.mjs"
+    "check:registry-drift": "node scripts/check-registry-drift.mjs",
+    "coverage": "node scripts/coverage.mjs",
+    "coverage:update": "node scripts/coverage.mjs --update"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
