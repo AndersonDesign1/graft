@@ -93,13 +93,13 @@ over Streamable HTTP, `/healthz` with a real DB round-trip) to a plain Node serv
 self-host container runs. Identity is env-driven (`GRAFT_DEV_TOKEN`, `GRAFT_TRUSTED_ISSUERS`
 for OIDC via discovery, `GRAFT_MCP_ALLOW_ANONYMOUS`, `GRAFT_APPROVAL_POLICY`), and
 `graft harden <role>` applies the runtime privilege split so the deployed credential can
-request and consume approvals but never decide them — opt-in, and applied to nothing by
-default. Topology decisions in
+serve, project content, and request and consume approvals, but never decide one. The
+container applies it by default wherever it owns its own database. Topology decisions in
 [`docs/design-notes/packaging.md`](docs/design-notes/packaging.md). **P7.2** ships the
 container ([`deploy/docker/`](deploy/docker/README.md)): one image = Postgres 18 + MinIO +
 `graft serve` — `docker run -p 3903:3903 graft` boots migrate → compile → serve and logs a
-generated bearer (anonymous MCP is never exposed); mount your project at `/project`, set
-`GRAFT_RUNTIME_PASSWORD` to serve under a hardened role, or use the split
+generated bearer (anonymous MCP is never exposed); mount your project at `/project`. It serves under a hardened
+role by default (`GRAFT_HARDEN=0` opts out); or use the split
 `deploy/docker/compose.yml` (db / storage / graft — swap to Neon/R2 by env alone). **P7.3**
 adds the deploy adapters ([`deploy/`](deploy/README.md)): Railway, Fly, and VPS run the
 container; Vercel deploys embedded (compile as a build step; the example app is the

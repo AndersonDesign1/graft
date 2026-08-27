@@ -36,9 +36,13 @@ the handlers only need the request as-is.)
 
 ## 3. Harden
 
-Set `GRAFT_RUNTIME_PASSWORD` in compose.yml and the boot does it for you:
-creates `graft_runtime`, applies `graft harden`, serves under it. Deciding
-approvals then requires the operator credential — from the box:
+Split compose runs `GRAFT_MODE=serve`, where the database is yours and
+hardening is opt-in. Set `GRAFT_HARDEN=1` in compose.yml (or supply
+`GRAFT_RUNTIME_PASSWORD` to choose the secret yourself) and boot does the rest:
+creates `graft_runtime`, applies `graft harden`, serves under it. The single
+all-in-one container hardens by default, because there the database is its own.
+
+Deciding approvals then requires the operator credential, from the box:
 
 ```sh
 docker compose exec graft graft approvals

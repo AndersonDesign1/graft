@@ -72,25 +72,46 @@ node /opt/graft/packages/db/scripts/migrate.mjs
 log "compiling authored content…"
 graft compile
 
-# ── Optional hardening: serve under a runtime role that can never decide
-# approvals. Trade-off (documented in packaging.md): the hardened role also
-# cannot project content, so MCP write_content/delete_content need the
-# operator credential — enable this when the container's callers are
-# functions/reads-first.
-if [ -n "${GRAFT_RUNTIME_PASSWORD:-}" ]; then
+# ── Hardening: serve under a runtime role that can never decide approvals.
+# Default ON in all-in-one, where the container owns the database and creates
+# the role in a cluster that is nothing but its own. In GRAFT_MODE=serve the
+# database belongs to the operator, and altering a role on every boot is not a
+# defensible default, so it stays opt-in there: set GRAFT_RUNTIME_PASSWORD.
+# GRAFT_HARDEN=0 turns it off anywhere.
+#
+# This used to cost the deployment its MCP content writes, which is why it was
+# opt-in everywhere. The runtime role projects content now, so it costs nothing.
+# Supplying a password is itself an opt-in, in either mode. An explicit
+# GRAFT_HARDEN always wins, so a password left in a compose file does not
+# override someone deliberately turning hardening off.
+if [ "$GRAFT_MODE" = "all-in-one" ] || [ -n "${GRAFT_RUNTIME_PASSWORD:-}" ]; then
+  HARDEN_DEFAULT=1
+else
+  HARDEN_DEFAULT=0
+fi
+GRAFT_HARDEN="${GRAFT_HARDEN:-$HARDEN_DEFAULT}"
+
+if [ "$GRAFT_HARDEN" = "1" ]; then
   ROLE="${GRAFT_RUNTIME_ROLE:-graft_runtime}"
+  # No password given: the embedded database is the container's own, so a
+  # per-boot secret is the right default. Nothing outside connects as this
+  # role, and leaving it unlogged keeps it out of the container's output.
+  GRAFT_RUNTIME_PASSWORD="${GRAFT_RUNTIME_PASSWORD:-$(openssl rand -hex 24)}"
+  export GRAFT_RUNTIME_ROLE="$ROLE"
   log "hardening runtime role ${ROLE}…"
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q \
     -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${ROLE}') THEN CREATE ROLE ${ROLE} LOGIN; END IF; END \$\$;" \
     -c "ALTER ROLE ${ROLE} WITH LOGIN PASSWORD '${GRAFT_RUNTIME_PASSWORD}';"
   graft harden "$ROLE"
-  export DATABASE_URL="$(node -e "
+  # One-shot env prefix, not an export: the password already travels in
+  # DATABASE_URL, and `graft serve` has no reason to hold a second copy.
+  export DATABASE_URL="$(GRAFT_RUNTIME_PASSWORD="$GRAFT_RUNTIME_PASSWORD" node -e "
     const u = new URL(process.env.DATABASE_URL);
     u.username = process.env.GRAFT_RUNTIME_ROLE || 'graft_runtime';
     u.password = process.env.GRAFT_RUNTIME_PASSWORD;
     console.log(u.href);
   ")"
-  log "serving as ${ROLE} (cannot decide approvals; content projection stays operator-only)"
+  log "serving as ${ROLE} (serves, projects content, requests approvals — never decides one)"
 fi
 
 # ── Identity defaults: never expose an unauthenticated MCP surface ──────────

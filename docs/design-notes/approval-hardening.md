@@ -134,10 +134,24 @@ of the gate ran under the same one.
 
 **What this changes about the model above.** The two-credential table is still
 correct and the role split is still worth applying. What it is _not_ is the
-primary control — it is opt-in (`graft harden`), applied to nothing by default,
-and a deployment that never runs it was relying entirely on the application-level
-check. That check is now real. Treat the role split as defence in depth beneath
-it, in that order.
+primary control. A deployment that never ran it was relying entirely on the
+application-level check. That check is now real. Treat the role split as defence
+in depth beneath it, in that order.
+
+**Second correction (2026-08-27).** The paragraph above used to end "it is
+opt-in (`graft harden`), applied to nothing by default". That was true when
+written and is no longer. It stopped being true for a reason worth recording:
+the split was opt-in because the runtime role could not project content, so
+turning it on cost a deployment its MCP `write_content`/`delete_content`. Nobody
+was going to pay that, which is why it was applied to nothing.
+
+The denial was not buying what it appeared to. `write_content` writes the MDX
+file and then compiles, and compile is the step that reaches Postgres, so
+whoever held the runtime credential could already project content through the
+application. Withholding the grant removed a feature, not a capability. The
+grants now cover projection (`581afde`) and the container hardens by default
+where it owns the database. See
+`docs/adr/0005-hardening-is-the-default-where-the-container-owns-the-database.md`.
 
 **The process lesson**, which is why this is a correction rather than a rewrite:
 a design note that states a premise should state what would falsify it. This one

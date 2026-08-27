@@ -28,7 +28,8 @@ Commands and runtimes walk up from the working directory for `.env`.
 | Variable | Purpose |
 | --- | --- |
 | `PORT` / `HOST` | Bind for `graft serve` (default loopback `:3903`) |
-| `GRAFT_RUNTIME_PASSWORD` | Container: create + harden runtime role at boot |
+| `GRAFT_HARDEN` | Container: create + harden the runtime role at boot, then serve under it. Default `1` in all-in-one, `0` in `GRAFT_MODE=serve` |
+| `GRAFT_RUNTIME_PASSWORD` | The hardened role's password; setting it also turns hardening on. Generated per boot when unset |
 | `GRAFT_MODE` | Container compose: `serve` against external db/storage |
 
 ## Assets (S3-compatible)

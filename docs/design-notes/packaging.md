@@ -75,12 +75,18 @@ process to an agent.
   `deploy/docker/project` workspace shim so `@usegraft/core`/`zod` imports
   resolve (pre-1.0: unpublished packages — the image supplies them). MCP
   writes land in the mounted tree; git stays authoritative on the host.
-- **Hardened mode:** `GRAFT_RUNTIME_PASSWORD` makes boot create the role,
-  `graft harden` it, and serve under it. Trade-off (deliberate): the hardened
-  credential cannot project content, so MCP `write_content`/`delete_content`
-  need the operator credential — enable it for functions/reads-first
-  deployments. Reopens if a vertical needs authored-content writes under
-  runtime creds (a grants-v2 decision).
+- **Hardened mode (default in all-in-one):** boot creates the role, `graft harden`s
+  it, and serves under it, generating a password when none is given.
+  `GRAFT_MODE=serve` keeps it opt-in (`GRAFT_HARDEN=1` or a password), because
+  there the database is the operator's, not the container's. `GRAFT_HARDEN=0`
+  turns it off. **Correction (superseded):** this bullet used to record a
+  deliberate trade-off, that the hardened credential could not project content
+  and so MCP `write_content`/`delete_content` needed the operator credential.
+  That is what kept hardening opt-in and applied to nothing. The trade-off was
+  not buying what it looked like it was buying: `write_content` already writes
+  the file and compiles, so the runtime credential had the capability through
+  the application either way. grants-v2 shipped in `581afde`; see
+  `docs/adr/0005-hardening-is-the-default-where-the-container-owns-the-database.md`.
 - **Split compose (scale):** `deploy/docker/compose.yml` — `db`/`storage`/
   `graft` services; the graft service runs `GRAFT_MODE=serve` against them.
   Managed swap is env-only (Neon URL, R2 `S3_*`, `GRAFT_ENSURE_BUCKET=0`).
