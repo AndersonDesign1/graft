@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/db",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Postgres client, schema, copy-on-write content branches, and the privilege split behind Graft's approval gate.",
   "keywords": [
     "agent",

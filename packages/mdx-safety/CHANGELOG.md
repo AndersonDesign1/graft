@@ -1,4 +1,4 @@
-# @usegraft/sdk-next
+# @usegraft/mdx-safety
 
 ## 0.2.0
 
@@ -84,23 +84,35 @@
   `README.md` or `LICENSE` (npm always packs those), but a licence file only ships
   if it exists in the package directory, and the root one does not count.
 
+- 301c817: Fixes found by independent review of the hardening work itself.
+
+  - **The rate-limit peer is no longer a header.** `x-graft-peer` was stripped and
+    re-set by Graft's Node adapter, which is sound for `graft serve` and worthless
+    in a Next.js or Astro route that passes the browser's Request through
+    untouched — a client could send the header and choose its own bucket. That is
+    the `x-forwarded-for` bug, relocated to a header nobody knew they had to
+    strip. The peer is now registered against the Request object in-process
+    (`setRequestPeer` / `getRequestPeer`), which nothing over the wire can forge.
+    `PEER_HEADER` is removed. Deployments with no adapter share one `unknown`
+    bucket unless they declare `trustedProxyHops`; both examples now do.
+  - **`@usegraft/mdx-safety` parses what the renderer parses, and fails closed.**
+    The checker used `remark-parse` + `remark-mdx` while `MdxBody` compiles with
+    `remark-gfm` — so source that failed to parse here but compiled there was
+    waved through by the old "unparseable means nothing to execute" shortcut. GFM
+    is now enabled on both sides, and unparseable source throws
+    `UncheckableMdxError` instead of returning `[]`.
+  - **Scripting elements and inline event handlers are refused.**
+    `<script>alert(1)</script>` and `<img onerror="…">` contain no `{}`
+    expression, so the expression checks never saw them. The module now documents
+    that it is not a general HTML sanitiser.
+  - **`createGraftMcp` fails closed when `actor` is set without `connectionActor`.**
+    That combination silently disabled every MCP write-tool scope check, and it
+    shipped in one of our own example scripts.
+
 ### Patch Changes
 
-- Updated dependencies [52d7488]
-- Updated dependencies [1aea0da]
+- Updated dependencies [61b9ac4]
 - Updated dependencies [f423a6e]
+- Updated dependencies [ed103a8]
 - Updated dependencies [301c817]
-  - @usegraft/mdx-safety@0.2.0
-  - @usegraft/sdk-core@0.2.0
-
-## 0.1.1
-
-### Patch Changes
-
-- @usegraft/sdk-core@0.1.1
-
-## 0.1.0
-
-### Patch Changes
-
-- @usegraft/sdk-core@0.1.0
+  - @usegraft/contracts@0.2.0

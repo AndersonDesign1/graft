@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/cli",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "The graft CLI: scaffold, compile authored content, serve the runtime, and split your database credentials.",
   "keywords": [
     "agent",
