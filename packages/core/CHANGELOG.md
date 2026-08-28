@@ -1,5 +1,12 @@
 # @usegraft/core
 
+## 0.2.1
+
+### Patch Changes
+
+- @usegraft/contracts@0.2.1
+- @usegraft/db@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

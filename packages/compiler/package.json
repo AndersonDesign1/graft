@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/compiler",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Validate authored MDX against your collections and project it into the content index.",
   "keywords": [
     "agent",

@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/auth",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Turn a request into a scoped actor by verifying bearer JWTs against trusted OIDC issuers. Graft verifies identity, it does not mint it.",
   "keywords": [
     "agent",

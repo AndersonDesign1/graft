@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/tokens",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Graft design tokens as plain CSS custom properties.",
   "keywords": [
     "agent",

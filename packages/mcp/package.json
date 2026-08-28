@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "An MCP server over your content, schema and typed functions, with errors an agent can act on.",
   "keywords": [
     "agent",

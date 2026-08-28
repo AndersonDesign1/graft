@@ -1,5 +1,17 @@
 # @usegraft/mcp
 
+## 0.2.1
+
+### Patch Changes
+
+- @usegraft/assets@0.2.1
+- @usegraft/compiler@0.2.1
+- @usegraft/contracts@0.2.1
+- @usegraft/core@0.2.1
+- @usegraft/db@0.2.1
+- @usegraft/mdx-safety@0.2.1
+- @usegraft/registry@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes
