@@ -32,14 +32,16 @@ Foundational conventions for the Graft monorepo. Keep this short and current.
 
 ## Scripts (run from the repo root)
 
-| Command                             | What it does                   |
-| ----------------------------------- | ------------------------------ |
-| `pnpm build`                        | Build all packages (Turborepo) |
-| `pnpm dev`                          | Watch-build all packages       |
-| `pnpm test`                         | Run all package tests (Vitest) |
-| `pnpm lint`                         | oxlint across packages         |
-| `pnpm typecheck`                    | `tsc --noEmit` across packages |
-| `pnpm format` / `pnpm format:check` | oxfmt write / check            |
+| Command                             | What it does                                  |
+| ----------------------------------- | --------------------------------------------- |
+| `pnpm build`                        | Build all packages (Turborepo)                |
+| `pnpm dev`                          | Watch-build all packages                      |
+| `pnpm test`                         | Run all package tests (Vitest)                |
+| `pnpm lint`                         | oxlint across packages                        |
+| `pnpm typecheck`                    | `tsc --noEmit` across packages                |
+| `pnpm format` / `pnpm format:check` | oxfmt write / check                           |
+| `pnpm changeset`                    | Describe a change for the next release        |
+| `pnpm check:canary-snapshot`        | Guard: refuse a canary that is not a snapshot |
 
 ## Lint calibration
 
@@ -85,8 +87,78 @@ here and write down why.
 - Commits: Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`).
 - Do not commit `.env`, `dist/`, or `node_modules/`.
 
+## Releasing
+
+Two channels. Both publish from `.github/workflows/release.yml`, because npm
+trusted publishing registers **one** workflow filename per package and a second
+workflow would authenticate against nothing.
+
+### Stable, to `latest`
+
+`changesets/action` runs on push to `feat/core`. It opens a
+"chore: version packages" PR, and **merging that PR publishes**. Both gates
+belong to the repository owner.
+
+All packages bump together: `.changeset/config.json` sets
+`fixed: [["@usegraft/*"]]`, so every package versions whether it changed or not.
+
+```bash
+pnpm changeset          # describe a change
+pnpm changeset status   # what the next release would bump
+```
+
+CI on the version PR shows `action_required` and does not run, because GitHub
+holds workflows on PRs the changesets bot opens. Approve it, or rely on CI
+having passed on `feat/core` for the identical code.
+
+### Canary, to the `canary` tag
+
+Snapshot releases: `0.0.0-canary-<timestamp>`, published under the `canary`
+dist-tag. `latest` never moves and real version numbers never change. There is
+no canary branch and none is needed.
+
+1. Branch off `feat/core`, build the change.
+2. `pnpm changeset`. **Required** — with nothing pending there is nothing to
+   snapshot and the run is refused.
+3. Push the branch.
+4. Actions → Release → Run workflow → select **your branch** → tick
+   "Publish a snapshot to the canary dist-tag".
+5. `npm i @usegraft/cli@canary`
+
+The tick resets every dispatch. Unticked is the safe default: a normal release,
+which is an idempotent no-op when nothing is pending.
+
+Never commit a snapshot bump. `changeset version --snapshot` consumes the
+changeset files as it runs, so committing it would drop the pending changesets
+for the real release.
+
+`scripts/assert-canary-snapshot.mjs` runs between versioning and publishing
+because `changeset version --snapshot` does not fail when nothing is pending —
+it warns and exits 0, and the publish would then push a **stable** version to
+the canary tag. Run it locally with `pnpm check:canary-snapshot`.
+
 ## Adding a package
 
 1. Create `packages/<name>/` with `package.json` (`@usegraft/<name>`), `tsconfig.json`, `src/index.ts`.
 2. Copy the build/test/typecheck/lint scripts from an existing package.
 3. `pnpm install` to register it in the workspace.
+4. **Publish it once by hand, before CI ever tries.** OIDC trusted publishing
+   needs the package to already exist on npm — there is nothing to hold the
+   trusted-publisher config on until then, so the first release fails with E404
+   while everything that depends on it publishes fine.
+
+   ```bash
+   npm login
+   pnpm --filter @usegraft/<name> publish --access public --no-git-checks
+   ```
+
+   `pnpm`, never `npm`: `npm publish` leaves `workspace:*` in the manifest,
+   which npm cannot resolve. pnpm rewrites it to the real version.
+
+5. Add its trusted publisher on npmjs.com (GitHub Actions,
+   `AndersonDesign1/graft`, `release.yml`) so it releases with everything else
+   from then on.
+
+Skipping 4 and 5 is what left `npm i @usegraft/cli` broken after the `0.2.0`
+release: 15 packages published, `@usegraft/mdx-safety` did not, and five of the
+15 depended on it.
