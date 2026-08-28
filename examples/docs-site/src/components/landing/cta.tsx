@@ -6,7 +6,7 @@
  */
 import { useCallback, useState, type ReactNode } from "react";
 
-const INIT_CMD = "pnpm dlx graft init";
+const INIT_CMD = "pnpm dlx @usegraft/cli init";
 const MCP_CMD = "graft mcp";
 
 const AGENTS = [

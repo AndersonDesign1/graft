@@ -10,31 +10,82 @@ New to Graft? Start at [What is Graft](/docs/what-is-graft).
 
 ## Prerequisites
 
-- Node.js 20 or newer
-- A Postgres database (`DATABASE_URL`)
-- Optional S3-compatible store for assets ([Configuration](/docs/configuration))
+- Node.js 22.16 or newer. The static index's full-text search uses the
+  `node:sqlite` build that ships from 22.16.0.
+- Nothing else. A content project needs no database and no object store.
+
+Postgres is required only for operational data, typed functions, and
+copy-on-write branches. [Add it later](#move-to-postgres) when you need one of
+those.
 
 ## Quick start
 
 ```sh
-pnpm dlx graft init my-site
+pnpm dlx @usegraft/cli init my-site
 cd my-site
 ```
 
-Add your database URL to `.env` (any parent directory works):
+Run it under the full package name. The bare name `graft` on npm belongs to an
+unrelated package.
+
+`graft init` writes `graft.config.ts`, `content/pages/home.mdx`, and the
+`graft/` barrel for owned primitives. It scaffolds the static index by default.
+
+Compile and watch:
+
+```sh
+graft compile       # validate content/ and write .graft/index.db
+graft dev           # recompile when content or config changes
+```
+
+Read a document in your app:
+
+```ts
+import { openStaticIndex } from "@usegraft/db";
+import { createClient } from "@usegraft/sdk-core";
+import { collections } from "./graft.config";
+
+const index = await openStaticIndex(".graft/index.db");
+const graft = createClient({ index, collections });
+
+const home = await graft.getDocument("pages", "home");
+//    ^? typed by your pages collection
+```
+
+`.graft/index.db` is derived from the files in git, so it is git-ignored.
+Rebuild it in your build command:
+
+```sh
+graft compile && next build
+```
+
+## Move to Postgres
+
+Postgres adds operational data, typed functions with access and approvals, and
+copy-on-write branches. Reach for one of those in static mode and Graft answers
+`NEEDS_DATABASE`, whose `fix` is these three steps.
+
+Add your database URL to `.env`. Any parent directory works:
 
 ```sh
 DATABASE_URL=postgres://…
 ```
 
-Compile and watch:
+Change one line in `graft.config.ts`:
 
-```sh
-graft compile       # project content/ into content_index once
-graft dev           # recompile when content or config changes
+```ts
+export const index = "postgres";
 ```
 
-Read a document in your app:
+Apply the schema that ships with `@usegraft/db`, then compile:
+
+```sh
+graft db migrate
+graft compile
+```
+
+Reads move to a framework adapter, which takes the database instead of the
+artifact:
 
 ```ts
 import { createGraft } from "@usegraft/sdk-astro";
@@ -42,11 +93,7 @@ import { collections } from "../graft.config";
 
 const graft = createGraft({ db, collections });
 const home = await graft.getContent("pages", "home");
-//    ^? typed by your pages collection
 ```
-
-`graft init` writes `graft.config.ts`, `content/pages/home.mdx`, and the
-`graft/` barrel for owned primitives.
 
 ## Author a document
 
@@ -68,8 +115,8 @@ frontmatter `slug:` field overrides the filename.
 
 | Term | Meaning |
 | --- | --- |
-| **compile** | Validate MDX against the schema and write rows into Postgres |
-| **index** | The `content_index` table. Derived from git. Rebuild with compile |
+| **compile** | Validate MDX against the schema and write it to the index |
+| **index** | The queryable projection of your content. A SQLite artifact, or the `content_index` table on Postgres. Derived from git, so rebuild it with compile |
 | **project** | Your Graft app directory (config + `content/` + optional `graft/`) |
 
 ## Common failures
@@ -78,6 +125,7 @@ frontmatter `slug:` field overrides the filename.
 | --- | --- | --- |
 | `CONFIG_NOT_FOUND` | No `graft.config.ts` above cwd | Run `graft init` or cd into the project |
 | `ENV_VAR_MISSING` | `DATABASE_URL` (or other required env) absent | Set it in `.env` |
+| `NEEDS_DATABASE` | A Postgres-tier feature was used in static mode | Follow [Move to Postgres](#move-to-postgres) |
 | `INDEX_OWNERSHIP` | Compile would purge another project's collections | Use a dedicated database (or branch) per project |
 | `CONTENT_DIR_NOT_FOUND` | `content/` missing | Create it or fix `contentDir` in config |
 

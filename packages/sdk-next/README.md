@@ -15,17 +15,34 @@ npm i @usegraft/sdk-next
 `createGraft` wraps the read client with `React.cache`, so repeated reads of the same document within one render are deduped. Server-only: it holds a database handle.
 
 ```ts
+// lib/graft.ts
+import { createDb } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-next";
 import { collections } from "@/graft.config";
 
-export const graft = createGraft({ db, collections });
+export const graft = createGraft({ db: createDb(process.env.DATABASE_URL!).db, collections });
+```
 
+```ts
 // in a Server Component
 const page = await graft.getContent("pages", "home");
 const posts = await graft.listContent("posts", { limit: 10 });
 ```
 
 Return types come from your `defineCollection` schemas, so a renamed field is a build error rather than a runtime `undefined`.
+
+### With no database
+
+Pass `index` instead of `db` and the same surface reads the SQLite artifact `graft compile` writes. Nothing else has to be running.
+
+```ts
+import { openStaticIndex } from "@usegraft/db";
+
+export const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});
+```
 
 ## Render MDX bodies
 

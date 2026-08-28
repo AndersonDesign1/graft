@@ -9,16 +9,20 @@ Part of [Graft](https://github.com/AndersonDesign1/graft), a CMS built so an AI 
 ```bash
 npm i -D @usegraft/cli
 # or run it without installing
-npx graft init
+npx @usegraft/cli init
 ```
+
+Once installed, the command is `graft`. Run it without installing under the
+full package name: the bare name `graft` on npm belongs to an unrelated
+package, so `npx graft` fetches the wrong thing.
 
 ## Quickstart, with no database
 
 A content project needs no services at all. `graft compile` writes the index to a SQLite artifact your app reads embedded.
 
 ```bash
-npx graft init      # scaffolds graft.config.ts, content/, llms.txt
-npx graft compile   # → .graft/index.db
+npx @usegraft/cli init      # scaffolds graft.config.ts, content/, llms.txt
+npx @usegraft/cli compile   # → .graft/index.db
 ```
 
 Move to Postgres by setting `DATABASE_URL` and changing one line in `graft.config.ts`:

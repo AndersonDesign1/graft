@@ -6,13 +6,16 @@ tagline: >-
   dashboard.
 description: >-
   Open-source, self-hostable CMS for agents and the people who run them. MDX in
-  git, one Zod schema, a derived Postgres index. CLI and MCP for day-to-day work.
+  git, one Zod schema, a derived index that needs no database to start. CLI and
+  MCP for day-to-day work.
 faqs:
   - question: Do I need a dashboard?
     answer: >-
-      No for day-to-day authoring. Write MDX, run the CLI, or drive MCP. Approvals
-      today are graft approve on your machine. An optional Studio may come later;
-      it is not required to ship.
+      No. Write MDX, run the CLI, or drive MCP, and nothing else has to be
+      running. A Studio ships in the box for the people who want one: run graft
+      studio to edit content, decide approvals, and browse branches. It is
+      optional, and every operation it performs also exists on the CLI and on
+      MCP.
   - question: Is Graft open source and self-hostable?
     answer: >-
       Yes. Run the packages on your Postgres and S3-compatible store. One Docker
