@@ -8,14 +8,25 @@ order: 0
 Graft is the open-source, self-hostable CMS for agents and the people who run
 them.
 
-Content is MDX in git. A Zod schema validates it. Postgres holds a derived
-index. You and your agent work through the CLI and MCP — no dashboard required.
+Content is MDX in git. A Zod schema validates it. A derived index makes it
+queryable. You and your agent work through the CLI and MCP, with no dashboard
+required.
 
 ## You'll need
 
-1. Node.js 20 or newer
-2. A Postgres database URL (`DATABASE_URL`)
-3. Optional: an S3-compatible store for assets (see [Configuration](/docs/configuration))
+1. Node.js 22.16 or newer. The index's full-text search uses the `node:sqlite`
+   build that ships from 22.16.0.
+
+That is the whole list. `graft compile` writes the index to a SQLite artifact
+your app reads embedded, so a content project runs with no database and no
+object store.
+
+Two things need more. Postgres backs operational data, typed functions, and
+copy-on-write branches. An S3-compatible store holds assets. Reach for either
+and Graft says so: a Postgres-tier feature in static mode fails with
+`NEEDS_DATABASE`, whose `fix` is the upgrade. See
+[Getting started](/docs/getting-started#move-to-postgres) and
+[Configuration](/docs/configuration).
 
 ## Quickstart
 
@@ -40,7 +51,7 @@ Pick a path:
 
 <DocCards>
   <DocCard title="The model" href="/docs/the-model">
-    Git owns content. Postgres is the index.
+    Git owns content. The index is derived.
   </DocCard>
   <DocCard title="Branching" href="/docs/branching-previews">
     Copy-on-write overlays or Neon forks.
@@ -48,16 +59,15 @@ Pick a path:
   <DocCard title="Owned primitives" href="/docs/owned-primitives">
     graft add copies source into your repo.
   </DocCard>
-  <DocCard title="Approvals" href="/docs/audit-and-approvals">
-    Human gates on destructive ops. Audit trail.
+  <DocCard title="Error reference" href="/docs/errors">
+    Every code, what it means, how to recover.
   </DocCard>
 </DocCards>
 
 ## Load-bearing ideas
 
-1. **Git owns authored content.** Postgres is derived. Recompile if they disagree.
+1. **Git owns authored content.** The index is derived. Recompile if they disagree.
 2. **One Zod layer** types compile, reads, functions, and MCP.
-3. **MCP + CLI** are first-class. Errors carry a `fix`.
+3. **MCP and the CLI** are first-class. Errors carry a `fix`.
 4. **Preview branches** are copy-on-write.
 5. **Owned primitives** land as source via `graft add`.
-

@@ -7,7 +7,16 @@ order: 3
 
 Commands and runtimes walk up from the working directory for `.env`.
 
-## Required
+## Required: none
+
+A static project needs no environment at all. `graft init` scaffolds the static
+index, `graft compile` writes `.graft/index.db`, and your app reads it embedded.
+Everything below is for a capability you opt into.
+
+## Postgres
+
+Required once `graft.config.ts` sets `export const index = "postgres"`, which is
+what operational data, typed functions, and copy-on-write branches need.
 
 | Variable | Used by | Purpose |
 | --- | --- | --- |

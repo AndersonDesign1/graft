@@ -1,13 +1,26 @@
 ---
 title: Search
-description: Postgres full-text search on the content index and on operational data.
+description: Full-text search on the content index and on operational data, on either tier.
 section: Content
 order: 5
 ---
 
-Search is a property of the index. Generated `tsvector` columns cover
-`content_index` and `data_records`. Every write path is searchable without
-app-side bookkeeping.
+Search is a property of the index. It comes with the compile, on both tiers,
+with no app-side bookkeeping and nothing extra to run.
+
+One API covers both. The engine underneath differs, the call and the query
+syntax do not.
+
+| | Static index | Postgres |
+| --- | --- | --- |
+| Engine | SQLite FTS5, porter stemming | Generated `tsvector` columns, GIN |
+| Ranking | `bm25` with column weights | `ts_rank` over a weighted vector |
+| Weighting | slug > frontmatter strings > body | slug (A) > frontmatter strings (B) > body (C) |
+| Needs | nothing | a database |
+
+The static tier translates the same websearch surface into an FTS5 `MATCH`
+expression, and its bm25 column weights mirror the Postgres A/B/C vector, so
+results come back in the same order for the same query.
 
 ## Authored content
 
@@ -19,21 +32,26 @@ Surfaces:
 | MCP | `search_content` |
 | db | `searchContent` (used under the hood) |
 
-Query syntax is Postgres `websearch_to_tsquery`: words, `"quoted phrases"`,
+Query syntax is the `websearch_to_tsquery` surface: words, `"quoted phrases"`,
 `or`, and `-exclusions`. Empty queries fail with `INPUT_VALIDATION_FAILED`.
 Stopword-only queries return `[]`.
 
 Hits include rank, headline snippets, and `sourcePath` (the file to edit). On
 overlay branches, search walks the branch chain so inherited documents appear.
 
-Weighting on content: slug (A) > frontmatter strings (B) > body (C).
+Snippets mark the matched terms with `<b>` on both tiers. Render them or strip
+them, but know they are there.
 
 ## Operational data
 
 Data search stays behind typed functions (`searchRecords` in core). The same
-authority and Zod rules apply as other record helpers. Example apps expose
+authority and Zod rules apply as to other record helpers. Example apps expose
 gated functions such as `searchSubmissions`.
+
+Operational data is Postgres-tier by construction, so this half has no static
+equivalent. Calling it in static mode fails with `NEEDS_DATABASE`.
 
 ## Language
 
-FTS config is `'english'` today. i18n configs are an open follow-up.
+The FTS config is English on both tiers: `'english'` on Postgres, `porter
+unicode61` on FTS5. Per-collection language configs are an open follow-up.
