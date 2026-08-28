@@ -44,3 +44,30 @@ What this costs, and what it makes harder.
 
 Design notes keep their place for explanation — how a subsystem works, what a
 spike found. Decisions live here.
+
+## Review the fixes, not just the code they fix
+
+Every regression this repository has shipped was introduced _by_ a fix, and
+found only by review that ran against the fix itself:
+
+- The rate-limit peer moved off `x-forwarded-for` onto `x-graft-peer`, a header
+  only the CLI adapter stripped — so in a Next.js or Astro route a client could
+  still choose its own bucket. The same bug, relocated. It lives in a WeakMap
+  keyed by the Request object now, which nothing over the wire can write.
+- The MDX safety checker parsed with `remark-mdx` while the renderer compiled
+  with `remark-gfm`, and treated a parse error as "nothing to execute" — true
+  only if the checker is a superset of the renderer, and it was a subset.
+- Scoping the `approvals` INSERT grant to seven columns fixed a real privilege
+  escalation and broke `delete_content`, because Drizzle names every column and
+  passes `default` for unset ones, and Postgres checks INSERT privilege on the
+  columns a statement _names_. The unit suite passed: its control case wrote
+  hand-written SQL naming exactly the granted columns.
+- The canary guard added to catch a silent-success bug had a silent gap of its
+  own: it globbed `packages/`, so a publishable package anywhere else in the
+  workspace would have been skipped.
+
+All four looked correct from inside the change. Two were caught by an
+independent reviewer, one by a container test, one by re-reading the fix.
+
+The practical rule: after fixing something, review the fix as if someone else
+wrote it, and prefer a reviewer that runs the code over one that reads it.
