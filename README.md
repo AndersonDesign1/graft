@@ -8,7 +8,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@usegraft/cli"><img alt="npm" src="https://img.shields.io/npm/v/@usegraft/cli?label=%40usegraft%2Fcli&color=111111"></a>
   <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/license-MIT-111111"></a>
-  <a href="https://github.com/AndersonDesign1/graft/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/AndersonDesign1/graft/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/AndersonDesign1/graft/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/AndersonDesign1/graft/actions/workflows/ci.yml/badge.svg?branch=feat%2Fcore"></a>
   <img alt="Node 22.16 or newer" src="https://img.shields.io/badge/node-%3E%3D22.16-111111">
 </p>
 
