@@ -1,0 +1,12 @@
+{
+  "strictness": 2,
+  "ignorePatterns": [
+    "**/dist/**",
+    "examples/docs-site/content/docs/errors.mdx",
+    "tools/oxlint/anti-slop/**",
+    "**/.next/**",
+    "**/.astro/**",
+    "**/.vercel/**",
+    "pnpm-lock.yaml"
+  ]
+}
