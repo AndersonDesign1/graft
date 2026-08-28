@@ -22,7 +22,7 @@
     "@usegraft/registry": "workspace:*",
     "@usegraft/sdk-next": "workspace:*",
     "better-auth": "^1.6.23",
-    "next": "^16.0.0",
+    "next": "^16.2.11",
     "pg": "^8.22.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

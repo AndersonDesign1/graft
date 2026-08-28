@@ -39,7 +39,7 @@
     "tsup": "^8.0.0",
     "turbo": "^2.0.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vitest": "^2.0.0"
+    "vitest": "^3.2.6"
   },
   "engines": {
     "node": ">=22.16"
