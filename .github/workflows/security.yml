@@ -1,0 +1,97 @@
+name: Security
+
+# Three checks that ci.yml cannot make. CodeQL builds a whole-program database
+# and tracks taint across file and function boundaries, which oxlint (single-file
+# AST matching) cannot do by construction. Dependency Review reads the diff of
+# the dependency graph, which minimumReleaseAge does not: that gate blocks a
+# dependency for being *new*, not for being vulnerable or wrongly licensed.
+# zizmor audits these workflow files themselves, which nothing else here does.
+
+on:
+  push:
+    branches: [main, feat/core]
+  pull_request:
+  schedule:
+    # CodeQL's query packs improve after a commit lands. A weekly run finds
+    # what the query set could not see the day the code was written.
+    - cron: "27 5 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  # Interprocedural taint tracking over the whole workspace. The sinks that
+  # matter here are the filesystem paths in @usegraft/compiler (path traversal
+  # past the containment check), the raw SQL in @usegraft/db, the CLI's process
+  # spawns, and prototype pollution through the Record<string, unknown>
+  # frontmatter and JSONB round-trips that .oxlintrc.json deliberately allows.
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+        with:
+          languages: javascript-typescript
+          # No compilation step for JS/TS. Building would only add the tsup
+          # output back as scannable source, which is the same code twice.
+          build-mode: none
+          config: |
+            paths-ignore:
+              - "**/dist/**"
+              - "**/.next/**"
+              - "**/.astro/**"
+              - "**/.vercel/**"
+              - "**/*.test.ts"
+              - "tools/oxlint/anti-slop/**"
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+        with:
+          category: "/language:javascript-typescript"
+
+  # Graft ships 15 packages under MIT. A contributor adding a copyleft
+  # transitive dependency is a licensing problem for everyone downstream, and
+  # nothing else in the pipeline would notice.
+  dependency-review:
+    name: Dependency review
+    # Diffs a base against a head, so there is nothing to compare on a push.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: on-failure
+          # Denied rather than allow-listed: an allow list turns every new
+          # permissive licence into a failed CI run on someone else's PR.
+          deny-licenses: AGPL-3.0, AGPL-3.0-only, AGPL-3.0-or-later, GPL-2.0, GPL-3.0, SSPL-1.0
+
+  # The workflows here carry real security decisions: SHA-pinned actions, an
+  # id-token scoped to the one job that publishes, and no npm token anywhere.
+  # Nothing verified that any of it survived the next edit until this job.
+  workflows:
+    name: Workflow audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+        with:
+          # Findings land in the Security tab rather than failing the run. Raise
+          # this to a blocking level once the current findings are cleared.
+          advanced-security: true
+          persona: regular

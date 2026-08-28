@@ -1,0 +1,37 @@
+version: 2
+
+# Only the github-actions ecosystem for now. Dependabot documents support for
+# pnpm v7 through v10, and this workspace is on pnpm 11 (dependabot-core#14794
+# tracks v11). The lockfile is format 9.0, which pnpm 10 also emits, so npm
+# updates may well work — enable that ecosystem separately and watch the first
+# run rather than discovering it inside a batch of PRs.
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+    # One PR for every action, not one per action. Three actions across two
+    # workflow files would otherwise open three PRs, and each burns the full
+    # matrix: a Postgres service, the integration suite, and a Docker build.
+    groups:
+      actions:
+        patterns: ["*"]
+
+    # Four days, not the three-day default, because two clocks are involved.
+    # pnpm's minimumReleaseAge (4320 minutes) measures from the npm publish
+    # timestamp and Dependabot measures from registry availability. A lockfile
+    # naming a version younger than 4320 minutes fails `pnpm install
+    # --frozen-lockfile` in CI before a single test runs, because pnpm 11
+    # re-applies the policy on install (trustLockfile defaults to false).
+    # A day of slack keeps the two windows from disagreeing at the edge.
+    cooldown:
+      default-days: 4
+
+    commit-message:
+      prefix: "chore"
+
+    open-pull-requests-limit: 5
+
+    labels:
+      - "dependencies"

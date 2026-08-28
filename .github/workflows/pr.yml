@@ -1,0 +1,105 @@
+name: PR
+
+# Two things ci.yml does not check, both about the release path rather than the
+# code. Squash-merge takes the pull request *title* as the commit message, so
+# the title is what actually has to satisfy Conventional Commits. And a change
+# to a published package without a changeset ships silently in whatever release
+# happens next, unversioned and unmentioned in the changelog.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    name: Conventional title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            refactor
+            test
+            chore
+            perf
+            build
+            ci
+            revert
+          # Package directory names, so `fix(mdx-safety): …` reads the same way
+          # the workspace is laid out. `deps` covers Dependabot's grouped PRs.
+          scopes: |
+            assets
+            auth
+            cli
+            compiler
+            content-migrations
+            contracts
+            core
+            db
+            mcp
+            mdx-safety
+            registry
+            sdk-astro
+            sdk-core
+            sdk-next
+            sdk-sveltekit
+            studio
+            tokens
+            docs-site
+            landing-page
+            deploy
+            release
+            deps
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: >-
+            The subject "{subject}" must start lowercase, and must not end with
+            a period.
+
+  changeset:
+    name: Changeset present
+    runs-on: ubuntu-latest
+    # A pull request that genuinely touches nothing publishable says so with
+    # the label, and the reviewer sees that claim rather than a silent skip.
+    if: >-
+      !contains(github.event.pull_request.labels.*.name, 'no changeset')
+      && github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # `changeset status --since` needs the base branch to diff against.
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22.16
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check for a changeset
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE"
+          if pnpm changeset status --since="origin/$BASE"; then
+            exit 0
+          fi
+          echo ""
+          echo "No changeset found for a change that touches a published package."
+          echo "Run \`pnpm changeset\`, describe the change, and commit the file."
+          echo "If this pull request changes only docs, tests, or CI, add the"
+          echo "\`no changeset\` label instead."
+          exit 1

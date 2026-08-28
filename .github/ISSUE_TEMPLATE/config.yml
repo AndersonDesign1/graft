@@ -1,0 +1,10 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/AndersonDesign1/graft/blob/feat/core/SECURITY.md
+    about: >-
+      Do not open a public issue. Report it privately through the security
+      policy.
+  - name: Documentation
+    url: https://github.com/AndersonDesign1/graft/tree/feat/core/examples/docs-site/content/docs
+    about: Check the docs before filing. Every error code is listed with its fix.

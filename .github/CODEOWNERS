@@ -1,0 +1,17 @@
+# Every change needs the maintainer's review while Graft is pre-1.0.
+* @AndersonDesign1
+
+# Surfaces where a mistake is a security bug rather than a defect. Called out
+# separately so the reason is visible in the review, not just the rule.
+/packages/auth/          @AndersonDesign1
+/packages/mdx-safety/    @AndersonDesign1
+/packages/db/src/harden.ts     @AndersonDesign1
+/packages/db/src/approvals.ts  @AndersonDesign1
+/SECURITY.md             @AndersonDesign1
+/docs/adr/               @AndersonDesign1
+
+# The release path. Trusted publishing registers one workflow filename per
+# package, so a rename here silently breaks publishing for all of them.
+/.github/workflows/      @AndersonDesign1
+/.changeset/config.json  @AndersonDesign1
+/pnpm-workspace.yaml     @AndersonDesign1

@@ -1,0 +1,57 @@
+name: Feature request
+description: Propose something Graft should do and does not.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Graft holds a small number of invariants, listed in
+        [CONTRIBUTING.md](https://github.com/AndersonDesign1/graft/blob/feat/core/CONTRIBUTING.md).
+        A proposal that breaks one is turned down however well it is argued, so
+        it is worth a look first.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What you were trying to do, and where Graft stopped you. Describe the
+        situation, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you want instead
+      description: Sketch the surface. Real command names, real function signatures.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried
+      description: >-
+        Workarounds you found, and why they were not enough. If a Graft error
+        pointed you somewhere that turned out to be a dead end, say which one.
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface does this touch?
+      multiple: true
+      options:
+        - Schema and collections
+        - Authoring and compile
+        - Typed reads (SDKs)
+        - Typed functions and access
+        - Agent surface (MCP)
+        - CLI
+        - Studio
+        - Registry primitives (graft add)
+        - Branching and previews
+        - Deploy and self-host
+        - Docs
+    validations:
+      required: true

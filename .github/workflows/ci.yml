@@ -5,6 +5,11 @@ on:
     branches: [main, feat/core]
   pull_request:
 
+# Read-only by default. No job here writes to the repository, publishes, or
+# needs a token beyond checkout. release.yml widens per job where it must.
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -46,6 +51,11 @@ jobs:
       - run: pnpm check:registry-drift
       - run: pnpm typecheck
       - run: pnpm build
+      # The error reference on the docs site is generated from ERROR_KNOWLEDGE
+      # in @usegraft/mcp, which is already under test. Prose does not fail a
+      # build, so a second hand-written copy would drift invisibly. Needs the
+      # build above: it imports the built package.
+      - run: pnpm check:error-docs
       - run: pnpm test
       # P6.1 — cold-agent path must stay green: MCP-only introspection → write → read.
       # Runs again explicitly so the gate is visible in CI logs (also covered by pnpm test).
