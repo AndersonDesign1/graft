@@ -1,24 +1,37 @@
-# Graft
+<h1 align="center">Graft</h1>
 
-> The agent-native CMS. Everything is code; the agent is the operator, the human is optional.
+<p align="center">
+  <strong>The agent-native CMS.</strong><br>
+  Content, schema, logic, and access are code an agent edits directly.
+</p>
 
-Graft is a CMS built so an **AI agent** is the primary operator. Content, schema, logic, and access
-are **owned code** an agent edits directly, backed by a self-hostable Postgres engine, with
-**git-native versioning**, **copy-on-write database branches**, and **shadcn-style owned
-extensibility**. Humans get an optional Studio and a configurable approval policy.
+<p align="center">
+  <a href="https://www.npmjs.com/package/@usegraft/cli"><img alt="npm" src="https://img.shields.io/npm/v/@usegraft/cli?label=%40usegraft%2Fcli&color=111111"></a>
+  <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/license-MIT-111111"></a>
+  <a href="https://github.com/AndersonDesign1/graft/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/AndersonDesign1/graft/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Node 22.16 or newer" src="https://img.shields.io/badge/node-%3E%3D22.16-111111">
+</p>
 
-Design decisions from the de-risking spikes live in
-[`docs/design-notes/`](docs/design-notes/). (The PRD and phase tracker are private planning docs,
-kept out of the repo.)
+---
 
-## Quickstart — no database required
+Most content systems put a dashboard between you and your content. Graft puts a
+schema and a filesystem there instead, then gives an agent the same operator
+surface a human gets.
 
-A content project needs **no services at all**. `graft compile` writes the content index to a
-SQLite artifact, and your app reads it embedded:
+Authored content is MDX in git. Your schema is a Zod-typed `defineCollection`
+call. The queryable index is derived, so when git and the index disagree, git
+wins and the compiler rebuilds. Everything a human can do in the optional
+Studio, an agent can do over MCP or the CLI, under the same access rules, the
+same audit trail, and the same human gate on anything destructive.
+
+## Start with no database
+
+A content project needs no services at all. `graft compile` writes the index to
+a SQLite artifact, and your app reads it embedded.
 
 ```bash
-npx graft init          # scaffolds schema, content/, llms.txt (static index by default)
-npx graft compile       # → .graft/index.db — no DATABASE_URL, no containers
+npx @usegraft/cli init      # schema, content/, llms.txt
+npx @usegraft/cli compile   # writes .graft/index.db
 ```
 
 ```ts
@@ -28,190 +41,144 @@ import { collections } from "./graft.config";
 
 const index = await openStaticIndex(".graft/index.db");
 const graft = createClient({ index, collections });
-const home = await graft.getDocument("pages", "home"); // fully typed, zero codegen
+
+const home = await graft.getDocument("pages", "home");
+//    ^? typed by your pages collection. No codegen step.
 ```
 
-The artifact is derived from the files in git, so it is git-ignored and rebuilt in your build
-command (`graft compile && next build`). Preview branches are just git branches — each checkout
-compiles its own index. Full-text search works too; it is a property of the artifact.
+The artifact is derived from the files in git, so it is git-ignored and rebuilt
+in your build command: `graft compile && next build`. Preview branches are git
+branches, and each checkout compiles its own index. Full-text search comes with
+it, because search is a property of the artifact.
 
-Agents get the same surface here — `graft mcp` serves a static project, so an agent can author,
-read, and search content with no database attached.
+That deploys to Vercel, Netlify, or Cloudflare Pages with nothing attached.
 
-**When you need more:**
+## Add Postgres when you need it
+
+Postgres buys operational data (orders, submissions, comments), typed functions
+with auth, audit, rate limits, and approvals, and copy-on-write preview
+branches.
 
 ```bash
-# 1. set DATABASE_URL in .env, 2. flip one line: export const index = "postgres"
-npx graft db migrate    # applies the schema that ships with @usegraft/db
-npx graft compile
+# set DATABASE_URL, then change one line: export const index = "postgres"
+npx @usegraft/cli db migrate
+npx @usegraft/cli compile
 ```
 
-Postgres unlocks operational data (form submissions, orders, comments), typed functions with
-auth/audit/approvals, and copy-on-write database branches — and Graft tells you the moment you
-need it: reaching for one of those in static mode fails with `NEEDS_DATABASE`, whose `fix` is the
-upgrade above. Design note:
-[`docs/design-notes/static-index.md`](docs/design-notes/static-index.md).
+Graft tells you the moment you need it. Reaching for a Postgres-tier feature in
+static mode fails with `NEEDS_DATABASE`, and that error's `fix` field is the two
+commands above.
 
-## Status
+## Agents operate it
 
-**Phase 5 — Registry + commerce vertical: complete.** On top of Phases 2–4 (wow loop, runtime
-data, auth, branching, cache tags), Graft now ships **owned primitives** and a real content body
-model:
+`graft mcp` serves your project over MCP, on stdio or Streamable HTTP. An agent
+reads your real schema through `describe_schema` instead of guessing at it, and
+every error it can hit carries a `fix` it can act on.
 
-- **Real MDX bodies.** Authored `*.mdx` is compiled and rendered via `@usegraft/sdk-next`
-  `MdxBody` with a generated `components/mdx-components.ts` map — registry **blocks** are real
-  React components, not markdown-only fakes.
-- **`graft add`.** Local-first registry (`@usegraft/registry`): Tier-1 `seo` / `callout` / `faq` /
-  `scoped-access` / `comments`, Tier-2 **`commerce`** (file-authoritative products + db-authoritative
-  orders + place/list/update/cancel). Pure file-drop + generated `graft/` barrel; zero config
-  edits.
-- **Typed nested fields.** `field.object` / `field.array` with recursive `describe_schema`.
-- **Agent surfaces** (MCP + CLI + HTTP functions) live: compile, branch/merge, migrate,
-  approvals, search, auth.
+```jsonc
+// .mcp.json
+{ "mcpServers": { "graft": { "command": "npx", "args": ["-y", "@usegraft/cli", "mcp"] } } }
+```
 
-**Phase 6 — Self-teaching (in progress).** CI gates a cold-agent MCP path
-(`pnpm test:cold-agent`). **P6.2** made the project MCP a full operator surface:
-`list_functions` / `describe_function` / `run_function` (same access, audit, rate-limit, and
-human-gate rules as `POST /api/fn/<name>`), plus `graft mcp` for one-command stdio install.
-**P6.3** adds `list_registry` / `describe_item` so agents browse owned primitives before
-`graft add`, and locks the whole introspection surface with contract tests. **P6.4** gates the
-remote path in CI: a cold agent reaching Graft only over Streamable HTTP — auth wall first
-(the 401 teaches the fix), then authoring, function invocation via the connection's bearer,
-and registry browsing. **P6.5** completes the content-ops surface: `delete_content` (the
-destructive human gate over MCP — approval filed on first call, `graft approve <id>`, one-shot
-input-bound retry) and `put_asset` (upload via server-local `path` or remote `base64`;
-refuses existing keys without `overwrite: true`) — and passed the **live off-repo cold-agent
-exercise**: a fresh agent with no repo checkout and no llms.txt, taught only by tool
-descriptions and error messages over network HTTP MCP, authored a page with an uploaded asset
-and walked the human-gated delete end-to-end with **zero unintended failures**. Its friction
-log fed straight back into the surface (asset-field teaching in `describe_schema`, MCP-speak
-approval errors). See [`docs/design-notes/agent-mcp.md`](docs/design-notes/agent-mcp.md).
+The agent surface is not a subset of the human one. It reads and writes
+content, uploads assets, browses and installs registry primitives, runs typed
+functions, and compiles. What an agent cannot do is decide its own approval.
 
-**Phase 7 — Packaging, SDKs & launch (in progress).** **P7.1** ships the headless runtime:
-`graft serve` binds the same stateless handlers the example app mounts (typed functions, MCP
-over Streamable HTTP, `/healthz` with a real DB round-trip) to a plain Node server — what a
-self-host container runs. Identity is env-driven (`GRAFT_DEV_TOKEN`, `GRAFT_TRUSTED_ISSUERS`
-for OIDC via discovery, `GRAFT_MCP_ALLOW_ANONYMOUS`, `GRAFT_APPROVAL_POLICY`), and
-`graft harden <role>` applies the runtime privilege split so the deployed credential can
-serve, project content, and request and consume approvals, but never decide one. The
-container applies it by default wherever it owns its own database. Topology decisions in
-[`docs/design-notes/packaging.md`](docs/design-notes/packaging.md). **P7.2** ships the
-container ([`deploy/docker/`](deploy/docker/README.md)): one image = Postgres 18 + MinIO +
-`graft serve` — `docker run -p 3903:3903 graft` boots migrate → compile → serve and logs a
-generated bearer (anonymous MCP is never exposed); mount your project at `/project`. It serves under a hardened
-role by default (`GRAFT_HARDEN=0` opts out); or use the split
-`deploy/docker/compose.yml` (db / storage / graft — swap to Neon/R2 by env alone). **P7.3**
-adds the deploy adapters ([`deploy/`](deploy/README.md)): Railway, Fly, and VPS run the
-container; Vercel deploys embedded (compile as a build step; the example app is the
-reference) — every adapter carries the runtime-credential harden recipe. **P7.4** ships
-`@usegraft/sdk-astro` and `@usegraft/sdk-sveltekit`: the same typed `getContent`/`listContent`/
-`searchContent` surface as sdk-next plus `graftRoute` — mounting the function/MCP handlers is
-one property access because both frameworks' endpoints are already Web-standard; cache
-invalidation maps the tag contract onto CDN surrogate keys. Next: docs site + compare page.
+Destructive operations are human-gated under every policy. The call returns 403
+with a pending approval id, a human runs `graft approve <id>`, and the caller
+retries carrying that id. The deciding identity is derived from the verified
+caller and never read from the request, so no argument exists that an agent
+could set to approve itself. On Postgres, `graft harden` moves that guarantee
+below the application: the runtime role holds no `UPDATE` on `approvals`, which
+puts `pending → approved` out of reach even through raw SQL.
+
+## Primitives you own
+
+`graft add` copies a primitive's files into your repository, shadcn-style. You
+own the copy and edit it like the rest of your code. No version of it sits in
+`node_modules` to fight with.
+
+```bash
+graft add commerce
+```
+
+Available today: `seo`, `callout`, `faq`, `scoped-access`, `comments`, and
+`commerce` (file-authoritative products, database-authoritative orders, and the
+place, list, update, and cancel functions).
+
+## Read it from your framework
+
+| Package                                             | Framework                                                              |
+| --------------------------------------------------- | ---------------------------------------------------------------------- |
+| [`@usegraft/sdk-next`](packages/sdk-next)           | Next.js. React.cache-deduped reads, `revalidateContent`, and `MdxBody` |
+| [`@usegraft/sdk-astro`](packages/sdk-astro)         | Astro. Typed reads plus `graftRoute` endpoint mounts                   |
+| [`@usegraft/sdk-sveltekit`](packages/sdk-sveltekit) | SvelteKit. Typed reads plus `graftRoute` for `+server.ts`              |
+| [`@usegraft/sdk-core`](packages/sdk-core)           | Anything else. The typed client the others wrap                        |
 
 ## Telemetry
 
-**None.** Graft collects no analytics, sends no usage pings, and phones home from no command.
-The only network calls it makes are the ones your project configures: your database, your asset
-store, and (if you use them) Neon's branching API and your OIDC issuer.
+None. Graft collects no analytics, sends no usage pings, and phones home from no
+command. The only network calls it makes are the ones your project configures:
+your database, your asset store, and, when you use them, Neon's branching API
+and your OIDC issuer.
 
-## Requirements
+## Packages
 
-- Node `>=22.16` (developed on 24). The static index's FTS5 search needs the
-  `node:sqlite` build that ships from 22.16.0 — also comfortably above pnpm 11's
-  own floor. Node 20 reached end-of-life in April 2026.
-- TypeScript **7** (native `tsc`; monorepo dual-install keeps TS 6 API for tsup DTS until tooling catches up)
-- [pnpm](https://pnpm.io) `11.x` (pinned via `packageManager`)
-- Docker (for the self-host Postgres + MinIO stack)
+| Package                        | Purpose                                                                      |
+| ------------------------------ | ---------------------------------------------------------------------------- |
+| `@usegraft/core`               | Schema (`defineCollection`), typed functions, access, the function runtime   |
+| `@usegraft/compiler`           | Validate authored MDX and project it into the index                          |
+| `@usegraft/db`                 | Postgres client, migrations, the static SQLite index, copy-on-write branches |
+| `@usegraft/contracts`          | Error codes and introspection schemas every package shares                   |
+| `@usegraft/sdk-core`           | Framework-agnostic typed read client and the cache-tag contract              |
+| `@usegraft/sdk-next`           | Next.js adapter                                                              |
+| `@usegraft/sdk-astro`          | Astro adapter                                                                |
+| `@usegraft/sdk-sveltekit`      | SvelteKit adapter                                                            |
+| `@usegraft/cli`                | The `graft` command                                                          |
+| `@usegraft/mcp`                | The agent surface: content, functions, introspection                         |
+| `@usegraft/studio`             | The optional editing UI and approval queue                                   |
+| `@usegraft/registry`           | The registry behind `graft add`                                              |
+| `@usegraft/auth`               | OIDC verification, actor resolution, scope checks                            |
+| `@usegraft/assets`             | S3-compatible storage and agent upload primitives                            |
+| `@usegraft/mdx-safety`         | Refuses executable constructs in authored MDX                                |
+| `@usegraft/content-migrations` | Codemod-style transforms for authored content                                |
+| `@usegraft/tokens`             | The design tokens the Studio and examples share                              |
 
-## Getting started
+## Self-host
 
-```bash
-pnpm install
-pnpm build
-pnpm test        # unit tests; live integration tests are opt-in via RUN_INTEGRATION=1
-pnpm test:cold-agent   # P6.1 self-teaching gate (also runs under pnpm test)
-
-# self-host infra (Postgres 18 + MinIO); dev currently runs against Neon + R2 via .env
-docker compose up -d
-```
-
-To see the loop: set `DATABASE_URL` in a repo-root `.env`, then
-
-```bash
-pnpm --filter landing-page compile   # graft compile: project content/ into Postgres
-pnpm --filter landing-page watch     # graft dev: recompile on every save (optional)
-pnpm --filter landing-page dev       # renders at http://localhost:3000
-```
-
-### Try the runtime
-
-With the example app running (`pnpm --filter landing-page dev`), the typed functions from
-`examples/landing-page/graft.config.ts` (plus `graft/*` primitives) are live at
-`POST /api/fn/<name>` — success returns `{ data }`, failure returns a `GraftError` JSON
-carrying a `fix`:
+One image runs the whole backend: Postgres, MinIO, and `graft serve`.
 
 ```bash
-# Open query — lists the live page slugs straight from content_index:
-curl -s localhost:3000/api/fn/pageStats -d '{}'
-
-# Public mutation — the contact form's endpoint (anonymous allowed, 5/min per IP):
-curl -s localhost:3000/api/fn/submitContact \
-  -d '{"email":"a@b.com","message":"hi"}'
-
-# Commerce — place an order against content/products (public; prices snapshotted):
-curl -s localhost:3000/api/fn/placeOrder \
-  -d '{"email":"buyer@example.com","items":[{"productSlug":"team","qty":1}]}'
-
-# Scope-gated query — needs a token; mutations reject anonymous callers by default.
-# Set GRAFT_DEV_TOKEN in .env, then present it as a bearer:
-curl -s localhost:3000/api/fn/listSubmissions \
-  -H "authorization: Bearer $GRAFT_DEV_TOKEN" -d '{}'
+docker run -p 3903:3903 -v "$PWD:/project" graft
 ```
 
-Destructive functions (e.g. `deleteSubmission`, `cancelOrder`) are human-gated: the call 403s
-with a pending approval id, a human runs `graft approve <id>`, and the caller retries carrying
-that id — an `x-graft-approval: <id>` header over HTTP, or the `approval` tool argument over
-MCP. See [`llms.txt`](examples/landing-page/llms.txt) for the full surface, including MCP
-tools and Better Auth token minting.
+It migrates, compiles, and serves, then logs a generated bearer token. Anonymous
+MCP is never exposed. It serves under a hardened role wherever it owns its own
+database. Adapters for Railway, Fly, a plain VPS, and Vercel live in
+[`deploy/`](deploy/README.md).
 
-The gate holds against the agent itself, not just accidents. **The identity that decides is
-derived from the verified caller, never from the request** — there is no `decidedBy` argument
-on any surface — so approver == requester is a comparison between two server-established
-facts and is refused with `APPROVAL_SELF_DECISION`. An approval whose requester has no stable
-identity cannot be decided by anyone (`APPROVAL_UNATTRIBUTED`), and a human-gated call from an
-unidentified caller is refused rather than filed. Decisions also record the Postgres role they
-ran as, stamped server-side.
+## Documentation
 
-Consuming an approval rides a `SECURITY DEFINER` function, so a deployment can additionally
-give its app/agent a runtime role with **no UPDATE on `approvals`**, making `pending → approved`
-unreachable even with raw SQL against the app's own `DATABASE_URL`. That split is **opt-in**:
-run `graft harden <role>` and serve under that role. It is defence in depth beneath the
-application-level control above, not a substitute for it
-(`runtimeRoleGrantsSql` / `hardenRuntimeRole` in `@usegraft/db` emit the grants; see
-[`docs/design-notes/approval-hardening.md`](docs/design-notes/approval-hardening.md)).
+- [Getting started](examples/docs-site/content/docs/getting-started.mdx)
+- [The model](examples/docs-site/content/docs/the-model.mdx), and why content is code
+- [The agent surface](examples/docs-site/content/docs/agent-surface.mdx)
+- [Architecture decisions](docs/adr/), each stating the premise it rests on
+- [Design notes](docs/design-notes/) from the de-risking spikes
 
-## Monorepo layout
+## Status
 
-| Package                        | Purpose                                                             |
-| ------------------------------ | ------------------------------------------------------------------- |
-| `@usegraft/core`               | Schema (`defineCollection`), function runtime, access, migrations   |
-| `@usegraft/compiler`           | Authored content → Postgres index + typegen + validation            |
-| `@usegraft/content-migrations` | Codemod-style authored-content transforms                           |
-| `@usegraft/db`                 | Postgres + Drizzle + branching abstraction                          |
-| `@usegraft/assets`             | S3/MinIO storage, transforms, agent upload primitives               |
-| `@usegraft/auth`               | OIDC token verification, actor resolver, scope-based access         |
-| `@usegraft/contracts`          | Shared types, error codes, introspection schemas                    |
-| `@usegraft/mdx-safety`         | Refuses executable constructs in authored MDX                       |
-| `@usegraft/mcp`                | Project MCP (content + functions + introspection)                   |
-| `@usegraft/cli`                | Human + agent CLI (`graft`, including `graft mcp` + `graft serve`)  |
-| `@usegraft/studio`             | Opt-in Studio UI (`graft studio` / `serve --studio`; OpenAPI-first) |
-| `@usegraft/registry`           | shadcn-style owned-primitive registry                               |
-| `@usegraft/sdk-core`           | Framework-agnostic client + cache contract                          |
-| `@usegraft/sdk-next`           | Next.js adapter + `MdxBody`                                         |
-| `@usegraft/sdk-astro`          | Astro adapter (typed reads + endpoint mounts)                       |
-| `@usegraft/sdk-sveltekit`      | SvelteKit adapter (typed reads + endpoint mounts)                   |
+Pre-1.0. Packages are published under `@usegraft/*`, and the API can still change
+between minors when the change buys a better design. Every break is described in
+the changelog and in the pull request that makes it.
 
-## Conventions
+## Contributing
 
-See [`CONVENTIONS.md`](CONVENTIONS.md).
+Start with [`CONTRIBUTING.md`](CONTRIBUTING.md). Engineering conventions live in
+[`CONVENTIONS.md`](CONVENTIONS.md).
+
+Report a vulnerability through [`SECURITY.md`](SECURITY.md), never a public
+issue. This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).
