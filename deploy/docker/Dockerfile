@@ -23,8 +23,18 @@ RUN pnpm exec turbo run build --filter="./packages/*"
 
 # MinIO server + client binaries come from the official images (registry
 # pulls, not dl.min.io — some networks can't resolve it).
-FROM minio/minio:latest AS minio
-FROM minio/mc:latest AS mc
+#
+# Pinned by digest, not by tag. Both sat on `latest`, which MinIO moves on
+# every release, so the same Dockerfile put a different storage server in the
+# image from one build to the next, and a bad upstream release would reach a
+# user's `docker run` with nothing in this repo having changed. Every action
+# in the workflows is SHA-pinned for that reason, and a floating container tag
+# is what OpenSSF Scorecard deducts for on Pinned-Dependencies. The digest is
+# what gets pulled and the tag is only there to read, so moving to a newer
+# release means resolving its digest from the registry, not editing the tag on
+# its own. Both digests are multi-arch indexes, so arm64 still resolves.
+FROM minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e AS minio
+FROM minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 AS mc
 
 # Runtime rides the official postgres image: its entrypoint owns initdb +
 # role/db bootstrap, we add Node, MinIO, and the built workspace on top.
