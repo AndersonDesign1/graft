@@ -34,6 +34,7 @@ import { registerContentTools } from "./tools/content";
 import { registerErrorTools } from "./tools/errors";
 import { registerFunctionTools } from "./tools/functions";
 import { registerIntrospectionTools } from "./tools/introspection";
+import { registerContentPrompts } from "./tools/prompts";
 import { registerRegistryTools } from "./tools/registry";
 import { registerContentResources } from "./tools/resources";
 import type { GraftMcpOptions } from "./options";
@@ -327,9 +328,11 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
   registerBranchTools(server, deps);
   registerApprovalTools(server, deps);
   registerErrorTools(server, deps);
-  // Not a tool group: documents and the schema as addressable resources, so a
-  // client can attach one as context instead of spending a turn fetching it.
+  // Not tool groups. Resources make documents addressable, so a client can
+  // attach one as context instead of spending a turn fetching it; prompts
+  // offer the project's workflows filled in from the live schema.
   registerContentResources(server, deps);
+  registerContentPrompts(server, deps);
 
   return server;
 }
