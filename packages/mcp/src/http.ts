@@ -16,7 +16,7 @@
 import { GraftError } from "@usegraft/contracts";
 import type { FunctionActor } from "@usegraft/core";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { createGraftMcp, type GraftMcpOptions } from "./server";
+import { createDocsMcp, createGraftMcp, type DocsMcpOptions, type GraftMcpOptions } from "./server";
 
 export interface GraftMcpHandlerOptions extends GraftMcpOptions {
   /**
@@ -122,6 +122,41 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
     } finally {
       // JSON mode returns complete bodies, so closing after handleRequest
       // resolves cannot cut a response short.
+      void server.close().catch(() => undefined);
+    }
+  };
+}
+
+/**
+ * A public documentation MCP endpoint, over the same stateless transport.
+ *
+ * Deliberately has no `actor` and no `allowAnonymous`. The full handler refuses
+ * to start without one of them because it serves writes, uploads and approval
+ * decisions; this one serves documentation, so there is nothing to authenticate
+ * and nothing to accidentally leave open. That is the point of it being a
+ * separate function: the closed endpoint gains no new way to be opened.
+ *
+ * Mount it at `/mcp` on the docs domain, which is where clients look —
+ * Mintlify generates one there for every site it hosts, and Cloudflare runs a
+ * documentation server separately from its authenticated API server.
+ */
+export function createDocsMcpHandler(options: DocsMcpOptions): GraftMcpHandler {
+  return async (request: Request): Promise<Response> => {
+    if (request.method !== "POST") {
+      return jsonRpcError(405, -32000, "Method not allowed: this server is stateless (POST only)", {
+        allow: "POST",
+      });
+    }
+
+    const server = createDocsMcp(options);
+    const transport = new WebStandardStreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
+    });
+    try {
+      await server.connect(transport);
+      return await transport.handleRequest(request);
+    } finally {
       void server.close().catch(() => undefined);
     }
   };

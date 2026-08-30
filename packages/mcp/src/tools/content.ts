@@ -28,21 +28,13 @@ import {
 } from "./outputs";
 import type { RegisterTools } from "./deps";
 
-export const registerContentTools: RegisterTools = (server, deps) => {
-  const {
-    branchId,
-    collections,
-    contentDir,
-    elicitApproval,
-    functions,
-    getDeleteHandler,
-    getScope,
-    options,
-    projectContent,
-    requireScope,
-    searchIndex,
-    staticIndexPath,
-  } = deps;
+/**
+ * Reading and searching documents. Split from the write half because the
+ * public documentation server registers these and nothing else — a mount whose
+ * whole purpose is public should not be one `if` away from `write_content`.
+ */
+export const registerContentReadTools: RegisterTools = (server, deps) => {
+  const { branchId, collections, contentDir, getScope, searchIndex, staticIndexPath } = deps;
 
   server.registerTool(
     "list_content",
@@ -155,6 +147,21 @@ export const registerContentTools: RegisterTools = (server, deps) => {
         (payload) => payload.hits.map((hit) => documentLink(branchId, hit.collection, hit.slug)),
       ),
   );
+};
+
+/** Authoring and deleting. Never registered on the public documentation mount. */
+export const registerContentWriteTools: RegisterTools = (server, deps) => {
+  const {
+    branchId,
+    collections,
+    contentDir,
+    elicitApproval,
+    functions,
+    getDeleteHandler,
+    options,
+    projectContent,
+    requireScope,
+  } = deps;
 
   server.registerTool(
     "write_content",
@@ -275,6 +282,4 @@ export const registerContentTools: RegisterTools = (server, deps) => {
         return { ...(data as Record<string, unknown>), correlationId };
       }),
   );
-
-  const uploadRoot = options.localUploadRoot;
 };

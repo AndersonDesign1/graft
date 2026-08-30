@@ -36,8 +36,12 @@ const isFileAuthoritative = (authority: string | undefined): boolean =>
 const asString = (value: unknown): string | undefined =>
   typeof value === "string" && value !== "" ? value : undefined;
 
-export const registerContentResources: RegisterTools = (server, deps) => {
-  const { branchId, collections, contentDir, functionsByName } = deps;
+/**
+ * Documents as resources. The public documentation mount registers this and
+ * not the schema resource below, which carries the function surface.
+ */
+export const registerDocumentResources: RegisterTools = (server, deps) => {
+  const { branchId, collections, contentDir } = deps;
 
   const fileCollections = (): string[] =>
     Object.values(collections)
@@ -144,12 +148,17 @@ export const registerContentResources: RegisterTools = (server, deps) => {
         };
       }),
   );
+};
 
-  /**
-   * The schema as a resource, not only as a tool call. It is the one piece of
-   * context an agent wants attached for a whole session rather than fetched
-   * once and forgotten, and it is the same payload describe_schema returns.
-   */
+/**
+ * The schema as a resource, not only as a tool call. It is the one piece of
+ * context an agent wants attached for a whole session rather than fetched once
+ * and forgotten, and it is the same payload describe_schema returns — which is
+ * also why it stays off the public mount.
+ */
+export const registerSchemaResource: RegisterTools = (server, deps) => {
+  const { branchId, collections, functionsByName } = deps;
+
   server.registerResource(
     "schema",
     schemaUri(branchId),

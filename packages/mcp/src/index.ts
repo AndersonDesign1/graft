@@ -5,13 +5,24 @@
  * `createGraftMcp` builds the server; `serveStdio`
  * binds it to stdio for `.mcp.json` / `graft mcp`; `createGraftMcpHandler`
  * serves it over Streamable HTTP as a stateless `Request → Response` handler.
+ *
+ * `createDocsMcp` / `createDocsMcpHandler` build the other one: a public,
+ * read-only documentation server for `/mcp` on a docs domain. It is a separate
+ * factory rather than a flag, so the authenticated endpoint gains no new way to
+ * be opened.
+ *
  * See docs/design-notes/agent-mcp.md.
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
-export { createGraftMcp, type GraftMcpOptions } from "./server";
-export { createGraftMcpHandler, type GraftMcpHandler, type GraftMcpHandlerOptions } from "./http";
+export { createDocsMcp, createGraftMcp, type DocsMcpOptions, type GraftMcpOptions } from "./server";
+export {
+  createDocsMcpHandler,
+  createGraftMcpHandler,
+  type GraftMcpHandler,
+  type GraftMcpHandlerOptions,
+} from "./http";
 export { ERROR_KNOWLEDGE, explainCode, type ErrorExplanation } from "./explain";
 
 /**

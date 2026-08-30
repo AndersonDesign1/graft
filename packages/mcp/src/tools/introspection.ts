@@ -16,8 +16,12 @@ import {
 } from "./outputs";
 import type { RegisterTools } from "./deps";
 
-export const registerIntrospectionTools: RegisterTools = (server, deps) => {
-  const { branchId, collections, functions, functionsByName } = deps;
+/**
+ * What kinds of content exist. Safe to publish: a collection name and a field
+ * count describe the documents, not the project's API.
+ */
+export const registerCollectionIntrospection: RegisterTools = (server, deps) => {
+  const { branchId, collections } = deps;
 
   server.registerTool(
     "list_collections",
@@ -43,6 +47,17 @@ export const registerIntrospectionTools: RegisterTools = (server, deps) => {
         }),
       })),
   );
+};
+
+/**
+ * The function surface, and the schema view that carries it.
+ *
+ * `describe_schema` has included `functions` since P6.2, which makes it the
+ * project's API rather than its content shape — so it belongs here, with the
+ * function tools, and not on a mount open to the internet.
+ */
+export const registerFunctionIntrospection: RegisterTools = (server, deps) => {
+  const { branchId, collections, functions, functionsByName } = deps;
 
   server.registerTool(
     "describe_schema",
