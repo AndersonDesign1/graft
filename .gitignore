@@ -25,5 +25,9 @@ PRD.md
 # Not Graft source; regenerated on demand. Already in .prettierignore.
 mcps/
 
+# pnpm pack / npm pack output. The first publish of a package is done by hand
+# from a tarball, and the repo root is where pack drops it.
+*.tgz
+
 # Throwaway Phase 1 spikes (learnings go to docs/design-notes/)
 /spikes/
