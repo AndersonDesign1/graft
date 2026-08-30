@@ -205,6 +205,37 @@ describe("tools over HTTP", () => {
     await client.close();
   });
 
+  /**
+   * Resources and prompts are registered on the same server factory, so they
+   * ought to arrive over HTTP too — but this transport builds a fresh server
+   * per request, and "ought to" is how the P6.2 actor bug survived: the stdio
+   * path was always correct and only HTTP was broken. Assert it on the wire.
+   */
+  it("serves resources over HTTP, not only over stdio", async () => {
+    const client = await connectClient(handler);
+    const { resourceTemplates } = await client.listResourceTemplates();
+    const { resources } = await client.listResources();
+    await client.close();
+
+    expect(resourceTemplates.map((template) => template.uriTemplate)).toContain(
+      "graft://main/{collection}/{slug}",
+    );
+    expect(resources.map((resource) => resource.uri)).toContain("graft://main/schema");
+  });
+
+  it("serves prompts over HTTP, not only over stdio", async () => {
+    const client = await connectClient(handler);
+    const { prompts } = await client.listPrompts();
+    await client.close();
+
+    expect(prompts.map((prompt) => prompt.name).sort()).toEqual([
+      "author-document",
+      "fix-error",
+      "plan-migration",
+      "revise-document",
+    ]);
+  });
+
   it("reads content from files without touching the database", async () => {
     const client = await connectClient(handler);
     const result = (await client.callTool({
