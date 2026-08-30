@@ -28,6 +28,10 @@ await graft.searchContent("docs", "branching");
 Unknown collection names are compile-time errors when you pass your
 `collections` map. Reads re-validate; a poisoned index row throws.
 
+Pass `index` instead of `db` to read a static SQLite artifact or a remote
+`graft serve` through `createContentApiReader`. The SDK surface does not
+change. See [Reading content](/docs/reading-content).
+
 ## Mount the runtime
 
 Handlers are Web-standard. Mounts are thin:

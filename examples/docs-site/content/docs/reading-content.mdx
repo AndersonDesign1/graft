@@ -1,8 +1,8 @@
 ---
 title: Reading content
 description: Typed reads with sdk-core and the Next, Astro, and SvelteKit adapters.
-section: Content
-order: 1
+section: Build
+order: 2
 ---
 
 All reads go through `@usegraft/sdk-core`: `getDocument`, `listDocuments`, and
@@ -29,6 +29,30 @@ await graft.searchContent("docs", "branching"); // ranked hits + snippets
 
 Pass `branch` to resolve overlay or Neon preview branches. See
 [Branching & previews](/docs/branching-previews).
+
+## Remote runtime
+
+`createContentApiReader` implements the same `index` seam against a
+`graft serve` process. The four SDK packages keep their existing surface; only
+the transport changes. The endpoint is one branch, so a caller cannot switch a
+production read onto preview content.
+
+```ts
+import { createContentApiReader } from "@usegraft/content-api";
+import { createGraft } from "@usegraft/sdk-astro";
+import { collections } from "../../graft.config";
+
+export const graft = createGraft({
+  index: createContentApiReader({
+    endpoint: "https://cms.example.com/api/content/v1",
+    headers: { authorization: `Bearer ${process.env.GRAFT_CONTENT_TOKEN}` },
+  }),
+  collections,
+});
+```
+
+`graft serve` mounts the matching handler at `/api/content/v1/documents` and
+`/api/content/v1/search`.
 
 ## Astro
 

@@ -20,14 +20,21 @@ const echo =
     });
 
 describe("createServeRouter", () => {
-  const router = createServeRouter({ fn: echo("fn"), mcp: echo("mcp"), health: echo("health") });
+  const router = createServeRouter({
+    fn: echo("fn"),
+    mcp: echo("mcp"),
+    content: echo("content"),
+    health: echo("health"),
+  });
 
-  it("mounts /healthz, /api/mcp, and /api/fn/<name>", async () => {
+  it("mounts health, MCP, functions, and the authored-content API", async () => {
     for (const [path, label] of [
       ["/healthz", "health"],
       ["/api/mcp", "mcp"],
       ["/api/fn/pageStats", "fn"],
       ["/api/fn", "fn"], // handler answers FUNCTION_NOT_FOUND itself
+      ["/api/content/v1/documents?collection=pages", "content"],
+      ["/api/content/v1/search?collection=pages&query=hello", "content"],
     ] as const) {
       const res = await router(new Request(`http://localhost${path}`, { method: "POST" }));
       expect(((await res.json()) as { label: string }).label).toBe(label);
@@ -44,6 +51,8 @@ describe("createServeRouter", () => {
     };
     expect(body.error).toBe("ROUTE_NOT_FOUND");
     expect(body.fix).toContain("/api/fn/<name>");
+    expect(body.fix).toContain("/api/content/v1/documents");
+    expect(body.fix).toContain("/api/content/v1/search");
     expect(body.fix).toContain("/healthz");
     expect(body.fix).toContain("--studio");
     expect(body.details.pathname).toBe("/api/fns/typo");
@@ -53,6 +62,7 @@ describe("createServeRouter", () => {
     const withStudio = createServeRouter({
       fn: echo("fn"),
       mcp: echo("mcp"),
+      content: echo("content"),
       health: echo("health"),
       studio: echo("studio"),
     });

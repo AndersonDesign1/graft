@@ -1,8 +1,8 @@
 ---
 title: Deploy
 description: Self-host Graft — one container, split compose, or handlers embedded in your app.
-section: Deploy
-order: 1
+section: Operate
+order: 7
 ---
 
 ## Self-host Graft
@@ -28,7 +28,10 @@ Runtime work is a stateless `Request → Response` handler. Two wrappers, same b
 
 1. **Embedded** — your app (Next, Astro, SvelteKit) mounts the handlers as routes.
 2. **Headless** — `graft serve` binds those handlers to a Node HTTP server:
-   `POST /api/fn/<name>`, `POST /api/mcp`, `GET /healthz`.
+   `POST /api/fn/<name>`, `POST /api/mcp`, `GET /api/content/v1/documents`,
+   `GET /api/content/v1/search`, `GET /healthz`. A frontend can read authored
+   content through `@usegraft/content-api` without a database of its own. See
+   [Reading content](/docs/reading-content).
 
 ## Adapters
 

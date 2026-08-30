@@ -72,6 +72,7 @@ artifact by default, and the whole unit suite runs against it.
 | `packages/db`                                     | Postgres client, migrations, the static SQLite index         |
 | `packages/compiler`                               | Authored MDX to a projected index, plus the ChangeSet        |
 | `packages/sdk-core`                               | The typed read client every framework SDK wraps              |
+| `packages/content-api`                            | Read-only HTTP transport for the authored-content index      |
 | `packages/sdk-next`, `sdk-astro`, `sdk-sveltekit` | Framework adapters                                           |
 | `packages/cli`                                    | `graft init`, `compile`, `serve`, `mcp`, `add`, and the rest |
 | `packages/mcp`                                    | The agent surface, over stdio and Streamable HTTP            |

@@ -45,7 +45,25 @@ const graft = createClient({ db: createDb(process.env.DATABASE_URL!).db, collect
 
 Pass both and `index` wins. Add `branch` to read from a preview branch, on either backend.
 
-This client is server-only. It holds a database handle or an open SQLite file, so never import it into browser code.
+## Read from a remote `graft serve`
+
+`createContentApiReader` implements the same `index` seam. The four SDK packages keep their existing `createClient` / `createGraft` surface; only the transport changes. The endpoint is fixed to the server's branch, so a caller cannot switch a production read to preview content.
+
+```ts
+import { createContentApiReader } from "@usegraft/content-api";
+import { createClient } from "@usegraft/sdk-core";
+import { collections } from "./graft.config";
+
+const graft = createClient({
+  index: createContentApiReader({
+    endpoint: "https://cms.example.com/api/content/v1",
+    headers: { authorization: `Bearer ${process.env.GRAFT_CONTENT_TOKEN}` },
+  }),
+  collections,
+});
+```
+
+This client is server-only. It holds a database handle, an open SQLite file, or a remote endpoint, so never import it into browser code.
 
 ## Cache tags
 

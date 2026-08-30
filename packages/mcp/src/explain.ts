@@ -158,10 +158,10 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "The Graft server (`graft serve`) has nothing mounted at the requested path — the request reached the right process but the wrong URL.",
     typicalCauses: [
       "A typo in the endpoint path (e.g. /api/fns instead of /api/fn/<name>)",
-      "Expecting the frontend app's routes on the headless runtime — graft serve hosts only the function, MCP, and health endpoints",
+      "Expecting the frontend app's routes on the headless runtime — graft serve hosts functions, MCP, authored-content reads, and health",
     ],
     howToRecover:
-      "Use POST /api/fn/<name> for typed functions, POST /api/mcp for the MCP Streamable HTTP surface, or GET /healthz for liveness. The error's details carry the path that missed.",
+      "Use POST /api/fn/<name> for typed functions, POST /api/mcp for the MCP Streamable HTTP surface, GET /api/content/v1/documents or GET /api/content/v1/search for authored content, or GET /healthz for liveness. The error's details carry the path that missed.",
   },
   AUTHORITY_MISMATCH: {
     code: "AUTHORITY_MISMATCH",

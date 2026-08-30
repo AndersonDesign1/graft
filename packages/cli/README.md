@@ -38,7 +38,7 @@ export const index = "postgres";
 | `graft init`                   | Scaffold a project                                                                             |
 | `graft compile`                | Validate authored MDX and project it into the index                                            |
 | `graft dev`                    | Recompile on save                                                                              |
-| `graft serve`                  | Run the headless runtime: typed functions, MCP over HTTP, `/healthz`                           |
+| `graft serve`                  | Run the headless runtime: typed functions, MCP, authored-content reads, `/healthz`             |
 | `graft studio`                 | Open the optional editing UI                                                                   |
 | `graft mcp`                    | Serve MCP on stdio, for `.mcp.json`                                                            |
 | `graft add <item>`             | Copy a registry primitive into your repo, shadcn-style                                         |

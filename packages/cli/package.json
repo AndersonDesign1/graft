@@ -43,6 +43,7 @@
     "@usegraft/assets": "workspace:*",
     "@usegraft/auth": "workspace:*",
     "@usegraft/compiler": "workspace:*",
+    "@usegraft/content-api": "workspace:*",
     "@usegraft/content-migrations": "workspace:*",
     "@usegraft/contracts": "workspace:*",
     "@usegraft/core": "workspace:*",

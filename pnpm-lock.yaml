@@ -259,6 +259,9 @@ importers:
       '@usegraft/compiler':
         specifier: workspace:*
         version: link:../compiler
+      '@usegraft/content-api':
+        specifier: workspace:*
+        version: link:../content-api
       '@usegraft/content-migrations':
         specifier: workspace:*
         version: link:../content-migrations
@@ -308,6 +311,15 @@ importers:
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
+
+  packages/content-api:
+    dependencies:
+      '@usegraft/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@usegraft/db':
+        specifier: workspace:*
+        version: link:../db
 
   packages/content-migrations:
     dependencies:

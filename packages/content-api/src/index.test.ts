@@ -1,0 +1,302 @@
+import type {
+  ContentIndexReader,
+  ContentRow,
+  ReaderReadOptions,
+  ReaderSearchOptions,
+} from "@usegraft/db";
+import { describe, expect, it } from "vitest";
+import { createContentApiHandler, createContentApiReader } from "./index";
+
+function row(overrides: Partial<ContentRow> = {}): ContentRow {
+  return {
+    branchId: "preview/copy",
+    collection: "pages",
+    slug: "home",
+    data: { title: "Home" },
+    body: "# Hello",
+    contentHash: "sha256:home",
+    sourcePath: "pages/home.mdx",
+    deleted: false,
+    updatedAt: new Date("2026-08-28T10:00:00.000Z"),
+    search: null,
+    ...overrides,
+  };
+}
+
+function reader(options?: {
+  onRead?: (input: ReaderReadOptions) => void;
+  onSearch?: (input: ReaderSearchOptions) => void;
+}): ContentIndexReader {
+  return {
+    async readContent(input) {
+      options?.onRead?.(input);
+      return [row()];
+    },
+    async searchContent(input) {
+      options?.onSearch?.(input);
+      return [{ row: row(), rank: 0.75, snippet: "<b>Hello</b>" }];
+    },
+    async close() {},
+  };
+}
+
+function handlerFetch(
+  handler: (request: Request) => Promise<Response>,
+  inspect?: (request: Request) => void,
+): typeof fetch {
+  return async (input, init) => {
+    const request = new Request(input, init);
+    inspect?.(request);
+    return handler(request);
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function errorBody(response: Response): Promise<{
+  error: string;
+  message: string;
+  fix?: string;
+  details?: Record<string, unknown>;
+}> {
+  const body: unknown = await response.json();
+  if (!isRecord(body) || typeof body.error !== "string" || typeof body.message !== "string") {
+    throw new Error("expected a GraftError JSON body");
+  }
+  const parsed: {
+    error: string;
+    message: string;
+    fix?: string;
+    details?: Record<string, unknown>;
+  } = { error: body.error, message: body.message };
+  if (typeof body.fix === "string") parsed.fix = body.fix;
+  if (isRecord(body.details)) parsed.details = body.details;
+  return parsed;
+}
+
+describe("createContentApiHandler", () => {
+  it("routes document reads, clamps limits, and fixes reads to the mounted branch", async () => {
+    let received: ReaderReadOptions | undefined;
+    const handler = createContentApiHandler({
+      collections: ["pages"],
+      branch: "preview/copy",
+      index: reader({ onRead: (input) => (received = input) }),
+    });
+
+    const response = await handler(
+      new Request(
+        "http://localhost/api/content/v1/documents?collection=pages&slug=home&limit=9999&offset=2",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("application/json; charset=utf-8");
+    expect(received).toEqual({
+      collection: "pages",
+      slug: "home",
+      limit: 500,
+      offset: 2,
+      branch: "preview/copy",
+    });
+    expect(await response.json()).toEqual({
+      rows: [
+        {
+          branchId: "preview/copy",
+          collection: "pages",
+          slug: "home",
+          data: { title: "Home" },
+          body: "# Hello",
+          contentHash: "sha256:home",
+          sourcePath: "pages/home.mdx",
+          deleted: false,
+          updatedAt: "2026-08-28T10:00:00.000Z",
+          search: null,
+        },
+      ],
+    });
+  });
+
+  it("routes ranked search hits with the fixed branch", async () => {
+    let received: ReaderSearchOptions | undefined;
+    const handler = createContentApiHandler({
+      collections: ["pages"],
+      branch: "main",
+      index: reader({ onSearch: (input) => (received = input) }),
+    });
+
+    const response = await handler(
+      new Request("http://localhost/api/content/v1/search?collection=pages&query=hello&limit=10"),
+    );
+
+    expect(received).toEqual({
+      collections: ["pages"],
+      query: "hello",
+      limit: 10,
+      branch: "main",
+    });
+    expect(await response.json()).toMatchObject({
+      hits: [{ rank: 0.75, snippet: "<b>Hello</b>", row: { slug: "home" } }],
+    });
+  });
+
+  it.each([
+    ["/api/content/v1/documents", "GET", 400, "INPUT_VALIDATION_FAILED"],
+    ["/api/content/v1/documents?collection=pages&slug=", "GET", 400, "INPUT_VALIDATION_FAILED"],
+    ["/api/content/v1/search?collection=pages", "GET", 400, "INPUT_VALIDATION_FAILED"],
+    ["/api/content/v1/documents?collection=missing", "GET", 404, "COLLECTION_NOT_FOUND"],
+    ["/api/content/v1/documents?collection=pages&limit=-1", "GET", 400, "INPUT_VALIDATION_FAILED"],
+    ["/api/content/v1/documents?collection=pages&limit=1.5", "GET", 400, "INPUT_VALIDATION_FAILED"],
+    ["/api/content/v1/documents?collection=pages&offset=-1", "GET", 400, "INPUT_VALIDATION_FAILED"],
+    [
+      "/api/content/v1/documents?collection=pages&offset=one",
+      "GET",
+      400,
+      "INPUT_VALIDATION_FAILED",
+    ],
+    ["/api/content/v1/search?collection=pages&query=%20", "GET", 400, "INPUT_VALIDATION_FAILED"],
+    [
+      "/api/content/v1/documents?collection=pages&branch=preview",
+      "GET",
+      400,
+      "INPUT_VALIDATION_FAILED",
+    ],
+    ["/api/content/v1/documents?collection=pages", "POST", 405, "METHOD_NOT_ALLOWED"],
+    ["/api/content/v1/unknown", "GET", 404, "ROUTE_NOT_FOUND"],
+  ])("rejects invalid request %s", async (path, method, status, code) => {
+    const handler = createContentApiHandler({
+      collections: ["pages"],
+      branch: "main",
+      index: reader(),
+    });
+    const response = await handler(new Request(`http://localhost${path}`, { method }));
+
+    expect(response.status).toBe(status);
+    expect((await errorBody(response)).error).toBe(code);
+    expect(response.headers.get("content-type")).toBe("application/json; charset=utf-8");
+    if (status === 405) expect(response.headers.get("allow")).toBe("GET");
+  });
+});
+
+describe("createContentApiReader", () => {
+  it("round-trips rows and hits through the real handler-backed protocol", async () => {
+    const handler = createContentApiHandler({
+      collections: ["pages"],
+      branch: "preview/copy",
+      index: reader(),
+    });
+    const seenRequests: Request[] = [];
+    const remote = createContentApiReader({
+      endpoint: "http://content.test/api/content/v1/",
+      headers: { authorization: "Bearer secret" },
+      fetch: handlerFetch(handler, (request) => seenRequests.push(request)),
+    });
+
+    const rows = await remote.readContent({
+      collection: "pages",
+      slug: "home",
+      branch: "caller-selected-branch",
+    });
+    const hits = await remote.searchContent({
+      collections: ["pages"],
+      query: "hello",
+      branch: "another-caller-branch",
+    });
+
+    expect(rows[0]?.updatedAt).toBeInstanceOf(Date);
+    expect(rows[0]?.updatedAt.toISOString()).toBe("2026-08-28T10:00:00.000Z");
+    expect(hits[0]).toMatchObject({ rank: 0.75, snippet: "<b>Hello</b>" });
+    expect(hits[0]?.row.updatedAt).toBeInstanceOf(Date);
+    expect(seenRequests).toHaveLength(2);
+    for (const request of seenRequests) {
+      expect(request.headers.get("authorization")).toBe("Bearer secret");
+      expect(new URL(request.url).searchParams.has("branch")).toBe(false);
+    }
+  });
+
+  it("refuses search across zero or many collections", async () => {
+    const remote = createContentApiReader({
+      endpoint: "http://content.test/api/content/v1",
+      fetch: async () => {
+        throw new Error("search must fail before fetch when the collection count is wrong");
+      },
+    });
+
+    await expect(remote.searchContent({ collections: [], query: "hello" })).rejects.toMatchObject({
+      code: "INPUT_VALIDATION_FAILED",
+      fix: "Pass collections: [name]. Graft SDK searchDocuments already does this.",
+    });
+    await expect(
+      remote.searchContent({ collections: ["pages", "docs"], query: "hello" }),
+    ).rejects.toMatchObject({
+      code: "INPUT_VALIDATION_FAILED",
+    });
+  });
+
+  it("revives a remote GraftError without losing its fix or details", async () => {
+    const handler = createContentApiHandler({
+      collections: ["pages"],
+      branch: "main",
+      index: reader(),
+    });
+    const remote = createContentApiReader({
+      endpoint: "http://content.test/api/content/v1",
+      fetch: handlerFetch(handler),
+    });
+
+    await expect(remote.readContent({ collection: "missing" })).rejects.toMatchObject({
+      code: "COLLECTION_NOT_FOUND",
+      fix: "Use one of the registered collections: pages.",
+      details: { collection: "missing", registered: ["pages"] },
+    });
+  });
+
+  it.each([
+    ["missing rows wrapper", () => Response.json({ documents: [] }), /"rows" array/],
+    [
+      "invalid date",
+      () =>
+        Response.json({
+          rows: [{ ...JSON.parse(JSON.stringify(row())), updatedAt: "not-a-date" }],
+        }),
+      /invalid updatedAt/,
+    ],
+    [
+      "malformed hit",
+      () => Response.json({ hits: [{ row: JSON.parse(JSON.stringify(row())), rank: "high" }] }),
+      /malformed search hit/,
+    ],
+  ])("rejects %s payloads", async (_name, response, message) => {
+    const remote = createContentApiReader({
+      endpoint: "http://content.test/api/content/v1",
+      fetch: async () => response(),
+    });
+
+    const operation =
+      _name === "malformed hit"
+        ? remote.searchContent({ collections: ["pages"], query: "hello" })
+        : remote.readContent({ collection: "pages" });
+    await expect(operation).rejects.toMatchObject({
+      code: "FUNCTION_EXECUTION_FAILED",
+      message: expect.stringMatching(message),
+      fix: expect.stringContaining("/api/content/v1"),
+    });
+  });
+
+  it("turns non-Graft and non-JSON responses into actionable GraftErrors", async () => {
+    for (const response of [
+      new Response("<html>proxy error</html>", { status: 502 }),
+      Response.json({ message: "plain error" }, { status: 500 }),
+    ]) {
+      const remote = createContentApiReader({
+        endpoint: "http://content.test/api/content/v1",
+        fetch: async () => response.clone(),
+      });
+      await expect(remote.readContent({ collection: "pages" })).rejects.toMatchObject({
+        code: "FUNCTION_EXECUTION_FAILED",
+        fix: expect.stringContaining("proxy"),
+      });
+    }
+  });
+});

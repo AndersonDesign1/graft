@@ -131,6 +131,7 @@ and your OIDC issuer.
 | `@usegraft/db`                 | Postgres client, migrations, the static SQLite index, copy-on-write branches |
 | `@usegraft/contracts`          | Error codes and introspection schemas every package shares                   |
 | `@usegraft/sdk-core`           | Framework-agnostic typed read client and the cache-tag contract              |
+| `@usegraft/content-api`        | Read-only HTTP transport for the authored-content index                      |
 | `@usegraft/sdk-next`           | Next.js adapter                                                              |
 | `@usegraft/sdk-astro`          | Astro adapter                                                                |
 | `@usegraft/sdk-sveltekit`      | SvelteKit adapter                                                            |

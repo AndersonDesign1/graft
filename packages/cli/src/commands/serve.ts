@@ -11,6 +11,7 @@
  * Endpoints:
  *   POST /api/fn/<name>  — typed function RPC (access/audit/limits/approvals)
  *   POST /api/mcp        — MCP Streamable HTTP (content + function + registry tools)
+ *   GET  /api/content/v1/* — read-only authored content
  *   GET  /healthz        — liveness + a real DB round-trip
  *   GET  /studio (+ /api/studio/v1/*) — opt-in when --studio / GRAFT_STUDIO=1
  *
@@ -38,6 +39,7 @@ export type FetchHandler = (request: Request) => Promise<Response>;
 export interface ServeRoutes {
   fn: FetchHandler;
   mcp: FetchHandler;
+  content: FetchHandler;
   health: FetchHandler;
   /** Opt-in Studio UI + OpenAPI read API (`--studio` / GRAFT_STUDIO=1). */
   studio?: FetchHandler;
@@ -50,6 +52,9 @@ export function createServeRouter(routes: ServeRoutes): FetchHandler {
     if (pathname === "/healthz") return routes.health(request);
     if (pathname === "/api/mcp") return routes.mcp(request);
     if (pathname === "/api/fn" || pathname.startsWith("/api/fn/")) return routes.fn(request);
+    if (pathname === "/api/content/v1" || pathname.startsWith("/api/content/v1/")) {
+      return routes.content(request);
+    }
     if (
       routes.studio &&
       (pathname === "/studio" ||
@@ -64,7 +69,7 @@ export function createServeRouter(routes: ServeRoutes): FetchHandler {
     const error = new GraftError({
       code: "ROUTE_NOT_FOUND",
       message: `Nothing is mounted at ${pathname}.`,
-      fix: `Use POST /api/fn/<name> (typed functions), POST /api/mcp (MCP Streamable HTTP), or GET /healthz${studioHint}.`,
+      fix: `Use POST /api/fn/<name> (typed functions), POST /api/mcp (MCP Streamable HTTP), GET /api/content/v1/documents (authored content), GET /api/content/v1/search, or GET /healthz${studioHint}.`,
       details: { pathname },
     });
     return new Response(JSON.stringify(error.toJSON()), {
@@ -244,11 +249,13 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   const [
     { createFunctionsHandler },
     { createGraftMcpHandler },
-    { createDb, resolveBranchHandle, scopeWriteBranch, sql },
+    { createContentApiHandler },
+    { createDb, createDbIndexReader, resolveBranchHandle, scopeWriteBranch, sql },
     studioMod,
   ] = await Promise.all([
     import("@usegraft/core"),
     import("@usegraft/mcp"),
+    import("@usegraft/content-api"),
     import("@usegraft/db"),
     enableStudio ? import("@usegraft/studio") : Promise.resolve(null),
   ]);
@@ -311,6 +318,12 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     scope: branch.scope,
     actor: resolveActor,
     allowAnonymous: allowAnonymousMcp,
+  });
+
+  const contentHandler = createContentApiHandler({
+    collections: Object.keys(config.collections),
+    branch: writeBranch,
+    index: createDbIndexReader(branch.db),
   });
 
   const health: FetchHandler = async () => {
@@ -399,7 +412,13 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
 
   const server = createServer(
     createNodeListener(
-      createServeRouter({ fn: fnHandler, mcp: mcpHandler, health, studio: studioHandler }),
+      createServeRouter({
+        fn: fnHandler,
+        mcp: mcpHandler,
+        content: contentHandler,
+        health,
+        studio: studioHandler,
+      }),
       { allowedHosts: allowedHostsFor(host) },
     ),
   );
@@ -434,6 +453,8 @@ export async function serveCommand(options: ServeCommandOptions): Promise<void> 
       `graft serve — branch "${running.branch}"`,
       `  functions  POST ${base}/api/fn/<name>`,
       `  mcp        POST ${base}/api/mcp`,
+      `  documents  GET  ${base}/api/content/v1/documents`,
+      `  search     GET  ${base}/api/content/v1/search`,
       `  health     GET  ${base}/healthz`,
       ...(studioOn
         ? [
