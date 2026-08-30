@@ -1,0 +1,55 @@
+{
+  "name": "@usegraft/sdk-react-router",
+  "version": "0.2.0",
+  "description": "React Router v7 adapter: typed content reads and loader/action mounts over Graft's stateless handlers.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "react",
+    "react-router",
+    "remix",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndersonDesign1/graft.git",
+    "directory": "packages/sdk-react-router"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts --format esm --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@usegraft/sdk-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@usegraft/core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=22.16"
+  }
+}

@@ -496,6 +496,16 @@ importers:
         specifier: ^19.0.0
         version: 19.2.7
 
+  packages/sdk-react-router:
+    dependencies:
+      '@usegraft/sdk-core':
+        specifier: workspace:*
+        version: link:../sdk-core
+    devDependencies:
+      '@usegraft/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/sdk-sveltekit:
     dependencies:
       '@usegraft/sdk-core':
