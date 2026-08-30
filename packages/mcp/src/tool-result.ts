@@ -66,3 +66,28 @@ export async function guarded<T>(body: () => Promise<T> | T): Promise<ToolResult
     throw error;
   }
 }
+
+/**
+ * The same guarantee for a resource read, which has no ToolResult to carry it.
+ *
+ * A tool failure is a value — `fail()` puts the code, the `fix` and the
+ * recovery text in the body. A resource read has no such envelope: the SDK
+ * turns a thrown error into a JSON-RPC error whose only human-readable field is
+ * `message`, so a GraftError escaping raw arrives with its `fix` stripped off.
+ * This repo's rule is that every error a caller sees carries the next action,
+ * so the fix is folded into the message rather than lost.
+ */
+export async function guardedResource<T>(body: () => Promise<T> | T): Promise<T> {
+  try {
+    return await body();
+  } catch (error) {
+    if (!(error instanceof GraftError)) throw error;
+    const explanation = ERROR_KNOWLEDGE[error.code];
+    throw new Error(
+      [error.message, error.fix && `Fix: ${error.fix}`, explanation?.howToRecover]
+        .filter(Boolean)
+        .join(" "),
+      { cause: error },
+    );
+  }
+}
