@@ -51,7 +51,12 @@ const EXPECTED = {
   put_asset: "destroys",
   decide_approval: "destroys",
   run_function: "destroys",
-} satisfies Record<string, "reads" | "writes" | "destroys">;
+} satisfies Record<string, Behaviour>;
+
+type Behaviour = "reads" | "writes" | "destroys";
+
+/** Looked up by a name off the wire, which is a string and may be unknown. */
+const behaviourOf = new Map<string, Behaviour>(Object.entries(EXPECTED));
 
 let dir: string;
 let client: Client;
@@ -83,7 +88,7 @@ describe("tool annotations", () => {
     const { tools } = await client.listTools();
 
     for (const tool of tools) {
-      if (EXPECTED[tool.name] !== "reads") continue;
+      if (behaviourOf.get(tool.name) !== "reads") continue;
       expect(tool.annotations, tool.name).toMatchObject({
         readOnlyHint: true,
         openWorldHint: false,
@@ -95,7 +100,7 @@ describe("tool annotations", () => {
     const { tools } = await client.listTools();
 
     for (const tool of tools) {
-      if (EXPECTED[tool.name] !== "destroys") continue;
+      if (behaviourOf.get(tool.name) !== "destroys") continue;
       expect(tool.annotations, tool.name).toMatchObject({
         readOnlyHint: false,
         destructiveHint: true,
