@@ -23,7 +23,8 @@
  * Anonymous MCP callers are served on loopback (zero-config local dev) and
  * refused anywhere else, with no env var to remember. Off loopback it takes a
  * deliberate GRAFT_MCP_ALLOW_ANONYMOUS=1, which warns.
- * GRAFT_APPROVAL_POLICY=human gates every mutation. Binding beyond loopback
+ * GRAFT_APPROVAL_POLICY=human gates every mutation; =unattended gates nothing,
+ * including destructive functions, and warns on every boot. Binding beyond loopback
  * with no identity configured prints a warning, because MCP will then refuse
  * every caller.
  */
@@ -276,7 +277,12 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     devTokens: devToken ? { [devToken]: { kind: "agent", id: "graft-serve", scopes } } : undefined,
   });
 
-  const approvalPolicy = process.env.GRAFT_APPROVAL_POLICY === "human" ? "human" : "none";
+  const approvalPolicy =
+    process.env.GRAFT_APPROVAL_POLICY === "human"
+      ? "human"
+      : process.env.GRAFT_APPROVAL_POLICY === "unattended"
+        ? "unattended"
+        : "none";
 
   const host = options.host ?? process.env.HOST ?? "127.0.0.1";
   const loopback = host === "127.0.0.1" || host === "localhost" || host === "::1";
@@ -376,6 +382,18 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
       "[graft serve] WARNING: binding beyond loopback with no identity configured — " +
         "MCP will refuse every caller, because there is nothing to authenticate them against. " +
         "Set GRAFT_DEV_TOKEN or GRAFT_TRUSTED_ISSUERS.",
+    );
+  }
+
+  // Every boot, not once at deploy time. This is the setting that turns off the
+  // gate on irreversible work, and an env var is one line in a dashboard for
+  // someone who may not know what it means — the log is where a mistake is
+  // actually noticed.
+  if (approvalPolicy === "unattended") {
+    console.warn(
+      "[graft serve] WARNING: GRAFT_APPROVAL_POLICY=unattended — destructive functions run " +
+        "without human approval. Deletes are not recoverable from git: deleteRecord removes " +
+        "rows outright and the asset store keeps no history. Audit rows are still written.",
     );
   }
 

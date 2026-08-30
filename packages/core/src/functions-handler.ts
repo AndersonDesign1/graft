@@ -54,11 +54,29 @@ export interface FunctionsHandlerOptions {
    */
   rateLimit?: RateLimit;
   /**
-   * Who must approve mutations. "none" (default): only `destructive` functions
-   * are human-gated. "human": every mutation requires an approval — the
-   * conservative template policy. Destructive ops are gated under BOTH.
+   * Who must approve mutations.
+   *
+   * - `"none"` (default) gates only `destructive` functions.
+   * - `"human"` gates every mutation, the conservative template policy.
+   * - `"unattended"` gates nothing, including destructive functions.
+   *
+   * `"unattended"` exists because the other two have no answer for a caller
+   * with no human behind it. A scheduled cleanup job and a CI migration are
+   * both legitimate, and under `"none"` a destructive function refuses them
+   * forever: that arm of the gate had no off switch, which is an absence of a
+   * policy rather than a policy.
+   *
+   * It is deliberately a value the operator writes in config rather than an
+   * env var, because turning off the gate on irreversible work should appear
+   * in a diff and a review. `deleteRecord` hard-deletes rows and the asset
+   * store keeps no history, so "git will restore it" does not apply to either
+   * — this is the setting that accepts that.
+   *
+   * Everything else is unchanged. Every invocation still writes its audit row,
+   * access rules and rate limits still apply, and approvals already granted
+   * are still consumed one-shot. Only the waiting stops.
    */
-  approvalPolicy?: "none" | "human";
+  approvalPolicy?: "none" | "human" | "unattended";
   /**
    * Git commit SHA stamped on audit rows (ties invocations to the code that
    * served them). Defaults to VERCEL_GIT_COMMIT_SHA / GITHUB_SHA when present.
@@ -380,8 +398,14 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
 
       // Human gate — destructive ops always; every mutation under the "human"
       // policy. An approval is one-shot and bound to this exact input.
+      //
+      // "unattended" turns the gate off entirely, which is the only way a
+      // caller with no human behind it can run a destructive function. The
+      // audit row is still written either way, so what is lost is the waiting,
+      // not the record of who did what.
       const gated =
-        fn.destructive === true || (approvalPolicy === "human" && fn.kind === "mutation");
+        approvalPolicy !== "unattended" &&
+        (fn.destructive === true || (approvalPolicy === "human" && fn.kind === "mutation"));
       if (gated) {
         const inputCanonical = canonicalJson(parsed.data);
         const approvalId = request.headers.get(APPROVAL_HEADER);

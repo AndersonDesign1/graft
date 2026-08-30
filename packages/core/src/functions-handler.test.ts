@@ -742,6 +742,41 @@ describe("destructive-op human gate (P3.4)", () => {
     expect(stores.approvalRows.size).toBe(0);
   });
 
+  it("approvalPolicy 'none' still gates a destructive function", async () => {
+    // The arm with no off switch before "unattended" existed. Pinned so the
+    // new value cannot quietly become the behaviour of the default.
+    const stores = memoryStores();
+    const handler = p34handler(stores);
+
+    expect((await handler(post("nuke", { target: "x" }))).status).toBe(403);
+    expect(stores.approvalRows.size).toBe(1);
+  });
+
+  it("approvalPolicy 'unattended' runs a destructive function with no human", async () => {
+    // The case the other two policies had no answer for: a scheduled job or a
+    // CI migration, where there is nobody to ask and refusing forever is not a
+    // policy but the absence of one.
+    const stores = memoryStores();
+    const handler = p34handler(stores, { approvalPolicy: "unattended" });
+
+    expect((await handler(post("nuke", { target: "x" }))).status).toBe(200);
+    // Nothing was filed, because nothing was waiting for anyone.
+    expect(stores.approvalRows.size).toBe(0);
+  });
+
+  it("approvalPolicy 'unattended' still writes the audit row", async () => {
+    // What "unattended" gives up is the waiting, not the record. A deployment
+    // that cannot say who deleted what is a different and worse thing.
+    const stores = memoryStores();
+    const handler = p34handler(stores, { approvalPolicy: "unattended" });
+
+    const before = stores.auditRows.length;
+    await handler(post("nuke", { target: "x" }));
+
+    expect(stores.auditRows.length).toBe(before + 1);
+    expect(stores.auditRows.at(-1)).toMatchObject({ functionName: "nuke" });
+  });
+
   it("describe() exposes the destructive flag for introspection", () => {
     expect(nuke.describe().destructive).toBe(true);
     expect(echo.describe().destructive).toBeUndefined();

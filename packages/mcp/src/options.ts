@@ -84,7 +84,7 @@ export interface GraftMcpOptions {
    */
   localUploadRoot?: string;
   /** Forwarded to createFunctionsHandler for run_function. */
-  approvalPolicy?: "none" | "human";
+  approvalPolicy?: "none" | "human" | "unattended";
   rateLimit?: RateLimit;
   gitSha?: string;
   /**
