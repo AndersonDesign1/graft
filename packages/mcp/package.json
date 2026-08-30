@@ -44,7 +44,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@usegraft/assets": "workspace:*",
     "@usegraft/compiler": "workspace:*",
     "@usegraft/contracts": "workspace:*",

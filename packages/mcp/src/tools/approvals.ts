@@ -7,6 +7,7 @@ import { GraftError } from "@usegraft/contracts";
 import { decideApproval, listPendingApprovals } from "@usegraft/db";
 import { z } from "zod";
 import { guarded } from "../tool-result";
+import { DESTROYS, READS } from "./annotations";
 import type { RegisterTools } from "./deps";
 
 export const registerApprovalTools: RegisterTools = (server, deps) => {
@@ -16,6 +17,7 @@ export const registerApprovalTools: RegisterTools = (server, deps) => {
     "list_approvals",
     {
       title: "List pending approvals",
+      annotations: READS,
       description:
         "Pending human-gated approvals. Decide with decide_approval, Studio Approve/Deny, or `graft approve` / `graft deny`. Same data as GET /api/studio/v1/approvals.",
       inputSchema: {},
@@ -46,6 +48,7 @@ export const registerApprovalTools: RegisterTools = (server, deps) => {
     "decide_approval",
     {
       title: "Approve or deny a pending approval",
+      annotations: DESTROYS,
       description:
         "Record a decision on a pending approval (same as Studio Approve/Deny and `graft approve` / `graft deny`). The decision is attributed to the identity THIS connection authenticated as — there is no way to name a different decider — and a requester can never decide their own approval. Requires an authenticated caller and an owner DB role that can UPDATE approvals.",
       inputSchema: {

@@ -6,6 +6,7 @@
 import { describeItem, listItems, loadItem } from "@usegraft/registry";
 import { z } from "zod";
 import { guarded } from "../tool-result";
+import { READS } from "./annotations";
 import type { RegisterTools } from "./deps";
 
 export const registerRegistryTools: RegisterTools = (server, deps) => {
@@ -15,6 +16,7 @@ export const registerRegistryTools: RegisterTools = (server, deps) => {
     "list_registry",
     {
       title: "List registry items",
+      annotations: READS,
       description:
         "List every owned primitive available to `graft add` — shadcn-style copy-in blocks / fields / access rules / bundles (name, type, one-line description, and any registry items it pulls in). Use describe_item for the full details, then install with `graft add <name>` from the CLI. MCP browses what exists; the CLI installs it.",
       inputSchema: {},
@@ -34,6 +36,7 @@ export const registerRegistryTools: RegisterTools = (server, deps) => {
     "describe_item",
     {
       title: "Describe a registry item",
+      annotations: READS,
       description:
         "Full details for one owned primitive: type, description, the files it writes into the project, npm dependencies to install, the registry items it pulls in first, and whether it ships an llms.txt fragment. Use list_registry for names; install with `graft add <name>` (CLI). MCP does not install.",
       inputSchema: {

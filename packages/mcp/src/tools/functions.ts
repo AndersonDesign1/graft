@@ -7,6 +7,7 @@ import { GraftError } from "@usegraft/contracts";
 import { z } from "zod";
 import { invokeFunction } from "../tool-helpers";
 import { guarded } from "../tool-result";
+import { DESTROYS } from "./annotations";
 import type { RegisterTools } from "./deps";
 
 export const registerFunctionTools: RegisterTools = (server, deps) => {
@@ -16,6 +17,7 @@ export const registerFunctionTools: RegisterTools = (server, deps) => {
     "run_function",
     {
       title: "Run a typed function",
+      annotations: DESTROYS,
       description:
         "Invoke a defineFunction by name with a JSON input object. Same pipeline as POST /api/fn/<name>: Zod validation, access rules, rate limits, audit log, and the human gate for destructive ops. The server may already act with a configured identity (graft mcp uses GRAFT_DEV_TOKEN; over HTTP your connection's bearer is forwarded) — only pass authorization to override it. Pass approval after a human runs `graft approve <id>` for gated calls. Success returns { data, correlationId }; failures are GraftError JSON with a fix.",
       inputSchema: {

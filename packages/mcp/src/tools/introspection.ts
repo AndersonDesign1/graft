@@ -7,6 +7,7 @@ import { GraftError, type SchemaDescription } from "@usegraft/contracts";
 import { z } from "zod";
 import { teachAssetFields } from "../tool-helpers";
 import { guarded } from "../tool-result";
+import { READS } from "./annotations";
 import type { RegisterTools } from "./deps";
 
 export const registerIntrospectionTools: RegisterTools = (server, deps) => {
@@ -16,6 +17,7 @@ export const registerIntrospectionTools: RegisterTools = (server, deps) => {
     "list_collections",
     {
       title: "List collections",
+      annotations: READS,
       description:
         "List every registered content collection (name, description, authority, field count). Start here to learn what kinds of content this project has.",
       inputSchema: {},
@@ -39,6 +41,7 @@ export const registerIntrospectionTools: RegisterTools = (server, deps) => {
     "describe_schema",
     {
       title: "Describe the content schema",
+      annotations: READS,
       description:
         "Full schema introspection: every collection with its typed fields (name, type, optional, description), plus every registered function (kind, args, public/destructive). Documents also accept an optional kebab-case `slug` (defaults to the filename). Prefer list_functions / describe_function when you only need the function surface.",
       inputSchema: {},
@@ -59,6 +62,7 @@ export const registerIntrospectionTools: RegisterTools = (server, deps) => {
     "list_functions",
     {
       title: "List functions",
+      annotations: READS,
       description:
         "List every registered typed function (name, kind, public, destructive, short description). Use describe_function for the full input schema, then run_function to invoke. Mutations reject anonymous callers unless public: true; destructive functions always require human approval (graft approve).",
       inputSchema: {},
@@ -84,6 +88,7 @@ export const registerIntrospectionTools: RegisterTools = (server, deps) => {
     "describe_function",
     {
       title: "Describe one function",
+      annotations: READS,
       description:
         "Full introspection for one function: kind, args (name/type/optional/description), returns, public, destructive. Use this before run_function so the input object matches the schema.",
       inputSchema: {

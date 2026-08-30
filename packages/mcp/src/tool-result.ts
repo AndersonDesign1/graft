@@ -10,11 +10,34 @@ import { ERROR_KNOWLEDGE } from "./explain";
 
 export type ToolResult = {
   content: { type: "text"; text: string }[];
+  /** The same payload as data, for clients that speak MCP 2025-06-18 or later. */
+  structuredContent?: Record<string, unknown>;
   isError?: boolean;
 };
 
+/**
+ * Every tool already returns a JS object and every tool serialised it to a
+ * string, so each caller had to parse the prose back into the shape it started
+ * as. `structuredContent` hands over the object itself.
+ *
+ * Only objects. The protocol types structured content as an object, and most
+ * of these payloads already are one; a tool that answers with an array or a
+ * scalar keeps the text form alone rather than being wrapped in an invented
+ * key that would then be part of the contract.
+ *
+ * Safe to send unconditionally: the SDK validates structured content only for
+ * a tool that declares an `outputSchema`, and a client that predates the field
+ * ignores it and reads the text, which is unchanged.
+ */
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 export function ok(payload: unknown): ToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
+  const result: ToolResult = {
+    content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+  };
+  if (isPlainObject(payload)) result.structuredContent = payload;
+  return result;
 }
 
 export function fail(error: GraftError): ToolResult {
