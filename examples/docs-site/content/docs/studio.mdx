@@ -1,0 +1,198 @@
+---
+title: Studio
+description: The optional editing UI — content tree, rich and raw editors, a Changes drawer that commits, and revert from a compilation.
+section: Build
+order: 6
+---
+
+Studio is an editing UI for a Graft project. It is opt-in: nothing requires it,
+and every operation it performs also exists on the CLI and on MCP.
+
+<TierBadge tier="postgres" />
+
+Studio reads the compiled index alongside the files on disk, so it needs a
+database.
+
+## Run it
+
+```sh
+graft studio                 # local window, default port 4983
+graft serve --studio         # mount it inside the headless runtime at /studio
+```
+
+`graft studio` binds loopback and opens a browser. `graft serve --studio` mounts
+the same handler under `/studio`, and `GRAFT_STUDIO=1` does the same without the
+flag.
+
+Both accept `--branch <id>` to work on a content branch. The hosted mount pins
+`?branch` to the branch it was started on, so the UI cannot silently show `main`
+while the server serves a preview.
+
+## What it shows
+
+Seven views, routed on the URL hash so deep links and the back button work.
+
+| View | What it is for |
+| --- | --- |
+| Overview | Document counts, drift, recent compilations, activity |
+| Collections | The content tree, and the editor |
+| Schema | Every collection's fields, read-only |
+| Approvals | Pending approvals, with approve and deny |
+| Branches | Registered branches and their backends |
+| History | Recent compilations, and revert |
+| Settings | Appearance, project facts, and package versions |
+
+## Four document states
+
+Content is git-authoritative and the index is a projection, so "what is in this
+project" has two answers that can disagree. Studio models the gap instead of
+hiding it.
+
+| State | Meaning |
+| --- | --- |
+| `synced` | On disk, in the index, hashes match |
+| `drifted` | On disk and in the index, hashes differ — edited since the last compile |
+| `unindexed` | On disk only — never compiled |
+| `orphaned` | In the index only — the file is gone and the index is stale |
+
+The tree is built filesystem-first and enriched from the index, so a project
+that has never compiled still shows its documents. Anything that is not
+`synced` counts toward the drift number in the header, and the header can
+compile to clear it.
+
+A collection whose files fail to parse reports its own error and the rest of the
+tree still renders. One bad document does not blank the UI.
+
+db-authoritative collections are flagged rather than shown as an empty folder.
+Their rows live in `data_records` and are written only through typed functions.
+
+## Editing
+
+Documents open in one of two modes.
+
+**Rich** edits the body the way a document editor does. It is built on Milkdown,
+which is remark-native, so the file goes in as markdown and comes back as
+markdown.
+
+**Raw MDX** edits the source directly.
+
+Rich mode is offered per document, not per project, and the decision is a
+measurement rather than a guess. On open, the editor re-serializes the document
+and Studio compares that text to the bytes it loaded. If they differ beyond
+normalization, the document stays in Raw and the Rich tab is disabled. The rule
+the comparison enforces is that the editor may normalize markdown **style** and
+never **content**: delimiter width, cell padding and bullet markers may
+canonicalize, alignment colons survive, fenced code is never touched, and
+everything else is byte-exact.
+
+Byte-exact rather than tree-equal, because MDX cares about characters markdown
+does not. Escaping `{` to `\{` gives an identical syntax tree and a broken
+document.
+
+### Saving
+
+Saving is automatic, with two independent guards against writing a file you did
+not edit.
+
+1. Changes are ignored until a real interaction proves a human is driving. The
+   rich editor emits an update on mount from its own re-serialization, and
+   treating that as an edit would mean opening a document rewrote it.
+2. A save that would write bytes identical to what was loaded is refused
+   outright.
+
+Keep both in mind if you are reading the source: the first is a heuristic about
+intent, the second is a fact about bytes.
+
+### What a save runs through
+
+A Studio save is not a file write. It validates frontmatter against the
+collection schema, runs the MDX safety check, writes the document, and
+recompiles. A document that fails the schema comes back with the same
+`SCHEMA_VALIDATION_FAILED` an agent or the CLI would get.
+
+## The Changes drawer
+
+Because content is git-authoritative, "what have I changed?" has a real answer
+that no draft table has to invent. The drawer reads it from git.
+
+- Files are listed relative to the content directory, with one verb each:
+  added, modified, deleted, or renamed.
+- Diffs are computed against `HEAD`. Git's staged and unstaged split never
+  reaches the UI, because "what have I changed since the last commit" is the
+  only question the drawer asks.
+- Binary files show no diff. There is nothing to review line by line.
+
+Selecting files and writing a message commits them. Three properties are worth
+knowing:
+
+| Property | Behavior |
+| --- | --- |
+| Only what you were shown | Requested paths are intersected with the live change set, so a file the drawer never listed cannot be committed |
+| Identity checked first | Committer identity is verified before anything is staged, so a failure leaves the git index untouched |
+| Pathspec-scoped | The commit records exactly the selected paths and leaves the rest of your staged work alone |
+
+A project not under git is not an error. The drawer says so and explains why —
+content still compiles and serves without git.
+
+## Revert from a compilation
+
+Every compilation records the git SHA it read. That makes "go back" a real
+operation rather than an undo stack: History can restore the content directory
+to the tree a past compilation saw, then recompile.
+
+It refuses when it cannot be safe. The preview reports whether the commit is
+reachable in this clone and which uncommitted content files a revert would
+destroy, and reverting is only offered when the commit is reachable and the
+content directory is clean.
+
+Files are restored and staged, not committed. Recording a revert is the
+operator's call.
+
+## Who can do what
+
+Studio's API separates three permissions, because an agent that may read the
+content tree has no business committing it, and deciding approvals is the human
+gate.
+
+| Scope | Covers |
+| --- | --- |
+| `studio:read` | Tree, document reads, schema, branches, compilations, diffs, approval listing |
+| `studio:write` | Saving documents, compiling, committing, reverting |
+| `approvals:decide` | Approving and denying |
+
+`graft studio` on loopback is unauthenticated by design, and that is the only
+place unauthenticated is appropriate. Bound beyond loopback it requires
+`GRAFT_DEV_TOKEN` as a bearer, and warns at startup if one is not set.
+
+Approval decisions are attributed to the identity the Studio was **mounted**
+with, never to something in the request. `graft studio` uses the OS user;
+`graft serve --studio` uses the service identity it runs as. A caller that could
+name its own decider could approve its own destructive call, which is exactly
+what the requester-cannot-decide rule exists to prevent.
+
+Deciding an approval is a plain `UPDATE` on `approvals`, which a hardened
+runtime role cannot perform. On a hardened deployment the approvals view is
+read-only by construction. See [Hardening](/docs/hardening).
+
+## Headless parity
+
+Every Studio operation exists elsewhere. Nothing is UI-only.
+
+| Studio | CLI | MCP |
+| --- | --- | --- |
+| Content tree | `graft content` | `list_content` |
+| Save a document | files + `graft compile` | `write_content` |
+| Compilations | `graft compilations` | `list_compilations` |
+| Branches | `graft branch list` | `list_branches` |
+| Approvals | `graft approvals` | `list_approvals` |
+| Approve or deny | `graft approve` / `graft deny` | `decide_approval` |
+
+The UI is a client of `/api/studio/v1/*`, documented at
+[Studio API](/docs/studio-api).
+
+## Next steps
+
+- [Studio API](/docs/studio-api) — the endpoints the UI calls
+- [Hardening](/docs/hardening) — why a runtime role cannot approve
+- [Audit & approvals](/docs/audit-and-approvals) — the gate Studio surfaces
+- [MDX safety](/docs/mdx-safety) — what a save refuses
