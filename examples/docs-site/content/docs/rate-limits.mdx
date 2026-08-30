@@ -38,6 +38,9 @@ createFunctionsHandler({ functions, db, rateLimit: { limit: 60, windowSeconds: 6
 the window, counted backwards from now — a rolling window, not a fixed bucket
 that resets on the minute.
 
+`graft serve` already sets a backstop of 60 calls per 60 seconds, which any
+function's own `rateLimit` overrides.
+
 ## Who a caller is
 
 | Actor | Counted as |

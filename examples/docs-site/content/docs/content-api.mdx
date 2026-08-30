@@ -111,6 +111,9 @@ const handler = createContentApiHandler({
 far as this endpoint is concerned, which is how you publish some of a project
 without publishing all of it.
 
+Note that `graft serve` registers **every** collection in your config. Mount the
+handler yourself when you want a narrower list.
+
 The handler never closes the reader it was given. Ownership stays with you.
 
 ## Reading from it

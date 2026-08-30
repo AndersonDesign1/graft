@@ -10,11 +10,16 @@ human-gated approvals.
 
 ## Audit log
 
-Every function invocation writes an `audit_log` row: actor, function, input hash,
-status, duration, correlation id, and the git SHA of the serving code. Rate
-limits count those rows. Handlers stay stateless.
+Every function invocation writes an `audit_log` row: actor, function and kind,
+branch, rate key, status, duration, correlation id, and the git SHA of the
+serving code. Rate limits count those rows. Handlers stay stateless.
 
-Look up a call with `x-graft-correlation-id` from the response headers.
+Inputs are **not** recorded. The row says who ran what and how it went, not what
+they sent. An approval's exact input is stored on the `approvals` row instead,
+which is what binds a decision to one call.
+
+Look up a call with `x-graft-correlation-id` from the response headers. See
+[Observability](/docs/observability).
 
 ## Human-gated approvals
 
