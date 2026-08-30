@@ -9,6 +9,7 @@ import DocsRoot from "../../layouts/DocsRoot.astro";
 import { getGraft } from "../../lib/graft";
 import { renderMdx } from "../../lib/mdx";
 import { docsPageTree } from "../../lib/nav";
+import { extractHeadings } from "../../lib/search-results";
 
 const { slug } = Astro.params;
 const doc = slug ? await getGraft().getContent("docs", slug) : null;
@@ -18,28 +19,25 @@ if (!doc) {
 
 const [tree, bodyHtml] = await Promise.all([docsPageTree(), renderMdx(doc.body)]);
 
-/** TOC from the raw MDX: ##/### headings outside code fences, slugged like rehype-slug. */
-const toc: Array<{ title: string; url: string; depth: number }> = [];
-let inFence = false;
-for (const line of doc.body.split("\n")) {
-  if (/^\s*(```|~~~)/.test(line)) {
-    inFence = !inFence;
-    continue;
-  }
-  if (inFence) continue;
-  const match = /^(#{2,3})\s+(.+?)\s*$/.exec(line);
-  if (!match) continue;
-  const title = match[2].replace(/`/g, "");
-  const id = title
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s-]/gu, "")
-    .trim()
-    .replace(/\s+/g, "-");
-  toc.push({ title, url: `#${id}`, depth: match[1].length });
-}
+/**
+ * TOC from the raw MDX, through the same extractor search uses.
+ *
+ * This was a second, hand-rolled slugger, and it disagreed with rehype-slug in
+ * two ways that both produced links to nowhere: it stripped underscores, and
+ * it never disambiguated a repeated heading. On the generated error reference
+ * that made 41 of 43 entries dead — every error code in the list. There is one
+ * slugger now, and anchor-parity.test.ts holds it to the rendered page.
+ */
+const toc = extractHeadings(doc.body)
+  .filter((heading) => heading.depth >= 2 && heading.depth <= 3)
+  .map((heading) => ({ title: heading.text, url: `#${heading.id}`, depth: heading.depth }));
 ---
 
-<DocsRoot title={`${doc.data.title} — Graft docs`} description={doc.data.description}>
+<DocsRoot
+  title={`${doc.data.title} — Graft docs`}
+  description={doc.data.description}
+  markdownHref={`/docs/${doc.slug}.md`}
+>
   <DocsShell
     tree={tree}
     pathname={Astro.url.pathname}
