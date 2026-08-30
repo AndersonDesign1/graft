@@ -1,0 +1,148 @@
+---
+title: Hardening
+description: Two database credentials, and the one thing a runtime role can never do.
+section: Operate
+order: 10
+---
+
+<TierBadge tier="postgres" />
+
+A deployed Graft app holds a database credential. `graft harden` makes that
+credential unable to approve its own destructive calls.
+
+## Two credentials
+
+| Role | Holds | Does |
+| --- | --- | --- |
+| Operator | Your machine, or CI | `graft compile`, `graft migrate --apply`, `graft merge`, `graft approve` |
+| Runtime | The deployment's `DATABASE_URL` | Serves reads, runs functions, projects content, files and consumes approvals |
+
+Create the role yourself, then grant it:
+
+```sh
+CREATE ROLE graft_runtime LOGIN PASSWORD '…';
+graft harden graft_runtime
+```
+
+Run `graft harden` with the **operator** `DATABASE_URL`. It applies grants to an
+existing role; it does not create one. A role that does not exist yet fails with
+`INPUT_VALIDATION_FAILED` and a `fix` containing the `CREATE ROLE` line.
+
+Then deploy with the runtime role's URL, and keep the operator URL for compile,
+migrate, merge, and approve.
+
+## What the runtime role gets
+
+Wide enough that hardening costs a deployment nothing:
+
+| Table | Grants |
+| --- | --- |
+| Every Graft table | `SELECT` |
+| `data_records` | `INSERT`, `UPDATE`, `DELETE` |
+| `content_index` | `INSERT`, `UPDATE` |
+| `compilations` | `INSERT` |
+| `audit_log` | `INSERT`, and `UPDATE` on `status` and `duration_ms` only |
+| `approvals` | `INSERT` on seven named columns only |
+
+Plus `EXECUTE` on `graft_consume_approval`, the `SECURITY DEFINER` function that
+flips an approved row to consumed.
+
+That is why the container applies hardening by default rather than offering it
+as an opt-in that trades a working feature for a second layer.
+
+## What it never gets
+
+No schema changes. No `CREATE`, no DDL, no write to `migrations_applied`.
+Branch create and merge stay operator work.
+
+And, the point of the whole exercise, two denials on `approvals`:
+
+1. **No `UPDATE`.** It cannot flip a pending row to approved.
+2. **Column-scoped `INSERT` only.** It can file a request, but it cannot name
+   `status`.
+
+Both halves are load-bearing. Withholding `UPDATE` alone left the runtime able
+to mint a row that was already `approved` and consume it, which is cheaper than
+flipping one — `status` is plain text with a `DEFAULT` rather than a `CHECK`.
+Then `decideApproval` never runs, so the separation-of-duties check never runs
+either.
+
+The seven columns it may insert are exactly the ones the approval store writes:
+`branch_id`, `function_name`, `input`, `input_canonical`, `requested_by_kind`,
+`requested_by_id`, `correlation_id`. `id`, `status` and `created_at` take their
+defaults, and the `decided_*` columns stay null until an operator decides.
+
+## What hardening does not buy
+
+Worth being precise about, because the wrong mental model here is worse than
+none.
+
+The runtime role holds `UPDATE` on `content_index`, because `write_content`
+compiles and compile is the step that reaches Postgres. A stolen runtime
+credential can therefore rewrite or hide every document by raw SQL, including
+setting `deleted = true` — which is the effect `delete_content` gates behind a
+human.
+
+Withholding `DELETE` would not prevent that. Removal here **is** an `UPDATE` of
+`deleted`, and an attacker who wanted the same result could blank every `body`
+instead. `DELETE` stays ungranted because nothing needs it, not because it buys
+a guarantee.
+
+So: **the human gate on `delete_content` is an application control against an
+agent misusing the tool, not a database control against a stolen credential.**
+No grant list short of denying content writes entirely would make it one.
+
+The approval gate is different, and that difference is the reason it is enforced
+in the database rather than trusted to the application. It survives a stolen
+credential.
+
+## Consequences for a hardened deployment
+
+Some operations move to the operator path. That is intended, not a gap.
+
+| Operation | On a hardened deployment |
+| --- | --- |
+| `graft approve` / `graft deny` | Operator credential only |
+| `decide_approval` over MCP | Fails — the role cannot `UPDATE approvals` |
+| Studio's approve and deny | Same, so the approvals view is effectively read-only |
+| Elicited approvals | Fails by construction, which is the intended answer |
+| `graft compile` from a remote MCP write | Works — the runtime may project content |
+| `graft migrate --apply` | Operator credential only |
+
+`decided_role` is stamped server-side from `current_user`, so the audit trail
+records which credential decided, not which one claimed to.
+
+## The container does this for you
+
+The self-host image creates and hardens a runtime role at boot, then serves
+under it, because there the container owns its database.
+
+| Mode | Default |
+| --- | --- |
+| All-in-one | Hardening on |
+| `GRAFT_MODE=serve` | Off, until `GRAFT_HARDEN=1` or `GRAFT_RUNTIME_PASSWORD` is set |
+
+The split exists because in `serve` mode the database is yours, and creating
+roles in someone else's database is not a boot-time decision to make on their
+behalf.
+
+See [Configuration](/docs/configuration#serve) for those variables.
+
+## Checking it worked
+
+`graft harden` returns the statements it applied. To verify the denial that
+matters, connect as the runtime role and try:
+
+```sql
+UPDATE approvals SET status = 'approved' WHERE status = 'pending';
+```
+
+A hardened role gets a permission error. That is the whole guarantee, and it
+holds against raw SQL, not just against the application.
+
+## Next steps
+
+- [Audit & approvals](/docs/audit-and-approvals) — the gate this protects
+- [Deploy](/docs/deploy) — where each credential goes
+- [Studio](/docs/studio) — what a hardened deployment's approvals view can do
+- [Configuration](/docs/configuration) — the container's hardening variables

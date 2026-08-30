@@ -1,0 +1,151 @@
+---
+title: Rate limits
+description: Per-caller limits counted against the audit log, with no counter service to run.
+section: Operate
+order: 11
+---
+
+<TierBadge tier="postgres" />
+
+Rate limiting is a property of the audit log. Every invocation already writes a
+row, so counting recent rows for one caller is the limit. There is no Redis, no
+counter table, and nothing to keep in sync.
+
+## Declaring one
+
+Per function:
+
+```ts
+export const submitContact = defineFunction({
+  name: "submitContact",
+  kind: "mutation",
+  public: true,
+  rateLimit: { limit: 5, windowSeconds: 60 },
+  input: submissions.fields,
+  handler: async (ctx) => {
+    /* … */
+  },
+});
+```
+
+Or as a handler-wide default, which any function's own `rateLimit` overrides:
+
+```ts
+createFunctionsHandler({ functions, db, rateLimit: { limit: 60, windowSeconds: 60 } });
+```
+
+`limit` is the maximum number of calls per caller per window. `windowSeconds` is
+the window, counted backwards from now — a rolling window, not a fixed bucket
+that resets on the minute.
+
+## Who a caller is
+
+| Actor | Counted as |
+| --- | --- |
+| Authenticated | The actor's kind and id |
+| Anonymous | The client IP |
+
+That means two authenticated agents do not share a bucket, and one signed-in
+user cannot be locked out by another.
+
+### Client IP behind a proxy
+
+By default `x-forwarded-for` is **ignored entirely** and the identity comes from
+the peer address the adapter reports. Anything else trusts a header the client
+writes.
+
+```ts
+createFunctionsHandler({ functions, db, trustedProxyHops: 1 });
+```
+
+Set it to the number of proxies you run, not the number you have. Behind a
+single nginx or one CDN layer, that is 1.
+
+The header is append-ordered, so the leftmost entry is whatever the original
+client supplied. With `trustedProxyHops: n`, the nth entry from the **right** is
+used: the address your own nearest proxy observed, which a client cannot forge
+past. Reading `split(",")[0]` instead would let an attacker mint a fresh bucket
+per request by rotating the header.
+
+## Every attempt counts
+
+Including the ones that were refused. A caller who fails validation twenty times
+has used twenty calls.
+
+This is deliberate, and the `fix` on the error says so:
+
+```text
+Wait for the window to pass (Retry-After is set) before retrying. Do not
+tight-loop retries — every attempt, including rejected ones, counts against
+the limit.
+```
+
+The mechanism is the reason. The audit row is reserved as soon as the caller is
+known, before validation, before the access check, before the handler. Counting
+first and recording last would leave a window spanning the whole invocation, in
+which N concurrent requests all read the same count, all saw room, and all ran.
+
+Because the row already exists when the count is taken, the comparison is
+strict: at the limit, the row just inserted is the one over it.
+
+## When a caller is over
+
+```json
+{
+  "error": "RATE_LIMITED",
+  "message": "\"submitContact\" allows 5 calls per 60s per caller; this caller has made 6.",
+  "fix": "Wait for the window to pass (Retry-After is set) before retrying. …",
+  "details": { "function": "submitContact", "limit": 5, "windowSeconds": 60 }
+}
+```
+
+The response is HTTP 429 and carries `Retry-After` set to `windowSeconds`. It
+also carries `x-graft-correlation-id`, like every other function response.
+
+## Limits need the audit log
+
+Rate limiting is counted against audit rows, so a handler configured with
+`audit: false` and a rate limit is a contradiction. It is refused at
+construction rather than silently not limiting:
+
+```text
+Remove `audit: false` from createFunctionsHandler, or drop the rateLimit
+configuration.
+```
+
+## It applies to MCP too
+
+`run_function` reuses the same handler, so a function's rate limit applies
+identically whether it was called over HTTP or by an agent. MCP is a door, not a
+bypass.
+
+## Choosing a limit
+
+Two things to weigh.
+
+**Anonymous endpoints need one.** A `public: true` mutation accepts strangers,
+so its limit is the only thing between the endpoint and a script. The contact
+form in the docs site's own config uses 5 per 60 seconds.
+
+**Bounded inputs matter as much as the count.** A limit caps how often, not how
+much. A public form writing into an unbounded column is a storage-exhaustion
+vector at any rate, which is why the same collection bounds its fields:
+
+```ts
+email: field.string({ maxLength: 320, pattern: /^[^@\s]+@[^@\s]+\.[^@\s]+$/ }),
+message: field.text({ maxLength: 4000, optional: true }),
+```
+
+## What is not rate limited
+
+- Content reads through the SDK. Those touch the index, not the function
+  handler.
+- The content API. Put a limit in front of it at the edge if you need one.
+- MCP tools other than `run_function`.
+
+## Next steps
+
+- [Functions & access](/docs/functions-and-access) — the rest of the function surface
+- [Audit & approvals](/docs/audit-and-approvals) — the rows the limit counts
+- [Observability](/docs/observability) — reading those rows back
+- [Error reference](/docs/errors) — `RATE_LIMITED` and its neighbours
