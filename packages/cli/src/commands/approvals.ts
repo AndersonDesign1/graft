@@ -19,7 +19,16 @@ export interface DecideCommandOptions {
   decision: "approved" | "denied";
 }
 
-function operatorName(): string {
+/**
+ * The OS user this process runs as — the strongest identity available locally,
+ * and not something a caller can pass in.
+ *
+ * Exported because `graft mcp --elicit-approvals` records an elicited decision
+ * as the same person `graft approve` would. Answering a dialog and answering a
+ * terminal are the same human, and the audit trail should not invent a
+ * difference between them.
+ */
+export function operatorName(): string {
   try {
     return userInfo().username;
   } catch {

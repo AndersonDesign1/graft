@@ -40,6 +40,43 @@ graft:  200 { data: … }
 Pass `approval: "<id>"` on `run_function` or `delete_content`. Do not send the
 HTTP header name over MCP — the bridge maps the argument for you.
 
+### Asking in-band (opt-in)
+
+The loop above sends the human to another terminal. On a local server, where
+that human is sitting at the same machine, the server can ask them directly
+instead — MCP calls this elicitation.
+
+```ts
+createGraftMcp({
+  // …
+  approvalElicitation: { decider: { kind: "human", id: "you@example.com" } },
+});
+```
+
+The destructive call then pauses, the client shows a confirmation, and an
+approval completes the call in one step.
+
+**It is off unless you configure it, and it belongs only where the human is
+actually present.** A remote or public mount must never set it: there is nobody
+at the other end to ask, and an elicitation nobody answers is a destructive call
+left hanging. A client that never declared the elicitation capability falls back
+to the id-and-retry loop, because a client that cannot ask its user is not a
+client whose user said yes.
+
+What does not change is everything underneath. The decision is still a row in
+`approvals`, still one-shot, still bound to the exact input, still stamped with
+`decided_role` server-side. `decider` is a separate setting rather than the
+connection's own identity because Postgres enforces `requested_by_id <>
+decided_by` in the UPDATE's own `WHERE`: name the operator at the machine, and
+if that operator is also the caller, the decision is refused exactly as it would
+be from the CLI. Deciding is a plain `UPDATE` on `approvals`, which the hardened
+runtime role deliberately cannot perform — so on a hardened deployment this
+fails by construction, which is the intended answer rather than a gap.
+
+Dismissing the prompt leaves the approval pending. Only an explicit no records a
+denial: closing a dialog is not a decision, and recording it as one would put a
+verdict in the audit trail that nobody reached.
+
 ### Policy
 
 Set `approvalPolicy: "human"` on a function to gate non-destructive mutations

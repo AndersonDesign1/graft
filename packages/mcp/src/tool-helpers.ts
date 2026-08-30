@@ -15,6 +15,7 @@ import {
   type GraftErrorJSON,
 } from "@usegraft/contracts";
 import { APPROVAL_HEADER, type AnyCollection, type GraftFunctionsHandler } from "@usegraft/core";
+import type { ApprovalElicitor } from "./approval-elicitation";
 
 /**
  * Invoke a function through a createFunctionsHandler instance via a synthetic
@@ -56,6 +57,50 @@ export async function invokeFunction(
       ? (body as { data: unknown }).data
       : body;
   return { data, correlationId, status: response.status };
+}
+
+/** The approval id a DESTRUCTIVE_OP_REQUIRES_APPROVAL refusal was filed under. */
+function filedApprovalId(error: unknown): string | undefined {
+  if (!(error instanceof GraftError) || error.code !== "DESTRUCTIVE_OP_REQUIRES_APPROVAL") {
+    return undefined;
+  }
+  const id = error.details?.approvalId;
+  return typeof id === "string" ? id : undefined;
+}
+
+/**
+ * Invoke a function, and if it files an approval, offer the human the chance to
+ * decide it now rather than in another terminal.
+ *
+ * The retry passes the approval id back through the ordinary path, so the
+ * one-shot consume, the input binding and the audit row are the same ones the
+ * out-of-band flow produces. Nothing here decides anything: `elicit` either
+ * comes back with a decided approval or it does not, and without an elicitor
+ * this is `invokeFunction` unchanged.
+ */
+export async function invokeFunctionWithApproval(
+  handler: GraftFunctionsHandler,
+  name: string,
+  input: Record<string, unknown>,
+  identity: { credential?: string; approval?: string },
+  elicit?: ApprovalElicitor,
+): Promise<{ data: unknown; correlationId?: string; status: number }> {
+  try {
+    return await invokeFunction(handler, name, input, identity);
+  } catch (error) {
+    const approvalId = filedApprovalId(error);
+    // Only a fresh refusal is worth asking about. A caller that already sent an
+    // approval and still got refused has a different problem, and re-asking
+    // would turn one human decision into a loop.
+    if (approvalId === undefined || elicit === undefined || identity.approval !== undefined) {
+      throw error;
+    }
+
+    const approved = await elicit({ approvalId, functionName: name, input });
+    if (approved === undefined) throw error;
+
+    return invokeFunction(handler, name, input, { ...identity, approval: approved });
+  }
 }
 
 /**

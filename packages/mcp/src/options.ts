@@ -96,6 +96,33 @@ export interface GraftMcpOptions {
    */
   defaultAuthorization?: string;
   /**
+   * Ask the connected client's human to decide a pending approval in-band,
+   * instead of failing with an id and waiting for someone to run
+   * `graft approve`.
+   *
+   * **Off unless configured, and it belongs only on a mount whose human is
+   * actually present** — a local stdio server, a desktop client. A remote or
+   * public mount must never set it: there is nobody at the other end to ask,
+   * and an elicitation nobody answers is a destructive call left hanging.
+   *
+   * The reason this needs an explicit `decider` rather than reusing the
+   * connection's identity is the invariant underneath: `decideApproval`
+   * enforces `requested_by_id <> decided_by` in the UPDATE's own WHERE, so a
+   * requester deciding its own approval is refused by Postgres, not by a guard
+   * that could be forgotten. Elicitation changes *how the human is asked*, not
+   * *who is recorded as having answered*. Name the operator sitting at the
+   * machine; if that operator is also the requester, the decision is refused
+   * exactly as it would be from the CLI.
+   *
+   * Deciding is a plain UPDATE on `approvals`, which the hardened runtime role
+   * deliberately cannot perform (see `graft harden`). On such a deployment this
+   * fails, correctly and by construction.
+   */
+  approvalElicitation?: {
+    /** The operator a decision is attributed to. Never the requester. */
+    decider: { kind: string; id: string };
+  };
+  /**
    * Audit / approval stores for run_function. Defaults match createFunctionsHandler
    * (db-backed). Pass `audit: false` in unit tests that do not hit a real DB.
    */

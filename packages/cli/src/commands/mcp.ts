@@ -17,10 +17,20 @@ import { createActorResolver } from "@usegraft/auth";
 import type { FunctionActor } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { assertNoStaticBranch } from "./compile";
+import { operatorName } from "./approvals";
 
 export interface McpCommandOptions {
   cwd: string;
   branchId?: string;
+  /**
+   * Ask this terminal's operator to decide a destructive call in-band, instead
+   * of failing with an id for them to run `graft approve` on.
+   *
+   * Opt-in even here, where the human is by definition present: it changes what
+   * happens when an agent tries something destructive, and that is not a
+   * default worth flipping on someone's behalf.
+   */
+  elicitApprovals?: boolean;
 }
 
 export async function mcpCommand(options: McpCommandOptions): Promise<void> {
@@ -76,6 +86,14 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
       return resolved.kind === "anonymous" ? cliActor : resolved;
     };
 
+    // The decider is the OS user, which is exactly who `graft approve` records
+    // — the same person, whether they answered a dialog or a terminal. It is
+    // also necessarily a different identity from the `agent:graft-cli` requester
+    // above, so separation of duties holds here without a special case.
+    const approvalElicitation = options.elicitApprovals
+      ? { decider: { kind: "human", id: operatorName() } }
+      : undefined;
+
     const server = createGraftMcp({
       name: "graft",
       contentDir: config.contentDir,
@@ -97,6 +115,7 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
       // `path` argument at all.
       localUploadRoot: config.projectDir,
       defaultAuthorization: devToken,
+      approvalElicitation,
     });
 
     // Stdio MCP: never write noise to stdout (that's the protocol stream).

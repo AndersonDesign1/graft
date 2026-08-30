@@ -16,7 +16,7 @@ import { assertSafeMdx } from "@usegraft/mdx-safety";
 import { assertSearchQuery, scopeChain } from "@usegraft/db";
 import { z } from "zod";
 import { findDoc, requireCollection } from "../content-hints";
-import { assertSlugFree, invokeFunction } from "../tool-helpers";
+import { assertSlugFree, invokeFunctionWithApproval } from "../tool-helpers";
 import { documentLink } from "./resource-uri";
 import { guarded } from "../tool-result";
 import { DESTROYS, READS, WRITES } from "./annotations";
@@ -33,6 +33,7 @@ export const registerContentTools: RegisterTools = (server, deps) => {
     branchId,
     collections,
     contentDir,
+    elicitApproval,
     functions,
     getDeleteHandler,
     getScope,
@@ -236,7 +237,7 @@ export const registerContentTools: RegisterTools = (server, deps) => {
       title: "Delete a document (human-gated)",
       annotations: DESTROYS,
       description:
-        "Delete an authored document: removes <contentDir>/<collection>/<slug>.mdx and compiles, so the index soft-deletes it. DESTRUCTIVE and always human-gated — the first call files an approval and fails with its id; a human decides with `graft approve <id>` (or deny); then retry the SAME collection+slug with `approval: <id>` (the MCP form of the x-graft-approval header). Approvals are one-shot and bound to that exact input. Git is the version history: commit the deletion afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.",
+        "Delete an authored document: removes <contentDir>/<collection>/<slug>.mdx and compiles, so the index soft-deletes it. DESTRUCTIVE and always human-gated — the first call files an approval and fails with its id; a human decides with `graft approve <id>` (or deny); then retry the SAME collection+slug with `approval: <id>` (the MCP form of the x-graft-approval header). Approvals are one-shot and bound to that exact input. On a server that has opted into elicited approvals AND a client that supports elicitation, you may instead be asked to confirm in-band and the call completes in one step — the gate is identical, only the way the human is reached differs, so do not treat either outcome as unusual. Git is the version history: commit the deletion afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.",
       inputSchema: {
         collection: z.string().describe("Collection name"),
         slug: z.string().describe("Document slug to delete"),
@@ -264,11 +265,12 @@ export const registerContentTools: RegisterTools = (server, deps) => {
         // would review for nothing.
         findDoc(contentDir, name, collection, slug);
 
-        const { data, correlationId } = await invokeFunction(
+        const { data, correlationId } = await invokeFunctionWithApproval(
           getDeleteHandler(),
           "delete_content",
           { collection: name, slug },
           { credential: options.defaultAuthorization, approval },
+          elicitApproval,
         );
         return { ...(data as Record<string, unknown>), correlationId };
       }),

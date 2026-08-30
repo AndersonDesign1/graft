@@ -337,7 +337,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "Calling any mutation on a deployment whose approvalPolicy is 'human'",
     ],
     howToRecover:
-      "Ask a human operator to run `graft approve <approvalId>` (they can also `graft deny` it). Once approved, retry the EXACT same call carrying the approval id — over MCP pass it as the `approval` tool argument; over raw HTTP send the `x-graft-approval: <approvalId>` header. Approvals are one-shot and bound to the exact input — never work around the gate.",
+      "Ask a human operator to run `graft approve <approvalId>` (they can also `graft deny` it). Once approved, retry the EXACT same call carrying the approval id — over MCP pass it as the `approval` tool argument; over raw HTTP send the `x-graft-approval: <approvalId>` header. Approvals are one-shot and bound to the exact input — never work around the gate. If you are seeing this over MCP, the server did not ask your client directly: either the mount has not opted into elicited approvals (`approvalElicitation`, off by default and intended for a local server whose operator is present) or your client did not declare the elicitation capability. Both are ordinary — the gate is the same either way, only the way the human is reached differs.",
   },
   APPROVAL_INVALID: {
     code: "APPROVAL_INVALID",

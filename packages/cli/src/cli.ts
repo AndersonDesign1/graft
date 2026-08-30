@@ -69,6 +69,11 @@ function printHelp(): void {
     "  --port <n>       Port for `graft serve` / `graft studio` (serve default 3903; studio 4983)",
     "  --host <h>       Host for `graft serve` / `graft studio` (default: 127.0.0.1, or HOST)",
     "  --studio         Mount opt-in Studio on `graft serve` at /studio (or GRAFT_STUDIO=1)",
+    "  --elicit-approvals",
+    "                   `graft mcp` asks THIS terminal's operator to decide a destructive call,",
+    "                   instead of failing with an id for `graft approve`. Local only: the human",
+    "                   must be present and the client must support MCP elicitation. Decisions",
+    "                   are recorded as the OS user, exactly as `graft approve` records them.",
     "  --from <name>    Parent to fork from (branch create; default: main)",
     "  --into <name>    Merge target (merge; default: main)",
     "  --backend <kind> Branch backend: overlay (default) or neon (branch create)",
@@ -98,6 +103,7 @@ interface ParsedArgs {
   overwrite: boolean;
   pruneUnknown: boolean;
   studio: boolean;
+  elicitApprovals: boolean;
   /** `graft init` index driver; undefined = the default (static). */
   initDriver?: "static" | "postgres";
 }
@@ -118,6 +124,7 @@ function parseArgs(rest: string[]): ParsedArgs {
   let overwrite = false;
   let pruneUnknown = false;
   let studio = false;
+  let elicitApprovals = false;
   let initDriver: "static" | "postgres" | undefined;
 
   const value = (flag: string, raw: string | undefined): string => {
@@ -156,6 +163,8 @@ function parseArgs(rest: string[]): ParsedArgs {
       pruneUnknown = true;
     } else if (arg === "--studio") {
       studio = true;
+    } else if (arg === "--elicit-approvals") {
+      elicitApprovals = true;
     } else if (arg === "--postgres") {
       initDriver = "postgres";
     } else if (arg === "--static") {
@@ -179,6 +188,7 @@ function parseArgs(rest: string[]): ParsedArgs {
     overwrite,
     pruneUnknown,
     studio,
+    elicitApprovals,
     initDriver,
   };
 }
@@ -393,7 +403,7 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
       case "mcp": {
         const { mcpCommand } = await import("./commands/mcp");
         // Blocks until the MCP client disconnects (stdio lifetime).
-        await mcpCommand({ cwd, branchId: args.branchId });
+        await mcpCommand({ cwd, branchId: args.branchId, elicitApprovals: args.elicitApprovals });
         return 0;
       }
       case "serve": {

@@ -34,6 +34,7 @@ import { registerContentTools } from "./tools/content";
 import { registerErrorTools } from "./tools/errors";
 import { registerFunctionTools } from "./tools/functions";
 import { registerIntrospectionTools } from "./tools/introspection";
+import { createApprovalElicitor } from "./approval-elicitation";
 import { registerContentPrompts } from "./tools/prompts";
 import { registerRegistryTools } from "./tools/registry";
 import { registerContentResources } from "./tools/resources";
@@ -318,6 +319,19 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     getFunctionsHandler,
     getDeleteHandler,
     getStorage,
+    // Absent unless the mount opted in. The default stays the out-of-band
+    // flow, which is the one a remote agent with no human attached must get.
+    elicitApproval: options.approvalElicitation
+      ? createApprovalElicitor({
+          server,
+          db: () =>
+            requireDb(
+              "approval elicitation",
+              "Approvals gate destructive operations on operational data, which a static project does not have.",
+            ),
+          decider: options.approvalElicitation.decider,
+        })
+      : undefined,
   };
 
   registerIntrospectionTools(server, deps);
