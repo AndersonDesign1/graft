@@ -121,6 +121,36 @@ describe.skipIf(!runIntegration)("write_content projects into content_index", ()
     });
     expect(result.payload.hits[0].snippet).toContain("<b>");
   });
+
+  /**
+   * The database-backed reads are the ones a unit test cannot reach: without a
+   * connection they fail at requireDb, so their declared outputSchema is never
+   * validated and a wrong shape would only surface in production. Calling them
+   * against real rows is the check — the SDK validates structuredContent before
+   * the result leaves the server, so a mismatch fails here rather than in
+   * whatever the agent tried to do with the answer.
+   */
+  it("answers the db-backed reads with structured content that matches their schema", async () => {
+    for (const name of ["list_branches", "list_compilations", "list_approvals"]) {
+      const result = await client.callTool({ name, arguments: {} });
+
+      expect(result.isError, `${name} failed: ${JSON.stringify(result.content)}`).toBeFalsy();
+      expect(result.structuredContent, name).toBeTypeOf("object");
+    }
+  });
+
+  it("validates decide_approval's shape against an id that does not exist", async () => {
+    // A real decision needs a real pending row, which needs a destructive call
+    // this suite has no business making. The refusal still proves the tool is
+    // reachable and that its failure path returns no structured content.
+    const result = await client.callTool({
+      name: "decide_approval",
+      arguments: { id: "00000000-0000-0000-0000-000000000000", decision: "approved" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+  });
 });
 
 /**

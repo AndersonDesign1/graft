@@ -19,6 +19,12 @@ import { findDoc, requireCollection } from "../content-hints";
 import { assertSlugFree, invokeFunction } from "../tool-helpers";
 import { guarded } from "../tool-result";
 import { DESTROYS, READS, WRITES } from "./annotations";
+import {
+  getContentOutput,
+  listContentOutput,
+  searchContentOutput,
+  writeContentOutput,
+} from "./outputs";
 import type { RegisterTools } from "./deps";
 
 export const registerContentTools: RegisterTools = (server, deps) => {
@@ -40,6 +46,7 @@ export const registerContentTools: RegisterTools = (server, deps) => {
     "list_content",
     {
       title: "List documents in a collection",
+      outputSchema: listContentOutput,
       annotations: READS,
       description:
         "List every document in a collection, read from the authored MDX files (git is the source of truth). Returns slug, sourcePath, and frontmatter data.",
@@ -66,6 +73,7 @@ export const registerContentTools: RegisterTools = (server, deps) => {
     "get_content",
     {
       title: "Get one document",
+      outputSchema: getContentOutput,
       annotations: READS,
       description:
         "Read a single document by collection + slug from the authored MDX files: validated frontmatter data, MDX body, and the file path to edit.",
@@ -92,6 +100,7 @@ export const registerContentTools: RegisterTools = (server, deps) => {
     "search_content",
     {
       title: "Full-text search across content",
+      outputSchema: searchContentOutput,
       annotations: READS,
       description:
         'Search authored content by words, "quoted phrases", `or`, and -exclusions (websearch syntax). Searches the branch\'s effective content in the compiled Postgres index — on a preview branch that includes documents inherited from parent branches, with branch overrides winning — so results are as fresh as the last compile (write_content compiles automatically); every hit carries the sourcePath of the file to edit. Ranking weights slug matches over frontmatter over body.',
@@ -136,6 +145,7 @@ export const registerContentTools: RegisterTools = (server, deps) => {
     "write_content",
     {
       title: "Write a document (create or update)",
+      outputSchema: writeContentOutput,
       annotations: WRITES,
       description:
         "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.",

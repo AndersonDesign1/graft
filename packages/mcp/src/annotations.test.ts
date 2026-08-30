@@ -132,6 +132,41 @@ describe("tool annotations", () => {
   });
 });
 
+/**
+ * The two tools without a declared shape are open by construction:
+ * `run_function` returns whatever the project's function returns, and
+ * `delete_content` spreads that return over its own. A schema saying `unknown`
+ * would promise nothing and cost a validation pass, so they are listed here as
+ * a deliberate exemption rather than left to look like an oversight.
+ */
+const OPEN_OUTPUT = new Set(["run_function", "delete_content"]);
+
+describe("output schemas", () => {
+  it("declares one for every tool whose answer has a fixed shape", async () => {
+    const { tools } = await client.listTools();
+    const missing = tools
+      .filter((tool) => !OPEN_OUTPUT.has(tool.name) && tool.outputSchema === undefined)
+      .map((tool) => tool.name);
+
+    expect(missing).toEqual([]);
+  });
+
+  it("leaves the open-ended tools open rather than promising a shape", async () => {
+    const { tools } = await client.listTools();
+
+    for (const name of OPEN_OUTPUT) {
+      expect(tools.find((tool) => tool.name === name)?.outputSchema, name).toBeUndefined();
+    }
+  });
+
+  it("advertises the schema as an object schema, which is what the protocol takes", async () => {
+    const { tools } = await client.listTools();
+    const listCollections = tools.find((tool) => tool.name === "list_collections");
+
+    expect(listCollections?.outputSchema).toMatchObject({ type: "object" });
+  });
+});
+
 describe("structured content", () => {
   it("returns the payload as data, not only as prose", async () => {
     const result = await client.callTool({ name: "list_collections", arguments: {} });

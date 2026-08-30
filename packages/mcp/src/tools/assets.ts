@@ -11,6 +11,7 @@ import { GraftError } from "@usegraft/contracts";
 import { z } from "zod";
 import { guarded } from "../tool-result";
 import { DESTROYS } from "./annotations";
+import { putAssetOutput } from "./outputs";
 import type { RegisterTools } from "./deps";
 
 export const registerAssetTools: RegisterTools = (server, deps) => {
@@ -22,6 +23,7 @@ export const registerAssetTools: RegisterTools = (server, deps) => {
     "put_asset",
     {
       title: "Upload an asset (image / binary)",
+      outputSchema: putAssetOutput,
       annotations: DESTROYS,
       description:
         (uploadRoot

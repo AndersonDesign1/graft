@@ -7,6 +7,7 @@ import { z } from "zod";
 import { ERROR_KNOWLEDGE, explainCode } from "../explain";
 import { guarded } from "../tool-result";
 import { READS } from "./annotations";
+import { explainErrorOutput } from "./outputs";
 import type { RegisterTools } from "./deps";
 
 export const registerErrorTools: RegisterTools = (server, deps) => {
@@ -16,6 +17,7 @@ export const registerErrorTools: RegisterTools = (server, deps) => {
     "explain_error",
     {
       title: "Explain a Graft error",
+      outputSchema: explainErrorOutput,
       annotations: READS,
       description:
         "Given a GraftError code or its JSON, explain what it means, its typical causes, and how to recover. Use whenever a tool call or compile fails.",
