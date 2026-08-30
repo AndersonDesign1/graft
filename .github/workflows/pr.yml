@@ -51,6 +51,7 @@ jobs:
             sdk-astro
             sdk-core
             sdk-next
+            sdk-react
             sdk-react-router
             sdk-sveltekit
             sdk-tanstack-start

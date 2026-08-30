@@ -1,0 +1,66 @@
+{
+  "name": "@usegraft/sdk-react",
+  "version": "0.2.0",
+  "description": "React browser client: typed content reads and hooks over Graft's read-only content API.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "content-api",
+    "graft",
+    "headless-cms",
+    "hooks",
+    "react",
+    "spa",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndersonDesign1/graft.git",
+    "directory": "packages/sdk-react"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --external react --external react/jsx-runtime",
+    "dev": "tsup src/index.ts --format esm --watch --external react --external react/jsx-runtime",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@usegraft/content-api": "workspace:*",
+    "@usegraft/contracts": "workspace:*",
+    "@usegraft/sdk-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@usegraft/core": "workspace:*",
+    "jsdom": "^25.0.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "engines": {
+    "node": ">=22.16"
+  }
+}
