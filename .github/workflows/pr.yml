@@ -52,6 +52,7 @@ jobs:
             sdk-core
             sdk-next
             sdk-sveltekit
+            sdk-tanstack-start
             studio
             tokens
             docs-site

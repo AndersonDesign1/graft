@@ -506,6 +506,16 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/sdk-tanstack-start:
+    dependencies:
+      '@usegraft/sdk-core':
+        specifier: workspace:*
+        version: link:../sdk-core
+    devDependencies:
+      '@usegraft/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/studio:
     dependencies:
       '@usegraft/assets':
