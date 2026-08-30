@@ -17,6 +17,7 @@ import { assertSearchQuery, scopeChain } from "@usegraft/db";
 import { z } from "zod";
 import { findDoc, requireCollection } from "../content-hints";
 import { assertSlugFree, invokeFunction } from "../tool-helpers";
+import { documentLink } from "./resource-uri";
 import { guarded } from "../tool-result";
 import { DESTROYS, READS, WRITES } from "./annotations";
 import {
@@ -55,18 +56,21 @@ export const registerContentTools: RegisterTools = (server, deps) => {
       },
     },
     ({ collection: name }) =>
-      guarded(() => {
-        const collection = requireCollection(collections, name);
-        const docs = readCollectionDocs(contentDir, name, collection);
-        return {
-          collection: name,
-          documents: docs.map((doc) => ({
-            slug: doc.slug,
-            sourcePath: doc.sourcePath,
-            data: doc.data,
-          })),
-        };
-      }),
+      guarded(
+        () => {
+          const collection = requireCollection(collections, name);
+          const docs = readCollectionDocs(contentDir, name, collection);
+          return {
+            collection: name,
+            documents: docs.map((doc) => ({
+              slug: doc.slug,
+              sourcePath: doc.sourcePath,
+              data: doc.data,
+            })),
+          };
+        },
+        (payload) => payload.documents.map((doc) => documentLink(branchId, name, doc.slug)),
+      ),
   );
 
   server.registerTool(
@@ -83,17 +87,22 @@ export const registerContentTools: RegisterTools = (server, deps) => {
       },
     },
     ({ collection: name, slug }) =>
-      guarded(() => {
-        const collection = requireCollection(collections, name);
-        const doc = findDoc(contentDir, name, collection, slug);
-        return {
-          collection: name,
-          slug: doc.slug,
-          sourcePath: doc.sourcePath,
-          data: doc.data,
-          body: doc.body,
-        };
-      }),
+      guarded(
+        () => {
+          const collection = requireCollection(collections, name);
+          const doc = findDoc(contentDir, name, collection, slug);
+          return {
+            collection: name,
+            slug: doc.slug,
+            sourcePath: doc.sourcePath,
+            data: doc.data,
+            body: doc.body,
+          };
+        },
+        // The document's own address, so a client that reached it by search or
+        // by guesswork can pin it as context without constructing the URI.
+        (payload) => [documentLink(branchId, name, payload.slug)],
+      ),
   );
 
   server.registerTool(
@@ -114,31 +123,36 @@ export const registerContentTools: RegisterTools = (server, deps) => {
       },
     },
     ({ query, collection: name, limit }) =>
-      guarded(async () => {
-        if (name !== undefined) requireCollection(collections, name);
-        // Cheap input gates first — an invalid query never pays scope resolution.
-        assertSearchQuery(query);
-        const collectionNames = name === undefined ? Object.keys(collections) : [name];
-        // A static artifact is a single compiled branch, so its "chain" is just
-        // this branch; Postgres searches the resolved chain (leaf-first), the
-        // same effective content readContent serves: inherited parent docs are
-        // found, branch overrides win, tombstones hide (P4.1 overlay semantics).
-        const chain = staticIndexPath === undefined ? scopeChain(await getScope()) : [branchId];
-        const hits = await searchIndex({ query, chain, collections: collectionNames, limit });
-        return {
-          branch: branchId,
-          chain,
-          query,
-          hits: hits.map(({ row, rank, snippet }) => ({
-            collection: row.collection,
-            slug: row.slug,
-            sourcePath: row.sourcePath,
-            rank,
-            snippet,
-            data: row.data,
-          })),
-        };
-      }),
+      guarded(
+        async () => {
+          if (name !== undefined) requireCollection(collections, name);
+          // Cheap input gates first — an invalid query never pays scope resolution.
+          assertSearchQuery(query);
+          const collectionNames = name === undefined ? Object.keys(collections) : [name];
+          // A static artifact is a single compiled branch, so its "chain" is just
+          // this branch; Postgres searches the resolved chain (leaf-first), the
+          // same effective content readContent serves: inherited parent docs are
+          // found, branch overrides win, tombstones hide (P4.1 overlay semantics).
+          const chain = staticIndexPath === undefined ? scopeChain(await getScope()) : [branchId];
+          const hits = await searchIndex({ query, chain, collections: collectionNames, limit });
+          return {
+            branch: branchId,
+            chain,
+            query,
+            hits: hits.map(({ row, rank, snippet }) => ({
+              collection: row.collection,
+              slug: row.slug,
+              sourcePath: row.sourcePath,
+              rank,
+              snippet,
+              data: row.data,
+            })),
+          };
+        },
+        // A hit already knows its collection and slug; the link saves the
+        // client a get_content round trip to reach the document itself.
+        (payload) => payload.hits.map((hit) => documentLink(branchId, hit.collection, hit.slug)),
+      ),
   );
 
   server.registerTool(
@@ -161,55 +175,59 @@ export const registerContentTools: RegisterTools = (server, deps) => {
       },
     },
     ({ collection: name, slug, data, body }) =>
-      guarded(async () => {
-        requireScope("write_content", "content:write");
-        const collection = requireCollection(collections, name);
+      guarded(
+        async () => {
+          requireScope("write_content", "content:write");
+          const collection = requireCollection(collections, name);
 
-        if (collection.authority === "db-authoritative") {
-          throw new GraftError({
-            code: "AUTHORITY_MISMATCH",
-            message: `Collection "${name}" is db-authoritative — its records live in Postgres, not as MDX files.`,
-            fix: `Write this data through the collection's function endpoint (POST /api/fn/<name>, see llms.txt) instead of write_content. write_content is only for file-authoritative collections.`,
-            details: { collection: name, authority: collection.authority },
-          });
-        }
+          if (collection.authority === "db-authoritative") {
+            throw new GraftError({
+              code: "AUTHORITY_MISMATCH",
+              message: `Collection "${name}" is db-authoritative — its records live in Postgres, not as MDX files.`,
+              fix: `Write this data through the collection's function endpoint (POST /api/fn/<name>, see llms.txt) instead of write_content. write_content is only for file-authoritative collections.`,
+              details: { collection: name, authority: collection.authority },
+            });
+          }
 
-        const frontmatterSlug = (data as Record<string, unknown>).slug;
-        if (frontmatterSlug !== undefined && frontmatterSlug !== slug) {
-          throw new GraftError({
-            code: "INVALID_SLUG",
-            message: `data.slug ("${String(frontmatterSlug)}") conflicts with the slug argument ("${slug}")`,
-            fix: "Omit `slug` from data — the slug argument names the file and the document.",
-            details: { slug, frontmatterSlug },
-          });
-        }
+          const frontmatterSlug = (data as Record<string, unknown>).slug;
+          if (frontmatterSlug !== undefined && frontmatterSlug !== slug) {
+            throw new GraftError({
+              code: "INVALID_SLUG",
+              message: `data.slug ("${String(frontmatterSlug)}") conflicts with the slug argument ("${slug}")`,
+              fix: "Omit `slug` from data — the slug argument names the file and the document.",
+              details: { slug, frontmatterSlug },
+            });
+          }
 
-        const sourcePath = `${name}/${slug}.mdx`;
-        const fullPath = join(contentDir, ...sourcePath.split("/"));
-        // Updating an existing document must not rewrite frontmatter the author
-        // (or an earlier agent) wrote — only a real data change re-serialises.
-        // Content arriving over the wire is not operator-authored, and MDX is
-        // code: rendering evaluates `{…}` and `import` as JavaScript on the
-        // server. Refuse it here, before it is stored.
-        assertSafeMdx(body ?? "", { label: `${name}/${slug}` });
+          const sourcePath = `${name}/${slug}.mdx`;
+          const fullPath = join(contentDir, ...sourcePath.split("/"));
+          // Updating an existing document must not rewrite frontmatter the author
+          // (or an earlier agent) wrote — only a real data change re-serialises.
+          // Content arriving over the wire is not operator-authored, and MDX is
+          // code: rendering evaluates `{…}` and `import` as JavaScript on the
+          // server. Refuse it here, before it is stored.
+          assertSafeMdx(body ?? "", { label: `${name}/${slug}` });
 
-        const existingRaw = existsSync(fullPath) ? readFileSync(fullPath, "utf8") : undefined;
-        const raw = composeDocument(existingRaw, data as Record<string, unknown>, body ?? "");
-        // Validate before touching disk: schema + slug shape, same path compile uses.
-        parseDocument(raw, collection, sourcePath);
+          const existingRaw = existsSync(fullPath) ? readFileSync(fullPath, "utf8") : undefined;
+          const raw = composeDocument(existingRaw, data as Record<string, unknown>, body ?? "");
+          // Validate before touching disk: schema + slug shape, same path compile uses.
+          parseDocument(raw, collection, sourcePath);
 
-        assertSlugFree(contentDir, name, collection, slug, sourcePath);
+          assertSlugFree(contentDir, name, collection, slug, sourcePath);
 
-        writeDocumentFile(fullPath, raw);
+          writeDocumentFile(fullPath, raw);
 
-        const result = await projectContent();
-        return {
-          written: sourcePath,
-          branch: branchId,
-          gitSha: result.gitSha,
-          changes: result.changes,
-        };
-      }),
+          const result = await projectContent();
+          return {
+            written: sourcePath,
+            branch: branchId,
+            gitSha: result.gitSha,
+            changes: result.changes,
+          };
+        },
+        // Where the thing it just wrote now lives.
+        () => [documentLink(branchId, name, slug)],
+      ),
   );
 
   server.registerTool(

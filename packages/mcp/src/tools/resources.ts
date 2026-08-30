@@ -27,6 +27,7 @@ import { requireCollection } from "../content-hints";
 import { teachAssetFields } from "../tool-helpers";
 import { guardedResource } from "../tool-result";
 import type { RegisterTools } from "./deps";
+import { documentUri, documentUriTemplate, schemaUri } from "./resource-uri";
 
 /** Authored documents live in files; db-authoritative rows have none to serve. */
 const isFileAuthoritative = (authority: string | undefined): boolean =>
@@ -72,15 +73,12 @@ export const registerContentResources: RegisterTools = (server, deps) => {
     return out;
   };
 
-  const uriFor = (collection: string, slug: string): string =>
-    `graft://${branchId}/${collection}/${slug}`;
-
   server.registerResource(
     "document",
-    new ResourceTemplate(`graft://${branchId}/{collection}/{slug}`, {
+    new ResourceTemplate(documentUriTemplate(branchId), {
       list: () => ({
         resources: allDocuments().map((doc) => ({
-          uri: uriFor(doc.collection, doc.slug),
+          uri: documentUri(branchId, doc.collection, doc.slug),
           name: `${doc.collection}/${doc.slug}`,
           title: doc.title ?? doc.slug,
           description: doc.description ?? `Authored MDX at ${doc.sourcePath}`,
@@ -154,7 +152,7 @@ export const registerContentResources: RegisterTools = (server, deps) => {
    */
   server.registerResource(
     "schema",
-    `graft://${branchId}/schema`,
+    schemaUri(branchId),
     {
       title: "Project schema",
       description:

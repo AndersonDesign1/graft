@@ -162,6 +162,87 @@ describe("reading", () => {
   });
 });
 
+/**
+ * The link and the resource have to agree. Two spellings of one URI scheme is
+ * two things to keep in step, and the failure is silent — a link pointing at a
+ * URI nothing serves reads as a broken client rather than a server that
+ * disagrees with itself. So every link a tool emits is followed here.
+ */
+describe("resource links", () => {
+  // callTool's result type still allows the legacy `toolResult` shape with no
+  // `content` at all, so the blocks are narrowed rather than indexed straight.
+  const contentOf = (result: Record<string, unknown>): Array<Record<string, unknown>> => {
+    if (!Array.isArray(result.content)) return [];
+    // SAFETY: every block the server sends is an object; a non-object here
+    // would be a protocol violation and is dropped rather than trusted.
+    return result.content.filter(
+      (block): block is Record<string, unknown> => typeof block === "object" && block !== null,
+    );
+  };
+
+  const linksIn = (result: Record<string, unknown>) =>
+    contentOf(result).filter((block) => block.type === "resource_link");
+
+  it("links every document a listing returned", async () => {
+    const result = await client.callTool({
+      name: "list_content",
+      arguments: { collection: "pages" },
+    });
+
+    expect(
+      linksIn(result)
+        .map((link) => link.uri)
+        .sort(),
+    ).toEqual(["graft://preview/pages/about", "graft://preview/pages/home"]);
+  });
+
+  it("keeps the text block first, so a client ignoring links loses nothing", async () => {
+    const result = await client.callTool({
+      name: "list_content",
+      arguments: { collection: "pages" },
+    });
+
+    expect(contentOf(result)[0]).toMatchObject({ type: "text" });
+  });
+
+  it("links the document a read returned", async () => {
+    const result = await client.callTool({
+      name: "get_content",
+      arguments: { collection: "pages", slug: "home" },
+    });
+
+    expect(linksIn(result)).toEqual([
+      {
+        type: "resource_link",
+        uri: "graft://preview/pages/home",
+        name: "pages/home",
+        mimeType: "text/markdown",
+      },
+    ]);
+  });
+
+  it("emits a link a readResource actually resolves", async () => {
+    const result = await client.callTool({
+      name: "get_content",
+      arguments: { collection: "pages", slug: "home" },
+    });
+    const [link] = linksIn(result);
+
+    const read = await client.readResource({ uri: String(link.uri) });
+    expect(textOf(read)).toBe(HOME);
+  });
+
+  it("emits no links on a failure", async () => {
+    const result = await client.callTool({
+      name: "get_content",
+      arguments: { collection: "pages", slug: "nope" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(linksIn(result)).toEqual([]);
+  });
+});
+
 describe("completions", () => {
   const complete = async (variable: string, value: string, chosen?: Record<string, string>) => {
     const request = {
