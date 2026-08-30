@@ -20,10 +20,42 @@ those.
 
 ## Quick start
 
+<TierBadge tier="static" />
+
+<Steps>
+
+<Step title="Scaffold a project">
+
+<Tabs labels="pnpm, npm, bun">
+
+<Tab>
+
 ```sh
 pnpm dlx @usegraft/cli init my-site
 cd my-site
 ```
+
+</Tab>
+
+<Tab>
+
+```sh
+npx @usegraft/cli init my-site
+cd my-site
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+bunx @usegraft/cli init my-site
+cd my-site
+```
+
+</Tab>
+
+</Tabs>
 
 Run it under the full package name. The bare name `graft` on npm belongs to an
 unrelated package.
@@ -31,14 +63,20 @@ unrelated package.
 `graft init` writes `graft.config.ts`, `content/pages/home.mdx`, and the
 `graft/` barrel for owned primitives. It scaffolds the static index by default.
 
-Compile and watch:
+</Step>
+
+<Step title="Compile and watch">
 
 ```sh
 graft compile       # validate content/ and write .graft/index.db
 graft dev           # recompile when content or config changes
 ```
 
-Read a document in your app:
+</Step>
+
+<Step title="Read a document">
+
+<CodeBlock title="app/page.ts" note="no database">
 
 ```ts
 import { openStaticIndex } from "@usegraft/db";
@@ -51,6 +89,12 @@ const graft = createClient({ index, collections });
 const home = await graft.getDocument("pages", "home");
 //    ^? typed by your pages collection
 ```
+
+</CodeBlock>
+
+</Step>
+
+</Steps>
 
 `.graft/index.db` is derived from the files in git, so it is git-ignored.
 Rebuild it in your build command:

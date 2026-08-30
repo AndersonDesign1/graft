@@ -63,6 +63,15 @@ faqs: field.array({
 }),
 ```
 
+### What a collection looks like once declared
+
+This is the `docs` collection that renders the page you are reading, generated
+from its own schema rather than written out here. The same descriptor answers
+MCP's `describe_schema` and fills the Studio's schema view, so this table cannot
+drift from what the compiler enforces.
+
+<FieldTable collection="docs" />
+
 ## Merge with primitives
 
 `graft add` drops source under `graft/`. Merge your collections with the generated

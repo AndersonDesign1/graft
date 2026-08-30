@@ -165,6 +165,9 @@ importers:
       '@usegraft/compiler':
         specifier: workspace:*
         version: link:../../packages/compiler
+      '@usegraft/mdx-safety':
+        specifier: workspace:*
+        version: link:../../packages/mdx-safety
       rehype-raw:
         specifier: ^7.0.0
         version: 7.0.0
