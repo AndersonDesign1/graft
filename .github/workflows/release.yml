@@ -138,6 +138,20 @@ jobs:
           node scripts/assert-canary-snapshot.mjs
           pnpm release:canary
 
+      # `changeset publish` cannot be trusted to say what landed. On the first
+      # canary it printed E404 for six packages, then listed all twenty-one
+      # under "packages published successfully" with an empty failure list. The
+      # job exited 1, so this was not silent — but the output naming which
+      # packages need attention was wrong, and a partial canary is worse than
+      # none, because internal deps pin the exact snapshot version and the tag
+      # ends up pointing at something that fails to install.
+      #
+      # `always()` so it also reports after a failed publish, which is exactly
+      # when the accurate list is worth having.
+      - name: Verify the canary is installable
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.canary }}
+        run: node scripts/assert-canary-published.mjs
+
       - name: Create release PR or publish
         if: ${{ github.event_name != 'workflow_dispatch' || !inputs.canary }}
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
