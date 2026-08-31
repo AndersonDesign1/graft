@@ -50,7 +50,7 @@ describe("toDocument", () => {
 
 describe("createClient", () => {
   it("rejects unknown collections with the registered list", async () => {
-    const client = createClient({ db: {} as never, collections: { pages } });
+    const client = createClient({ index: {} as never, collections: { pages } });
     await expect(
       // @ts-expect-error — unknown collection is a type error too
       client.getDocument("widgets", "x"),
@@ -58,7 +58,7 @@ describe("createClient", () => {
   });
 
   it("returns fully inferred document types per collection key", () => {
-    const client = createClient({ db: {} as never, collections: { pages } });
+    const client = createClient({ index: {} as never, collections: { pages } });
     // Assert on the function type — invoking it would hit the fake db.
     expectTypeOf(client.getDocument<"pages">).returns.resolves.toEqualTypeOf<Document<
       typeof pages
@@ -66,7 +66,7 @@ describe("createClient", () => {
   });
 
   it("rejects search on unknown collections and infers hit types", async () => {
-    const client = createClient({ db: {} as never, collections: { pages } });
+    const client = createClient({ index: {} as never, collections: { pages } });
     await expect(
       // @ts-expect-error — unknown collection is a type error too
       client.searchDocuments("widgets", "anything"),

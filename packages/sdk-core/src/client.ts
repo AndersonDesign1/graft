@@ -10,24 +10,23 @@
  *
  * The cache/invalidation contract (subscribe, revalidateTag) lands in Phase 4.
  */
-import { GraftError } from "@usegraft/contracts";
+import { GraftError, type ContentIndexReader, type ContentRow } from "@usegraft/contracts";
 import type { AnyCollection, DocumentData } from "@usegraft/core";
-import {
-  createDbIndexReader,
-  type ContentIndexReader,
-  type ContentRow,
-  type Database,
-} from "@usegraft/db";
 
 export interface ClientOptions<TCollections extends Record<string, AnyCollection>> {
-  /** The Postgres index. Provide either `db` or `index`. */
-  db?: Database;
   /**
-   * A ContentIndexReader — e.g. `await openStaticIndex(path)` for static
-   * (zero-service) projects, or any custom driver. Wins over `db` when both
-   * are set.
+   * Where reads come from: `await openStaticIndex(path)` for a static project,
+   * `createDbIndexReader(db)` for Postgres, `createContentApiReader({endpoint})`
+   * for a remote `graft serve`, or any driver implementing the interface.
+   *
+   * This entry point deliberately does not take a `db` handle. Doing so meant
+   * importing `@usegraft/db` for its value, which put `postgres` and
+   * `drizzle-orm` into the dependency graph of every consumer — including
+   * `@usegraft/sdk-react`, whose entire premise is that a database never
+   * reaches the browser. Pass a `db` to `createDbClient` from
+   * `@usegraft/sdk-core/db` instead, which is where that edge now lives.
    */
-  index?: ContentIndexReader;
+  index: ContentIndexReader;
   collections: TCollections;
   /** Default branch for all reads; per-call `branch` overrides. Defaults to "main". */
   branch?: string;
@@ -96,16 +95,15 @@ export function createClient<TCollections extends Record<string, AnyCollection>>
 ): GraftClient<TCollections> {
   const defaultBranch = options.branch ?? "main";
 
-  // The index driver: an explicit reader (static SQLite, custom), or the
-  // Postgres reader over the given db handle (which owns the per-branch
-  // overlay-scope memo that used to live here).
-  const reader =
-    options.index ?? (options.db !== undefined ? createDbIndexReader(options.db) : undefined);
-  if (reader === undefined) {
+  const reader = options.index;
+  // Types stop a missing `index` at compile time; this catches the runtime
+  // shapes they cannot — untyped JavaScript, and a config object that arrived
+  // as JSON with the reader dropped.
+  if (reader === undefined || reader === null) {
     throw new GraftError({
       code: "CONFIG_INVALID",
-      message: "createClient needs an index to read from: pass `db` or `index`.",
-      fix: 'Pass `db` (a @usegraft/db Database, Postgres index) or `index` (a ContentIndexReader — e.g. `await openStaticIndex(".graft/index.db")` for static mode).',
+      message: "createClient needs an `index` to read from.",
+      fix: 'Pass `index`: `await openStaticIndex(".graft/index.db")` for static mode, `createContentApiReader({ endpoint })` for a remote `graft serve`, or use `createDbClient` from "@usegraft/sdk-core/db" to pass a Postgres handle directly.',
     });
   }
 

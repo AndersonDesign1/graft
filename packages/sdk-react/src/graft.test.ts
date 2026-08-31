@@ -108,6 +108,31 @@ describe("createGraft configuration", () => {
       }),
     ).toThrowError(/cannot be combined with `endpoint`/);
   });
+
+  it("refuses a per-read branch on an endpoint-backed handle", async () => {
+    // The constructor check above only covers the handle. A branch passed to an
+    // individual read reaches the same dead end — the reader never sends it and
+    // the server would refuse it — so it has to fail here too, not resolve to
+    // main.
+    const graft = servedGraft();
+    await expect(graft.getContent("docs", "intro", { branch: "preview/redesign" })).rejects.toThrow(
+      /`branch` cannot be passed to a read/,
+    );
+    await expect(graft.listContent("docs", { branch: "preview/redesign" })).rejects.toThrow(
+      /`branch` cannot be passed to a read/,
+    );
+    await expect(
+      graft.searchContent("docs", "intro", { branch: "preview/redesign" }),
+    ).rejects.toThrow(/`branch` cannot be passed to a read/);
+  });
+
+  it("still allows a per-read branch when the handle owns its own index", async () => {
+    // An index-backed handle is not pinned by a server, so the guard must not
+    // fire there — otherwise it would break the one configuration where a
+    // branch is meaningful.
+    const graft = createGraft({ index, collections: { docs } });
+    await expect(graft.listContent("docs", { branch: "main" })).resolves.toBeInstanceOf(Array);
+  });
 });
 
 describe("reads over the content API", () => {

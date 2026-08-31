@@ -4,6 +4,7 @@
  * (added / changed / removed / unchanged) is deterministic and unit-testable;
  * projectBranchContent applies the result transactionally.
  */
+import type { ChangeSet } from "@usegraft/contracts";
 import type { NewContentRow } from "./schema";
 
 /** The fields a caller supplies per row; branch_id/deleted/updated_at are managed by the db layer. */
@@ -19,12 +20,7 @@ export interface ExistingContentState {
 }
 
 /** What a projection run did, keyed by "collection/slug". */
-export interface ChangeSet {
-  added: string[];
-  changed: string[];
-  removed: string[];
-  unchanged: number;
-}
+export type { ChangeSet } from "@usegraft/contracts";
 
 export interface ContentDiff {
   changes: ChangeSet;

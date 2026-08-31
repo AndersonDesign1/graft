@@ -2,16 +2,14 @@ import {
   ErrorCodes,
   GraftError,
   rateIdentity,
+  type ContentIndexReader,
+  type ContentRow,
+  type ContentSearchHit,
   type ErrorCode,
   type GraftErrorJSON,
+  type ReaderReadOptions,
+  type ReaderSearchOptions,
 } from "@usegraft/contracts";
-import type {
-  ContentIndexReader,
-  ContentRow,
-  ContentSearchHit,
-  ReaderReadOptions,
-  ReaderSearchOptions,
-} from "@usegraft/db";
 
 const CONTENT_API_BASE = "/api/content/v1";
 const MAX_QUERY_LIMIT = 500;

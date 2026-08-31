@@ -52,6 +52,7 @@
   },
   "dependencies": {
     "@mdx-js/mdx": "^3.1.1",
+    "@usegraft/db": "workspace:*",
     "@usegraft/mdx-safety": "workspace:*",
     "@usegraft/sdk-core": "workspace:*",
     "remark-gfm": "^4.0.1"

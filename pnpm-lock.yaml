@@ -326,6 +326,7 @@ importers:
       '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
+    devDependencies:
       '@usegraft/db':
         specifier: workspace:*
         version: link:../db
@@ -441,6 +442,9 @@ importers:
 
   packages/sdk-astro:
     dependencies:
+      '@usegraft/db':
+        specifier: workspace:*
+        version: link:../db
       '@usegraft/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
@@ -457,19 +461,22 @@ importers:
       '@usegraft/core':
         specifier: workspace:*
         version: link:../core
-      '@usegraft/db':
-        specifier: workspace:*
-        version: link:../db
     devDependencies:
       '@usegraft/compiler':
         specifier: workspace:*
         version: link:../compiler
+      '@usegraft/db':
+        specifier: workspace:*
+        version: link:../db
 
   packages/sdk-next:
     dependencies:
       '@mdx-js/mdx':
         specifier: ^3.1.1
         version: 3.1.1(supports-color@7.2.0)
+      '@usegraft/db':
+        specifier: workspace:*
+        version: link:../db
       '@usegraft/mdx-safety':
         specifier: workspace:*
         version: link:../mdx-safety
@@ -532,6 +539,9 @@ importers:
 
   packages/sdk-react-router:
     dependencies:
+      '@usegraft/db':
+        specifier: workspace:*
+        version: link:../db
       '@usegraft/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
@@ -542,6 +552,9 @@ importers:
 
   packages/sdk-sveltekit:
     dependencies:
+      '@usegraft/db':
+        specifier: workspace:*
+        version: link:../db
       '@usegraft/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
@@ -552,6 +565,9 @@ importers:
 
   packages/sdk-tanstack-start:
     dependencies:
+      '@usegraft/db':
+        specifier: workspace:*
+        version: link:../db
       '@usegraft/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core

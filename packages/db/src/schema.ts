@@ -1,3 +1,4 @@
+import type { ContentRow } from "@usegraft/contracts";
 /**
  * Database schema (Drizzle).
  *
@@ -65,7 +66,16 @@ export const contentIndex = pgTable(
   ],
 );
 
-export type ContentRow = typeof contentIndex.$inferSelect;
+/**
+ * The published row shape lives in `@usegraft/contracts` so a consumer can
+ * describe a row without installing a database driver. This asserts the table
+ * still produces it — if a column changes type, this line fails rather than the
+ * contract silently drifting from its only implementation.
+ */
+type InferredContentRow = typeof contentIndex.$inferSelect;
+const _tableMatchesContract: (row: InferredContentRow) => ContentRow = (row) => row;
+void _tableMatchesContract;
+export type { ContentRow };
 export type NewContentRow = typeof contentIndex.$inferInsert;
 
 /**

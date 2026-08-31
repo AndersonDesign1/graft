@@ -31,8 +31,14 @@ import {
 
 export interface GraftOptions<TCollections extends Record<string, AnyCollection>> extends Omit<
   ClientOptions<TCollections>,
-  "db"
+  "index"
 > {
+  /**
+   * Your own reader, when `endpoint` is not enough. Optional here because
+   * `endpoint` is the ordinary way to configure this package, and exactly one
+   * of the two is required.
+   */
+  index?: ClientOptions<TCollections>["index"];
   /** Content API base URL, e.g. `https://cms.example.com/api/content/v1`. */
   endpoint?: string | URL;
   /** Static headers sent with every read, such as `Authorization`. */
@@ -109,10 +115,40 @@ export function createGraft<TCollections extends Record<string, AnyCollection>>(
     collections: options.collections,
     branch: options.branch,
   });
+
+  // An endpoint is one branch, pinned by the server, and the server refuses a
+  // branch query param outright. So a per-read `branch` is not merely
+  // unsupported here — it is dropped on the way out, and the caller reads main
+  // while believing they read a preview. The constructor already refuses
+  // `branch` beside `endpoint`; this closes the same hole one level down, where
+  // it is easier to reach and just as silent.
+  const endpointPinned = options.endpoint !== undefined;
+  function assertNoBranch(opts: ReadOptions | undefined): void {
+    if (!endpointPinned || opts?.branch === undefined) return;
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message: "`branch` cannot be passed to a read on an endpoint-backed handle.",
+      fix: "Each content API endpoint serves exactly one branch, fixed by the server, and the branch query param is refused. Point a second handle at the preview's own endpoint instead of asking this one for a branch.",
+      details: { branch: opts.branch, endpoint: String(options.endpoint) },
+    });
+  }
+
+  // `async` so the refusal arrives as a rejection. These are declared to return
+  // promises, and a synchronous throw from one is the kind of thing a caller
+  // handling errors with `.catch()` never sees.
   return {
     client,
-    getContent: (collection, slug, opts) => client.getDocument(collection, slug, opts),
-    listContent: (collection, opts) => client.listDocuments(collection, opts),
-    searchContent: (collection, query, opts) => client.searchDocuments(collection, query, opts),
+    async getContent(collection, slug, opts) {
+      assertNoBranch(opts);
+      return client.getDocument(collection, slug, opts);
+    },
+    async listContent(collection, opts) {
+      assertNoBranch(opts);
+      return client.listDocuments(collection, opts);
+    },
+    async searchContent(collection, query, opts) {
+      assertNoBranch(opts);
+      return client.searchDocuments(collection, query, opts);
+    },
   };
 }

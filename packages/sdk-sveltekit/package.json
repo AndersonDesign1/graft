@@ -43,6 +43,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@usegraft/db": "workspace:*",
     "@usegraft/sdk-core": "workspace:*"
   },
   "devDependencies": {

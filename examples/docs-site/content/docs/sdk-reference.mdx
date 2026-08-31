@@ -10,7 +10,7 @@ with local ergonomics. The same `graft.config.ts` types every package.
 
 | Package | For | Notes |
 | --- | --- | --- |
-| `@usegraft/sdk-core` | any JS | `getDocument` / `listDocuments` / `searchDocuments`; branch-aware; cache-tag helpers |
+| `@usegraft/sdk-core` | any JS | `getDocument` / `listDocuments` / `searchDocuments`; branch-aware; cache-tag helpers. Postgres lives behind `@usegraft/sdk-core/db` |
 | `@usegraft/sdk-next` | Next (RSC) | `React.cache` memo; `MdxBody`; `revalidateContent` / `updateContent` |
 | `@usegraft/sdk-astro` | Astro | No request memo; `graftRoute` for endpoint mounts |
 | `@usegraft/sdk-sveltekit` | SvelteKit | `graftRoute` for `+server.ts`; CDN surrogate keys for tags |
@@ -33,6 +33,14 @@ await graft.searchContent("docs", "branching");
 
 Unknown collection names are compile-time errors when you pass your
 `collections` map. Reads re-validate; a poisoned index row throws.
+
+Every framework adapter takes `db` directly, as above. `createClient` in
+`@usegraft/sdk-core` does not: it takes an `index`, and a Postgres handle goes
+to `createDbClient` from `@usegraft/sdk-core/db`. Accepting `db` on the main
+entry meant importing the database package for its value, which put `postgres`
+and `drizzle-orm` into the dependency graph of everything downstream — including
+the browser client. `@usegraft/db` is an optional peer dependency now, so a
+server install resolves it and a browser install never sees it.
 
 Pass `index` instead of `db` to read a static SQLite artifact or a remote
 `graft serve` through `createContentApiReader`. The SDK surface does not

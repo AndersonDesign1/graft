@@ -43,7 +43,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@usegraft/contracts": "workspace:*",
+    "@usegraft/contracts": "workspace:*"
+  },
+  "devDependencies": {
     "@usegraft/db": "workspace:*"
   },
   "engines": {

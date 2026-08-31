@@ -7,7 +7,7 @@
  * Framework-agnostic on purpose: `@usegraft/sdk-next` binds these to Next's
  * `revalidateTag`, but any cache keyed by string tags can use the same scheme.
  */
-import type { ChangeSet } from "@usegraft/db";
+import type { ChangeSet } from "@usegraft/contracts";
 
 /** Every Graft tag starts here, so an app can namespace or bulk-clear them. */
 export const TAG_NAMESPACE = "graft";

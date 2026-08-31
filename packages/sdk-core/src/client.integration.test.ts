@@ -1,3 +1,4 @@
+import { createDbClient } from "./db";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -44,7 +45,7 @@ describe.skipIf(!runIntegration)("sdk-core reads back what the compiler wrote", 
   });
 
   it("getDocument returns the typed doc; missing and soft-deleted rows are null", async () => {
-    const client = createClient({ db: handle.db, collections, branch: BRANCH });
+    const client = createDbClient({ db: handle.db, collections, branch: BRANCH });
 
     const home = await client.getDocument("pages", "home");
     expect(home?.data.title).toBe("Home");
@@ -62,7 +63,7 @@ describe.skipIf(!runIntegration)("sdk-core reads back what the compiler wrote", 
   }, 60_000);
 
   it("searchDocuments finds compiled content with rank + snippet", async () => {
-    const client = createClient({ db: handle.db, collections, branch: BRANCH });
+    const client = createDbClient({ db: handle.db, collections, branch: BRANCH });
 
     const hits = await client.searchDocuments("pages", "welcome");
     expect(hits.map((h) => h.slug)).toEqual(["home"]);
