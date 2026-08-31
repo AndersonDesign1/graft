@@ -61,12 +61,26 @@ createGraftMcp({
 The destructive call then pauses, the client shows a confirmation, and an
 approval completes the call in one step.
 
-**It is off unless you configure it, and it belongs only where the human is
-actually present.** A remote or public mount must never set it: there is nobody
-at the other end to ask, and an elicitation nobody answers is a destructive call
-left hanging. A client that never declared the elicitation capability falls back
-to the id-and-retry loop, because a client that cannot ask its user is not a
-client whose user said yes.
+**It is off unless you configure it, and it is refused outright over HTTP.**
+`createGraftMcpHandler` throws `CONFIG_INVALID` at construction if you pass
+`approvalElicitation`, because over HTTP the client being asked to approve *is*
+the agent that made the call, while `decider` is configured server-side — so an
+accepted prompt would be self-approval recorded under the operator's name. That
+is precisely what `requested_by_id <> decided_by` exists to prevent, and routing
+the question to the requester's own client walks around it. Elicitation is for a
+stdio server whose operator is at the machine.
+
+A client that never declared the capability falls back to the id-and-retry loop,
+because a client that cannot ask its user is not a client whose user said yes.
+So does a client that declared it and then fails the request — an older SDK, a
+schema it will not render, a transport that times out with the dialog open. A
+client-side limitation should not become a broken destructive operation, and the
+gate is identical on either path.
+
+Long inputs are truncated in the prompt at 1000 characters, and the prompt says
+so and points at `graft approvals` for the full text. A consent dialog that
+silently shows part of what is being consented to is worse than no preview,
+because the reader believes they have seen the call.
 
 What does not change is everything underneath. The decision is still a row in
 `approvals`, still one-shot, still bound to the exact input, still stamped with

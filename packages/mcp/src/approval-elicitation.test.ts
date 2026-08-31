@@ -67,6 +67,21 @@ async function connectWithoutElicitation() {
   return { server, client };
 }
 
+/** A client that declares the capability and then fails the elicitation. */
+async function connectThatFailsElicitation() {
+  const server = new McpServer({ name: "t", version: "0" });
+  const client = new Client(
+    { name: "test-agent", version: "0.0.0" },
+    { capabilities: { elicitation: {} } },
+  );
+  client.setRequestHandler(ElicitRequestSchema, async () => {
+    throw new Error("this client cannot render that schema");
+  });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  return { server, client };
+}
+
 const APPROVAL_ID = "11111111-1111-1111-1111-111111111111";
 const DECIDER = { kind: "human", id: "operator@example.com" };
 
@@ -239,6 +254,36 @@ describe("elicited approval", () => {
         createApprovalElicitor({ server, db: () => db, decider: DECIDER }),
       ),
     ).rejects.toMatchObject({ code: "APPROVAL_INVALID" });
+    await client.close();
+  });
+});
+
+describe("when the elicitation itself fails", () => {
+  it("falls back to the out-of-band flow instead of failing the call", async () => {
+    // A client can declare the capability and still fail the request — an older
+    // SDK, a schema it will not render, a transport that times out with the
+    // dialog open. cubic raised the unhandled case on the pull request. The
+    // right answer is the same one a client that never declared it gets: the
+    // human is reached through `graft approve`, and the gate is identical
+    // either way. Failing the tool call would turn a client-side limitation
+    // into a broken destructive operation.
+    const { server, client } = await connectThatFailsElicitation();
+    const { db, decisions } = fakeDb();
+    const { handler } = handlerRequiring(APPROVAL_ID);
+
+    await expect(
+      invokeFunctionWithApproval(
+        handler,
+        "deleteThing",
+        { id: 1 },
+        {},
+        createApprovalElicitor({ server, db: () => db, decider: DECIDER }),
+      ),
+    ).rejects.toMatchObject({ code: "DESTRUCTIVE_OP_REQUIRES_APPROVAL" });
+
+    // Nothing was decided: a failed prompt is not a verdict, and the row stays
+    // pending for a human to find.
+    expect(decisions).toEqual([]);
     await client.close();
   });
 });

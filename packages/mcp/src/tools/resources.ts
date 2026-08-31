@@ -19,7 +19,6 @@
  * work on a static project with no database at all.
  */
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { GraftError, type SchemaDescription } from "@usegraft/contracts";
 import { readCollectionDocs, resolveContained } from "@usegraft/compiler";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";

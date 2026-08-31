@@ -42,12 +42,27 @@ export interface ApprovalElicitor {
   }): Promise<string | undefined>;
 }
 
-/** A short, readable rendering of the call the human is being asked about. */
+/** How much of the input the prompt will render before it truncates. */
+const INPUT_PREVIEW_LIMIT = 1000;
+
+/**
+ * A readable rendering of the call the human is being asked about.
+ *
+ * A consent prompt that silently shows part of what is being consented to is
+ * worse than no preview: the reader believes they have seen the call. So when
+ * this truncates it says so, and says where the whole thing is — the pending
+ * row holds the exact input the approval is bound to, and `graft approvals`
+ * prints it.
+ */
 function describeCall(functionName: string, input: unknown): string {
   const rendered = JSON.stringify(input);
   if (rendered === undefined) return functionName;
-  const compact = rendered.length > 300 ? `${rendered.slice(0, 300)}…` : rendered;
-  return `${functionName} ${compact}`;
+  if (rendered.length <= INPUT_PREVIEW_LIMIT) return `${functionName} ${rendered}`;
+  return [
+    `${functionName} ${rendered.slice(0, INPUT_PREVIEW_LIMIT)}…`,
+    "",
+    `⚠️ Input truncated (${rendered.length} characters). Run \`graft approvals\` to read it in full before deciding — the approval binds to the whole input, not the part shown here.`,
+  ].join("\n");
 }
 
 export function createApprovalElicitor(options: {
@@ -63,27 +78,39 @@ export function createApprovalElicitor(options: {
       return undefined;
     }
 
-    const result = await options.server.server.elicitInput({
-      message: [
-        `Approve this destructive call?`,
-        "",
-        describeCall(functionName, input),
-        "",
-        `It will be recorded as decided by ${options.decider.kind}:${options.decider.id}.`,
-        "The approval is one-shot and bound to exactly this input.",
-      ].join("\n"),
-      requestedSchema: {
-        type: "object",
-        properties: {
-          approve: {
-            type: "boolean",
-            title: "Approve",
-            description: `Allow ${functionName} to run once, with exactly this input.`,
+    // A client can declare the capability and still fail the call — an older
+    // SDK, a schema it will not render, a transport that times out while the
+    // dialog is open. Falling back to the out-of-band path is the same answer
+    // as a client that never declared it: the human is reached through
+    // `graft approve` instead, and the gate is identical either way. Failing
+    // the tool call here would turn a client-side limitation into a broken
+    // destructive operation.
+    let result: Awaited<ReturnType<typeof options.server.server.elicitInput>>;
+    try {
+      result = await options.server.server.elicitInput({
+        message: [
+          `Approve this destructive call?`,
+          "",
+          describeCall(functionName, input),
+          "",
+          `It will be recorded as decided by ${options.decider.kind}:${options.decider.id}.`,
+          "The approval is one-shot and bound to exactly this input.",
+        ].join("\n"),
+        requestedSchema: {
+          type: "object",
+          properties: {
+            approve: {
+              type: "boolean",
+              title: "Approve",
+              description: `Allow ${functionName} to run once, with exactly this input.`,
+            },
           },
+          required: ["approve"],
         },
-        required: ["approve"],
-      },
-    });
+      });
+    } catch {
+      return undefined;
+    }
 
     // Dismissed. Not a decision — leave the row pending for a human to find.
     if (result.action === "cancel") return undefined;

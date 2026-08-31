@@ -68,6 +68,29 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
     });
   }
 
+  // Elicited approvals were documented as "a remote or public mount must never
+  // set it" and enforced nowhere, which cubic pointed out on the pull request.
+  // A documented caution is the wrong shape for this one, because getting it
+  // wrong inverts the gate rather than weakening it: elicitation asks the
+  // *client*, and the client on an HTTP mount is the calling agent, while
+  // `decider` is configured server-side. So a remote caller answers its own
+  // destructive call and the approval is recorded as the operator's decision —
+  // self-approval with the audit trail naming someone else. The whole point of
+  // `requested_by_id <> decided_by` living in the UPDATE's WHERE is that this
+  // cannot happen, and routing the question to the requester's own client walks
+  // around it.
+  //
+  // Elicitation is for a stdio server whose operator is sitting at the machine.
+  // That is `createGraftMcp`, which still accepts it.
+  if (serverOptions.approvalElicitation !== undefined) {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message:
+        "createGraftMcpHandler cannot use `approvalElicitation`: over HTTP the client being asked to approve is the agent that made the call.",
+      fix: "Drop `approvalElicitation` from this handler. Approvals over HTTP go through the out-of-band path — the call returns DESTRUCTIVE_OP_REQUIRES_APPROVAL with an id, a human runs `graft approve <id>`, and the caller retries with it. Elicitation is for a stdio server (`createGraftMcp` / `graft mcp --elicit-approvals`) whose operator is at the machine.",
+    });
+  }
+
   return async (request: Request): Promise<Response> => {
     // Stateless mode is POST-only: no sessions, so no SSE stream to GET and no
     // session to DELETE. Clients treat the 405 as "server-initiated messages
