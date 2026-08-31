@@ -300,3 +300,79 @@ describe("createContentApiReader", () => {
     }
   });
 });
+
+describe("rate limit", () => {
+  const DOCUMENTS = "http://localhost/api/content/v1/documents?collection=pages";
+
+  it("admits the limit and refuses the next, with Retry-After", async () => {
+    const handler = createContentApiHandler({
+      collections: ["pages"],
+      branch: "main",
+      index: reader(),
+      rateLimit: { limit: 60, windowSeconds: 60 },
+    });
+
+    for (let i = 0; i < 60; i++) {
+      const response = await handler(new Request(DOCUMENTS));
+      expect(response.status, `request ${i + 1} of 60`).toBe(200);
+    }
+
+    // The 61st is the one Greptile's reproduction showed returning 200 with no
+    // Retry-After, which is what this asserts against.
+    const refused = await handler(new Request(DOCUMENTS));
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("retry-after")).toBe("60");
+
+    const body = await errorBody(refused);
+    expect(body.error).toBe("RATE_LIMITED");
+    expect(body.fix).toContain("Retry-After");
+  });
+
+  it("does not read the index once a caller is over the limit", async () => {
+    let reads = 0;
+    const handler = createContentApiHandler({
+      collections: ["pages"],
+      branch: "main",
+      index: reader({ onRead: () => void reads++ }),
+      rateLimit: { limit: 2, windowSeconds: 60 },
+    });
+
+    await handler(new Request(DOCUMENTS));
+    await handler(new Request(DOCUMENTS));
+    await handler(new Request(DOCUMENTS));
+
+    // The point of the limit is the database work it prevents, not the status
+    // code — a 429 issued after the query has already run protects nothing.
+    expect(reads).toBe(2);
+  });
+
+  it("is unlimited when no rateLimit is configured", async () => {
+    const handler = createContentApiHandler({
+      collections: ["pages"],
+      branch: "main",
+      index: reader(),
+    });
+
+    for (let i = 0; i < 100; i++) {
+      expect((await handler(new Request(DOCUMENTS))).status).toBe(200);
+    }
+  });
+
+  it("charges a refused method to nobody's bucket", async () => {
+    const handler = createContentApiHandler({
+      collections: ["pages"],
+      branch: "main",
+      index: reader(),
+      rateLimit: { limit: 2, windowSeconds: 60 },
+    });
+
+    // A 405 is refused before the limiter, so a caller probing with the wrong
+    // method cannot spend another caller's shared "unknown" budget.
+    for (let i = 0; i < 5; i++) {
+      expect((await handler(new Request(DOCUMENTS, { method: "POST" }))).status).toBe(405);
+    }
+    expect((await handler(new Request(DOCUMENTS))).status).toBe(200);
+    expect((await handler(new Request(DOCUMENTS))).status).toBe(200);
+    expect((await handler(new Request(DOCUMENTS))).status).toBe(429);
+  });
+});

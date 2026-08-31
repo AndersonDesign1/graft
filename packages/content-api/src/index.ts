@@ -1,4 +1,10 @@
-import { ErrorCodes, GraftError, type ErrorCode, type GraftErrorJSON } from "@usegraft/contracts";
+import {
+  ErrorCodes,
+  GraftError,
+  rateIdentity,
+  type ErrorCode,
+  type GraftErrorJSON,
+} from "@usegraft/contracts";
 import type {
   ContentIndexReader,
   ContentRow,
@@ -32,6 +38,13 @@ interface WireContentSearchHit {
   snippet: string;
 }
 
+export interface ContentApiRateLimit {
+  /** Requests allowed per identity per window. */
+  limit: number;
+  /** Window length in seconds. Also the `Retry-After` value on a refusal. */
+  windowSeconds: number;
+}
+
 export interface ContentApiHandlerOptions {
   /** Collection names this endpoint may expose. */
   collections: readonly string[];
@@ -39,6 +52,20 @@ export interface ContentApiHandlerOptions {
   branch: string;
   /** Reader owned by the caller. The handler never closes it. */
   index: ContentIndexReader;
+  /**
+   * Per-identity backstop. Omitted means unlimited, which is the right default
+   * for a handler mounted behind something that already has a limiter — but a
+   * mount facing the open internet wants one, because these routes run database
+   * listings and full-text searches for callers this handler never
+   * authenticates.
+   */
+  rateLimit?: ContentApiRateLimit;
+  /**
+   * How many proxies in front of this handler are ours. Forwarded to
+   * `rateIdentity`; zero (the default) means `x-forwarded-for` is never read
+   * and every unidentified caller shares one bucket.
+   */
+  trustedProxyHops?: number;
 }
 
 export interface ContentApiReaderOptions {
@@ -204,6 +231,21 @@ function json(value: unknown, status = 200, extra?: Record<string, string>): Res
   return new Response(JSON.stringify(value), { status, headers });
 }
 
+/**
+ * Headers a refusal carries beyond the body. `Allow` tells a wrong-method
+ * caller what the route accepts; `Retry-After` tells a throttled one when to
+ * come back, which is the difference between a client that backs off and one
+ * that spins.
+ */
+function responseHeadersFor(error: GraftError): Record<string, string> | undefined {
+  if (error.code === "METHOD_NOT_ALLOWED") return { allow: "GET" };
+  if (error.code === "RATE_LIMITED") {
+    const retryAfter = error.details?.retryAfter;
+    if (typeof retryAfter === "number") return { "retry-after": String(retryAfter) };
+  }
+  return undefined;
+}
+
 function statusFor(error: GraftError): number {
   switch (error.code) {
     case "COLLECTION_NOT_FOUND":
@@ -213,6 +255,8 @@ function statusFor(error: GraftError): number {
       return 405;
     case "INPUT_VALIDATION_FAILED":
       return 400;
+    case "RATE_LIMITED":
+      return 429;
     default:
       return 500;
   }
@@ -271,8 +315,64 @@ function assertNoBranchOverride(url: URL): void {
 }
 
 /** Create the read-only Web-standard handler mounted at /api/content/v1. */
+/**
+ * A fixed-window counter per caller identity, held in memory.
+ *
+ * Deliberately not the audit-table counter `createFunctionsHandler` uses. That
+ * one counts rows it is already writing; these routes are reads that write
+ * nothing, and adding a write per read to enforce a read limit inverts the cost
+ * of the thing being protected.
+ *
+ * Two honest limits follow from that. It is per process, so N replicas allow
+ * N times the limit; and it resets on restart. Both are acceptable for a
+ * backstop whose job is to stop one caller trivially exhausting the database —
+ * a deployment that needs an exact global limit puts it in the proxy that is
+ * already terminating TLS.
+ *
+ * The map is bounded by the distinct identities seen inside one window, which
+ * is bounded by real traffic rather than by anything a caller controls: with
+ * `trustedProxyHops` at its default, `rateIdentity` never reads
+ * `x-forwarded-for`, so an attacker cannot mint identities to grow it. The
+ * sweep keeps that true across windows.
+ */
+function createRateLimiter(
+  limit: number,
+  windowSeconds: number,
+): (identity: string, now: number) => number | undefined {
+  const windowMs = windowSeconds * 1000;
+  const buckets = new Map<string, { count: number; resetAt: number }>();
+  // Sweeping every request would make each read O(identities). Sweeping only
+  // once the map is larger than a busy window plausibly needs keeps the common
+  // path O(1) and still collects everything expired.
+  const SWEEP_THRESHOLD = 4096;
+
+  return (identity, now) => {
+    if (buckets.size >= SWEEP_THRESHOLD) {
+      for (const [key, bucket] of buckets) {
+        if (bucket.resetAt <= now) buckets.delete(key);
+      }
+    }
+
+    const bucket = buckets.get(identity);
+    if (bucket === undefined || bucket.resetAt <= now) {
+      buckets.set(identity, { count: 1, resetAt: now + windowMs });
+      return undefined;
+    }
+
+    bucket.count += 1;
+    if (bucket.count <= limit) return undefined;
+    // Ceil so the caller never retries a millisecond early and is refused again.
+    return Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+  };
+}
+
 export function createContentApiHandler(options: ContentApiHandlerOptions): ContentApiHandler {
   const collections = new Set(options.collections);
+  const consume =
+    options.rateLimit === undefined
+      ? undefined
+      : createRateLimiter(options.rateLimit.limit, options.rateLimit.windowSeconds);
+  const trustedProxyHops = options.trustedProxyHops ?? 0;
 
   return async (request): Promise<Response> => {
     const url = new URL(request.url);
@@ -298,6 +398,22 @@ export function createContentApiHandler(options: ContentApiHandlerOptions): Cont
           fix: `Send a GET request to ${url.pathname}.`,
           details: { method: request.method },
         });
+      }
+
+      if (consume !== undefined && options.rateLimit !== undefined) {
+        const retryAfter = consume(rateIdentity(request, trustedProxyHops), Date.now());
+        if (retryAfter !== undefined) {
+          throw new GraftError({
+            code: "RATE_LIMITED",
+            message: `This content endpoint allows ${options.rateLimit.limit} requests per ${options.rateLimit.windowSeconds}s per caller.`,
+            fix: `Wait ${retryAfter}s — the Retry-After header says how long — then retry. Cache reads at your CDN if you need a higher sustained rate.`,
+            details: {
+              limit: options.rateLimit.limit,
+              windowSeconds: options.rateLimit.windowSeconds,
+              retryAfter,
+            },
+          });
+        }
       }
 
       assertNoBranchOverride(url);
@@ -355,7 +471,7 @@ export function createContentApiHandler(options: ContentApiHandlerOptions): Cont
           : protocolError(
               `Content API failed to read its index: ${error instanceof Error ? error.message : String(error)}`,
             );
-      const extra = graftError.code === "METHOD_NOT_ALLOWED" ? { allow: "GET" } : undefined;
+      const extra = responseHeadersFor(graftError);
       return json(graftError.toJSON(), statusFor(graftError), extra);
     }
   };

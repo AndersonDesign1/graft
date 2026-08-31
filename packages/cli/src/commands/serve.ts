@@ -330,6 +330,12 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     collections: Object.keys(config.collections),
     branch: writeBranch,
     index: createDbIndexReader(branch.db),
+    // The same backstop the functions handler gets, for the same reason. These
+    // routes authenticate nobody and run database listings and full-text
+    // searches, so without a limit here one anonymous caller can keep the index
+    // busy indefinitely — and `graft serve` is the mount most likely to face
+    // the open internet.
+    rateLimit: { limit: 60, windowSeconds: 60 },
   });
 
   const health: FetchHandler = async () => {

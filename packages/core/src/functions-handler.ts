@@ -17,7 +17,7 @@
  * route, the self-host container, Vercel Fluid, or a Worker — the Phase 3
  * runtime invariant, locked here before the first mutation function exists.
  */
-import { GraftError, type ErrorCode } from "@usegraft/contracts";
+import { GraftError, rateIdentity, type ErrorCode } from "@usegraft/contracts";
 import {
   createDbApprovalStore,
   createDbAuditStore,
@@ -26,7 +26,6 @@ import {
   type Database,
 } from "@usegraft/db";
 import type { AnyGraftFunction, FunctionActor, RateLimit } from "./function";
-import { getRequestPeer } from "./peer";
 
 export interface FunctionsHandlerOptions {
   /** The functions to serve, routed by each function's `name` (not the record key). */
@@ -148,35 +147,6 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(value) ?? "null";
 }
 
-/**
- * The rate identity for anonymous callers.
- *
- * Never reads `x-forwarded-for` unless the deployment declares how many proxies
- * it controls. See `trustedProxyHops`.
- */
-function clientIp(request: Request, trustedProxyHops: number): string {
-  if (trustedProxyHops > 0) {
-    const forwarded = request.headers.get("x-forwarded-for");
-    if (forwarded) {
-      const hops = forwarded
-        .split(",")
-        .map((entry) => entry.trim())
-        .filter(Boolean);
-      // Count from the right: entries are appended, so the rightmost were added
-      // by infrastructure closest to us. A client can prepend anything it likes
-      // and never reach this far.
-      const trusted = hops[hops.length - trustedProxyHops];
-      if (trusted) return trusted;
-    }
-  }
-  // No header fallback. A peer is something an adapter registers in-process;
-  // anything arriving over the wire is the caller's word for it. "unknown"
-  // shares one bucket across every unidentified caller, which is strict rather
-  // than permissive — a deployment that wants per-caller limits declares its
-  // proxy depth instead.
-  return getRequestPeer(request) ?? "unknown";
-}
-
 function defaultGitSha(): string | undefined {
   if (typeof process === "undefined") return undefined;
   return process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
@@ -264,7 +234,7 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
     // From here the request targets a real function — everything below lands
     // in the audit log, whatever the outcome.
     const startedAt = Date.now();
-    const ip = clientIp(request, options.trustedProxyHops ?? 0);
+    const ip = rateIdentity(request, options.trustedProxyHops ?? 0);
     let actor: FunctionActor | undefined;
     /** Id of this invocation's audit row, reserved before the handler runs. */
     let auditId: string | undefined;

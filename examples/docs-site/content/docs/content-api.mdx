@@ -184,12 +184,36 @@ produce a `FUNCTION_EXECUTION_FAILED` naming the endpoint and what was wrong.
 The `fix` points at the two usual causes, which are an incompatible server and
 a proxy rewriting the response.
 
+## It authenticates nobody
+
+Say this one plainly, because it decides how you deploy it: the handler
+performs **no authentication**. Every document in every registered collection is
+readable by anyone who can reach the endpoint. That is deliberate — authored
+content is the part of a Graft project that is usually public, and a handler
+that guessed at an auth scheme would be wrong for most mounts.
+
+It means the `collections` allowlist is the security boundary, not a
+convenience. A collection registered here is published. If some of your authored
+content is not public, do not register it — and remember that `graft serve`
+registers every collection in your config, so a narrower list means mounting the
+handler yourself.
+
+If the endpoint needs to be private, put a proxy in front of it and check there,
+or pass a bearer token through the reader's `headers` and verify it in that
+proxy. Do not rely on it being an unadvertised URL.
+
+The one protection the handler does apply is a rate limit, and only when you
+configure one. `graft serve` sets 60 per 60 seconds; a handler you mount
+yourself gets none unless you pass `rateLimit`. See
+[Rate limits](/docs/rate-limits#the-content-api).
+
 ## What it does not do
 
 - **No writes.** `GET` only. Authoring goes through files, the CLI, or MCP.
 - **No branch switching.** One endpoint, one branch.
 - **No operational data.** Records live behind typed functions at
   `POST /api/fn/<name>`.
+- **No authentication.** See above.
 
 ## Next steps
 

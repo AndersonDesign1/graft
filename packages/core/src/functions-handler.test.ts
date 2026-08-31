@@ -1,6 +1,5 @@
-import { GraftError } from "@usegraft/contracts";
+import { GraftError, setRequestPeer } from "@usegraft/contracts";
 import { AUDIT_IN_FLIGHT } from "@usegraft/db";
-import { setRequestPeer } from "./peer";
 import type { ApprovalStore, AuditEntry, AuditStore, Database } from "@usegraft/db";
 import { describe, expect, it } from "vitest";
 import { field } from "./field";

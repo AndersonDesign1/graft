@@ -11,4 +11,8 @@ export * from "./function";
 export * from "./functions-handler";
 export * from "./primitives";
 export * from "./records";
-export * from "./peer";
+// Peer registration and the anonymous rate identity moved to
+// @usegraft/contracts, so the content API can share the one
+// implementation of the x-forwarded-for rule instead of copying it.
+// Re-exported here because this is where callers already import them.
+export { setRequestPeer, getRequestPeer, rateIdentity } from "@usegraft/contracts";

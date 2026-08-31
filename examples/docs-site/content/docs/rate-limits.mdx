@@ -39,7 +39,9 @@ the window, counted backwards from now — a rolling window, not a fixed bucket
 that resets on the minute.
 
 `graft serve` already sets a backstop of 60 calls per 60 seconds, which any
-function's own `rateLimit` overrides.
+function's own `rateLimit` overrides. It applies the same backstop to the
+content API — see [The content API](#the-content-api) below, which counts
+differently.
 
 ## Who a caller is
 
@@ -139,11 +141,45 @@ email: field.string({ maxLength: 320, pattern: /^[^@\s]+@[^@\s]+\.[^@\s]+$/ }),
 message: field.text({ maxLength: 4000, optional: true }),
 ```
 
+## The content API
+
+`createContentApiHandler` takes its own `rateLimit`, and `graft serve` gives it
+the same 60 per 60 seconds it gives functions. It needs one for a reason the
+function routes do not: these routes **authenticate nobody**, and they run
+database listings and full-text searches, so without a limit a single anonymous
+caller can keep the index busy indefinitely.
+
+```ts
+createContentApiHandler({
+  collections,
+  branch: "main",
+  index,
+  rateLimit: { limit: 60, windowSeconds: 60 },
+});
+```
+
+Omitting `rateLimit` means unlimited, which is the right default when the
+handler is mounted behind something that already limits.
+
+Two differences from the function limiter, both worth knowing before you rely
+on it:
+
+- **It counts in memory, not in the audit table.** These are reads that write
+  nothing, and adding a write per read to enforce a read limit inverts the cost
+  of the thing being protected. The consequence is that it is **per process**:
+  N replicas allow N times the limit, and a restart resets the counters. A
+  deployment needing an exact global limit puts it in the proxy already
+  terminating TLS.
+- **It is a fixed window**, not the rolling one functions use.
+
+Identity is shared: the same `trustedProxyHops` rule, the same refusal to read
+`x-forwarded-for` unless you declare your proxy depth. A refusal is a `429`
+carrying `Retry-After`, and it is checked before the index is touched — a limit
+that fires after the query has already run protects nothing.
+
 ## What is not rate limited
 
-- Content reads through the SDK. Those touch the index, not the function
-  handler.
-- The content API. Put a limit in front of it at the edge if you need one.
+- Content reads through the SDK. Those touch the index, not a handler.
 - MCP tools other than `run_function`.
 
 ## Next steps

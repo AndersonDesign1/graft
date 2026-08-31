@@ -34,6 +34,12 @@ Runtime work is a stateless `Request → Response` handler. Two wrappers, same b
    content through `@usegraft/content-api` without a database of its own. See
    [Reading content](/docs/reading-content).
 
+   The two content routes **authenticate nobody**, and they publish every
+   collection in your config. They carry a 60-per-60s rate limit under
+   `graft serve`, which is a backstop against exhaustion, not an access control.
+   Anything reachable beyond a trusted proxy should be fronted by one that
+   checks. See [The content API](/docs/content-api#it-authenticates-nobody).
+
 ## Adapters
 
 | Adapter | Topology | Runs |
