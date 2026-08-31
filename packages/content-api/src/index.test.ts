@@ -376,3 +376,83 @@ describe("rate limit", () => {
     expect((await handler(new Request(DOCUMENTS))).status).toBe(429);
   });
 });
+
+describe("CORS", () => {
+  const DOCS = "http://localhost/api/content/v1/documents?collection=pages";
+  const APP = "https://app.example.com";
+
+  function handler(allowedOrigins?: readonly string[] | "*") {
+    return createContentApiHandler({
+      collections: ["pages"],
+      branch: "main",
+      index: reader(),
+      ...(allowedOrigins === undefined ? {} : { allowedOrigins }),
+    });
+  }
+
+  it("sends nothing when no origins are configured", async () => {
+    // Same-origin only is the default, because publishing to other origins is
+    // the deployer's decision.
+    const response = await handler()(new Request(DOCS, { headers: { origin: APP } }));
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("echoes an allowed origin and varies on it", async () => {
+    const response = await handler([APP])(new Request(DOCS, { headers: { origin: APP } }));
+    expect(response.headers.get("access-control-allow-origin")).toBe(APP);
+    // Without Vary a shared cache can hand one origin another's response.
+    expect(response.headers.get("vary")).toBe("Origin");
+  });
+
+  it("stays silent for an origin not on the list, without failing the request", async () => {
+    // The browser enforces this. Refusing outright would make the allowlist an
+    // origin oracle for non-browser callers, who are not bound by CORS anyway.
+    const response = await handler([APP])(
+      new Request(DOCS, { headers: { origin: "https://evil.test" } }),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("answers preflight without touching the index or the limiter", async () => {
+    let reads = 0;
+    const h = createContentApiHandler({
+      collections: ["pages"],
+      branch: "main",
+      index: reader({ onRead: () => void reads++ }),
+      allowedOrigins: [APP],
+      rateLimit: { limit: 1, windowSeconds: 60 },
+    });
+
+    for (let i = 0; i < 5; i++) {
+      const pre = await h(
+        new Request(DOCS, {
+          method: "OPTIONS",
+          headers: { origin: APP, "access-control-request-headers": "authorization" },
+        }),
+      );
+      expect(pre.status).toBe(204);
+      expect(pre.headers.get("access-control-allow-methods")).toContain("GET");
+      expect(pre.headers.get("access-control-allow-headers")).toBe("authorization");
+    }
+
+    expect(reads).toBe(0);
+    // Five preflights did not spend the one-request budget.
+    expect((await h(new Request(DOCS, { headers: { origin: APP } }))).status).toBe(200);
+  });
+
+  it("puts the headers on errors too, so the browser can show the fix", async () => {
+    const response = await handler([APP])(
+      new Request("http://localhost/api/content/v1/documents", { headers: { origin: APP } }),
+    );
+    expect(response.status).toBe(400);
+    expect(response.headers.get("access-control-allow-origin")).toBe(APP);
+  });
+
+  it("allows any origin with a wildcard", async () => {
+    const response = await handler("*")(
+      new Request(DOCS, { headers: { origin: "https://anything.test" } }),
+    );
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+  });
+});

@@ -326,10 +326,26 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     allowAnonymous: allowAnonymousMcp,
   });
 
+  // Same-origin unless the operator names origins. A browser client on another
+  // origin (@usegraft/sdk-react, ordinarily) cannot read these responses
+  // otherwise — but turning that on for everyone by default would publish the
+  // endpoint to every page on the internet on their behalf.
+  const allowedOriginsRaw = process.env.GRAFT_CONTENT_ALLOWED_ORIGINS?.trim();
+  const allowedOrigins =
+    allowedOriginsRaw === undefined || allowedOriginsRaw === ""
+      ? undefined
+      : allowedOriginsRaw === "*"
+        ? ("*" as const)
+        : allowedOriginsRaw
+            .split(",")
+            .map((entry) => entry.trim())
+            .filter(Boolean);
+
   const contentHandler = createContentApiHandler({
     collections: Object.keys(config.collections),
     branch: writeBranch,
     index: createDbIndexReader(branch.db),
+    ...(allowedOrigins === undefined ? {} : { allowedOrigins }),
     // The same backstop the functions handler gets, for the same reason. These
     // routes authenticate nobody and run database listings and full-text
     // searches, so without a limit here one anonymous caller can keep the index

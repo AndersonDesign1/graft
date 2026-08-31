@@ -207,6 +207,37 @@ configure one. `graft serve` sets 60 per 60 seconds; a handler you mount
 yourself gets none unless you pass `rateLimit`. See
 [Rate limits](/docs/rate-limits#the-content-api).
 
+## Reading it from a browser
+
+`@usegraft/sdk-react` runs in the browser, so unless the app and the content API
+share an origin the browser will block the read. The handler sends no CORS
+headers by default — same-origin only — because publishing an endpoint to other
+origins is the deployer's decision, not a library's.
+
+Name the origins that may read it:
+
+```ts
+createContentApiHandler({
+  collections,
+  branch: "main",
+  index,
+  allowedOrigins: ["https://app.example.com"],
+});
+```
+
+On `graft serve`, set `GRAFT_CONTENT_ALLOWED_ORIGINS` to a comma-separated list,
+or `*`. A wildcard is defensible here in a way it usually is not: this content is
+readable by anyone who can reach the endpoint regardless, so allowing any origin
+gives away nothing that was being withheld.
+
+Preflight (`OPTIONS`) is answered before the rate limiter, so a browser's
+permission check never spends the budget for the read that follows. An origin
+that is not on the list gets an ordinary response with no CORS header, and the
+browser hides it — rather than a refusal, which would make the list an origin
+oracle for non-browser callers who are not bound by CORS anyway. Errors carry
+the headers too, so a failing request shows its `fix` instead of an opaque
+network error.
+
 ## What it does not do
 
 - **No writes.** `GET` only. Authoring goes through files, the CLI, or MCP.

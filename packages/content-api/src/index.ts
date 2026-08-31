@@ -64,6 +64,21 @@ export interface ContentApiHandlerOptions {
    * and every unidentified caller shares one bucket.
    */
   trustedProxyHops?: number;
+  /**
+   * Origins allowed to read responses from a browser.
+   *
+   * Omitted means no CORS headers at all, which is same-origin only — the
+   * correct default, because publishing an endpoint to other origins is a
+   * decision for whoever deploys it and not one a library should make on their
+   * behalf. `@usegraft/sdk-react` needs this set whenever the app and the
+   * content API are on different origins, which is the ordinary case.
+   *
+   * An explicit list is echoed back per request (with `Vary: Origin`, so a
+   * cache cannot serve one origin's response to another). `"*"` allows any
+   * origin and is reasonable for content that is public anyway — which this
+   * handler's content is, since it authenticates nobody.
+   */
+  allowedOrigins?: readonly string[] | "*";
 }
 
 export interface ContentApiReaderOptions {
@@ -364,6 +379,33 @@ function createRateLimiter(
   };
 }
 
+/**
+ * The CORS headers for one request, or nothing when the origin is not allowed.
+ *
+ * Returning nothing rather than a rejection is deliberate: a disallowed origin
+ * gets a perfectly ordinary response that the *browser* then refuses to expose
+ * to the page. That is how CORS is specified to work, and answering differently
+ * would turn the allowlist into an origin oracle for non-browser callers, who
+ * are not bound by it anyway.
+ */
+function corsHeaders(
+  request: Request,
+  allowed: readonly string[] | "*" | undefined,
+): Record<string, string> | undefined {
+  if (allowed === undefined) return undefined;
+  const origin = request.headers.get("origin");
+  if (origin === null) return undefined;
+
+  if (allowed === "*") {
+    return { "access-control-allow-origin": "*" };
+  }
+  if (!allowed.includes(origin)) return undefined;
+  // Vary is not optional here. Without it a shared cache can hand one origin
+  // the response it stored for another, and the allowlist stops meaning
+  // anything.
+  return { "access-control-allow-origin": origin, vary: "Origin" };
+}
+
 export function createContentApiHandler(options: ContentApiHandlerOptions): ContentApiHandler {
   const collections = new Set(options.collections);
   const consume =
@@ -374,6 +416,24 @@ export function createContentApiHandler(options: ContentApiHandlerOptions): Cont
 
   return async (request): Promise<Response> => {
     const url = new URL(request.url);
+    const cors = corsHeaders(request, options.allowedOrigins);
+
+    // Preflight is answered before method validation and before the rate
+    // limiter: it is the browser asking permission, not the caller reading
+    // anything, so a 405 or a charged bucket would both be wrong.
+    if (request.method === "OPTIONS" && cors !== undefined) {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          ...cors,
+          "access-control-allow-methods": "GET, OPTIONS",
+          "access-control-allow-headers":
+            request.headers.get("access-control-request-headers") ?? "authorization,content-type",
+          "access-control-max-age": "86400",
+        },
+      });
+    }
+
     try {
       const route =
         url.pathname === `${CONTENT_API_BASE}/documents`
@@ -443,7 +503,7 @@ export function createContentApiHandler(options: ContentApiHandlerOptions): Cont
           offset: parseOffset(url),
           branch: options.branch,
         });
-        return json({ rows: rows.map(toWireRow) });
+        return json({ rows: rows.map(toWireRow) }, 200, cors);
       }
 
       const query = requiredParam(url, "query");
@@ -453,15 +513,19 @@ export function createContentApiHandler(options: ContentApiHandlerOptions): Cont
         limit,
         branch: options.branch,
       });
-      return json({
-        hits: hits.map(
-          ({ row, rank, snippet }): WireContentSearchHit => ({
-            row: toWireRow(row),
-            rank,
-            snippet,
-          }),
-        ),
-      });
+      return json(
+        {
+          hits: hits.map(
+            ({ row, rank, snippet }): WireContentSearchHit => ({
+              row: toWireRow(row),
+              rank,
+              snippet,
+            }),
+          ),
+        },
+        200,
+        cors,
+      );
     } catch (error) {
       const graftError =
         error instanceof GraftError
@@ -469,8 +533,15 @@ export function createContentApiHandler(options: ContentApiHandlerOptions): Cont
           : protocolError(
               `Content API failed to read its index: ${error instanceof Error ? error.message : String(error)}`,
             );
-      const extra = responseHeadersFor(graftError);
-      return json(graftError.toJSON(), statusFor(graftError), extra);
+      // Errors carry them too: without the header the browser hides the body,
+      // and a caller debugging a 400 sees an opaque network failure instead of
+      // the `fix` this API went to the trouble of sending.
+      const extra = { ...responseHeadersFor(graftError), ...cors };
+      return json(
+        graftError.toJSON(),
+        statusFor(graftError),
+        Object.keys(extra).length > 0 ? extra : undefined,
+      );
     }
   };
 }
