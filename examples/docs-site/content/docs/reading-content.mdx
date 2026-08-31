@@ -94,6 +94,11 @@ import { createGraft } from "@usegraft/sdk-sveltekit";
 export const graft = createGraft({ db, collections });
 ```
 
+Build the handle in a server-only module and read it from `+page.server.ts` or
+`+layout.server.ts`. A **universal** `load` in `+page.ts` or `+layout.ts` also
+runs in the browser on client-side navigation, so a database connection does not
+belong there — the same care TanStack Start needs, under different filenames.
+
 Mount functions and MCP with `graftRoute` on `+server.ts` endpoints. See
 [SDK reference](/docs/sdk-reference).
 
@@ -109,8 +114,9 @@ export const graft = createGraft({ db, collections });
 The filename is the point. Start's route loaders are **isomorphic** — they run
 on the server for the first paint and in the browser on client-side navigation —
 so a handle holding a database connection belongs in a server function or a
-server route, never in a loader. Astro frontmatter and SvelteKit's `load` are
-server-side by default and need no such care.
+server route, never in a loader.
+
+Astro frontmatter is the only adapter here that is server-side unconditionally.
 
 ## React Router v7
 

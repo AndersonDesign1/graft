@@ -14,8 +14,10 @@ version to keep in step.
 The framework-specific warning is about loaders. TanStack Start route loaders
 are isomorphic — they run on the server for the first paint and in the browser
 on client-side navigation — so a handle holding a database connection belongs in
-a server function or a server route, never in a loader. Astro frontmatter and
-SvelteKit's `load` are server-side by default and needed no such caveat.
+a server function or a server route, never in a loader. Astro frontmatter is
+the only adapter here that is server-side unconditionally; SvelteKit has the
+same split under different names, where a `load` in `+page.server.ts` is
+server-only and a universal `load` in `+page.ts` also runs in the browser.
 
 Add `@usegraft/sdk-react-router` for React Router v7 framework mode, which
 absorbs the Remix path. Same surface again, with one difference worth knowing
