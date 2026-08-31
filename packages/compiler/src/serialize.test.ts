@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GraftError } from "@usegraft/contracts";
@@ -216,8 +216,8 @@ describe("writeDocumentFile", () => {
   it("creates missing directories and writes the bytes", () => {
     const dir = mkdtempSync(join(tmpdir(), "graft-write-"));
     try {
-      const path = join(dir, "docs", "nested", "page.mdx");
-      writeDocumentFile(path, "---\ntitle: T\n---\n\nBody.\n");
+      const path = writeDocumentFile(dir, "docs/nested/page.mdx", "---\ntitle: T\n---\n\nBody.\n");
+      expect(path).toBe(join(dir, "docs", "nested", "page.mdx"));
       expect(readFileSync(path, "utf8")).toContain("title: T");
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -230,7 +230,7 @@ describe("writeDocumentFile", () => {
       stub.errno = code;
       const error = (() => {
         try {
-          writeDocumentFile(join(tmpdir(), "graft-ro", "page.mdx"), "x");
+          writeDocumentFile(tmpdir(), "graft-ro/page.mdx", "x");
           return undefined;
         } catch (e) {
           return e;
@@ -245,6 +245,24 @@ describe("writeDocumentFile", () => {
 
   it("lets an unrelated filesystem error through untranslated", () => {
     stub.errno = "ENOSPC";
-    expect(() => writeDocumentFile(join(tmpdir(), "graft-full", "p.mdx"), "x")).toThrow(/ENOSPC/);
+    expect(() => writeDocumentFile(tmpdir(), "graft-full/p.mdx", "x")).toThrow(/ENOSPC/);
+  });
+
+  it("refuses a path that escapes the root rather than trusting its caller", () => {
+    // This sink used to take an already-resolved path and write it, while
+    // `.greptile/rules.md` told reviewers that every filesystem sink in this
+    // package contained its own paths. Studio resolved carefully; MCP's
+    // write_content did not, and a slug of "../../escaped" wrote outside the
+    // content tree. Containment that lives in each caller is not a guarantee,
+    // because a new caller does not inherit it.
+    const dir = mkdtempSync(join(tmpdir(), "graft-escape-"));
+    try {
+      expect(() => writeDocumentFile(dir, "pages/../../escaped.mdx", "x")).toThrow(
+        /outside the permitted directory/,
+      );
+      expect(existsSync(join(dir, "..", "escaped.mdx"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

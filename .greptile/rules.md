@@ -94,9 +94,18 @@ its own message. A change to an error message with no matching change to its
 ## Filesystem
 
 Every filesystem sink in `@usegraft/compiler` performs path containment with
-symlink refusal. A new sink that joins a path and writes without both checks is a
+symlink refusal, and does it **itself** rather than trusting a resolved path
+from its caller. `writeDocumentFile` takes a root and a relative path for that
+reason. A new sink that joins a path and writes without both checks is a
 traversal bug. Resolving the real path after the containment check rather than
 before does not count as doing the check.
+
+This rule was false when it was written, which is the reason it is worded this
+way now. `writeDocumentFile` accepted an already-resolved `fullPath` and wrote
+it. Studio resolved carefully before calling; MCP's `write_content` did not, and
+a slug of `"../../escaped"` wrote outside the content tree — the exact bug the
+rule told reviewers was impossible. Containment that lives in each caller is not
+an invariant, because the next caller does not inherit it.
 
 ## MDX
 

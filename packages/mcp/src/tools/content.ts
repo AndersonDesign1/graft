@@ -255,7 +255,7 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
 
           assertSlugFree(contentDir, name, collection, slug, sourcePath);
 
-          writeDocumentFile(fullPath, raw);
+          writeDocumentFile(contentDir, sourcePath, raw);
 
           const result = await projectContent();
           return {

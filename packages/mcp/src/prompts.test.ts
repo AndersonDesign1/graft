@@ -161,6 +161,24 @@ describe("plan-migration", () => {
     // would be teaching it to skip the one gate that command exists to be.
     expect(text).toMatch(/graft migrate --apply[\s\S]*operator/);
   });
+
+  it("gives a db-authoritative collection its own steps, not a trailing correction", async () => {
+    // It used to walk every reader through five steps about `graft compile`
+    // failing on documents and then close with "for a db-authoritative
+    // collection use defineDataMigration instead" — after they had followed
+    // the wrong five. The server knows the authority.
+    const text = await render("plan-migration", {
+      collection: "submissions",
+      change: "lowercase every email",
+    });
+
+    expect(text).toMatch(/defineDataMigration/);
+    expect(text).not.toMatch(/defineContentMigration/);
+    // The file-authoritative story must not survive anywhere in the message:
+    // no compile step names these records, because they are rows.
+    expect(text).not.toMatch(/graft compile` now fails/);
+    expect(text).toMatch(/graft migrate --apply[\s\S]*operator/);
+  });
 });
 
 describe("argument completion", () => {

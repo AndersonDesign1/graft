@@ -38,6 +38,36 @@ export const registerContentPrompts: RegisterTools = (server, deps) => {
       .filter((collection) => collection.describe().authority !== "db-authoritative")
       .map((collection) => collection.describe().name);
 
+  /**
+   * The migration steps for THIS collection, rather than the file-authoritative
+   * ones with a correction bolted onto the end.
+   *
+   * The previous version walked every reader through five steps about
+   * `graft compile` failing on documents, then closed with "for a
+   * db-authoritative collection use defineDataMigration instead" — after they
+   * had followed the wrong five. The server knows the authority. A prompt whose
+   * last line corrects its own body is one the server should not have sent.
+   */
+  const migrationSteps = (name: string): string[] => {
+    if (collections[name]?.describe().authority === "db-authoritative") {
+      return [
+        "This collection is db-authoritative: its records live in Postgres, not as MDX files. `graft compile` has nothing to say about them, and no file will fail to name the work.",
+        "1. Edit the collection in graft.config.ts (or under graft/) to the new shape.",
+        "2. Write `migrations/<seq>-<name>.ts` default-exporting defineDataMigration. It backfills data_records and writes its ledger row in ONE transaction, so a half-applied migration is not a state this can reach.",
+        "3. `graft migrate` is a dry run. `graft migrate --apply` is the operator's consent, and is theirs to give — propose the command, do not assume it.",
+        "4. Commit. The migration is a reviewable commit, which is the whole reason it is a file rather than a live edit.",
+      ];
+    }
+    return [
+      "How migrations work here — they are code, not a console action:",
+      "1. Edit the collection in graft.config.ts (or under graft/) to the new shape.",
+      "2. `graft compile` now fails, once per document that no longer satisfies the schema. That is the point: the failure names every file to fix.",
+      "3. Write `migrations/<seq>-<name>.ts` default-exporting defineContentMigration. It transforms old-shape frontmatter, validates every output against the NEW schema, and rewrites the files all-or-nothing.",
+      "4. `graft migrate` is a dry run. `graft migrate --apply` is the operator's consent, and is theirs to give — propose the command, do not assume it.",
+      "5. Compile again, then commit. The migration is a reviewable commit, which is the whole reason it is a file rather than a live edit.",
+    ];
+  };
+
   const slugsIn = (name: string): string[] => {
     const collection = collections[name];
     if (!collection) return [];
@@ -126,6 +156,8 @@ export const registerContentPrompts: RegisterTools = (server, deps) => {
           "Then call write_content with the same collection and slug. Send the full frontmatter and body, not a patch — write_content replaces the document.",
           "",
           "Change only what the goal asks for. Frontmatter keys you are not changing must come back byte-identical: the writer preserves untouched lines, and a reformatted file is a diff the author has to review for nothing.",
+          "",
+          "If that write comes back SLUG_NOT_UNIQUE, the document is not where write_content would put it — it is a .md file, or it lives under a different filename and claims this slug in its frontmatter. write_content always targets <collection>/<slug>.mdx, so it cannot edit that file in place. The error names the path that owns the slug; report it rather than writing a second document with the same slug.",
         ].join("\n"),
       ),
   );
@@ -193,14 +225,7 @@ export const registerContentPrompts: RegisterTools = (server, deps) => {
           "Current fields:",
           fieldLines(collection),
           "",
-          "How migrations work here — they are code, not a console action:",
-          "1. Edit the collection in graft.config.ts (or under graft/) to the new shape.",
-          "2. `graft compile` now fails, once per document that no longer satisfies the schema. That is the point: the failure names every file to fix.",
-          "3. Write `migrations/<seq>-<name>.ts` default-exporting defineContentMigration. It transforms old-shape frontmatter, validates every output against the NEW schema, and rewrites the files all-or-nothing.",
-          "4. `graft migrate` is a dry run. `graft migrate --apply` is the operator's consent, and is theirs to give — propose the command, do not assume it.",
-          "5. Compile again, then commit. The migration is a reviewable commit, which is the whole reason it is a file rather than a live edit.",
-          "",
-          "For a db-authoritative collection use defineDataMigration instead: it backfills data_records and writes its ledger row in one transaction.",
+          ...migrationSteps(collection),
         ].join("\n"),
       ),
   );

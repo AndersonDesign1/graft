@@ -16,6 +16,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { GraftError } from "@usegraft/contracts";
+import { resolveContained } from "./paths";
 import matter from "gray-matter";
 
 /** Filesystem refusals that mean "this tree is not writable", not "this write was wrong". */
@@ -27,11 +28,23 @@ const READ_ONLY_CODES = new Set(["EROFS", "EACCES", "EPERM"]);
  * a Studio or MCP write served from one fails deep inside fs with an opaque
  * errno; authored content being files is the whole model, so the fix is to run
  * the writing surface where the checkout is writable.
+ *
+ * Takes a root and a relative path rather than a resolved one, and contains it
+ * here, because this sink previously trusted whatever path it was handed and
+ * `.greptile/rules.md` told reviewers that every sink in this package did its
+ * own containment. Studio resolved carefully; MCP's `write_content` did not,
+ * and a slug of `"../../escaped"` wrote outside the content tree — the exact
+ * bug the rule claimed was impossible. A guarantee that lives in each caller is
+ * one a new caller does not inherit.
+ *
+ * Returns the resolved path, so a caller that needs it does not re-derive it.
  */
-export function writeDocumentFile(fullPath: string, raw: string): void {
+export function writeDocumentFile(root: string, sourcePath: string, raw: string): string {
+  const fullPath = resolveContained(root, sourcePath, { label: "document" });
   try {
     mkdirSync(dirname(fullPath), { recursive: true });
     writeFileSync(fullPath, raw);
+    return fullPath;
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code ?? "";
     if (!READ_ONLY_CODES.has(code)) throw error;

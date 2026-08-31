@@ -114,7 +114,7 @@ export async function writeDocument(options: {
   const raw = composeDocument(existingRaw, options.data, options.body ?? "");
   parseDocument(raw, collection, sourcePath);
 
-  writeDocumentFile(fullPath, raw);
+  writeDocumentFile(options.contentDir, sourcePath, raw);
 
   const result = await compile({
     contentDir: options.contentDir,
