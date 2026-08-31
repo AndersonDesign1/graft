@@ -28,6 +28,31 @@ Run `graft harden` with the **operator** `DATABASE_URL`. It applies grants to an
 existing role; it does not create one. A role that does not exist yet fails with
 `INPUT_VALIDATION_FAILED` and a `fix` containing the `CREATE ROLE` line.
 
+<Callout label="it grants, it does not revoke">
+  `graft harden` issues `GRANT` statements and nothing else. It cannot take a
+  privilege away, so **the guarantee below only holds for a role that started
+  with none.** Point it at a superuser, or a role that inherits from a group
+  with broad rights, or one you granted something to earlier, and it will add
+  the Graft grants on top and report success while the role keeps everything it
+  already had — including the `UPDATE` on `approvals` this whole page exists to
+  deny it.
+
+  Create the role fresh, as above, and grant it nothing else. Then verify rather
+  than assume:
+
+```sql
+-- Expect zero rows. Any row here means the gate is not closed.
+SELECT grantee, privilege_type
+FROM information_schema.table_privileges
+WHERE table_name = 'approvals'
+  AND grantee = 'graft_runtime'
+  AND privilege_type = 'UPDATE';
+
+-- And confirm it is not a superuser, which ignores grants entirely.
+SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'graft_runtime';
+```
+</Callout>
+
 Then deploy with the runtime role's URL, and keep the operator URL for compile,
 migrate, merge, and approve.
 

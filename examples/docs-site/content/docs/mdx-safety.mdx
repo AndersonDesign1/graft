@@ -62,6 +62,20 @@ The compile check is what makes the failure a build-time one. Without it,
 `MdxBody` refusing at render would mean an unchecked tree fails per-request in
 production instead.
 
+<Callout label="Next only">
+  The render-time row is `MdxBody`, which lives in `@usegraft/sdk-next` because
+  it evaluates MDX in a Server Component. **No other adapter has a render-time
+  check** — Astro, SvelteKit, TanStack Start and React Router hand you the
+  authored source and you render it with your own pipeline, which is where that
+  responsibility then sits. This documentation site is one of them.
+
+  So on those stacks the write-side guards and `graft compile` are the whole
+  defence, and the case the render check exists for — content inserted straight
+  into the index with the runtime credential, which no write-side guard sees —
+  is one your own renderer has to answer. `assertSafeMdx` from
+  `@usegraft/mdx-safety` is exported for exactly that.
+</Callout>
+
 ### Compile reports all of them
 
 Refusals are collected rather than thrown per file. Within one body, every
