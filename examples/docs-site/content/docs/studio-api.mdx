@@ -187,10 +187,28 @@ const handler = createStudioHandler({
 | `projectRoot` | Where `graft/` lives, for the project's editor component declarations. Defaults to the content directory's parent |
 | `mdxTrust` | Governs the whole-tree recompile that follows a save |
 | `defaultBranch` | Branch used for compile and the tree default |
-| `decider` | Identity approval decisions are attributed to. A value or a function |
+| `decider` | Identity approval decisions are attributed to. A value or a function. **Defaults to `{ kind: "human", id: "studio" }`** — set it, or every decision in the audit trail names the same generic identity |
 | `uiBasePath` | URL prefix for the UI. Empty string serves it at `/` |
 
 API paths are always absolute `/api/studio/v1/*` regardless of `uiBasePath`.
+
+`decider` is resolved from configuration, never from the request — a caller
+cannot name its own decider, which is what the requester-cannot-decide rule
+depends on. It is **not** derived from whatever `authenticate` returned, so an
+embedding that authenticates real people still attributes every approval to the
+one configured identity unless you pass a function:
+
+```ts
+createStudioApiHandler({
+  // Resolved per call, from your own session — not from anything the caller
+  // sends. The audit row is only as useful as this value.
+  decider: () => ({ kind: "human", id: currentOperator().email }),
+});
+```
+
+The default exists so a local single-operator mount works with no configuration.
+On anything with more than one person behind it, leaving it unset makes the
+approval trail unable to answer who approved what.
 
 The shell redirects to add a trailing slash, so relative asset references
 resolve, and pins `?branch` to the mounted branch. Without that pin,
