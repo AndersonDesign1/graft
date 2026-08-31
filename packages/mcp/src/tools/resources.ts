@@ -21,7 +21,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GraftError, type SchemaDescription } from "@usegraft/contracts";
-import { readCollectionDocs } from "@usegraft/compiler";
+import { readCollectionDocs, resolveContained } from "@usegraft/compiler";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireCollection } from "../content-hints";
 import { teachAssetFields } from "../tool-helpers";
@@ -142,7 +142,14 @@ export const registerDocumentResources: RegisterTools = (server, deps) => {
             {
               uri: uri.href,
               mimeType: "text/markdown",
-              text: readFileSync(join(contentDir, ...doc.sourcePath.split("/")), "utf8"),
+              // Contained rather than joined: the scan that produced
+              // sourcePath happily lists a symlink, and this mount can be the
+              // unauthenticated docs server, where following one would serve
+              // bytes from outside the content tree to anybody who asks.
+              text: readFileSync(
+                resolveContained(contentDir, doc.sourcePath, { label: "document source" }),
+                "utf8",
+              ),
             },
           ],
         };

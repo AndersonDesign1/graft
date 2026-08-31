@@ -13,7 +13,7 @@
 import { unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { createStorage, storageConfigFromEnv, type Storage } from "@usegraft/assets";
-import { compile, compileStatic, type CompileResult } from "@usegraft/compiler";
+import { compile, compileStatic, resolveContained, type CompileResult } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import {
   createFunctionsHandler,
@@ -263,7 +263,10 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
       // approval was filed; the file named by the approval must still exist.
       const collection = requireCollection(collections, input.collection);
       const doc = findDoc(contentDir, input.collection, collection, input.slug);
-      unlinkSync(join(contentDir, ...doc.sourcePath.split("/")));
+      // Same containment as the read and the write: sourcePath comes from a
+      // directory scan, and a symlink in the content tree would point this
+      // unlink at a file outside it.
+      unlinkSync(resolveContained(contentDir, doc.sourcePath, { label: "document path" }));
       const result = await projectContent();
       return {
         deleted: doc.sourcePath,

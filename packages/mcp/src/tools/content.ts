@@ -9,6 +9,8 @@ import {
   composeDocument,
   parseDocument,
   readCollectionDocs,
+  resolveContained,
+  SLUG_RE,
   writeDocumentFile,
 } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
@@ -33,6 +35,25 @@ import type { RegisterTools } from "./deps";
  * public documentation server registers these and nothing else — a mount whose
  * whole purpose is public should not be one `if` away from `write_content`.
  */
+/**
+ * A slug names a file, so refuse anything that could name a *different* file.
+ *
+ * In the handler rather than the input schema on purpose: a zod `.regex()`
+ * rejects before the tool body runs, and the SDK surfaces that as a bare
+ * protocol error with no `fix` — which is exactly the self-teaching an agent
+ * needs here, since the correct slug is one edit away. `resolveContained` is
+ * still applied downstream as the backstop that does not depend on this.
+ */
+function assertSlugShape(slug: string, collection: string): void {
+  if (SLUG_RE.test(slug)) return;
+  throw new GraftError({
+    code: "INVALID_SLUG",
+    message: `Slug "${slug}" is not URL-safe.`,
+    fix: 'Slugs must be kebab-case: lowercase letters, digits, and single hyphens (e.g. "getting-started"). A slug names a file inside the collection directory, so it cannot contain "/", ".." or a drive letter.',
+    details: { slug, collection, pattern: SLUG_RE.source },
+  });
+}
+
 export const registerContentReadTools: RegisterTools = (server, deps) => {
   const { branchId, collections, contentDir, getScope, searchIndex, staticIndexPath } = deps;
 
@@ -207,8 +228,19 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
             });
           }
 
+          assertSlugShape(slug, name);
+
           const sourcePath = `${name}/${slug}.mdx`;
-          const fullPath = join(contentDir, ...sourcePath.split("/"));
+          // Belt and braces, and the braces are load-bearing. The input schema
+          // above rejects a slug with a path separator in it, but this is the
+          // line that decides where bytes land, and `parseDocument` below is no
+          // guard at all here: it validates `basename(sourcePath)`, so a slug of
+          // "../../escaped" parses as the perfectly legal slug "escaped" while
+          // the join walks two directories up. Verified before the fix by
+          // writing outside contentDir and getting a success response.
+          const fullPath = resolveContained(contentDir, sourcePath, {
+            label: "document path",
+          });
           // Updating an existing document must not rewrite frontmatter the author
           // (or an earlier agent) wrote — only a real data change re-serialises.
           // Content arriving over the wire is not operator-authored, and MDX is
@@ -268,6 +300,9 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
             details: { collection: name, authority: collection.authority },
           });
         }
+        // Before findDoc, and before the approval: a malformed slug should not
+        // reach a human as a pending decision.
+        assertSlugShape(slug, name);
         // Fail fast on a missing document — never file an approval a human
         // would review for nothing.
         findDoc(contentDir, name, collection, slug);
