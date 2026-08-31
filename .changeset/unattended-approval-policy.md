@@ -17,6 +17,14 @@ every invocation still writes its audit row with actor, correlation id and git
 SHA, and access rules and rate limits still apply. What is given up is the
 waiting, not the accounting.
 
+It is deliberately **not on the MCP surface**. `GraftMcpOptions` accepts only
+`"none"` and `"human"`, so there is no server setting that makes `run_function`
+stop asking before a destructive call. The policy exists for a caller with no
+human behind it; an MCP mount exists because an agent is calling it, and the
+agent is precisely the party the gate is there to stop. On `graft serve` that
+split is observable — the env var lifts the gate on `POST /api/fn` and leaves
+`POST /api/mcp` gated.
+
 `graft serve` reads it from `GRAFT_APPROVAL_POLICY=unattended` and warns on
 every boot while it is on, because an env var is one line in a dashboard and
 the log is where a mistake gets noticed.

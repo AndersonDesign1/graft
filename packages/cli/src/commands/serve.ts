@@ -393,7 +393,9 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     console.warn(
       "[graft serve] WARNING: GRAFT_APPROVAL_POLICY=unattended — destructive functions run " +
         "without human approval. Deletes are not recoverable from git: deleteRecord removes " +
-        "rows outright and the asset store keeps no history. Audit rows are still written.",
+        "rows outright and the asset store keeps no history. Audit rows are still written. " +
+        "This applies to POST /api/fn only; run_function over /api/mcp stays gated, because " +
+        "the policy is not part of the MCP surface.",
     );
   }
 

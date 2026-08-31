@@ -83,8 +83,21 @@ export interface GraftMcpOptions {
    * hero image from the repo is the case the argument exists for.
    */
   localUploadRoot?: string;
-  /** Forwarded to createFunctionsHandler for run_function. */
-  approvalPolicy?: "none" | "human" | "unattended";
+  /**
+   * Forwarded to createFunctionsHandler for run_function.
+   *
+   * Deliberately narrower than the core option, which also accepts
+   * `"unattended"`. That policy exists for a deployment with no human to ask —
+   * a scheduled job, a CI step — and an MCP mount is the opposite of that: it
+   * exists because an agent is calling it, and the agent is the party the gate
+   * is there to stop. Allowing it here would let one option turn every
+   * destructive tool an agent can reach into an ungated one.
+   *
+   * A headless deployment that genuinely wants it still has it, on
+   * `createFunctionsHandler` and through `GRAFT_APPROVAL_POLICY` on
+   * `graft serve`'s /api/fn routes. It just does not reach the tool surface.
+   */
+  approvalPolicy?: "none" | "human";
   rateLimit?: RateLimit;
   gitSha?: string;
   /**

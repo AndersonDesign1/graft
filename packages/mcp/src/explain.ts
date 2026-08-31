@@ -335,7 +335,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     typicalCauses: [
       "Calling a function marked `destructive: true` (deletes or irreversibly overwrites data)",
       "Calling any mutation on a deployment whose approvalPolicy is 'human'",
-      "Running unattended (a scheduled job, CI) on a deployment that has not set approvalPolicy: 'unattended' — that is an operator decision, not something to route around",
+      "Calling a destructive function over MCP at all — the 'unattended' policy that lifts this gate for a headless deployment is not part of the MCP surface, so there is no server setting that makes this tool call stop asking. That is deliberate, and not something to route around",
     ],
     howToRecover:
       "Ask a human operator to run `graft approve <approvalId>` (they can also `graft deny` it). Once approved, retry the EXACT same call carrying the approval id — over MCP pass it as the `approval` tool argument; over raw HTTP send the `x-graft-approval: <approvalId>` header. Approvals are one-shot and bound to the exact input — never work around the gate. If you are seeing this over MCP, the server did not ask your client directly: either the mount has not opted into elicited approvals (`approvalElicitation`, off by default and intended for a local server whose operator is present) or your client did not declare the elicitation capability. Both are ordinary — the gate is the same either way, only the way the human is reached differs.",

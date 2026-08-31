@@ -261,7 +261,7 @@ The operation is human-gated: a pending approval request was filed (details.appr
 
 - Calling a function marked `destructive: true` (deletes or irreversibly overwrites data)
 - Calling any mutation on a deployment whose approvalPolicy is 'human'
-- Running unattended (a scheduled job, CI) on a deployment that has not set approvalPolicy: 'unattended' — that is an operator decision, not something to route around
+- Calling a destructive function over MCP at all — the 'unattended' policy that lifts this gate for a headless deployment is not part of the MCP surface, so there is no server setting that makes this tool call stop asking. That is deliberate, and not something to route around
 
 **How to recover**
 

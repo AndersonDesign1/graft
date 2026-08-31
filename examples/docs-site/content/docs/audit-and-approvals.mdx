@@ -86,13 +86,21 @@ verdict in the audit trail that nobody reached.
 
 `approvalPolicy` has three values.
 
-| Value | Gates |
-| --- | --- |
-| `"none"` (default) | Only `destructive: true` functions |
-| `"human"` | Every mutation, plus destructive |
-| `"unattended"` | Nothing |
+| Value | Gates | Available on |
+| --- | --- | --- |
+| `"none"` (default) | Only `destructive: true` functions | every surface |
+| `"human"` | Every mutation, plus destructive | every surface |
+| `"unattended"` | Nothing | HTTP functions only |
 
 Policy is code: greppable and reviewable.
+
+`"unattended"` is **not part of the MCP surface**. `GraftMcpOptions` does not
+accept it, so no server setting makes `run_function` stop asking for a
+destructive call. An MCP mount exists because an agent is calling it, and the
+agent is the party the gate is there to stop — one option that turned every
+destructive tool into an ungated one is not a trade worth offering. On
+`graft serve` the split is visible: `GRAFT_APPROVAL_POLICY=unattended` lifts the
+gate on `POST /api/fn` and leaves `POST /api/mcp` gated.
 
 ### Running with no human at all
 
