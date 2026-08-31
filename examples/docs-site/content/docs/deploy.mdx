@@ -26,7 +26,8 @@ under `deploy/` in the repo.
 
 Runtime work is a stateless `Request → Response` handler. Two wrappers, same bytes:
 
-1. **Embedded** — your app (Next, Astro, SvelteKit) mounts the handlers as routes.
+1. **Embedded** — your app (Next, Astro, SvelteKit, TanStack Start, React
+   Router) mounts the handlers as routes.
 2. **Headless** — `graft serve` binds those handlers to a Node HTTP server:
    `POST /api/fn/<name>`, `POST /api/mcp`, `GET /api/content/v1/documents`,
    `GET /api/content/v1/search`, `GET /healthz`. A frontend can read authored

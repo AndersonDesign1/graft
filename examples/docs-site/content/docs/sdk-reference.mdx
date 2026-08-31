@@ -1,6 +1,6 @@
 ---
 title: SDK reference
-description: One schema types every read across Next, Astro, and SvelteKit.
+description: One schema types every read, on six frameworks and in the browser.
 section: Reference
 order: 2
 ---
@@ -14,6 +14,12 @@ with local ergonomics. The same `graft.config.ts` types every package.
 | `@usegraft/sdk-next` | Next (RSC) | `React.cache` memo; `MdxBody`; `revalidateContent` / `updateContent` |
 | `@usegraft/sdk-astro` | Astro | No request memo; `graftRoute` for endpoint mounts |
 | `@usegraft/sdk-sveltekit` | SvelteKit | `graftRoute` for `+server.ts`; CDN surrogate keys for tags |
+| `@usegraft/sdk-tanstack-start` | TanStack Start | `graftRoute` for server routes; build the handle in a server-only module |
+| `@usegraft/sdk-react-router` | React Router v7 | Framework mode; `graftRoute` returns both `action` and `loader` |
+| `@usegraft/sdk-react` | the browser | Reads over HTTP; `createGraftHooks`; no `db` option by construction |
+
+Every adapter is typed **structurally**, so none of them takes a dependency on
+the framework it adapts and there is no peer version to keep in step.
 
 ## Shared surface
 
@@ -32,6 +38,25 @@ Pass `index` instead of `db` to read a static SQLite artifact or a remote
 `graft serve` through `createContentApiReader`. The SDK surface does not
 change. See [Reading content](/docs/reading-content).
 
+`@usegraft/sdk-react` is the exception, and deliberately so: it takes an
+`endpoint`, never a `db`, because a Postgres handle in a browser bundle is a
+database URL in a browser bundle. It also refuses `branch` with a
+`CONFIG_INVALID`, since a `graft serve` endpoint pins its own branch and ignores
+the query param — point at the preview's own endpoint instead. Its hooks come
+from `createGraftHooks(graft)` rather than being importable directly, which is
+what keeps them typed to your collections.
+
+```ts
+const graft = createGraft({ endpoint, collections });
+const { useContent } = createGraftHooks(graft);
+
+const { data, error, loading, refresh } = useContent("docs", slug);
+```
+
+They are a binding, not a cache: no deduplication, no retries, no
+stale-while-revalidate. `graft.getContent` is a plain async function, so compose
+it with TanStack Query or SWR if you want those.
+
 ## Mount the runtime
 
 Handlers are Web-standard. Mounts are thin:
@@ -43,11 +68,27 @@ export const POST = graftRoute(functionsHandler);
 // SvelteKit: src/routes/api/fn/[name]/+server.ts
 export const POST = graftRoute(functionsHandler);
 
+// TanStack Start: src/routes/api/fn/$name.ts
+export const ServerRoute = createServerFileRoute("/api/fn/$name").methods({
+  POST: graftRoute(functionsHandler),
+  GET: graftRoute(functionsHandler), // answers 405
+});
+
+// React Router v7: app/routes/api.fn.$name.ts
+export const action = graftRoute(functionsHandler); // POST
+export const loader = graftRoute(functionsHandler); // GET, answers 405
+
 // Next: app/api/fn/[name]/route.ts
 export const POST = functionsHandler;
 ```
 
 MCP mounts the same way with `createGraftMcpHandler`.
+
+React Router is the one that looks wrong and is not. It splits a route by method
+into two exports rather than naming the method, so the handler is mounted twice.
+Exporting `loader` is what makes a GET answer with Graft's 405 and its `Allow`
+header and `fix`, instead of React Router's own "no loader" error, which teaches
+the caller nothing.
 
 ## Cache tags
 
@@ -56,14 +97,23 @@ MCP mounts the same way with `createGraftMcpHandler`.
 | `tagsFor(collection, slug?)` | What a read depends on |
 | `tagsForChanges(branch, changeSet)` | What a compile invalidated |
 
-Next maps tags onto `'use cache'` + `revalidateTag`. Astro and SvelteKit stamp
-CDN headers and purge from a compile webhook. Unchanged documents invalidate
+Next maps tags onto `'use cache'` + `revalidateTag`. Every other adapter stamps
+CDN headers and purges from a compile webhook. Unchanged documents invalidate
 nothing. Preview branches do not bust main.
 
 ## Honest gaps
 
-- Astro / SvelteKit have no `MdxBody` (React-specific). Author bodies for
-  `@astrojs/mdx` or mdsvex.
-- No React.cache equivalent outside Next — call sites own memoization.
+- **`MdxBody` is Next-only.** It evaluates MDX in a Server Component, which no
+  other adapter here has. Astro and SvelteKit author bodies for `@astrojs/mdx`
+  or mdsvex; TanStack Start and React Router render authored source with their
+  own pipeline.
+- **No `React.cache` equivalent outside Next** — call sites own memoization.
+  TanStack Start route loaders are isomorphic, running on the server for first
+  paint and in the browser on client navigation, so a handle holding a database
+  connection belongs in a server function or server route and never in a loader.
+- **No tag-based data cache outside Next.** Everything else maps the
+  `@usegraft/sdk-core` tag contract onto HTTP: stamp `tagsFor(...)` into a CDN
+  surrogate-key header and purge `tagsForChanges(...)` from the compile webhook.
+- **`sdk-react` has no cache and no `db`,** both by construction. See above.
 - Next apps should use `withGraft(nextConfig)` so `@usegraft/registry` stays
   externalized for the server.

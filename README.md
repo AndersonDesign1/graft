@@ -108,12 +108,20 @@ place, list, update, and cancel functions).
 
 ## Read it from your framework
 
-| Package                                             | Framework                                                              |
-| --------------------------------------------------- | ---------------------------------------------------------------------- |
-| [`@usegraft/sdk-next`](packages/sdk-next)           | Next.js. React.cache-deduped reads, `revalidateContent`, and `MdxBody` |
-| [`@usegraft/sdk-astro`](packages/sdk-astro)         | Astro. Typed reads plus `graftRoute` endpoint mounts                   |
-| [`@usegraft/sdk-sveltekit`](packages/sdk-sveltekit) | SvelteKit. Typed reads plus `graftRoute` for `+server.ts`              |
-| [`@usegraft/sdk-core`](packages/sdk-core)           | Anything else. The typed client the others wrap                        |
+| Package                                                       | Framework                                                              |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [`@usegraft/sdk-next`](packages/sdk-next)                     | Next.js. React.cache-deduped reads, `revalidateContent`, and `MdxBody` |
+| [`@usegraft/sdk-astro`](packages/sdk-astro)                   | Astro. Typed reads plus `graftRoute` endpoint mounts                   |
+| [`@usegraft/sdk-sveltekit`](packages/sdk-sveltekit)           | SvelteKit. Typed reads plus `graftRoute` for `+server.ts`              |
+| [`@usegraft/sdk-tanstack-start`](packages/sdk-tanstack-start) | TanStack Start. Typed reads plus `graftRoute` for server routes        |
+| [`@usegraft/sdk-react-router`](packages/sdk-react-router)     | React Router v7 framework mode. Typed reads plus loader/action mounts  |
+| [`@usegraft/sdk-react`](packages/sdk-react)                   | The browser. Reads over HTTP, plus hooks                               |
+| [`@usegraft/sdk-core`](packages/sdk-core)                     | Anything else. The typed client the others wrap                        |
+
+Every adapter is typed structurally, so none of them depends on the framework it
+adapts. `sdk-react` is the one that does not read a database: it reads a
+[`@usegraft/content-api`](packages/content-api) endpoint over HTTP, because a
+Postgres handle in a browser bundle is a database URL in a browser bundle.
 
 ## Telemetry
 
@@ -135,6 +143,9 @@ and your OIDC issuer.
 | `@usegraft/sdk-next`           | Next.js adapter                                                              |
 | `@usegraft/sdk-astro`          | Astro adapter                                                                |
 | `@usegraft/sdk-sveltekit`      | SvelteKit adapter                                                            |
+| `@usegraft/sdk-tanstack-start` | TanStack Start adapter                                                       |
+| `@usegraft/sdk-react-router`   | React Router v7 adapter, framework mode                                      |
+| `@usegraft/sdk-react`          | Browser client and hooks over the content API                                |
 | `@usegraft/cli`                | The `graft` command                                                          |
 | `@usegraft/mcp`                | The agent surface: content, functions, introspection                         |
 | `@usegraft/studio`             | The optional editing UI and approval queue                                   |
