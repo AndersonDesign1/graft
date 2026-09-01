@@ -354,12 +354,13 @@ importers:
       '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@usegraft/db':
-        specifier: workspace:*
-        version: link:../db
       zod:
         specifier: ^4.1.0
         version: 4.4.3
+    devDependencies:
+      '@usegraft/db':
+        specifier: workspace:*
+        version: link:../db
 
   packages/db:
     dependencies:

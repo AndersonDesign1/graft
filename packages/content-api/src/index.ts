@@ -82,7 +82,11 @@ export interface ContentApiHandlerOptions {
 }
 
 export interface ContentApiReaderOptions {
-  /** Full API base URL, for example https://cms.example.com/api/content/v1. */
+  /**
+   * API base URL: absolute (https://cms.example.com/api/content/v1), or a
+   * same-origin path (/api/content/v1) when running in a browser, where it
+   * resolves against the page origin.
+   */
   endpoint: string | URL;
   /** Fetch implementation for non-browser runtimes, tests, or instrumentation. */
   fetch?: typeof globalThis.fetch;
@@ -547,11 +551,39 @@ export function createContentApiHandler(options: ContentApiHandlerOptions): Cont
 }
 
 function normalizeEndpoint(endpoint: string | URL): URL {
-  const url = new URL(endpoint.toString());
+  // A same-origin path is the ordinary way to name this endpoint from a
+  // browser, and it is what /docs/reading-content tells people to write. Bare
+  // `new URL("/api/content/v1")` throws TypeError, so resolve it against the
+  // page origin first. Outside a browser there is no origin to resolve
+  // against, and guessing one would send content reads somewhere arbitrary —
+  // so that case is refused with the reason rather than a TypeError.
+  const url = endpoint instanceof URL ? new URL(endpoint) : resolveEndpointUrl(endpoint);
   url.pathname = url.pathname.replace(/\/+$/, "");
   url.search = "";
   url.hash = "";
   return url;
+}
+
+function resolveEndpointUrl(endpoint: string): URL {
+  // Narrowed rather than relying on the DOM lib, which this package does not
+  // pull in: it runs on the server too.
+  // SAFETY: widening-only. `location` is declared optional and read with `?.`,
+  // so a runtime without it yields undefined rather than throwing, which is the
+  // non-browser branch below.
+  const base = (globalThis as { location?: { href?: string } }).location?.href;
+  try {
+    return base === undefined ? new URL(endpoint) : new URL(endpoint, base);
+  } catch {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message: `\`endpoint\` is not a valid URL: ${endpoint}`,
+      fix:
+        base === undefined
+          ? "Outside a browser there is no page origin to resolve a relative path against. Pass an absolute endpoint, e.g. https://cms.example.com/api/content/v1."
+          : "Pass an absolute endpoint (https://cms.example.com/api/content/v1) or a same-origin path (/api/content/v1).",
+      details: { endpoint, base },
+    });
+  }
 }
 
 /** Create a ContentIndexReader that reads a remote /api/content/v1 endpoint. */

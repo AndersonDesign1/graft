@@ -4,7 +4,7 @@ import type {
   ReaderReadOptions,
   ReaderSearchOptions,
 } from "@usegraft/db";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createContentApiHandler, createContentApiReader } from "./index";
 
 function row(overrides: Partial<ContentRow> = {}): ContentRow {
@@ -281,6 +281,77 @@ describe("createContentApiReader", () => {
       code: "FUNCTION_EXECUTION_FAILED",
       message: expect.stringMatching(message),
       fix: expect.stringContaining("/api/content/v1"),
+    });
+  });
+
+  // The relative form is what /docs/reading-content and the createGraft JSDoc
+  // both tell people to write, and it threw `TypeError: Invalid URL` before a
+  // single read. Found in the pull request review.
+  describe("endpoint resolution", () => {
+    const originalLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
+
+    afterEach(() => {
+      // SAFETY: widening-only, to restore the pre-test shape of globalThis.
+      // The property was installed by this suite and is configurable.
+      const global = globalThis as { location?: unknown };
+      if (originalLocation) Object.defineProperty(globalThis, "location", originalLocation);
+      else delete global.location;
+    });
+
+    function pretendBrowser(href: string): void {
+      Object.defineProperty(globalThis, "location", {
+        value: { href, origin: new URL(href).origin },
+        configurable: true,
+        writable: true,
+      });
+    }
+
+    it("resolves a same-origin path against the page origin", async () => {
+      pretendBrowser("https://app.test/blog/hello");
+      const seen: Request[] = [];
+      const remote = createContentApiReader({
+        endpoint: "/api/content/v1",
+        fetch: async (input) => {
+          seen.push(new Request(input));
+          return Response.json({ rows: [] });
+        },
+      });
+
+      await remote.readContent({ collection: "pages" });
+      expect(new URL(seen[0]!.url).origin).toBe("https://app.test");
+      expect(new URL(seen[0]!.url).pathname).toBe("/api/content/v1/documents");
+    });
+
+    it("still accepts an absolute endpoint in a browser", async () => {
+      pretendBrowser("https://app.test/blog/hello");
+      const seen: Request[] = [];
+      const remote = createContentApiReader({
+        endpoint: "https://cms.example.com/api/content/v1",
+        fetch: async (input) => {
+          seen.push(new Request(input));
+          return Response.json({ rows: [] });
+        },
+      });
+
+      await remote.readContent({ collection: "pages" });
+      expect(new URL(seen[0]!.url).origin).toBe("https://cms.example.com");
+    });
+
+    it("refuses a relative endpoint outside a browser, with the reason", () => {
+      // SAFETY: widening-only. Removing the property is the point of this
+      // case: it reproduces a non-browser runtime.
+      delete (globalThis as { location?: unknown }).location;
+      expect(() => createContentApiReader({ endpoint: "/api/content/v1" })).toThrow(
+        /not a valid URL/,
+      );
+      try {
+        createContentApiReader({ endpoint: "/api/content/v1" });
+      } catch (error) {
+        expect(error).toMatchObject({
+          code: "CONFIG_INVALID",
+          fix: expect.stringContaining("no page origin"),
+        });
+      }
     });
   });
 
