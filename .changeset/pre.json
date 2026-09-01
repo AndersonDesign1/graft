@@ -27,5 +27,30 @@
     "@usegraft/studio": "0.2.0",
     "@usegraft/tokens": "0.2.0"
   },
-  "changesets": []
+  "changesets": [
+    "approval-policy-to-config",
+    "content-api-cors",
+    "content-api-rate-limit",
+    "content-api-reads",
+    "core-db-optional-peer",
+    "db-out-of-the-browser",
+    "elicitation-hardening",
+    "mcp-approval-elicitation",
+    "mcp-docs-server",
+    "mcp-output-schemas",
+    "mcp-path-containment",
+    "mcp-prompts-completions",
+    "mcp-resource-links",
+    "mcp-resources",
+    "mcp-tool-annotations",
+    "more-framework-adapters",
+    "relative-content-api-endpoint",
+    "release-channel-switch",
+    "release-channels-and-discovery",
+    "ruleset-drift-check",
+    "shaggy-jars-repeat",
+    "sink-owns-containment",
+    "sveltekit-joins-the-release",
+    "unattended-approval-policy"
+  ]
 }

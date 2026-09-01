@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/content-migrations",
-  "version": "0.2.0",
+  "version": "1.0.0-beta.0",
   "description": "Codemod-style transforms for authored content when the schema changes.",
   "keywords": [
     "agent",

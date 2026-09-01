@@ -1,5 +1,13 @@
 # @usegraft/registry
 
+## 1.0.0-beta.0
+
+### Patch Changes
+
+- Updated dependencies [15568eb]
+- Updated dependencies [e2829b4]
+  - @usegraft/contracts@1.0.0-beta.0
+
 ## 0.2.0
 
 ### Minor Changes
