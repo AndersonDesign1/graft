@@ -27,11 +27,17 @@ actors in both directions. It does not apply the file: a commit that could
 rewrite branch protection is a commit that could remove it, so the record can
 fail the build without being able to weaken the branch.
 
-Reading who can bypass needs a token with `administration: read`. Without one
-GitHub answers `200` with `rules` and silently omits `bypass_actors` — so the
-check refuses to report a pass it did not earn and skips instead, naming the
-reason. That is also what a fork's pull request sees, which is why a skip is not
-a failure.
+Reading who can bypass needs a token with `administration: read`, and the
+built-in `GITHUB_TOKEN` **cannot be one** — `administration` is not among the
+permissions a workflow may request for it. The job reads a `RULESETS_TOKEN`
+secret instead: a fine-grained PAT scoped to this repository with
+`Administration: Read-only` and nothing else.
+
+Until that secret exists the job skips, loudly, and says why. It does not pass:
+without `bypass_actors` GitHub answers `200` with `rules` alone, and checking
+the rules while never checking who may ignore them is worse than not checking —
+it prints a green tick nobody should trust. A fork's pull request sees the same
+skip, which is why a skip is not a failure.
 
 To import a change: Settings → Rules → Rulesets → the ruleset → ⋯ → Import,
 then paste the file.

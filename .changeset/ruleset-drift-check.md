@@ -14,10 +14,13 @@ It is deliberately one-directional: it never applies the file, because a commit
 that could rewrite branch protection is a commit that could remove it. The
 record can fail the build without being able to weaken the branch.
 
-Reading bypass actors needs `administration: read`. Without it GitHub answers
-`200` with `rules` and silently omits `bypass_actors` — a check that compared
-rules, skipped the actors who can ignore those rules, and printed OK would be
-worse than no check, so an absent key skips with the reason instead. That is
-also what a fork's pull request sees, so outside contributors are not blocked.
-It runs as its own job rather than inside `verify`, to keep the wider token away
-from the runner that executes every installed dependency.
+Reading bypass actors needs `administration: read`, which the built-in
+`GITHUB_TOKEN` cannot hold — that permission is not one a workflow may request
+for it. The job reads a `RULESETS_TOKEN` secret (a fine-grained PAT scoped to
+this repository, `Administration: Read-only`). Until it exists the job skips and
+says why rather than passing: without `bypass_actors` GitHub answers `200` with
+`rules` alone, and checking the rules while never checking who can ignore them
+prints a green tick nobody should trust. A fork's pull request sees the same
+skip, so outside contributors are not blocked. It runs as its own job rather
+than inside `verify`, keeping that token away from the runner that executes
+every installed dependency.

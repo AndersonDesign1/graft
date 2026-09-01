@@ -159,19 +159,26 @@ jobs:
   # The README used to carry a hand-checked date, which is a claim with a shelf
   # life. This is that claim as a job.
   #
-  # Its own job on purpose. Reading who can bypass branch protection needs
-  # `administration: read`, and granting that to `verify` would hand the wider
-  # token to every dependency `pnpm install` pulls into the same runner. This
-  # script imports nothing outside node: builtins and uses global fetch, so it
-  # needs no install step at all.
+  # Needs a token that can read repository settings, which GITHUB_TOKEN cannot
+  # be: `administration` is not a permission a workflow may request for it (that
+  # scope exists only for fine-grained PATs and GitHub Apps). Asking anyway does
+  # not degrade gracefully — GitHub rejects the whole file and every job in it
+  # stops running, which is how this was found.
   #
-  # A fork's pull request gets a token that cannot read repository settings; the
-  # script skips rather than fails, so outside contributors are not blocked.
+  # So it reads RULESETS_TOKEN: a fine-grained PAT with `administration: read`
+  # on this repository and nothing else. Absent, the script skips with the
+  # reason rather than passing, because rules checked without bypass actors is
+  # not a verified record. That is also what a fork's pull request sees, so an
+  # outside contributor is never blocked on a secret they cannot have.
+  #
+  # Its own job rather than a step in `verify`, so the settings-reading token is
+  # never present in the runner that executes every installed dependency. The
+  # script imports nothing outside node: builtins and uses global fetch, so it
+  # needs no install step.
   rulesets:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      administration: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -187,4 +194,4 @@ jobs:
       - name: Branch protection matches the record
         run: node scripts/check-ruleset-drift.mjs
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RULESETS_TOKEN }}
