@@ -141,3 +141,34 @@ jobs:
       # a Dockerfile still parses is a poor trade. The runner ships buildx.
       - name: Build the self-host image
         run: docker build -f deploy/docker/Dockerfile -t graft:ci .
+
+  # .github/rulesets/*.json is a record of branch protection, not a mechanism
+  # that applies it — a change made in the GitHub UI leaves no diff anywhere.
+  # The README used to carry a hand-checked date, which is a claim with a shelf
+  # life. This is that claim as a job.
+  #
+  # Its own job on purpose. Reading who can bypass branch protection needs
+  # `administration: read`, and granting that to `verify` would hand the wider
+  # token to every dependency `pnpm install` pulls into the same runner. This
+  # script imports nothing outside node: builtins and uses global fetch, so it
+  # needs no install step at all.
+  #
+  # A fork's pull request gets a token that cannot read repository settings; the
+  # script skips rather than fails, so outside contributors are not blocked.
+  rulesets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      administration: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22.16
+
+      - name: Branch protection matches the record
+        run: node scripts/check-ruleset-drift.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

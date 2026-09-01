@@ -8,19 +8,30 @@ Committing a change here changes nothing until someone imports it.
 
 ## Verified
 
-Both rulesets are **active** and match these files byte for byte, checked
-2026-08-31:
-
 | File             | Ruleset           | ID         |
 | ---------------- | ----------------- | ---------- |
 | `feat-core.json` | Protect feat/core | `21730847` |
 | `main.json`      | Protect main      | `21730831` |
 
-Re-check without trusting this table:
+This used to say "checked <date>", which is a claim with a shelf life — and the
+one thing a record of branch protection cannot afford is going quietly stale.
+CI now asserts it on every push and pull request (the `rulesets` job), so a rule
+relaxed in the web UI fails the build:
 
 ```bash
-gh api repos/AndersonDesign1/graft/rulesets -q '.[] | [.id, .name, .enforcement] | @tsv'
+pnpm check:ruleset-drift
 ```
+
+It asserts every rule these files **declare** is in force, and compares bypass
+actors in both directions. It does not apply the file: a commit that could
+rewrite branch protection is a commit that could remove it, so the record can
+fail the build without being able to weaken the branch.
+
+Reading who can bypass needs a token with `administration: read`. Without one
+GitHub answers `200` with `rules` and silently omits `bypass_actors` — so the
+check refuses to report a pass it did not earn and skips instead, naming the
+reason. That is also what a fork's pull request sees, which is why a skip is not
+a failure.
 
 To import a change: Settings → Rules → Rulesets → the ruleset → ⋯ → Import,
 then paste the file.
