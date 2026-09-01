@@ -68,6 +68,17 @@ jobs:
       # The warning is correct behaviour at runtime; it is only noise at build.
       BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
     steps:
+      # The one checkout in this repository that keeps its credentials, and
+      # the reason is `changesets/action` below: it pushes the
+      # `changeset-release/<branch>` branch before opening the version pull
+      # request, and that push authenticates with the token this step writes
+      # into .git/config. Setting persist-credentials: false here does not
+      # harden the release, it breaks it.
+      #
+      # What makes that acceptable rather than merely necessary: this job
+      # uploads no artifacts, so there is nothing for a token in .git/config to
+      # ride out on, and `contents: write` is scoped to this job alone.
+      # zizmor: ignore[artipacked]
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # pnpm — not npm — performs the OIDC exchange. changesets picks its
