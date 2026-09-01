@@ -1,5 +1,328 @@
 # @usegraft/cli
 
+## 1.0.0-beta.0
+
+### Minor Changes
+
+- 2561b47: **BREAKING:** approval policy moves from `GRAFT_APPROVAL_POLICY` to
+  `approvalPolicy` in `graft.config.ts`. The env var is ignored, and `graft serve`
+  warns once at boot if it is still set.
+
+  `createFunctionsHandler` has documented this setting as config-owned all along:
+  "deliberately a value the operator writes in config rather than an env var,
+  because turning off the gate on irreversible work should appear in a diff and a
+  review." The CLI was the piece still reading an env var, so the rationale was
+  written down and not enforced. This is the setting that lets `deleteRecord`
+  hard-delete rows with no human in the loop, and a hosting dashboard is where
+  that decision goes unreviewed. It is parsed like `mdxTrust`: an unknown value is
+  refused rather than defaulted, so a typo cannot silently pick a weaker policy.
+
+  ```ts
+  // graft.config.ts
+  export const approvalPolicy = "unattended";
+  ```
+
+  **An approval presented to an ungated call is now spent.** Under `"unattended"`
+  the gate is skipped, and the whole block went with it, including
+  `approvals.consume`. A granted row stayed `approved` and replayable: tighten the
+  policy later and that row still authorized a destructive call nobody
+  re-reviewed. One-shot has to survive a policy change, which is exactly when the
+  stale row is dangerous. Consuming is best-effort here, because an ungated call
+  must not fail on the approval store.
+
+  **`run_function` over MCP gets the same rate-limit backstop as `POST /api/fn`.**
+  `graft serve` passed `{ limit: 60, windowSeconds: 60 }` to the functions handler
+  and nothing to the MCP handler, so a function with no per-function `rateLimit`
+  was capped on one transport and uncapped on the other. `tools/functions.ts`
+  claims both surfaces apply rate limits identically; now they do.
+
+  **`assertSafeMdx` reports unparseable MDX as `INPUT_VALIDATION_FAILED`.**
+  `UncheckableMdxError` escaped it raw, so `write_content` and a Studio save
+  returned a bare `Error` where every other rejection on that path is a structured
+  `GraftError` — a client could not tell malformed input from a transport fault.
+  `graft compile` catches the raw error itself and is unaffected.
+
+  All four found by cubic on the pull request.
+
+### Patch Changes
+
+- d5f5567: Let the content API be read from a browser on another origin.
+
+  `@usegraft/sdk-react` reads over HTTP from a browser, and the handler sent no
+  CORS headers at all — so unless the app and the content API shared an origin,
+  every read was blocked by the browser. That is the ordinary deployment for the
+  browser client, which made it largely unusable as shipped. cubic raised it on
+  the pull request.
+
+  `createContentApiHandler` takes `allowedOrigins`: a list, or `"*"`. Omitted
+  means no CORS headers and same-origin only, which stays the default because
+  publishing an endpoint to other origins is the deployer's decision rather than
+  a library's. `graft serve` reads `GRAFT_CONTENT_ALLOWED_ORIGINS` (comma
+  separated, or `*`).
+
+  Details that are easy to get wrong and are tested:
+
+  - An allowed origin is echoed with `Vary: Origin`. Without `Vary`, a shared
+    cache can hand one origin the response it stored for another and the
+    allowlist stops meaning anything.
+  - A disallowed origin gets an ordinary response with no CORS header, not a
+    refusal. The browser enforces it; answering differently would turn the
+    allowlist into an origin oracle for non-browser callers, who are not bound by
+    CORS in the first place.
+  - `OPTIONS` preflight is answered before method validation and before the rate
+    limiter, so a browser asking permission is neither a `405` nor a charge
+    against the budget for the read it precedes.
+  - Error responses carry the headers too, or the browser hides the body and a
+    developer debugging a `400` sees an opaque network failure instead of the
+    `fix` this API took care to send.
+
+- 15568eb: Rate-limit the content API, and give `graft serve` the same backstop there it
+  already gave functions.
+
+  `graft serve` passed `rateLimit: { limit: 60, windowSeconds: 60 }` to
+  `createFunctionsHandler` and nothing to `createContentApiHandler`, which had no
+  such option to pass. Greptile demonstrated the consequence on the pull request
+  by running it: 61 requests to `/api/content/v1/documents`, 61 responses of
+  `200`, no `Retry-After` on the last one. These routes authenticate nobody and
+  run database listings and full-text searches, so one anonymous caller could
+  keep the index busy for as long as it liked.
+
+  `createContentApiHandler` now takes `rateLimit` and `trustedProxyHops`.
+  Omitting `rateLimit` means unlimited, which stays correct for a handler mounted
+  behind something that already limits. `graft serve` passes the same 60 per 60
+  seconds it gives functions.
+
+  The counter is in memory rather than in the audit table. The function limiter
+  counts rows it is already writing; these are reads that write nothing, and
+  adding a write per read to enforce a read limit inverts the cost of the thing
+  being protected. Two honest consequences, both documented: it is per process,
+  so N replicas allow N times the limit and a restart resets it; and it is a
+  fixed window where functions get a rolling one. A deployment needing an exact
+  global limit puts it in the proxy already terminating TLS.
+
+  The check runs before the index is touched, and after method and route
+  validation. Both halves are tested: a limit that fires once the query has
+  already run protects nothing, and charging a `405` to the bucket would let
+  someone probing with the wrong method spend the shared anonymous budget.
+
+  **The caller-identity rule is now shared rather than copied.** `rateIdentity`
+  and the peer registry move from `@usegraft/core` to `@usegraft/contracts`,
+  which both packages already depend on, and `@usegraft/core` re-exports them so
+  `setRequestPeer` keeps resolving where callers already import it. That rule —
+  never read `x-forwarded-for` unless the deployment declares its proxy depth,
+  then count from the right — is listed in `.greptile/rules.md` as a security
+  invariant precisely because the obvious implementation is the wrong one, and
+  two copies of it is how a future fix lands in only one.
+
+  Also documents what was true before this change and unwritten: the content API
+  performs no authentication at all, so its `collections` list is a security
+  boundary rather than a convenience, and `graft serve` registers every
+  collection in the config.
+
+- 1139a88: Add a versioned, read-only authored-content HTTP API and a remote
+  `ContentIndexReader`. `graft serve` now mounts document reads and search at
+  `/api/content/v1`, fixed to the server's resolved branch.
+- d3c51d1: Let a local MCP server ask its operator to decide a destructive call in-band,
+  instead of failing with an id for them to run `graft approve` on.
+
+  Opt-in and off by default: `approvalElicitation: { decider }` on
+  `createGraftMcp`, or `graft mcp --elicit-approvals`, which records the decision
+  as the OS user — exactly who `graft approve` records. A remote or public mount
+  must never enable it: there is nobody at the other end to ask.
+
+  What changes is how the human is reached. What does not change is anything
+  underneath: the decision is still a row in `approvals`, still one-shot, still
+  bound to the exact function and canonical input, still stamped with
+  `decided_role = current_user`, and still refused by Postgres when the decider is
+  the requester. `decider` is configured rather than taken from the connection
+  precisely because that predicate lives in the UPDATE's own `WHERE`.
+
+  A client that never declared the elicitation capability falls back to the
+  id-and-retry flow. Dismissing the prompt leaves the approval pending — only an
+  explicit no records a denial.
+
+  `delete_content`, `run_function` and the DESTRUCTIVE_OP_REQUIRES_APPROVAL
+  explanation all now say the in-band path exists, so an agent seeing either
+  outcome knows both are ordinary.
+
+- 76baf51: Add a real release channel switch, and one GitHub Release per version.
+
+  Canary was doing a job it cannot do. A snapshot is `0.0.0-canary-<timestamp>`
+  forever: it sorts _below_ every real release, npm never offers it as an
+  upgrade, and there is no path from it to a stable version — you hand someone a
+  build and they pin a timestamp. It answers "does this commit work?", not "is the
+  next version ready?"
+
+  Beta is changesets prerelease mode: `1.0.0-beta.0` → `1.0.0-beta.1` → `1.0.0`.
+  A tester runs `npm i @usegraft/cli@beta` once and gets each new beta as an
+  ordinary upgrade, while `latest` stays where it is.
+
+  ```sh
+  pnpm release:beta-enter   # commit .changeset/pre.json
+  pnpm release:beta-exit    # graduate to stable
+  pnpm release:channel      # which channel am I on?
+  ```
+
+  release.yml's own comment named the reason pre mode was avoided: the state is
+  committed, feat/core takes every ordinary push, and nothing would remind you to
+  leave. So the release job now prints the active channel before anything
+  publishes, and the canary path refuses to run in pre mode and says why. Being
+  in beta is something the log tells you, not something you remember.
+
+  **One release per version.** `fixed` makes all 21 packages one product on one
+  version line, but changesets/action tags and releases each separately — 21 tags
+  and 21 GitHub Releases per version, with one arbitrarily flagged "Latest"
+  because GitHub picks by recency. Tags fragmented the history instead of
+  grouping it. A `v<version>` release now collects every package's changelog
+  entry. The per-package tags stay, because npm and provenance point at them.
+
+- 76baf51: Add `list_packages`, so an agent can answer "what do I install?"
+
+  The tool surface could already introspect a project that exists — its
+  collections, functions, errors, owned primitives. Nothing said which
+  `@usegraft/*` package to reach for, so a user on SvelteKit could only be told
+  about `@usegraft/sdk-sveltekit` if the model happened to have read the docs.
+  That is the first question anyone asks, and it was the one question with no
+  surface.
+
+  Filter by `framework` and you get that adapter plus the packages every project
+  needs, never a competing one. Filter by `tier` and a static project is never
+  told to install something that cannot work without Postgres. It is registered
+  on the public documentation mount too: it carries nothing about the project,
+  only which of Graft's own packages exists, which is documentation in the
+  plainest sense.
+
+  `PACKAGE_KNOWLEDGE` is held in lockstep with what actually ships by a test, the
+  same way `ERROR_KNOWLEDGE` is with `ErrorCodes` — a package added without an
+  entry is a package no agent will ever suggest. It caught `@usegraft/tokens`
+  missing on its first run.
+
+- 4ac881c: CI asserts that `.github/rulesets/*.json` still matches the branch protection
+  GitHub is actually enforcing.
+
+  Those files are a record, not a mechanism — a rule relaxed in the web UI leaves
+  no diff anywhere, which is why the directory exists and also its weakness. The
+  README carried "checked 2026-08-31", a claim with a shelf life. `pnpm
+check:ruleset-drift` turns it into a job.
+
+  It is deliberately one-directional: it never applies the file, because a commit
+  that could rewrite branch protection is a commit that could remove it. The
+  record can fail the build without being able to weaken the branch.
+
+  Reading bypass actors needs `administration: read`, which the built-in
+  `GITHUB_TOKEN` cannot hold — that permission is not one a workflow may request
+  for it. The job reads a `RULESETS_TOKEN` secret (a fine-grained PAT scoped to
+  this repository, `Administration: Read-only`). Until it exists the job skips and
+  says why rather than passing: without `bypass_actors` GitHub answers `200` with
+  `rules` alone, and checking the rules while never checking who can ignore them
+  prints a green tick nobody should trust. A fork's pull request sees the same
+  skip, so outside contributors are not blocked. It runs as its own job rather
+  than inside `verify`, keeping that token away from the runner that executes
+  every installed dependency.
+
+- 36d6045: Fix the install command on every package page. `npx graft` resolves to an
+  unrelated package on npm, so the documented way to run the CLI without
+  installing fetched the wrong thing. It is `npx @usegraft/cli` everywhere now,
+  with a note saying why the scoped name is needed.
+
+  Fix the `graftRoute` example in `@usegraft/sdk-astro`. It showed a config
+  object, but `graftRoute` takes the handler, so the snippet did not compile.
+
+  Document the static index in the SDK READMEs. `createClient` and `createGraft`
+  both accept `index` from `openStaticIndex(".graft/index.db")`, which is what
+  `graft init` scaffolds by default, and none of the READMEs mentioned it. Every
+  read example now shows where its `db` or `index` comes from instead of leaving
+  the handle undefined.
+
+  `@usegraft/sdk-sveltekit` gets the same treatment, and its README ships in this
+  release. It was `private` and so could not be named in a changeset at all. It
+  is public now, at the same version as the rest of the workspace.
+
+- 3bb7f7b: Publish `@usegraft/sdk-sveltekit`. It sat at `0.1.0` and `private` while every
+  other package in the workspace was at `0.2.0`, and `private` is what kept it
+  there. The release config puts every `@usegraft/*` package in one `fixed`
+  group, and changesets counts a private package as ignored, so naming this one
+  beside any other failed the mixed-changeset check and the release plan refused
+  to build. That left no way to ship a fix for it at all, and it fell one version
+  further behind on each release. It is public at `0.2.0` now and versions with
+  everything else.
+
+  Nothing in the package itself changed. The README, the adapter and its tests
+  were already written and are untouched. `src/` still tracks
+  `@usegraft/sdk-astro`: the same `createGraft` and `graftRoute`, differing only
+  in doc comments, the `context` to `event` rename that SvelteKit's
+  `RequestEvent` asks for, and the URL one test uses as a fixture. That adapter
+  is exercised by `examples/docs-site`, so this code path has been covered all
+  along and only the packaging held it back.
+
+  Pin the MinIO images in the self-host Dockerfile to digests. `minio/minio` and
+  `minio/mc` were both on `latest`, which MinIO moves on every release, so the
+  image the README tells people to `docker run` could change from one build to
+  the next while nothing in this repo did, and a bad upstream release would
+  arrive with no way to tell what had shifted. Every GitHub Action here is
+  already SHA-pinned for that reason.
+
+- a442299: Add `approvalPolicy: "unattended"`, so a caller with no human behind it can run
+  a destructive function.
+
+  `"none"` and `"human"` both had no answer for a scheduled job or a CI
+  migration. The destructive arm of the gate had no off switch at all, which is
+  the absence of a policy rather than a policy: those callers could never invoke
+  a destructive function, ever.
+
+  `"unattended"` turns the gate off entirely. Everything else is unchanged —
+  every invocation still writes its audit row with actor, correlation id and git
+  SHA, and access rules and rate limits still apply. What is given up is the
+  waiting, not the accounting.
+
+  It is deliberately **not on the MCP surface**. `GraftMcpOptions` accepts only
+  `"none"` and `"human"`, so there is no server setting that makes `run_function`
+  stop asking before a destructive call. The policy exists for a caller with no
+  human behind it; an MCP mount exists because an agent is calling it, and the
+  agent is precisely the party the gate is there to stop. On `graft serve` that
+  split is observable — the env var lifts the gate on `POST /api/fn` and leaves
+  `POST /api/mcp` gated.
+
+  `graft serve` reads it from `GRAFT_APPROVAL_POLICY=unattended` and warns on
+  every boot while it is on, because an env var is one line in a dashboard and
+  the log is where a mistake gets noticed.
+
+  Worth being explicit about the trade: git restores authored content, so a
+  deleted document comes back, but it does not restore operational data.
+  `deleteRecord` removes rows outright and the asset store keeps no history.
+
+- Updated dependencies [2561b47]
+- Updated dependencies [d5f5567]
+- Updated dependencies [15568eb]
+- Updated dependencies [1139a88]
+- Updated dependencies [655e4d1]
+- Updated dependencies [e2829b4]
+- Updated dependencies [18ac061]
+- Updated dependencies [d3c51d1]
+- Updated dependencies [ffd5a07]
+- Updated dependencies [e36c09b]
+- Updated dependencies [04f7576]
+- Updated dependencies [23b73fa]
+- Updated dependencies [9859435]
+- Updated dependencies [0db04f7]
+- Updated dependencies [fe8b02f]
+- Updated dependencies [655e4d1]
+- Updated dependencies [76baf51]
+- Updated dependencies [a6b7ddf]
+- Updated dependencies [a442299]
+  - @usegraft/core@1.0.0-beta.0
+  - @usegraft/mdx-safety@1.0.0-beta.0
+  - @usegraft/content-api@1.0.0-beta.0
+  - @usegraft/contracts@1.0.0-beta.0
+  - @usegraft/mcp@1.0.0-beta.0
+  - @usegraft/db@1.0.0-beta.0
+  - @usegraft/compiler@1.0.0-beta.0
+  - @usegraft/studio@1.0.0-beta.0
+  - @usegraft/auth@1.0.0-beta.0
+  - @usegraft/content-migrations@1.0.0-beta.0
+  - @usegraft/registry@1.0.0-beta.0
+  - @usegraft/assets@1.0.0-beta.0
+
 ## 0.2.0
 
 ### Minor Changes
