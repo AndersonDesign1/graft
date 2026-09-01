@@ -81,7 +81,11 @@ here and write down why.
 
 ## Git
 
-- Default branch: `main`. Never commit directly to `main` for feature work.
+- `main` is the default branch and the public face of the repository. It is merged
+  from `feat/core` at each release, and nothing lands on it directly.
+- `feat/core` is the working mainline. Every change lands there, and it is the only
+  branch that publishes to npm.
+- Feature branches are cut from `feat/core` and merge back into it.
 - Branch naming: `preview/<short-topic>` for content/feature branches (these map to
   copy-on-write DB preview branches from Phase 4).
 - Commits: Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`).

@@ -1,0 +1,222 @@
+---
+title: Studio API
+description: The HTTP surface the Studio UI is a client of, and the rules a state-changing request has to satisfy.
+section: Reference
+order: 6
+---
+
+The Studio UI has no privileged access. Everything it does goes through
+`/api/studio/v1/*`, which is documented by its own OpenAPI document and usable
+without the UI.
+
+<TierBadge tier="postgres" />
+
+## The document
+
+```sh
+curl http://127.0.0.1:4983/api/studio/v1/openapi.json
+```
+
+That is the authoritative shape. The tables below are the map.
+
+## Routes
+
+| Method | Path | Scope |
+| --- | --- | --- |
+| `GET` | `/openapi.json` | `studio:read` |
+| `GET` | `/tree` | `studio:read` |
+| `GET` | `/collections` | `studio:read` |
+| `GET` | `/document` | `studio:read` |
+| `PUT` | `/document` | `studio:write` |
+| `GET` | `/editor-components` | `studio:read` |
+| `GET` | `/asset-url` | `studio:read` |
+| `POST` | `/compile` | `studio:write` |
+| `GET` | `/changes` | `studio:read` |
+| `GET` | `/changes/diff` | `studio:read` |
+| `POST` | `/changes/commit` | `studio:write` |
+| `GET` | `/compilations` | `studio:read` |
+| `GET` | `/compilations/:id/revert` | `studio:read` |
+| `POST` | `/compilations/:id/revert` | `studio:write` |
+| `GET` | `/branches` | `studio:read` |
+| `GET` | `/approvals` | `studio:read` |
+| `POST` | `/approvals/:id/decide` | `approvals:decide` |
+
+All paths are prefixed with `/api/studio/v1`.
+
+Revert is two routes on one path because they are two different questions.
+`GET` previews whether a revert is safe and carries a read scope; `POST` does it
+and carries a write scope.
+
+## The three scopes
+
+| Scope | Why it is separate |
+| --- | --- |
+| `studio:read` | Looking at the project |
+| `studio:write` | Changing it: saving, compiling, committing, reverting |
+| `approvals:decide` | The human gate. No agent runtime token should carry it |
+
+An agent that may read the content tree has no business committing it, which is
+why "authenticated" is not a permission here.
+
+## Authentication
+
+`authenticate` resolves a request to a principal, or returns `null` to refuse
+it.
+
+```ts
+createStudioHandler({
+  db,
+  collections,
+  contentDir,
+  authenticate: (request) =>
+    tokenIsValid(request) ? { kind: "human", id: "you@example.com", scopes: [...] } : null,
+});
+```
+
+A principal is `{ kind, id, scopes? }`. **Absent `scopes` means none, not all.**
+
+Omitting `authenticate` entirely means the mount is unauthenticated, which is
+only appropriate on loopback.
+
+<Callout label="why not a boolean">
+  The signature is deliberately not `(request) => boolean`. "May this actor do
+  this particular thing" cannot be expressed in one boolean decided per handler,
+  so callers of the boolean version invented their own policy — and what
+  `graft serve` invented was `actor.kind !== "anonymous"`, which admitted every
+  agent to the approve and deny surface.
+</Callout>
+
+## State-changing requests
+
+Two checks apply to every `POST` and `PUT`. Either alone has a gap.
+
+**Origin.** If the request carries an `Origin` header, its **host** must match
+the server's. The scheme is not compared, because the Node adapter synthesizes
+the request URL as `http://<host>` and comparing whole origins rejected every
+legitimate save behind an HTTPS-terminating proxy. `Origin: null` has no host
+and is refused rather than treated as absent.
+
+**Content type.** `Content-Type: application/json` is required. This is a CSRF
+control as much as a parsing one: `Request.json()` does not care about the
+content type, so a cross-origin `text/plain` POST is a simple request that
+browsers dispatch with no preflight. Requiring JSON forces one.
+
+On a loopback mount there is no authentication by design, so anything that can
+reach `127.0.0.1` can act — including a web page the operator happens to open.
+The response would be unreadable to the attacker, but the side effect already
+happened.
+
+## Deciding approvals
+
+```sh
+curl -X POST http://127.0.0.1:4983/api/studio/v1/approvals/ap_123/decide \
+  -H 'content-type: application/json' \
+  -d '{"decision":"approved"}'
+```
+
+`decision` must be `"approved"` or `"denied"`. Anything else is
+`INPUT_VALIDATION_FAILED`.
+
+There is no `decidedBy` field, and that absence is the design. The decision is
+attributed to the identity the Studio was **mounted** with, so a caller cannot
+name a decider other than itself and defeat the requester-cannot-decide check.
+
+Deciding a row that is not pending answers `APPROVAL_INVALID`.
+
+## Committing
+
+```sh
+curl -X POST http://127.0.0.1:4983/api/studio/v1/changes/commit \
+  -H 'content-type: application/json' \
+  -d '{"paths":["docs/tiers.mdx"],"message":"Add the tier page"}'
+```
+
+Paths are relative to the content directory. Requested paths are intersected
+with the live change set, so this endpoint cannot commit a file the change list
+never contained.
+
+An empty message or an empty path list is `INPUT_VALIDATION_FAILED`. A path that
+is not in the current change set is too, and says to reload the list. A project
+not under git is `GIT_UNAVAILABLE`. Committer identity is checked before
+anything is staged, so a failure leaves the git index untouched.
+
+## Errors
+
+GraftErrors throughout, mapped to status codes.
+
+| Status | Codes |
+| --- | --- |
+| 400 | `INPUT_VALIDATION_FAILED`, `SCHEMA_VALIDATION_FAILED`, `INVALID_SLUG`, `AUTHORITY_MISMATCH` |
+| 401 | `UNAUTHORIZED`, `TOKEN_INVALID` |
+| 403 | `APPROVAL_SELF_DECISION` |
+| 404 | `DOCUMENT_NOT_FOUND`, `COLLECTION_NOT_FOUND`, `APPROVAL_INVALID`, `ROUTE_NOT_FOUND` |
+| 405 | `METHOD_NOT_ALLOWED` |
+| 409 | `GIT_UNAVAILABLE`, `COMMIT_FAILED` |
+| 500 | Anything unexpected |
+
+`GIT_UNAVAILABLE` and `COMMIT_FAILED` are 409 rather than 500 because neither is
+a malformed request or a server fault. The repository is in a state that cannot
+satisfy the request.
+
+A route id containing malformed percent-encoding is a bad request rather than a
+server error, and says so.
+
+## Mounting it yourself
+
+`createStudioApiHandler` gives you the API alone. `createStudioHandler` adds the
+SPA.
+
+```ts
+import { createStudioHandler } from "@usegraft/studio";
+
+const handler = createStudioHandler({
+  db,
+  collections,
+  contentDir,
+  mdxTrust,
+  defaultBranch: "main",
+  decider: { kind: "human", id: "ops@example.com" },
+  authenticate,
+  uiBasePath: "/studio",
+});
+```
+
+| Option | Purpose |
+| --- | --- |
+| `contentDir` | Absolute content root. Required for document reads and writes |
+| `projectRoot` | Where `graft/` lives, for the project's editor component declarations. Defaults to the content directory's parent |
+| `mdxTrust` | Governs the whole-tree recompile that follows a save |
+| `defaultBranch` | Branch used for compile and the tree default |
+| `decider` | Identity approval decisions are attributed to. A value or a function. **Defaults to `{ kind: "human", id: "studio" }`** — set it, or every decision in the audit trail names the same generic identity |
+| `uiBasePath` | URL prefix for the UI. Empty string serves it at `/` |
+
+API paths are always absolute `/api/studio/v1/*` regardless of `uiBasePath`.
+
+`decider` is resolved from configuration, never from the request — a caller
+cannot name its own decider, which is what the requester-cannot-decide rule
+depends on. It is **not** derived from whatever `authenticate` returned, so an
+embedding that authenticates real people still attributes every approval to the
+one configured identity unless you pass a function:
+
+```ts
+createStudioApiHandler({
+  // Resolved per call, from your own session — not from anything the caller
+  // sends. The audit row is only as useful as this value.
+  decider: () => ({ kind: "human", id: currentOperator().email }),
+});
+```
+
+The default exists so a local single-operator mount works with no configuration.
+On anything with more than one person behind it, leaving it unset makes the
+approval trail unable to answer who approved what.
+
+The shell redirects to add a trailing slash, so relative asset references
+resolve, and pins `?branch` to the mounted branch. Without that pin,
+`graft serve --studio --branch preview` served the UI for `main`.
+
+## Next steps
+
+- [Studio](/docs/studio) — what the UI does with all of this
+- [Hardening](/docs/hardening) — why decide can fail on a deployment
+- [CLI reference](/docs/cli-reference) — the same operations as commands
+- [MCP tools](/docs/mcp-tools) — and as tools

@@ -19,6 +19,6 @@ both accept `index` from `openStaticIndex(".graft/index.db")`, which is what
 read example now shows where its `db` or `index` comes from instead of leaving
 the handle undefined.
 
-`@usegraft/sdk-sveltekit` gets the same treatment in the repository, but it
-is still `private` and so cannot be named in a changeset. Its README ships with
-whatever release first publishes it.
+`@usegraft/sdk-sveltekit` gets the same treatment, and its README ships in this
+release. It was `private` and so could not be named in a changeset at all. It
+is public now, at the same version as the rest of the workspace.

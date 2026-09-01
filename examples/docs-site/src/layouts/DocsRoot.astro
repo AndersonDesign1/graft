@@ -13,9 +13,11 @@ import "../styles/fumadocs.css";
 interface Props {
   title: string;
   description?: string;
+  /** This page's Markdown twin, advertised to agents that prefer the source. */
+  markdownHref?: string;
 }
 
-const { title, description } = Astro.props;
+const { title, description, markdownHref } = Astro.props;
 ---
 
 <!doctype html>
@@ -26,6 +28,11 @@ const { title, description } = Astro.props;
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    {/* Discovery for agents: the Markdown source of this page, and the index
+        of every page. Advertised in the head so a crawler finds them without
+        being told, which is the whole reason the routes exist. */}
+    {markdownHref && <link rel="alternate" type="text/markdown" href={markdownHref} />}
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
     <meta name="generator" content={Astro.generator} />
   </head>
   <body class="flex flex-col min-h-screen">

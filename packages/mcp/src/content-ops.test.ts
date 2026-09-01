@@ -186,6 +186,51 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+describe("path containment", () => {
+  // Found by pulling on a symlink finding from the pull request review, and
+  // worse than the finding: `write_content`'s `slug` was `z.string()` with no
+  // shape constraint, and `parseDocument` is no backstop because it validates
+  // `basename(sourcePath)` — so "../../escaped" parsed as the entirely legal
+  // slug "escaped" while the join walked two directories up. Confirmed by
+  // running it: the file landed outside contentDir and the call returned
+  // success, not an error.
+  it("refuses a slug that would write outside contentDir", async () => {
+    const escaped = join(dir, "..", "escaped.mdx");
+    const { isError, payload } = await callTool("write_content", {
+      collection: "pages",
+      slug: "../../escaped",
+      data: { title: "X" },
+      body: "owned",
+    });
+
+    expect(isError).toBe(true);
+    expect(existsSync(escaped)).toBe(false);
+    // The schema rejects it first, so the caller is told the rule rather than
+    // the resolved path — which would echo a filesystem layout back at them.
+    expect(String(payload.message ?? payload.error)).toMatch(/kebab-case|slug/i);
+  });
+
+  it("refuses a traversing slug on delete_content too", async () => {
+    const { isError } = await callTool("delete_content", {
+      collection: "pages",
+      slug: "../../keep",
+    });
+    expect(isError).toBe(true);
+    expect(existsSync(join(dir, "pages", "keep.mdx"))).toBe(true);
+  });
+
+  it("still writes an ordinary slug where it belongs", async () => {
+    const { isError } = await callTool("write_content", {
+      collection: "pages",
+      slug: "about",
+      data: { title: "About" },
+      body: "Hello",
+    });
+    expect(isError).toBe(false);
+    expect(existsSync(join(dir, "pages", "about.mdx"))).toBe(true);
+  });
+});
+
 describe("delete_content — the destructive gate over MCP", () => {
   it("files an approval and fails self-teachingly on the first call", async () => {
     const { isError, payload } = await callTool("delete_content", {

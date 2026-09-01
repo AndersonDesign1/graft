@@ -16,7 +16,7 @@
 import { GraftError } from "@usegraft/contracts";
 import type { FunctionActor } from "@usegraft/core";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { createGraftMcp, type GraftMcpOptions } from "./server";
+import { createDocsMcp, createGraftMcp, type DocsMcpOptions, type GraftMcpOptions } from "./server";
 
 export interface GraftMcpHandlerOptions extends GraftMcpOptions {
   /**
@@ -65,6 +65,29 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
       message:
         "createGraftMcpHandler was given no way to authenticate callers, and this endpoint serves content writes, asset uploads and approval decisions.",
       fix: "Pass `actor` — the @usegraft/auth `createActorResolver` seam, the same one the functions route uses. For a local dev server with no auth at all, pass `allowAnonymous: true` explicitly; never do that on anything reachable from a network.",
+    });
+  }
+
+  // Elicited approvals were documented as "a remote or public mount must never
+  // set it" and enforced nowhere, which cubic pointed out on the pull request.
+  // A documented caution is the wrong shape for this one, because getting it
+  // wrong inverts the gate rather than weakening it: elicitation asks the
+  // *client*, and the client on an HTTP mount is the calling agent, while
+  // `decider` is configured server-side. So a remote caller answers its own
+  // destructive call and the approval is recorded as the operator's decision —
+  // self-approval with the audit trail naming someone else. The whole point of
+  // `requested_by_id <> decided_by` living in the UPDATE's WHERE is that this
+  // cannot happen, and routing the question to the requester's own client walks
+  // around it.
+  //
+  // Elicitation is for a stdio server whose operator is sitting at the machine.
+  // That is `createGraftMcp`, which still accepts it.
+  if (serverOptions.approvalElicitation !== undefined) {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message:
+        "createGraftMcpHandler cannot use `approvalElicitation`: over HTTP the client being asked to approve is the agent that made the call.",
+      fix: "Drop `approvalElicitation` from this handler. Approvals over HTTP go through the out-of-band path — the call returns DESTRUCTIVE_OP_REQUIRES_APPROVAL with an id, a human runs `graft approve <id>`, and the caller retries with it. Elicitation is for a stdio server (`createGraftMcp` / `graft mcp --elicit-approvals`) whose operator is at the machine.",
     });
   }
 
@@ -122,6 +145,41 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
     } finally {
       // JSON mode returns complete bodies, so closing after handleRequest
       // resolves cannot cut a response short.
+      void server.close().catch(() => undefined);
+    }
+  };
+}
+
+/**
+ * A public documentation MCP endpoint, over the same stateless transport.
+ *
+ * Deliberately has no `actor` and no `allowAnonymous`. The full handler refuses
+ * to start without one of them because it serves writes, uploads and approval
+ * decisions; this one serves documentation, so there is nothing to authenticate
+ * and nothing to accidentally leave open. That is the point of it being a
+ * separate function: the closed endpoint gains no new way to be opened.
+ *
+ * Mount it at `/mcp` on the docs domain, which is where clients look —
+ * Mintlify generates one there for every site it hosts, and Cloudflare runs a
+ * documentation server separately from its authenticated API server.
+ */
+export function createDocsMcpHandler(options: DocsMcpOptions): GraftMcpHandler {
+  return async (request: Request): Promise<Response> => {
+    if (request.method !== "POST") {
+      return jsonRpcError(405, -32000, "Method not allowed: this server is stateless (POST only)", {
+        allow: "POST",
+      });
+    }
+
+    const server = createDocsMcp(options);
+    const transport = new WebStandardStreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
+    });
+    try {
+      await server.connect(transport);
+      return await transport.handleRequest(request);
+    } finally {
       void server.close().catch(() => undefined);
     }
   };

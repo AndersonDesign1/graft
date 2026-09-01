@@ -83,18 +83,27 @@ const body = codes
   })
   .join("\n\n");
 
+// The "do not edit" banner lives in the frontmatter, as YAML comments.
+//
+// It used to be an MDX comment, `{/* … */}`, which is a JSX expression holding
+// a JavaScript comment — and @usegraft/mdx-safety refuses executable MDX, so
+// this page failed `graft compile` and never entered the index. The whole
+// error reference was missing from docs search, and because the compile aborts
+// on the first offender, no other doc could be reindexed either.
+//
+// MDX 3 has no HTML comment to fall back on (`<!--` is a parse error), so the
+// frontmatter is the only place left that is both invisible to readers and
+// inert. gray-matter drops comments from the parsed data and composeDocument
+// preserves the block verbatim, so they survive a Studio save.
 const page = `---
+# GENERATED FILE. Do not edit.
+# Source: ERROR_KNOWLEDGE in packages/mcp/src/explain.ts
+# Regenerate: node scripts/gen-error-docs.mjs
 title: Error reference
 description: ${quote(`Every Graft error code, what it means, and how to recover. ${codes.length} codes.`)}
 section: Reference
 order: 4
 ---
-
-{/*
-  GENERATED FILE. Do not edit.
-  Source: ERROR_KNOWLEDGE in packages/mcp/src/explain.ts
-  Regenerate: node scripts/gen-error-docs.mjs
-*/}
 
 Every error Graft throws across a package boundary is a \`GraftError\`. It carries
 a \`code\` from this list, a \`message\` saying what happened, and a \`fix\` naming

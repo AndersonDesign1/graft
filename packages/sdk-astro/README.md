@@ -90,4 +90,4 @@ Astro.response.headers.set("Cache-Tag", tagsFor(branch, "pages", slug).join(",")
 
 ---
 
-MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/feat/core/packages/sdk-astro/CHANGELOG.md)
+MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/main/packages/sdk-astro/CHANGELOG.md)

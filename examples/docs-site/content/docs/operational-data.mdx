@@ -1,0 +1,202 @@
+---
+title: Operational data
+description: db-authoritative collections and the record helpers that read and write them.
+section: Build
+order: 8
+---
+
+<TierBadge tier="postgres" />
+
+Some data is not content. Form submissions, orders, and comments are written by
+users at runtime, not authored in git, and git cannot rebuild them.
+
+Graft calls that operational data. It lives in Postgres, in `data_records`, and
+it is reachable only through typed functions.
+
+## Declaring a collection
+
+One flag separates it from authored content.
+
+```ts
+export const submissions = defineCollection({
+  name: "submissions",
+  authority: "db-authoritative",
+  description: "Landing-page contact submissions. Write via submitContact.",
+  fields: {
+    email: field.string({
+      maxLength: 320,
+      pattern: /^[^@\s]+@[^@\s]+\.[^@\s]+$/,
+      description: "Sender address.",
+    }),
+    message: field.text({ maxLength: 4000, optional: true }),
+  },
+});
+```
+
+The schema does the same job it does for content: it types the function's input,
+validates on the way in, and re-validates on the way out.
+
+Bound your fields. An anonymous form writing into an unbounded `jsonb` column is
+a storage-exhaustion vector no rate limit fixes.
+
+## The two authorities never mix
+
+| | `file-authoritative` (default) | `db-authoritative` |
+| --- | --- | --- |
+| Lives in | `content/<collection>/<slug>.mdx` | `data_records` |
+| Written by | Compile, `write_content`, Studio | Typed functions only |
+| Read by | The SDKs, search, MCP | Typed functions only |
+
+Crossing the line fails at every boundary that could catch it:
+
+- A `.mdx` file in a db-authoritative collection's folder fails compile with
+  `AUTHORITY_MISMATCH`.
+- `write_content` and `delete_content` refuse a db-authoritative collection with
+  the same code, and point at the function endpoint.
+- A record helper aimed at a file-authoritative collection refuses too.
+
+## The record helpers
+
+Handlers call these. They enforce authority, validate against the collection's
+Zod schema, and stamp actor and correlation id on every row.
+
+Pass the handler's `ctx` straight through as the first argument.
+
+### insertRecord
+
+```ts
+const record = await insertRecord(ctx, submissions, ctx.input);
+// → { id, branch, collection, data, actorKind, actorId, correlationId, createdAt }
+```
+
+Validates, then inserts. The returned `data` is typed by the collection.
+
+### listRecords
+
+```ts
+const rows = await listRecords(ctx, comments, {
+  limit: 20,
+  match: { pageSlug: "pricing", approved: true },
+});
+```
+
+Newest first, re-validated on read.
+
+`limit` defaults to 50 and is clamped to 500. It is clamped rather than trusted
+because it routinely comes from a function input, and an unclamped one reaches
+Postgres directly.
+
+`match` applies equality filters **in SQL**, and using it is a correctness
+matter rather than a performance one. The row cap applies to the scan, so rows
+that do not match still consume the window. A public "list approved comments"
+that filtered in JavaScript could be emptied site-wide by posting enough newer
+unapproved rows to fill it.
+
+### updateRecord
+
+```ts
+const updated = await updateRecord(ctx, orders, id, { status: "shipped" });
+```
+
+A partial patch, merged and then validated against the full schema. An update
+that would violate the schema fails with `SCHEMA_VALIDATION_FAILED` and writes
+nothing.
+
+This is the moderation and status-change primitive: approve a comment, advance
+an order.
+
+### deleteRecord
+
+```ts
+const removed = await deleteRecord(ctx, submissions, id);
+// → { id, data }
+```
+
+<Callout label="irreversible">
+  `deleteRecord` is a hard delete. There is no tombstone, no soft-delete column,
+  and git does not restore it, because git never had it. Mark any function that
+  calls this `destructive: true`.
+</Callout>
+
+### searchRecords
+
+```ts
+const hits = await searchRecords(ctx, submissions, 'refund "order 41" -spam');
+```
+
+Full-text over every string value in the record's `data`. Same websearch syntax
+as content search: words, `"quoted phrases"`, `or`, and `-exclusions`.
+
+Search is a read, so it stays behind the typed-function boundary and
+re-validates rows on the way out. There is deliberately no open MCP or HTTP
+surface for searching operational data.
+
+## A complete function
+
+```ts
+export const submitContact = defineFunction({
+  name: "submitContact",
+  kind: "mutation",
+  public: true,
+  rateLimit: { limit: 5, windowSeconds: 60 },
+  description: "Stores a contact-form submission.",
+  returns: "{ id: string; receivedAt: string }",
+  input: submissions.fields,
+  handler: async (ctx) => {
+    const record = await insertRecord(ctx, submissions, ctx.input);
+    return { id: record.id, receivedAt: record.createdAt.toISOString() };
+  },
+});
+```
+
+`input: submissions.fields` reuses the collection's fields as the function's
+input schema, so the two cannot drift.
+
+`public: true` is the greppable opt-out of the anonymous-mutation deny default.
+Without it, this endpoint would refuse the anonymous visitors a contact form
+exists for.
+
+## Branches and operational data
+
+Preview branches inherit **content**, never operational data. Both backends
+arrive at that, by different routes:
+
+- **Overlay** branches read data at the exact branch, so a branch simply has no
+  rows until something writes them.
+- **Neon** forks copy storage, so `data_records` and `approvals` are cleared on
+  create. `audit_log` stays, because that is history.
+
+Approvals are cleared for a specific reason: a one-shot approval consumed on a
+fork would not mark the parent's copy consumed, which would let one gated
+destructive call execute once per fork.
+
+The result is that a preview shows you the site's shape, not a copy of
+production users.
+
+## Reading it in a page
+
+There is no read SDK for operational data. Write a query function and call it:
+
+```ts
+export const recentSubmissions = defineFunction({
+  name: "recentSubmissions",
+  kind: "query",
+  access: requireScopes("submissions:read"),
+  returns: "{ id: string; email: string }[]",
+  input: {},
+  handler: async (ctx) => {
+    const rows = await listRecords(ctx, submissions, { limit: 20 });
+    return rows.map((row) => ({ id: row.id, email: row.data.email }));
+  },
+});
+```
+
+Queries are open by default, so a query returning anyone's data needs an
+`access` rule. That is the one default worth double-checking in your own config.
+
+## Next steps
+
+- [Functions & access](/docs/functions-and-access) — the function surface
+- [Rate limits](/docs/rate-limits) — protecting a public mutation
+- [Audit & approvals](/docs/audit-and-approvals) — gating a destructive one
+- [Migrations](/docs/migrations) — backfilling records when the schema changes

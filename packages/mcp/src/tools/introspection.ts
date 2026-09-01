@@ -7,15 +7,28 @@ import { GraftError, type SchemaDescription } from "@usegraft/contracts";
 import { z } from "zod";
 import { teachAssetFields } from "../tool-helpers";
 import { guarded } from "../tool-result";
+import { READS } from "./annotations";
+import {
+  describeFunctionOutput,
+  describeSchemaOutput,
+  listCollectionsOutput,
+  listFunctionsOutput,
+} from "./outputs";
 import type { RegisterTools } from "./deps";
 
-export const registerIntrospectionTools: RegisterTools = (server, deps) => {
-  const { branchId, collections, functions, functionsByName } = deps;
+/**
+ * What kinds of content exist. Safe to publish: a collection name and a field
+ * count describe the documents, not the project's API.
+ */
+export const registerCollectionIntrospection: RegisterTools = (server, deps) => {
+  const { branchId, collections } = deps;
 
   server.registerTool(
     "list_collections",
     {
       title: "List collections",
+      outputSchema: listCollectionsOutput,
+      annotations: READS,
       description:
         "List every registered content collection (name, description, authority, field count). Start here to learn what kinds of content this project has.",
       inputSchema: {},
@@ -34,11 +47,24 @@ export const registerIntrospectionTools: RegisterTools = (server, deps) => {
         }),
       })),
   );
+};
+
+/**
+ * The function surface, and the schema view that carries it.
+ *
+ * `describe_schema` has included `functions` since P6.2, which makes it the
+ * project's API rather than its content shape — so it belongs here, with the
+ * function tools, and not on a mount open to the internet.
+ */
+export const registerFunctionIntrospection: RegisterTools = (server, deps) => {
+  const { branchId, collections, functions, functionsByName } = deps;
 
   server.registerTool(
     "describe_schema",
     {
       title: "Describe the content schema",
+      outputSchema: describeSchemaOutput,
+      annotations: READS,
       description:
         "Full schema introspection: every collection with its typed fields (name, type, optional, description), plus every registered function (kind, args, public/destructive). Documents also accept an optional kebab-case `slug` (defaults to the filename). Prefer list_functions / describe_function when you only need the function surface.",
       inputSchema: {},
@@ -59,6 +85,8 @@ export const registerIntrospectionTools: RegisterTools = (server, deps) => {
     "list_functions",
     {
       title: "List functions",
+      outputSchema: listFunctionsOutput,
+      annotations: READS,
       description:
         "List every registered typed function (name, kind, public, destructive, short description). Use describe_function for the full input schema, then run_function to invoke. Mutations reject anonymous callers unless public: true; destructive functions always require human approval (graft approve).",
       inputSchema: {},
@@ -84,6 +112,8 @@ export const registerIntrospectionTools: RegisterTools = (server, deps) => {
     "describe_function",
     {
       title: "Describe one function",
+      outputSchema: describeFunctionOutput,
+      annotations: READS,
       description:
         "Full introspection for one function: kind, args (name/type/optional/description), returns, public, destructive. Use this before run_function so the input object matches the schema.",
       inputSchema: {

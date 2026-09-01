@@ -15,6 +15,7 @@
  * (`Cache-Tag` / `Surrogate-Key`) on SSR responses, and purge
  * `tagsForChanges(branch, changeSet)` from your compile webhook.
  */
+import { createDbClient, type DbClientOptions } from "@usegraft/sdk-core/db";
 import {
   createClient,
   type AnyCollection,
@@ -49,10 +50,21 @@ export interface Graft<TCollections extends Record<string, AnyCollection>> {
   client: GraftClient<TCollections>;
 }
 
+/**
+ * Either an index this adapter reads through, or a Postgres handle it builds
+ * the reader for. Two shapes rather than one optional field so that neither can
+ * be omitted: `createClient` no longer accepts `db`, because taking it there
+ * meant every consumer of `@usegraft/sdk-core` — the browser client included —
+ * carried a Postgres driver in its dependency graph.
+ */
+export type GraftOptions<TCollections extends Record<string, AnyCollection>> =
+  | ClientOptions<TCollections>
+  | DbClientOptions<TCollections>;
+
 export function createGraft<TCollections extends Record<string, AnyCollection>>(
-  options: ClientOptions<TCollections>,
+  options: GraftOptions<TCollections>,
 ): Graft<TCollections> {
-  const client = createClient(options);
+  const client = "db" in options ? createDbClient(options) : createClient(options);
   return {
     client,
     getContent: (collection, slug, opts) => client.getDocument(collection, slug, opts),

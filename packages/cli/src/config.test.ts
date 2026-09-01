@@ -118,6 +118,47 @@ describe("requireDatabaseUrl", () => {
   });
 });
 
+describe("loadConfig — approvalPolicy", () => {
+  // It lives in config rather than GRAFT_APPROVAL_POLICY on purpose: this is
+  // the setting that turns off the human gate on irreversible work, and a
+  // dashboard variable never reaches a diff or a reviewer.
+  it('defaults to "none" when the project does not export it', async () => {
+    const config = await loadConfig(join(fixtures, "basic", "graft.config.ts"));
+    expect(config.approvalPolicy).toBe("none");
+  });
+
+  it('reads "unattended" from the project', async () => {
+    const config = await loadConfig(join(fixtures, "approval-unattended", "graft.config.ts"));
+    expect(config.approvalPolicy).toBe("unattended");
+  });
+
+  it("refuses an unrecognised value rather than defaulting it", async () => {
+    // Defaulting a typo here would quietly pick a policy nobody wrote down. The
+    // safe direction is not obviously "none" either: someone typing "unatended"
+    // wanted the gate off, and silently gating instead breaks their scheduled
+    // job at 3am. Refusing says so at boot.
+    expect(
+      await graftErrorCodeAsync(() =>
+        loadConfig(join(fixtures, "approval-bad", "graft.config.ts")),
+      ),
+    ).toBe("CONFIG_INVALID");
+  });
+
+  it("names all three valid values in the fix", async () => {
+    try {
+      await loadConfig(join(fixtures, "approval-bad", "graft.config.ts"));
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      // SAFETY: parseApprovalPolicy throws GraftError on this fixture, and the
+      // unreachable() above fails the test if it threw nothing at all.
+      const fix = (error as GraftError).fix ?? "";
+      expect(fix).toContain("none");
+      expect(fix).toContain("human");
+      expect(fix).toContain("unattended");
+    }
+  });
+});
+
 describe("loadConfig — mdxTrust", () => {
   it('defaults to "restricted" when the project does not export it', async () => {
     const config = await loadConfig(join(fixtures, "basic", "graft.config.ts"));

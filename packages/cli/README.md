@@ -38,7 +38,7 @@ export const index = "postgres";
 | `graft init`                   | Scaffold a project                                                                             |
 | `graft compile`                | Validate authored MDX and project it into the index                                            |
 | `graft dev`                    | Recompile on save                                                                              |
-| `graft serve`                  | Run the headless runtime: typed functions, MCP over HTTP, `/healthz`                           |
+| `graft serve`                  | Run the headless runtime: typed functions, MCP, authored-content reads, `/healthz`             |
 | `graft studio`                 | Open the optional editing UI                                                                   |
 | `graft mcp`                    | Serve MCP on stdio, for `.mcp.json`                                                            |
 | `graft add <item>`             | Copy a registry primitive into your repo, shadcn-style                                         |
@@ -61,4 +61,4 @@ graft harden graft_runtime
 
 ---
 
-MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/feat/core/packages/cli/CHANGELOG.md) · [Security policy](https://github.com/AndersonDesign1/graft/blob/feat/core/SECURITY.md)
+MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/main/packages/cli/CHANGELOG.md) · [Security policy](https://github.com/AndersonDesign1/graft/blob/main/SECURITY.md)

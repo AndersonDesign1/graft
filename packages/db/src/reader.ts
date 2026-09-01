@@ -9,36 +9,24 @@
  * - `openStaticIndex` (static.ts): the compiled SQLite artifact — no server,
  *   no env; the artifact IS the branch.
  */
+import type {
+  ContentIndexReader,
+  ReaderReadOptions,
+  ReaderSearchOptions,
+} from "@usegraft/contracts";
 import { readContent, resolveBranchScope, scopeChain, type BranchScope } from "./branch";
 import type { Database } from "./client";
 import { searchContent, type ContentSearchHit } from "./search";
 import type { ContentRow } from "./schema";
 
-export interface ReaderReadOptions {
-  collection: string;
-  /** When set, read a single document; otherwise the whole collection. */
-  slug?: string;
-  limit?: number;
-  offset?: number;
-  /** Branch to read; defaults to "main". Static readers serve their compiled branch regardless. */
-  branch?: string;
-}
-
-export interface ReaderSearchOptions {
-  /** Websearch-syntax query: words, "quoted phrases", `or`, -exclusions. */
-  query: string;
-  /** Restrict to these collections; defaults to all. */
-  collections?: string[];
-  /** Max hits, best-ranked first. Defaults to 20. */
-  limit?: number;
-  branch?: string;
-}
-
-export interface ContentIndexReader {
-  readContent(options: ReaderReadOptions): Promise<ContentRow[]>;
-  searchContent(options: ReaderSearchOptions): Promise<ContentSearchHit[]>;
-  close(): Promise<void>;
-}
+// The seam itself is published from @usegraft/contracts, so a consumer can
+// implement or describe it without a database driver. Re-exported here because
+// this is where callers already import it from.
+export type {
+  ContentIndexReader,
+  ReaderReadOptions,
+  ReaderSearchOptions,
+} from "@usegraft/contracts";
 
 /** The Postgres-backed reader over an existing Database handle (does not own/close it). */
 export function createDbIndexReader(db: Database): ContentIndexReader {

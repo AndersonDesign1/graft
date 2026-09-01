@@ -186,3 +186,292 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+/* Tabs — switching without JavaScript.
+
+   The radios sit before the list and the panels so a sibling combinator can
+   reach both. Every panel is hidden; the rules below re-show the one whose
+   radio is checked. Six is the ceiling, which covers npm/pnpm/yarn/bun with
+   room to spare, and an author who needs more should probably be writing
+   sections. */
+.tabs {
+  margin-block: var(--space-6);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.tab-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tab-list {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2) 0;
+  background: var(--paper-sunken);
+  border-block-end: 1px solid var(--hairline-strong);
+  overflow-x: auto;
+}
+
+.tab-label {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+}
+
+.tab-label:hover {
+  color: var(--ink);
+}
+
+.tab-panel {
+  display: none;
+  padding: var(--space-4);
+}
+
+/* The panel's own block spacing would double the padding above. */
+.tab-panel > :first-child {
+  margin-block-start: 0;
+}
+.tab-panel > :last-child {
+  margin-block-end: 0;
+}
+
+/* A focused tab must be visible, or keyboard users cannot tell where they are. */
+.tab-input:focus-visible + .tab-input + .tab-list .tab-label,
+.tab-input:focus-visible ~ .tab-list .tab-label {
+  outline: none;
+}
+
+.tabs:has(.tab-input:nth-of-type(1):checked) .tab-label:nth-of-type(1),
+.tabs:has(.tab-input:nth-of-type(2):checked) .tab-label:nth-of-type(2),
+.tabs:has(.tab-input:nth-of-type(3):checked) .tab-label:nth-of-type(3),
+.tabs:has(.tab-input:nth-of-type(4):checked) .tab-label:nth-of-type(4),
+.tabs:has(.tab-input:nth-of-type(5):checked) .tab-label:nth-of-type(5),
+.tabs:has(.tab-input:nth-of-type(6):checked) .tab-label:nth-of-type(6) {
+  color: var(--ink);
+  border-block-end-color: var(--mark);
+}
+
+.tabs:has(.tab-input:nth-of-type(1):checked) .tab-panel:nth-of-type(1),
+.tabs:has(.tab-input:nth-of-type(2):checked) .tab-panel:nth-of-type(2),
+.tabs:has(.tab-input:nth-of-type(3):checked) .tab-panel:nth-of-type(3),
+.tabs:has(.tab-input:nth-of-type(4):checked) .tab-panel:nth-of-type(4),
+.tabs:has(.tab-input:nth-of-type(5):checked) .tab-panel:nth-of-type(5),
+.tabs:has(.tab-input:nth-of-type(6):checked) .tab-panel:nth-of-type(6) {
+  display: block;
+}
+
+.tabs:has(.tab-input:focus-visible) .tab-list {
+  outline: 2px solid var(--mark);
+  outline-offset: -2px;
+}
+
+/* CodeBlock — a titled fence. The bar says where the code goes. */
+.codeblock {
+  margin-block: var(--space-6);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.codeblock-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--paper-sunken);
+  border-block-end: 1px solid var(--hairline-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.codeblock-title {
+  color: var(--ink);
+}
+
+.codeblock-note {
+  color: var(--ink-faint);
+}
+
+/* The fence brings its own card; inside the frame it would be a second one. */
+.codeblock-body pre {
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Steps — numbers from a counter, so inserting one renumbers nothing. */
+.prose ol.steps {
+  list-style: none;
+  counter-reset: step;
+  padding: 0;
+  margin-block: var(--space-6);
+}
+
+.prose ol.steps > li.step {
+  counter-increment: step;
+  position: relative;
+  padding-inline-start: var(--space-8);
+  padding-block-end: var(--space-6);
+  margin-block-start: 0;
+}
+
+.prose ol.steps > li.step::before {
+  content: counter(step);
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--paper-sunken);
+  border: 1px solid var(--hairline-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+/* The rule joins one step's marker to the next, and stops at the last. */
+.prose ol.steps > li.step::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0.875rem;
+  inset-block: 1.75rem 0;
+  border-inline-start: 1px solid var(--hairline-strong);
+}
+
+.prose ol.steps > li.step:last-child::after {
+  display: none;
+}
+
+.prose ol.steps > li.step:last-child {
+  padding-block-end: 0;
+}
+
+.step-title {
+  margin: 0 0 var(--space-2);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.step-body > :first-child {
+  margin-block-start: 0;
+}
+
+.step-body > :last-child {
+  margin-block-end: 0;
+}
+
+/* TierBadge — a binary answer the reader is usually scanning for. */
+.tier-badge {
+  display: inline-block;
+  padding: 0.1em 0.5em;
+  border-radius: 999px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--paper-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.tier-badge.tier-postgres {
+  border-color: color-mix(in oklch, var(--mark) 40%, var(--hairline-strong));
+  color: var(--mark);
+}
+
+/* FieldTable — generated from the collection, so it cannot drift. */
+.field-table-wrap {
+  margin-block: var(--space-6);
+  overflow-x: auto;
+}
+
+.prose table.field-table {
+  margin: 0;
+  width: 100%;
+}
+
+.field-name {
+  white-space: nowrap;
+}
+
+.field-type {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+/* A nested field is indented under its parent rather than given its own table. */
+.prose table.field-table tr[data-depth="1"] td:first-child {
+  padding-inline-start: var(--space-5);
+}
+
+.prose table.field-table tr[data-depth="1"] .field-name::before {
+  content: "└ ";
+  color: var(--ink-faint);
+}
+
+.field-table-missing {
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.prose ul,
+.prose ol {
+  padding-inline-start: 1.25em;
+  margin: 0;
+}
+
+.prose li + li {
+  margin-block-start: var(--space-2);
+}
+
+.prose blockquote {
+  margin: 0;
+  padding-inline-start: var(--space-4);
+  border-inline-start: 2px solid var(--mark);
+  color: var(--ink-muted);
+}
+
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--text-sm);
+}
+
+.prose th {
+  text-align: left;
+  font-weight: 600;
+  border-block-end: 1px solid var(--hairline-strong);
+  padding: var(--space-2) var(--space-3);
+}
+
+.prose td {
+  border-block-end: 1px solid var(--hairline);
+  padding: var(--space-2) var(--space-3);
+}
+
+/* ---- reduced motion: gentler, not zero ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 60ms !important;
+  }
+  button:active,
+  .pressable:active {
+    transform: none;
+  }
+}

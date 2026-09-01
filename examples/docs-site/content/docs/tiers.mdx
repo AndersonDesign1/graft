@@ -1,0 +1,200 @@
+---
+title: Static or Postgres
+description: The one decision a new project makes, and what changes when you switch.
+section: Start here
+order: 3
+---
+
+Graft runs on two tiers. Picking one is the first real decision in a project,
+and it is one line of config.
+
+```ts
+// graft.config.ts
+export const index = "static"; // or "postgres" (the default when omitted)
+```
+
+The tier decides where the **index** lives. It does not change how you author,
+how you read, or what your schema looks like.
+
+## The split
+
+Postgres does two jobs for Graft. The tiers split them apart.
+
+| Job | What it holds | Static tier | Postgres tier |
+| --- | --- | --- | --- |
+| Content index | Projected documents, full-text search, compile trail | A SQLite file | `content_index` |
+| Operational data | `data_records`, `audit_log`, `approvals`, branches | Not available | Postgres |
+
+The content index is derived from git, so it can be a file. Operational data is
+real state that git cannot rebuild, so it stays in Postgres.
+
+## What you get on each
+
+<TierBadge tier="static" />
+
+Everything in the authoring loop, with no service to run:
+
+- `graft init`, `graft compile`, `graft dev`
+- Typed reads through `@usegraft/sdk-core` and the framework SDKs
+- Full-text search, including snippets and ranking
+- `graft mcp` — authoring over MCP works the same way
+- MCP document resources, prompts, and argument completion
+- `graft asset put`, once S3 credentials are set
+
+<TierBadge tier="postgres" />
+
+Everything above, plus the parts that need real state:
+
+- `authority: "db-authoritative"` collections
+- `defineFunction` and `POST /api/fn/<name>`
+- The audit log, rate limits, and human-gated approvals
+- Copy-on-write branches and `graft merge`
+- Studio, and `graft serve` (which mounts functions, MCP, and the content API)
+
+## Where the line is drawn
+
+The boundary is checked when your config loads, not when a feature eventually
+breaks. A static project that declares a typed function or a db-authoritative
+collection is refused with `NEEDS_DATABASE`, and the message names the
+offenders.
+
+```text
+graft.config.ts uses the static index, but declares typed function(s)
+"submitContact" — those live in Postgres, not in the compiled artifact.
+```
+
+The `fix` on that error is the upgrade, in order. Follow it and nothing else
+changes.
+
+## The artifact
+
+`graft compile` writes `.graft/index.db` in static mode. Facts worth knowing
+about it:
+
+- It is derived from the files in git, so it is git-ignored. Rebuild it in your
+  build command: `graft compile && next build`.
+- Each compile is a full rebuild into a temporary file, then a rename. There is
+  no partial state to recover from.
+- Readers open it read-only, so a read-only deployment filesystem is fine.
+- It uses `node:sqlite`, which ships with Node. The static tier adds no npm
+  dependency and no native build step.
+- The artifact **is** the branch. A `branch` argument is accepted and ignored,
+  because each checkout compiles its own file.
+
+Reads open it directly:
+
+<CodeBlock title="app/page.ts" note="static tier">
+
+```ts
+import { openStaticIndex } from "@usegraft/db";
+import { createClient } from "@usegraft/sdk-core";
+import { collections } from "./graft.config";
+
+const index = await openStaticIndex(".graft/index.db");
+const graft = createClient({ index, collections });
+```
+
+</CodeBlock>
+
+Two errors belong to this path. `STATIC_INDEX_NOT_FOUND` means you read before
+the first compile. `STATIC_INDEX_UNSUPPORTED` means the Node version has no
+`node:sqlite`.
+
+## Agents work on both tiers
+
+The agent surface is not a Postgres feature. `graft mcp` serves a static
+project, `write_content` validates and recompiles the same way, and
+`search_content` reads the artifact.
+
+Postgres-tier tools stay registered rather than disappearing. Calling one
+answers `NEEDS_DATABASE` with the upgrade, because an absent tool teaches
+nothing. Two of those refusals are deliberate:
+
+| Tool | Why it refuses in static mode |
+| --- | --- |
+| `delete_content` | Its one-shot human approval is a Postgres table. Serving it without that would turn a gated delete into an ungated one. Delete the file and recompile instead — git history is the undo |
+| `list_compilations` | The artifact carries the last 50 runs, but the Postgres trail is the full history. Returning a truncated one under the same name would be a quieter lie than an error |
+
+## Moving to Postgres
+
+Four steps, in this order.
+
+<Steps>
+
+<Step title="Point at a database">
+
+```sh
+DATABASE_URL=postgres://…
+```
+
+Any parent directory's `.env` works. Commands walk up from the working
+directory.
+
+</Step>
+
+<Step title="Change the index">
+
+```ts
+export const index = "postgres";
+```
+
+</Step>
+
+<Step title="Apply the schema">
+
+```sh
+graft db migrate
+```
+
+The SQL ships inside `@usegraft/db`, so there is no drizzle-kit to install and
+no migrations to check out. Unlike `graft migrate` and `graft merge`, this
+applies by default: it is generated, additive, idempotent DDL and the
+prerequisite for anything else working. Pass `--dry-run` to list what is
+pending.
+
+</Step>
+
+<Step title="Compile again">
+
+```sh
+graft compile
+```
+
+</Step>
+
+</Steps>
+
+Reads move from the artifact to a framework adapter, which takes the database
+instead:
+
+```ts
+import { createGraft } from "@usegraft/sdk-astro";
+import { collections } from "../graft.config";
+
+const graft = createGraft({ db, collections });
+```
+
+## Going the other way
+
+Nothing stops you setting `index = "static"` again, but the config will refuse
+to load while typed functions or db-authoritative collections are still
+declared. Remove them first. A `graft add` primitive that brought one can be
+deleted from `graft/`.
+
+Postgres also owns your operational rows, and switching the index does not move
+them anywhere. They stay in the database.
+
+## One database per project
+
+Two projects sharing a `DATABASE_URL` would each purge the other's documents on
+compile. Graft refuses: a compile that would remove collections your schema does
+not know aborts with `INDEX_OWNERSHIP` and writes nothing.
+
+The static tier cannot have this problem. The artifact lives in the project.
+
+## Next steps
+
+- [Getting started](/docs/getting-started) — the static loop end to end
+- [The model](/docs/the-model) — why the index is derived
+- [Configuration](/docs/configuration) — every environment variable
+- [Deploy](/docs/deploy) — self-host either tier

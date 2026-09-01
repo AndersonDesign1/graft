@@ -1,6 +1,5 @@
-import { GraftError } from "@usegraft/contracts";
+import { GraftError, setRequestPeer } from "@usegraft/contracts";
 import { AUDIT_IN_FLIGHT } from "@usegraft/db";
-import { setRequestPeer } from "./peer";
 import type { ApprovalStore, AuditEntry, AuditStore, Database } from "@usegraft/db";
 import { describe, expect, it } from "vitest";
 import { field } from "./field";
@@ -740,6 +739,83 @@ describe("destructive-op human gate (P3.4)", () => {
     const handler = p34handler(stores);
     expect((await handler(post("guardedMutation", {}))).status).toBe(200);
     expect(stores.approvalRows.size).toBe(0);
+  });
+
+  it("approvalPolicy 'none' still gates a destructive function", async () => {
+    // The arm with no off switch before "unattended" existed. Pinned so the
+    // new value cannot quietly become the behaviour of the default.
+    const stores = memoryStores();
+    const handler = p34handler(stores);
+
+    expect((await handler(post("nuke", { target: "x" }))).status).toBe(403);
+    expect(stores.approvalRows.size).toBe(1);
+  });
+
+  it("approvalPolicy 'unattended' runs a destructive function with no human", async () => {
+    // The case the other two policies had no answer for: a scheduled job or a
+    // CI migration, where there is nobody to ask and refusing forever is not a
+    // policy but the absence of one.
+    const stores = memoryStores();
+    const handler = p34handler(stores, { approvalPolicy: "unattended" });
+
+    expect((await handler(post("nuke", { target: "x" }))).status).toBe(200);
+    // Nothing was filed, because nothing was waiting for anyone.
+    expect(stores.approvalRows.size).toBe(0);
+  });
+
+  it("approvalPolicy 'unattended' still writes the audit row", async () => {
+    // What "unattended" gives up is the waiting, not the record. A deployment
+    // that cannot say who deleted what is a different and worse thing.
+    const stores = memoryStores();
+    const handler = p34handler(stores, { approvalPolicy: "unattended" });
+
+    const before = stores.auditRows.length;
+    await handler(post("nuke", { target: "x" }));
+
+    expect(stores.auditRows.length).toBe(before + 1);
+    expect(stores.auditRows.at(-1)).toMatchObject({ functionName: "nuke" });
+  });
+
+  it("approvalPolicy 'unattended' still spends an approval the caller presents", async () => {
+    // The gate is off, so the call runs either way. What must not happen is the
+    // row surviving as `approved`: tighten the policy back to "none" later and a
+    // stale row would still authorize a destructive call nobody re-reviewed.
+    // One-shot has to hold across a policy change, which is when it matters.
+    const stores = memoryStores();
+    const gated = p34handler(stores, { approvalPolicy: "none" });
+
+    // File and approve under the gated policy.
+    await gated(post("nuke", { target: "row-1" }));
+    const id = [...stores.approvalRows.keys()].at(-1)!;
+    stores.approve(id);
+
+    // Now the deployment flips to unattended and the token is presented.
+    const unattended = p34handler(stores, { approvalPolicy: "unattended" });
+    expect(
+      (await unattended(postWith("nuke", { target: "row-1" }, { "x-graft-approval": id }))).status,
+    ).toBe(200);
+    expect(stores.approvalRows.get(id)?.status).toBe("consumed");
+
+    // And the policy tightening again does not find a reusable row.
+    const reuse = await gated(postWith("nuke", { target: "row-1" }, { "x-graft-approval": id }));
+    expect(reuse.status).toBe(403);
+  });
+
+  it("approvalPolicy 'unattended' does not fail a call whose approval store is broken", async () => {
+    // Consuming is best-effort on this path: the call is not gated, so a store
+    // that throws must not turn a permitted invocation into a failure.
+    const stores = memoryStores();
+    const broken = {
+      ...stores.approvals,
+      consume: async () => {
+        throw new Error("approval store is down");
+      },
+    };
+    const handler = p34handler({ ...stores, approvals: broken }, { approvalPolicy: "unattended" });
+
+    expect(
+      (await handler(postWith("nuke", { target: "x" }, { "x-graft-approval": "apr-nope" }))).status,
+    ).toBe(200);
   });
 
   it("describe() exposes the destructive flag for introspection", () => {

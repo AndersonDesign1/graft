@@ -83,7 +83,20 @@ export interface GraftMcpOptions {
    * hero image from the repo is the case the argument exists for.
    */
   localUploadRoot?: string;
-  /** Forwarded to createFunctionsHandler for run_function. */
+  /**
+   * Forwarded to createFunctionsHandler for run_function.
+   *
+   * Deliberately narrower than the core option, which also accepts
+   * `"unattended"`. That policy exists for a deployment with no human to ask —
+   * a scheduled job, a CI step — and an MCP mount is the opposite of that: it
+   * exists because an agent is calling it, and the agent is the party the gate
+   * is there to stop. Allowing it here would let one option turn every
+   * destructive tool an agent can reach into an ungated one.
+   *
+   * A headless deployment that genuinely wants it still has it, on
+   * `createFunctionsHandler` and through `approvalPolicy` in graft.config.ts on
+   * `graft serve`'s /api/fn routes. It just does not reach the tool surface.
+   */
   approvalPolicy?: "none" | "human";
   rateLimit?: RateLimit;
   gitSha?: string;
@@ -95,6 +108,33 @@ export interface GraftMcpOptions {
    * GRAFT_DEV_TOKEN; the HTTP handler forwards the caller's own header.
    */
   defaultAuthorization?: string;
+  /**
+   * Ask the connected client's human to decide a pending approval in-band,
+   * instead of failing with an id and waiting for someone to run
+   * `graft approve`.
+   *
+   * **Off unless configured, and it belongs only on a mount whose human is
+   * actually present** — a local stdio server, a desktop client. A remote or
+   * public mount must never set it: there is nobody at the other end to ask,
+   * and an elicitation nobody answers is a destructive call left hanging.
+   *
+   * The reason this needs an explicit `decider` rather than reusing the
+   * connection's identity is the invariant underneath: `decideApproval`
+   * enforces `requested_by_id <> decided_by` in the UPDATE's own WHERE, so a
+   * requester deciding its own approval is refused by Postgres, not by a guard
+   * that could be forgotten. Elicitation changes *how the human is asked*, not
+   * *who is recorded as having answered*. Name the operator sitting at the
+   * machine; if that operator is also the requester, the decision is refused
+   * exactly as it would be from the CLI.
+   *
+   * Deciding is a plain UPDATE on `approvals`, which the hardened runtime role
+   * deliberately cannot perform (see `graft harden`). On such a deployment this
+   * fails, correctly and by construction.
+   */
+  approvalElicitation?: {
+    /** The operator a decision is attributed to. Never the requester. */
+    decider: { kind: string; id: string };
+  };
   /**
    * Audit / approval stores for run_function. Defaults match createFunctionsHandler
    * (db-backed). Pass `audit: false` in unit tests that do not hit a real DB.

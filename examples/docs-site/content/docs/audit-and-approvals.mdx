@@ -1,8 +1,8 @@
 ---
 title: Audit & approvals
 description: Every invocation leaves a row. Destructive operations wait for a human decision.
-section: Runtime
-order: 2
+section: Operate
+order: 3
 ---
 
 Agents drive Graft hard. Two mechanisms keep that safe: an audit log and
@@ -10,11 +10,16 @@ human-gated approvals.
 
 ## Audit log
 
-Every function invocation writes an `audit_log` row: actor, function, input hash,
-status, duration, correlation id, and the git SHA of the serving code. Rate
-limits count those rows. Handlers stay stateless.
+Every function invocation writes an `audit_log` row: actor, function and kind,
+branch, rate key, status, duration, correlation id, and the git SHA of the
+serving code. Rate limits count those rows. Handlers stay stateless.
 
-Look up a call with `x-graft-correlation-id` from the response headers.
+Inputs are **not** recorded. The row says who ran what and how it went, not what
+they sent. An approval's exact input is stored on the `approvals` row instead,
+which is what binds a decision to one call.
+
+Look up a call with `x-graft-correlation-id` from the response headers. See
+[Observability](/docs/observability).
 
 ## Human-gated approvals
 
@@ -40,10 +45,107 @@ graft:  200 { data: … }
 Pass `approval: "<id>"` on `run_function` or `delete_content`. Do not send the
 HTTP header name over MCP — the bridge maps the argument for you.
 
+### Asking in-band (opt-in)
+
+The loop above sends the human to another terminal. On a local server, where
+that human is sitting at the same machine, the server can ask them directly
+instead — MCP calls this elicitation.
+
+```ts
+createGraftMcp({
+  // …
+  approvalElicitation: { decider: { kind: "human", id: "you@example.com" } },
+});
+```
+
+The destructive call then pauses, the client shows a confirmation, and an
+approval completes the call in one step.
+
+**It is off unless you configure it, and it is refused outright over HTTP.**
+`createGraftMcpHandler` throws `CONFIG_INVALID` at construction if you pass
+`approvalElicitation`, because over HTTP the client being asked to approve *is*
+the agent that made the call, while `decider` is configured server-side — so an
+accepted prompt would be self-approval recorded under the operator's name. That
+is precisely what `requested_by_id <> decided_by` exists to prevent, and routing
+the question to the requester's own client walks around it. Elicitation is for a
+stdio server whose operator is at the machine.
+
+A client that never declared the capability falls back to the id-and-retry loop,
+because a client that cannot ask its user is not a client whose user said yes.
+So does a client that declared it and then fails the request — an older SDK, a
+schema it will not render, a transport that times out with the dialog open. A
+client-side limitation should not become a broken destructive operation, and the
+gate is identical on either path.
+
+Long inputs are truncated in the prompt at 1000 characters, and the prompt says
+so and points at `graft approvals` for the full text. A consent dialog that
+silently shows part of what is being consented to is worse than no preview,
+because the reader believes they have seen the call.
+
+What does not change is everything underneath. The decision is still a row in
+`approvals`, still one-shot, still bound to the exact input, still stamped with
+`decided_role` server-side. `decider` is a separate setting rather than the
+connection's own identity because Postgres enforces `requested_by_id <>
+decided_by` in the UPDATE's own `WHERE`: name the operator at the machine, and
+if that operator is also the caller, the decision is refused exactly as it would
+be from the CLI. Deciding is a plain `UPDATE` on `approvals`, which the hardened
+runtime role deliberately cannot perform — so on a hardened deployment this
+fails by construction, which is the intended answer rather than a gap.
+
+Dismissing the prompt leaves the approval pending. Only an explicit no records a
+denial: closing a dialog is not a decision, and recording it as one would put a
+verdict in the audit trail that nobody reached.
+
 ### Policy
 
-Set `approvalPolicy: "human"` on a function to gate non-destructive mutations
-the same way. Policy is code: greppable and reviewable.
+`approvalPolicy` has three values.
+
+| Value | Gates | Available on |
+| --- | --- | --- |
+| `"none"` (default) | Only `destructive: true` functions | every surface |
+| `"human"` | Every mutation, plus destructive | every surface |
+| `"unattended"` | Nothing | HTTP functions only |
+
+Policy is code: greppable and reviewable.
+
+`"unattended"` is **not part of the MCP surface**. `GraftMcpOptions` does not
+accept it, so no server setting makes `run_function` stop asking for a
+destructive call. An MCP mount exists because an agent is calling it, and the
+agent is the party the gate is there to stop — one option that turned every
+destructive tool into an ungated one is not a trade worth offering. On
+`graft serve` the split is visible: `approvalPolicy: "unattended"` lifts the
+gate on `POST /api/fn` and leaves `POST /api/mcp` gated.
+
+### Running with no human at all
+
+`"unattended"` exists because the other two have no answer for a caller with
+nobody behind it. A scheduled cleanup job and a CI migration are both
+legitimate, and under `"none"` a destructive function refuses them forever.
+That was the absence of a policy rather than a policy.
+
+```ts
+createFunctionsHandler({ functions, db, approvalPolicy: "unattended" });
+```
+
+On `graft serve`, export it from `graft.config.ts`:
+
+```ts
+export const approvalPolicy = "unattended";
+```
+
+It is config rather than an env var deliberately. This is the setting that
+turns off the gate on irreversible work, and a dashboard variable is invisible
+to review — in config it appears in a diff. The server also warns on every boot
+while it is on, because the log is where a mistake actually gets noticed.
+
+Understand what you are accepting. Git restores authored content, so a deleted
+document comes back. It does not restore operational data: `deleteRecord`
+removes rows outright and the asset store keeps no history. `"unattended"` is
+the setting that says those are acceptable losses for this deployment.
+
+What you keep is the record. Every invocation still writes its audit row with
+the actor, the correlation id and the git SHA, and access rules and rate limits
+still apply. What `"unattended"` gives up is the waiting, not the accounting.
 
 ## Hardened roles
 

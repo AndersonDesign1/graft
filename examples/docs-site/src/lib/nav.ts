@@ -24,6 +24,39 @@ export interface DocNavSection {
   entries: DocNavEntry[];
 }
 
+export interface DocNavSourceEntry extends DocNavEntry {
+  section: string;
+  order?: number;
+}
+
+/** Group indexed docs without touching the database, preserving sidebar semantics. */
+export function groupDocsNav(
+  docs: readonly DocNavSourceEntry[],
+  sectionOrder: readonly string[] = SECTION_ORDER,
+): DocNavSection[] {
+  const bySection = new Map<string, Array<{ entry: DocNavEntry; order: number }>>();
+  for (const doc of docs) {
+    const list = bySection.get(doc.section) ?? [];
+    list.push({
+      entry: { slug: doc.slug, title: doc.title, description: doc.description },
+      order: doc.order ?? 99,
+    });
+    bySection.set(doc.section, list);
+  }
+
+  const rank = (section: string): number => {
+    const index = sectionOrder.indexOf(section);
+    return index === -1 ? sectionOrder.length : index;
+  };
+
+  return [...bySection.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+    .map(([section, entries]) => ({
+      section,
+      entries: entries.sort((a, b) => a.order - b.order).map(({ entry }) => entry),
+    }));
+}
+
 /** The docsNav sections as a fumadocs PageTree (serializable — strings only). */
 export async function docsPageTree(): Promise<{
   name: string;
@@ -46,24 +79,13 @@ export async function docsPageTree(): Promise<{
 
 export async function docsNav(): Promise<DocNavSection[]> {
   const docs = await getGraft().listContent("docs");
-
-  const bySection = new Map<string, DocNavEntry[]>();
-  const orderOf = new Map(docs.map((d) => [d.slug, d.data.order ?? 99]));
-  for (const doc of docs) {
-    const list = bySection.get(doc.data.section) ?? [];
-    list.push({ slug: doc.slug, title: doc.data.title, description: doc.data.description });
-    bySection.set(doc.data.section, list);
-  }
-
-  const rank = (s: string): number => {
-    const i = (SECTION_ORDER as readonly string[]).indexOf(s);
-    return i === -1 ? SECTION_ORDER.length : i;
-  };
-
-  return [...bySection.entries()]
-    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
-    .map(([section, entries]) => ({
-      section,
-      entries: entries.sort((a, b) => (orderOf.get(a.slug) ?? 99) - (orderOf.get(b.slug) ?? 99)),
-    }));
+  return groupDocsNav(
+    docs.map((doc) => ({
+      slug: doc.slug,
+      title: doc.data.title,
+      description: doc.data.description,
+      section: doc.data.section,
+      order: doc.data.order,
+    })),
+  );
 }

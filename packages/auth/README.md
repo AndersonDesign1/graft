@@ -44,4 +44,4 @@ Being signed in earns nothing. An account gets scopes because something granted 
 
 ---
 
-MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/feat/core/packages/auth/CHANGELOG.md) · [Security policy](https://github.com/AndersonDesign1/graft/blob/feat/core/SECURITY.md)
+MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/main/packages/auth/CHANGELOG.md) · [Security policy](https://github.com/AndersonDesign1/graft/blob/main/SECURITY.md)

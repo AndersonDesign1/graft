@@ -1,8 +1,8 @@
 ---
 title: Schema
 description: defineCollection and field builders — the single Zod layer for content and functions.
-section: Start here
-order: 3
+section: Build
+order: 1
 ---
 
 Define collections and fields in `graft.config.ts` (and under `graft/` when you
@@ -62,6 +62,15 @@ faqs: field.array({
   optional: true,
 }),
 ```
+
+### What a collection looks like once declared
+
+This is the `docs` collection that renders the page you are reading, generated
+from its own schema rather than written out here. The same descriptor answers
+MCP's `describe_schema` and fills the Studio's schema view, so this table cannot
+drift from what the compiler enforces.
+
+<FieldTable collection="docs" />
 
 ## Merge with primitives
 

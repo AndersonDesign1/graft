@@ -33,24 +33,36 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./db": {
+      "types": "./dist/db.d.ts",
+      "import": "./dist/db.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
-    "dev": "tsup src/index.ts --format esm --watch",
+    "build": "tsup src/index.ts src/db.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts src/db.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@usegraft/contracts": "workspace:*",
-    "@usegraft/core": "workspace:*",
-    "@usegraft/db": "workspace:*"
+    "@usegraft/core": "workspace:*"
   },
   "devDependencies": {
-    "@usegraft/compiler": "workspace:*"
+    "@usegraft/compiler": "workspace:*",
+    "@usegraft/db": "workspace:*"
+  },
+  "peerDependencies": {
+    "@usegraft/db": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@usegraft/db": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=22.16"

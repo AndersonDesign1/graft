@@ -1,8 +1,7 @@
 {
   "name": "@usegraft/sdk-sveltekit",
-  "version": "0.1.0",
-  "private": true,
-  "description": "SvelteKit adapter for Graft. Private while the surface is being shaped.",
+  "version": "0.2.0",
+  "description": "SvelteKit adapter: typed content reads and endpoint mounts over Graft's stateless handlers.",
   "keywords": [
     "agent",
     "ai",
@@ -44,6 +43,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@usegraft/db": "workspace:*",
     "@usegraft/sdk-core": "workspace:*"
   },
   "devDependencies": {

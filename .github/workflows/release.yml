@@ -9,11 +9,13 @@ name: Release
 # short-lived, workflow-scoped token at publish time; `id-token: write` below
 # is what makes that possible.
 #
-# feat/core is the working mainline (operator decision 2026-07-11); main is
-# listed for the eventual post-launch branch model.
+# main is the default branch, the one visitors and npm land on, and it is merged
+# from feat/core at each release. feat/core is the working mainline and the only
+# branch that publishes, so it is the only branch listed here. Adding main would
+# fire a second, redundant release the moment feat/core merged into it.
 on:
   push:
-    branches: [feat/core, main]
+    branches: [feat/core]
   # Retry surface, and the canary surface. With no pending changesets and
   # `canary` unchecked, dispatching re-runs `publish`, which is idempotent —
   # changesets skips versions the registry already has.
@@ -66,6 +68,17 @@ jobs:
       # The warning is correct behaviour at runtime; it is only noise at build.
       BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
     steps:
+      # The one checkout in this repository that keeps its credentials, and
+      # the reason is `changesets/action` below: it pushes the
+      # `changeset-release/<branch>` branch before opening the version pull
+      # request, and that push authenticates with the token this step writes
+      # into .git/config. Setting persist-credentials: false here does not
+      # harden the release, it breaks it.
+      #
+      # What makes that acceptable rather than merely necessary: this job
+      # uploads no artifacts, so there is nothing for a token in .git/config to
+      # ride out on, and `contents: write` is scoped to this job alone.
+      # zizmor: ignore[artipacked]
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # pnpm — not npm — performs the OIDC exchange. changesets picks its
@@ -105,9 +118,9 @@ jobs:
       # Snapshot releases, NOT changesets prerelease mode. Prerelease mode is
       # stateful (.changeset/pre.json), it accumulates -canary.0, .1, .2 toward
       # one eventual version, and the changesets docs recommend running it from
-      # a branch other than the default. feat/core IS the default branch here,
-      # so entering pre mode would put every ordinary push into prerelease
-      # versioning until someone remembered to exit.
+      # a dedicated branch. feat/core is where every ordinary push lands, so
+      # entering pre mode here would put all of that ordinary work into
+      # prerelease versioning until someone remembered to exit.
       #
       # Snapshots have none of that. `--snapshot canary` produces
       # 0.0.0-canary-<timestamp> from the current tree, publishes it, and leaves
@@ -135,6 +148,20 @@ jobs:
           pnpm version:canary
           node scripts/assert-canary-snapshot.mjs
           pnpm release:canary
+
+      # `changeset publish` cannot be trusted to say what landed. On the first
+      # canary it printed E404 for six packages, then listed all twenty-one
+      # under "packages published successfully" with an empty failure list. The
+      # job exited 1, so this was not silent — but the output naming which
+      # packages need attention was wrong, and a partial canary is worse than
+      # none, because internal deps pin the exact snapshot version and the tag
+      # ends up pointing at something that fails to install.
+      #
+      # `always()` so it also reports after a failed publish, which is exactly
+      # when the accurate list is worth having.
+      - name: Verify the canary is installable
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.canary }}
+        run: node scripts/assert-canary-published.mjs
 
       - name: Create release PR or publish
         if: ${{ github.event_name != 'workflow_dispatch' || !inputs.canary }}

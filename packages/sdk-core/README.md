@@ -33,19 +33,45 @@ Return types are derived from your collection schemas. There is no codegen step.
 
 ## Read from Postgres
 
-Pass `db` instead of `index`. Everything above is unchanged.
+Use `createDbClient` from the `/db` entry point. Everything above is unchanged.
 
 ```ts
 import { createDb } from "@usegraft/db";
+import { createDbClient } from "@usegraft/sdk-core/db";
+import { collections } from "./graft.config";
+
+const graft = createDbClient({ db: createDb(process.env.DATABASE_URL!).db, collections });
+```
+
+`createClient` itself takes only an `index`, and that is deliberate. Accepting a
+`db` handle there meant this package imported `@usegraft/db` for its value,
+which put `postgres` and `drizzle-orm` into the dependency graph of everything
+downstream — including [`@usegraft/sdk-react`](https://www.npmjs.com/package/@usegraft/sdk-react),
+a browser package whose whole premise is that a database never reaches a bundle.
+The database edge lives behind `/db`, and `@usegraft/db` is an optional peer
+dependency: a server install has it, a browser install does not.
+
+Add `branch` to read from a preview branch, on either backend.
+
+## Read from a remote `graft serve`
+
+`createContentApiReader` implements the same `index` seam. Every SDK package keeps its existing `createClient` / `createGraft` surface; only the transport changes. The endpoint is fixed to the server's branch, so a caller cannot switch a production read to preview content.
+
+```ts
+import { createContentApiReader } from "@usegraft/content-api";
 import { createClient } from "@usegraft/sdk-core";
 import { collections } from "./graft.config";
 
-const graft = createClient({ db: createDb(process.env.DATABASE_URL!).db, collections });
+const graft = createClient({
+  index: createContentApiReader({
+    endpoint: "https://cms.example.com/api/content/v1",
+    headers: { authorization: `Bearer ${process.env.GRAFT_CONTENT_TOKEN}` },
+  }),
+  collections,
+});
 ```
 
-Pass both and `index` wins. Add `branch` to read from a preview branch, on either backend.
-
-This client is server-only. It holds a database handle or an open SQLite file, so never import it into browser code.
+This client is server-only. It holds a database handle, an open SQLite file, or a remote endpoint, so never import it into browser code.
 
 ## Cache tags
 
@@ -65,4 +91,4 @@ const tags = tagsForChanges(branch, changes);
 
 ---
 
-MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/feat/core/packages/sdk-core/CHANGELOG.md)
+MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/main/packages/sdk-core/CHANGELOG.md)

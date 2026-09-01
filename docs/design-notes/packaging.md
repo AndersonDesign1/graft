@@ -38,7 +38,7 @@ neon-backed branch serves its fork transparently); `GRAFT_DEV_TOKEN` /
 `GRAFT_DEV_SCOPES` (static local identity); **`GRAFT_TRUSTED_ISSUERS`**
 (comma-separated OIDC issuer URLs, verified via discovery — the
 Connect/Passport-shaped enterprise path); anonymous MCP refused by default;
-`GRAFT_APPROVAL_POLICY=human`; `PORT`/`HOST` (default loopback:3903 — binding
+`approvalPolicy` in graft.config.ts; `PORT`/`HOST` (default loopback:3903 — binding
 wider with no identity configured warns loudly).
 
 ### Credentials in deployment: `graft harden` (P7.1)

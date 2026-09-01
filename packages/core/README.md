@@ -54,4 +54,4 @@ Functions are served at `POST /api/fn/<name>` by `graft serve`, and exposed to a
 
 ---
 
-MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/feat/core/packages/core/CHANGELOG.md)
+MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/main/packages/core/CHANGELOG.md)

@@ -1,0 +1,212 @@
+---
+title: MCP tools
+description: All eighteen tools, what each one needs, and the annotations and output schemas a client can rely on.
+section: Reference
+order: 7
+---
+
+The project MCP server exposes eighteen tools. This page is the full list. For
+how to connect one, see [Connecting agents](/docs/connecting-agents).
+
+Tools are not a bypass. `run_function` reuses the same functions handler as
+`POST /api/fn/<name>`, so access rules, audit rows, rate limits, and approval
+gates apply identically.
+
+## Discovery
+
+| Tool | Input | Returns |
+| --- | --- | --- |
+| `list_collections` | none | Every registered collection on this branch |
+| `describe_schema` | none | Collections with full field descriptors, plus the project's functions |
+| `list_functions` | none | Every typed function |
+| `describe_function` | `name` | One function's input fields, kind, and flags |
+
+`describe_schema` returns the same descriptor the Studio's schema view renders
+and `FieldTable` builds its table from, so the three cannot drift.
+
+## Reading content
+
+| Tool | Input | Notes |
+| --- | --- | --- |
+| `list_content` | `collection` | Reads the authored MDX files, not the index |
+| `get_content` | `collection`, `slug` | Returns data, body, and `sourcePath` |
+| `search_content` | `query`, `collection?`, `limit?` | Reads the compiled index; default limit 20 |
+
+`list_content` and `get_content` read files because git is the source of truth,
+so they reflect the working tree rather than the last compile.
+
+`search_content` reads the index, so results are as fresh as the last compile.
+`write_content` compiles, so authoring keeps search current on its own. Query
+syntax is websearch: words, `"quoted phrases"`, `or`, and `-exclusions`. On an
+overlay branch it searches the whole parent chain, so inherited documents
+appear and branch overrides win.
+
+All three carry `resource_link`s to the documents they name, so a client can
+attach a document without a second call.
+
+## Writing content
+
+| Tool | Scope | Notes |
+| --- | --- | --- |
+| `write_content` | `content:write` | Validates, writes `<contentDir>/<collection>/<slug>.mdx`, compiles |
+| `delete_content` | `content:write` | Destructive and human-gated |
+| `put_asset` | `content:write` | Uploads a binary for `field.asset` |
+
+### write_content
+
+Takes `collection`, `slug`, `data`, and an optional `body`. It replaces the
+document rather than patching it.
+
+Three refusals worth knowing:
+
+- A db-authoritative collection answers `AUTHORITY_MISMATCH`. Those rows are
+  written through typed functions.
+- A `slug` inside `data` that disagrees with the `slug` argument answers
+  `INVALID_SLUG`. Omit it from `data`.
+- An executable MDX body is refused before it is stored. See
+  [MDX safety](/docs/mdx-safety).
+
+Frontmatter keys you do not change come back byte-identical. Only a real data
+change re-serializes the file.
+
+### delete_content
+
+The first call files an approval and fails with its id. A human decides, then
+the caller retries the same collection and slug with `approval: "<id>"`.
+Approvals are one-shot and bound to that exact input.
+
+A missing document fails before an approval is filed, so nobody reviews a
+request for a file that was never there.
+
+On a server that opted into elicited approvals, and a client that supports
+elicitation, the confirmation happens in-band and the call completes in one
+step. The gate is the same either way.
+
+### put_asset
+
+Pass exactly one of `path` or `base64`. `path` only exists on a local mount and
+resolves inside the project root; a remote server does not offer it at all and
+tells the caller to send bytes instead.
+
+`key` is required with `base64` and defaults to `assets/<filename>` with `path`.
+Existing keys refuse unless `overwrite: true`, because the store keeps no
+version history.
+
+## Functions
+
+| Tool | Input | Notes |
+| --- | --- | --- |
+| `run_function` | `name`, `input?`, `approval?`, `authorization?` | Runs a typed function through the ordinary handler |
+
+There is no MCP-level scope on `run_function`. The function's own `access` rule,
+the anonymous-mutation default, its rate limit, and its approval gate all
+decide, exactly as they would over HTTP.
+
+`authorization` overrides the connection's bearer for one call, which is how an
+agent acts as someone else. On stdio the server holds `GRAFT_DEV_TOKEN` as the
+default authorization, so the secret never enters the agent's context.
+
+## Operations
+
+| Tool | Input | Notes |
+| --- | --- | --- |
+| `list_branches` | none | Registered branches and their backends |
+| `list_compilations` | `branch?`, `limit?` | Recent projection trail rows; default 20, max 100 |
+| `list_approvals` | none | Pending approvals, the same data as the Studio's list |
+| `decide_approval` | `id`, `decision` | Approve or deny |
+
+`decide_approval` needs the `approvals:decide` scope **and** an authenticated
+connection. The decision is attributed to the identity the connection
+authenticated as, and there is no argument to name a different decider. A
+requester can never decide its own approval.
+
+It also needs a database role that may `UPDATE approvals`. A hardened runtime
+role cannot, by design. See [Hardening](/docs/hardening).
+
+Note that `graft mcp` deliberately does **not** carry `approvals:decide`. The
+CLI files approvals and `graft approve` decides them, and those have to stay
+different identities.
+
+## Registry and errors
+
+| Tool | Input | Notes |
+| --- | --- | --- |
+| `list_registry` | none | Owned primitives available to `graft add` |
+| `describe_item` | `name` | One primitive's files and dependencies |
+| `explain_error` | `code?`, `error?` | What a GraftError means and how to recover |
+
+`explain_error` with no arguments lists every code this build knows. See the
+[Error reference](/docs/errors) for the same content as a page.
+
+## Annotations
+
+Every tool declares MCP annotations, so a client can tell a read from a deletion
+without parsing prose.
+
+| Annotation set | Tools |
+| --- | --- |
+| Read-only | The four discovery tools, the three content reads, `list_branches`, `list_compilations`, `list_approvals`, `list_registry`, `describe_item`, `explain_error` |
+| Write, not destructive | `write_content` |
+| Destructive | `delete_content`, `put_asset`, `decide_approval`, `run_function` |
+
+`write_content` claims a non-destructive change because git is its undo.
+`put_asset` does not get that claim, because the asset store keeps no history.
+`run_function` is destructive because it can be: what it runs is the project's
+code.
+
+`openWorldHint` is false on all eighteen. Graft's domain is the collections a
+project declares, which is a closed set known at config load.
+
+<Callout label="hints, not a boundary">
+  Annotations are hints. The MCP spec says a client must not make an
+  authorization decision on annotations from a server it does not trust, and
+  that is right. Graft's real gates are the scope check, the one-shot
+  input-bound approval, and the Postgres role separation.
+</Callout>
+
+## Output schemas
+
+Sixteen of the eighteen declare an `outputSchema`. The SDK validates every
+result against it before the answer leaves the server, so a tool that quietly
+changes shape fails there rather than inside whatever the agent did next.
+Results also carry `structuredContent` alongside the text block.
+
+The two exemptions are deliberate. `run_function` returns whatever the project's
+function returns, and `delete_content` spreads the deleted function's own return
+over the top level. Both are open by construction, and a schema saying `unknown`
+would be a contract promising nothing.
+
+## Scopes
+
+Three tools check a scope at the MCP layer.
+
+| Scope | Tools |
+| --- | --- |
+| `content:write` | `write_content`, `delete_content`, `put_asset` |
+| `approvals:decide` | `decide_approval` |
+
+Everything else is ungated at this layer, and `run_function` defers to the
+function.
+
+A credential without the scope gets `UNAUTHORIZED` naming what was required and
+what it holds. An unauthenticated mount that opted into anonymous callers is
+unscoped by construction, so nothing is refused there — which is why anonymous
+MCP is loopback-only.
+
+One failure mode is worth knowing because it shipped in one of Graft's own
+examples: a server built with an actor resolver but no `connectionActor` would
+pass every scope check silently. That now fails closed with `CONFIG_INVALID`.
+
+## Static projects
+
+Postgres-tier tools stay registered on a static project and answer
+`NEEDS_DATABASE` with the upgrade rather than vanishing. `delete_content` and
+`list_compilations` refuse for reasons covered in
+[Static or Postgres](/docs/tiers#agents-work-on-both-tiers).
+
+## Next steps
+
+- [Connecting agents](/docs/connecting-agents) — transports, identity, and setup
+- [MCP resources & prompts](/docs/mcp-resources-and-prompts) — the rest of the surface
+- [The agent surface](/docs/agent-surface) — why this exists in place of a dashboard
+- [Error reference](/docs/errors) — every code a tool can return

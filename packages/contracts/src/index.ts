@@ -5,3 +5,5 @@
 export * from "./errors";
 export * from "./introspection";
 export * from "./paths";
+export * from "./peer";
+export * from "./content-index";

@@ -8,4 +8,9 @@ export * from "./client";
 export * from "./tags";
 // Convenience re-exports so consumers can type helpers without importing @usegraft/core or @usegraft/db.
 export type { AnyCollection, DocumentData } from "@usegraft/core";
-export type { ChangeSet } from "@usegraft/db";
+export type {
+  ChangeSet,
+  ContentIndexReader,
+  ContentRow,
+  ContentSearchHit,
+} from "@usegraft/contracts";

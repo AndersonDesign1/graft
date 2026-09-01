@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Graft holds a small number of invariants, listed in
-        [CONTRIBUTING.md](https://github.com/AndersonDesign1/graft/blob/feat/core/CONTRIBUTING.md).
+        [CONTRIBUTING.md](https://github.com/AndersonDesign1/graft/blob/main/CONTRIBUTING.md).
         A proposal that breaks one is turned down however well it is argued, so
         it is worth a look first.
 

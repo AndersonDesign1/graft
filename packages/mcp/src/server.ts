@@ -13,7 +13,7 @@
 import { unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { createStorage, storageConfigFromEnv, type Storage } from "@usegraft/assets";
-import { compile, compileStatic, type CompileResult } from "@usegraft/compiler";
+import { compile, compileStatic, resolveContained, type CompileResult } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import {
   createFunctionsHandler,
@@ -26,20 +26,44 @@ import type { BranchScope, ContentSearchHit, Database } from "@usegraft/db";
 import { openStaticIndex, resolveBranchScope, searchContent } from "@usegraft/db";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { findDoc, requireCollection } from "./content-hints";
-import type { ToolDeps } from "./tools/deps";
+import type { RegisterTools, ToolDeps } from "./tools/deps";
 import { registerApprovalTools } from "./tools/approvals";
 import { registerAssetTools } from "./tools/assets";
 import { registerBranchTools } from "./tools/branches";
-import { registerContentTools } from "./tools/content";
+import { registerContentReadTools, registerContentWriteTools } from "./tools/content";
 import { registerErrorTools } from "./tools/errors";
 import { registerFunctionTools } from "./tools/functions";
-import { registerIntrospectionTools } from "./tools/introspection";
+import {
+  registerCollectionIntrospection,
+  registerFunctionIntrospection,
+} from "./tools/introspection";
+import { createApprovalElicitor } from "./approval-elicitation";
+import { registerContentPrompts } from "./tools/prompts";
 import { registerRegistryTools } from "./tools/registry";
+import { registerDocumentResources, registerSchemaResource } from "./tools/resources";
 import type { GraftMcpOptions } from "./options";
 
 export type { GraftMcpOptions } from "./options";
 
-export function createGraftMcp(options: GraftMcpOptions): McpServer {
+/**
+ * What a public documentation server needs, which is much less than the full
+ * one. No `functions`, no `actor`, no asset store, no approval elicitation:
+ * omitting them from the type is what keeps them from being configured by
+ * accident on a mount that answers the internet.
+ */
+export type DocsMcpOptions = Pick<
+  GraftMcpOptions,
+  | "contentDir"
+  | "collections"
+  | "db"
+  | "staticIndexPath"
+  | "branchId"
+  | "scope"
+  | "name"
+  | "version"
+>;
+
+function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServer {
   const { contentDir, collections } = options;
   const branchId = options.branchId ?? "main";
 
@@ -239,7 +263,10 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
       // approval was filed; the file named by the approval must still exist.
       const collection = requireCollection(collections, input.collection);
       const doc = findDoc(contentDir, input.collection, collection, input.slug);
-      unlinkSync(join(contentDir, ...doc.sourcePath.split("/")));
+      // Same containment as the read and the write: sourcePath comes from a
+      // directory scan, and a symlink in the content tree would point this
+      // unlink at a file outside it.
+      unlinkSync(resolveContained(contentDir, doc.sourcePath, { label: "document path" }));
       const result = await projectContent();
       return {
         deleted: doc.sourcePath,
@@ -316,16 +343,88 @@ export function createGraftMcp(options: GraftMcpOptions): McpServer {
     getFunctionsHandler,
     getDeleteHandler,
     getStorage,
+    // Absent unless the mount opted in. The default stays the out-of-band
+    // flow, which is the one a remote agent with no human attached must get.
+    elicitApproval: options.approvalElicitation
+      ? createApprovalElicitor({
+          server,
+          db: () =>
+            requireDb(
+              "approval elicitation",
+              "Approvals gate destructive operations on operational data, which a static project does not have.",
+            ),
+          decider: options.approvalElicitation.decider,
+        })
+      : undefined,
   };
 
-  registerIntrospectionTools(server, deps);
+  register(server, deps);
+  return server;
+}
+
+/**
+ * The whole surface: read, author, delete, run functions, browse the registry,
+ * decide approvals.
+ */
+const FULL_SURFACE: RegisterTools = (server, deps) => {
+  registerCollectionIntrospection(server, deps);
+  registerFunctionIntrospection(server, deps);
   registerFunctionTools(server, deps);
   registerRegistryTools(server, deps);
-  registerContentTools(server, deps);
+  registerContentReadTools(server, deps);
+  registerContentWriteTools(server, deps);
   registerAssetTools(server, deps);
   registerBranchTools(server, deps);
   registerApprovalTools(server, deps);
   registerErrorTools(server, deps);
+  // Not tool groups. Resources make documents addressable, so a client can
+  // attach one as context instead of spending a turn fetching it; prompts
+  // offer the project's workflows filled in from the live schema.
+  registerDocumentResources(server, deps);
+  registerSchemaResource(server, deps);
+  registerContentPrompts(server, deps);
+};
 
-  return server;
+/**
+ * Documentation only: find a page, read it, understand a failure.
+ *
+ * The set is chosen to match what docs platforms already publish. Mintlify
+ * generates a docs MCP for every site it hosts — public, unauthenticated,
+ * strictly read-only, offering search plus navigating and reading the docs
+ * filesystem. Cloudflare runs a documentation server separately from its
+ * authenticated API server. Agents arrive expecting this shape.
+ *
+ * What is missing is missing on purpose, and mostly it is not about writes.
+ * `describe_schema` carries the project's functions, `list_registry` its owned
+ * primitives, and `list_branches` / `list_compilations` / `list_approvals` its
+ * operations. Those are all reads, which is exactly why "read-only" is the
+ * wrong test for what belongs on a public endpoint.
+ *
+ * Prompts are absent too: three of the four instruct `write_content`, which is
+ * not here, and telling a stranger how to author into someone else's project
+ * is not documentation.
+ */
+const DOCS_SURFACE: RegisterTools = (server, deps) => {
+  registerCollectionIntrospection(server, deps);
+  registerContentReadTools(server, deps);
+  registerErrorTools(server, deps);
+  registerDocumentResources(server, deps);
+};
+
+export function createGraftMcp(options: GraftMcpOptions): McpServer {
+  return buildServer(options, FULL_SURFACE);
+}
+
+/**
+ * A public, read-only documentation server.
+ *
+ * A separate factory rather than a flag on `createGraftMcp`, because the
+ * safety property worth having is that the closed mount gains no new way to be
+ * opened. There is no option here that widens the surface; reaching the wider
+ * one means calling the other function.
+ *
+ * Serve it at `/mcp` on the docs domain, which is where clients look.
+ */
+export function createDocsMcp(options: DocsMcpOptions): McpServer {
+  return buildServer({ ...options, functions: undefined }, DOCS_SURFACE);
 }

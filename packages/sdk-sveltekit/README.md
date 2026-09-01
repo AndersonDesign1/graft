@@ -101,4 +101,4 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
 
 ---
 
-MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/feat/core/packages/sdk-sveltekit/CHANGELOG.md)
+MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/main/packages/sdk-sveltekit/CHANGELOG.md)

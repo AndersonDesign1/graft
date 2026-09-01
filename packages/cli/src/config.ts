@@ -47,7 +47,20 @@ export interface ProjectConfig {
    * default so a document that compiles is a document that renders.
    */
   mdxTrust: MdxTrust;
+  /**
+   * From the optional `approvalPolicy` export; defaults to "none". Governs who
+   * must approve mutations at the POST /api/fn surface.
+   *
+   * It lives here rather than in an env var on purpose. This is the setting
+   * that turns off the human gate on irreversible work — `deleteRecord` hard-
+   * deletes rows and the asset store keeps no history — and a dashboard
+   * variable is invisible to review. In graft.config.ts it appears in a diff.
+   */
+  approvalPolicy: ApprovalPolicy;
 }
+
+/** Who must approve mutations. See ProjectConfig.approvalPolicy. */
+export type ApprovalPolicy = "none" | "human" | "unattended";
 
 /** Walk up from `cwd` to the first directory containing a graft.config. */
 export function findConfig(cwd: string): string {
@@ -163,6 +176,7 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
   const index = parseIndexConfig(mod.index, projectDir, configPath);
   assertStaticSupports(index, collections as Record<string, AnyCollection>, functions, configPath);
   const mdxTrust = parseMdxTrust(mod.mdxTrust, configPath);
+  const approvalPolicy = parseApprovalPolicy(mod.approvalPolicy, configPath);
   const contentDirSetting = typeof mod.contentDir === "string" ? mod.contentDir : "content";
   const migrationsDirSetting =
     typeof mod.migrationsDir === "string" ? mod.migrationsDir : "migrations";
@@ -175,6 +189,7 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
     collections: collections as Record<string, AnyCollection>,
     functions,
     mdxTrust,
+    approvalPolicy,
   };
 }
 
@@ -191,6 +206,22 @@ function parseMdxTrust(value: unknown, configPath: string): MdxTrust {
     message: `${configPath} exports \`mdxTrust\` as ${JSON.stringify(value)}, which is not "restricted" or "full".`,
     fix: 'Export `mdxTrust = "restricted"` (the default: `{…}` expressions and `import` are refused in authored bodies) or `mdxTrust = "full"` (every author has commit access, so code review is the control). Omit the export to keep the default.',
     details: { mdxTrust: value },
+  });
+}
+
+/**
+ * Read the optional `approvalPolicy` export. Refused rather than defaulted on
+ * an unknown value, for the same reason as `mdxTrust`: a typo must not silently
+ * pick a weaker policy than the one someone wrote down.
+ */
+function parseApprovalPolicy(value: unknown, configPath: string): ApprovalPolicy {
+  if (value === undefined) return "none";
+  if (value === "none" || value === "human" || value === "unattended") return value;
+  throw new GraftError({
+    code: "CONFIG_INVALID",
+    message: `${configPath} exports \`approvalPolicy\` as ${JSON.stringify(value)}, which is not "none", "human" or "unattended".`,
+    fix: 'Export `approvalPolicy = "none"` (the default: only `destructive` functions are gated), `"human"` (every mutation is gated), or `"unattended"` (nothing is gated, for a caller with no human behind it). Omit the export to keep the default.',
+    details: { approvalPolicy: value },
   });
 }
 

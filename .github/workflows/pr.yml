@@ -40,6 +40,7 @@ jobs:
             auth
             cli
             compiler
+            content-api
             content-migrations
             contracts
             core
@@ -50,7 +51,10 @@ jobs:
             sdk-astro
             sdk-core
             sdk-next
+            sdk-react
+            sdk-react-router
             sdk-sveltekit
+            sdk-tanstack-start
             studio
             tokens
             docs-site
@@ -77,6 +81,9 @@ jobs:
         with:
           # `changeset status --since` needs the base branch to diff against.
           fetch-depth: 0
+          # The `git fetch origin` below reaches a public repository over HTTPS
+          # and needs no credential. This job never pushes.
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6

@@ -10,6 +10,8 @@ import { resolveContained } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { z } from "zod";
 import { guarded } from "../tool-result";
+import { DESTROYS } from "./annotations";
+import { putAssetOutput } from "./outputs";
 import type { RegisterTools } from "./deps";
 
 export const registerAssetTools: RegisterTools = (server, deps) => {
@@ -21,6 +23,8 @@ export const registerAssetTools: RegisterTools = (server, deps) => {
     "put_asset",
     {
       title: "Upload an asset (image / binary)",
+      outputSchema: putAssetOutput,
+      annotations: DESTROYS,
       description:
         (uploadRoot
           ? "Upload a binary to the asset store and get the frontmatter reference for an `asset` field. Pass `path` (a file inside this project) OR `base64` + `key`. "

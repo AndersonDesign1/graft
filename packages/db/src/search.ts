@@ -11,6 +11,7 @@
  * A query that reduces to nothing (only stopwords, e.g. "the") matches no rows
  * and returns [] — that is Postgres semantics, not an error.
  */
+import type { ContentSearchHit } from "@usegraft/contracts";
 import { GraftError } from "@usegraft/contracts";
 import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { overlaySubquery } from "./branch";
@@ -57,13 +58,11 @@ export interface SearchContentOptions {
   limit?: number;
 }
 
-export interface ContentSearchHit {
-  row: ContentRow;
-  /** ts_rank over the weighted vector: slug (A) > frontmatter (B) > body (C). */
-  rank: number;
-  /** ts_headline fragment(s) of the body with matches wrapped in <b>…</b>. */
-  snippet: string;
-}
+// Published from @usegraft/contracts; re-exported here for existing callers.
+// The doc comments there are implementation-neutral — the ranking this reader
+// applies is slug (A) > frontmatter (B) > body (C), via ts_rank, and the
+// snippet comes from ts_headline.
+export type { ContentSearchHit } from "@usegraft/contracts";
 
 export async function searchContent(
   db: Database,

@@ -1,0 +1,154 @@
+---
+title: Observability
+description: Correlation ids, the audit log, the compilation trail, and what /healthz reports.
+section: Operate
+order: 12
+---
+
+Graft records what happened in three tables and one endpoint. All of them are
+readable with ordinary SQL, and the ones an agent needs are also on MCP and the
+CLI.
+
+## Correlation ids
+
+Every function response carries `x-graft-correlation-id`, on success and on
+failure. It is the join key between a user's report, your logs, and the audit
+row.
+
+```sh
+curl -i -X POST https://cms.example.com/api/fn/submitContact \
+  -H 'content-type: application/json' \
+  -d '{"email":"a@b.co"}'
+# x-graft-correlation-id: 4f1c…
+```
+
+```sql
+select * from audit_log where correlation_id = '4f1c…';
+```
+
+There is an index on `correlation_id`, so that lookup is cheap.
+
+## The audit log
+
+One row per invocation, written whatever the outcome.
+
+| Column | What it holds |
+| --- | --- |
+| `correlation_id` | The id returned in the response header |
+| `branch_id` | Which content branch the call targeted |
+| `function_name`, `function_kind` | What ran |
+| `actor_kind`, `actor_id` | Who ran it. `actor_id` is null for anonymous |
+| `rate_key` | What the rate limit counted against: actor id, or client IP |
+| `status` | `"ok"`, or the GraftError code it failed with |
+| `duration_ms` | How long it took |
+| `git_sha` | The commit of the serving code, or null |
+| `created_at` | When |
+
+Inputs are not recorded. The row says who ran what and how it went. If you need
+the exact input of a gated call, it is on the `approvals` row, which is what
+binds a decision to one invocation.
+
+### The row exists before the call runs
+
+It is reserved as soon as the caller is known, then settled with its outcome.
+That ordering is what makes rate limiting immune to concurrency, and it means a
+refused call still leaves a row. A caller who fails validation twenty times
+produced twenty rows.
+
+Useful consequence: `status` is a census of your failure modes.
+
+```sql
+select status, count(*)
+from audit_log
+where created_at > now() - interval '1 day'
+group by status
+order by count(*) desc;
+```
+
+### Which code served it
+
+`git_sha` is stamped from the environment, defaulting to
+`VERCEL_GIT_COMMIT_SHA` or `GITHUB_SHA` when present, and `graft serve` resolves
+it from the local checkout. It answers "which deploy did this" without a log
+correlation exercise.
+
+## The compilation trail
+
+`compilations` records every projection: the branch, the git SHA it read,
+document count, and how many documents were added, changed, and removed.
+
+| Surface | Call |
+| --- | --- |
+| CLI | `graft compilations` |
+| MCP | `list_compilations` |
+| Studio | The History view |
+| HTTP | `GET /api/studio/v1/compilations` |
+
+The git SHA on each row is what makes revert possible: a compilation knows the
+tree it saw, so restoring it restores real files. See
+[Studio](/docs/studio#revert-from-a-compilation).
+
+## Approvals as a record
+
+The `approvals` table is an audit surface in its own right. Every destructive
+call that was gated leaves a row with the requester, the exact input, the
+decision, and who decided.
+
+`decided_role` is stamped server-side from `current_user`, so it records which
+database credential decided rather than which one claimed to. See
+[Hardening](/docs/hardening).
+
+## Health checks
+
+`graft serve` answers `GET /healthz`. It is not a static 200: it runs a real
+database round-trip first.
+
+```json
+{
+  "ok": true,
+  "branch": "main",
+  "collections": 3,
+  "functions": 2,
+  "gitSha": "d7aa173…"
+}
+```
+
+A failed round-trip answers 503 with `{ "ok": false, "error": "…" }`.
+
+Point your platform's liveness probe at it. The `gitSha` field also makes it a
+cheap way to confirm which build is live.
+
+## What Graft does not do
+
+- **No log shipping.** Handlers write to stdout. Collect it however your
+  platform does.
+- **No metrics endpoint.** The audit log is the source; aggregate it with SQL or
+  export it.
+- **No tracing.** The correlation id is the thread to follow, and it is yours to
+  propagate into your own spans if you run them.
+
+Audit writes are best-effort in one specific sense: a failure to write the row is
+logged to stderr with the correlation id rather than failing the call. Losing
+the record of a successful call is bad, and failing a user's request because the
+bookkeeping failed is worse.
+
+## Retention
+
+Graft never deletes audit rows. On a busy deployment that grows, and rate
+limiting only ever reads recent rows, so old ones are dead weight.
+
+Trim them on your own schedule, keeping whatever your compliance needs require:
+
+```sql
+delete from audit_log where created_at < now() - interval '90 days';
+```
+
+A hardened runtime role cannot run that. It is operator work, which is the
+intended answer.
+
+## Next steps
+
+- [Audit & approvals](/docs/audit-and-approvals) — what the log is for
+- [Rate limits](/docs/rate-limits) — the other job these rows do
+- [Hardening](/docs/hardening) — which credential may write what
+- [Deploy](/docs/deploy) — where `/healthz` lives

@@ -108,8 +108,8 @@ const BEATS: Beat[] = [
     ),
     note: (
       <>
-        <b>Deploy anywhere.</b> Railway, Fly, VPS, or embed the handlers in Next / Astro /
-        SvelteKit.
+        <b>Deploy anywhere.</b> Railway, Fly, VPS, or embed the handlers in Next, Astro, SvelteKit,
+        TanStack Start, or React Router.
       </>
     ),
   },

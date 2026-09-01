@@ -17,7 +17,7 @@
  * route, the self-host container, Vercel Fluid, or a Worker — the Phase 3
  * runtime invariant, locked here before the first mutation function exists.
  */
-import { GraftError, type ErrorCode } from "@usegraft/contracts";
+import { GraftError, rateIdentity, type ErrorCode } from "@usegraft/contracts";
 import {
   createDbApprovalStore,
   createDbAuditStore,
@@ -26,7 +26,6 @@ import {
   type Database,
 } from "@usegraft/db";
 import type { AnyGraftFunction, FunctionActor, RateLimit } from "./function";
-import { getRequestPeer } from "./peer";
 
 export interface FunctionsHandlerOptions {
   /** The functions to serve, routed by each function's `name` (not the record key). */
@@ -54,11 +53,29 @@ export interface FunctionsHandlerOptions {
    */
   rateLimit?: RateLimit;
   /**
-   * Who must approve mutations. "none" (default): only `destructive` functions
-   * are human-gated. "human": every mutation requires an approval — the
-   * conservative template policy. Destructive ops are gated under BOTH.
+   * Who must approve mutations.
+   *
+   * - `"none"` (default) gates only `destructive` functions.
+   * - `"human"` gates every mutation, the conservative template policy.
+   * - `"unattended"` gates nothing, including destructive functions.
+   *
+   * `"unattended"` exists because the other two have no answer for a caller
+   * with no human behind it. A scheduled cleanup job and a CI migration are
+   * both legitimate, and under `"none"` a destructive function refuses them
+   * forever: that arm of the gate had no off switch, which is an absence of a
+   * policy rather than a policy.
+   *
+   * It is deliberately a value the operator writes in config rather than an
+   * env var, because turning off the gate on irreversible work should appear
+   * in a diff and a review. `deleteRecord` hard-deletes rows and the asset
+   * store keeps no history, so "git will restore it" does not apply to either
+   * — this is the setting that accepts that.
+   *
+   * Everything else is unchanged. Every invocation still writes its audit row,
+   * access rules and rate limits still apply, and approvals already granted
+   * are still consumed one-shot. Only the waiting stops.
    */
-  approvalPolicy?: "none" | "human";
+  approvalPolicy?: "none" | "human" | "unattended";
   /**
    * Git commit SHA stamped on audit rows (ties invocations to the code that
    * served them). Defaults to VERCEL_GIT_COMMIT_SHA / GITHUB_SHA when present.
@@ -128,35 +145,6 @@ export function canonicalJson(value: unknown): string {
     return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
   }
   return JSON.stringify(value) ?? "null";
-}
-
-/**
- * The rate identity for anonymous callers.
- *
- * Never reads `x-forwarded-for` unless the deployment declares how many proxies
- * it controls. See `trustedProxyHops`.
- */
-function clientIp(request: Request, trustedProxyHops: number): string {
-  if (trustedProxyHops > 0) {
-    const forwarded = request.headers.get("x-forwarded-for");
-    if (forwarded) {
-      const hops = forwarded
-        .split(",")
-        .map((entry) => entry.trim())
-        .filter(Boolean);
-      // Count from the right: entries are appended, so the rightmost were added
-      // by infrastructure closest to us. A client can prepend anything it likes
-      // and never reach this far.
-      const trusted = hops[hops.length - trustedProxyHops];
-      if (trusted) return trusted;
-    }
-  }
-  // No header fallback. A peer is something an adapter registers in-process;
-  // anything arriving over the wire is the caller's word for it. "unknown"
-  // shares one bucket across every unidentified caller, which is strict rather
-  // than permissive — a deployment that wants per-caller limits declares its
-  // proxy depth instead.
-  return getRequestPeer(request) ?? "unknown";
 }
 
 function defaultGitSha(): string | undefined {
@@ -246,7 +234,7 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
     // From here the request targets a real function — everything below lands
     // in the audit log, whatever the outcome.
     const startedAt = Date.now();
-    const ip = clientIp(request, options.trustedProxyHops ?? 0);
+    const ip = rateIdentity(request, options.trustedProxyHops ?? 0);
     let actor: FunctionActor | undefined;
     /** Id of this invocation's audit row, reserved before the handler runs. */
     let auditId: string | undefined;
@@ -380,8 +368,14 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
 
       // Human gate — destructive ops always; every mutation under the "human"
       // policy. An approval is one-shot and bound to this exact input.
+      //
+      // "unattended" turns the gate off entirely, which is the only way a
+      // caller with no human behind it can run a destructive function. The
+      // audit row is still written either way, so what is lost is the waiting,
+      // not the record of who did what.
       const gated =
-        fn.destructive === true || (approvalPolicy === "human" && fn.kind === "mutation");
+        approvalPolicy !== "unattended" &&
+        (fn.destructive === true || (approvalPolicy === "human" && fn.kind === "mutation"));
       if (gated) {
         const inputCanonical = canonicalJson(parsed.data);
         const approvalId = request.headers.get(APPROVAL_HEADER);
@@ -435,6 +429,28 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
               details: { function: name, approvalId, reason: consumed.reason },
             }),
           );
+        }
+      } else {
+        // The gate is off, but an approval this caller actually presented is
+        // still spent. Skipping the consume left a granted row `approved` and
+        // replayable: flip the policy back to "none" or "human" later and that
+        // row still authorizes a destructive call nobody re-reviewed. One-shot
+        // has to mean one-shot across a policy change, which is exactly when
+        // the stale row is dangerous.
+        //
+        // Best-effort on purpose. The call is not gated, so a failure to spend
+        // the token must not fail an otherwise-permitted invocation — but a
+        // token that was presented is never left reusable on a healthy store.
+        const approvalId = request.headers.get(APPROVAL_HEADER);
+        if (approvalId) {
+          try {
+            await stores.approvals.consume(approvalId, {
+              functionName: name,
+              inputCanonical: canonicalJson(parsed.data),
+            });
+          } catch {
+            // Deliberately swallowed; see above.
+          }
         }
       }
 

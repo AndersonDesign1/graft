@@ -158,10 +158,10 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "The Graft server (`graft serve`) has nothing mounted at the requested path — the request reached the right process but the wrong URL.",
     typicalCauses: [
       "A typo in the endpoint path (e.g. /api/fns instead of /api/fn/<name>)",
-      "Expecting the frontend app's routes on the headless runtime — graft serve hosts only the function, MCP, and health endpoints",
+      "Expecting the frontend app's routes on the headless runtime — graft serve hosts functions, MCP, authored-content reads, and health",
     ],
     howToRecover:
-      "Use POST /api/fn/<name> for typed functions, POST /api/mcp for the MCP Streamable HTTP surface, or GET /healthz for liveness. The error's details carry the path that missed.",
+      "Use POST /api/fn/<name> for typed functions, POST /api/mcp for the MCP Streamable HTTP surface, GET /api/content/v1/documents or GET /api/content/v1/search for authored content, or GET /healthz for liveness. The error's details carry the path that missed.",
   },
   AUTHORITY_MISMATCH: {
     code: "AUTHORITY_MISMATCH",
@@ -335,9 +335,10 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     typicalCauses: [
       "Calling a function marked `destructive: true` (deletes or irreversibly overwrites data)",
       "Calling any mutation on a deployment whose approvalPolicy is 'human'",
+      "Calling a destructive function over MCP at all — the 'unattended' policy that lifts this gate for a headless deployment is not part of the MCP surface, so there is no server setting that makes this tool call stop asking. That is deliberate, and not something to route around",
     ],
     howToRecover:
-      "Ask a human operator to run `graft approve <approvalId>` (they can also `graft deny` it). Once approved, retry the EXACT same call carrying the approval id — over MCP pass it as the `approval` tool argument; over raw HTTP send the `x-graft-approval: <approvalId>` header. Approvals are one-shot and bound to the exact input — never work around the gate.",
+      "Ask a human operator to run `graft approve <approvalId>` (they can also `graft deny` it). Once approved, retry the EXACT same call carrying the approval id — over MCP pass it as the `approval` tool argument; over raw HTTP send the `x-graft-approval: <approvalId>` header. Approvals are one-shot and bound to the exact input — never work around the gate. If you are seeing this over MCP, the server did not ask your client directly: either the mount has not opted into elicited approvals (`approvalElicitation`, off by default and intended for a local server whose operator is present) or your client did not declare the elicitation capability. Both are ordinary — the gate is the same either way, only the way the human is reached differs.",
   },
   APPROVAL_INVALID: {
     code: "APPROVAL_INVALID",

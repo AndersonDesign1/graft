@@ -5,19 +5,21 @@
  */
 import { GraftError } from "@usegraft/contracts";
 import { z } from "zod";
-import { invokeFunction } from "../tool-helpers";
+import { invokeFunctionWithApproval } from "../tool-helpers";
 import { guarded } from "../tool-result";
+import { DESTROYS } from "./annotations";
 import type { RegisterTools } from "./deps";
 
 export const registerFunctionTools: RegisterTools = (server, deps) => {
-  const { functions, functionsByName, getFunctionsHandler, options } = deps;
+  const { elicitApproval, functions, functionsByName, getFunctionsHandler, options } = deps;
 
   server.registerTool(
     "run_function",
     {
       title: "Run a typed function",
+      annotations: DESTROYS,
       description:
-        "Invoke a defineFunction by name with a JSON input object. Same pipeline as POST /api/fn/<name>: Zod validation, access rules, rate limits, audit log, and the human gate for destructive ops. The server may already act with a configured identity (graft mcp uses GRAFT_DEV_TOKEN; over HTTP your connection's bearer is forwarded) — only pass authorization to override it. Pass approval after a human runs `graft approve <id>` for gated calls. Success returns { data, correlationId }; failures are GraftError JSON with a fix.",
+        "Invoke a defineFunction by name with a JSON input object. Same pipeline as POST /api/fn/<name>: Zod validation, access rules, rate limits, audit log, and the human gate for destructive ops. The server may already act with a configured identity (graft mcp uses GRAFT_DEV_TOKEN; over HTTP your connection's bearer is forwarded) — only pass authorization to override it. Pass approval after a human runs `graft approve <id>` for gated calls — or, where the server has opted into elicited approvals and your client supports elicitation, expect to be asked to confirm in-band and the call completes in one step. The gate is the same either way. Success returns { data, correlationId }; failures are GraftError JSON with a fix.",
       inputSchema: {
         name: z.string().describe("Function name (defineFunction name, not the export key)"),
         input: z
@@ -58,10 +60,13 @@ export const registerFunctionTools: RegisterTools = (server, deps) => {
         }
 
         // Explicit tool-arg override beats the server's configured identity.
-        return invokeFunction(getFunctionsHandler(), name, input ?? {}, {
-          credential: authorization ?? options.defaultAuthorization,
-          approval,
-        });
+        return invokeFunctionWithApproval(
+          getFunctionsHandler(),
+          name,
+          input ?? {},
+          { credential: authorization ?? options.defaultAuthorization, approval },
+          elicitApproval,
+        );
       }),
   );
 };

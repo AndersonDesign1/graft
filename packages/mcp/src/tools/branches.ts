@@ -6,6 +6,8 @@
 import { listBranches, listCompilations } from "@usegraft/db";
 import { z } from "zod";
 import { guarded } from "../tool-result";
+import { READS } from "./annotations";
+import { listBranchesOutput, listCompilationsOutput } from "./outputs";
 import type { RegisterTools } from "./deps";
 
 export const registerBranchTools: RegisterTools = (server, deps) => {
@@ -15,6 +17,8 @@ export const registerBranchTools: RegisterTools = (server, deps) => {
     "list_branches",
     {
       title: "List branches",
+      outputSchema: listBranchesOutput,
+      annotations: READS,
       description:
         "List registered content branches (name, parent, backend, status). Same data as GET /api/studio/v1/branches and `graft branch`.",
       inputSchema: {},
@@ -43,6 +47,8 @@ export const registerBranchTools: RegisterTools = (server, deps) => {
     "list_compilations",
     {
       title: "List compilations",
+      outputSchema: listCompilationsOutput,
+      annotations: READS,
       description:
         "Recent content projection trail rows (git SHA, added/changed/removed counts), newest first. Same data as GET /api/studio/v1/compilations and `graft compilations`.",
       inputSchema: {

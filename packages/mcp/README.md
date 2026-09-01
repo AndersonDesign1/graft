@@ -50,4 +50,4 @@ Content: `list_content`, `read_content`, `write_content`, `delete_content`, `sea
 
 ---
 
-MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/feat/core/packages/mcp/CHANGELOG.md) · [Security policy](https://github.com/AndersonDesign1/graft/blob/feat/core/SECURITY.md)
+MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/main/packages/mcp/CHANGELOG.md) · [Security policy](https://github.com/AndersonDesign1/graft/blob/main/SECURITY.md)

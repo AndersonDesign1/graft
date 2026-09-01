@@ -41,4 +41,4 @@ Set `export const mdxTrust = "full"` in `graft.config.ts` to allow full MDX. Tha
 
 ---
 
-MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/feat/core/packages/compiler/CHANGELOG.md)
+MIT. [Repository](https://github.com/AndersonDesign1/graft) · [Changelog](https://github.com/AndersonDesign1/graft/blob/main/packages/compiler/CHANGELOG.md)

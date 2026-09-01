@@ -1,1 +1,6 @@
 * text=auto eol=lf
+
+# Generated from ERROR_KNOWLEDGE in packages/mcp/src/explain.ts by
+# scripts/gen-error-docs.mjs. Collapsing it in diffs keeps a regenerated
+# page from burying a real change in review.
+examples/docs-site/content/docs/errors.mdx linguist-generated=true

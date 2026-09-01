@@ -141,6 +141,25 @@ describe("actor gate", () => {
     ).toThrowError(/authenticate/i);
   });
 
+  it("refuses to construct with elicited approvals", () => {
+    // Over HTTP the client being asked to approve IS the agent that made the
+    // call, while `decider` is configured server-side — so an accepted
+    // elicitation is self-approval recorded under the operator's name. The
+    // `requested_by_id <> decided_by` check in the UPDATE's WHERE exists to make
+    // that impossible, and asking the requester's own client walks around it.
+    // Documented as "never set this on a remote mount" and enforced nowhere
+    // until now.
+    expect(() =>
+      createGraftMcpHandler({
+        contentDir: dir,
+        collections,
+        db: untouchableDb,
+        allowAnonymous: true,
+        approvalElicitation: { decider: { kind: "human", id: "operator" } },
+      }),
+    ).toThrowError(/approvalElicitation/);
+  });
+
   it("serves anonymous callers only when explicitly opted in", async () => {
     const open = createGraftMcpHandler({
       contentDir: dir,
@@ -203,6 +222,37 @@ describe("tools over HTTP", () => {
       "write_content",
     ]);
     await client.close();
+  });
+
+  /**
+   * Resources and prompts are registered on the same server factory, so they
+   * ought to arrive over HTTP too — but this transport builds a fresh server
+   * per request, and "ought to" is how the P6.2 actor bug survived: the stdio
+   * path was always correct and only HTTP was broken. Assert it on the wire.
+   */
+  it("serves resources over HTTP, not only over stdio", async () => {
+    const client = await connectClient(handler);
+    const { resourceTemplates } = await client.listResourceTemplates();
+    const { resources } = await client.listResources();
+    await client.close();
+
+    expect(resourceTemplates.map((template) => template.uriTemplate)).toContain(
+      "graft://main/{collection}/{slug}",
+    );
+    expect(resources.map((resource) => resource.uri)).toContain("graft://main/schema");
+  });
+
+  it("serves prompts over HTTP, not only over stdio", async () => {
+    const client = await connectClient(handler);
+    const { prompts } = await client.listPrompts();
+    await client.close();
+
+    expect(prompts.map((prompt) => prompt.name).sort()).toEqual([
+      "author-document",
+      "fix-error",
+      "plan-migration",
+      "revise-document",
+    ]);
   });
 
   it("reads content from files without touching the database", async () => {

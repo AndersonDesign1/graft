@@ -46,8 +46,18 @@
   },
   "dependencies": {
     "@usegraft/contracts": "workspace:*",
-    "@usegraft/db": "workspace:*",
     "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@usegraft/db": "workspace:*"
+  },
+  "peerDependencies": {
+    "@usegraft/db": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@usegraft/db": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=22.16"

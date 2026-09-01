@@ -1,0 +1,254 @@
+---
+title: Content API
+description: Versioned read-only HTTP over the content index, and the reader that makes it a drop-in index for the SDKs.
+section: Reference
+order: 5
+---
+
+`@usegraft/content-api` is the read side of Graft over HTTP. It has two halves
+that fit together: a handler that serves the content index, and a reader that
+consumes it as if it were a local index.
+
+That lets a frontend read authored content with no database handle and no
+artifact of its own.
+
+## The endpoints
+
+Two routes under `/api/content/v1`, both `GET`.
+
+| Route | Required params | Optional params |
+| --- | --- | --- |
+| `/api/content/v1/documents` | `collection` | `slug`, `limit`, `offset` |
+| `/api/content/v1/search` | `collection`, `query` | `limit` |
+
+`graft serve` mounts them. So does any framework route that forwards to the
+handler.
+
+```sh
+curl "https://cms.example.com/api/content/v1/documents?collection=docs&slug=tiers"
+curl "https://cms.example.com/api/content/v1/search?collection=docs&query=branching"
+```
+
+`documents` answers `{ "rows": [...] }`. `search` answers `{ "hits": [...] }`,
+where each hit is `{ row, rank, snippet }`.
+
+### Row shape
+
+Each row is the index row, with `updatedAt` as an ISO string on the wire.
+
+| Field | Type |
+| --- | --- |
+| `branchId` | string |
+| `collection` | string |
+| `slug` | string |
+| `data` | object — the validated frontmatter |
+| `body` | string — the MDX body |
+| `contentHash` | string |
+| `sourcePath` | string — the file to edit |
+| `deleted` | boolean |
+| `updatedAt` | string — ISO 8601 |
+| `search` | string or null |
+
+### Limits
+
+`limit` must be a positive integer. Values above 500 are capped at 500 rather
+than refused. `offset` must be a non-negative integer. Anything else is
+`INPUT_VALIDATION_FAILED`.
+
+### One endpoint is one branch
+
+The handler is mounted for exactly one branch, and a `branch` query param is
+refused rather than ignored:
+
+```json
+{
+  "error": "INPUT_VALIDATION_FAILED",
+  "message": "The content API does not accept a branch query param.",
+  "fix": "Use the endpoint mounted for the branch you need. Each endpoint represents exactly one branch."
+}
+```
+
+A caller cannot switch a production read onto preview content. If you want
+preview reads, mount a second endpoint for that branch.
+
+### Failures
+
+Errors are GraftErrors, with the same `error` / `message` / `fix` shape as
+everywhere else.
+
+| Status | Code | When |
+| --- | --- | --- |
+| 400 | `INPUT_VALIDATION_FAILED` | Bad `limit`, `offset`, empty `slug`, missing `collection` or `query`, or a `branch` param |
+| 404 | `COLLECTION_NOT_FOUND` | The collection is not registered on this endpoint |
+| 404 | `ROUTE_NOT_FOUND` | Nothing is mounted at that path |
+| 405 | `METHOD_NOT_ALLOWED` | Anything other than `GET`. The response carries `Allow: GET` |
+| 500 | `FUNCTION_EXECUTION_FAILED` | The endpoint could not read its index |
+
+`COLLECTION_NOT_FOUND` lists the registered collections in its `fix`, so a
+caller can correct itself without reading this page.
+
+## Serving it
+
+`createContentApiHandler` is a Web-standard handler. It takes the reader you
+already have.
+
+<CodeBlock title="content-api route">
+
+```ts
+import { createContentApiHandler } from "@usegraft/content-api";
+import { createDbIndexReader } from "@usegraft/db";
+
+const handler = createContentApiHandler({
+  collections: ["docs", "pages"],
+  branch: "main",
+  index: createDbIndexReader(db),
+});
+```
+
+</CodeBlock>
+
+`collections` is an allowlist. A collection that is not in it does not exist as
+far as this endpoint is concerned, which is how you publish some of a project
+without publishing all of it.
+
+Note that `graft serve` registers **every** collection in your config. Mount the
+handler yourself when you want a narrower list.
+
+The handler never closes the reader it was given. Ownership stays with you.
+
+## Reading from it
+
+`createContentApiReader` returns a `ContentIndexReader` — the same seam
+`openStaticIndex` and `createDbIndexReader` implement. Hand it to any SDK as
+`index` and the SDK surface does not change.
+
+<CodeBlock title="src/lib/graft.ts" note="remote runtime">
+
+```ts
+import { createContentApiReader } from "@usegraft/content-api";
+import { createGraft } from "@usegraft/sdk-astro";
+import { collections } from "../../graft.config";
+
+export const graft = createGraft({
+  index: createContentApiReader({
+    endpoint: "https://cms.example.com/api/content/v1",
+    headers: { authorization: `Bearer ${process.env.GRAFT_CONTENT_TOKEN}` },
+  }),
+  collections,
+});
+```
+
+</CodeBlock>
+
+Options:
+
+| Option | Purpose |
+| --- | --- |
+| `endpoint` | Full API base URL. Trailing slashes, query and hash are stripped |
+| `headers` | Static headers sent on every request, such as `Authorization` |
+| `fetch` | A `fetch` implementation, for non-browser runtimes, tests, or instrumentation |
+
+`Accept: application/json` is set for you unless you send your own.
+
+Because reads still go through `@usegraft/sdk-core`, rows are re-validated
+against your Zod schema on arrival. The wire is not trusted more than a local
+index is.
+
+`close()` on this reader is a no-op. It owns no handle.
+
+### Search takes exactly one collection
+
+`searchContent` on this reader requires a single collection, because the
+endpoint takes a single `collection` param:
+
+```json
+{
+  "error": "INPUT_VALIDATION_FAILED",
+  "message": "The content API reader needs exactly one collection for search.",
+  "fix": "Pass collections: [name]. Graft SDK searchDocuments already does this."
+}
+```
+
+The SDK's `searchContent(collection, query)` already passes one, so this only
+comes up if you are calling the reader directly.
+
+## Errors cross the wire intact
+
+A GraftError raised on the server is parsed back into a GraftError on the
+client, with its `fix` and `details` preserved. Only responses that are not
+recognizably GraftErrors get wrapped.
+
+When the wrapping happens, it says so specifically: a non-JSON response, a
+malformed row, a row with an invalid `updatedAt`, or a transport failure each
+produce a `FUNCTION_EXECUTION_FAILED` naming the endpoint and what was wrong.
+The `fix` points at the two usual causes, which are an incompatible server and
+a proxy rewriting the response.
+
+## It authenticates nobody
+
+Say this one plainly, because it decides how you deploy it: the handler
+performs **no authentication**. Every document in every registered collection is
+readable by anyone who can reach the endpoint. That is deliberate — authored
+content is the part of a Graft project that is usually public, and a handler
+that guessed at an auth scheme would be wrong for most mounts.
+
+It means the `collections` allowlist is the security boundary, not a
+convenience. A collection registered here is published. If some of your authored
+content is not public, do not register it — and remember that `graft serve`
+registers every collection in your config, so a narrower list means mounting the
+handler yourself.
+
+If the endpoint needs to be private, put a proxy in front of it and check there,
+or pass a bearer token through the reader's `headers` and verify it in that
+proxy. Do not rely on it being an unadvertised URL.
+
+The one protection the handler does apply is a rate limit, and only when you
+configure one. `graft serve` sets 60 per 60 seconds; a handler you mount
+yourself gets none unless you pass `rateLimit`. See
+[Rate limits](/docs/rate-limits#the-content-api).
+
+## Reading it from a browser
+
+`@usegraft/sdk-react` runs in the browser, so unless the app and the content API
+share an origin the browser will block the read. The handler sends no CORS
+headers by default — same-origin only — because publishing an endpoint to other
+origins is the deployer's decision, not a library's.
+
+Name the origins that may read it:
+
+```ts
+createContentApiHandler({
+  collections,
+  branch: "main",
+  index,
+  allowedOrigins: ["https://app.example.com"],
+});
+```
+
+On `graft serve`, set `GRAFT_CONTENT_ALLOWED_ORIGINS` to a comma-separated list,
+or `*`. A wildcard is defensible here in a way it usually is not: this content is
+readable by anyone who can reach the endpoint regardless, so allowing any origin
+gives away nothing that was being withheld.
+
+Preflight (`OPTIONS`) is answered before the rate limiter, so a browser's
+permission check never spends the budget for the read that follows. An origin
+that is not on the list gets an ordinary response with no CORS header, and the
+browser hides it — rather than a refusal, which would make the list an origin
+oracle for non-browser callers who are not bound by CORS anyway. Errors carry
+the headers too, so a failing request shows its `fix` instead of an opaque
+network error.
+
+## What it does not do
+
+- **No writes.** `GET` only. Authoring goes through files, the CLI, or MCP.
+- **No branch switching.** One endpoint, one branch.
+- **No operational data.** Records live behind typed functions at
+  `POST /api/fn/<name>`.
+- **No authentication.** See above.
+
+## Next steps
+
+- [Reading content](/docs/reading-content) — the SDK surface this feeds
+- [Deploy](/docs/deploy) — where the endpoint runs
+- [Search](/docs/search) — the query syntax `query` accepts
+- [Error reference](/docs/errors) — every code in the table above

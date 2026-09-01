@@ -27,6 +27,10 @@ jobs:
       NODE_OPTIONS: --experimental-strip-types
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Nothing in this job pushes, and a persisted token in .git/config
+          # is one careless artifact upload away from being published.
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
@@ -94,6 +98,10 @@ jobs:
       BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Nothing in this job pushes, and a persisted token in .git/config
+          # is one careless artifact upload away from being published.
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
@@ -135,9 +143,55 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Nothing in this job pushes, and a persisted token in .git/config
+          # is one careless artifact upload away from being published.
+          persist-credentials: false
 
       # Plain `docker build`, not docker/build-push-action: every other action
       # here is SHA-pinned, and adding one more supply-chain dependency to prove
       # a Dockerfile still parses is a poor trade. The runner ships buildx.
       - name: Build the self-host image
         run: docker build -f deploy/docker/Dockerfile -t graft:ci .
+
+  # .github/rulesets/*.json is a record of branch protection, not a mechanism
+  # that applies it — a change made in the GitHub UI leaves no diff anywhere.
+  # The README used to carry a hand-checked date, which is a claim with a shelf
+  # life. This is that claim as a job.
+  #
+  # Needs a token that can read repository settings, which GITHUB_TOKEN cannot
+  # be: `administration` is not a permission a workflow may request for it (that
+  # scope exists only for fine-grained PATs and GitHub Apps). Asking anyway does
+  # not degrade gracefully — GitHub rejects the whole file and every job in it
+  # stops running, which is how this was found.
+  #
+  # So it reads RULESETS_TOKEN: a fine-grained PAT with `administration: read`
+  # on this repository and nothing else. Absent, the script skips with the
+  # reason rather than passing, because rules checked without bypass actors is
+  # not a verified record. That is also what a fork's pull request sees, so an
+  # outside contributor is never blocked on a secret they cannot have.
+  #
+  # Its own job rather than a step in `verify`, so the settings-reading token is
+  # never present in the runner that executes every installed dependency. The
+  # script imports nothing outside node: builtins and uses global fetch, so it
+  # needs no install step.
+  rulesets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Nothing in this job pushes, and a persisted token in .git/config
+          # is one careless artifact upload away from being published.
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22.16
+
+      - name: Branch protection matches the record
+        run: node scripts/check-ruleset-drift.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.RULESETS_TOKEN }}

@@ -1,8 +1,8 @@
 ---
 title: The agent surface
 description: MCP tools and self-teaching errors. Operate without an admin UI.
-section: Agents
-order: 1
+section: Operate
+order: 6
 ---
 
 Day-to-day content work goes through MCP and the CLI — the same ops a dashboard
@@ -41,6 +41,50 @@ limits, and approval gates apply identically. MCP is a door, not a bypass.
 
 `delete_content` is destructive and human-gated. First call files an approval;
 retry with `approval: "<id>"` after `graft approve`.
+
+Tools also carry MCP annotations, so a client can tell a read from a deletion
+without parsing a description. Results carry `structuredContent` alongside the
+text, and the sixteen tools with a fixed shape declare an `outputSchema` the
+server validates against before answering.
+
+## Resources and prompts
+
+Documents are addressable as resources at `graft://<branch>/<collection>/<slug>`,
+so a client can attach one as context instead of spending a turn on
+`get_content`. Reads come from the authored files, so a resource reflects the
+working tree rather than the last compile. `graft://<branch>/schema` serves the
+`describe_schema` payload for attaching once.
+
+Prompts carry the workflows filled in from the live project: `author-document`
+and `plan-migration` include the collection's real field list, `revise-document`
+the document's URI, `fix-error` this build's recovery text. Prompt arguments and
+resource variables autocomplete from what exists.
+
+## Two endpoints
+
+A Graft project can serve two MCP endpoints, and they are different servers
+rather than one server with a setting.
+
+| | Surface | Auth |
+| --- | --- | --- |
+| `POST /api/mcp` | Everything above | Required |
+| `POST /mcp` | Documentation only | None |
+
+The public one is built by `createDocsMcpHandler`, and it exists because docs
+platforms already publish this: Mintlify generates a docs MCP at `/mcp` for
+every site it hosts, and Cloudflare runs a documentation server separately from
+its authenticated API server. Agents arrive looking there.
+
+It serves `list_collections`, `list_content`, `get_content`, `search_content`,
+`explain_error` and the document resources. Nothing else, and mostly for
+reasons that are not about writes: `describe_schema` carries the project's
+functions, `list_registry` its owned primitives, and the branch, compilation and
+approval listings its operations. Those are all reads, which is why "read-only"
+is the wrong test for what belongs on a public endpoint.
+
+It is a separate factory rather than a flag on the authenticated one. There is
+no option on it that widens the surface and no `allowAnonymous` escape, so
+standing up the public endpoint cannot open the private one.
 
 ## Proof
 

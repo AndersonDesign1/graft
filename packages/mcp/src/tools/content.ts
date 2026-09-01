@@ -9,6 +9,8 @@ import {
   composeDocument,
   parseDocument,
   readCollectionDocs,
+  resolveContained,
+  SLUG_RE,
   writeDocumentFile,
 } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
@@ -16,29 +18,51 @@ import { assertSafeMdx } from "@usegraft/mdx-safety";
 import { assertSearchQuery, scopeChain } from "@usegraft/db";
 import { z } from "zod";
 import { findDoc, requireCollection } from "../content-hints";
-import { assertSlugFree, invokeFunction } from "../tool-helpers";
+import { assertSlugFree, invokeFunctionWithApproval } from "../tool-helpers";
+import { documentLink } from "./resource-uri";
 import { guarded } from "../tool-result";
+import { DESTROYS, READS, WRITES } from "./annotations";
+import {
+  getContentOutput,
+  listContentOutput,
+  searchContentOutput,
+  writeContentOutput,
+} from "./outputs";
 import type { RegisterTools } from "./deps";
 
-export const registerContentTools: RegisterTools = (server, deps) => {
-  const {
-    branchId,
-    collections,
-    contentDir,
-    functions,
-    getDeleteHandler,
-    getScope,
-    options,
-    projectContent,
-    requireScope,
-    searchIndex,
-    staticIndexPath,
-  } = deps;
+/**
+ * Reading and searching documents. Split from the write half because the
+ * public documentation server registers these and nothing else — a mount whose
+ * whole purpose is public should not be one `if` away from `write_content`.
+ */
+/**
+ * A slug names a file, so refuse anything that could name a *different* file.
+ *
+ * In the handler rather than the input schema on purpose: a zod `.regex()`
+ * rejects before the tool body runs, and the SDK surfaces that as a bare
+ * protocol error with no `fix` — which is exactly the self-teaching an agent
+ * needs here, since the correct slug is one edit away. `resolveContained` is
+ * still applied downstream as the backstop that does not depend on this.
+ */
+function assertSlugShape(slug: string, collection: string): void {
+  if (SLUG_RE.test(slug)) return;
+  throw new GraftError({
+    code: "INVALID_SLUG",
+    message: `Slug "${slug}" is not URL-safe.`,
+    fix: 'Slugs must be kebab-case: lowercase letters, digits, and single hyphens (e.g. "getting-started"). A slug names a file inside the collection directory, so it cannot contain "/", ".." or a drive letter.',
+    details: { slug, collection, pattern: SLUG_RE.source },
+  });
+}
+
+export const registerContentReadTools: RegisterTools = (server, deps) => {
+  const { branchId, collections, contentDir, getScope, searchIndex, staticIndexPath } = deps;
 
   server.registerTool(
     "list_content",
     {
       title: "List documents in a collection",
+      outputSchema: listContentOutput,
+      annotations: READS,
       description:
         "List every document in a collection, read from the authored MDX files (git is the source of truth). Returns slug, sourcePath, and frontmatter data.",
       inputSchema: {
@@ -46,24 +70,29 @@ export const registerContentTools: RegisterTools = (server, deps) => {
       },
     },
     ({ collection: name }) =>
-      guarded(() => {
-        const collection = requireCollection(collections, name);
-        const docs = readCollectionDocs(contentDir, name, collection);
-        return {
-          collection: name,
-          documents: docs.map((doc) => ({
-            slug: doc.slug,
-            sourcePath: doc.sourcePath,
-            data: doc.data,
-          })),
-        };
-      }),
+      guarded(
+        () => {
+          const collection = requireCollection(collections, name);
+          const docs = readCollectionDocs(contentDir, name, collection);
+          return {
+            collection: name,
+            documents: docs.map((doc) => ({
+              slug: doc.slug,
+              sourcePath: doc.sourcePath,
+              data: doc.data,
+            })),
+          };
+        },
+        (payload) => payload.documents.map((doc) => documentLink(branchId, name, doc.slug)),
+      ),
   );
 
   server.registerTool(
     "get_content",
     {
       title: "Get one document",
+      outputSchema: getContentOutput,
+      annotations: READS,
       description:
         "Read a single document by collection + slug from the authored MDX files: validated frontmatter data, MDX body, and the file path to edit.",
       inputSchema: {
@@ -72,23 +101,30 @@ export const registerContentTools: RegisterTools = (server, deps) => {
       },
     },
     ({ collection: name, slug }) =>
-      guarded(() => {
-        const collection = requireCollection(collections, name);
-        const doc = findDoc(contentDir, name, collection, slug);
-        return {
-          collection: name,
-          slug: doc.slug,
-          sourcePath: doc.sourcePath,
-          data: doc.data,
-          body: doc.body,
-        };
-      }),
+      guarded(
+        () => {
+          const collection = requireCollection(collections, name);
+          const doc = findDoc(contentDir, name, collection, slug);
+          return {
+            collection: name,
+            slug: doc.slug,
+            sourcePath: doc.sourcePath,
+            data: doc.data,
+            body: doc.body,
+          };
+        },
+        // The document's own address, so a client that reached it by search or
+        // by guesswork can pin it as context without constructing the URI.
+        (payload) => [documentLink(branchId, name, payload.slug)],
+      ),
   );
 
   server.registerTool(
     "search_content",
     {
       title: "Full-text search across content",
+      outputSchema: searchContentOutput,
+      annotations: READS,
       description:
         'Search authored content by words, "quoted phrases", `or`, and -exclusions (websearch syntax). Searches the branch\'s effective content in the compiled Postgres index — on a preview branch that includes documents inherited from parent branches, with branch overrides winning — so results are as fresh as the last compile (write_content compiles automatically); every hit carries the sourcePath of the file to edit. Ranking weights slug matches over frontmatter over body.',
       inputSchema: {
@@ -101,37 +137,59 @@ export const registerContentTools: RegisterTools = (server, deps) => {
       },
     },
     ({ query, collection: name, limit }) =>
-      guarded(async () => {
-        if (name !== undefined) requireCollection(collections, name);
-        // Cheap input gates first — an invalid query never pays scope resolution.
-        assertSearchQuery(query);
-        const collectionNames = name === undefined ? Object.keys(collections) : [name];
-        // A static artifact is a single compiled branch, so its "chain" is just
-        // this branch; Postgres searches the resolved chain (leaf-first), the
-        // same effective content readContent serves: inherited parent docs are
-        // found, branch overrides win, tombstones hide (P4.1 overlay semantics).
-        const chain = staticIndexPath === undefined ? scopeChain(await getScope()) : [branchId];
-        const hits = await searchIndex({ query, chain, collections: collectionNames, limit });
-        return {
-          branch: branchId,
-          chain,
-          query,
-          hits: hits.map(({ row, rank, snippet }) => ({
-            collection: row.collection,
-            slug: row.slug,
-            sourcePath: row.sourcePath,
-            rank,
-            snippet,
-            data: row.data,
-          })),
-        };
-      }),
+      guarded(
+        async () => {
+          if (name !== undefined) requireCollection(collections, name);
+          // Cheap input gates first — an invalid query never pays scope resolution.
+          assertSearchQuery(query);
+          const collectionNames = name === undefined ? Object.keys(collections) : [name];
+          // A static artifact is a single compiled branch, so its "chain" is just
+          // this branch; Postgres searches the resolved chain (leaf-first), the
+          // same effective content readContent serves: inherited parent docs are
+          // found, branch overrides win, tombstones hide (P4.1 overlay semantics).
+          const chain = staticIndexPath === undefined ? scopeChain(await getScope()) : [branchId];
+          const hits = await searchIndex({ query, chain, collections: collectionNames, limit });
+          return {
+            branch: branchId,
+            chain,
+            query,
+            hits: hits.map(({ row, rank, snippet }) => ({
+              collection: row.collection,
+              slug: row.slug,
+              sourcePath: row.sourcePath,
+              rank,
+              snippet,
+              data: row.data,
+            })),
+          };
+        },
+        // A hit already knows its collection and slug; the link saves the
+        // client a get_content round trip to reach the document itself.
+        (payload) => payload.hits.map((hit) => documentLink(branchId, hit.collection, hit.slug)),
+      ),
   );
+};
+
+/** Authoring and deleting. Never registered on the public documentation mount. */
+export const registerContentWriteTools: RegisterTools = (server, deps) => {
+  const {
+    branchId,
+    collections,
+    contentDir,
+    elicitApproval,
+    functions,
+    getDeleteHandler,
+    options,
+    projectContent,
+    requireScope,
+  } = deps;
 
   server.registerTool(
     "write_content",
     {
       title: "Write a document (create or update)",
+      outputSchema: writeContentOutput,
+      annotations: WRITES,
       description:
         "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.",
       inputSchema: {
@@ -146,63 +204,79 @@ export const registerContentTools: RegisterTools = (server, deps) => {
       },
     },
     ({ collection: name, slug, data, body }) =>
-      guarded(async () => {
-        requireScope("write_content", "content:write");
-        const collection = requireCollection(collections, name);
+      guarded(
+        async () => {
+          requireScope("write_content", "content:write");
+          const collection = requireCollection(collections, name);
 
-        if (collection.authority === "db-authoritative") {
-          throw new GraftError({
-            code: "AUTHORITY_MISMATCH",
-            message: `Collection "${name}" is db-authoritative — its records live in Postgres, not as MDX files.`,
-            fix: `Write this data through the collection's function endpoint (POST /api/fn/<name>, see llms.txt) instead of write_content. write_content is only for file-authoritative collections.`,
-            details: { collection: name, authority: collection.authority },
+          if (collection.authority === "db-authoritative") {
+            throw new GraftError({
+              code: "AUTHORITY_MISMATCH",
+              message: `Collection "${name}" is db-authoritative — its records live in Postgres, not as MDX files.`,
+              fix: `Write this data through the collection's function endpoint (POST /api/fn/<name>, see llms.txt) instead of write_content. write_content is only for file-authoritative collections.`,
+              details: { collection: name, authority: collection.authority },
+            });
+          }
+
+          const frontmatterSlug = (data as Record<string, unknown>).slug;
+          if (frontmatterSlug !== undefined && frontmatterSlug !== slug) {
+            throw new GraftError({
+              code: "INVALID_SLUG",
+              message: `data.slug ("${String(frontmatterSlug)}") conflicts with the slug argument ("${slug}")`,
+              fix: "Omit `slug` from data — the slug argument names the file and the document.",
+              details: { slug, frontmatterSlug },
+            });
+          }
+
+          assertSlugShape(slug, name);
+
+          const sourcePath = `${name}/${slug}.mdx`;
+          // Belt and braces, and the braces are load-bearing. The input schema
+          // above rejects a slug with a path separator in it, but this is the
+          // line that decides where bytes land, and `parseDocument` below is no
+          // guard at all here: it validates `basename(sourcePath)`, so a slug of
+          // "../../escaped" parses as the perfectly legal slug "escaped" while
+          // the join walks two directories up. Verified before the fix by
+          // writing outside contentDir and getting a success response.
+          const fullPath = resolveContained(contentDir, sourcePath, {
+            label: "document path",
           });
-        }
+          // Updating an existing document must not rewrite frontmatter the author
+          // (or an earlier agent) wrote — only a real data change re-serialises.
+          // Content arriving over the wire is not operator-authored, and MDX is
+          // code: rendering evaluates `{…}` and `import` as JavaScript on the
+          // server. Refuse it here, before it is stored.
+          assertSafeMdx(body ?? "", { label: `${name}/${slug}` });
 
-        const frontmatterSlug = (data as Record<string, unknown>).slug;
-        if (frontmatterSlug !== undefined && frontmatterSlug !== slug) {
-          throw new GraftError({
-            code: "INVALID_SLUG",
-            message: `data.slug ("${String(frontmatterSlug)}") conflicts with the slug argument ("${slug}")`,
-            fix: "Omit `slug` from data — the slug argument names the file and the document.",
-            details: { slug, frontmatterSlug },
-          });
-        }
+          const existingRaw = existsSync(fullPath) ? readFileSync(fullPath, "utf8") : undefined;
+          const raw = composeDocument(existingRaw, data as Record<string, unknown>, body ?? "");
+          // Validate before touching disk: schema + slug shape, same path compile uses.
+          parseDocument(raw, collection, sourcePath);
 
-        const sourcePath = `${name}/${slug}.mdx`;
-        const fullPath = join(contentDir, ...sourcePath.split("/"));
-        // Updating an existing document must not rewrite frontmatter the author
-        // (or an earlier agent) wrote — only a real data change re-serialises.
-        // Content arriving over the wire is not operator-authored, and MDX is
-        // code: rendering evaluates `{…}` and `import` as JavaScript on the
-        // server. Refuse it here, before it is stored.
-        assertSafeMdx(body ?? "", { label: `${name}/${slug}` });
+          assertSlugFree(contentDir, name, collection, slug, sourcePath);
 
-        const existingRaw = existsSync(fullPath) ? readFileSync(fullPath, "utf8") : undefined;
-        const raw = composeDocument(existingRaw, data as Record<string, unknown>, body ?? "");
-        // Validate before touching disk: schema + slug shape, same path compile uses.
-        parseDocument(raw, collection, sourcePath);
+          writeDocumentFile(contentDir, sourcePath, raw);
 
-        assertSlugFree(contentDir, name, collection, slug, sourcePath);
-
-        writeDocumentFile(fullPath, raw);
-
-        const result = await projectContent();
-        return {
-          written: sourcePath,
-          branch: branchId,
-          gitSha: result.gitSha,
-          changes: result.changes,
-        };
-      }),
+          const result = await projectContent();
+          return {
+            written: sourcePath,
+            branch: branchId,
+            gitSha: result.gitSha,
+            changes: result.changes,
+          };
+        },
+        // Where the thing it just wrote now lives.
+        () => [documentLink(branchId, name, slug)],
+      ),
   );
 
   server.registerTool(
     "delete_content",
     {
       title: "Delete a document (human-gated)",
+      annotations: DESTROYS,
       description:
-        "Delete an authored document: removes <contentDir>/<collection>/<slug>.mdx and compiles, so the index soft-deletes it. DESTRUCTIVE and always human-gated — the first call files an approval and fails with its id; a human decides with `graft approve <id>` (or deny); then retry the SAME collection+slug with `approval: <id>` (the MCP form of the x-graft-approval header). Approvals are one-shot and bound to that exact input. Git is the version history: commit the deletion afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.",
+        "Delete an authored document: removes <contentDir>/<collection>/<slug>.mdx and compiles, so the index soft-deletes it. DESTRUCTIVE and always human-gated — the first call files an approval and fails with its id; a human decides with `graft approve <id>` (or deny); then retry the SAME collection+slug with `approval: <id>` (the MCP form of the x-graft-approval header). Approvals are one-shot and bound to that exact input. On a server that has opted into elicited approvals AND a client that supports elicitation, you may instead be asked to confirm in-band and the call completes in one step — the gate is identical, only the way the human is reached differs, so do not treat either outcome as unusual. Git is the version history: commit the deletion afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.",
       inputSchema: {
         collection: z.string().describe("Collection name"),
         slug: z.string().describe("Document slug to delete"),
@@ -226,19 +300,21 @@ export const registerContentTools: RegisterTools = (server, deps) => {
             details: { collection: name, authority: collection.authority },
           });
         }
+        // Before findDoc, and before the approval: a malformed slug should not
+        // reach a human as a pending decision.
+        assertSlugShape(slug, name);
         // Fail fast on a missing document — never file an approval a human
         // would review for nothing.
         findDoc(contentDir, name, collection, slug);
 
-        const { data, correlationId } = await invokeFunction(
+        const { data, correlationId } = await invokeFunctionWithApproval(
           getDeleteHandler(),
           "delete_content",
           { collection: name, slug },
           { credential: options.defaultAuthorization, approval },
+          elicitApproval,
         );
         return { ...(data as Record<string, unknown>), correlationId };
       }),
   );
-
-  const uploadRoot = options.localUploadRoot;
 };

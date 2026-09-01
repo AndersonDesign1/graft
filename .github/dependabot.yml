@@ -11,6 +11,14 @@ updates:
     schedule:
       interval: "weekly"
 
+    # Dependabot reads and targets the repository's DEFAULT branch unless told
+    # otherwise, and the default is now main. Without this line the grouped
+    # action bumps would open against main, which only moves at release time,
+    # so feat/core would keep running the old pins until the next merge landed
+    # them the long way round. Development happens on feat/core, so the updates
+    # belong there.
+    target-branch: "feat/core"
+
     # One PR for every action, not one per action. Three actions across two
     # workflow files would otherwise open three PRs, and each burns the full
     # matrix: a Postgres service, the integration suite, and a Docker build.

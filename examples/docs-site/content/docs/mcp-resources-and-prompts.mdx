@@ -1,0 +1,116 @@
+---
+title: MCP resources & prompts
+description: Documents addressable by URI, workflows filled in from the live project, and arguments that autocomplete.
+section: Reference
+order: 8
+---
+
+Tools are requests to do something. Resources are things that exist, and prompts
+are workflows a person picks on purpose. Graft serves both alongside its
+[tools](/docs/mcp-tools).
+
+## Resources
+
+Documents are addressable:
+
+```text
+graft://<branch>/<collection>/<slug>
+```
+
+A client can list them, attach one to a conversation, and re-read it without
+spending a turn deciding to. Before resources existed, attaching a document
+meant calling `get_content` and pasting the answer.
+
+The branch is baked into the template rather than left as a variable. A server
+is pinned to one branch, so a URI naming a branch it cannot serve would be a URI
+it has to refuse. What a client fills in is what the server can actually vary.
+
+### Reads come from files
+
+Resource reads go to the authored MDX, not the index. Two consequences:
+
+- A resource reflects the working tree, not the last compile.
+- Resources work on a static project with no database at all.
+
+Reads are byte-exact — the same promise `write_content` makes in the other
+direction.
+
+### The schema resource
+
+```text
+graft://<branch>/schema
+```
+
+Serves the `describe_schema` payload, so a client can attach the project's shape
+once instead of calling a tool every session.
+
+This one is not published on the [public docs mount](/docs/docs-mcp), because
+`describe_schema` carries the project's functions.
+
+### Resource links on tool results
+
+`list_content`, `get_content`, `search_content`, and `write_content` attach a
+`resource_link` for every document they name. A search hit already knows its
+collection and slug; the link saves the client the round trip to reach the
+document itself.
+
+## Prompts
+
+Four prompts, each filled in from the live project rather than stating something
+generic. A prompt that only said "author a document nicely" is a sentence the
+user could have typed, and carries no reason to live on a server.
+
+| Prompt | Arguments | What it carries |
+| --- | --- | --- |
+| `author-document` | `collection`, `topic` | That collection's real field list, with required and optional marked |
+| `revise-document` | `collection`, `slug`, `goal` | The document's resource URI and the collection's fields |
+| `fix-error` | `code` | This build's meaning, typical causes, and recovery text for that code |
+| `plan-migration` | `collection`, `change` | Current fields, and the migration order of operations |
+
+They also encode the order of operations this codebase cares about, which an
+agent has no way to infer:
+
+- Validate against the schema before writing.
+- Migrations are reviewable commits, not live edits.
+- `graft migrate --apply` is the operator's consent, so it is proposed and never
+  assumed.
+- A destructive call is expected to stop and wait for a human rather than route
+  around the refusal.
+
+`fix-error` given a code Graft does not know says so, and points at
+`explain_error` with no arguments to list the codes this build knows. It also
+states the rule that matters when advice conflicts: the failing call's own `fix`
+is more specific than the general explanation and beats it.
+
+Prompts are absent from the public docs mount. Three of the four instruct
+`write_content`, and telling a stranger how to author into someone else's
+project is not documentation.
+
+## Completion
+
+Prompt arguments and resource-template variables autocomplete from what exists.
+
+| Argument | Completes to |
+| --- | --- |
+| `collection` | Registered file-authoritative collection names |
+| `slug` | Slugs in the collection already chosen, or all slugs if none is |
+| `code` | Error codes, matched case-insensitively |
+
+Picking a collection that is not registered is a mistake the server can prevent
+rather than diagnose.
+
+db-authoritative collections are excluded from collection completion, because
+they have no authored documents to write or revise.
+
+## Both transports
+
+Resources and prompts are asserted on the HTTP transport as well as stdio. That
+transport builds a fresh server per request, and "it is the same factory" is
+exactly how an earlier identity bug survived — correct on stdio, broken over
+HTTP.
+
+## Next steps
+
+- [MCP tools](/docs/mcp-tools) — the eighteen tools
+- [Connecting agents](/docs/connecting-agents) — how to reach the server
+- [Public docs MCP](/docs/docs-mcp) — the read-only mount, and what it omits

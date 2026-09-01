@@ -16,6 +16,7 @@ import type { BranchScope, ContentSearchHit, Database } from "@usegraft/db";
 import type { Storage } from "@usegraft/assets";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { GraftMcpOptions } from "../options";
+import type { ApprovalElicitor } from "../approval-elicitation";
 
 export interface ToolDeps {
   /** The options the server was created with, for tool-specific settings. */
@@ -53,6 +54,12 @@ export interface ToolDeps {
   getDeleteHandler: () => GraftFunctionsHandler;
   /** The asset store, constructed on first use. */
   getStorage: () => Promise<Storage>;
+  /**
+   * Ask the connected human to decide a filed approval, when the mount is
+   * configured for it and the client can ask. Undefined is the default and
+   * means the out-of-band flow: fail with the id, wait for `graft approve`.
+   */
+  elicitApproval?: ApprovalElicitor;
 }
 
 /** Registers one cohesive group of tools onto a server. */

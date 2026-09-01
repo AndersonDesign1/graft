@@ -37,7 +37,7 @@ order: 1
 | --- | --- |
 | `graft add [item]` | Copy an owned primitive into `graft/` (no name: list) |
 | `graft mcp` | Serve project MCP over stdio |
-| `graft serve [--port 3903] [--studio]` | Headless runtime: `/api/fn/<name>`, `/api/mcp`, `/healthz`; `--studio` mounts opt-in Studio at `/studio` |
+| `graft serve [--port 3903] [--studio]` | Headless runtime: `/api/fn/<name>`, `/api/mcp`, `/api/content/v1/*`, `/healthz`; `--studio` mounts opt-in Studio at `/studio` |
 | `graft studio` | Opt-in Studio UI — edit content, approve/deny, browse branches (default port 4983) |
 | `graft content` | List the content tree from the compiled index (Studio/OpenAPI parity) |
 | `graft compilations` | List recent projection trail rows (Studio/OpenAPI parity) |
