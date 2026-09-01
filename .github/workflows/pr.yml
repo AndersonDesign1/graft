@@ -73,9 +73,16 @@ jobs:
     runs-on: ubuntu-latest
     # A pull request that genuinely touches nothing publishable says so with
     # the label, and the reviewer sees that claim rather than a silent skip.
+    #
+    # The changesets version PR is excluded because it CONSUMES changesets —
+    # deleting them is its entire purpose, so it can never satisfy a check that
+    # demands one. This is a required status check on feat/core, which made that
+    # pull request structurally unmergeable: it failed, every time, by design,
+    # and the release could not land until someone noticed why.
     if: >-
       !contains(github.event.pull_request.labels.*.name, 'no changeset')
       && github.actor != 'dependabot[bot]'
+      && !startsWith(github.head_ref, 'changeset-release/')
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
