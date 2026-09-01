@@ -6,13 +6,7 @@
  * Primitives you add with `graft add` live under graft/ and are merged in via
  * the generated graft/index.ts barrel — you never edit the import below.
  */
-import {
-  defineCollection,
-  defineFunction,
-  field,
-  insertRecord,
-  mergePrimitives,
-} from "@usegraft/core";
+import { defineCollection, field, mergePrimitives } from "@usegraft/core";
 import * as primitives from "./graft";
 
 /** Marketing/landing pages (/, /why). */
@@ -59,72 +53,25 @@ export const docs = defineCollection({
   },
 });
 
-/**
- * docStats — the docs site's own heartbeat: what the index currently serves.
- * Exists so the graftRoute mount (/api/fn/docStats) is exercised end-to-end.
- */
-export const docStats = defineFunction({
-  name: "docStats",
-  kind: "query",
-  description: "Lists live doc slugs by section on the current branch, from content_index.",
-  returns: "{ branch: string; count: number; sections: Record<string, string[]> }",
-  input: {},
-  handler: async ({ db, branch }) => {
-    const rows = await db.query.contentIndex.findMany({
-      columns: { slug: true, data: true },
-      where: (t, { and, eq }) =>
-        and(eq(t.branchId, branch), eq(t.collection, "docs"), eq(t.deleted, false)),
-      orderBy: (t, { asc }) => asc(t.slug),
-    });
-    const sections: Record<string, string[]> = {};
-    for (const row of rows) {
-      const section = String((row.data as { section?: string }).section ?? "Other");
-      (sections[section] ??= []).push(row.slug);
-    }
-    return { branch, count: rows.length, sections };
-  },
-});
-
-/**
- * submissions — operational data (db-authoritative): rows live in Postgres,
- * written only through submitContact. The landing page's contact form is a
- * live demo of the typed function runtime, not a mock.
- */
-export const submissions = defineCollection({
-  name: "submissions",
-  authority: "db-authoritative",
-  description: "Landing-page contact submissions. Write via submitContact.",
-  fields: {
-    // Bounded: this is an anonymous public form writing into an unbounded jsonb
-    // column, so an unbounded string is a storage-exhaustion vector.
-    email: field.string({
-      maxLength: 320,
-      pattern: /^[^@\s]+@[^@\s]+\.[^@\s]+$/,
-      description: "Sender address.",
-    }),
-    message: field.text({ maxLength: 4000, optional: true, description: "What they wrote." }),
-  },
-});
-
-/** Public mutation the landing form posts to (`public: true` is the greppable opt-out). */
-export const submitContact = defineFunction({
-  name: "submitContact",
-  kind: "mutation",
-  public: true,
-  rateLimit: { limit: 5, windowSeconds: 60 },
-  description:
-    "Stores a contact-form submission (public; anonymous callers allowed; 5/min per caller).",
-  returns: "{ id: string; receivedAt: string }",
-  input: submissions.fields,
-  handler: async (ctx) => {
-    const record = await insertRecord(ctx, submissions, ctx.input);
-    return { id: record.id, receivedAt: record.createdAt.toISOString() };
-  },
-});
-
 // Your own collections/functions + everything under graft/ (added via `graft add`).
 // mergePrimitives throws CONFIG_INVALID on a duplicate key — never a silent override.
 export const { collections, functions } = mergePrimitives([
-  { collections: { pages, docs, submissions }, functions: { docStats, submitContact } },
+  { collections: { pages, docs }, functions: {} },
   primitives,
 ]);
+
+/**
+ * The static index: compile writes a SQLite artifact and nothing here needs a
+ * database at runtime.
+ *
+ * This site is documentation. Its content is MDX in git, and the only reasons
+ * it ever required Postgres were a `submissions` collection and two functions
+ * that no page in `src/` referenced — declared to exercise the Postgres tier,
+ * never rendered. The landing page carries that demo properly: its own
+ * `submitContact`, wired to a `<ContactForm />` a visitor can actually post.
+ *
+ * What this buys: docs that cannot go down with a database, cost nothing per
+ * page view, and prerender. `/mcp` still serves agents — the docs MCP handler
+ * reads the same artifact through `staticIndexPath`.
+ */
+export const index = "static";

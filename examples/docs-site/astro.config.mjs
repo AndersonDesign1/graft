@@ -5,10 +5,10 @@ import vercel from "@astrojs/vercel";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
 
-// Env layering, most specific wins: repo-root .env fills shared values
-// (GRAFT_DEV_TOKEN, …), then this app's own .env overrides on top — the
-// docs site owns its own database (graft_docs), never the landing page's.
-// Both loads are harmless when the file is absent (CI, prod).
+// Env layering, most specific wins: repo-root .env fills shared values, then
+// this app's own .env overrides on top. Both loads are harmless when the file
+// is absent (CI, prod) — and this site needs no DATABASE_URL at all now that it
+// reads the compiled static index.
 import { readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 
@@ -23,12 +23,21 @@ for (const rel of ["../../.env", "./.env"]) {
 
 // https://astro.build/config
 export default defineConfig({
-  // Server output: sdk-astro reads go straight to Postgres per request (no
-  // request memo — a page makes a handful of reads). Pages can opt back into
-  // prerendering with `export const prerender = true` once the compile-webhook
-  // → CDN-purge loop from the Phase 4 tag contract is wired up.
-  output: "server",
-  adapter: vercel(),
+  // Prerendered by default. Content is MDX in git compiled to a SQLite
+  // artifact, so every page can be built once and served from the CDN: the docs
+  // cannot go down with a database they no longer have, and a page view costs
+  // nothing. `graft compile` runs before `astro build` (see package.json) so
+  // the artifact exists when the prerender pass reads it.
+  //
+  // Two routes opt out with `export const prerender = false` because they take
+  // input rather than a slug: /api/search and /mcp, the public docs MCP. Both
+  // read the same artifact.
+  output: "static",
+  // The prerendered pages need no artifact at runtime, but the two on-demand
+  // routes do: /api/search and /mcp both read the compiled index. Vercel traces
+  // imports, not data files, so it has to be named or the functions deploy
+  // without the thing they read.
+  adapter: vercel({ includeFiles: [".graft/index.db"] }),
   integrations: [react()],
   vite: {
     // Tailwind v4 processes the fumadocs-ui stylesheet (docs shell only; the
