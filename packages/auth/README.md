@@ -7,7 +7,7 @@ Part of [Graft](https://github.com/AndersonDesign1/graft), a CMS built so an AI 
 ## Install
 
 ```bash
-npm i @usegraft/auth
+npm i @usegraft/auth@beta
 ```
 
 ## Resolve an actor

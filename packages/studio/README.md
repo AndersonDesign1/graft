@@ -9,7 +9,7 @@ The Studio is opt-in, Drizzle-style. Nothing depends on it, and the UI is only a
 ## Install
 
 ```bash
-npm i @usegraft/studio
+npm i @usegraft/studio@beta
 ```
 
 Or just run `graft studio` from [`@usegraft/cli`](https://www.npmjs.com/package/@usegraft/cli).

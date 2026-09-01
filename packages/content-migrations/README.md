@@ -11,7 +11,7 @@ Content lives in files that git owns. When you add a required field or rename on
 ## Install
 
 ```bash
-npm i @usegraft/content-migrations
+npm i @usegraft/content-migrations@beta
 ```
 
 ## Write one

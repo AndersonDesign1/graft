@@ -13,7 +13,7 @@ That is the whole extensibility story. A plugin you cannot read is a plugin an a
 ## Install
 
 ```bash
-npm i @usegraft/registry
+npm i @usegraft/registry@beta
 ```
 
 Most people use `graft add` rather than this package directly.

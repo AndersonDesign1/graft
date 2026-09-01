@@ -53,6 +53,11 @@ jobs:
       # are the ones readers see. A fix that lands in only one of the two is how
       # a patched vulnerability ships unpatched.
       - run: pnpm check:registry-drift
+      # While the repo is in beta, `latest` is an older version than the docs
+      # describe. A README saying `npm i @usegraft/cli` sends a reader to a build
+      # that does not match the page they read it from, which during this beta
+      # means approvalPolicy in config silently doing nothing.
+      - run: pnpm check:install-tag
       - run: pnpm typecheck
       - run: pnpm build
       # The error reference on the docs site is generated from ERROR_KNOWLEDGE
