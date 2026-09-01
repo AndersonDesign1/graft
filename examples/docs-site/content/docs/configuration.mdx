@@ -30,7 +30,7 @@ what operational data, typed functions, and copy-on-write branches need.
 | `GRAFT_DEV_SCOPES` | Comma-separated scopes for the dev token |
 | `GRAFT_TRUSTED_ISSUERS` | Comma-separated OIDC issuer URLs (discovery) |
 | `GRAFT_MCP_ALLOW_ANONYMOUS` | `1` to serve anonymous MCP callers (local dev only; refused by default) |
-| `GRAFT_APPROVAL_POLICY` | e.g. `human` to gate mutations by default at the handler |
+| `approvalPolicy` (graft.config.ts, not an env var) | `human` gates every mutation, `unattended` gates nothing |
 
 ## Serve
 

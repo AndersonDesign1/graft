@@ -113,7 +113,7 @@ accept it, so no server setting makes `run_function` stop asking for a
 destructive call. An MCP mount exists because an agent is calling it, and the
 agent is the party the gate is there to stop — one option that turned every
 destructive tool into an ungated one is not a trade worth offering. On
-`graft serve` the split is visible: `GRAFT_APPROVAL_POLICY=unattended` lifts the
+`graft serve` the split is visible: `approvalPolicy: "unattended"` lifts the
 gate on `POST /api/fn` and leaves `POST /api/mcp` gated.
 
 ### Running with no human at all
@@ -127,9 +127,16 @@ That was the absence of a policy rather than a policy.
 createFunctionsHandler({ functions, db, approvalPolicy: "unattended" });
 ```
 
-On `graft serve`, set `GRAFT_APPROVAL_POLICY=unattended`. The server warns on
-every boot when it is on, because an env var is one line in a dashboard and the
-log is where a mistake gets noticed.
+On `graft serve`, export it from `graft.config.ts`:
+
+```ts
+export const approvalPolicy = "unattended";
+```
+
+It is config rather than an env var deliberately. This is the setting that
+turns off the gate on irreversible work, and a dashboard variable is invisible
+to review — in config it appears in a diff. The server also warns on every boot
+while it is on, because the log is where a mistake actually gets noticed.
 
 Understand what you are accepting. Git restores authored content, so a deleted
 document comes back. It does not restore operational data: `deleteRecord`

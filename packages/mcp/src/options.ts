@@ -94,7 +94,7 @@ export interface GraftMcpOptions {
    * destructive tool an agent can reach into an ungated one.
    *
    * A headless deployment that genuinely wants it still has it, on
-   * `createFunctionsHandler` and through `GRAFT_APPROVAL_POLICY` on
+   * `createFunctionsHandler` and through `approvalPolicy` in graft.config.ts on
    * `graft serve`'s /api/fn routes. It just does not reach the tool surface.
    */
   approvalPolicy?: "none" | "human";

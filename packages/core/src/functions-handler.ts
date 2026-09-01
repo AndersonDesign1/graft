@@ -430,6 +430,28 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
             }),
           );
         }
+      } else {
+        // The gate is off, but an approval this caller actually presented is
+        // still spent. Skipping the consume left a granted row `approved` and
+        // replayable: flip the policy back to "none" or "human" later and that
+        // row still authorizes a destructive call nobody re-reviewed. One-shot
+        // has to mean one-shot across a policy change, which is exactly when
+        // the stale row is dangerous.
+        //
+        // Best-effort on purpose. The call is not gated, so a failure to spend
+        // the token must not fail an otherwise-permitted invocation — but a
+        // token that was presented is never left reusable on a healthy store.
+        const approvalId = request.headers.get(APPROVAL_HEADER);
+        if (approvalId) {
+          try {
+            await stores.approvals.consume(approvalId, {
+              functionName: name,
+              inputCanonical: canonicalJson(parsed.data),
+            });
+          } catch {
+            // Deliberately swallowed; see above.
+          }
+        }
       }
 
       const data = await fn.handler(ctx);

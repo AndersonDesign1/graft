@@ -776,6 +776,48 @@ describe("destructive-op human gate (P3.4)", () => {
     expect(stores.auditRows.at(-1)).toMatchObject({ functionName: "nuke" });
   });
 
+  it("approvalPolicy 'unattended' still spends an approval the caller presents", async () => {
+    // The gate is off, so the call runs either way. What must not happen is the
+    // row surviving as `approved`: tighten the policy back to "none" later and a
+    // stale row would still authorize a destructive call nobody re-reviewed.
+    // One-shot has to hold across a policy change, which is when it matters.
+    const stores = memoryStores();
+    const gated = p34handler(stores, { approvalPolicy: "none" });
+
+    // File and approve under the gated policy.
+    await gated(post("nuke", { target: "row-1" }));
+    const id = [...stores.approvalRows.keys()].at(-1)!;
+    stores.approve(id);
+
+    // Now the deployment flips to unattended and the token is presented.
+    const unattended = p34handler(stores, { approvalPolicy: "unattended" });
+    expect(
+      (await unattended(postWith("nuke", { target: "row-1" }, { "x-graft-approval": id }))).status,
+    ).toBe(200);
+    expect(stores.approvalRows.get(id)?.status).toBe("consumed");
+
+    // And the policy tightening again does not find a reusable row.
+    const reuse = await gated(postWith("nuke", { target: "row-1" }, { "x-graft-approval": id }));
+    expect(reuse.status).toBe(403);
+  });
+
+  it("approvalPolicy 'unattended' does not fail a call whose approval store is broken", async () => {
+    // Consuming is best-effort on this path: the call is not gated, so a store
+    // that throws must not turn a permitted invocation into a failure.
+    const stores = memoryStores();
+    const broken = {
+      ...stores.approvals,
+      consume: async () => {
+        throw new Error("approval store is down");
+      },
+    };
+    const handler = p34handler({ ...stores, approvals: broken }, { approvalPolicy: "unattended" });
+
+    expect(
+      (await handler(postWith("nuke", { target: "x" }, { "x-graft-approval": "apr-nope" }))).status,
+    ).toBe(200);
+  });
+
   it("describe() exposes the destructive flag for introspection", () => {
     expect(nuke.describe().destructive).toBe(true);
     expect(echo.describe().destructive).toBeUndefined();

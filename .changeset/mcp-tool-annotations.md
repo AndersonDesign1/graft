@@ -11,8 +11,10 @@ so `search_content` and `delete_content` were offered on the same terms, and a
 client that asks a human before a destructive call had nothing to key on. Reads
 are `readOnlyHint`, `delete_content` / `put_asset` / `decide_approval` /
 `run_function` are `destructiveHint`, `write_content` is a non-destructive
-change because git is its undo, and nothing claims an open world: the domain is
-the collections a project declares.
+change where `contentDir` is a git work tree, which is the ordinary case and
+the one the hint is set for — outside one an overwrite has no undo, and the
+hint is then optimistic. Nothing claims an open world: the domain is the
+collections a project declares.
 
 These are hints and not a boundary, exactly as the spec says. Graft's real gates
 are unchanged — the scope check, the one-shot input-bound approval, the Postgres

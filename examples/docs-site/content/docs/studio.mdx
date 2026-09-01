@@ -164,11 +164,21 @@ gate.
 place unauthenticated is appropriate. Bound beyond loopback it requires
 `GRAFT_DEV_TOKEN` as a bearer, and warns at startup if one is not set.
 
-Approval decisions are attributed to the identity the Studio was **mounted**
-with, never to something in the request. `graft studio` uses the OS user;
-`graft serve --studio` uses the service identity it runs as. A caller that could
-name its own decider could approve its own destructive call, which is exactly
-what the requester-cannot-decide rule exists to prevent.
+Approval decisions are attributed to a **verified** identity, never to something
+the caller names in the request body. Which identity depends on whether the
+mount authenticates anyone:
+
+| Mount | Decider recorded |
+| --- | --- |
+| `graft studio` | The OS user this process runs as |
+| `graft serve --studio` on loopback | `studio-serve`, the mount identity — there is no caller to attribute to |
+| `graft serve --studio` off loopback | The authenticated bearer/OIDC principal |
+
+Off loopback the principal wins because there *is* a verified caller, and
+attributing an approval to the service account would lose who actually decided
+it. Either way the caller cannot pick: a caller that could name its own decider
+could approve its own destructive call, which is exactly what the
+requester-cannot-decide rule exists to prevent.
 
 Deciding an approval is a plain `UPDATE` on `approvals`, which a hardened
 runtime role cannot perform. On a hardened deployment the approvals view is

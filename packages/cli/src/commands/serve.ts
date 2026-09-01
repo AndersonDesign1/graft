@@ -23,8 +23,9 @@
  * Anonymous MCP callers are served on loopback (zero-config local dev) and
  * refused anywhere else, with no env var to remember. Off loopback it takes a
  * deliberate GRAFT_MCP_ALLOW_ANONYMOUS=1, which warns.
- * GRAFT_APPROVAL_POLICY=human gates every mutation; =unattended gates nothing,
- * including destructive functions, and warns on every boot. Binding beyond loopback
+ * Approval policy comes from graft.config.ts (`approvalPolicy`), not an env var:
+ * "human" gates every mutation, "unattended" gates nothing, including destructive
+ * functions, and warns on every boot. Binding beyond loopback
  * with no identity configured prints a warning, because MCP will then refuse
  * every caller.
  */
@@ -277,12 +278,21 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     devTokens: devToken ? { [devToken]: { kind: "agent", id: "graft-serve", scopes } } : undefined,
   });
 
-  const approvalPolicy =
-    process.env.GRAFT_APPROVAL_POLICY === "human"
-      ? "human"
-      : process.env.GRAFT_APPROVAL_POLICY === "unattended"
-        ? "unattended"
-        : "none";
+  // From graft.config.ts, not the environment. This is the setting that turns
+  // off the human gate on irreversible work, and GRAFT_APPROVAL_POLICY put it
+  // one line into a hosting dashboard, where nobody reviews it and nothing
+  // records who chose it. In config it lands in a diff. createFunctionsHandler
+  // has documented it as config-owned all along; the CLI was the piece still
+  // reading an env var.
+  const approvalPolicy = config.approvalPolicy;
+  if (process.env.GRAFT_APPROVAL_POLICY) {
+    console.warn(
+      "[graft serve] GRAFT_APPROVAL_POLICY is set and is now ignored. Approval policy moved " +
+        "to graft.config.ts so that turning off the gate on destructive functions appears in " +
+        `a diff. Export \`approvalPolicy = "${process.env.GRAFT_APPROVAL_POLICY}"\` there instead. ` +
+        `Serving with "${approvalPolicy}".`,
+    );
+  }
 
   const host = options.host ?? process.env.HOST ?? "127.0.0.1";
   const loopback = host === "127.0.0.1" || host === "localhost" || host === "::1";
@@ -324,6 +334,11 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     scope: branch.scope,
     actor: resolveActor,
     allowAnonymous: allowAnonymousMcp,
+    // The same backstop the functions handler gets. Without it a function with
+    // no per-function rateLimit was capped over POST /api/fn and uncapped over
+    // run_function, so the transport decided the limit — and tools/functions.ts
+    // claims the two surfaces apply rate limits identically.
+    rateLimit: { limit: 60, windowSeconds: 60 },
   });
 
   // Same-origin unless the operator names origins. A browser client on another
@@ -408,12 +423,11 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   }
 
   // Every boot, not once at deploy time. This is the setting that turns off the
-  // gate on irreversible work, and an env var is one line in a dashboard for
-  // someone who may not know what it means — the log is where a mistake is
-  // actually noticed.
+  // gate on irreversible work, and the log is where a mistake is actually
+  // noticed — a reviewer who missed the config line still sees this.
   if (approvalPolicy === "unattended") {
     console.warn(
-      "[graft serve] WARNING: GRAFT_APPROVAL_POLICY=unattended — destructive functions run " +
+      '[graft serve] WARNING: approvalPolicy = "unattended" in graft.config.ts — destructive functions run ' +
         "without human approval. Deletes are not recoverable from git: deleteRecord removes " +
         "rows outright and the asset store keeps no history. Audit rows are still written. " +
         "This applies to POST /api/fn only; run_function over /api/mcp stays gated, because " +

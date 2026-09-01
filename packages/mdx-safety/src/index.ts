@@ -220,10 +220,28 @@ export interface AssertSafeMdxOptions {
  * production instead of at build time.
  */
 export function assertSafeMdx(source: string, options: AssertSafeMdxOptions = {}): void {
-  const found = findExecutableMdx(source);
+  const where = options.label ? ` in ${options.label}` : "";
+
+  // `findExecutableMdx` throws UncheckableMdxError on source it cannot parse.
+  // Letting that escape means the one caller that matters most — `write_content`
+  // over MCP, and a Studio save — reports a bare Error where every other
+  // rejection on this path is a structured GraftError, so a client cannot tell
+  // "malformed" from a transport fault. The compiler catches the raw error
+  // itself (it calls findExecutableMdx directly) and is unaffected.
+  let found: ExecutableNode[];
+  try {
+    found = findExecutableMdx(source);
+  } catch (error) {
+    if (!(error instanceof UncheckableMdxError)) throw error;
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `MDX could not be parsed${where}, so it cannot be checked for executable source — ${error.message}`,
+      fix: "Fix the MDX syntax and retry. Source the checker cannot read is refused rather than accepted, because the renderer's parser is not this one and the gap between them is exactly where executable source would sit.",
+      details: { label: options.label, reason: error.message },
+    });
+  }
   if (found.length === 0) return;
 
-  const where = options.label ? ` in ${options.label}` : "";
   const listed = found
     .slice(0, 5)
     .map((node) => {
