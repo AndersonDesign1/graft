@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "graft compile && astro build",
+    "build": "node ../../packages/cli/dist/index.js compile && astro build",
     "preview": "astro preview",
     "astro": "astro",
     "compile": "graft compile",
