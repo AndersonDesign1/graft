@@ -142,8 +142,27 @@ try {
   // Not found is the ordinary path.
 }
 
-gh(
-  ["release", "create", tag, "--repo", repo, "--title", `Graft ${version}`, "--notes-file", "-"],
-  body,
+// A version with a prerelease identifier must say so. Unmarked, GitHub is free
+// to show `v1.0.0-beta.0` as the repository's Latest release — telling every
+// visitor the beta is the current version, which is the exact confusion a beta
+// channel exists to prevent. changesets marks its per-package releases; this
+// one has to as well.
+const prerelease = version.includes("-");
+const args = [
+  "release",
+  "create",
+  tag,
+  "--repo",
+  repo,
+  "--title",
+  `Graft ${version}`,
+  "--notes-file",
+  "-",
+];
+if (prerelease) args.push("--prerelease");
+
+gh(args, body);
+console.log(
+  `group-release: created ${tag} covering ${pkgs.length} packages` +
+    `${prerelease ? " (marked prerelease)" : ""}.`,
 );
-console.log(`group-release: created ${tag} covering ${pkgs.length} packages.`);
