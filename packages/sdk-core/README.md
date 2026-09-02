@@ -7,7 +7,7 @@ Part of [Graft](https://github.com/AndersonDesign1/graft), a CMS built so an AI 
 ## Install
 
 ```bash
-npm i @usegraft/sdk-core@beta
+npm i @usegraft/sdk-core
 ```
 
 Most apps use a framework adapter instead: [`@usegraft/sdk-next`](https://www.npmjs.com/package/@usegraft/sdk-next), [`@usegraft/sdk-astro`](https://www.npmjs.com/package/@usegraft/sdk-astro), or [`@usegraft/sdk-sveltekit`](https://www.npmjs.com/package/@usegraft/sdk-sveltekit). Reach for this package directly when yours has no adapter yet.

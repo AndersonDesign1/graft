@@ -17,14 +17,19 @@
  * That only works if a command is spelled somewhere the script reads and only
  * once — hence this module, rather than three literals it has to find.
  *
- * The split below is the part worth keeping straight: INIT is what someone
- * with nothing types, so it names the package and carries the channel. The
- * others run a binary the project already has after `init`, so a dist-tag on
- * them would be meaningless.
+ * The split below is the part worth keeping straight: INIT is what someone with
+ * nothing types, so it names the package. The others run a binary the project
+ * already has after `init`.
+ *
+ * None of them carry a dist-tag. They used to carry `@beta`, because `latest`
+ * pointed at 0.2.0 while every page described the beta. The tag was the wrong
+ * fix for that — `latest` has been moved to the prerelease across all published
+ * packages, so a bare install now lands where the docs point, which is what
+ * `latest` is for. install-tag.mjs enforces the absence.
  */
 
-/** First contact: no repo, nothing installed. Carries the channel tag. */
-export const INIT_CMD = "pnpm dlx @usegraft/cli@beta init";
+/** First contact: no repo, nothing installed. */
+export const INIT_CMD = "pnpm dlx @usegraft/cli init";
 
 /** Run inside a scaffolded project, against its own devDependency. */
 export const COMPILE_CMD = "pnpm graft compile";

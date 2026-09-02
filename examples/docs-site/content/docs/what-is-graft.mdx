@@ -12,6 +12,21 @@ Content is MDX in git. A Zod schema validates it. A derived index makes it
 queryable. You and your agent work through the CLI and MCP, with no dashboard
 required.
 
+<Callout label="Graft is in beta, and under active development">
+  These docs describe `1.0.0-beta.x`, which is what a plain install gives you.
+
+  The shape is settled — content in git, a derived index, one Zod schema, CLI
+  and MCP — and the details still move. Breaking changes land between betas when
+  a review or a report argues for one, and several already have: the MDX safety
+  gate, per-route scopes, and `approvalPolicy` moving out of an environment
+  variable into `graft.config.ts` all came from someone reading the code and
+  saying it was wrong. Every one is written up in the changelog.
+
+  So: usable, worth building against, and still changing on purpose. If that is
+  a poor fit, wait for 1.0. If you would rather have a say in what 1.0 becomes,
+  now is when saying so still changes it.
+</Callout>
+
 ## You'll need
 
 1. Node.js 22.16 or newer. The index's full-text search uses the `node:sqlite`
