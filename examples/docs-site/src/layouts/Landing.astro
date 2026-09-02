@@ -190,7 +190,16 @@ const footerDocs = nav.slice(0, 4).map((section) => ({
       const onScroll = () => {
         if (!raf) raf = requestAnimationFrame(update);
       };
-      update();
+      // Seeding the initial state through rAF, not by calling update() here.
+      // This script runs during parse, and reading window.scrollY is a layout
+      // read: the browser has to lay out everything parsed so far before it can
+      // answer. A trace put that single call at 75ms with 604 dirty objects —
+      // the largest forced reflow on the page, and the only one caused by our
+      // own code rather than by first render.
+      //
+      // The cost is that a page restored mid-scroll shows the nav without its
+      // hairline for one frame. The alternative was blocking parse to avoid it.
+      raf = requestAnimationFrame(update);
       addEventListener("scroll", onScroll, { passive: true });
 
       // Wide dropdown. Pointer opens on hover (with a close delay so the
