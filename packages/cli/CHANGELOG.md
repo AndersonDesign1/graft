@@ -1,5 +1,138 @@
 # @usegraft/cli
 
+## 1.0.0-beta.1
+
+### Patch Changes
+
+- 27b8468: Dependency floors raised to versions without known advisories.
+
+  `main` was carrying 34 Dependabot alerts, and a range-respecting update across
+  the workspace clears 23 of them: `next` 16.2.9 → 16.3.3 (nine alerts on its
+  own), `hono` 4.12.27 → 4.13.5, `postcss` 8.4.31 → 8.5.23, plus `astro`, `tar`,
+  `sharp`, `svgo`, `@astrojs/vercel` and `@hono/node-server`.
+
+  Declared ranges move with the lockfile, which is what makes this a change worth
+  a version rather than a lockfile refresh: `zod` `^4.1.0` → `^4.5.4`, `jose`
+  `^6.0.0` → `^6.2.10`, `jiti` `^2.4.0` → `^2.7.0` and the React type packages.
+  Every one is a floor raised inside the same major. **No peer range changed** —
+  `sdk-next` still peers `next >=15.0.0`, `sdk-react` still peers `react >=18.0.0`
+  — so nothing a consumer already resolves stops resolving.
+
+  Eleven alerts survive this and are deliberately not addressed here. Two are
+  `vitest`, pinned at `^2.1.9` against a fix in `3.2.6`: a major upgrade of the
+  test framework is its own change, not a line in a dependency bump. The other
+  nine are transitive versions their parents pin — `esbuild` now resolves
+  `0.28.1` and `0.28.2` alongside `0.18.20`, `0.21.5`, `0.25.12` and `0.27.7`,
+  and only `pnpm.overrides` dislodges those. Each override is a compatibility bet
+  and belongs where it can be argued one at a time.
+
+- 1f23844: Point the getting-started install at `@beta`, because the docs already describe it.
+
+  `latest` is `0.2.0` and these docs are written against `1.0.0-beta.x`. That gap
+  is not cosmetic: `approvalPolicy` moved out of `GRAFT_APPROVAL_POLICY` and into
+  `graft.config.ts`, so someone following the page on a default install configures
+  a policy their build ignores. The relative-endpoint fix and the database leaving
+  the browser dependency graph are also beta-only.
+
+  Every install command on the page now carries `@beta`, with a note saying it is
+  a channel rather than a snapshot — subscribe once, upgrade normally, drop the
+  tag when 1.0 ships.
+
+- db5abe6: Move the docs site to the static tier. It needs no database now.
+
+  The docs are MDX in git. The only things forcing Postgres were a `submissions`
+  collection and two functions — `docStats` and `submitContact` — that **no page
+  in `src/` referenced**. They were declared to exercise the Postgres tier and
+  never rendered, while the landing page carries that demo properly: its own
+  `submitContact`, wired to a `<ContactForm />` a visitor can actually post.
+
+  So documentation was paying a database's availability, cost and cold starts to
+  demonstrate something it did not show. `graft compile` writes `.graft/index.db`
+  and 36 pages prerender from it.
+
+  `/mcp` still serves agents — the docs MCP handler takes `staticIndexPath`, so it
+  reads the same artifact. `/api/search` stays on-demand for the same reason. The
+  two routes that genuinely needed Postgres, `/api/fn/[name]` and the
+  authenticated `/api/mcp`, are gone; both were already local-only, the latter by
+  its own comment ("never set it on a deployed instance").
+
+  The build is `graft compile && astro build`, and the Vercel adapter is told to
+  include the artifact — Vercel traces imports, not data files, so the on-demand
+  routes would otherwise deploy without the thing they read.
+
+- 411e9f0: Mark a grouped release as a prerelease when the version has one.
+
+  `v1.0.0-beta.0` was created unmarked, which leaves GitHub free to show it as the
+  repository's Latest release — telling every visitor the beta is the current
+  version, the exact confusion a beta channel exists to prevent. changesets marks
+  its per-package releases; the grouped one now does too.
+
+- 0e537ee: Keep every documented install command on the channel we actually ship.
+
+  While the repo is in beta, `latest` is an older version than the docs describe.
+  A README saying `npm i @usegraft/cli` sends a reader to a build that does not
+  match the page they read it from — during this beta that means `approvalPolicy`
+  in `graft.config.ts` silently doing nothing, because `0.2.0` still reads an
+  environment variable.
+
+  `scripts/install-tag.mjs` derives the tag from `.changeset/pre.json` instead of
+  anyone remembering: pre mode means `@beta`, stable means no tag.
+  `release:beta-enter` and `release:beta-exit` both run it, so entering and
+  leaving the channel rewrites 22 READMEs and the docs with it, in both
+  directions. CI checks it, because the failure is silent otherwise.
+
+  CHANGELOGs are deliberately untouched. They narrate what happened at a version —
+  "`npm i @usegraft/sdk-react` installed postgres and drizzle-orm" is a statement
+  about the past, and rewriting it would falsify the record.
+
+- 52fc3e6: Install commands drop `@beta`. A plain install is now the right install.
+
+  Every README said `npm i @usegraft/<pkg>@beta`, because `latest` pointed at
+  `0.2.0` while the docs described `1.0.0-beta.x`. Writing the tag into 22 files
+  treated the symptom. The defect was the dist-tag: `latest` is what a bare
+  install resolves, and it resolved to somewhere nobody should land.
+
+  `latest` now points at the prerelease across all 21 published packages, and the
+  `0.x` line is deprecated, so the tag has nothing left to do. `install-tag.mjs`
+  inverts with it — it strips tags instead of adding them, and CI fails if one
+  comes back.
+
+  The half a script cannot check is the registry. Publishing a prerelease while
+  `latest` sits on something older reopens the original bug and nothing in the
+  repo will notice. That property is kept by moving the tag at release, and it is
+  written down in the script rather than assumed.
+
+- 94c8909: `npx @usegraft/cli init` in the README could run a copy from weeks ago.
+
+  `npx`, `pnpm dlx` and `bunx` fetch a package, run it, discard the process — and
+  keep the tarball. So a bare runner command re-runs whatever it cached last,
+  without saying so. That is the failure the dist-tag work was meant to close,
+  arriving by another road: the registry is right and the machine is stale.
+
+  `@latest` is what tells them to check, and it is why `npx create-next-app@latest`
+  is written that way everywhere. The reason is the cache, not decoration.
+
+  `npm i -D @usegraft/cli` stays bare. A bare install already resolves `latest` —
+  that is what it means — so the tag would add a word that changes nothing, and a
+  tag that is load-bearing on some lines and noise on others teaches a reader to
+  skim past tags where it matters. `scripts/install-tag.mjs` now enforces both
+  halves: `@latest` on the ephemeral three, absent on the installers.
+
+- Updated dependencies [27b8468]
+- Updated dependencies [52fc3e6]
+  - @usegraft/auth@1.0.0-beta.1
+  - @usegraft/contracts@1.0.0-beta.1
+  - @usegraft/core@1.0.0-beta.1
+  - @usegraft/mcp@1.0.0-beta.1
+  - @usegraft/registry@1.0.0-beta.1
+  - @usegraft/studio@1.0.0-beta.1
+  - @usegraft/assets@1.0.0-beta.1
+  - @usegraft/compiler@1.0.0-beta.1
+  - @usegraft/content-api@1.0.0-beta.1
+  - @usegraft/content-migrations@1.0.0-beta.1
+  - @usegraft/db@1.0.0-beta.1
+  - @usegraft/mdx-safety@1.0.0-beta.1
+
 ## 1.0.0-beta.0
 
 ### Minor Changes
