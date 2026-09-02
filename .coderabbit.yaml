@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit reviews pull requests into feat/core, not just into main.
+#
+# By default it only reviews PRs whose base is the repository default branch,
+# and it said so on #17: "Auto reviews are disabled on base/target branches
+# other than the default branch." That default is wrong for this repo's shape.
+# main is a release target that moves in periodic syncs; feat/core is where
+# every change actually lands. So CodeRabbit was reviewing 24-commit sync PRs
+# full of already-merged work, and reviewing none of the changes themselves —
+# it had never looked at a single one.
+#
+# Both branches are listed: a sync PR is still worth a look, and this is a
+# pattern list rather than a replacement for the default.
+language: en-GB
+
+reviews:
+  # The repo already runs Greptile and cubic, and both have found real defects
+  # (a CSRF origin check in d376487, four findings on the approval-policy PR).
+  # A fourth voice earns its place by being specific, so: no praise, and a
+  # walkthrough only where the change is big enough to need one.
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+      - "feat/core"
+
+  path_filters:
+    # Generated or vendored: reviewing these produces noise about code nobody
+    # wrote by hand and nobody will edit by hand.
+    - "!**/CHANGELOG.md"
+    - "!pnpm-lock.yaml"
+    - "!tools/oxlint/anti-slop/**"
+    - "!examples/docs-site/.graft/**"

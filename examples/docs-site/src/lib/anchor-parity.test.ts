@@ -39,6 +39,9 @@ describe("heading anchor parity", () => {
 
       const rendered = [...html.matchAll(RENDERED_HEADING_ID)].map((match) => match[1]);
       expect(extractHeadings(body).map((heading) => heading.id)).toEqual(rendered);
-    });
+      // Renders a whole doc through MDX + shiki, and the first case in a file
+      // also pays shiki grammar load. Fifteen seconds is real work, not a
+      // hang; the 5s default was always marginal and vitest 3 tipped it over.
+    }, 30_000);
   }
 });

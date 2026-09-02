@@ -37,14 +37,25 @@ describe("Tabs", () => {
     "</Tabs>",
   ].join("\n");
 
-  it("renders a label and a panel per tab", async () => {
-    const html = await render(body);
+  // The first render in this file pays shiki's grammar and theme load, so this
+  // case carries the cost for the whole suite: real work, not a hang. The 5s
+  // default was always marginal here and vitest 3 tipped it over. Raised on
+  // this case alone rather than globally, so a test that really does hang
+  // still fails in five seconds.
+  const SHIKI_WARMUP_MS = 30_000;
 
-    expect(html.match(/class="tab-label"/g)).toHaveLength(2);
-    expect(html.match(/class="tab-panel"/g)).toHaveLength(2);
-    expect(html).toContain(">npm<");
-    expect(html).toContain(">pnpm<");
-  });
+  it(
+    "renders a label and a panel per tab",
+    async () => {
+      const html = await render(body);
+
+      expect(html.match(/class="tab-label"/g)).toHaveLength(2);
+      expect(html.match(/class="tab-panel"/g)).toHaveLength(2);
+      expect(html).toContain(">npm<");
+      expect(html).toContain(">pnpm<");
+    },
+    SHIKI_WARMUP_MS,
+  );
 
   it("switches with radios, so the panel needs no JavaScript", async () => {
     const html = await render(body);
