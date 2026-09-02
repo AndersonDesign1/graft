@@ -21,20 +21,21 @@
     "@usegraft/db": "workspace:*",
     "@usegraft/registry": "workspace:*",
     "@usegraft/sdk-next": "workspace:*",
-    "better-auth": "^1.6.23",
-    "next": "^16.0.0",
-    "pg": "^8.22.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "better-auth": "^1.7.2",
+    "next": "^16.3.3",
+    "pg": "^8.23.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "@types/pg": "^8.20.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "@usegraft/cli": "workspace:*",
     "@usegraft/compiler": "workspace:*",
     "@usegraft/content-migrations": "workspace:*",
     "@usegraft/mcp": "workspace:*",
-    "tsx": "^4.20.0"
+    "tsx": "^4.23.13",
+    "typescript": "7.0.2"
   }
 }

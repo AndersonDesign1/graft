@@ -52,7 +52,7 @@
     "@usegraft/mdx-safety": "workspace:*",
     "@usegraft/registry": "workspace:*",
     "@usegraft/studio": "workspace:*",
-    "jiti": "^2.4.0"
+    "jiti": "^2.7.0"
   },
   "devDependencies": {
     "@usegraft/sdk-core": "workspace:*"
