@@ -208,3 +208,16 @@ jobs:
         run: node scripts/group-release.mjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # `changeset publish` in pre mode publishes to `beta` and never touches
+      # `latest`, so `latest` keeps pointing at the previous release while the
+      # docs describe this one. That is how 1.0.0-beta.1 shipped green with a
+      # plain `npm i` still resolving beta.0 on all 21 packages.
+      #
+      # This step cannot fix it: OIDC trusted publishing authorises `npm
+      # publish` and nothing else, and the pipeline holds no npm token on
+      # purpose. So it fails the run and prints the `npm dist-tag add` lines
+      # instead — the tag move stays manual, but it stops being invisible.
+      - name: Does `latest` point at what we just published
+        if: ${{ steps.changesets.outputs.published == 'true' }}
+        run: pnpm check:dist-tags
