@@ -106,32 +106,29 @@
   gap: 0.35rem;
 }
 
+/* The chevron paints 9x5, which left the button 17x13 against the 24x24
+   minimum in WCAG 2.5.8. A centred ::after was tried first and does make the
+   control easier to hit, but it cannot pass the check and should not: the
+   check measures the element's own box, and an absolutely-positioned pseudo
+   contributes nothing to it. So the box is really 24x24 now.
+
+   The negative inline margin gives most of that width back to the row rather
+   than pushing Why and Security along. It stops at -0.25rem deliberately —
+   .nav-menu's gap is 0.35rem, so the box still clears the Docs link beside it
+   and cannot swallow clicks meant for that link. */
 .nav-toggle {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin-inline: -0.25rem;
   background: none;
   border: 0;
-  padding: 0.25rem;
-  margin: -0.25rem;
   cursor: pointer;
   color: var(--ink-faint);
   transition: color var(--duration-fast) var(--ease-out);
-}
-
-/* The chevron paints at 17x13, under the 24x24 minimum for a touch target.
-   Grown with a centred pseudo-element rather than padding: the button sits in
-   a flex row next to the Docs link, and real box growth would push it. This
-   takes the pointer without taking any space. */
-.nav-toggle::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 24px;
-  height: 24px;
-  translate: -50% -50%;
 }
 
 .nav-toggle:hover,
