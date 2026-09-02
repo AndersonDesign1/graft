@@ -77,7 +77,7 @@ every error it can hit carries a `fix` it can act on.
 
 ```jsonc
 // .mcp.json
-{ "mcpServers": { "graft": { "command": "npx", "args": ["-y", "@usegraft/cli", "mcp"] } } }
+{ "mcpServers": { "graft": { "command": "npx", "args": ["-y", "@usegraft/cli@latest", "mcp"] } } }
 ```
 
 The agent surface is not a subset of the human one. It reads and writes
