@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/mdx-safety",
-  "version": "1.0.0-beta.0",
+  "version": "1.0.0-beta.1",
   "description": "Refuse executable MDX before it is stored or rendered. MDX is code, and rendering evaluates it on the server.",
   "keywords": [
     "agent",

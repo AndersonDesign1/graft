@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/content-api",
-  "version": "1.0.0-beta.0",
+  "version": "1.0.0-beta.1",
   "description": "A versioned read-only HTTP transport for Graft's authored content index.",
   "keywords": [
     "agent",
