@@ -12,6 +12,13 @@
 #
 # Both branches are listed: a sync PR is still worth a look, and this is a
 # pattern list rather than a replacement for the default.
+#
+# ⚠️ This alone does not turn reviews on. CodeRabbit's next message on #18 named
+# a second gate: "This repository does not receive automatic reviews because it
+# has fewer than 10 stars." So the base-branch default was one of two reasons
+# and the star count is the binding one. This config is correct and inert until
+# that changes — which is worth knowing before wondering why nothing reviews.
+# Greptile has no such threshold and is doing the actual reviewing today.
 language: en-GB
 
 reviews:
