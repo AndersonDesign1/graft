@@ -48,7 +48,7 @@
   "dependencies": {
     "@usegraft/contracts": "workspace:*",
     "@usegraft/core": "workspace:*",
-    "jose": "^6.0.0"
+    "jose": "^6.2.10"
   },
   "engines": {
     "node": ">=22.16"

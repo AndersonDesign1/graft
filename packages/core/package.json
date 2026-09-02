@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "@usegraft/contracts": "workspace:*",
-    "zod": "^4.1.0"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@usegraft/db": "workspace:*"

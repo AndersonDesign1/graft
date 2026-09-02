@@ -53,7 +53,7 @@
     "@usegraft/mdx-safety": "workspace:*",
     "@usegraft/registry": "workspace:*",
     "gray-matter": "^4.0.3",
-    "zod": "^4.1.0"
+    "zod": "^4.5.4"
   },
   "engines": {
     "node": ">=22.16"
