@@ -33,6 +33,25 @@ export default defineConfig({
   // input rather than a slug: /api/search and /mcp, the public docs MCP. Both
   // read the same artifact.
   output: "static",
+
+  // /docs is a signpost, not a page. It used to be src/pages/docs/index.astro
+  // calling Astro.redirect(), which worked when this site was server-rendered
+  // and stopped working the moment it went static (db5abe6): a prerendered
+  // route cannot emit an HTTP status, so Astro fell back to writing a
+  // <meta http-equiv="refresh" content="2;url=..."> page. Readers got two
+  // seconds of unstyled black-on-white text before the docs appeared.
+  //
+  // Declared here instead, the Vercel adapter turns it into a routing rule in
+  // .vercel/output/config.json, so it is a real 308 at the edge with no HTML,
+  // no delay, and no function invocation.
+  //
+  // The target is written out rather than derived from docsNav()[0]. Config is
+  // evaluated before the content index is guaranteed to exist, and a redirect
+  // that reads a database is a redirect that can fail to build. nav.test.ts
+  // pins this slug against the real nav so the two cannot drift apart.
+  redirects: {
+    "/docs": "/docs/what-is-graft",
+  },
   // The prerendered pages need no artifact at runtime, but the two on-demand
   // routes do: /api/search and /mcp both read the compiled index. Vercel traces
   // imports, not data files, so it has to be named or the functions deploy

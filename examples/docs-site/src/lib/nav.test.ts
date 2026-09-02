@@ -40,3 +40,22 @@ describe("groupDocsNav", () => {
     ]);
   });
 });
+
+/**
+ * The /docs redirect target is written out in astro.config.mjs because config
+ * is evaluated before the content index is guaranteed to exist. That buys a
+ * real edge redirect at the cost of a copy, so this pins the copy: reordering
+ * the sidebar, or renaming the first doc, fails here instead of shipping a
+ * /docs that lands on a stale page or a 404.
+ */
+describe("the /docs redirect", () => {
+  it("points at whatever docsNav puts first", async () => {
+    const [{ readFileSync }, { docsNav }] = await Promise.all([import("node:fs"), import("./nav")]);
+
+    const config = readFileSync(new URL("../../astro.config.mjs", import.meta.url), "utf8");
+    const target = config.match(/"\/docs":\s*"\/docs\/([a-z0-9-]+)"/)?.[1];
+
+    expect(target, "no /docs redirect found in astro.config.mjs").toBeDefined();
+    expect(target).toBe((await docsNav())[0]?.entries[0]?.slug);
+  });
+});
