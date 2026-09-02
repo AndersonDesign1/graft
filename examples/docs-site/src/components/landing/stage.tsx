@@ -4,8 +4,9 @@
  * The stage — one sticky frame, four beats.
  *
  * The copy scrolls, the frame holds, and crossing a beat swaps what the frame
- * shows. Compile → the agent correcting itself → the types that fall out of
- * the same schema → self-host is one argument, so it gets one object.
+ * shows. The agent locked out of a dashboard → the compile loop that answers it
+ * → the types that fall out of the same schema → self-host is one argument, so
+ * it gets one object.
  *
  * State is scroll position, nothing else. A single IntersectionObserver with a
  * middle band (`-45%` top and bottom) leaves at most one beat intersecting at
@@ -25,7 +26,16 @@ import { Terminal } from "./terminal";
 import { TypedReads } from "./typed-reads";
 
 interface Beat {
-  n: string;
+  /**
+   * Ties a beat to the panel it drives and to its replay counter.
+   *
+   * Order used to live in three places at once — this array, a hardcoded run of
+   * panel indices, and an effect matching `active === 0` to a specific demo.
+   * Reordering the argument meant editing all three in step, and getting it
+   * wrong showed the wrong demo under the right copy. Now order lives here,
+   * and the number is derived from position rather than written down.
+   */
+  id: "mcp" | "loop" | "types" | "selfhost";
   kicker: string;
   /** what the frame is showing while this beat is active */
   frame: string;
@@ -36,9 +46,32 @@ interface Beat {
   note?: React.ReactNode;
 }
 
+/** Displayed beat number. Derived from position so a reorder renumbers itself. */
+const num = (i: number): string => String(i + 1).padStart(2, "0");
+
+// The problem leads. The hero states the claim and does not argue it, so the
+// first beat is the argument: why a dashboard is the wrong shape for the thing
+// doing most of the edits. The loop then answers it. Running the loop first
+// showed the solution to a problem the reader had not been given yet.
 const BEATS: Beat[] = [
   {
-    n: "01",
+    id: "mcp",
+    kicker: "no dashboard trap",
+    frame: "mcp exchange — replayed",
+    head: (
+      <>
+        Dashboards <span className="marked">lock agents out.</span>
+      </>
+    ),
+    lede: (
+      <>
+        A mouse UI is a dead end for an agent. Graft speaks MCP and CLI with errors that carry their
+        own <code>fix</code>. This replay is a real cold exchange.
+      </>
+    ),
+  },
+  {
+    id: "loop",
     kicker: "the loop",
     frame: "graft compile — live",
     head: (
@@ -60,23 +93,7 @@ const BEATS: Beat[] = [
     ),
   },
   {
-    n: "02",
-    kicker: "no dashboard trap",
-    frame: "mcp exchange — replayed",
-    head: (
-      <>
-        Dashboards <span className="marked">lock agents out.</span>
-      </>
-    ),
-    lede: (
-      <>
-        A mouse UI is a dead end for an agent. Graft speaks MCP and CLI with errors that carry their
-        own <code>fix</code>. This replay is a real cold exchange.
-      </>
-    ),
-  },
-  {
-    n: "03",
+    id: "types",
     kicker: "typed reads",
     frame: "graft.config.ts → your editor",
     head: (
@@ -92,7 +109,7 @@ const BEATS: Beat[] = [
     ),
   },
   {
-    n: "04",
+    id: "selfhost",
     kicker: "self-host",
     frame: "docker run / graft serve",
     head: (
@@ -118,16 +135,17 @@ const BEATS: Beat[] = [
 export function Stage({ compile, selfhost }: { compile: TermLine[]; selfhost: TermLine[] }) {
   const [active, setActive] = useState(0);
   // Returning to a beat remounts its demo so the type-out / message cascade
-  // plays again instead of sitting finished.
-  const [compileRun, setCompileRun] = useState(0);
-  const [agentRun, setAgentRun] = useState(0);
-  const [selfhostRun, setSelfhostRun] = useState(0);
+  // plays again instead of sitting finished. Keyed by beat id rather than by
+  // index, so the counters cannot be pointed at the wrong demo by a reorder.
+  const [runs, setRuns] = useState<Partial<Record<Beat["id"], number>>>({});
   const track = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (active === 0) setCompileRun((r) => r + 1);
-    if (active === 1) setAgentRun((r) => r + 1);
-    if (active === 3) setSelfhostRun((r) => r + 1);
+    const id = BEATS[active]?.id;
+    // "types" is static — nothing to replay, so remounting it would only throw
+    // away the hover state someone is using.
+    if (!id || id === "types") return;
+    setRuns((r) => ({ ...r, [id]: (r[id] ?? 0) + 1 }));
   }, [active]);
 
   useEffect(() => {
@@ -173,38 +191,38 @@ export function Stage({ compile, selfhost }: { compile: TermLine[]; selfhost: Te
             </span>
             <div className="stage-frame-progress" aria-hidden="true">
               {BEATS.map((b, i) => (
-                <i key={b.n} data-on={i === active} data-done={i < active} />
+                <i key={b.id} data-on={i === active} data-done={i < active} />
               ))}
             </div>
             <span className="stage-frame-count">
-              {beat.n} / {BEATS.length.toString().padStart(2, "0")}
+              {num(active)} / {num(BEATS.length - 1)}
             </span>
           </div>
 
           {/* All panels share one grid cell, so the frame is as tall as the
               tallest panel and swapping never reflows the page. */}
           <div className="stage-panels">
-            <div className="stage-panel" data-active={active === 0} aria-hidden={active !== 0}>
-              <Terminal key={compileRun} lines={compile} play={active === 0} />
-            </div>
-            <div className="stage-panel" data-active={active === 1} aria-hidden={active !== 1}>
-              <AgentSession key={agentRun} play={active === 1} />
-            </div>
-            <div className="stage-panel" data-active={active === 2} aria-hidden={active !== 2}>
-              <TypedReads />
-            </div>
-            <div className="stage-panel" data-active={active === 3} aria-hidden={active !== 3}>
-              <Terminal key={selfhostRun} lines={selfhost} play={active === 3} />
-            </div>
+            {BEATS.map((b, i) => {
+              const on = active === i;
+              const run = runs[b.id] ?? 0;
+              return (
+                <div className="stage-panel" key={b.id} data-active={on} aria-hidden={!on}>
+                  {b.id === "mcp" ? <AgentSession key={run} play={on} /> : null}
+                  {b.id === "loop" ? <Terminal key={run} lines={compile} play={on} /> : null}
+                  {b.id === "types" ? <TypedReads /> : null}
+                  {b.id === "selfhost" ? <Terminal key={run} lines={selfhost} play={on} /> : null}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
       <div className="stage-track" ref={track}>
         {BEATS.map((b, i) => (
-          <div className="stage-beat" key={b.n} data-beat={i} data-active={i === active}>
+          <div className="stage-beat" key={b.id} data-beat={i} data-active={i === active}>
             <p className="section-label">
-              §{b.n} <em>{b.kicker}</em>
+              §{num(i)} <em>{b.kicker}</em>
             </p>
             <h2>{b.head}</h2>
             <p className="section-lede">{b.lede}</p>
