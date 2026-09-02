@@ -151,10 +151,12 @@ export async function highlightSession(
  * stage shows the loop running (`compile`). Together they are one transcript,
  * so neither surface repeats the other.
  *
- * The two prompts are deliberately different commands. `init` runs before a
- * project exists, so it is the dlx form carrying the channel; `compile` runs
- * inside the project `init` just made, against the devDependency it added.
- * Typing the same runner for both would show a session that cannot happen.
+ * Both prompts run through npx, and they are not the same command. `init`
+ * runs before a project exists, so it names the package and carries `@latest`
+ * to defeat the runner cache; `compile` runs inside the project `init` just
+ * made, where npx resolves the devDependency it added and never reaches the
+ * registry. One runner across both is what a real session looks like — the
+ * reader who pasted the hero command has npx and nothing else.
  */
 export const HERO_INIT = `
 $ ${INIT_CMD}

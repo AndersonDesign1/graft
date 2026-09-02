@@ -21,11 +21,21 @@
  * nothing types, so it names the package. The others run a binary the project
  * already has after `init`.
  *
+ * All three are spelled with npx, which is a choice about the reader rather
+ * than about us. The landing prints one command and offers no tab strip, so
+ * whichever runner it shows is the one a stranger pastes — and npx is the only
+ * one already on the machine, because it ships with Node. Asking someone to
+ * install pnpm before they can find out what Graft is puts a package manager
+ * in front of the product. getting-started still offers all three runners,
+ * where there is room to choose.
+ *
  * INIT carries `@latest` and the others carry nothing, which is a distinction
- * about caching rather than about channels. `pnpm dlx` fetches, runs and
- * discards — and caches what it fetched, so a bare command can silently re-run
- * a copy from weeks ago. `@latest` is what tells it to check, and it is why
- * `npx create-next-app@latest` is written that way everywhere.
+ * about caching rather than about channels. npx fetches, runs and discards —
+ * and caches what it fetched, so a bare command can silently re-run a copy
+ * from weeks ago. `@latest` is what tells it to check, and it is why
+ * create-next-app is written with that tag everywhere. The others resolve the
+ * devDependency `init` added and reach no registry at all, so a tag on them
+ * would be a word that changes nothing.
  *
  * These used to carry `@beta`, because `latest` pointed at 0.2.0 while every
  * page described the beta. That was the wrong fix: `latest` now points at the
@@ -34,10 +44,10 @@
  */
 
 /** First contact: no repo, nothing installed. */
-export const INIT_CMD = "pnpm dlx @usegraft/cli@latest init";
+export const INIT_CMD = "npx @usegraft/cli@latest init";
 
 /** Run inside a scaffolded project, against its own devDependency. */
-export const COMPILE_CMD = "pnpm graft compile";
+export const COMPILE_CMD = "npx graft compile";
 
 /** The agent entry point, once the project exists. */
 export const MCP_CMD = "graft mcp";
