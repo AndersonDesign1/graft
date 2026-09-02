@@ -4,7 +4,7 @@
  * Closing CTA — human install + agent MCP path.
  * Real brand marks from /public/agents (Claude, Cursor, Codex, Copilot, Gemini).
  */
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useState } from "react";
 
 const INIT_CMD = "pnpm dlx @usegraft/cli init";
 const MCP_CMD = "graft mcp";
@@ -52,27 +52,29 @@ function CopyIcon() {
   );
 }
 
-function CopyRow({
-  getText,
-  children,
-  mono = false,
-  ariaLabel,
-}: {
-  getText: () => string;
-  children: ReactNode;
-  mono?: boolean;
-  ariaLabel: string;
-}) {
+/**
+ * The command is one prop, not a hand-written label beside duplicated children.
+ * The label read "Copy init command" over visible text reading
+ * "$ pnpm dlx @usegraft/cli init", which fails WCAG 2.5.3 Label in Name: a
+ * speech-input user says what they see, and nothing they could see appeared in
+ * the name they had to say. Deriving the label from the command means the two
+ * cannot drift. The prompt marker is hidden — it is decoration, and it is not
+ * part of what the button copies.
+ */
+function CopyRow({ command, mono = false }: { command: string; mono?: boolean }) {
   const { copied, copy } = useCopy();
   return (
     <button
       type="button"
       className="cta-copy"
       data-mono={mono || undefined}
-      aria-label={copied ? "Copied" : ariaLabel}
-      onClick={() => copy(getText())}
+      aria-label={copied ? "Copied" : `Copy ${command}`}
+      onClick={() => copy(command)}
     >
-      <span className="cta-copy-text">{children}</span>
+      <span className="cta-copy-text">
+        <span aria-hidden="true">$ </span>
+        {command}
+      </span>
       <span className="cta-copy-affordance" aria-hidden="true">
         {copied ? "✓" : <CopyIcon />}
       </span>
@@ -105,9 +107,7 @@ export function ClosingCta() {
             Tool descriptions and error <code>fix</code> fields teach the loop. Claude, Cursor,
             Codex, Copilot, Gemini — anything that speaks MCP.
           </p>
-          <CopyRow getText={() => MCP_CMD} mono ariaLabel="Copy graft mcp command">
-            $ {MCP_CMD}
-          </CopyRow>
+          <CopyRow command={MCP_CMD} mono />
         </div>
 
         <div className="cta-cell cta-init">
@@ -116,9 +116,7 @@ export function ClosingCta() {
           <p className="cta-cell-body">
             One command. Config and the first document: files you own on your machine.
           </p>
-          <CopyRow getText={() => INIT_CMD} mono ariaLabel="Copy init command">
-            $ {INIT_CMD}
-          </CopyRow>
+          <CopyRow command={INIT_CMD} mono />
         </div>
       </div>
 

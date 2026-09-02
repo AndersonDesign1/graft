@@ -107,6 +107,7 @@
 }
 
 .nav-toggle {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -117,6 +118,20 @@
   cursor: pointer;
   color: var(--ink-faint);
   transition: color var(--duration-fast) var(--ease-out);
+}
+
+/* The chevron paints at 17x13, under the 24x24 minimum for a touch target.
+   Grown with a centred pseudo-element rather than padding: the button sits in
+   a flex row next to the Docs link, and real box growth would push it. This
+   takes the pointer without taking any space. */
+.nav-toggle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  translate: -50% -50%;
 }
 
 .nav-toggle:hover,
