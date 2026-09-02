@@ -38,12 +38,38 @@
   gap: 1.75rem;
 }
 
+/* Wordmark and badge travel together, so the pair takes the auto margin that
+   used to sit on the wordmark alone — otherwise the flex row pushes the badge
+   to the far side of the nav, away from the name it qualifies. */
+.brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin-right: auto;
+}
+
 .landing-wordmark {
   font: 400 1.45rem/1 var(--font-display);
   letter-spacing: -0.01em;
   color: var(--ink);
   text-decoration: none;
-  margin-right: auto;
+}
+
+/* Inherits the nav's uppercase mono from the rule below and adds the pill.
+   Deliberately quiet: it qualifies the name, and a badge that outshouts the
+   wordmark reads as a warning rather than a state. */
+.beta-badge {
+  padding: 0.2rem 0.45rem;
+  border: 1px solid color-mix(in oklch, var(--mark) 35%, transparent);
+  border-radius: var(--radius-inner);
+  background: color-mix(in oklch, var(--mark) 10%, transparent);
+  color: var(--mark);
+  align-self: center;
+}
+
+.landing-nav a.beta-badge:hover {
+  color: var(--mark-strong);
+  background: color-mix(in oklch, var(--mark) 18%, transparent);
 }
 
 .landing-wordmark b {

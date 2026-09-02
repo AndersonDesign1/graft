@@ -7,9 +7,9 @@ Part of [Graft](https://github.com/AndersonDesign1/graft), a CMS built so an AI 
 ## Install
 
 ```bash
-npm i -D @usegraft/cli@beta
+npm i -D @usegraft/cli
 # or run it without installing
-npx @usegraft/cli@beta init
+npx @usegraft/cli init
 ```
 
 Once installed, the command is `graft`. Run it without installing under the
@@ -21,8 +21,8 @@ package, so `npx graft` fetches the wrong thing.
 A content project needs no services at all. `graft compile` writes the index to a SQLite artifact your app reads embedded.
 
 ```bash
-npx @usegraft/cli@beta init      # scaffolds graft.config.ts, content/, llms.txt
-npx @usegraft/cli@beta compile   # → .graft/index.db
+npx @usegraft/cli init      # scaffolds graft.config.ts, content/, llms.txt
+npx @usegraft/cli compile   # → .graft/index.db
 ```
 
 Move to Postgres by setting `DATABASE_URL` and changing one line in `graft.config.ts`:

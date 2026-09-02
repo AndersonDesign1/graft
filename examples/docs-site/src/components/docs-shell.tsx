@@ -41,9 +41,26 @@ export function DocsShell({
         tree={tree}
         themeSwitch={{ enabled: false }}
         nav={{
+          // A span, not a link like its counterpart on the landing: fumadocs
+          // wraps this whole title in its own <a href={url}>, and an anchor
+          // inside an anchor is invalid. The explanation lives one click away
+          // on getting-started, which the badge sits next to in the sidebar
+          // anyway.
           title: (
-            <span className="font-serif text-xl">
-              graft<b style={{ color: "var(--mark)" }}>.</b> docs
+            <span className="inline-flex items-baseline gap-2">
+              <span className="font-serif text-xl">
+                graft<b style={{ color: "var(--mark)" }}>.</b> docs
+              </span>
+              <span
+                className="self-center rounded px-1.5 py-0.5 font-mono text-[0.625rem] uppercase tracking-wider"
+                style={{
+                  color: "var(--mark)",
+                  border: "1px solid color-mix(in oklch, var(--mark) 35%, transparent)",
+                  background: "color-mix(in oklch, var(--mark) 10%, transparent)",
+                }}
+              >
+                beta
+              </span>
             </span>
           ),
           // The wordmark reads "graft. docs", so it goes to the docs index —

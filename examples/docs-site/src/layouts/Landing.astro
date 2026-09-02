@@ -57,7 +57,13 @@ const footerDocs = nav.slice(0, 4).map((section) => ({
   <body>
     <header class="landing-nav" id="landing-nav">
       <nav class="landing-nav-inner" aria-label="Main">
-        <a href="/" class="landing-wordmark">graft<b>.</b></a>
+        {/* The badge is a link, not a tooltip. "beta" raises a question and the
+            answer is a paragraph, so it points at the page holding it — and a
+            title attribute would hide that answer from every touchscreen. */}
+        <div class="brand">
+          <a href="/" class="landing-wordmark">graft<b>.</b></a>
+          <a href="/docs/getting-started" class="beta-badge">beta</a>
+        </div>
 
         {/*
           The label is a real link — a nav item with a menu is still a

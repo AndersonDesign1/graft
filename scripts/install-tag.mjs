@@ -1,19 +1,32 @@
 /**
- * Keep every documented install command on the channel we are actually shipping.
+ * Documented install commands carry no dist-tag. This keeps them that way.
  *
- * While the repo is in beta prerelease mode, `latest` is an older version than
- * the docs describe. Someone copying `npm i @usegraft/cli` off a README lands on
- * a build that does not match the page they read it from — during this beta,
- * that means `approvalPolicy` in config silently doing nothing, because 0.2.0
- * still reads an environment variable.
+ * The rule used to be the opposite. `latest` pointed at 0.2.0 while every page
+ * described `1.0.0-beta.x`, so a reader copying `npm i @usegraft/cli` landed on
+ * a build that did not match the page — during that beta, `approvalPolicy` in
+ * config silently doing nothing, because 0.2.0 still read an environment
+ * variable. The fix at the time was to write `@beta` into all 22 files and
+ * derive the tag from `.changeset/pre.json`.
  *
- * So the tag is derived from `.changeset/pre.json` rather than remembered:
- * pre mode means `@beta`, stable means no tag. `release:beta-enter` and
- * `release:beta-exit` run this, so entering and leaving the channel rewrites
- * the docs with it and neither direction has to be done by hand.
+ * That was treating the symptom. The real defect was the dist-tag: `latest`
+ * is what a bare install resolves, and it pointed somewhere we did not want
+ * anyone. On 2026-09-02 `latest` was moved to the prerelease across all 21
+ * published packages, and the 0.x line deprecated. A bare install now lands on
+ * the version the docs describe, which is what `latest` is for.
  *
- *   node scripts/install-tag.mjs           rewrite to match the channel
- *   node scripts/install-tag.mjs --check   exit 1 if anything is out of sync
+ * So the tag comes off, and the invariant this script enforces is the simple
+ * one: **an install command in this repo names a package and nothing else.**
+ * A tag reappearing means someone is documenting a channel again, and the two
+ * halves — what `latest` resolves and what the docs say — have to agree.
+ *
+ * ⚠️ The half this script cannot see is the registry. It enforces that the docs
+ * carry no tag; it cannot check that `latest` still points where we think.
+ * Publishing a prerelease while `latest` sits on something older reopens the
+ * original bug, and nothing here will catch it. That is a release-process
+ * property, kept by moving the tag, not a property of this file.
+ *
+ *   node scripts/install-tag.mjs           strip any tag from install commands
+ *   node scripts/install-tag.mjs --check   exit 1 if anything carries one
  *
  * CHANGELOGs are deliberately untouched. They narrate what happened at a
  * version — "`npm i @usegraft/sdk-react` installed postgres and drizzle-orm" is
@@ -24,16 +37,6 @@ import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const check = process.argv.includes("--check");
-
-/** The dist-tag the current channel installs from, or "" for stable. */
-function currentTag() {
-  const pre = join(root, ".changeset", "pre.json");
-  if (!existsSync(pre)) return "";
-  const parsed = JSON.parse(readFileSync(pre, "utf8"));
-  // `mode: "exit"` leaves the file in place so the next version can graduate
-  // the accumulated prereleases. That is stable, not beta.
-  return parsed.mode === "pre" ? String(parsed.tag) : "";
-}
 
 /** Build output and dependencies never hold a hand-written install command. */
 const SKIP_DIRS = new Set([
@@ -104,33 +107,28 @@ function targets() {
 const INSTALL =
   /((?:npm i|npm install|pnpm add|pnpm dlx|npx|bunx|yarn add)(?:\s+-\w+)*\s+@usegraft\/[a-z-]+)(@[a-z0-9.-]+)?/g;
 
-const tag = currentTag();
-const want = tag ? `@${tag}` : "";
 const changed = [];
 
 for (const file of targets()) {
   const before = readFileSync(file, "utf8");
-  const after = before.replace(INSTALL, (_match, command) => `${command}${want}`);
+  // The capture group is the command without its tag, so dropping the second
+  // group is the whole rewrite.
+  const after = before.replace(INSTALL, (_match, command) => command);
   if (after === before) continue;
   changed.push(file.slice(root.length + 1).replaceAll("\\", "/"));
   if (!check) writeFileSync(file, after);
 }
 
-const channel = tag
-  ? `${tag} (install commands carry @${tag})`
-  : "stable (install commands carry no tag)";
-
 if (check) {
   if (changed.length > 0) {
-    console.error(`install tags are out of sync with the ${channel.split(" ")[0]} channel:\n`);
+    console.error("install commands carry a dist-tag; they should name the package alone:\n");
     for (const file of changed) console.error(`  ${file}`);
-    console.error("\nRun `pnpm install-tag` to fix.");
+    console.error("\n`latest` is the channel. Run `pnpm install-tag` to strip them.");
     process.exit(1);
   }
-  console.log(`install tags: OK — every command matches the ${channel}.`);
+  console.log("install tags: OK — every command names the package alone.");
   process.exit(0);
 }
 
-console.log(`install tags: channel is ${channel}.`);
-if (changed.length === 0) console.log("  nothing to change.");
-for (const file of changed) console.log(`  updated ${file}`);
+if (changed.length === 0) console.log("install tags: nothing to change.");
+for (const file of changed) console.log(`  stripped tag in ${file}`);

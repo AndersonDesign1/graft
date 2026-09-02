@@ -13,7 +13,7 @@ For content an operator wrote and reviewed in git, that is the feature. It stops
 ## Install
 
 ```bash
-npm i @usegraft/mdx-safety@beta
+npm i @usegraft/mdx-safety
 ```
 
 ## Use

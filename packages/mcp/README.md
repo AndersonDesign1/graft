@@ -7,7 +7,7 @@ Part of [Graft](https://github.com/AndersonDesign1/graft), a CMS built so an AI 
 ## Install
 
 ```bash
-npm i @usegraft/mcp@beta
+npm i @usegraft/mcp
 ```
 
 ## Serve on stdio
