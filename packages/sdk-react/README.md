@@ -9,7 +9,7 @@ Every other Graft SDK reads on a server. This one reads in the browser, for the 
 ## Install
 
 ```bash
-npm i @usegraft/sdk-react@beta
+npm i @usegraft/sdk-react
 ```
 
 `react` is a peer dependency, 18 or 19.
