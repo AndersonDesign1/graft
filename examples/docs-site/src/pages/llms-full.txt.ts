@@ -3,13 +3,16 @@
  *
  * One read of the collection serves both the ordering and the bodies, so this
  * costs the same round trip the docs index page already makes.
+ *
+ * Origin comes from the configured `site`, for the reason spelled out in
+ * llms.txt.ts: this route is prerendered and has no request to read.
  */
 import type { APIRoute } from "astro";
 import { getGraft } from "../lib/graft";
 import { renderLlmsFull, textResponse } from "../lib/llms";
 import { docsNav } from "../lib/nav";
 
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ site, url }) => {
   const [sections, docs] = await Promise.all([docsNav(), getGraft().listContent("docs")]);
   const bodies = new Map(
     docs.map((doc) => [
@@ -18,5 +21,5 @@ export const GET: APIRoute = async ({ url }) => {
     ]),
   );
 
-  return textResponse(renderLlmsFull(sections, bodies, url.origin), "text/plain");
+  return textResponse(renderLlmsFull(sections, bodies, (site ?? url).origin), "text/plain");
 };

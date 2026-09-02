@@ -1,9 +1,13 @@
 /**
  * /llms.txt — the llmstxt.org index, generated from the content index.
  *
- * The origin comes from the request rather than a configured `site`, so the
- * links are correct on localhost, on a Vercel preview deployment, and in
- * production without anything to keep in step.
+ * Links are absolute, and the origin comes from the configured `site` — not
+ * from the request. It used to come from the request, which was right while
+ * this route was server-rendered: one expression covered localhost, previews
+ * and production with nothing to keep in step. Going static (db5abe6) removed
+ * the request. Prerendering supplies Astro's placeholder instead, so every link
+ * shipped as http://localhost:4321 while the file still built, deployed and
+ * returned 200. `site` is the only origin a prerendered route can trust.
  *
  * ⚠️ In `astro dev` this route is shadowed. Vite's dev server serves the whole
  * project root as static files — /package.json and /graft.config.ts answer too
@@ -19,5 +23,5 @@ import type { APIRoute } from "astro";
 import { renderLlmsIndex, textResponse } from "../lib/llms";
 import { docsNav } from "../lib/nav";
 
-export const GET: APIRoute = async ({ url }) =>
-  textResponse(renderLlmsIndex(await docsNav(), url.origin), "text/plain");
+export const GET: APIRoute = async ({ site, url }) =>
+  textResponse(renderLlmsIndex(await docsNav(), (site ?? url).origin), "text/plain");

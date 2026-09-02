@@ -32,6 +32,14 @@ export default defineConfig({
   // Two routes opt out with `export const prerender = false` because they take
   // input rather than a slug: /api/search and /mcp, the public docs MCP. Both
   // read the same artifact.
+  // The canonical origin, and load-bearing rather than decorative: /llms.txt
+  // and /llms-full.txt render absolute links, and prerendering gives them no
+  // request to read an origin from. Without this they build against Astro's
+  // placeholder and ship pointing at http://localhost:4321.
+  //
+  // Apex, not www — www.graft.page redirects here.
+  site: "https://graft.page",
+
   output: "static",
 
   // /docs is a signpost, not a page. It used to be src/pages/docs/index.astro
