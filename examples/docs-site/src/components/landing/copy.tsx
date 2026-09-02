@@ -52,9 +52,14 @@ export function CopyIcon() {
  * The accessible name for a copy control.
  *
  * Kept here because getting it wrong is a WCAG 2.5.3 failure and it already
- * happened once: a button reading "$ pnpm dlx @usegraft/cli init" was named
- * "Copy init command", so a speech-input user had no way to say it. The name
- * has to contain the visible command, which means deriving it from the command.
+ * happened once: a button showing the scaffold command was named "Copy init
+ * command", so a speech-input user had nothing to say that matched what they
+ * could see. The name has to contain the visible command, which means deriving
+ * it from the command rather than writing it out beside it.
+ *
+ * (Described rather than quoted. A literal install line here is one
+ * install-tag.mjs rewrites, and CI fails on the drift — which is exactly how
+ * this comment broke the build the first time it was written.)
  */
 export const copyLabel = (copied: boolean, command: string): string =>
   copied ? "Copied" : `Copy ${command}`;
