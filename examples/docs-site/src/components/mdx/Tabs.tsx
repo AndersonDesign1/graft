@@ -16,6 +16,7 @@
  * bodies: every attribute has to be a literal string.
  */
 import { Children, useId, type ReactNode } from "react";
+import { PM_ICONS } from "./pm-icons";
 
 export interface TabsProps {
   /** Comma-separated tab labels, in order, e.g. "npm, pnpm, bun". */
@@ -49,11 +50,28 @@ export function Tabs({ labels, children }: TabsProps) {
         />
       ))}
       <div className="tab-list">
-        {names.slice(0, count).map((label, index) => (
-          <label key={label} className="tab-label" htmlFor={`${group}-${index}`}>
-            {label}
-          </label>
-        ))}
+        {names.slice(0, count).map((label, index) => {
+          const icon = PM_ICONS[label.toLowerCase()];
+          return (
+            <label key={label} className="tab-label" htmlFor={`${group}-${index}`}>
+              {/* aria-hidden: the label text beside it already says "pnpm", so
+                  announcing the mark as well would read the name twice. */}
+              {icon ? (
+                <svg
+                  className="tab-icon"
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d={icon.d} />
+                </svg>
+              ) : null}
+              {label}
+            </label>
+          );
+        })}
       </div>
       <div className="tab-panels">
         {panels.slice(0, count).map((panel, index) => (
