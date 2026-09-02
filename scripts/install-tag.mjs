@@ -102,18 +102,35 @@ function targets() {
  * An install command naming a @usegraft package, with whatever tag it carries.
  *
  * Anchored on the runner so prose mentioning a package name is left alone —
- * only a line someone would paste into a terminal is rewritten.
+ * only a line someone would paste into a terminal is rewritten. The runner is
+ * captured because it decides the answer: see EPHEMERAL below.
  */
 const INSTALL =
-  /((?:npm i|npm install|pnpm add|pnpm dlx|npx|bunx|yarn add)(?:\s+-\w+)*\s+@usegraft\/[a-z-]+)(@[a-z0-9.-]+)?/g;
+  /((npm i|npm install|pnpm add|pnpm dlx|npx|bunx|yarn add)(?:\s+-\w+)*\s+@usegraft\/[a-z-]+)(@[a-z0-9.-]+)?/g;
+
+/**
+ * Runners that fetch, execute and discard — and cache what they fetched.
+ *
+ * `npx @usegraft/cli init` can re-run a copy npx downloaded weeks ago without
+ * saying so, which is the failure this whole script exists to prevent, arriving
+ * by a different road: the registry is right and the machine is stale. `@latest`
+ * is what tells them to check. It is why `npx create-next-app@latest` is written
+ * that way everywhere, and the reason is the cache, not decoration.
+ *
+ * The installers are left bare on purpose. `npm i @usegraft/core` already
+ * resolves `latest` — writing it out adds a word that changes nothing, and a
+ * tag that is sometimes meaningful and sometimes noise teaches a reader to stop
+ * reading tags.
+ */
+const EPHEMERAL = new Set(["npx", "pnpm dlx", "bunx"]);
+
+const want = (runner) => (EPHEMERAL.has(runner) ? "@latest" : "");
 
 const changed = [];
 
 for (const file of targets()) {
   const before = readFileSync(file, "utf8");
-  // The capture group is the command without its tag, so dropping the second
-  // group is the whole rewrite.
-  const after = before.replace(INSTALL, (_match, command) => command);
+  const after = before.replace(INSTALL, (_match, command, runner) => `${command}${want(runner)}`);
   if (after === before) continue;
   changed.push(file.slice(root.length + 1).replaceAll("\\", "/"));
   if (!check) writeFileSync(file, after);
@@ -121,14 +138,17 @@ for (const file of targets()) {
 
 if (check) {
   if (changed.length > 0) {
-    console.error("install commands carry a dist-tag; they should name the package alone:\n");
+    console.error("install commands do not match the tag rule:\n");
     for (const file of changed) console.error(`  ${file}`);
-    console.error("\n`latest` is the channel. Run `pnpm install-tag` to strip them.");
+    console.error(
+      "\nnpx / pnpm dlx / bunx take @latest so a cached copy is not silently reused;" +
+        "\neverything else names the package alone. Run `pnpm install-tag` to fix.",
+    );
     process.exit(1);
   }
-  console.log("install tags: OK — every command names the package alone.");
+  console.log("install tags: OK — ephemeral runners carry @latest, installers carry nothing.");
   process.exit(0);
 }
 
 if (changed.length === 0) console.log("install tags: nothing to change.");
-for (const file of changed) console.log(`  stripped tag in ${file}`);
+for (const file of changed) console.log(`  updated ${file}`);
