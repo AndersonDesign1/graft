@@ -843,6 +843,30 @@
     transform var(--duration-press) var(--ease-out);
 }
 
+/* The hero variant carries a copy affordance. Padding-inline-end is trimmed to
+   pay for the icon and its gap, so the button keeps the visual weight it had
+   as a link rather than growing a tail. */
+.button-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-inline-end: 1.05rem;
+}
+
+/* Held back so the command stays the thing you read. It is an affordance —
+   it should be findable once you have decided to act, not competing with the
+   text for the first look. */
+.button-copy-affordance {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.65;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.button-copy:hover .button-copy-affordance {
+  opacity: 1;
+}
+
 .button-primary:hover {
   background: var(--mark-strong);
 }

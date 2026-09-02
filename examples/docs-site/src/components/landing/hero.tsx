@@ -9,6 +9,7 @@
  */
 import type { TermLine } from "../../lib/highlight";
 import { INIT_CMD } from "../../lib/install";
+import { CopyIcon, copyLabel, useCopy } from "./copy";
 import { Terminal } from "./terminal";
 
 /** The classic leaf silhouette, drawn once; each instance is placed and
@@ -74,6 +75,7 @@ function GraftFigure() {
 }
 
 export function Hero({ tagline, terminal }: { tagline?: string; terminal: TermLine[] }) {
+  const { copied, copy } = useCopy();
   return (
     <section className="hero-section">
       <div className="hero-copy">
@@ -91,9 +93,21 @@ export function Hero({ tagline, terminal }: { tagline?: string; terminal: TermLi
             "Most of us already ship with agents more than by hand. Graft keeps content as MDX in git so you and your agent can author, branch, and deploy without living in a panel."}
         </p>
         <div className="hero-actions">
-          <a className="button-primary" href="#start">
+          {/* A button, not a link to #start. It reads as a command, so the
+              thing it should do is give you the command — scrolling somebody
+              to a section that shows the same string, to copy it there, is a
+              detour dressed as a call to action. */}
+          <button
+            type="button"
+            className="button-primary button-copy"
+            aria-label={copyLabel(copied, INIT_CMD)}
+            onClick={() => copy(INIT_CMD)}
+          >
             {INIT_CMD}
-          </a>
+            <span className="button-copy-affordance" aria-hidden="true">
+              {copied ? "✓" : <CopyIcon />}
+            </span>
+          </button>
           <a className="button-ghost" href="/why">
             Why Graft
           </a>
