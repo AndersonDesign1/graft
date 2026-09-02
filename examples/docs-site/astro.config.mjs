@@ -40,6 +40,19 @@ export default defineConfig({
   // Apex, not www — www.graft.page redirects here.
   site: "https://graft.page",
 
+  // Every page here is a static file on a CDN, so the only cost left in a
+  // navigation is the round trip. Hovering a sidebar link starts it early.
+  //
+  // prefetchAll because the sidebar is the whole point of a docs site and
+  // opting in link by link through a fumadocs React island is not reachable
+  // from here. "hover" rather than "viewport": the sidebar puts 36 links on
+  // screen at once, and viewport strategy would fetch all of them to serve
+  // the one someone actually wants.
+  prefetch: {
+    prefetchAll: true,
+    defaultStrategy: "hover",
+  },
+
   output: "static",
 
   // /docs is a signpost, not a page. It used to be src/pages/docs/index.astro
