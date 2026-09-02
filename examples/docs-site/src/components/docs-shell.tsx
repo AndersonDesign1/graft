@@ -46,8 +46,18 @@ export function DocsShell({
               graft<b style={{ color: "var(--mark)" }}>.</b> docs
             </span>
           ),
-          url: "/",
+          // The wordmark reads "graft. docs", so it goes to the docs index —
+          // clicking the name of where you are should not eject you from it.
+          // Leaving the site is what the Home link below is for, and having
+          // both means neither has to be guessed at.
+          url: "/docs",
         }}
+        links={[
+          { text: "Home", url: "/", active: "none" },
+          { text: "Why", url: "/why", active: "none" },
+          { text: "Security", url: "/security", active: "none" },
+        ]}
+        githubUrl="https://github.com/AndersonDesign1/graft"
       >
         <DocsPage toc={toc}>
           <DocsTitle>{title}</DocsTitle>

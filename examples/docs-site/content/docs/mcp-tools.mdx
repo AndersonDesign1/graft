@@ -127,13 +127,24 @@ Note that `graft mcp` deliberately does **not** carry `approvals:decide`. The
 CLI files approvals and `graft approve` decides them, and those have to stay
 different identities.
 
-## Registry and errors
+## Packages, registry and errors
 
 | Tool | Input | Notes |
 | --- | --- | --- |
+| `list_packages` | `framework?`, `tier?`, `includeIndirect?` | Which `@usegraft/*` package to install, and when |
 | `list_registry` | none | Owned primitives available to `graft add` |
 | `describe_item` | `name` | One primitive's files and dependencies |
 | `explain_error` | `code?`, `error?` | What a GraftError means and how to recover |
+
+`list_packages` answers the question that comes before a project exists: an
+agent that knows the user is on SvelteKit can name `@usegraft/sdk-sveltekit`
+rather than guess. Filter by `framework` and you get that adapter plus the
+packages every project needs, never a competing adapter. Filter by `tier` and a
+static project is never told to install something that cannot work without
+Postgres.
+
+Distinct from `list_registry`: packages come from npm, primitives are copied
+into your repository by `graft add`.
 
 `explain_error` with no arguments lists every code this build knows. See the
 [Error reference](/docs/errors) for the same content as a page.
@@ -145,7 +156,7 @@ without parsing prose.
 
 | Annotation set | Tools |
 | --- | --- |
-| Read-only | The four discovery tools, the three content reads, `list_branches`, `list_compilations`, `list_approvals`, `list_registry`, `describe_item`, `explain_error` |
+| Read-only | The four discovery tools, the three content reads, `list_branches`, `list_compilations`, `list_approvals`, `list_packages`, `list_registry`, `describe_item`, `explain_error` |
 | Write, not destructive | `write_content` |
 | Destructive | `delete_content`, `put_asset`, `decide_approval`, `run_function` |
 

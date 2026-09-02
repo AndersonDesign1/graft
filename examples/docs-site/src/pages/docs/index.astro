@@ -1,8 +1,0 @@
----
-/** /docs lands on the first page of the reading path (fumadocs shell owns the index). */
-import { docsNav } from "../../lib/nav";
-
-const nav = await docsNav();
-const first = nav[0]?.entries[0];
-return Astro.redirect(first ? `/docs/${first.slug}` : "/", 302);
----

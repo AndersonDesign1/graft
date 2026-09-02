@@ -8,9 +8,20 @@
  * 404s rather than falling back to the HTML page: a caller that asked for
  * Markdown and silently got a document shell would parse the shell.
  */
-import type { APIRoute } from "astro";
+import type { APIRoute, GetStaticPaths } from "astro";
 import { getGraft } from "../../lib/graft";
 import { renderDocMarkdown, textResponse } from "../../lib/llms";
+
+/**
+ * Every doc is known at build time — the index is compiled from files in git —
+ * so the whole set prerenders. The 404 branch below still stands: a slug can be
+ * requested that the index does not carry, and answering with the HTML shell
+ * would hand a Markdown client something it would parse as a document.
+ */
+export const getStaticPaths: GetStaticPaths = async () => {
+  const docs = await getGraft().listContent("docs");
+  return docs.map((doc) => ({ params: { slug: doc.slug } }));
+};
 
 export const GET: APIRoute = async ({ params }) => {
   const doc = params.slug ? await getGraft().getContent("docs", params.slug) : null;

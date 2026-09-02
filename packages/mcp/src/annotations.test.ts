@@ -46,6 +46,7 @@ const EXPECTED = {
   list_compilations: "reads",
   list_approvals: "reads",
   explain_error: "reads",
+  list_packages: "reads",
   write_content: "writes",
   delete_content: "destroys",
   put_asset: "destroys",

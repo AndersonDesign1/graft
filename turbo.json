@@ -36,6 +36,44 @@
       ],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
+    // The CLI reaches @usegraft/studio only through dynamic `import()`, and
+    // only behind an opt-in: `graft studio`, or `graft serve --studio`
+    // (commands/studio.ts:51, commands/serve.ts:262). There is no static
+    // import, so tsup never reads studio's dist and the CLI builds fine
+    // without it.
+    //
+    // The generic "^build" cannot know that. It walks package.json, where
+    // studio is an ordinary dependency — and must stay one, because
+    // `graft studio` resolves it at runtime and an optional peer would turn a
+    // shipped feature into an install someone has to know about.
+    //
+    // Left implicit, the cost lands on every consumer of the CLI: building
+    // examples/docs-site ran a full `vite build` of the Studio SPA so a static
+    // docs site could execute one `graft compile`.
+    //
+    // This restates cli's workspace dependencies minus studio. It is a manual
+    // list, which is the trade: a dependency added to packages/cli/package.json
+    // must be added here too or it will not be built before the CLI.
+    "@usegraft/cli#build": {
+      "dependsOn": [
+        "@usegraft/assets#build",
+        "@usegraft/auth#build",
+        "@usegraft/compiler#build",
+        "@usegraft/content-api#build",
+        "@usegraft/content-migrations#build",
+        "@usegraft/contracts#build",
+        "@usegraft/core#build",
+        "@usegraft/db#build",
+        "@usegraft/mcp#build",
+        "@usegraft/mdx-safety#build",
+        "@usegraft/registry#build",
+        "@usegraft/sdk-core#build"
+      ],
+      // Package-scoped task config does not inherit the generic "build" entry,
+      // so these are restated rather than omitted.
+      "env": ["NODE_ENV"],
+      "outputs": ["dist/**"]
+    },
     "typecheck": {
       "dependsOn": ["^build"]
     },

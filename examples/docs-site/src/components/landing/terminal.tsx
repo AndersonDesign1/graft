@@ -119,7 +119,11 @@ export function Terminal({
           replay
         </button>
       </div>
-      <pre className="terminal-body" aria-label={`Terminal demo: ${label}`}>
+      {/* role="img" so aria-label is allowed here (it is prohibited on a bare
+          <pre>, which has no role), and because that is what this actually is
+          to a screen reader: a picture of a terminal. Without it the label is
+          dropped and the reader gets a half-typed command stream instead. */}
+      <pre className="terminal-body" role="img" aria-label={`Terminal demo: ${label}`}>
         {lines.slice(0, row).map((line, i) => (
           <span key={i}>
             {line.tokens.map((token, j) => (

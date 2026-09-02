@@ -51,6 +51,10 @@ const PUBLISHED = [
   "get_content",
   "list_collections",
   "list_content",
+  // Graft's own packages, not the project's. "What do I install" is the first
+  // question a stranger's agent asks, and the answer says nothing about whose
+  // site this is.
+  "list_packages",
   "search_content",
 ];
 

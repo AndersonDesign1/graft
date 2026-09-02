@@ -7,7 +7,7 @@ Part of [Graft](https://github.com/AndersonDesign1/graft), a CMS built so an AI 
 ## Install
 
 ```bash
-npm i @usegraft/contracts
+npm i @usegraft/contracts@beta
 ```
 
 You rarely install this directly. It arrives as a dependency of the packages that throw.

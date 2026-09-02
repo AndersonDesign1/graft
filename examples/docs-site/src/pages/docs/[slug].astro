@@ -11,6 +11,15 @@ import { renderMdx } from "../../lib/mdx";
 import { docsPageTree } from "../../lib/nav";
 import { extractHeadings } from "../../lib/search-results";
 
+/**
+ * Every doc prerenders: the index is compiled from files in git, so the full
+ * set is known before the build runs.
+ */
+export async function getStaticPaths() {
+  const docs = await getGraft().listContent("docs");
+  return docs.map((doc) => ({ params: { slug: doc.slug } }));
+}
+
 const { slug } = Astro.params;
 const doc = slug ? await getGraft().getContent("docs", slug) : null;
 if (!doc) {

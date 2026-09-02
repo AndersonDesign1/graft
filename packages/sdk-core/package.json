@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/sdk-core",
-  "version": "0.2.0",
+  "version": "1.0.0-beta.0",
   "description": "Framework-agnostic typed read client over the Graft content index, plus the cache-tag contract.",
   "keywords": [
     "agent",

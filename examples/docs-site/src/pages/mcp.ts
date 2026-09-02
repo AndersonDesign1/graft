@@ -18,27 +18,27 @@
  */
 import type { APIRoute } from "astro";
 import { resolve } from "node:path";
-import { createDb } from "@usegraft/db";
 import { createDocsMcpHandler, type GraftMcpHandler } from "@usegraft/mcp";
 import { collections } from "../../graft.config";
+import { staticIndexPath } from "../lib/graft";
 
 let handler: GraftMcpHandler | null = null;
 
+/**
+ * Runs on demand, and needs no database. This site compiles to a static index,
+ * so the docs MCP reads the same `.graft/index.db` artifact the pages render
+ * from — `staticIndexPath` rather than `db`. An agent gets search and reads
+ * with nothing to provision and nothing to keep up.
+ */
+export const prerender = false;
+
 function getHandler(): GraftMcpHandler {
-  if (!handler) {
-    const url = process.env.DATABASE_URL;
-    if (!url) {
-      throw new Error(
-        "DATABASE_URL is not set. Put it in the repo-root .env (loaded by astro.config.mjs) or the environment.",
-      );
-    }
-    handler = createDocsMcpHandler({
-      name: "graft-docs",
-      contentDir: resolve(process.cwd(), "content"),
-      collections,
-      db: createDb(url).db,
-    });
-  }
+  handler ??= createDocsMcpHandler({
+    name: "graft-docs",
+    contentDir: resolve(import.meta.dirname, "../..", "content"),
+    collections,
+    staticIndexPath,
+  });
   return handler;
 }
 

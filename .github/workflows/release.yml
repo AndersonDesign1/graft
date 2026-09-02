@@ -113,19 +113,40 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Printed before anything publishes, on every run. `.changeset/pre.json`
+      # is committed state, and while it exists every release off this branch is
+      # a prerelease — the failure mode being "we were still in beta", found at
+      # publish time. This makes the channel a thing you are told, not a thing
+      # you remember.
+      - name: Which channel is this
+        run: pnpm release:channel
+
       # ── Canary: a snapshot of whatever is on this ref, right now ──────────
       #
-      # Snapshot releases, NOT changesets prerelease mode. Prerelease mode is
-      # stateful (.changeset/pre.json), it accumulates -canary.0, .1, .2 toward
-      # one eventual version, and the changesets docs recommend running it from
-      # a dedicated branch. feat/core is where every ordinary push lands, so
-      # entering pre mode here would put all of that ordinary work into
-      # prerelease versioning until someone remembered to exit.
+      # A canary is a snapshot, and deliberately NOT the beta channel. The two
+      # answer different questions and Graft has both:
       #
-      # Snapshots have none of that. `--snapshot canary` produces
-      # 0.0.0-canary-<timestamp> from the current tree, publishes it, and leaves
-      # no state behind. Real version numbers never move, `latest` never moves,
-      # and the next ordinary release is unaffected.
+      #   canary  0.0.0-canary-<ts>  "does this commit work?"
+      #   beta    1.0.0-beta.N       "is the next version ready?"
+      #
+      # A snapshot is version 0.0.0 forever. It sorts BELOW every real release,
+      # npm never offers it as an upgrade, and there is no path from it to a
+      # stable version — you hand it to someone, they pin the timestamp. That is
+      # a build, not a channel. `--snapshot canary` produces it from the current
+      # tree and leaves no state behind: real versions never move, `latest`
+      # never moves, the next ordinary release is unaffected.
+      #
+      # Beta is changesets prerelease mode, which IS stateful — `.changeset/pre.json`
+      # is committed, and while it exists every release off this branch is a
+      # prerelease. That state used to be the argument against pre mode here,
+      # because feat/core takes every ordinary push and nothing would remind you
+      # to leave. It is committed state now for the same reason approvalPolicy
+      # is: it appears in a diff and a review. And the "Which channel is this"
+      # step above prints it before anything publishes, so being in beta is
+      # something the log tells you rather than something you remember.
+      #
+      # The two cannot run together — changesets refuses a snapshot in pre mode
+      # — so the canary step asserts the stable channel first and says why.
       #
       # `--tag canary` is load-bearing, not cosmetic. Without it changesets
       # publishes the snapshot as `latest`, which would point every plain
@@ -145,6 +166,7 @@ jobs:
       - name: Publish a canary snapshot
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.canary }}
         run: |
+          node scripts/release-channel.mjs --assert-stable
           pnpm version:canary
           node scripts/assert-canary-snapshot.mjs
           pnpm release:canary
@@ -164,6 +186,7 @@ jobs:
         run: node scripts/assert-canary-published.mjs
 
       - name: Create release PR or publish
+        id: changesets
         if: ${{ github.event_name != 'workflow_dispatch' || !inputs.canary }}
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
         with:
@@ -171,5 +194,17 @@ jobs:
           publish: pnpm release
           commit: "chore: version packages"
           title: "chore: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # changesets/action tags and releases each package separately, so one
+      # version produced 21 tags and 21 GitHub Releases with one arbitrarily
+      # flagged "Latest" — GitHub picks by recency. `fixed` makes these one
+      # product on one version line, so this adds the release that says so: a
+      # single `v<version>` with every package's changelog entry collected.
+      # The per-package tags stay; npm and provenance point at them.
+      - name: One release for the whole version
+        if: ${{ steps.changesets.outputs.published == 'true' }}
+        run: node scripts/group-release.mjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

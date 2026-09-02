@@ -30,8 +30,8 @@ A content project needs no services at all. `graft compile` writes the index to
 a SQLite artifact, and your app reads it embedded.
 
 ```bash
-npx @usegraft/cli init      # schema, content/, llms.txt
-npx @usegraft/cli compile   # writes .graft/index.db
+npx @usegraft/cli@beta init      # schema, content/, llms.txt
+npx @usegraft/cli@beta compile   # writes .graft/index.db
 ```
 
 ```ts
@@ -61,8 +61,8 @@ branches.
 
 ```bash
 # set DATABASE_URL, then change one line: export const index = "postgres"
-npx @usegraft/cli db migrate
-npx @usegraft/cli compile
+npx @usegraft/cli@beta db migrate
+npx @usegraft/cli@beta compile
 ```
 
 Graft tells you the moment you need it. Reaching for a Postgres-tier feature in

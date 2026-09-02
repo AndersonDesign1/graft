@@ -7,7 +7,7 @@ Part of [Graft](https://github.com/AndersonDesign1/graft), a CMS built so an AI 
 ## Install
 
 ```bash
-npm i @usegraft/compiler
+npm i @usegraft/compiler@beta
 ```
 
 Most projects use `graft compile` from [`@usegraft/cli`](https://www.npmjs.com/package/@usegraft/cli) rather than calling this directly.

@@ -32,6 +32,7 @@ import { registerAssetTools } from "./tools/assets";
 import { registerBranchTools } from "./tools/branches";
 import { registerContentReadTools, registerContentWriteTools } from "./tools/content";
 import { registerErrorTools } from "./tools/errors";
+import { registerPackageTools } from "./tools/packages";
 import { registerFunctionTools } from "./tools/functions";
 import {
   registerCollectionIntrospection,
@@ -377,6 +378,7 @@ const FULL_SURFACE: RegisterTools = (server, deps) => {
   registerBranchTools(server, deps);
   registerApprovalTools(server, deps);
   registerErrorTools(server, deps);
+  registerPackageTools(server, deps);
   // Not tool groups. Resources make documents addressable, so a client can
   // attach one as context instead of spending a turn fetching it; prompts
   // offer the project's workflows filled in from the live schema.
@@ -408,6 +410,11 @@ const DOCS_SURFACE: RegisterTools = (server, deps) => {
   registerCollectionIntrospection(server, deps);
   registerContentReadTools(server, deps);
   registerErrorTools(server, deps);
+  // Passes the test above: it carries nothing about the project, only which of
+  // Graft's own packages exists and when you would want it. That is
+  // documentation in the plainest sense, and "what do I install" is the first
+  // question a stranger's agent asks.
+  registerPackageTools(server, deps);
   registerDocumentResources(server, deps);
 };
 

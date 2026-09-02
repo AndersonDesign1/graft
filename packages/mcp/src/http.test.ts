@@ -215,6 +215,7 @@ describe("tools over HTTP", () => {
       "list_compilations",
       "list_content",
       "list_functions",
+      "list_packages",
       "list_registry",
       "put_asset",
       "run_function",

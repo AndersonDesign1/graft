@@ -98,3 +98,21 @@ describe("textResponse", () => {
     expect(response.headers.get("cache-control")).toContain("stale-while-revalidate");
   });
 });
+
+/**
+ * The rendering above is origin-agnostic by design, which is exactly why the
+ * localhost bug survived: every unit test passed while the deployed file
+ * pointed at a dev server. The origin is supplied by the route, and a
+ * prerendered route can only get it from `site`. So this guards the config.
+ */
+describe("the configured site origin", () => {
+  it("is an absolute https origin, because prerendered routes have no request", async () => {
+    const { readFileSync } = await import("node:fs");
+    const config = readFileSync(new URL("../../astro.config.mjs", import.meta.url), "utf8");
+    const site = config.match(/^\s*site:\s*"([^"]+)"/m)?.[1];
+
+    expect(site, "astro.config.mjs declares no `site`").toBeDefined();
+    expect(site).toMatch(/^https:\/\//);
+    expect(site).not.toMatch(/localhost/);
+  });
+});

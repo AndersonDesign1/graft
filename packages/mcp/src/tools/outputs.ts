@@ -78,6 +78,19 @@ export const listRegistryOutput = {
 
 export const describeItemOutput = RegistryItemDescriptor.shape;
 
+export const listPackagesOutput = {
+  packages: z.array(
+    z.object({
+      name: z.string(),
+      role: z.string(),
+      when: z.string(),
+      tier: z.enum(["static", "postgres", "either"]),
+      framework: z.string().optional(),
+      direct: z.boolean(),
+    }),
+  ),
+};
+
 export const listContentOutput = {
   collection: z.string(),
   documents: z.array(

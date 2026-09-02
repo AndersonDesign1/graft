@@ -106,14 +106,26 @@
   gap: 0.35rem;
 }
 
+/* The chevron paints 9x5, which left the button 17x13 against the 24x24
+   minimum in WCAG 2.5.8. A centred ::after was tried first and does make the
+   control easier to hit, but it cannot pass the check and should not: the
+   check measures the element's own box, and an absolutely-positioned pseudo
+   contributes nothing to it. So the box is really 24x24 now.
+
+   The negative inline margin gives most of that width back to the row rather
+   than pushing Why and Security along. It stops at -0.25rem deliberately —
+   .nav-menu's gap is 0.35rem, so the box still clears the Docs link beside it
+   and cannot swallow clicks meant for that link. */
 .nav-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin-inline: -0.25rem;
   background: none;
   border: 0;
-  padding: 0.25rem;
-  margin: -0.25rem;
   cursor: pointer;
   color: var(--ink-faint);
   transition: color var(--duration-fast) var(--ease-out);
@@ -829,6 +841,30 @@
   transition:
     background-color var(--duration-fast) var(--ease-out),
     transform var(--duration-press) var(--ease-out);
+}
+
+/* The hero variant carries a copy affordance. Padding-inline-end is trimmed to
+   pay for the icon and its gap, so the button keeps the visual weight it had
+   as a link rather than growing a tail. */
+.button-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-inline-end: 1.05rem;
+}
+
+/* Held back so the command stays the thing you read. It is an affordance —
+   it should be findable once you have decided to act, not competing with the
+   text for the first look. */
+.button-copy-affordance {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.65;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.button-copy:hover .button-copy-affordance {
+  opacity: 1;
 }
 
 .button-primary:hover {

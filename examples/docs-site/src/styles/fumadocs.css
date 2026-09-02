@@ -217,6 +217,9 @@ kbd {
 }
 
 .tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   padding: var(--space-2) var(--space-3);
   font-size: var(--text-sm);
   color: var(--ink-muted);
@@ -224,6 +227,16 @@ kbd {
   white-space: nowrap;
   border-block-end: 2px solid transparent;
   margin-block-end: -1px;
+}
+
+/* The mark is drawn with fill: currentColor, so it dims and lights with its
+   label — the selected-tab and hover rules below already carry it and need no
+   counterpart here. Held slightly back because a solid 14px glyph reads
+   heavier than 14px of text beside it, so matching them exactly would make
+   the icon look like the label. */
+.tab-icon {
+  flex: none;
+  opacity: 0.8;
 }
 
 .tab-label:hover {
