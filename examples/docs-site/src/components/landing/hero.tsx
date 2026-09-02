@@ -8,6 +8,7 @@
  * just arrived).
  */
 import type { TermLine } from "../../lib/highlight";
+import { INIT_CMD } from "../../lib/install";
 import { Terminal } from "./terminal";
 
 /** The classic leaf silhouette, drawn once; each instance is placed and
@@ -91,7 +92,7 @@ export function Hero({ tagline, terminal }: { tagline?: string; terminal: TermLi
         </p>
         <div className="hero-actions">
           <a className="button-primary" href="#start">
-            pnpm graft init
+            {INIT_CMD}
           </a>
           <a className="button-ghost" href="/why">
             Why Graft

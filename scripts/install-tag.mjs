@@ -35,27 +35,63 @@ function currentTag() {
   return parsed.mode === "pre" ? String(parsed.tag) : "";
 }
 
-/** Files that tell a reader how to install. Not CHANGELOGs — see the note above. */
+/** Build output and dependencies never hold a hand-written install command. */
+const SKIP_DIRS = new Set([
+  "node_modules",
+  "dist",
+  ".astro",
+  ".vercel",
+  ".turbo",
+  ".graft",
+  ".next",
+]);
+
+/** Every file under `dir` whose extension is in `exts`, recursively. */
+function walk(dir, exts, found = []) {
+  if (!existsSync(dir)) return found;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (!SKIP_DIRS.has(entry.name)) walk(join(dir, entry.name), exts, found);
+    } else if (exts.some((ext) => entry.name.endsWith(ext))) {
+      found.push(join(dir, entry.name));
+    }
+  }
+  return found;
+}
+
+/**
+ * Files that tell a reader how to install. Not CHANGELOGs — see the note above.
+ *
+ * The landing was missing for a while, and the failure was the one this script
+ * exists to prevent: the docs said `@usegraft/cli@beta` while the front page —
+ * the first install command anyone sees — said `@usegraft/cli`, sending readers
+ * to 0.2.0. Prose is not the only place a command lives, so the source of the
+ * site that renders it is scanned too, and by directory rather than by a list
+ * of filenames, so a new component carrying a command is covered by existing.
+ *
+ * This script itself is deliberately not a target. It quotes install commands
+ * in its own header to explain what it does, and rewriting those would turn an
+ * explanation into a claim about the current channel.
+ */
 function targets() {
   const files = [];
   const readme = join(root, "README.md");
   if (existsSync(readme)) files.push(readme);
 
-  const packages = join(root, "packages");
-  if (existsSync(packages)) {
-    for (const entry of readdirSync(packages, { withFileTypes: true })) {
+  for (const group of ["packages", "examples"]) {
+    const dir = join(root, group);
+    if (!existsSync(dir)) continue;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      const candidate = join(packages, entry.name, "README.md");
+      const candidate = join(dir, entry.name, "README.md");
       if (existsSync(candidate)) files.push(candidate);
     }
   }
 
-  const docs = join(root, "examples", "docs-site", "content", "docs");
-  if (existsSync(docs)) {
-    for (const name of readdirSync(docs)) {
-      if (name.endsWith(".mdx")) files.push(join(docs, name));
-    }
-  }
+  const site = join(root, "examples", "docs-site");
+  files.push(...walk(join(site, "content"), [".mdx", ".md"]));
+  files.push(...walk(join(site, "src"), [".ts", ".tsx", ".astro"]));
+
   return files;
 }
 

@@ -13,6 +13,7 @@
  * client — the tokens are just strings and inline styles.
  */
 import { codeToTokens } from "shiki";
+import { COMPILE_CMD, INIT_CMD } from "./install";
 
 /** Single source for landing + docs Shiki dual themes. */
 export const SHIKI_THEMES = {
@@ -149,9 +150,14 @@ export async function highlightSession(
  * the two places it is told. The hero shows the graft taking (`init`); the
  * stage shows the loop running (`compile`). Together they are one transcript,
  * so neither surface repeats the other.
+ *
+ * The two prompts are deliberately different commands. `init` runs before a
+ * project exists, so it is the dlx form carrying the channel; `compile` runs
+ * inside the project `init` just made, against the devDependency it added.
+ * Typing the same runner for both would show a session that cannot happen.
  */
 export const HERO_INIT = `
-$ pnpm graft init
+$ ${INIT_CMD}
   created graft.config.ts
   created content/pages/home.mdx
 
@@ -159,7 +165,7 @@ $ # your repo is now the CMS
 `;
 
 export const STAGE_COMPILE = `
-$ pnpm graft compile
+$ ${COMPILE_CMD}
   pages/home     validated ✓
   pages/pricing  validated ✓
   projected to content_index @ 9f31c2e

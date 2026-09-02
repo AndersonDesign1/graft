@@ -5,9 +5,7 @@
  * Real brand marks from /public/agents (Claude, Cursor, Codex, Copilot, Gemini).
  */
 import { useCallback, useState } from "react";
-
-const INIT_CMD = "pnpm dlx @usegraft/cli init";
-const MCP_CMD = "graft mcp";
+import { INIT_CMD, MCP_CMD } from "../../lib/install";
 
 const AGENTS = [
   { name: "Claude", src: "/agents/claude.svg" },
@@ -55,7 +53,7 @@ function CopyIcon() {
 /**
  * The command is one prop, not a hand-written label beside duplicated children.
  * The label read "Copy init command" over visible text reading
- * "$ pnpm dlx @usegraft/cli init", which fails WCAG 2.5.3 Label in Name: a
+ * "$ pnpm dlx @usegraft/cli@beta init", which fails WCAG 2.5.3 Label in Name: a
  * speech-input user says what they see, and nothing they could see appeared in
  * the name they had to say. Deriving the label from the command means the two
  * cannot drift. The prompt marker is hidden — it is decoration, and it is not
