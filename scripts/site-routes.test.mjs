@@ -1,6 +1,8 @@
 /**
- * Lock: a custom-slug doc and a nested doc must produce the routes the
- * compiler wrote, not the filename. A full site build is not required.
+ * Lock: a custom-slug doc and a nested *source* file must produce the routes
+ * the compiler wrote. Nested directories do not become slash slugs —
+ * `parse.ts` uses basename + kebab-case `SLUG_RE`. A full site build is not
+ * required.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -36,26 +38,19 @@ function seed() {
   );
   // Filename is custom-filename.mdx; the compiler stored the frontmatter slug.
   insert.run("docs", "fixture-custom-route", "{}", "", "h1", "content/docs/custom-filename.mdx", 0);
-  insert.run(
-    "docs",
-    "guides/install/quickstart",
-    "{}",
-    "",
-    "h2",
-    "content/docs/guides/install/quickstart.mdx",
-    0,
-  );
+  // Nested source; slug is the basename. The compiler would reject a slash slug.
+  insert.run("docs", "quickstart", "{}", "", "h2", "content/docs/guides/install/quickstart.mdx", 0);
   insert.run("pages", "home", "{}", "", "h3", "content/pages/home.mdx", 0);
   insert.run("pages", "why", "{}", "", "h4", "content/pages/why.mdx", 0);
   return db;
 }
 
 describe("authoredRoutesFromIndex", () => {
-  it("reads slugs the compiler stored, including nested paths", () => {
+  it("reads slugs the compiler stored, including from a nested source path", () => {
     const db = seed();
     try {
       const authored = authoredRoutesFromIndex(db);
-      assert.deepEqual(authored.docs, ["fixture-custom-route", "guides/install/quickstart"]);
+      assert.deepEqual(authored.docs, ["fixture-custom-route", "quickstart"]);
       assert.deepEqual(authored.pages, ["home", "why"]);
     } finally {
       db.close();
@@ -64,16 +59,16 @@ describe("authoredRoutesFromIndex", () => {
 });
 
 describe("expectedStaticFiles", () => {
-  it("maps a custom slug and a nested doc to the files getStaticPaths would emit", () => {
+  it("maps a custom slug and a nested-source kebab slug to [slug] files", () => {
     const files = expectedStaticFiles({
-      docs: ["fixture-custom-route", "guides/install/quickstart"],
+      docs: ["fixture-custom-route", "quickstart"],
       pages: ["home", "why"],
     });
     assert.deepEqual(files, [
       "docs/fixture-custom-route/index.html",
       "docs/fixture-custom-route.md",
-      "docs/guides/install/quickstart/index.html",
-      "docs/guides/install/quickstart.md",
+      "docs/quickstart/index.html",
+      "docs/quickstart.md",
       "index.html",
       "why/index.html",
     ]);
@@ -81,6 +76,18 @@ describe("expectedStaticFiles", () => {
       files.includes("docs/custom-filename/index.html"),
       false,
       "a filename that is not the stored slug must not be checked",
+    );
+    assert.equal(
+      files.some((path) => path.includes("guides/install")),
+      false,
+      "a nested source path is not a URL path",
+    );
+  });
+
+  it("refuses a slash slug the compiler cannot write and [slug].astro cannot serve", () => {
+    assert.throws(
+      () => expectedStaticFiles({ docs: ["guides/install/quickstart"], pages: [] }),
+      /not kebab-case/,
     );
   });
 });

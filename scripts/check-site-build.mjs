@@ -66,7 +66,7 @@ if (pages.length === 0) {
 // rule, and the re-derivation was wrong in both directions: `parse.ts` honours
 // a frontmatter `slug` over the filename, so `a.mdx` with `slug: b` builds at
 // /docs/b and this demanded /docs/a — a green build failed by the checker; and
-// it only listed the top level, so anything nested was never checked at all.
+// it only listed the top level, so a nested *source* file was never checked.
 //
 // index.db is what `getStaticPaths` itself reads, so the two cannot disagree
 // about which routes exist. node:sqlite is why this repo's Node floor is 22.16.
