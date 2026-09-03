@@ -261,9 +261,9 @@ const receipts = [
       <pre class="sec-diff" aria-hidden="true"><code><span class="sec-diff-meta">content/pages/home.mdx</span><span class="sec-diff-del">-  description: The old positioning line</span><span class="sec-diff-add">+  description: The new positioning line</span></code></pre>
       <p class="sec-blast-caveat">
         The honest limit: a stolen <strong>runtime</strong> credential can still
-        rewrite or hide <code>content_index</code> rows. Projection needs
+        rewrite or hide <code>content_index</code> rows. Projection needs{" "}
         <code>INSERT</code>/<code>UPDATE</code> on that table, so raw SQL under
-        that role is a content write. The human gate on MCP
+        that role is a content write. The human gate on MCP{" "}
         <code>delete_content</code> is an application control against a tool
         being misused — not a database lock. The approval table is the
         exception, deliberately: the runtime role cannot decide, even with raw
