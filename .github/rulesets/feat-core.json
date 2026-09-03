@@ -64,6 +64,9 @@
           },
           {
             "context": "Workflow audit"
+          },
+          {
+            "context": "Vercel"
           }
         ],
         "strict_required_status_checks_policy": true

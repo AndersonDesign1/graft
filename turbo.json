@@ -34,7 +34,17 @@
         "VERCEL_GIT_COMMIT_SHA",
         "GITHUB_SHA"
       ],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      // `.vercel/output` is the docs site's real build product — the artifact
+      // Vercel uploads, and the one `pnpm check:site` reads. Undeclared, turbo
+      // does not own it: a cache hit would restore `dist/**` and leave this
+      // stale, or absent on a fresh runner, and the check would be reading
+      // nothing while the build reported success.
+      //
+      // Not a live bug: docs-site currently misses cache on every run, and CI
+      // configures no turbo cache at all. Both of those are circumstances
+      // rather than guarantees, and the declaration is what makes the artifact
+      // turbo's to restore when either changes.
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**", ".vercel/output/**"]
     },
     // The CLI reaches @usegraft/studio only through dynamic `import()`, and
     // only behind an opt-in: `graft studio`, or `graft serve --studio`
