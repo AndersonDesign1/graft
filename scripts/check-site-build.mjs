@@ -199,11 +199,24 @@ function resolves(path) {
   );
 }
 
+/**
+ * `href` in all three spellings HTML allows.
+ *
+ * The first version matched `href="..."` only, so `href='/missing-page'` was
+ * not a link this file could see — and a link it cannot see is one it reports
+ * as fine, which is the same way round as every other bug found in this batch.
+ * Not theoretical here: `rehype-raw` is a dependency, so MDX may carry raw HTML
+ * written by hand, and hand-written HTML is exactly where the other quote style
+ * shows up.
+ */
+const HREF = /\shref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>=`]+))/g;
+
 const broken = new Map();
 for (const page of pages) {
   const html = readFileSync(join(STATIC, page), "utf8");
-  for (const match of html.matchAll(/\shref="([^"]+)"/g)) {
-    const href = match[1];
+  for (const match of html.matchAll(HREF)) {
+    const href = match[1] ?? match[2] ?? match[3];
+    if (!href) continue;
     // Off-site, in-page, and non-navigational schemes are not this build's job.
     if (!href.startsWith("/") || href.startsWith("//")) continue;
     if (resolves(href)) continue;
