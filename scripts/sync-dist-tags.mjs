@@ -20,8 +20,14 @@
  *   node scripts/sync-dist-tags.mjs --dry-run   # say what would change
  *   node scripts/sync-dist-tags.mjs             # do it
  */
-import { execSync } from "node:child_process";
-import { NPM_NAME, publishablePackages, releaseChannel, releaseVersion } from "./lib/workspace.mjs";
+import {
+  NPM_NAME,
+  fetchDistTags,
+  npm,
+  publishablePackages,
+  releaseChannel,
+  releaseVersion,
+} from "./lib/workspace.mjs";
 
 const dryRun = process.argv.includes("--dry-run");
 
@@ -41,20 +47,6 @@ try {
 
 const { name: channelName, tags } = releaseChannel();
 
-/** Current dist-tags, or null when they cannot be read. */
-function currentTags(name) {
-  try {
-    return JSON.parse(
-      execSync(`npm view ${name} dist-tags --json`, {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-      }),
-    );
-  } catch {
-    return null;
-  }
-}
-
 console.log(
   `Pointing ${tags.join(" and ")} at ${version} across ${packages.length} package(s) ` +
     `(${channelName} channel).${dryRun ? "  DRY RUN — nothing will change." : ""}\n`,
@@ -64,15 +56,22 @@ const planned = [];
 const skipped = [];
 const unreadable = [];
 
-for (const pkg of packages) {
-  const now = currentTags(pkg.name);
-  if (now === null) {
-    unreadable.push(pkg.name);
+// Read over HTTP and in parallel — the registry is only being asked what a tag
+// points at, which needs no npm and no subprocess. Writing still does.
+const current = await Promise.all(packages.map((pkg) => fetchDistTags(pkg.name)));
+
+for (const [i, pkg] of packages.entries()) {
+  const result = current[i];
+  // "Absent" is grouped with "failed" on purpose: this script moves a tag onto
+  // a published version, and a package with nothing on the registry has no tag
+  // to move. Either way it is untouched and worth saying so.
+  if (result.kind !== "tags") {
+    unreadable.push(`${pkg.name}${result.reason ? ` (${result.reason})` : " (not published)"}`);
     continue;
   }
   for (const tag of tags) {
-    if (now[tag] === version) skipped.push(`${pkg.name} ${tag}`);
-    else planned.push({ name: pkg.name, tag, from: now[tag] ?? "(unset)" });
+    if (result.tags[tag] === version) skipped.push(`${pkg.name} ${tag}`);
+    else planned.push({ name: pkg.name, tag, from: result.tags[tag] ?? "(unset)" });
   }
 }
 
@@ -109,7 +108,7 @@ for (const p of planned) {
     // stdio inherited so a 2FA prompt is visible and answerable. npm is
     // passkey-only here, and a prompt swallowed into a pipe would look like a
     // hang with no way to respond.
-    execSync(`npm dist-tag add ${p.name}@${version} ${p.tag}`, { stdio: "inherit" });
+    npm(["dist-tag", "add", `${p.name}@${version}`, p.tag], { stdio: "inherit" });
     done++;
   } catch (error) {
     failed.push({ ...p, reason: `npm exited ${error.status ?? "non-zero"}` });
