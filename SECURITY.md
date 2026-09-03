@@ -73,3 +73,40 @@ false, say which one — that is the most useful kind of report.
 ## Supported versions
 
 Pre-1.0: only the latest minor receives fixes.
+
+## Remaining GitHub Security alerts
+
+The Security tab is not empty. This agent cannot read Dependabot or code
+scanning APIs (403), so the leftover list is taken from the lockfile and from
+what [#16](https://github.com/AndersonDesign1/graft/pull/16) and
+[#18](https://github.com/AndersonDesign1/graft/pull/18) already recorded.
+
+**Cleared**
+
+- [#16](https://github.com/AndersonDesign1/graft/pull/16) raised declared
+  floors and cleared 23 of 34 Dependabot alerts.
+- [#18](https://github.com/AndersonDesign1/graft/pull/18) upgraded vitest to
+  3.2.7, which was the two leftover criticals.
+
+**Left on purpose — transitive `esbuild`, one parent at a time**
+
+`pnpm.overrides` is the only thing that moves a pin the parent owns. Each
+override is a compatibility bet, so none of these are forced here:
+
+| `esbuild` | Parent                                                  | Why it stays                                                                                                                     |
+| --------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `0.18.20` | `@esbuild-kit/core-utils@3.3.2` ← `drizzle-kit@0.31.10` | Unmaintained loader inside the kit CLI. Not a runtime dep of a Graft package.                                                    |
+| `0.21.5`  | `vite@5.4.21` ← `vitest@3.2.7` / `vite-node@3.2.4`      | Vitest 3 still bundles Vite 5 for its own runner. Overriding Vite across that major is the next parent, not a line in a site PR. |
+| `0.25.12` | `drizzle-kit@0.31.10` (also pulls `0.18.20` above)      | Kit's own `esbuild` range. Bump the kit, do not override under it.                                                               |
+| `0.27.7`  | `bundle-require@5.1.0` ← `tsup@8`                       | Dev bundler. `0.28.x` is already what Vite 8 resolves.                                                                           |
+
+Those are the nine-ish leftover Dependabot rows the changelog called out,
+minus the two vitest criticals. They are build/test tooling, not something
+`graft serve` or an adapter loads in production.
+
+**zizmor**
+
+[`.github/workflows/security.yml`](.github/workflows/security.yml) writes
+findings to the Security tab and does not fail CI. Raise that job to blocking
+only after the current SARIF findings are gone. This token cannot dismiss
+alerts or merge Dependabot.

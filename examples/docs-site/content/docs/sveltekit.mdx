@@ -1,0 +1,126 @@
+---
+title: SvelteKit
+description: Server load versus universal load, and graftRoute on +server.ts.
+section: Build
+order: 5
+---
+
+<Tabs labels="pnpm, npm, bun">
+
+<Tab>
+
+```sh
+pnpm add @usegraft/sdk-sveltekit
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+npm i @usegraft/sdk-sveltekit
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+bun add @usegraft/sdk-sveltekit
+```
+
+</Tab>
+
+</Tabs>
+
+Build the handle in `$lib/server/`, so SvelteKit's server-only enforcement
+guards it. The client holds a database handle and must never reach the browser.
+
+## Create the handle
+
+```ts
+// src/lib/server/graft.ts
+import { DATABASE_URL } from "$env/static/private";
+import { createDb } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-sveltekit";
+import { collections } from "../../../graft.config";
+
+export const graft = createGraft({ db: createDb(DATABASE_URL).db, collections });
+```
+
+Static index instead of Postgres:
+
+```ts
+import { openStaticIndex } from "@usegraft/db";
+
+export const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});
+```
+
+## Read one document
+
+```ts
+// src/routes/[slug]/+page.server.ts
+import { error } from "@sveltejs/kit";
+import { graft } from "$lib/server/graft";
+import type { PageServerLoad } from "./$types";
+
+export const load: PageServerLoad = async ({ params }) => {
+  const page = await graft.getContent("pages", params.slug);
+  if (!page) error(404);
+  return { page };
+};
+```
+
+## Mount functions and MCP
+
+```ts
+// src/routes/api/fn/[name]/+server.ts
+import { createFunctionsHandler } from "@usegraft/core";
+import { graftRoute } from "@usegraft/sdk-sveltekit";
+
+const handler = createFunctionsHandler({ db, collections, functions });
+
+export const POST = graftRoute(handler);
+export const GET = graftRoute(handler); // 405s with Allow and a fix
+```
+
+```ts
+// src/routes/api/mcp/+server.ts
+import { createGraftMcpHandler } from "@usegraft/mcp";
+import { graftRoute } from "@usegraft/sdk-sveltekit";
+
+export const POST = graftRoute(createGraftMcpHandler({ db, collections, functions, actor }));
+```
+
+The parameter is typed structurally as `{ request: Request }`, so this package
+needs no `@sveltejs/kit` dependency.
+
+## Cache and invalidation
+
+SvelteKit has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
+surrogate-key header with `setHeaders` in `load`, and purge
+`tagsForChanges(branch, changeSet)` from your compile webhook.
+
+```ts
+export const load: PageServerLoad = async ({ params, setHeaders }) => {
+  const page = await graft.getContent("pages", params.slug);
+  setHeaders({ "Cache-Tag": tagsFor("main", "pages", params.slug).join(",") });
+  return { page };
+};
+```
+
+## The caveat you cannot infer
+
+Read from `+page.server.ts` or `+layout.server.ts`. A **universal** `load` in
+`+page.ts` or `+layout.ts` also runs in the browser on client-side navigation,
+so a database connection does not belong there — the same care TanStack Start
+needs, under different filenames.
+
+`node:sqlite` backs the static index and must stay external to the client
+bundle. Keeping the handle in `$lib/server/` is what guarantees that.
+
+See [SDK reference](/docs/sdk-reference) for mounts across adapters and the
+honest gaps.

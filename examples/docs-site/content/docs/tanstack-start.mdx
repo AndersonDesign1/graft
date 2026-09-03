@@ -1,0 +1,123 @@
+---
+title: TanStack Start
+description: Isomorphic loaders are the wrong place for a database handle.
+section: Build
+order: 6
+---
+
+<Tabs labels="pnpm, npm, bun">
+
+<Tab>
+
+```sh
+pnpm add @usegraft/sdk-tanstack-start
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+npm i @usegraft/sdk-tanstack-start
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+bun add @usegraft/sdk-tanstack-start
+```
+
+</Tab>
+
+</Tabs>
+
+Build the handle once in a server-only module, then reach it from server
+functions and server routes.
+
+## Create the handle
+
+```ts
+// src/lib/graft.server.ts
+import { createDb } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-tanstack-start";
+import { collections } from "../../graft.config";
+
+export const graft = createGraft({ db: createDb(process.env.DATABASE_URL!).db, collections });
+```
+
+Static index instead of Postgres:
+
+```ts
+import { openStaticIndex } from "@usegraft/db";
+
+export const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});
+```
+
+## Read one document
+
+```ts
+// src/routes/docs.$slug.tsx
+import { createServerFn } from "@tanstack/react-start";
+import { graft } from "../lib/graft.server";
+
+const getDoc = createServerFn({ method: "GET" })
+  .validator((slug: string) => slug)
+  .handler(({ data: slug }) => graft.getContent("docs", slug));
+```
+
+There is no request-level memo. Reads go straight to the index; call sites own
+memoization.
+
+## Mount functions and MCP
+
+Copy these mounts as written. The server-route factory name has moved across
+TanStack Start releases; the handler signature has not.
+
+```ts
+// src/routes/api/fn/$name.ts
+import { createServerFileRoute } from "@tanstack/react-start/server";
+import { createFunctionsHandler } from "@usegraft/core";
+import { graftRoute } from "@usegraft/sdk-tanstack-start";
+
+const handler = createFunctionsHandler({ db, collections, functions });
+
+export const ServerRoute = createServerFileRoute("/api/fn/$name").methods({
+  POST: graftRoute(handler),
+  GET: graftRoute(handler), // 405s with Allow and a fix
+});
+```
+
+```ts
+// src/routes/api/mcp.ts
+import { createGraftMcpHandler } from "@usegraft/mcp";
+import { graftRoute } from "@usegraft/sdk-tanstack-start";
+
+export const ServerRoute = createServerFileRoute("/api/mcp").methods({
+  POST: graftRoute(createGraftMcpHandler({ db, collections, functions, actor })),
+});
+```
+
+The parameter is typed structurally as `{ request: Request }`, so this package
+needs no `@tanstack/react-start` dependency.
+
+## Cache and invalidation
+
+TanStack Start has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
+surrogate-key header on the responses you serve, and purge
+`tagsForChanges(branch, changeSet)` from your compile webhook.
+
+## The caveat you cannot infer
+
+A route `loader` is the wrong place for this handle. TanStack Start loaders
+are **isomorphic**: they run on the server for the first paint and in the
+browser on client-side navigation. A handle that holds a database connection
+has no business in either the client bundle or the browser, which is what
+`createServerFn` is for.
+
+See [SDK reference](/docs/sdk-reference) for mounts across adapters and the
+honest gaps.

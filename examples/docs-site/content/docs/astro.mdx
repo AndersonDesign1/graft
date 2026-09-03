@@ -1,0 +1,130 @@
+---
+title: Astro
+description: Frontmatter-only reads, graftRoute mounts, and no request memo.
+section: Build
+order: 4
+---
+
+<Tabs labels="pnpm, npm, bun">
+
+<Tab>
+
+```sh
+pnpm add @usegraft/sdk-astro
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+npm i @usegraft/sdk-astro
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+bun add @usegraft/sdk-astro
+```
+
+</Tab>
+
+</Tabs>
+
+Build the handle once in a server-only module, then import it from frontmatter,
+endpoints, and middleware. Never from a client island.
+
+## Create the handle
+
+`graft init` scaffolds the static index. This docs site is that path:
+
+```ts
+// src/lib/graft.ts
+import { openStaticIndex } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-astro";
+import { collections } from "../../graft.config";
+
+export const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});
+```
+
+On Postgres:
+
+```ts
+import { createDb } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-astro";
+import { collections } from "../../graft.config";
+
+export const graft = createGraft({
+  db: createDb(process.env.DATABASE_URL!).db,
+  collections,
+});
+```
+
+## Read one document
+
+```astro
+---
+// src/pages/[slug].astro
+import { graft } from "../lib/graft";
+
+const page = await graft.getContent("pages", Astro.params.slug!);
+---
+```
+
+Astro frontmatter is server-side unconditionally — the only adapter here that
+is. There is no request-level memo, because `React.cache` has no Astro
+equivalent. Reads go straight to the index, which is the right default:
+prerendered pages read at build time, and an SSR page makes a handful of reads.
+
+## Mount functions and MCP
+
+`graftRoute` binds a Graft handler to an Astro endpoint. It takes the handler,
+not a config object: Astro hands over an `APIContext`, and the handlers want
+its `request`.
+
+```ts
+// src/pages/api/fn/[name].ts
+import { createFunctionsHandler } from "@usegraft/core";
+import { graftRoute } from "@usegraft/sdk-astro";
+
+const handler = createFunctionsHandler({ db, collections, functions });
+
+export const POST = graftRoute(handler);
+export const GET = graftRoute(handler); // 405s with Allow and a fix
+```
+
+```ts
+// src/pages/api/mcp.ts
+import { createGraftMcpHandler } from "@usegraft/mcp";
+import { graftRoute } from "@usegraft/sdk-astro";
+
+export const POST = graftRoute(createGraftMcpHandler({ db, collections, functions, actor }));
+```
+
+The parameter is typed structurally as `{ request: Request }`, so this package
+needs no `astro` dependency.
+
+## Cache and invalidation
+
+Astro has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
+surrogate-key header on SSR responses, and purge
+`tagsForChanges(branch, changeSet)` from your compile webhook.
+
+```astro
+---
+Astro.response.headers.set("Cache-Tag", tagsFor(branch, "pages", slug).join(","));
+---
+```
+
+## The caveat you cannot infer
+
+Bodies come back as authored source. Render them with Astro's own MDX pipeline.
+There is no `MdxBody` here — that evaluator is Next-only.
+
+See [SDK reference](/docs/sdk-reference) for mounts across adapters and the
+honest gaps.

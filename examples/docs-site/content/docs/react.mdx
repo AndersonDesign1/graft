@@ -1,0 +1,119 @@
+---
+title: React
+description: Browser reads over HTTP. No db. Hooks stay a typed binding.
+section: Build
+order: 8
+---
+
+<Tabs labels="pnpm, npm, bun">
+
+<Tab>
+
+```sh
+pnpm add @usegraft/sdk-react
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+npm i @usegraft/sdk-react
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+bun add @usegraft/sdk-react
+```
+
+</Tab>
+
+</Tabs>
+
+Every other Graft SDK reads on a server. This one reads in the browser, for
+the places a loader cannot help: a search box, a client-side editor preview,
+a widget on a page the server rendered an hour ago.
+
+`react` is a peer dependency, 18 or 19.
+
+## Create the handle
+
+```ts
+// src/graft.ts
+import { createGraft, createGraftHooks } from "@usegraft/sdk-react";
+import { collections } from "../graft.config";
+
+export const graft = createGraft({
+  endpoint: "https://cms.example.com/api/content/v1",
+  collections,
+});
+
+export const { GraftProvider, useGraft, useContent, useContentList, useContentSearch } =
+  createGraftHooks(graft);
+```
+
+Types do not cross the wire. Your app imports its own `collections` at compile
+time, exactly as a server adapter does. The endpoint supplies data at runtime.
+
+The hooks come out of a factory rather than being importable directly, and that
+is what keeps the reads typed.
+
+## Read one document
+
+```tsx
+import { useContent } from "../graft";
+
+function Doc({ slug }: { slug: string }) {
+  const { data, error, loading } = useContent("docs", slug);
+
+  if (loading) return <Spinner />;
+  if (error) return <Problem error={error} />;
+  if (!data) return <NotFound />;
+  return <article>{data.data.title}</article>;
+}
+```
+
+Each hook reports `{ data, error, loading, refresh }`. Changing the slug
+clears `data` rather than showing the previous document while the next one
+loads.
+
+`endpoint` points at a mount of Graft's read-only content API — what
+`graft serve` exposes at `/api/content/v1`, or your own mount of
+`createContentApiHandler`. See [Content API](/docs/content-api).
+
+## Mount functions and MCP
+
+There is no `graftRoute`. Mounting a request handler is a server's job. Use
+the adapter for the framework that serves the page.
+
+## Cache and invalidation
+
+There is none, by construction. No deduplication, no retry, no
+stale-while-revalidate. `graft.getContent` is a plain async function, so
+compose it with TanStack Query or SWR if you want those.
+
+```ts
+useQuery({
+  queryKey: ["docs", slug],
+  queryFn: () => graft.getContent("docs", slug),
+});
+```
+
+## The caveat you cannot infer
+
+There is no `db` option. A database handle in a browser bundle is a database
+URL in a browser bundle.
+
+There is also no `branch` option. An endpoint is pinned to one branch on the
+server. Passing `branch` throws `CONFIG_INVALID`. Point at the preview
+deployment's own endpoint instead.
+
+`useEffect` does not run during server rendering, so on the server these hooks
+report their loading state and nothing else. Content that has to be in the
+HTML belongs in a loader or a [server adapter](/docs/reading-content).
+
+See [SDK reference](/docs/sdk-reference) for the shared surface and the honest
+gaps.
