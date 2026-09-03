@@ -22,91 +22,8 @@
  * command that finishes it. A wrong `latest` is now a red build instead of a
  * fact nobody learns from the repository.
  */
-import { globSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
-import { dirname, join } from "node:path";
-
-/**
- * The `packages:` globs from pnpm-workspace.yaml.
- *
- * Read here rather than shelled out to `pnpm list` for the same reason
- * assert-canary-snapshot.mjs reads them: locating pnpm across platforms needs
- * `shell: true`, and Node deprecated passing args alongside it (DEP0190).
- */
-function workspaceGlobs() {
-  const lines = readFileSync("pnpm-workspace.yaml", "utf8").split(/\r?\n/);
-  const start = lines.findIndex((line) => /^packages:\s*$/.test(line));
-  const globs = [];
-  for (let i = start + 1; start !== -1 && i < lines.length; i++) {
-    if (/^\S/.test(lines[i])) break; // the next top-level key ends the block
-    const item = lines[i].match(/^\s*-\s*["']?([^"'\s#]+)["']?\s*$/);
-    if (item) globs.push(item[1]);
-  }
-  if (globs.length === 0) {
-    throw new Error("Parsed no workspace globs from pnpm-workspace.yaml. Refusing to guess.");
-  }
-  return globs;
-}
-
-function publishablePackages() {
-  const seen = new Set();
-  const packages = [];
-  for (const glob of workspaceGlobs()) {
-    for (const manifest of globSync(join(glob, "package.json"))) {
-      const dir = dirname(manifest);
-      if (seen.has(dir)) continue;
-      seen.add(dir);
-      try {
-        const pkg = JSON.parse(readFileSync(manifest, "utf8"));
-        if (!pkg.private && pkg.name && pkg.version) {
-          packages.push({ name: pkg.name, version: pkg.version });
-        }
-      } catch {
-        // A member without a readable manifest cannot be published either.
-      }
-    }
-  }
-  return packages;
-}
-
-/**
- * Where `latest` belongs, and why.
- *
- * In pre mode the answer is the prerelease, not the newest stable. The 0.x line
- * is deprecated and the beta is what the documentation describes, so a bare
- * install has to reach it — that is the whole reason `@beta` was removed from
- * every install command. Reading `mode` matters: `changeset pre exit` leaves
- * pre.json in place with `mode: "exit"`, which means stable, and treating that
- * as beta would pin `latest` to a prerelease after graduating away from one.
- */
-function channel() {
-  let pre;
-  try {
-    pre = JSON.parse(readFileSync(".changeset/pre.json", "utf8"));
-  } catch {
-    return { name: "stable", tags: ["latest"] };
-  }
-  if (pre.mode === "exit" || pre.mode === "none") return { name: "stable", tags: ["latest"] };
-  return { name: pre.tag, tags: ["latest", pre.tag] };
-}
-
-/**
- * npm has to be reached through a shell, and the name has to be safe to put in
- * one.
- *
- * `execFileSync("npm", …)` cannot spawn npm on Windows, where it is a `.cmd`
- * shim, and naming `npm.cmd` does not rescue it under Git Bash, whose PATH is
- * POSIX-shaped and unreadable to CreateProcess. `shell: true` alongside an args
- * array is the combination Node deprecated in DEP0190, because it concatenates
- * arguments rather than escaping them.
- *
- * So the command is built as one string, and the only interpolated value is
- * checked against the grammar npm itself allows for a package name. A name that
- * does not match cannot be published, so refusing it loses nothing — and it
- * means no string reaching the shell here is one this repo did not already
- * control.
- */
-const NPM_NAME = /^(?:@[a-z0-9-][a-z0-9._-]*\/)?[a-z0-9-][a-z0-9._-]*$/;
+import { NPM_NAME, publishablePackages, releaseChannel, releaseVersion } from "./lib/workspace.mjs";
 
 /**
  * What the registry says about one package, as one of three distinct answers.
@@ -167,18 +84,15 @@ if (packages.length === 0) {
   process.exit(1);
 }
 
-// `fixed: [["@usegraft/*"]]` in .changeset/config.json versions these together,
-// so one version describes the release. Disagreement means a partial `version`
-// run, which is worth stopping on before any tag is judged against it.
-const versions = [...new Set(packages.map((p) => p.version))];
-if (versions.length > 1) {
-  console.error(`Workspace packages disagree about the version: ${versions.join(", ")}.`);
-  console.error("`fixed` should keep these identical. Refusing to check tags against a guess.");
+let version;
+try {
+  version = releaseVersion(packages);
+} catch (error) {
+  console.error(error.message);
   process.exit(1);
 }
 
-const [version] = versions;
-const { name: channelName, tags: shouldPoint } = channel();
+const { name: channelName, tags: shouldPoint } = releaseChannel();
 const drift = [];
 const absent = [];
 const unreadable = [];

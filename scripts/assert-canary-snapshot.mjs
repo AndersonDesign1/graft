@@ -21,53 +21,10 @@
  * `fixed: [["@usegraft/*"]]`, which versions them together. Drop `fixed` and
  * only changed packages would snapshot, so this check must change with it.
  */
-import { globSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { workspaceProjects } from "./lib/workspace.mjs";
 
 /** `changeset version --snapshot` always produces 0.0.0-<tag>-<timestamp>. */
 const SNAPSHOT = /^0\.0\.0-/;
-
-/**
- * The `packages:` globs from pnpm-workspace.yaml.
- *
- * Parsed here rather than shelling out to `pnpm list`: locating pnpm across
- * platforms needs `shell: true`, and Node deprecated passing args alongside it
- * (DEP0190). The block is a plain list, so reading it is smaller than the
- * subprocess it replaces.
- */
-function workspaceGlobs() {
-  const lines = readFileSync("pnpm-workspace.yaml", "utf8").split(/\r?\n/);
-  const start = lines.findIndex((line) => /^packages:\s*$/.test(line));
-  const globs = [];
-  for (let i = start + 1; start !== -1 && i < lines.length; i++) {
-    if (/^\S/.test(lines[i])) break; // the next top-level key ends the block
-    const item = lines[i].match(/^\s*-\s*["']?([^"'\s#]+)["']?\s*$/);
-    if (item) globs.push(item[1]);
-  }
-  if (globs.length === 0) {
-    throw new Error("Parsed no workspace globs from pnpm-workspace.yaml. Refusing to guess.");
-  }
-  return globs;
-}
-
-function workspaceProjects() {
-  const seen = new Set();
-  const projects = [];
-  for (const glob of workspaceGlobs()) {
-    for (const manifest of globSync(join(glob, "package.json"))) {
-      const dir = dirname(manifest);
-      if (seen.has(dir)) continue;
-      seen.add(dir);
-      try {
-        const pkg = JSON.parse(readFileSync(manifest, "utf8"));
-        projects.push({ name: pkg.name, version: pkg.version, private: !!pkg.private });
-      } catch {
-        // A member without a readable manifest cannot be published either.
-      }
-    }
-  }
-  return projects;
-}
 
 const publishable = workspaceProjects().filter((p) => !p.private && p.name && p.version);
 

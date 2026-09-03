@@ -19,8 +19,7 @@
  *
  * Run: node scripts/assert-canary-published.mjs
  */
-import { globSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { publishablePackages } from "./lib/workspace.mjs";
 
 const SNAPSHOT = /^0\.0\.0-/;
 const REGISTRY = "https://registry.npmjs.org";
@@ -32,37 +31,6 @@ const REGISTRY = "https://registry.npmjs.org";
  */
 const ATTEMPTS = 4;
 const BACKOFF_MS = 5000;
-
-function workspaceGlobs() {
-  const lines = readFileSync("pnpm-workspace.yaml", "utf8").split(/\r?\n/);
-  const start = lines.findIndex((line) => /^packages:\s*$/.test(line));
-  const globs = [];
-  for (let i = start + 1; start !== -1 && i < lines.length; i++) {
-    if (/^\S/.test(lines[i])) break;
-    const item = lines[i].match(/^\s*-\s*["']?([^"'\s#]+)["']?\s*$/);
-    if (item) globs.push(item[1]);
-  }
-  if (globs.length === 0) {
-    throw new Error("Parsed no workspace globs from pnpm-workspace.yaml. Refusing to guess.");
-  }
-  return globs;
-}
-
-function publishablePackages() {
-  const seen = new Set();
-  const found = [];
-  for (const glob of workspaceGlobs()) {
-    for (const manifestPath of globSync(join(glob, "package.json"))) {
-      const dir = dirname(manifestPath);
-      if (seen.has(dir)) continue;
-      seen.add(dir);
-      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-      if (manifest.private === true || !manifest.name || !manifest.version) continue;
-      found.push({ name: manifest.name, version: manifest.version });
-    }
-  }
-  return found;
-}
 
 async function isPublished(name, version) {
   const url = `${REGISTRY}/${name}/${version}`;
