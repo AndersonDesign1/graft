@@ -166,7 +166,16 @@ export async function fetchDistTags(name) {
   }
   let response;
   try {
-    response = await fetch(`${REGISTRY}/${encodeURIComponent(name).replace("%40", "@")}`, {
+    // The name goes in unencoded, which is safe only because NPM_NAME ran
+    // first: everything it permits — letters, digits, `-` `.` `_` `~`, one
+    // leading `@` and one `/` — is already legal in a URL path, so there is
+    // nothing to escape. The previous `encodeURIComponent(name).replace("%40",
+    // "@")` encoded the whole thing and then undid one character of it, which
+    // CodeQL flagged as incomplete sanitisation and was right to: a replace of
+    // a single occurrence standing in for a decode is a pattern that is correct
+    // only by accident of the input. assert-canary-published builds its URL
+    // this way too.
+    response = await fetch(`${REGISTRY}/${name}`, {
       headers: { accept: "application/json" },
     });
   } catch (error) {
