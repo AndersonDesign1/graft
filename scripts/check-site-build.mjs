@@ -22,6 +22,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { authoredRoutesFromIndex, expectedStaticFiles } from "./site-routes.mjs";
 
 const SITE = "examples/docs-site";
 const OUT = join(SITE, ".vercel", "output");
@@ -69,6 +70,7 @@ if (pages.length === 0) {
 //
 // index.db is what `getStaticPaths` itself reads, so the two cannot disagree
 // about which routes exist. node:sqlite is why this repo's Node floor is 22.16.
+// The static artifact has no `deleted` column, so there is nothing to filter.
 // ---------------------------------------------------------------------------
 const indexDb = join(SITE, ".graft", "index.db");
 if (!existsSync(indexDb)) {
@@ -76,34 +78,23 @@ if (!existsSync(indexDb)) {
   process.exit(1);
 }
 
-const authored = { docs: [], pages: [] };
-{
+const authored = (() => {
   const db = new DatabaseSync(indexDb, { readOnly: true });
   try {
-    for (const row of db.prepare("SELECT collection, slug FROM content_index").all()) {
-      if (row.collection in authored) authored[row.collection].push(row.slug);
-    }
+    return authoredRoutesFromIndex(db);
   } finally {
     db.close();
   }
-}
+})();
 
 if (authored.docs.length === 0)
   fail("The compiled index holds no docs to check the build against.");
 
-for (const slug of authored.docs) {
-  if (!staticFiles.has(`docs/${slug}/index.html`)) fail(`compiled but not built: /docs/${slug}`);
-  // The .md twin is what agents and `llms.txt` consumers fetch. It is generated
-  // by a separate route, so it can go missing on its own.
-  if (!staticFiles.has(`docs/${slug}.md`)) fail(`compiled but not built: /docs/${slug}.md`);
-}
-
-// The `pages` collection is the site chrome: `home` is the root, the rest sit
-// at their slug. Derived for the same reason as docs — the previous hardcoded
-// trio would not have noticed a fourth page being added and never rendering.
-for (const slug of authored.pages) {
-  const path = slug === "home" ? "index.html" : `${slug}/index.html`;
-  if (!staticFiles.has(path)) fail(`compiled but not built: /${path.replace(/index\.html$/, "")}`);
+for (const path of expectedStaticFiles(authored)) {
+  if (!staticFiles.has(path)) {
+    const href = path.endsWith(".md") ? `/${path}` : `/${path.replace(/index\.html$/, "")}`;
+    fail(`compiled but not built: ${href}`);
+  }
 }
 
 // Absolute-URL manifests. They are prerendered, so a missing `site` in the
