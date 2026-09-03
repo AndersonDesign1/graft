@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/sdk-tanstack-start",
-  "version": "1.0.0-beta.0",
+  "version": "1.0.0-beta.1",
   "description": "TanStack Start adapter: typed content reads and server-route mounts over Graft's stateless handlers.",
   "keywords": [
     "agent",

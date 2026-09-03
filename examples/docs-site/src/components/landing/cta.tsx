@@ -18,7 +18,7 @@ const AGENTS = [
 /**
  * The command is one prop, not a hand-written label beside duplicated children.
  * The label read "Copy init command" over visible text reading
- * "$ pnpm dlx @usegraft/cli init", which fails WCAG 2.5.3 Label in Name: a
+ * "$ npx @usegraft/cli@latest init", which fails WCAG 2.5.3 Label in Name: a
  * speech-input user says what they see, and nothing they could see appeared in
  * the name they had to say. Deriving the label from the command means the two
  * cannot drift. The prompt marker is hidden — it is decoration, and it is not
