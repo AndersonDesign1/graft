@@ -3,7 +3,7 @@
  * Serves the OpenAPI surface + interactive SPA on loopback by default.
  */
 import { execFile } from "node:child_process";
-import { createServer } from "node:http";
+import { createServer, type Server } from "node:http";
 import { userInfo } from "node:os";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
@@ -33,10 +33,41 @@ function operatorIdentity(): { kind: string; id: string } {
   }
 }
 
+/**
+ * `git check-ref-format --allow-onelevel`, plus an ASCII allowlist so the
+ * value can enter `execFile` argv (CodeQL `js/shell-command-constructed-from-input`).
+ * `@` is legal in a git ref (`release@2026`); `~` is not.
+ */
+function isGitPreviewBranch(branch: string): boolean {
+  if (branch === "" || branch === "@") return false;
+  if (
+    branch.includes("..") ||
+    branch.includes("@{") ||
+    branch.includes("//") ||
+    branch.includes("\\")
+  ) {
+    return false;
+  }
+  if (branch.startsWith("/") || branch.endsWith("/") || branch.endsWith(".")) return false;
+  if (!/^[A-Za-z0-9._/@+-]+$/.test(branch)) return false;
+  return branch
+    .split("/")
+    .every((part) => part.length > 0 && !part.startsWith(".") && !part.endsWith(".lock"));
+}
+
+function assertGitPreviewBranch(branch: string): void {
+  if (isGitPreviewBranch(branch)) return;
+  throw new GraftError({
+    code: "INPUT_VALIDATION_FAILED",
+    message: `Branch "${branch}" is not a safe preview query value.`,
+    fix: "Use a git-ref-shaped branch name (letters, digits, . _ / @ + -).",
+  });
+}
+
 /** Loopback preview URL only. Host/port/branch stay out of the shell argv
  *  until they pass this check — CodeQL `js/shell-command-constructed-from-input`
  *  on `execFile` otherwise. */
-function studioPreviewUrl(port: number, branch: string): string {
+export function studioPreviewUrl(port: number, branch: string): string {
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
@@ -44,14 +75,17 @@ function studioPreviewUrl(port: number, branch: string): string {
       fix: "Pass --port <1-65535> (0 picks a free port, then we read the one that bound).",
     });
   }
-  if (!/^[A-Za-z0-9._~/-]+$/.test(branch) || branch.includes("..")) {
+  assertGitPreviewBranch(branch);
+  const preview = new URL(`http://127.0.0.1:${port}/`);
+  preview.searchParams.set("branch", branch);
+  if (preview.protocol !== "http:" || preview.hostname !== "127.0.0.1") {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
-      message: `Branch "${branch}" is not a safe preview query value.`,
-      fix: "Use a git-ref-shaped branch name (letters, digits, . _ ~ / -).",
+      message: `Preview URL is not loopback http.`,
+      fix: "graft studio only opens http://127.0.0.1.",
     });
   }
-  return `http://127.0.0.1:${port}/?branch=${encodeURIComponent(branch)}`;
+  return preview.href;
 }
 
 function openBrowser(url: string): void {
@@ -78,88 +112,101 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
   const [{ createStudioHandler }, { createDb, resolveBranchHandle, scopeWriteBranch }] =
     await Promise.all([import("@usegraft/studio"), import("@usegraft/db")]);
 
-  const control = createDb(url);
   const branchName = options.branchId ?? "main";
-  const branch = await resolveBranchHandle(control.db, branchName, { databaseUrl: url });
-  const writeBranch = scopeWriteBranch(branch.scope);
+  // Fail before listen: resolveBranchHandle accepts unregistered overlay ids,
+  // including git refs with `@`, and the preview URL must too.
+  assertGitPreviewBranch(branchName);
 
-  const host = options.host ?? process.env.HOST ?? "127.0.0.1";
-  const requestedPort = options.port ?? Number(process.env.GRAFT_STUDIO_PORT ?? 4983);
-  if (!Number.isInteger(requestedPort) || requestedPort < 0 || requestedPort > 65535) {
-    await branch.close();
+  const control = createDb(url);
+  try {
+    const branch = await resolveBranchHandle(control.db, branchName, { databaseUrl: url });
+    const writeBranch = scopeWriteBranch(branch.scope);
+    let server: Server | undefined;
+    try {
+      const host = options.host ?? process.env.HOST ?? "127.0.0.1";
+      const requestedPort = options.port ?? Number(process.env.GRAFT_STUDIO_PORT ?? 4983);
+      if (!Number.isInteger(requestedPort) || requestedPort < 0 || requestedPort > 65535) {
+        throw new GraftError({
+          code: "INPUT_VALIDATION_FAILED",
+          message: `"${options.port ?? process.env.GRAFT_STUDIO_PORT}" is not a valid port.`,
+          fix: "Pass --port <0-65535> (0 picks a free port).",
+        });
+      }
+
+      const loopback = isLoopback(host);
+      const devToken = process.env.GRAFT_DEV_TOKEN;
+      if (!loopback && !devToken) {
+        console.warn(
+          "[graft studio] WARNING: binding beyond loopback with no GRAFT_DEV_TOKEN — " +
+            "set a bearer token before exposing Studio to a network.",
+        );
+      }
+
+      // `graft studio` is the operator's own tool, so the dev token identifies the
+      // operator rather than an agent — it carries the full operator scope set.
+      // Anything else is refused; this command has no notion of a lesser caller.
+      const authenticate =
+        !loopback && devToken
+          ? (request: Request) => {
+              const header = request.headers.get("authorization") ?? "";
+              if (header !== `Bearer ${devToken}`) return null;
+              return {
+                ...operatorIdentity(),
+                scopes: ["studio:read", "studio:write", "approvals:decide"],
+              };
+            }
+          : !loopback
+            ? () => null
+            : undefined;
+
+      const handler = createStudioHandler({
+        db: branch.db,
+        collections: config.collections,
+        contentDir: config.contentDir,
+        mdxTrust: config.mdxTrust,
+        defaultBranch: writeBranch,
+        decider: operatorIdentity,
+        authenticate,
+      });
+
+      const listening = createServer(
+        createNodeListener(handler, { allowedHosts: allowedHostsFor(host) }),
+      );
+      server = listening;
+      await new Promise<void>((resolve, reject) => {
+        listening.once("error", reject);
+        listening.listen(requestedPort, host, () => resolve());
+      });
+      const address = listening.address();
+      const port = typeof address === "object" && address ? address.port : requestedPort;
+      const origin = loopback ? `http://127.0.0.1:${port}` : `http://${host}:${port}`;
+
+      console.log(
+        [
+          `graft studio — branch "${branchName}" (opt-in)`,
+          `  ui         GET  ${origin}/`,
+          `  openapi    GET  ${origin}/api/studio/v1/openapi.json`,
+          `  Edit content, approve/deny — same ops as MCP/CLI.`,
+        ].join("\n"),
+      );
+
+      if (loopback) openBrowser(studioPreviewUrl(port, branchName));
+
+      await new Promise<void>((resolve) => {
+        const stop = (): void => resolve();
+        process.once("SIGINT", stop);
+        process.once("SIGTERM", stop);
+      });
+    } finally {
+      const bound = server;
+      if (bound?.listening) {
+        await new Promise<void>((resolve, reject) => {
+          bound.close((err) => (err ? reject(err) : resolve()));
+        });
+      }
+      await branch.close();
+    }
+  } finally {
     await control.close();
-    throw new GraftError({
-      code: "INPUT_VALIDATION_FAILED",
-      message: `"${options.port ?? process.env.GRAFT_STUDIO_PORT}" is not a valid port.`,
-      fix: "Pass --port <0-65535> (0 picks a free port).",
-    });
   }
-
-  const loopback = isLoopback(host);
-  const devToken = process.env.GRAFT_DEV_TOKEN;
-  if (!loopback && !devToken) {
-    console.warn(
-      "[graft studio] WARNING: binding beyond loopback with no GRAFT_DEV_TOKEN — " +
-        "set a bearer token before exposing Studio to a network.",
-    );
-  }
-
-  // `graft studio` is the operator's own tool, so the dev token identifies the
-  // operator rather than an agent — it carries the full operator scope set.
-  // Anything else is refused; this command has no notion of a lesser caller.
-  const authenticate =
-    !loopback && devToken
-      ? (request: Request) => {
-          const header = request.headers.get("authorization") ?? "";
-          if (header !== `Bearer ${devToken}`) return null;
-          return {
-            ...operatorIdentity(),
-            scopes: ["studio:read", "studio:write", "approvals:decide"],
-          };
-        }
-      : !loopback
-        ? () => null
-        : undefined;
-
-  const handler = createStudioHandler({
-    db: branch.db,
-    collections: config.collections,
-    contentDir: config.contentDir,
-    mdxTrust: config.mdxTrust,
-    defaultBranch: writeBranch,
-    decider: operatorIdentity,
-    authenticate,
-  });
-
-  const server = createServer(createNodeListener(handler, { allowedHosts: allowedHostsFor(host) }));
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(requestedPort, host, () => resolve());
-  });
-  const address = server.address();
-  const port = typeof address === "object" && address ? address.port : requestedPort;
-  const origin = loopback ? `http://127.0.0.1:${port}` : `http://${host}:${port}`;
-
-  console.log(
-    [
-      `graft studio — branch "${branchName}" (opt-in)`,
-      `  ui         GET  ${origin}/`,
-      `  openapi    GET  ${origin}/api/studio/v1/openapi.json`,
-      `  Edit content, approve/deny — same ops as MCP/CLI.`,
-    ].join("\n"),
-  );
-
-  if (loopback) openBrowser(studioPreviewUrl(port, branchName));
-
-  await new Promise<void>((resolve) => {
-    const stop = (): void => resolve();
-    process.once("SIGINT", stop);
-    process.once("SIGTERM", stop);
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    server.close((err) => (err ? reject(err) : resolve()));
-  });
-  await branch.close();
-  await control.close();
 }
