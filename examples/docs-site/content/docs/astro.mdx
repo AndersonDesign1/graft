@@ -59,10 +59,8 @@ import { createDb } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-astro";
 import { collections } from "../../graft.config";
 
-export const graft = createGraft({
-  db: createDb(process.env.DATABASE_URL!).db,
-  collections,
-});
+export const db = createDb(process.env.DATABASE_URL!).db;
+export const graft = createGraft({ db, collections });
 ```
 
 ## Read one document
@@ -91,8 +89,10 @@ its `request`.
 // src/pages/api/fn/[name].ts
 import { createFunctionsHandler } from "@usegraft/core";
 import { graftRoute } from "@usegraft/sdk-astro";
+import { functions } from "../../../graft.config";
+import { db } from "../../lib/graft";
 
-const handler = createFunctionsHandler({ db, collections, functions });
+const handler = createFunctionsHandler({ db, functions });
 
 export const POST = graftRoute(handler);
 export const GET = graftRoute(handler); // 405s with Allow and a fix
@@ -102,8 +102,18 @@ export const GET = graftRoute(handler); // 405s with Allow and a fix
 // src/pages/api/mcp.ts
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftRoute } from "@usegraft/sdk-astro";
+import { collections, functions } from "../../graft.config";
+import { db } from "../lib/graft";
 
-export const POST = graftRoute(createGraftMcpHandler({ db, collections, functions, actor }));
+export const POST = graftRoute(
+  createGraftMcpHandler({
+    contentDir: "./content",
+    db,
+    collections,
+    functions,
+    allowAnonymous: true,
+  }),
+);
 ```
 
 The parameter is typed structurally as `{ request: Request }`, so this package
@@ -117,9 +127,19 @@ surrogate-key header on SSR responses, and purge
 
 ```astro
 ---
-Astro.response.headers.set("Cache-Tag", tagsFor(branch, "pages", slug).join(","));
+import { tagsFor } from "@usegraft/sdk-astro";
+import { graft } from "../lib/graft";
+
+const slug = Astro.params.slug!;
+const page = await graft.getContent("pages", slug);
+Astro.response.headers.set("Cache-Tag", tagsFor("main", "pages", slug).join(","));
 ---
 ```
+
+`Cache-Tag` is the surrogate-key header. Purge the same strings
+`tagsForChanges` returns from your compile webhook. The Postgres handle
+snippet should `export const db` next to `graft` so the mounts above can
+import it.
 
 ## The caveat you cannot infer
 

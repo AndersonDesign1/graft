@@ -44,7 +44,8 @@ import { createDb } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-tanstack-start";
 import { collections } from "../../graft.config";
 
-export const graft = createGraft({ db: createDb(process.env.DATABASE_URL!).db, collections });
+export const db = createDb(process.env.DATABASE_URL!).db;
+export const graft = createGraft({ db, collections });
 ```
 
 Static index instead of Postgres:
@@ -83,8 +84,10 @@ TanStack Start releases; the handler signature has not.
 import { createServerFileRoute } from "@tanstack/react-start/server";
 import { createFunctionsHandler } from "@usegraft/core";
 import { graftRoute } from "@usegraft/sdk-tanstack-start";
+import { functions } from "../../../graft.config";
+import { db } from "../../lib/graft.server";
 
-const handler = createFunctionsHandler({ db, collections, functions });
+const handler = createFunctionsHandler({ db, functions });
 
 export const ServerRoute = createServerFileRoute("/api/fn/$name").methods({
   POST: graftRoute(handler),
@@ -94,11 +97,22 @@ export const ServerRoute = createServerFileRoute("/api/fn/$name").methods({
 
 ```ts
 // src/routes/api/mcp.ts
+import { createServerFileRoute } from "@tanstack/react-start/server";
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftRoute } from "@usegraft/sdk-tanstack-start";
+import { collections, functions } from "../../graft.config";
+import { db } from "../lib/graft.server";
 
 export const ServerRoute = createServerFileRoute("/api/mcp").methods({
-  POST: graftRoute(createGraftMcpHandler({ db, collections, functions, actor })),
+  POST: graftRoute(
+    createGraftMcpHandler({
+      contentDir: "./content",
+      db,
+      collections,
+      functions,
+      allowAnonymous: true,
+    }),
+  ),
 });
 ```
 
@@ -110,6 +124,16 @@ needs no `@tanstack/react-start` dependency.
 TanStack Start has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
 surrogate-key header on the responses you serve, and purge
 `tagsForChanges(branch, changeSet)` from your compile webhook.
+
+```ts
+import { tagsFor } from "@usegraft/sdk-tanstack-start";
+
+const slug = "home";
+headers.set("Cache-Tag", tagsFor("main", "pages", slug).join(","));
+```
+
+`Cache-Tag` is the surrogate-key header. Purge the same strings
+`tagsForChanges` returns from your compile webhook.
 
 ## The caveat you cannot infer
 

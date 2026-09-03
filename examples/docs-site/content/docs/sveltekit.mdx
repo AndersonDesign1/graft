@@ -45,7 +45,8 @@ import { createDb } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-sveltekit";
 import { collections } from "../../../graft.config";
 
-export const graft = createGraft({ db: createDb(DATABASE_URL).db, collections });
+export const db = createDb(DATABASE_URL).db;
+export const graft = createGraft({ db, collections });
 ```
 
 Static index instead of Postgres:
@@ -80,8 +81,10 @@ export const load: PageServerLoad = async ({ params }) => {
 // src/routes/api/fn/[name]/+server.ts
 import { createFunctionsHandler } from "@usegraft/core";
 import { graftRoute } from "@usegraft/sdk-sveltekit";
+import { functions } from "../../../../graft.config";
+import { db } from "$lib/server/graft";
 
-const handler = createFunctionsHandler({ db, collections, functions });
+const handler = createFunctionsHandler({ db, functions });
 
 export const POST = graftRoute(handler);
 export const GET = graftRoute(handler); // 405s with Allow and a fix
@@ -91,8 +94,18 @@ export const GET = graftRoute(handler); // 405s with Allow and a fix
 // src/routes/api/mcp/+server.ts
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftRoute } from "@usegraft/sdk-sveltekit";
+import { collections, functions } from "../../../../graft.config";
+import { db } from "$lib/server/graft";
 
-export const POST = graftRoute(createGraftMcpHandler({ db, collections, functions, actor }));
+export const POST = graftRoute(
+  createGraftMcpHandler({
+    contentDir: "./content",
+    db,
+    collections,
+    functions,
+    allowAnonymous: true,
+  }),
+);
 ```
 
 The parameter is typed structurally as `{ request: Request }`, so this package
@@ -105,12 +118,17 @@ surrogate-key header with `setHeaders` in `load`, and purge
 `tagsForChanges(branch, changeSet)` from your compile webhook.
 
 ```ts
+import { tagsFor } from "@usegraft/sdk-sveltekit";
+
 export const load: PageServerLoad = async ({ params, setHeaders }) => {
   const page = await graft.getContent("pages", params.slug);
   setHeaders({ "Cache-Tag": tagsFor("main", "pages", params.slug).join(",") });
   return { page };
 };
 ```
+
+`Cache-Tag` is the surrogate-key header. Purge the same strings
+`tagsForChanges` returns from your compile webhook.
 
 ## The caveat you cannot infer
 

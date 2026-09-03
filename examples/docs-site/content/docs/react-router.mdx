@@ -44,7 +44,8 @@ import { createDb } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-react-router";
 import { collections } from "../../graft.config";
 
-export const graft = createGraft({ db: createDb(process.env.DATABASE_URL!).db, collections });
+export const db = createDb(process.env.DATABASE_URL!).db;
+export const graft = createGraft({ db, collections });
 ```
 
 Static index instead of Postgres:
@@ -87,8 +88,10 @@ no default export, whose loader and action return raw Responses.
 // app/routes/api.fn.$name.ts
 import { createFunctionsHandler } from "@usegraft/core";
 import { graftRoute } from "@usegraft/sdk-react-router";
+import { functions } from "../../graft.config";
+import { db } from "../lib/graft.server"; // export the same db you passed to createGraft
 
-const handler = createFunctionsHandler({ db, collections, functions });
+const handler = createFunctionsHandler({ db, functions });
 
 export const action = graftRoute(handler); // POST
 export const loader = graftRoute(handler); // GET, which 405s with Allow and a fix
@@ -98,8 +101,18 @@ export const loader = graftRoute(handler); // GET, which 405s with Allow and a f
 // app/routes/api.mcp.ts
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftRoute } from "@usegraft/sdk-react-router";
+import { collections, functions } from "../../graft.config";
+import { db } from "../lib/graft.server";
 
-export const action = graftRoute(createGraftMcpHandler({ db, collections, functions, actor }));
+export const action = graftRoute(
+  createGraftMcpHandler({
+    contentDir: "./content",
+    db,
+    collections,
+    functions,
+    allowAnonymous: true,
+  }),
+);
 ```
 
 Register them the way you register any route:
@@ -121,10 +134,16 @@ surrogate-key header from the route's `headers` export, and purge
 `tagsForChanges(branch, changeSet)` from your compile webhook.
 
 ```ts
-export function headers() {
-  return { "Cache-Tag": tagsFor("main", "docs", slug).join(",") };
+import { tagsFor } from "@usegraft/sdk-react-router";
+import type { Route } from "./+types/docs.$slug";
+
+export function headers({ params }: Route.HeadersArgs) {
+  return { "Cache-Tag": tagsFor("main", "docs", params.slug).join(",") };
 }
 ```
+
+`Cache-Tag` is the surrogate-key header. Purge the same strings
+`tagsForChanges` returns from your compile webhook.
 
 ## The caveat you cannot infer
 
