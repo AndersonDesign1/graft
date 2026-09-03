@@ -469,7 +469,7 @@ async function resolveAssetUrl(key: string): Promise<{
     const { createStorage } = await import("@usegraft/assets");
     return { key, url: await createStorage().url(key) };
   } catch (error) {
-    return { key, url: null, reason: error instanceof Error ? error.message : String(error) };
+    return { key, url: null, reason: "storage_unavailable" };
   }
 }
 

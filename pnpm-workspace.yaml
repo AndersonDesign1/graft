@@ -3,6 +3,19 @@ packages:
   - "examples/*"
   - "deploy/docker/project"
 
+# Transitive pins their parents will not move. Each line is a leftover
+# Dependabot row: browserslist 4.28.5 (two advisories, patched in 4.28.7+),
+# path-to-regexp 6.1.0 under @vercel/routing-utils, launch-editor under Vite 5,
+# and old esbuild copies under drizzle-kit / vitest / tsup.
+overrides:
+  browserslist: 4.28.8
+  path-to-regexp@6.1.0: 6.3.0
+  launch-editor: 2.14.1
+  esbuild@0.18.20: 0.28.2
+  esbuild@0.21.5: 0.28.2
+  esbuild@0.25.12: 0.28.2
+  esbuild@0.27.7: 0.28.2
+
 # Allow esbuild (tsup + vitest) and sharp (Next image optimization) to run
 # their install scripts (pnpm 11 model).
 allowBuilds:

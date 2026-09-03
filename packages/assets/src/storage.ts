@@ -27,6 +27,14 @@ export interface Storage {
   url(key: string, options?: PresignOptions): Promise<string>;
 }
 
+/** Strip trailing slashes without a quantifier regex. `/\/+$/` on env-sourced
+ *  endpoint / publicBaseUrl is what CodeQL flags as polynomial ReDoS. */
+function withoutTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+  return value.slice(0, end);
+}
+
 export function createStorage(config: StorageConfig = storageConfigFromEnv()): Storage {
   const aws = new AwsClient({
     accessKeyId: config.accessKeyId,
@@ -34,7 +42,7 @@ export function createStorage(config: StorageConfig = storageConfigFromEnv()): S
     region: config.region,
     service: "s3",
   });
-  const base = `${config.endpoint.replace(/\/+$/, "")}/${config.bucket}`;
+  const base = `${withoutTrailingSlashes(config.endpoint)}/${config.bucket}`;
   const urlFor = (key: string) => `${base}/${key.split("/").map(encodeURIComponent).join("/")}`;
 
   const presign = async (key: string, method: "GET" | "PUT", options: PresignOptions) => {
@@ -74,7 +82,7 @@ export function createStorage(config: StorageConfig = storageConfigFromEnv()): S
     },
     async url(key, options = {}) {
       if (config.publicBaseUrl) {
-        const publicBase = config.publicBaseUrl.replace(/\/+$/, "");
+        const publicBase = withoutTrailingSlashes(config.publicBaseUrl);
         return `${publicBase}/${key.split("/").map(encodeURIComponent).join("/")}`;
       }
       return presign(key, "GET", options);

@@ -33,10 +33,38 @@ function operatorIdentity(): { kind: string; id: string } {
   }
 }
 
+/** Loopback preview URL only. Host/port/branch stay out of the shell argv
+ *  until they pass this check — CodeQL `js/shell-command-constructed-from-input`
+ *  on `execFile` otherwise. */
+function studioPreviewUrl(port: number, branch: string): string {
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `"${port}" is not a valid bound port.`,
+      fix: "Pass --port <1-65535> (0 picks a free port, then we read the one that bound).",
+    });
+  }
+  if (!/^[A-Za-z0-9._~/-]+$/.test(branch) || branch.includes("..")) {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `Branch "${branch}" is not a safe preview query value.`,
+      fix: "Use a git-ref-shaped branch name (letters, digits, . _ ~ / -).",
+    });
+  }
+  return `http://127.0.0.1:${port}/?branch=${encodeURIComponent(branch)}`;
+}
+
 function openBrowser(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return;
+  }
+  if (parsed.protocol !== "http:" || parsed.hostname !== "127.0.0.1") return;
   const platform = process.platform;
   const cmd = platform === "win32" ? "cmd" : platform === "darwin" ? "open" : "xdg-open";
-  const args = platform === "win32" ? ["/c", "start", "", url] : [url];
+  const args = platform === "win32" ? ["/c", "start", "", parsed.href] : [parsed.href];
   execFile(cmd, args, () => {
     /* best-effort */
   });
@@ -110,18 +138,18 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
   });
   const address = server.address();
   const port = typeof address === "object" && address ? address.port : requestedPort;
-  const base = `http://${host}:${port}`;
+  const origin = loopback ? `http://127.0.0.1:${port}` : `http://${host}:${port}`;
 
   console.log(
     [
       `graft studio — branch "${branchName}" (opt-in)`,
-      `  ui         GET  ${base}/`,
-      `  openapi    GET  ${base}/api/studio/v1/openapi.json`,
+      `  ui         GET  ${origin}/`,
+      `  openapi    GET  ${origin}/api/studio/v1/openapi.json`,
       `  Edit content, approve/deny — same ops as MCP/CLI.`,
     ].join("\n"),
   );
 
-  if (loopback) openBrowser(`${base}/?branch=${encodeURIComponent(branchName)}`);
+  if (loopback) openBrowser(studioPreviewUrl(port, branchName));
 
   await new Promise<void>((resolve) => {
     const stop = (): void => resolve();

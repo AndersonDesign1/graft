@@ -189,6 +189,6 @@ describe("createNodeListener", () => {
     expect(res.status).toBe(500);
     const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe("FUNCTION_EXECUTION_FAILED");
-    expect(body.message).toContain("boom");
+    expect(body.message).toBe("graft serve failed to relay the request.");
   });
 });

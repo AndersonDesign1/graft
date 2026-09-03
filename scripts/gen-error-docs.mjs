@@ -52,13 +52,24 @@ const quote = (s) => `"${String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"
  * that throws. Escape `<` and `{` everywhere except inside an inline code
  * span, where MDX already treats them as literal text.
  *
- * The split keeps code spans at odd indices, so only the prose is touched.
+ * Walk the string once. A regex split-and-replace is what CodeQL flags as
+ * incomplete sanitisation (`js/incomplete-sanitization`) — backslash-escaping
+ * `<`/`{` via `replace` looks like a broken HTML escaper. A scan does the
+ * same job and does not leave a sanitiser for the analyser to distrust.
  */
 function escapeMdx(text) {
-  return String(text)
-    .split(/(`[^`]*`)/)
-    .map((part, i) => (i % 2 === 1 ? part : part.replace(/[<{]/g, "\\$&")))
-    .join("");
+  let out = "";
+  let inCode = false;
+  for (const ch of String(text)) {
+    if (ch === "`") {
+      inCode = !inCode;
+      out += ch;
+      continue;
+    }
+    if (!inCode && (ch === "<" || ch === "{")) out += `\\${ch}`;
+    else out += ch;
+  }
+  return out;
 }
 
 const codes = Object.keys(ERROR_KNOWLEDGE).sort();
