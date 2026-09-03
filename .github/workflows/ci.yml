@@ -60,6 +60,16 @@ jobs:
       - run: pnpm check:install-tag
       - run: pnpm typecheck
       - run: pnpm build
+      # graft.page is a static deploy, and `astro build` exiting 0 says it
+      # compiled, not that it serves. Both ways this site has broken were clean
+      # builds: `/docs` became a page that could not redirect once the site went
+      # static, and the on-demand routes read a SQLite artifact that Vercel does
+      # not trace and would ship without. Neither is a compile error, so neither
+      # is caught above. This reads the artifact Vercel actually uploads.
+      #
+      # Lives in `verify` rather than its own job so it reuses that build — and
+      # so it is covered by a required status check that already exists.
+      - run: pnpm check:site
       # The error reference on the docs site is generated from ERROR_KNOWLEDGE
       # in @usegraft/mcp, which is already under test. Prose does not fail a
       # build, so a second hand-written copy would drift invisibly. Needs the
