@@ -21,6 +21,7 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
 const SITE = "examples/docs-site";
 const OUT = join(SITE, ".vercel", "output");
@@ -57,28 +58,52 @@ if (pages.length === 0) {
 // Every authored page reached the build.
 //
 // A page can leave the site without anything failing: a content file renamed,
-// a getStaticPaths filter that quietly matches less than it did. The source of
-// truth is the MDX on disk, so it is compared against rather than trusted.
+// a getStaticPaths filter that quietly matches less than it did.
+//
+// The expected routes come from the compiled index, not from the filenames
+// under content/. Reading the directory meant re-deriving the compiler's slug
+// rule, and the re-derivation was wrong in both directions: `parse.ts` honours
+// a frontmatter `slug` over the filename, so `a.mdx` with `slug: b` builds at
+// /docs/b and this demanded /docs/a — a green build failed by the checker; and
+// it only listed the top level, so anything nested was never checked at all.
+//
+// index.db is what `getStaticPaths` itself reads, so the two cannot disagree
+// about which routes exist. node:sqlite is why this repo's Node floor is 22.16.
 // ---------------------------------------------------------------------------
-const contentDir = join(SITE, "content", "docs");
-const slugs = existsSync(contentDir)
-  ? readdirSync(contentDir)
-      .filter((f) => f.endsWith(".mdx"))
-      .map((f) => f.slice(0, -".mdx".length))
-  : [];
-
-if (slugs.length === 0) fail(`Found no MDX under ${contentDir} to check the build against.`);
-
-for (const slug of slugs) {
-  if (!staticFiles.has(`docs/${slug}/index.html`)) fail(`authored but not built: /docs/${slug}`);
-  // The .md twin is what agents and `llms.txt` consumers fetch. It is generated
-  // by a separate route, so it can go missing on its own.
-  if (!staticFiles.has(`docs/${slug}.md`)) fail(`authored but not built: /docs/${slug}.md`);
+const indexDb = join(SITE, ".graft", "index.db");
+if (!existsSync(indexDb)) {
+  console.error(`No compiled index at ${indexDb}. Run \`pnpm build\` first.`);
+  process.exit(1);
 }
 
-// The hand-written pages, which have no content file to be derived from.
-for (const path of ["index.html", "why/index.html", "security/index.html"]) {
-  if (!staticFiles.has(path)) fail(`missing page: /${path.replace(/index\.html$/, "")}`);
+const authored = { docs: [], pages: [] };
+{
+  const db = new DatabaseSync(indexDb, { readOnly: true });
+  try {
+    for (const row of db.prepare("SELECT collection, slug FROM content_index").all()) {
+      if (row.collection in authored) authored[row.collection].push(row.slug);
+    }
+  } finally {
+    db.close();
+  }
+}
+
+if (authored.docs.length === 0)
+  fail("The compiled index holds no docs to check the build against.");
+
+for (const slug of authored.docs) {
+  if (!staticFiles.has(`docs/${slug}/index.html`)) fail(`compiled but not built: /docs/${slug}`);
+  // The .md twin is what agents and `llms.txt` consumers fetch. It is generated
+  // by a separate route, so it can go missing on its own.
+  if (!staticFiles.has(`docs/${slug}.md`)) fail(`compiled but not built: /docs/${slug}.md`);
+}
+
+// The `pages` collection is the site chrome: `home` is the root, the rest sit
+// at their slug. Derived for the same reason as docs — the previous hardcoded
+// trio would not have noticed a fourth page being added and never rendering.
+for (const slug of authored.pages) {
+  const path = slug === "home" ? "index.html" : `${slug}/index.html`;
+  if (!staticFiles.has(path)) fail(`compiled but not built: /${path.replace(/index\.html$/, "")}`);
 }
 
 // Absolute-URL manifests. They are prerendered, so a missing `site` in the
@@ -246,6 +271,6 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `site build: OK — ${pages.length} pages, ${slugs.length} docs from content, ` +
+  `site build: OK — ${pages.length} pages, ${authored.docs.length} docs from the compiled index, ` +
     `on-demand routes wired with their index, no dead internal links.`,
 );
