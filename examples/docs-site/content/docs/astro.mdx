@@ -100,10 +100,23 @@ export const GET = graftRoute(handler); // 405s with Allow and a fix
 
 ```ts
 // src/pages/api/mcp.ts
+import { createActorResolver } from "@usegraft/auth";
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftRoute } from "@usegraft/sdk-astro";
 import { collections, functions } from "../../graft.config";
 import { db } from "../lib/graft";
+
+const actor = createActorResolver({
+  devTokens: process.env.GRAFT_DEV_TOKEN
+    ? {
+        [process.env.GRAFT_DEV_TOKEN]: {
+          kind: "human",
+          id: "owner",
+          scopes: ["content:write"],
+        },
+      }
+    : undefined,
+});
 
 export const POST = graftRoute(
   createGraftMcpHandler({
@@ -111,10 +124,18 @@ export const POST = graftRoute(
     db,
     collections,
     functions,
-    allowAnonymous: true,
+    actor,
   }),
 );
 ```
+
+This endpoint serves content writes and asset uploads. Pass `actor` — the same
+`createActorResolver` seam as the functions route — and add OIDC issuers in
+production as in [Auth](/docs/auth). Unauthenticated callers get 401.
+`allowAnonymous: true` is only for a loopback local server — never on anything
+reachable from a network. A public docs surface is
+[`createDocsMcpHandler`](/docs/docs-mcp), which has no write tools and no
+anonymous opt-in.
 
 The parameter is typed structurally as `{ request: Request }`, so this package
 needs no `astro` dependency.
