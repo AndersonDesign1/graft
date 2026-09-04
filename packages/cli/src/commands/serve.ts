@@ -196,7 +196,7 @@ export function createNodeListener(handler: FetchHandler, options: NodeListenerO
       res.end(
         JSON.stringify({
           error: "FUNCTION_EXECUTION_FAILED",
-          message: `graft serve failed to relay the request: ${error instanceof Error ? error.message : String(error)}`,
+          message: "graft serve failed to relay the request.",
           fix: "Check the server logs; if this reproduces, file it — the adapter should never throw.",
         }),
       );
@@ -372,14 +372,11 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   const health: FetchHandler = async () => {
     try {
       await branch.db.execute(sql`select 1`);
-    } catch (error) {
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: error instanceof Error ? error.message : String(error),
-        }),
-        { status: 503, headers: { "content-type": "application/json" } },
-      );
+    } catch {
+      return new Response(JSON.stringify({ ok: false, error: "database_unavailable" }), {
+        status: 503,
+        headers: { "content-type": "application/json" },
+      });
     }
     return new Response(
       JSON.stringify({

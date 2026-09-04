@@ -17,6 +17,16 @@ describe("storage.url", () => {
     );
   });
 
+  it("strips any number of trailing slashes on the public base", async () => {
+    const storage = createStorage({
+      ...baseConfig,
+      publicBaseUrl: "https://assets.example.com////",
+    });
+    expect(await storage.url("pages/home/hero.svg")).toBe(
+      "https://assets.example.com/pages/home/hero.svg",
+    );
+  });
+
   it("falls back to a presigned GET without publicBaseUrl", async () => {
     const storage = createStorage(baseConfig);
     const url = new URL(await storage.url("pages/home/hero.svg", { expiresIn: 60 }));
