@@ -185,16 +185,21 @@ jobs:
         if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.canary }}
         run: node scripts/assert-canary-published.mjs
 
+      # Action v2.x requires Changesets CLI v3. This repo is on CLI v2.31.1,
+      # so the pin stays on action v1.9.0. Dependabot's grouped bump in #29
+      # moved this to v2.1.1 and the next feat/core push failed:
+      # "use Changesets action v1 instead, which is compatible with CLI v2."
       - name: Create release PR or publish
         id: changesets
         if: ${{ github.event_name != 'workflow_dispatch' || !inputs.canary }}
-        uses: changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1
+        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
-          version-script: pnpm version-packages
-          publish-script: pnpm release
-          commit-message: "chore: version packages"
-          pr-title: "chore: version packages"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version: pnpm version-packages
+          publish: pnpm release
+          commit: "chore: version packages"
+          title: "chore: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # changesets/action tags and releases each package separately, so one
       # version produced 21 tags and 21 GitHub Releases with one arbitrarily

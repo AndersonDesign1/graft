@@ -42,3 +42,9 @@ updates:
 
     labels:
       - "dependencies"
+
+    ignore:
+      # Action v2 requires Changesets CLI v3. Stay on action v1 until the CLI
+      # major lands; grouped bumps otherwise pull this in with zizmor-action.
+      - dependency-name: "changesets/action"
+        update-types: ["version-update:semver-major"]
