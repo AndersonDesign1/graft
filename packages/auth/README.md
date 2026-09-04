@@ -40,7 +40,7 @@ Being signed in earns nothing. An account gets scopes because something granted 
 
 ## Environment
 
-`graft serve` parses `GRAFT_TRUSTED_ISSUERS` into `createActorResolver({ issuers })`. An embedded resolver must be passed `issuers` itself — the library does not read that env. `GRAFT_DEV_TOKEN` and `GRAFT_DEV_SCOPES` for a static local identity. Anonymous MCP is refused unless `GRAFT_MCP_ALLOW_ANONYMOUS=1`, which nothing sets for you.
+`GRAFT_TRUSTED_ISSUERS` for OIDC issuers, `GRAFT_DEV_TOKEN` and `GRAFT_DEV_SCOPES` for a static local identity. Anonymous MCP is refused unless `GRAFT_MCP_ALLOW_ANONYMOUS=1`, which nothing sets for you.
 
 ---
 
