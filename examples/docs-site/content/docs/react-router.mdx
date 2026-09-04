@@ -10,7 +10,7 @@ order: 7
 <Tab>
 
 ```sh
-pnpm add @usegraft/sdk-react-router
+pnpm add @usegraft/sdk-react-router @usegraft/auth @usegraft/mcp
 ```
 
 </Tab>
@@ -18,7 +18,7 @@ pnpm add @usegraft/sdk-react-router
 <Tab>
 
 ```sh
-npm i @usegraft/sdk-react-router
+npm i @usegraft/sdk-react-router @usegraft/auth @usegraft/mcp
 ```
 
 </Tab>
@@ -26,7 +26,7 @@ npm i @usegraft/sdk-react-router
 <Tab>
 
 ```sh
-bun add @usegraft/sdk-react-router
+bun add @usegraft/sdk-react-router @usegraft/auth @usegraft/mcp
 ```
 
 </Tab>
@@ -106,6 +106,10 @@ import { collections, functions } from "../../graft.config";
 import { db } from "../lib/graft.server";
 
 const actor = createActorResolver({
+  issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
+    .split(/[,\s]+/)
+    .filter(Boolean)
+    .map((issuer) => ({ issuer })),
   devTokens: process.env.GRAFT_DEV_TOKEN
     ? {
         [process.env.GRAFT_DEV_TOKEN]: {
@@ -128,13 +132,13 @@ export const action = graftRoute(
 );
 ```
 
-This endpoint serves content writes and asset uploads. Pass `actor` — the same
-`createActorResolver` seam as the functions route — and add OIDC issuers in
-production as in [Auth](/docs/auth). Unauthenticated callers get 401.
-`allowAnonymous: true` is only for a loopback local server — never on anything
-reachable from a network. A public docs surface is
-[`createDocsMcpHandler`](/docs/docs-mcp), which has no write tools and no
-anonymous opt-in.
+This endpoint serves content writes and asset uploads. JWT verification runs
+only when `issuers` is passed; the library does not read
+`GRAFT_TRUSTED_ISSUERS` (`graft serve` does). See [Auth](/docs/auth).
+Unauthenticated callers get 401. `allowAnonymous: true` is only for a
+loopback local server — never on anything reachable from a network. A public
+docs surface is [`createDocsMcpHandler`](/docs/docs-mcp), which has no write
+tools and no anonymous opt-in.
 
 Register them the way you register any route:
 
