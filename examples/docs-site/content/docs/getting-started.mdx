@@ -114,6 +114,11 @@ const home = await graft.getDocument("pages", "home");
 
 </CodeBlock>
 
+Framework adapters wrap the same surface. `graft init` leaves you on the
+static index; [Next](/docs/next) and [Astro](/docs/astro) show that path with
+`createGraft({ index, collections })`. The other adapters are under
+[Reading content](/docs/reading-content).
+
 </Step>
 
 </Steps>
@@ -150,16 +155,9 @@ graft db migrate
 graft compile
 ```
 
-Reads move to a framework adapter, which takes the database instead of the
-artifact:
-
-```ts
-import { createGraft } from "@usegraft/sdk-astro";
-import { collections } from "../graft.config";
-
-const graft = createGraft({ db, collections });
-const home = await graft.getContent("pages", "home");
-```
+Reads move to a framework adapter. Pass `db` instead of the artifact — the
+surface does not change. [Next](/docs/next) and [Astro](/docs/astro) show both
+the static-index path `graft init` scaffolds and the Postgres swap.
 
 ## Author a document
 
@@ -200,6 +198,7 @@ Every Graft error includes a `fix` field. Do what it says, then retry.
 ## Next steps
 
 - [Schema](/docs/schema) — define collections and fields with `defineCollection`
-- [Reading content](/docs/reading-content) — typed reads on six frameworks and in the browser
+- [Reading content](/docs/reading-content) — one page per framework adapter
+- [Powered by Graft](/docs/powered-by-graft) — the footer badge, as a paste
 - [The agent surface](/docs/agent-surface) — operate via MCP and the CLI
 - [Deploy](/docs/deploy) — self-host with a container or embed handlers

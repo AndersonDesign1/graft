@@ -7,18 +7,32 @@ order: 2
 
 All reads go through `@usegraft/sdk-core`: `getDocument`, `listDocuments`, and
 `searchDocuments`. Each call re-validates against your Zod schema. Soft-deleted
-index rows are excluded.
+index rows are excluded. Framework packages wrap that surface; pick the page
+for the app you are in.
 
-Framework SDKs wrap that surface:
+<DocCards>
+  <DocCard title="Next.js" href="/docs/next">
+    `@usegraft/sdk-next` — React.cache, MdxBody, withGraft.
+  </DocCard>
+  <DocCard title="Astro" href="/docs/astro">
+    `@usegraft/sdk-astro` — frontmatter, graftRoute, no request memo.
+  </DocCard>
+  <DocCard title="SvelteKit" href="/docs/sveltekit">
+    `@usegraft/sdk-sveltekit` — +page.server.ts, graftRoute.
+  </DocCard>
+  <DocCard title="TanStack Start" href="/docs/tanstack-start">
+    `@usegraft/sdk-tanstack-start` — keep the handle out of isomorphic loaders.
+  </DocCard>
+  <DocCard title="React Router" href="/docs/react-router">
+    `@usegraft/sdk-react-router` — framework mode; action plus loader.
+  </DocCard>
+  <DocCard title="React (browser)" href="/docs/react">
+    `@usegraft/sdk-react` — HTTP only. No db. createGraftHooks.
+  </DocCard>
+</DocCards>
 
-| Package | Entry | Notes |
-| --- | --- | --- |
-| `@usegraft/sdk-next` | `createGraft` | Per-request memo via `React.cache`; `MdxBody` for React MDX |
-| `@usegraft/sdk-astro` | `createGraft` | No request memo; use from frontmatter and endpoints only |
-| `@usegraft/sdk-sveltekit` | `createGraft` | Same shared surface; `graftRoute` for `+server.ts` |
-| `@usegraft/sdk-tanstack-start` | `createGraft` | Server functions and server routes; loaders are isomorphic, so keep the handle out of them |
-| `@usegraft/sdk-react-router` | `createGraft` | Framework mode; build the handle in a `.server.ts` module |
-| `@usegraft/sdk-react` | `createGraft` | Runs in the browser; takes an `endpoint`, never a `db` |
+Mounts, cache tags, and the honest gaps live on
+[SDK reference](/docs/sdk-reference). This page is the index.
 
 ## Shared API
 
@@ -31,7 +45,9 @@ await graft.searchContent("docs", "branching"); // ranked hits + snippets
 ```
 
 Pass `branch` to resolve overlay or Neon preview branches. See
-[Branching & previews](/docs/branching-previews).
+[Branching & previews](/docs/branching-previews). Pass `index` instead of `db`
+to read a static SQLite artifact or a remote `graft serve` — the surface does
+not change.
 
 ## Remote runtime
 
@@ -55,104 +71,4 @@ export const graft = createGraft({
 ```
 
 `graft serve` mounts the matching handler at `/api/content/v1/documents` and
-`/api/content/v1/search`.
-
-## Astro
-
-```ts
-// src/lib/graft.ts
-import { createDb } from "@usegraft/db";
-import { createGraft } from "@usegraft/sdk-astro";
-import { collections } from "../../graft.config";
-
-export const graft = createGraft({
-  db: createDb(process.env.DATABASE_URL!).db,
-  collections,
-});
-```
-
-Call it from `.astro` frontmatter, endpoints, and middleware. Do not import it
-into client islands — it holds a database handle.
-
-## Next.js
-
-```ts
-import { createGraft } from "@usegraft/sdk-next";
-
-export const graft = createGraft({ db, collections });
-// getContent / listContent / searchContent are React.cache-deduped per request
-```
-
-Render authored bodies with `MdxBody` and your generated `components/mdx-components.ts`
-map when you use registry blocks.
-
-## SvelteKit
-
-```ts
-import { createGraft } from "@usegraft/sdk-sveltekit";
-
-export const graft = createGraft({ db, collections });
-```
-
-Build the handle in a server-only module and read it from `+page.server.ts` or
-`+layout.server.ts`. A **universal** `load` in `+page.ts` or `+layout.ts` also
-runs in the browser on client-side navigation, so a database connection does not
-belong there — the same care TanStack Start needs, under different filenames.
-
-Mount functions and MCP with `graftRoute` on `+server.ts` endpoints. See
-[SDK reference](/docs/sdk-reference).
-
-## TanStack Start
-
-```ts
-// src/lib/graft.server.ts
-import { createGraft } from "@usegraft/sdk-tanstack-start";
-
-export const graft = createGraft({ db, collections });
-```
-
-The filename is the point. Start's route loaders are **isomorphic** — they run
-on the server for the first paint and in the browser on client-side navigation —
-so a handle holding a database connection belongs in a server function or a
-server route, never in a loader.
-
-Astro frontmatter is the only adapter here that is server-side unconditionally.
-
-## React Router v7
-
-```ts
-// app/lib/graft.server.ts
-import { createGraft } from "@usegraft/sdk-react-router";
-
-export const graft = createGraft({ db, collections });
-```
-
-Framework mode only, which is where React Router runs loaders and actions on a
-server. Import the handle from loaders and actions.
-
-## The browser
-
-```ts
-import { createGraft, createGraftHooks } from "@usegraft/sdk-react";
-import { collections } from "../graft.config";
-
-export const graft = createGraft({ endpoint: "/api/content/v1", collections });
-export const { useContent, useContentList, useContentSearch } =
-  createGraftHooks(graft);
-```
-
-This is the one read that does not touch a database. It goes over the content
-API, for the places a loader cannot help: a search box, an editor preview, a
-widget on a page the server rendered an hour ago. Types still do not cross the
-wire — the app imports its own `collections` at compile time, exactly as a
-server adapter does, so `getContent("docs", slug)` returns the type your schema
-declared. See [Content API](/docs/content-api).
-
-## Cache tags
-
-`tagsFor(collection, slug?)` names what a read depends on.
-`tagsForChanges(branch, changeSet)` names what a compile invalidated.
-
-- **Next:** map tags onto `'use cache'` + `revalidateTag` / `updateTag`
-- **Everything else:** stamp CDN surrogate-key headers; purge from your compile
-  webhook. Next is the only adapter here with a tag-based data cache of its own
+`/api/content/v1/search`. See [Content API](/docs/content-api).

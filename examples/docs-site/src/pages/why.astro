@@ -1,7 +1,8 @@
 ---
 /**
- * Why Graft — product story as a full landing composition (not a blog post).
- * Pillars and beats live here; FAQ + meta come from the `why` document.
+ * Why Graft — the argument, not a second hero. Pillars, roles, and receipts
+ * live here; FAQ + meta come from the `why` document. Landing stage copy
+ * stays on `/`.
  */
 import { LandingFaq } from "../components/landing/faq";
 import Landing from "../layouts/Landing.astro";
@@ -34,27 +35,6 @@ const pillars = [
     n: "04",
     title: "You still own the gate",
     body: "Destructive ops file an approval. You decide with graft approve. Runtime credentials cannot self-approve.",
-  },
-] as const;
-
-const beats = [
-  {
-    n: "01",
-    kicker: "how building works",
-    head: "Agents already do most of the typing.",
-    lede: "Teams ship with agents more than they write every line by hand. A CMS that only works as a human-only admin leaves that work stuck: the agent cannot see the schema or finish the job without someone clicking panels.",
-  },
-  {
-    n: "02",
-    kicker: "the lock-out",
-    head: "Dashboards were built for mice.",
-    lede: "Opaque admin flows make agents second-class. Bolting MCP onto a dashboard rarely matches what a human can do in the panel. Graft refuses that shape: content is MDX in git, schema is TypeScript, ops are CLI and MCP.",
-  },
-  {
-    n: "03",
-    kicker: "the loop",
-    head: "Let them code. Still get content.",
-    lede: "Author MDX or call write_content. graft compile validates and updates the index. Typed reads render in whichever framework you brought. If git and Postgres disagree, recompile. Git wins.",
   },
 ] as const;
 
@@ -127,20 +107,8 @@ const receipts = [
       </ul>
     </section>
 
-    {
-      beats.map((b) => (
-        <section class="why-beat section">
-          <p class="section-label">
-            §{b.n} <em>{b.kicker}</em>
-          </p>
-          <h2>{b.head}</h2>
-          <p class="section-lede">{b.lede}</p>
-        </section>
-      ))
-    }
-
     <section class="why-roles section" aria-label="You and your agent">
-      <p class="section-label">§04 <em>roles</em></p>
+      <p class="section-label">§01 <em>roles</em></p>
       <h2>Same product. <span class="marked">Two operators.</span></h2>
       <div class="why-role-grid">
         {
@@ -159,7 +127,7 @@ const receipts = [
     </section>
 
     <section class="why-receipts section" aria-label="Receipts in the docs">
-      <p class="section-label">§05 <em>receipts</em></p>
+      <p class="section-label">§02 <em>receipts</em></p>
       <h2>Claims with docs attached.</h2>
       <p class="section-lede">Every capability links to the page that teaches it.</p>
       <ul class="why-receipt-grid">
@@ -179,7 +147,7 @@ const receipts = [
     {
       faqs.length > 0 && (
         <section class="section" id="faq" aria-labelledby="why-faq-heading">
-          <p class="section-label">§06 <em>faq</em></p>
+          <p class="section-label">§03 <em>faq</em></p>
           <h2 id="why-faq-heading">Common questions</h2>
           <LandingFaq items={faqs} />
         </section>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="24" viewBox="0 0 180 24" role="img" aria-label="Powered by Graft">
+  <title>Powered by Graft</title>
+  <rect x="0.5" y="0.5" width="179" height="23" rx="4" fill="none" stroke="#111111" stroke-width="1"/>
+  <text x="10" y="16" font-family="ui-serif, Georgia, 'Times New Roman', serif" font-size="13" fill="#111111">graft.</text>
+  <line x1="54.5" y1="6" x2="54.5" y2="18" stroke="#111111" stroke-width="1"/>
+  <text x="62" y="16" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" fill="#111111">Powered by Graft</text>
+</svg>
