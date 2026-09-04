@@ -10,7 +10,7 @@ order: 5
 <Tab>
 
 ```sh
-pnpm add @usegraft/sdk-sveltekit
+pnpm add @usegraft/sdk-sveltekit @usegraft/auth @usegraft/mcp
 ```
 
 </Tab>
@@ -18,7 +18,7 @@ pnpm add @usegraft/sdk-sveltekit
 <Tab>
 
 ```sh
-npm i @usegraft/sdk-sveltekit
+npm i @usegraft/sdk-sveltekit @usegraft/auth @usegraft/mcp
 ```
 
 </Tab>
@@ -26,7 +26,7 @@ npm i @usegraft/sdk-sveltekit
 <Tab>
 
 ```sh
-bun add @usegraft/sdk-sveltekit
+bun add @usegraft/sdk-sveltekit @usegraft/auth @usegraft/mcp
 ```
 
 </Tab>
@@ -92,10 +92,27 @@ export const GET = graftRoute(handler); // 405s with Allow and a fix
 
 ```ts
 // src/routes/api/mcp/+server.ts
+import { createActorResolver } from "@usegraft/auth";
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftRoute } from "@usegraft/sdk-sveltekit";
 import { collections, functions } from "../../../../graft.config";
 import { db } from "$lib/server/graft";
+
+const actor = createActorResolver({
+  issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
+    .split(/[,\s]+/)
+    .filter(Boolean)
+    .map((issuer) => ({ issuer })),
+  devTokens: process.env.GRAFT_DEV_TOKEN
+    ? {
+        [process.env.GRAFT_DEV_TOKEN]: {
+          kind: "human",
+          id: "owner",
+          scopes: ["content:write"],
+        },
+      }
+    : undefined,
+});
 
 export const POST = graftRoute(
   createGraftMcpHandler({
@@ -103,10 +120,18 @@ export const POST = graftRoute(
     db,
     collections,
     functions,
-    allowAnonymous: true,
+    actor,
   }),
 );
 ```
+
+This endpoint serves content writes and asset uploads. JWT verification runs
+only when `issuers` is passed; the library does not read
+`GRAFT_TRUSTED_ISSUERS` (`graft serve` does). See [Auth](/docs/auth).
+Unauthenticated callers get 401. `allowAnonymous: true` is only for a
+loopback local server — never on anything reachable from a network. A public
+docs surface is [`createDocsMcpHandler`](/docs/docs-mcp), which has no write
+tools and no anonymous opt-in.
 
 The parameter is typed structurally as `{ request: Request }`, so this package
 needs no `@sveltejs/kit` dependency.

@@ -26,7 +26,35 @@ GRAFT_TRUSTED_ISSUERS=https://your-idp.example
 ```
 
 `GRAFT_TRUSTED_ISSUERS` is a comma-separated list of issuer URLs. Discovery loads
-JWKS for each.
+JWKS for each. `graft serve` parses that env itself. An embedded
+`createActorResolver` does not — JWT verification is created only when you pass
+`issuers`. Omit them and a valid bearer is `TOKEN_INVALID` (401).
+
+## Resolver
+
+```ts
+import { createActorResolver } from "@usegraft/auth";
+
+export const actor = createActorResolver({
+  issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
+    .split(/[,\s]+/)
+    .filter(Boolean)
+    .map((issuer) => ({ issuer })),
+  devTokens: process.env.GRAFT_DEV_TOKEN
+    ? {
+        [process.env.GRAFT_DEV_TOKEN]: {
+          kind: "human",
+          id: "owner",
+          scopes: ["content:write"],
+        },
+      }
+    : undefined,
+});
+```
+
+Hand `actor` to `createGraftMcpHandler` and `createFunctionsHandler`. Each
+`{ issuer }` URL is trusted for OIDC discovery. A Better Auth instance your app
+hosts uses `betterAuthIssuer({ url })` instead of a bare issuer URL.
 
 ## Access rules
 
@@ -43,7 +71,8 @@ mutations that must accept strangers (contact forms).
 
 The Next example hosts Better Auth and mints a JWT for browser sessions. That
 path is an **example**, not a Graft core dependency. Any OIDC issuer that
-matches `GRAFT_TRUSTED_ISSUERS` works the same way.
+matches an `issuers` entry (or `GRAFT_TRUSTED_ISSUERS` on `graft serve`) works
+the same way.
 
 ## MCP identity
 

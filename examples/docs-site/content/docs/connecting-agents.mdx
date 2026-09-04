@@ -98,8 +98,10 @@ per-framework mount.
 ### Identity over HTTP
 
 The connection's bearer is verified by `@usegraft/auth` and forwarded into
-`run_function`. Configure trusted issuers with `GRAFT_TRUSTED_ISSUERS`, or use
-`GRAFT_DEV_TOKEN` for local bootstrapping. See [Auth](/docs/auth).
+`run_function`. `graft serve` reads `GRAFT_TRUSTED_ISSUERS` (and
+`GRAFT_DEV_TOKEN` for local bootstrapping). An embedded handler must pass
+`issuers` into `createActorResolver` — the library does not read that env.
+See [Auth](/docs/auth).
 
 Anonymous callers are the interesting case, and the bind address decides rather
 than an env var an operator has to remember:
