@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/sdk-react",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "React browser client: typed content reads and hooks over Graft's read-only content API.",
   "keywords": [
     "agent",
