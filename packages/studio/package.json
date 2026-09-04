@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/studio",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "Graft's optional editing UI. Headless-first: every operation also exists on MCP and the CLI.",
   "keywords": [
     "admin-ui",

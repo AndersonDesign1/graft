@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/contracts",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "Shared error codes and introspection schemas: the vocabulary every Graft package speaks.",
   "keywords": [
     "agent",

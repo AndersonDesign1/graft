@@ -55,6 +55,7 @@
     "release-channel-switch",
     "release-channels-and-discovery",
     "ruleset-drift-check",
+    "security-quality-alerts",
     "shaggy-jars-repeat",
     "sink-owns-containment",
     "sveltekit-joins-the-release",

@@ -1,5 +1,13 @@
 # @usegraft/sdk-react
 
+## 1.0.0-beta.2
+
+### Patch Changes
+
+- @usegraft/content-api@1.0.0-beta.2
+- @usegraft/contracts@1.0.0-beta.2
+- @usegraft/sdk-core@1.0.0-beta.2
+
 ## 1.0.0-beta.1
 
 ### Patch Changes
