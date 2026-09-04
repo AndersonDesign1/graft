@@ -185,10 +185,14 @@ jobs:
         if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.canary }}
         run: node scripts/assert-canary-published.mjs
 
+      # Action v2.x requires Changesets CLI v3. This repo is on CLI v2.31.1,
+      # so the pin stays on action v1.9.0. Dependabot's grouped bump in #29
+      # moved this to v2.1.1 and the next feat/core push failed:
+      # "use Changesets action v1 instead, which is compatible with CLI v2."
       - name: Create release PR or publish
         id: changesets
         if: ${{ github.event_name != 'workflow_dispatch' || !inputs.canary }}
-        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
+        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           version: pnpm version-packages
           publish: pnpm release

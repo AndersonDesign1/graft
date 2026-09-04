@@ -1,0 +1,136 @@
+---
+title: Next.js
+description: Typed reads in Server Components, React.cache, MdxBody, and withGraft.
+section: Build
+order: 3
+---
+
+<Tabs labels="pnpm, npm, bun">
+
+<Tab>
+
+```sh
+pnpm add @usegraft/sdk-next
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+npm i @usegraft/sdk-next
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+bun add @usegraft/sdk-next
+```
+
+</Tab>
+
+</Tabs>
+
+`createGraft` wraps the read client with `React.cache`, so repeated reads of
+the same document within one render are deduped. Server-only: the handle holds
+a database connection or an open index.
+
+## Create the handle
+
+`graft init` scaffolds the static index. Pass that artifact and nothing else
+has to be running:
+
+```ts
+// lib/graft.ts
+import { openStaticIndex } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-next";
+import { collections } from "@/graft.config";
+
+export const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});
+```
+
+On Postgres, swap `index` for `db`:
+
+```ts
+import { createDb } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-next";
+import { collections } from "@/graft.config";
+
+export const graft = createGraft({
+  db: createDb(process.env.DATABASE_URL!).db,
+  collections,
+});
+```
+
+## Read one document
+
+```ts
+// in a Server Component
+const page = await graft.getContent("pages", "home");
+```
+
+Return types come from your `defineCollection` schemas. A renamed field is a
+build error rather than a runtime `undefined`.
+
+## Render MDX
+
+```tsx
+import { MdxBody } from "@usegraft/sdk-next";
+import { mdxComponents } from "@/components/mdx-components";
+
+<MdxBody source={page.body} components={mdxComponents} />;
+```
+
+`MdxBody` is Next-only. It defaults to `trust: "restricted"`, which refuses
+`{…}` expressions, `import`, `export`, and spread attributes. Pass
+`trust="full"` only when every author has commit access, and set
+`export const mdxTrust = "full"` in `graft.config.ts` to match.
+
+## Mount functions and MCP
+
+```ts
+// app/api/fn/[name]/route.ts
+export const POST = functionsHandler;
+```
+
+MCP mounts the same way with `createGraftMcpHandler`. Next's App Router takes
+the handler directly — there is no `graftRoute` wrapper here.
+
+## Cache and invalidation
+
+```ts
+import { revalidateContent, updateContent } from "@usegraft/sdk-next";
+
+// in a route handler, after a compile webhook
+revalidateContent(branch, changes);
+
+// in a Server Action, for read-your-own-writes
+updateContent(branch, changes);
+```
+
+Both turn a compile's `ChangeSet` into the exact `revalidateTag` / `updateTag`
+calls that refresh the changed pages, and no others. A no-op unless your reads
+were cached with `'use cache'` and `cacheTag`, but always safe to call.
+
+## The caveat you cannot infer
+
+Wrap the Next config with `withGraft` so `@usegraft/registry` stays external
+to the server bundle. Forgetting it breaks `list_registry` / `describe_item`
+at runtime with no build-time error.
+
+```ts
+// next.config.ts
+import { withGraft } from "@usegraft/sdk-next/config";
+
+export default withGraft({
+  // your Next config
+});
+```
+
+See [SDK reference](/docs/sdk-reference) for mounts across adapters and the
+honest gaps.

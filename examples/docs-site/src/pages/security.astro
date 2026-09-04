@@ -252,13 +252,24 @@ const receipts = [
 
     <section class="section reveal" aria-label="Blast radius">
       <p class="section-label">§04 <em>blast radius</em></p>
-      <h2>The worst case <span class="marked">is a diff.</span></h2>
+      <h2>An agent edit <span class="marked">is a diff.</span></h2>
       <p class="section-lede">
         An agent edit is a file edit. It shows up in <code>git status</code>, in
         your editor, in the Studio's Changes drawer. Undo belongs to git — scoped
         to the content directory, nothing else.
       </p>
       <pre class="sec-diff" aria-hidden="true"><code><span class="sec-diff-meta">content/pages/home.mdx</span><span class="sec-diff-del">-  description: The old positioning line</span><span class="sec-diff-add">+  description: The new positioning line</span></code></pre>
+      <p class="sec-blast-caveat">
+        The honest limit: a stolen <strong>runtime</strong> credential is the
+        exception. Raw SQL under that role can rewrite or hide{" "}
+        <code>content_index</code> rows, and those writes never appear in git —
+        undo is a restore or a recompile, not <code>git checkout</code>.
+        Projection needs <code>INSERT</code>/<code>UPDATE</code> on that table.
+        The human gate on MCP <code>delete_content</code> is an application
+        control against a tool being misused — not a database lock. The
+        approval table is the exception, deliberately: the runtime role cannot
+        decide, even with raw SQL.
+      </p>
     </section>
 
     <section class="why-receipts section reveal" aria-label="Receipts in the docs">

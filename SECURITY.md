@@ -73,3 +73,21 @@ false, say which one — that is the most useful kind of report.
 ## Supported versions
 
 Pre-1.0: only the latest minor receives fixes.
+
+## Remaining GitHub Security alerts
+
+Most leftover Dependabot rows are transitive pins. This repository now
+overrides `browserslist` to 4.28.8, `path-to-regexp@6.1.0` to 6.3.0,
+`launch-editor` to 2.14.1, and the old `esbuild` pins to `0.28.2`.
+
+**Left for an operator to dismiss**
+
+- **zizmor `artipacked` on `.github/workflows/release.yml`**. The changesets
+  job must keep checkout credentials so it can push `changeset-release/<branch>`.
+  `persist-credentials: false` would break the release. The finding is ignored
+  in-file (`zizmor: ignore[artipacked]`) and must be dismissed on the Security
+  tab; this token cannot do that.
+- **vite 5.4.21** (vitest 3's runner), if Dependabot still flags it after the
+  override pass. 5.4.21 is the last 5.4 patch. Moving vitest across a major
+  to pick up Vite 6+ is a separate change. The alert is the test runner's
+  dev server, not `graft serve`.

@@ -28,7 +28,7 @@ what operational data, typed functions, and copy-on-write branches need.
 | --- | --- |
 | `GRAFT_DEV_TOKEN` | Static bearer for local / bootstrap actors |
 | `GRAFT_DEV_SCOPES` | Comma-separated scopes for the dev token |
-| `GRAFT_TRUSTED_ISSUERS` | Comma-separated OIDC issuer URLs (discovery) |
+| `GRAFT_TRUSTED_ISSUERS` | Comma-separated OIDC issuer URLs (discovery). `graft serve` parses these into `issuers`; an embedded resolver must be passed `issuers` itself |
 | `GRAFT_MCP_ALLOW_ANONYMOUS` | `1` to serve anonymous MCP callers (local dev only; refused by default) |
 | `approvalPolicy` (graft.config.ts, not an env var) | `human` gates every mutation, `unattended` gates nothing |
 

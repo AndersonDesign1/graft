@@ -26,15 +26,14 @@ updates:
       actions:
         patterns: ["*"]
 
-    # Four days, not the three-day default, because two clocks are involved.
-    # pnpm's minimumReleaseAge (4320 minutes) measures from the npm publish
-    # timestamp and Dependabot measures from registry availability. A lockfile
-    # naming a version younger than 4320 minutes fails `pnpm install
-    # --frozen-lockfile` in CI before a single test runs, because pnpm 11
-    # re-applies the policy on install (trustLockfile defaults to false).
-    # A day of slack keeps the two windows from disagreeing at the edge.
+    # Seven days, not the three-day default. Two clocks are involved: pnpm's
+    # minimumReleaseAge (4320 minutes) measures from the npm publish timestamp
+    # and Dependabot measures from registry availability. A lockfile naming a
+    # version younger than 4320 minutes fails `pnpm install --frozen-lockfile`
+    # in CI. Seven days is above zizmor's cooldown floor and leaves slack
+    # between the two windows.
     cooldown:
-      default-days: 4
+      default-days: 7
 
     commit-message:
       prefix: "chore"
@@ -43,3 +42,9 @@ updates:
 
     labels:
       - "dependencies"
+
+    ignore:
+      # Action v2 requires Changesets CLI v3. Stay on action v1 until the CLI
+      # major lands; grouped bumps otherwise pull this in with zizmor-action.
+      - dependency-name: "changesets/action"
+        update-types: ["version-update:semver-major"]

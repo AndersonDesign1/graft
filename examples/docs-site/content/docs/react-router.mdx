@@ -1,0 +1,182 @@
+---
+title: React Router
+description: Framework mode only. Export action and loader so GET answers 405.
+section: Build
+order: 7
+---
+
+<Tabs labels="pnpm, npm, bun">
+
+<Tab>
+
+```sh
+pnpm add @usegraft/sdk-react-router @usegraft/auth @usegraft/mcp
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+npm i @usegraft/sdk-react-router @usegraft/auth @usegraft/mcp
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+bun add @usegraft/sdk-react-router @usegraft/auth @usegraft/mcp
+```
+
+</Tab>
+
+</Tabs>
+
+For framework mode, which is where React Router runs loaders and actions on a
+server. Build the handle once in a `.server.ts` module.
+
+## Create the handle
+
+```ts
+// app/lib/graft.server.ts
+import { createDb } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-react-router";
+import { collections } from "../../graft.config";
+
+export const db = createDb(process.env.DATABASE_URL!).db;
+export const graft = createGraft({ db, collections });
+```
+
+Static index instead of Postgres:
+
+```ts
+import { openStaticIndex } from "@usegraft/db";
+
+export const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});
+```
+
+## Read one document
+
+```ts
+// app/routes/docs.$slug.tsx
+import { graft } from "../lib/graft.server";
+import type { Route } from "./+types/docs.$slug";
+
+export async function loader({ params }: Route.LoaderArgs) {
+  return { doc: await graft.getContent("docs", params.slug) };
+}
+```
+
+`loader` and `action` run on the server and React Router strips them from the
+browser bundle. The `.server.ts` name is belt and braces on top of that: it
+turns a stray client import into a build error rather than a database URL in
+a bundle.
+
+To read content in the browser — a search box, an editor preview — use
+[the React adapter](/docs/react).
+
+## Mount functions and MCP
+
+`graftRoute` binds a Graft handler to a resource route — a route module with
+no default export, whose loader and action return raw Responses.
+
+```ts
+// app/routes/api.fn.$name.ts
+import { createFunctionsHandler } from "@usegraft/core";
+import { graftRoute } from "@usegraft/sdk-react-router";
+import { functions } from "../../graft.config";
+import { db } from "../lib/graft.server"; // export the same db you passed to createGraft
+
+const handler = createFunctionsHandler({ db, functions });
+
+export const action = graftRoute(handler); // POST
+export const loader = graftRoute(handler); // GET, which 405s with Allow and a fix
+```
+
+```ts
+// app/routes/api.mcp.ts
+import { createActorResolver } from "@usegraft/auth";
+import { createGraftMcpHandler } from "@usegraft/mcp";
+import { graftRoute } from "@usegraft/sdk-react-router";
+import { collections, functions } from "../../graft.config";
+import { db } from "../lib/graft.server";
+
+const actor = createActorResolver({
+  issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
+    .split(/[,\s]+/)
+    .filter(Boolean)
+    .map((issuer) => ({ issuer })),
+  devTokens: process.env.GRAFT_DEV_TOKEN
+    ? {
+        [process.env.GRAFT_DEV_TOKEN]: {
+          kind: "human",
+          id: "owner",
+          scopes: ["content:write"],
+        },
+      }
+    : undefined,
+});
+
+export const action = graftRoute(
+  createGraftMcpHandler({
+    contentDir: "./content",
+    db,
+    collections,
+    functions,
+    actor,
+  }),
+);
+```
+
+This endpoint serves content writes and asset uploads. JWT verification runs
+only when `issuers` is passed; the library does not read
+`GRAFT_TRUSTED_ISSUERS` (`graft serve` does). See [Auth](/docs/auth).
+Unauthenticated callers get 401. `allowAnonymous: true` is only for a
+loopback local server — never on anything reachable from a network. A public
+docs surface is [`createDocsMcpHandler`](/docs/docs-mcp), which has no write
+tools and no anonymous opt-in.
+
+Register them the way you register any route:
+
+```ts
+// app/routes.ts
+import { route, type RouteConfig } from "@react-router/dev/routes";
+
+export default [
+  route("api/fn/:name", "routes/api.fn.$name.ts"),
+  route("api/mcp", "routes/api.mcp.ts"),
+] satisfies RouteConfig;
+```
+
+## Cache and invalidation
+
+React Router has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
+surrogate-key header from the route's `headers` export, and purge
+`tagsForChanges(branch, changeSet)` from your compile webhook.
+
+```ts
+import { tagsFor } from "@usegraft/sdk-react-router";
+import type { Route } from "./+types/docs.$slug";
+
+export function headers({ params }: Route.HeadersArgs) {
+  return { "Cache-Tag": tagsFor("main", "docs", params.slug).join(",") };
+}
+```
+
+`Cache-Tag` is the surrogate-key header. Purge the same strings
+`tagsForChanges` returns from your compile webhook.
+
+## The caveat you cannot infer
+
+React Router splits a route by method into two exports rather than naming the
+method, so one handler is mounted twice. Exporting `loader` is not ceremony:
+it is what makes a GET to a function endpoint answer with Graft's 405 and its
+`Allow` header, instead of React Router's own "no loader" error, which teaches
+the caller nothing.
+
+See [SDK reference](/docs/sdk-reference) for mounts across adapters and the
+honest gaps.

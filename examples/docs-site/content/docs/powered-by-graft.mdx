@@ -1,0 +1,50 @@
+---
+title: Powered by Graft
+description: A copy-paste badge for a README or footer. No package to install.
+section: Start here
+order: 4
+---
+
+Hosted SVGs and an `<a><img></a>`. That is the whole integration — the same
+shape Vercel and Bolt publish. There is no npm package.
+
+The phrase is **Powered by Graft**. Two marks ship so the ink matches the
+paper: dark-on-light, and light-on-dark.
+
+## HTML
+
+```html
+<a href="https://graft.page?utm_source=powered-by-graft">
+  <img
+    src="https://graft.page/badges/powered-by-graft.svg"
+    alt="Powered by Graft"
+    height="24"
+  />
+</a>
+```
+
+On a dark background, swap the `src` for
+`https://graft.page/badges/powered-by-graft-light.svg`.
+
+## Markdown
+
+```md
+[![Powered by Graft](https://graft.page/badges/powered-by-graft.svg)](https://graft.page?utm_source=powered-by-graft)
+```
+
+## React
+
+Import nothing. Paste the same markup:
+
+```jsx
+<a href="https://graft.page?utm_source=powered-by-graft">
+  <img
+    src="https://graft.page/badges/powered-by-graft.svg"
+    alt="Powered by Graft"
+    height={24}
+  />
+</a>
+```
+
+This site uses the same files in the landing footer and the docs chrome. `graft
+init` does not drop the snippet into a new project yet.

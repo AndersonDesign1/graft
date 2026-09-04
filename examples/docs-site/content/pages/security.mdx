@@ -19,16 +19,14 @@ faqs:
       approvals only through a SECURITY DEFINER function; flipping pending to
       approved is an operator-role UPDATE stamped server-side with decided_role.
       Even raw SQL with the runtime credential cannot self-approve.
-  - question: Does Graft phone home?
-    answer: >-
-      No telemetry. Content lives in your repository, operational data in your
-      Postgres, assets in your bucket. There is no Graft cloud in the path.
   - question: What happens when a token leaks?
     answer: >-
       Tokens are verified against your OIDC issuer, carry only the scopes you
       granted, and expire on the issuer's schedule. Everything the token did is
-      in the audit log keyed by actor and correlation id, so the blast radius is
-      knowable — and revocation happens at your issuer, not ours.
+      in the audit log. Revocation is at your issuer. A stolen runtime
+      credential can still rewrite or hide content_index rows — the approval
+      gate is the exception, not a general database lock.
+
 ---
 
 Body rendered by the Security page layout; fields above drive the story.

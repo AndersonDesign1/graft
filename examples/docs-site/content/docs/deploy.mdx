@@ -72,9 +72,11 @@ database is yours.
 | `graft compile`, `migrate --apply`, `merge`, `approve` | operator |
 | Functions, MCP (incl. content writes), reads, approval request/consume | runtime |
 
-Hardened deployments are functions-and-reads first: the runtime role cannot
-project content, so remote MCP writes need the operator path (CI or a writable
-self-host mount).
+The runtime role **can** project content — `graft harden` grants
+`INSERT`/`UPDATE` on `content_index` because compile needs it. What it cannot
+do is decide approvals. A stolen runtime credential can rewrite or hide index
+rows; the human gate on MCP `delete_content` is an application control, not a
+database lock. Keep the operator URL for compile, migrate, merge, and approve.
 
 ## Next steps
 

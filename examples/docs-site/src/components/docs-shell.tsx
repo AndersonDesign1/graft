@@ -11,6 +11,7 @@ import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/page";
 import { RootProvider } from "fumadocs-ui/provider/astro";
 import type { ReactNode } from "react";
+import { PoweredByGraft } from "./powered-by-graft";
 import SearchDialog from "./search";
 
 export function DocsShell({
@@ -80,6 +81,9 @@ export function DocsShell({
           <DocsTitle>{title}</DocsTitle>
           {description ? <DocsDescription>{description}</DocsDescription> : null}
           <DocsBody>{children}</DocsBody>
+          <div className="powered-by-graft-docs">
+            <PoweredByGraft />
+          </div>
         </DocsPage>
       </DocsLayout>
     </RootProvider>
