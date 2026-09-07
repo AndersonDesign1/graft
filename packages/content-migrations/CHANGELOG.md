@@ -1,5 +1,12 @@
 # @usegraft/content-migrations
 
+## 1.0.0-beta.2
+
+### Patch Changes
+
+- @usegraft/contracts@1.0.0-beta.2
+- @usegraft/core@1.0.0-beta.2
+
 ## 1.0.0-beta.1
 
 ### Patch Changes

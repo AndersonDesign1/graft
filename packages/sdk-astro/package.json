@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/sdk-astro",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "Astro adapter: typed content reads and endpoint mounts over Graft's stateless handlers.",
   "keywords": [
     "agent",

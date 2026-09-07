@@ -1,5 +1,14 @@
 # @usegraft/compiler
 
+## 1.0.0-beta.2
+
+### Patch Changes
+
+- @usegraft/contracts@1.0.0-beta.2
+- @usegraft/core@1.0.0-beta.2
+- @usegraft/db@1.0.0-beta.2
+- @usegraft/mdx-safety@1.0.0-beta.2
+
 ## 1.0.0-beta.1
 
 ### Patch Changes
