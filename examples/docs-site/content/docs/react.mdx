@@ -1,16 +1,34 @@
 ---
 title: React
 description: Browser reads over HTTP. No db. Hooks stay a typed binding.
-section: Build
-order: 8
+section: Frameworks & Adapters
+order: 1
 ---
 
-<Tabs labels="pnpm, npm, bun">
+The `@usegraft/sdk-react` package provides React hooks for reading content
+in the browser over HTTP.
+
+Use this package when building client-side Single Page Apps (Vite, Create React App)
+or client components that need dynamic data (such as live search bars, inline previews,
+or interactive filters).
+
+<Callout label="Server vs Browser" type="note">
+  If you are using Next.js, Astro, SvelteKit, TanStack Start, or React Router with
+  Server Components or loaders, use the corresponding server SDK instead.
+  The server SDKs query your database or static SQLite index directly without an
+  extra HTTP network roundtrip.
+</Callout>
+
+---
+
+## Installation
+
+<Tabs labels="npm, pnpm, bun">
 
 <Tab>
 
 ```sh
-pnpm add @usegraft/sdk-react
+npm i @usegraft/sdk-react
 ```
 
 </Tab>
@@ -18,7 +36,7 @@ pnpm add @usegraft/sdk-react
 <Tab>
 
 ```sh
-npm i @usegraft/sdk-react
+pnpm add @usegraft/sdk-react
 ```
 
 </Tab>
@@ -33,87 +51,173 @@ bun add @usegraft/sdk-react
 
 </Tabs>
 
-Every other Graft SDK reads on a server. This one reads in the browser, for
-the places a loader cannot help: a search box, a client-side editor preview,
-a widget on a page the server rendered an hour ago.
+`react` (v18 or v19) is a peer dependency.
 
-`react` is a peer dependency, 18 or 19.
+---
 
-## Create the handle
+## 1. Create your client and hooks
+
+Initialize the client and generate typed hooks in `src/graft.ts`:
 
 ```ts
 // src/graft.ts
 import { createGraft, createGraftHooks } from "@usegraft/sdk-react";
 import { collections } from "../graft.config";
 
+// Point at your Graft Content API endpoint (e.g. running via `graft serve`)
 export const graft = createGraft({
   endpoint: "https://cms.example.com/api/content/v1",
   collections,
 });
 
-export const { GraftProvider, useGraft, useContent, useContentList, useContentSearch } =
-  createGraftHooks(graft);
+export const {
+  GraftProvider,
+  useGraft,
+  useContent,
+  useContentList,
+  useContentSearch,
+} = createGraftHooks(graft);
 ```
 
-Types do not cross the wire. Your app imports its own `collections` at compile
-time, exactly as a server adapter does. The endpoint supplies data at runtime.
+Because your frontend imports your own `graft.config.ts`, all hooks are
+fully typed without generating code or downloading remote schemas.
 
-The hooks come out of a factory rather than being importable directly, and that
-is what keeps the reads typed.
+---
 
-## Read one document
+## 2. Wrap your application
+
+Wrap your component tree in `<GraftProvider>`:
 
 ```tsx
-import { useContent } from "../graft";
+// src/App.tsx
+import { GraftProvider, graft } from "./graft";
+import { BlogPost } from "./BlogPost";
 
-function Doc({ slug }: { slug: string }) {
-  const { data, error, loading } = useContent("docs", slug);
-
-  if (loading) return <Spinner />;
-  if (error) return <Problem error={error} />;
-  if (!data) return <NotFound />;
-  return <article>{data.data.title}</article>;
+export default function App() {
+  return (
+    <GraftProvider client={graft}>
+      <BlogPost slug="hello-world" />
+    </GraftProvider>
+  );
 }
 ```
 
-Each hook reports `{ data, error, loading, refresh }`. Changing the slug
-clears `data` rather than showing the previous document while the next one
-loads.
+---
 
-`endpoint` points at a mount of Graft's read-only content API — what
-`graft serve` exposes at `/api/content/v1`, or your own mount of
-`createContentApiHandler`. See [Content API](/docs/content-api).
+## 3. Read a single document
 
-## Mount functions and MCP
+Use `useContent` to fetch a document by collection and slug:
 
-There is no `graftRoute`. Mounting a request handler is a server's job. Use
-the adapter for the framework that serves the page.
+```tsx
+// src/BlogPost.tsx
+import { useContent } from "./graft";
 
-## Cache and invalidation
+export function BlogPost({ slug }: { slug: string }) {
+  const { data: post, loading, error, refresh } = useContent("posts", slug);
 
-There is none, by construction. No deduplication, no retry, no
-stale-while-revalidate. `graft.getContent` is a plain async function, so
-compose it with TanStack Query or SWR if you want those.
+  if (loading) {
+    return <div className="spinner">Loading post...</div>;
+  }
 
-```ts
-useQuery({
-  queryKey: ["docs", slug],
-  queryFn: () => graft.getContent("docs", slug),
-});
+  if (error) {
+    return (
+      <div className="error-box">
+        <p>Failed to load: {error.message}</p>
+        <button onClick={() => refresh()}>Retry</button>
+      </div>
+    );
+  }
+
+  if (!post) {
+    return <p>Post not found.</p>;
+  }
+
+  return (
+    <article>
+      <h1>{post.data.title}</h1>
+      {post.data.publishedAt && (
+        <time>{new Date(post.data.publishedAt).toLocaleDateString()}</time>
+      )}
+      <div className="body-content">{post.body}</div>
+    </article>
+  );
+}
 ```
 
-## The caveat you cannot infer
+---
 
-There is no `db` option. A database handle in a browser bundle is a database
-URL in a browser bundle.
+## 4. Full-text search in the browser
 
-There is also no `branch` option. An endpoint is pinned to one branch on the
-server. Passing `branch` throws `CONFIG_INVALID`. Point at the preview
-deployment's own endpoint instead.
+Use `useContentSearch` to build responsive search inputs:
 
-`useEffect` does not run during server rendering, so on the server these hooks
-report their loading state and nothing else. Content that has to be in the
-HTML belongs in a loader or a [server adapter](/docs/reading-content).
+```tsx
+// src/SearchBar.tsx
+import { useState } from "react";
+import { useContentSearch } from "./graft";
 
-See [SDK reference](/docs/sdk-reference) for the shared surface and the honest
-gaps.
+export function SearchBar() {
+  const [query, setQuery] = useState("");
+  const { data: hits, loading } = useContentSearch("docs", query, { limit: 10 });
+
+  return (
+    <div>
+      <input
+        type="search"
+        placeholder="Search documentation..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+
+      {loading && <p>Searching...</p>}
+
+      <ul>
+        {hits?.map((hit) => (
+          <li key={hit.slug}>
+            <a href={`/docs/${hit.slug}`}>
+              <strong>{hit.data.title}</strong>
+              <p dangerouslySetInnerHTML={{ __html: hit.snippet }} />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+---
+
+## 5. Integrating with TanStack Query or SWR
+
+Graft hooks provide simple state management (`data`, `error`, `loading`).
+For advanced caching features like automatic deduplication, retry exponential backoff,
+or stale-while-revalidate, use `graft.getContent` with TanStack Query or SWR:
+
+```tsx
+import { useQuery } from "@tanstack/react-query";
+import { graft } from "./graft";
+
+export function usePostQuery(slug: string) {
+  return useQuery({
+    queryKey: ["posts", slug],
+    queryFn: () => graft.getContent("posts", slug),
+  });
+}
+```
+
+---
+
+## Architecture & Security Notes
+
+- **No Direct Database Access:** `@usegraft/sdk-react` communicates strictly over
+  HTTP. It does not accept a `db` connection or database credentials, ensuring your
+  database connection strings never leak into client-side bundles.
+- **Branch Pinning:** A remote Content API endpoint is pinned to a specific branch on the
+  server. To preview branch content, point your client at the preview deployment's
+  URL.
+
+## Next steps
+
+- [Content API](/docs/content-api) — How to serve the HTTP endpoint with `graft serve` or custom mounts.
+- [Schema](/docs/schema) — Define your collections and field validations.
+- [SDK reference](/docs/sdk-reference) — Complete API reference across all client and server SDKs.

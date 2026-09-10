@@ -1,48 +1,67 @@
 ---
 title: Reading content
 description: Typed reads with sdk-core and the six framework adapters that wrap it.
-section: Build
-order: 2
+section: Core Concepts
+order: 1
 ---
 
-All reads go through `@usegraft/sdk-core`: `getDocument`, `listDocuments`, and
-`searchDocuments`. Each call re-validates against your Zod schema. Soft-deleted
-index rows are excluded. Framework packages wrap that surface; pick the page
-for the app you are in.
+Graft provides typed read adapters for six major frontend frameworks, built on
+a shared, high-performance query engine.
+
+Every framework adapter exposes three core methods:
+- `getContent(collection, slug)` — Read and validate a single document.
+- `listContent(collection, options)` — List documents in a collection.
+- `searchContent(collection, query)` — Full-text search with ranked hits and match snippets.
+
+Reads are automatically typed by your `graft.config.ts` without codegen, and
+invalid or soft-deleted rows are excluded.
 
 <DocCards>
   <DocCard title="Next.js" href="/docs/next">
-    `@usegraft/sdk-next` — React.cache, MdxBody, withGraft.
+    `@usegraft/sdk-next` — React Server Components, React.cache, MdxBody, withGraft.
   </DocCard>
   <DocCard title="Astro" href="/docs/astro">
-    `@usegraft/sdk-astro` — frontmatter, graftRoute, no request memo.
+    `@usegraft/sdk-astro` — Zero client JS, frontmatter reads, graftRoute mounts.
   </DocCard>
   <DocCard title="SvelteKit" href="/docs/sveltekit">
-    `@usegraft/sdk-sveltekit` — +page.server.ts, graftRoute.
+    `@usegraft/sdk-sveltekit` — Server loads (+page.server.ts) and endpoints.
   </DocCard>
   <DocCard title="TanStack Start" href="/docs/tanstack-start">
-    `@usegraft/sdk-tanstack-start` — keep the handle out of isomorphic loaders.
+    `@usegraft/sdk-tanstack-start` — Server functions and type-safe routes.
   </DocCard>
   <DocCard title="React Router" href="/docs/react-router">
-    `@usegraft/sdk-react-router` — framework mode; action plus loader.
+    `@usegraft/sdk-react-router` — Route loaders, actions, and framework mode.
   </DocCard>
   <DocCard title="React (browser)" href="/docs/react">
-    `@usegraft/sdk-react` — HTTP only. No db. createGraftHooks.
+    `@usegraft/sdk-react` — Browser hooks for SPAs and live search bars over HTTP.
   </DocCard>
 </DocCards>
 
-Mounts, cache tags, and the honest gaps live on
-[SDK reference](/docs/sdk-reference). This page is the index.
+## Shared query API
 
-## Shared API
+All server adapters share an identical, intuitive query surface:
 
 ```ts
-const graft = createGraft({ db, collections, branch: "main" });
+// Initialize client with either SQLite static index or Postgres db
+const graft = createGraft({ index, collections });
 
-await graft.getContent("pages", "home");       // Document | null
-await graft.listContent("docs");               // Document[]
-await graft.searchContent("docs", "branching"); // ranked hits + snippets
+// 1. Read a single document
+const home = await graft.getContent("pages", "home"); // Document | null
+
+// 2. List documents
+const docs = await graft.listContent("docs"); // Document[]
+
+// 3. Full-text search
+const hits = await graft.searchContent("docs", "branching"); // SearchHit[]
 ```
+
+<Callout label="Low-level SDK Core" type="note">
+  Framework adapters wrap `@usegraft/sdk-core` with framework-native caching
+  (`React.cache` in Next.js, loaders in SvelteKit/TanStack). If you are building
+  custom tooling without a frontend framework, `@usegraft/sdk-core` provides the
+  underlying `client.getDocument()`, `client.listDocuments()`, and
+  `client.searchDocuments()` methods directly.
+</Callout>
 
 Pass `branch` to resolve overlay or Neon preview branches. See
 [Branching & previews](/docs/branching-previews). Pass `index` instead of `db`

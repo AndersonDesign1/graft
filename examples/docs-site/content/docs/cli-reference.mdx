@@ -1,8 +1,8 @@
 ---
 title: CLI reference
 description: Every graft command with flags that matter.
-section: Reference
-order: 1
+section: API Reference
+order: 0
 ---
 
 ## Project loop
@@ -58,8 +58,12 @@ Save, `list_compilations`, `list_branches`, `list_approvals` +
 | `--port` / `--host` | serve, studio | Bind address (default loopback) |
 | `--studio` | serve | Mount opt-in Studio (or set `GRAFT_STUDIO=1`) |
 
-## Env discovery
+## Environment discovery
 
-Commands walk up from cwd for `.env`. `DATABASE_URL` is required for compile,
-dev, migrate, branch, merge, mcp (when projecting), serve, studio, content, and
-compilations.
+Commands walk up from the working directory to locate `.env`.
+
+- **Static Engine (Default):** `DATABASE_URL` is **not required** for `graft compile`,
+  `graft dev`, or `graft mcp`. The index is compiled directly to `.graft/index.db`.
+- **Postgres Engine:** `DATABASE_URL` is required when `graft.config.ts` sets
+  `index = "postgres"`, or when running database operations: `graft db migrate`,
+  `graft branch`, `graft merge`, and `graft serve`.

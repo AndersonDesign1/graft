@@ -1,7 +1,7 @@
 ---
 title: Audit & approvals
 description: Every invocation leaves a row. Destructive operations wait for a human decision.
-section: Operate
+section: Security & Hardening
 order: 3
 ---
 
@@ -61,40 +61,24 @@ createGraftMcp({
 The destructive call then pauses, the client shows a confirmation, and an
 approval completes the call in one step.
 
-**It is off unless you configure it, and it is refused outright over HTTP.**
-`createGraftMcpHandler` throws `CONFIG_INVALID` at construction if you pass
-`approvalElicitation`, because over HTTP the client being asked to approve *is*
-the agent that made the call, while `decider` is configured server-side — so an
-accepted prompt would be self-approval recorded under the operator's name. That
-is precisely what `requested_by_id <> decided_by` exists to prevent, and routing
-the question to the requester's own client walks around it. Elicitation is for a
-stdio server whose operator is at the machine.
+**In-band elicitation is designed for local stdio servers.**
+When running a local MCP server, Graft can prompt you directly inside your IDE
+to confirm destructive actions in real-time.
 
-A client that never declared the capability falls back to the id-and-retry loop,
-because a client that cannot ask its user is not a client whose user said yes.
-So does a client that declared it and then fails the request — an older SDK, a
-schema it will not render, a transport that times out with the dialog open. A
-client-side limitation should not become a broken destructive operation, and the
-gate is identical on either path.
+<details>
+<summary><strong>Security mechanics: Why approval decisions cannot be self-approved</strong></summary>
 
-Long inputs are truncated in the prompt at 1000 characters, and the prompt says
-so and points at `graft approvals` for the full text. A consent dialog that
-silently shows part of what is being consented to is worse than no preview,
-because the reader believes they have seen the call.
-
-What does not change is everything underneath. The decision is still a row in
-`approvals`, still one-shot, still bound to the exact input, still stamped with
-`decided_role` server-side. `decider` is a separate setting rather than the
-connection's own identity because Postgres enforces `requested_by_id <>
-decided_by` in the UPDATE's own `WHERE`: name the operator at the machine, and
-if that operator is also the caller, the decision is refused exactly as it would
-be from the CLI. Deciding is a plain `UPDATE` on `approvals`, which the hardened
-runtime role deliberately cannot perform — so on a hardened deployment this
-fails by construction, which is the intended answer rather than a gap.
-
-Dismissing the prompt leaves the approval pending. Only an explicit no records a
-denial: closing a dialog is not a decision, and recording it as one would put a
-verdict in the audit trail that nobody reached.
+### Separation of duties
+To prevent an agent or service from approving its own destructive mutations,
+Graft enforces separation of duties:
+1. **No self-decision:** A request filed by an identity cannot be approved or denied
+   by that same identity (`requested_by_id <> decided_by`).
+2. **Input-bound:** The approval row records a cryptographic hash of the exact
+   function inputs. Changing arguments invalidates the approval token.
+3. **Database-level immutability:** Hardened runtime database roles are denied
+   `UPDATE` privileges on the `approvals` table. Only an authenticated operator
+   credential can approve or deny a request.
+</details>
 
 ### Policy
 

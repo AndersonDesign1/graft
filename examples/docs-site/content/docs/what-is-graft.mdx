@@ -1,85 +1,80 @@
 ---
 title: What is Graft
 description: The open-source, self-hostable CMS for agents and the people who run them.
-section: Start here
+section: Get Started
 order: 0
 ---
 
-Content is MDX in git. A Zod schema validates it. A derived index makes it
-queryable. You and your agent work through the CLI and MCP, with no dashboard
-required.
+Graft is an open-source, self-hostable content management system designed for
+modern developers and AI agents.
 
-<Callout label="Graft is in beta, and under active development">
-  These docs describe `1.0.0-beta.x`, which is what a plain install gives you.
+Instead of locking content inside a remote database or cloud dashboard, Graft
+treats content as code: your articles and pages live as version-controlled MDX
+files in Git. A single TypeScript schema validates your data and provides
+complete end-to-end type safety for your frontend.
 
-  The shape is settled — content in git, a derived index, one Zod schema, CLI
-  and MCP — and the details still move. Breaking changes land between betas when
-  a review or a report argues for one, and several already have: the MDX safety
-  gate, per-route scopes, and `approvalPolicy` moving out of an environment
-  variable into `graft.config.ts` all came from someone reading the code and
-  saying it was wrong. Every one is written up in the changelog.
-
-  So: usable, worth building against, and still changing on purpose. If that is
-  a poor fit, wait for 1.0. If you would rather have a say in what 1.0 becomes,
-  now is when saying so still changes it.
+<Callout label="Beta Notice" type="note">
+  These docs describe `1.0.0-beta.x`. The core architecture—content in Git,
+  derived indexing, unified Zod schemas, and native MCP support—is settled.
+  Minor improvements and fixes land between betas and are tracked in the
+  changelog.
 </Callout>
 
-## You'll need
+## The 30-second mental model
 
-1. Node.js 22.16 or newer. The index's full-text search uses the `node:sqlite`
-   build that ships from 22.16.0.
+```text
+┌────────────────────────┐      ┌────────────────────────┐      ┌────────────────────────┐
+│   MDX Files in Git     │ ───► │     graft compile      │ ───► │  Typed Reads in App    │
+│  content/pages/*.mdx   │      │  Validates & Projects  │      │  Next.js, Astro, React │
+└────────────────────────┘      └────────────────────────┘      └────────────────────────┘
+            ▲                                                                │
+            │                                                                │
+            └────────── AI Agents (MCP) & Developers (CLI / Git) ────────────┘
+```
 
-That is the whole list. `graft compile` writes the index to a SQLite artifact
-your app reads embedded, so a content project runs with no database and no
-object store.
+- **Author files in Git:** Write Markdown or MDX in your project's `content/`
+  directory. Commit, branch, and review diffs using your standard Git workflow.
+- **Compile a derived index:** `graft compile` validates your frontmatter
+  against your schema and builds an instant, queryable index with full-text
+  search.
+- **Read typed data:** Framework SDKs (Next.js, Astro, SvelteKit, TanStack Start,
+  React Router) provide fast, typed queries directly to your components.
+- **Collaborate via MCP:** AI agents connect via Model Context Protocol (MCP) to
+  draft content, search documents, and inspect schemas with built-in safety
+  boundaries.
 
-Two things need more. Postgres backs operational data, typed functions, and
-copy-on-write branches. An S3-compatible store holds assets. Reach for either
-and Graft says so: a Postgres-tier feature in static mode fails with
-`NEEDS_DATABASE`, whose `fix` is the upgrade. See
-[Getting started](/docs/getting-started#move-to-postgres) and
-[Configuration](/docs/configuration).
+## Popular places to get started
 
-## Quickstart
-
-Pick a path:
+Jump straight into a framework guide, security boundaries, or agent workflows:
 
 <DocCards>
-  <DocCard title="Getting started" href="/docs/getting-started">
-    Init a project, compile MDX, read it typed.
+  <DocCard title="Next.js" href="/docs/next" icon="next">
+    Server components, App Router, incremental static regeneration, and typed queries.
   </DocCard>
-  <DocCard title="Reading content" href="/docs/reading-content">
-    One page per adapter — Next through the browser.
+  <DocCard title="React" href="/docs/react" icon="react">
+    Client or server React apps with Vite, TanStack Query, and embedded SQLite index.
   </DocCard>
-  <DocCard title="Self-host" href="/docs/deploy">
-    One container, split compose, or embed handlers.
+  <DocCard title="Astro" href="/docs/astro" icon="astro">
+    Zero-JS content collections, content-driven layouts, and static edge builds.
   </DocCard>
-  <DocCard title="Agents" href="/docs/agent-surface">
-    MCP tools, self-teaching errors, cold-agent gate.
+  <DocCard title="SvelteKit" href="/docs/sveltekit" icon="svelte">
+    Typed load functions, server routes, and fast reactive UI.
+  </DocCard>
+  <DocCard title="Security & Hardening" href="/docs/hardening" icon="security">
+    Sandboxed MDX execution, read-only boundaries, and role-based permissions.
+  </DocCard>
+  <DocCard title="Agents & MCP" href="/docs/connecting-agents" icon="agent">
+    Connect Cursor, Claude Code, and autonomous agents through the Model Context Protocol.
   </DocCard>
 </DocCards>
 
-## Explore
+## Choosing your storage engine
 
-<DocCards>
-  <DocCard title="The model" href="/docs/the-model">
-    Git owns content. The index is derived.
-  </DocCard>
-  <DocCard title="Branching" href="/docs/branching-previews">
-    Copy-on-write overlays or Neon forks.
-  </DocCard>
-  <DocCard title="Owned primitives" href="/docs/owned-primitives">
-    graft add copies source into your repo.
-  </DocCard>
-  <DocCard title="Error reference" href="/docs/errors">
-    Every code, what it means, how to recover.
-  </DocCard>
-</DocCards>
+Graft runs on two interchangeable storage engines with an identical authoring and reading API:
 
-## Load-bearing ideas
+| Storage Engine | When to use | Infrastructure needed |
+| :--- | :--- | :--- |
+| **Static Engine** *(default)* | Blogs, documentation, marketing sites, portfolios | **None.** Runs off an embedded local SQLite file created at build time. |
+| **Postgres Engine** | Sites with form submissions, comments, user orders, or preview branches | **Postgres.** Holds live operational data alongside the content index. |
 
-1. **Git owns authored content.** The index is derived. Recompile if they disagree.
-2. **One Zod layer** types compile, reads, functions, and MCP.
-3. **MCP and the CLI** are first-class. Errors carry a `fix`.
-4. **Preview branches** are copy-on-write.
-5. **Owned primitives** land as source via `graft add`.
+Every project starts on the Static Engine by default. You can switch to the Postgres Engine with a single line in `graft.config.ts` whenever you need dynamic runtime data.

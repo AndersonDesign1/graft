@@ -1,8 +1,8 @@
 ---
 title: MCP tools
 description: All eighteen tools, what each one needs, and the annotations and output schemas a client can rely on.
-section: Reference
-order: 7
+section: Agents & MCP
+order: 3
 ---
 
 The project MCP server exposes eighteen tools. This page is the full list. For
@@ -139,7 +139,7 @@ different identities.
 `list_packages` answers the question that comes before a project exists: an
 agent that knows the user is on SvelteKit can name `@usegraft/sdk-sveltekit`
 rather than guess. Filter by `framework` and you get that adapter plus the
-packages every project needs, never a competing adapter. Filter by `tier` and a
+packages every project needs, never a competing adapter. Filter by storage engine (`tier`) and a
 static project is never told to install something that cannot work without
 Postgres.
 
@@ -210,10 +210,10 @@ pass every scope check silently. That now fails closed with `CONFIG_INVALID`.
 
 ## Static projects
 
-Postgres-tier tools stay registered on a static project and answer
+Postgres-engine tools stay registered on a static project and answer
 `NEEDS_DATABASE` with the upgrade rather than vanishing. `delete_content` and
 `list_compilations` refuse for reasons covered in
-[Static or Postgres](/docs/tiers#agents-work-on-both-tiers).
+[Storage Engines](/docs/tiers#agents-work-on-both-engines).
 
 ## Next steps
 

@@ -1,11 +1,11 @@
 ---
-title: Static or Postgres
-description: The one decision a new project makes, and what changes when you switch.
-section: Start here
+title: Storage Engines
+description: "Static SQLite or live Postgres: the architectural choice and how to switch."
+section: Get Started
 order: 3
 ---
 
-Graft runs on two tiers. Picking one is the first real decision in a project,
+Graft runs on two storage engines. Picking one is the first real decision in a project,
 and it is one line of config.
 
 ```ts
@@ -13,14 +13,14 @@ and it is one line of config.
 export const index = "static"; // or "postgres" (the default when omitted)
 ```
 
-The tier decides where the **index** lives. It does not change how you author,
+The storage engine decides where the **index** lives. It does not change how you author,
 how you read, or what your schema looks like.
 
 ## The split
 
-Postgres does two jobs for Graft. The tiers split them apart.
+Postgres does two jobs for Graft. The engines split them apart.
 
-| Job | What it holds | Static tier | Postgres tier |
+| Job | What it holds | Static Engine | Postgres Engine |
 | --- | --- | --- | --- |
 | Content index | Projected documents, full-text search, compile trail | A SQLite file | `content_index` |
 | Operational data | `data_records`, `audit_log`, `approvals`, branches | Not available | Postgres |
@@ -76,14 +76,14 @@ about it:
 - Each compile is a full rebuild into a temporary file, then a rename. There is
   no partial state to recover from.
 - Readers open it read-only, so a read-only deployment filesystem is fine.
-- It uses `node:sqlite`, which ships with Node. The static tier adds no npm
+- It uses `node:sqlite`, which ships with Node. The static engine adds no npm
   dependency and no native build step.
 - The artifact **is** the branch. A `branch` argument is accepted and ignored,
   because each checkout compiles its own file.
 
 Reads open it directly:
 
-<CodeBlock title="app/page.ts" note="static tier">
+<CodeBlock title="app/page.ts" note="static engine">
 
 ```ts
 import { openStaticIndex } from "@usegraft/db";
@@ -100,13 +100,13 @@ Two errors belong to this path. `STATIC_INDEX_NOT_FOUND` means you read before
 the first compile. `STATIC_INDEX_UNSUPPORTED` means the Node version has no
 `node:sqlite`.
 
-## Agents work on both tiers
+## Agents work on both engines
 
 The agent surface is not a Postgres feature. `graft mcp` serves a static
 project, `write_content` validates and recompiles the same way, and
 `search_content` reads the artifact.
 
-Postgres-tier tools stay registered rather than disappearing. Calling one
+Postgres-engine tools stay registered rather than disappearing. Calling one
 answers `NEEDS_DATABASE` with the upgrade, because an absent tool teaches
 nothing. Two of those refusals are deliberate:
 
@@ -186,15 +186,13 @@ them anywhere. They stay in the database.
 
 ## One database per project
 
-Two projects sharing a `DATABASE_URL` would each purge the other's documents on
-compile. Graft refuses: a compile that would remove collections your schema does
-not know aborts with `INDEX_OWNERSHIP` and writes nothing.
+Each Graft project requires its own database (or dedicated preview branch) when running on the Postgres engine. Because projection aligns the index with your schema, sharing a single `DATABASE_URL` across different projects will abort with `INDEX_OWNERSHIP` to prevent accidental purging. See [The model](/docs/the-model#one-database-per-project) for details.
 
-The static tier cannot have this problem. The artifact lives in the project.
+The static engine never encounters this issue because the `.graft/index.db` artifact lives inside the project itself.
 
 ## Next steps
 
 - [Getting started](/docs/getting-started) — the static loop end to end
 - [The model](/docs/the-model) — why the index is derived
 - [Configuration](/docs/configuration) — every environment variable
-- [Deploy](/docs/deploy) — self-host either tier
+- [Deploy](/docs/deploy) — self-host either engine

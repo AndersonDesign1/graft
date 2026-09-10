@@ -1,16 +1,31 @@
 ---
 title: Next.js
 description: Typed reads in Server Components, React.cache, MdxBody, and withGraft.
-section: Build
-order: 3
+section: Frameworks & Adapters
+order: 0
 ---
 
-<Tabs labels="pnpm, npm, bun">
+The `@usegraft/sdk-next` package provides first-class support for Next.js App
+Router and React Server Components.
+
+It features:
+- **Zero-waterfall reads:** Automatic request deduplication via `React.cache`.
+- **Complete type inference:** Return types are inferred directly from your `graft.config.ts`.
+- **Secure Server-side MDX:** The `<MdxBody />` component evaluates authored MDX in Server Components without exposing client-side AST parsers.
+- **On-demand revalidation:** Cache-tag helpers (`revalidateContent`) integrate with Next.js Data Cache.
+
+---
+
+## Installation
+
+Install the Next.js SDK and database layer:
+
+<Tabs labels="npm, pnpm, bun">
 
 <Tab>
 
 ```sh
-pnpm add @usegraft/sdk-next
+npm i @usegraft/sdk-next @usegraft/db
 ```
 
 </Tab>
@@ -18,7 +33,7 @@ pnpm add @usegraft/sdk-next
 <Tab>
 
 ```sh
-npm i @usegraft/sdk-next
+pnpm add @usegraft/sdk-next @usegraft/db
 ```
 
 </Tab>
@@ -26,21 +41,39 @@ npm i @usegraft/sdk-next
 <Tab>
 
 ```sh
-bun add @usegraft/sdk-next
+bun add @usegraft/sdk-next @usegraft/db
 ```
 
 </Tab>
 
 </Tabs>
 
-`createGraft` wraps the read client with `React.cache`, so repeated reads of
-the same document within one render are deduped. Server-only: the handle holds
-a database connection or an open index.
+---
 
-## Create the handle
+## 1. Configure next.config.ts
 
-`graft init` scaffolds the static index. Pass that artifact and nothing else
-has to be running:
+Wrap your Next.js config with `withGraft`. This ensures that Graft's runtime
+modules remain external to the server bundle:
+
+```ts
+// next.config.ts
+import { withGraft } from "@usegraft/sdk-next/config";
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  // your existing Next.js options
+};
+
+export default withGraft(nextConfig);
+```
+
+---
+
+## 2. Initialize the Graft client
+
+Create a server-only client instance.
+
+### Static Engine (Default — no database required)
 
 ```ts
 // lib/graft.ts
@@ -54,9 +87,10 @@ export const graft = createGraft({
 });
 ```
 
-On Postgres, swap `index` for `db`:
+### Postgres Engine
 
 ```ts
+// lib/graft.ts
 import { createDb } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-next";
 import { collections } from "@/graft.config";
@@ -67,70 +101,162 @@ export const graft = createGraft({
 });
 ```
 
-## Read one document
+`createGraft` automatically wraps queries in `React.cache`. Repeated calls for
+the same document within a single page render (e.g., in a layout and a page)
+are deduped into a single index read.
 
-```ts
-// in a Server Component
-const page = await graft.getContent("pages", "home");
+---
+
+## 3. Read content in Server Components
+
+You can query documents directly inside `app/[slug]/page.tsx`:
+
+```tsx
+// app/[slug]/page.tsx
+import { notFound } from "next/navigation";
+import { MdxBody } from "@usegraft/sdk-next";
+import { graft } from "@/lib/graft";
+
+interface PageProps {
+  params: Promise<{ slug: string }>;
+}
+
+// Optional: Pre-render all pages at build time
+export async function generateStaticParams() {
+  const pages = await graft.listContent("pages");
+  return pages.map((page) => ({ slug: page.slug }));
+}
+
+export default async function Page({ params }: PageProps) {
+  const { slug } = await params;
+  const doc = await graft.getContent("pages", slug);
+
+  if (!doc) {
+    notFound();
+  }
+
+  return (
+    <article className="max-w-2xl mx-auto py-12">
+      <h1 className="text-4xl font-bold">{doc.data.title}</h1>
+      {doc.data.tagline && (
+        <p className="text-xl text-gray-600 mt-2">{doc.data.tagline}</p>
+      )}
+      <div className="prose mt-8">
+        <MdxBody source={doc.body} />
+      </div>
+    </article>
+  );
+}
 ```
 
-Return types come from your `defineCollection` schemas. A renamed field is a
-build error rather than a runtime `undefined`.
+---
 
-## Render MDX
+## 4. Custom MDX components
+
+The `<MdxBody />` component accepts custom React components to render within
+your markdown content:
 
 ```tsx
 import { MdxBody } from "@usegraft/sdk-next";
-import { mdxComponents } from "@/components/mdx-components";
 
-<MdxBody source={page.body} components={mdxComponents} />;
+const components = {
+  Callout: ({ children, title }: { children: React.ReactNode; title?: string }) => (
+    <aside className="border-l-4 border-blue-500 bg-blue-50 p-4 my-4">
+      {title && <h4 className="font-semibold text-blue-900">{title}</h4>}
+      <div className="text-blue-800">{children}</div>
+    </aside>
+  ),
+};
+
+export default function DocumentBody({ source }: { source: string }) {
+  return <MdxBody source={source} components={components} />;
+}
 ```
 
-`MdxBody` is Next-only. It defaults to `trust: "restricted"`, which refuses
-`{…}` expressions, `import`, `export`, and spread attributes. Pass
-`trust="full"` only when every author has commit access, and set
-`export const mdxTrust = "full"` in `graft.config.ts` to match.
+<Callout label="MDX Safety" type="note">
+  By default, `MdxBody` runs in `trust: "restricted"` mode. This allows standard
+  Markdown, GFM, and safe JSX components with string attributes, while blocking
+  unsafe runtime script execution (`{process.env.SECRET}`, `import`, `export`).
+  See [MDX safety](/docs/mdx-safety).
+</Callout>
 
-## Mount functions and MCP
+---
+
+## 5. Mounting functions and MCP route handlers
+
+If you use Graft typed functions or wish to expose an authenticated MCP endpoint
+to remote AI agents, mount them directly as Next.js Route Handlers:
+
+### Typed Functions Route (`POST /api/fn/[name]`)
 
 ```ts
 // app/api/fn/[name]/route.ts
-export const POST = functionsHandler;
+import { createFunctionsHandler } from "@usegraft/core";
+import { createDb } from "@usegraft/db";
+import { functions } from "@/graft.config";
+
+const db = createDb(process.env.DATABASE_URL!).db;
+const handler = createFunctionsHandler({ db, functions });
+
+export const POST = handler;
 ```
 
-MCP mounts the same way with `createGraftMcpHandler`. Next's App Router takes
-the handler directly — there is no `graftRoute` wrapper here.
-
-## Cache and invalidation
+### Agent MCP Route (`POST /api/mcp`)
 
 ```ts
-import { revalidateContent, updateContent } from "@usegraft/sdk-next";
+// app/api/mcp/route.ts
+import { createActorResolver } from "@usegraft/auth";
+import { createDb } from "@usegraft/db";
+import { createGraftMcpHandler } from "@usegraft/mcp";
+import { collections, functions } from "@/graft.config";
 
-// in a route handler, after a compile webhook
-revalidateContent(branch, changes);
+const db = createDb(process.env.DATABASE_URL!).db;
 
-// in a Server Action, for read-your-own-writes
-updateContent(branch, changes);
-```
+const actor = createActorResolver({
+  devTokens: process.env.GRAFT_DEV_TOKEN
+    ? {
+        [process.env.GRAFT_DEV_TOKEN]: {
+          kind: "human",
+          id: "owner",
+          scopes: ["content:write"],
+        },
+      }
+    : undefined,
+});
 
-Both turn a compile's `ChangeSet` into the exact `revalidateTag` / `updateTag`
-calls that refresh the changed pages, and no others. A no-op unless your reads
-were cached with `'use cache'` and `cacheTag`, but always safe to call.
-
-## The caveat you cannot infer
-
-Wrap the Next config with `withGraft` so `@usegraft/registry` stays external
-to the server bundle. Forgetting it breaks `list_registry` / `describe_item`
-at runtime with no build-time error.
-
-```ts
-// next.config.ts
-import { withGraft } from "@usegraft/sdk-next/config";
-
-export default withGraft({
-  // your Next config
+export const POST = createGraftMcpHandler({
+  contentDir: "./content",
+  db,
+  collections,
+  functions,
+  actor,
 });
 ```
 
-See [SDK reference](/docs/sdk-reference) for mounts across adapters and the
-honest gaps.
+---
+
+## 6. Cache revalidation
+
+When content is recompiled (e.g. from a CI deployment or webhook), invalidate
+Next.js cached pages using `revalidateContent`:
+
+```ts
+// app/api/revalidate/route.ts
+import { revalidateContent } from "@usegraft/sdk-next";
+import { type NextRequest, NextResponse } from "next/server";
+
+export async function POST(request: NextRequest) {
+  const { branch, changes } = await request.json();
+
+  // Invalidates only the tags for documents that actually changed
+  const tags = revalidateContent(branch, changes);
+
+  return NextResponse.json({ revalidated: true, tags });
+}
+```
+
+## Next steps
+
+- [Schema](/docs/schema) — Configure collections, fields, and validation rules.
+- [SDK reference](/docs/sdk-reference) — Complete API reference for query options and caching.
+- [Connecting agents](/docs/connecting-agents) — Connect Cursor or Claude to your Next.js project.

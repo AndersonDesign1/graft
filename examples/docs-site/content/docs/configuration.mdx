@@ -1,8 +1,8 @@
 ---
 title: Configuration
 description: Environment variables for compile, serve, auth, MCP, and assets.
-section: Reference
-order: 3
+section: API Reference
+order: 2
 ---
 
 Commands and runtimes walk up from the working directory for `.env`.
@@ -69,7 +69,7 @@ required.
 | `functions` | `{}` | Record of `defineFunction` results; enables `list_functions` and `run_function` |
 | `contentDir` | `"content"` | Content root, relative to the config file |
 | `migrationsDir` | `"migrations"` | Migrations directory, relative to the config file |
-| `index` | `"postgres"` | `"static"` for the zero-service tier |
+| `index` | `"postgres"` | `"static"` for the zero-service storage engine |
 | `mdxTrust` | `"restricted"` | How much of MDX an authored body may be |
 
 ### mdxTrust
