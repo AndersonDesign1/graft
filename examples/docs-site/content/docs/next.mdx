@@ -261,12 +261,15 @@ import { revalidateContent } from "@usegraft/sdk-next";
 import { type NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  // Webhook security: verify secret header or bearer token
+  // Webhook security: fail closed if secret is unconfigured, then verify header or token
+  const expected = process.env.GRAFT_WEBHOOK_SECRET;
+  if (!expected) {
+    return NextResponse.json({ error: "Webhook secret is not configured" }, { status: 500 });
+  }
+
   const secret = request.headers.get("x-webhook-secret");
   const auth = request.headers.get("authorization");
-  const expected = process.env.GRAFT_WEBHOOK_SECRET;
-
-  if (expected && secret !== expected && auth !== `Bearer ${expected}`) {
+  if (secret !== expected && auth !== `Bearer ${expected}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
