@@ -191,12 +191,27 @@ to remote AI agents, mount them directly as Next.js Route Handlers:
 
 ```ts
 // app/api/fn/[name]/route.ts
+import { createActorResolver } from "@usegraft/auth";
 import { createFunctionsHandler } from "@usegraft/core";
 import { createDb } from "@usegraft/db";
 import { functions } from "@/graft.config";
 
 const db = createDb(process.env.DATABASE_URL!).db;
-const handler = createFunctionsHandler({ db, functions });
+
+// Resolve caller identity so mutations verify permissions & audit logs
+const actor = createActorResolver({
+  devTokens: process.env.GRAFT_DEV_TOKEN
+    ? {
+        [process.env.GRAFT_DEV_TOKEN]: {
+          kind: "human",
+          id: "owner",
+          scopes: ["submissions:admin"],
+        },
+      }
+    : undefined,
+});
+
+const handler = createFunctionsHandler({ db, functions, actor });
 
 export const POST = handler;
 ```
@@ -246,10 +261,37 @@ import { revalidateContent } from "@usegraft/sdk-next";
 import { type NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const { branch, changes } = await request.json();
+  // Webhook security: verify secret header or bearer token
+  const secret = request.headers.get("x-webhook-secret");
+  const auth = request.headers.get("authorization");
+  const expected = process.env.GRAFT_WEBHOOK_SECRET;
+
+  if (expected && secret !== expected && auth !== `Bearer ${expected}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = (await request.json().catch(() => null)) as {
+    branch?: unknown;
+    changes?: { added?: unknown; changed?: unknown; removed?: unknown };
+  } | null;
+
+  if (
+    !body ||
+    !body.changes ||
+    !Array.isArray(body.changes.added) ||
+    !Array.isArray(body.changes.changed) ||
+    !Array.isArray(body.changes.removed)
+  ) {
+    return NextResponse.json(
+      { error: "Invalid payload: body must include { branch?: string, changes: ChangeSet }" },
+      { status: 400 },
+    );
+  }
+
+  const branch = typeof body.branch === "string" ? body.branch : "main";
 
   // Invalidates only the tags for documents that actually changed
-  const tags = revalidateContent(branch, changes);
+  const tags = revalidateContent(branch, body.changes as any);
 
   return NextResponse.json({ revalidated: true, tags });
 }

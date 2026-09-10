@@ -95,7 +95,7 @@ import { BlogPost } from "./BlogPost";
 
 export default function App() {
   return (
-    <GraftProvider client={graft}>
+    <GraftProvider graft={graft}>
       <BlogPost slug="hello-world" />
     </GraftProvider>
   );
@@ -175,12 +175,34 @@ export function SearchBar() {
           <li key={hit.slug}>
             <a href={`/docs/${hit.slug}`}>
               <strong>{hit.data.title}</strong>
-              <p dangerouslySetInnerHTML={{ __html: hit.snippet }} />
+              <HighlightSnippet snippet={hit.snippet} />
             </a>
           </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+// Safely render search matches: escapes all markup while honoring <b> tags
+function HighlightSnippet({ snippet }: { snippet: string }) {
+  const parts = snippet.split(/(<\/?b>)/g);
+  let isBold = false;
+
+  return (
+    <p>
+      {parts.map((part, index) => {
+        if (part === "<b>") {
+          isBold = true;
+          return null;
+        }
+        if (part === "</b>") {
+          isBold = false;
+          return null;
+        }
+        return isBold ? <mark key={index}>{part}</mark> : <span key={index}>{part}</span>;
+      })}
+    </p>
   );
 }
 ```
