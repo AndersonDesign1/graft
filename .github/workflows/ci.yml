@@ -39,8 +39,7 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           # 22.16 is the floor: node:sqlite bundles FTS5 (the static index's
-          # search) from 22.16.0. pnpm 12 is a native binary, so unlike pnpm 11
-          # it brings no Node requirement of its own to stay above.
+          # search) from 22.16.0, which is also >= pnpm 12's >=18 requirement.
           # One number everywhere; pinning keeps CI honest about what we advertise.
           node-version: 22.16
           # Explicit: setup-node v5 began auto-caching from `packageManager`
