@@ -17,7 +17,7 @@ overrides:
   esbuild@0.27.7: 0.28.2
 
 # Allow esbuild (tsup + vitest) and sharp (Next image optimization) to run
-# their install scripts (pnpm 11 model).
+# their install scripts (pnpm 12 model).
 allowBuilds:
   esbuild: true
   sharp: true

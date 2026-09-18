@@ -36,8 +36,12 @@ Say in the pull request what breaks and who has to change.
 
 ## Set up the repo
 
-You need Node 22.16 or later and pnpm 11. The repo pins pnpm through
-`packageManager`, so Corepack picks the right version for you.
+You need Node 22.16 or later and pnpm 12. The repo pins pnpm through
+`packageManager`, so Corepack picks the right version for you. If your
+global pnpm is 11 or older, upgrade it directly (`npm install -g pnpm@12`
+or the standalone installer): pnpm 11 cannot auto-switch to a v12 pin,
+because the v12 layout needs its install script and the auto-switch skips
+it.
 
 ```bash
 git clone https://github.com/AndersonDesign1/graft.git

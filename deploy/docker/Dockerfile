@@ -12,7 +12,7 @@
 #   docker build -f deploy/docker/Dockerfile -t graft .
 
 FROM node:24-bookworm AS builder
-RUN npm install -g pnpm@11.9.0
+RUN npm install -g pnpm@12.4.2
 WORKDIR /opt/graft
 COPY . .
 ENV CI=true
