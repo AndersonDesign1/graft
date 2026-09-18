@@ -1,10 +1,11 @@
 version: 2
 
 # Only the github-actions ecosystem for now. Dependabot documents support for
-# pnpm v7 through v10, and this workspace is on pnpm 11 (dependabot-core#14794
-# tracks v11). The lockfile is format 9.0, which pnpm 10 also emits, so npm
-# updates may well work — enable that ecosystem separately and watch the first
-# run rather than discovering it inside a batch of PRs.
+# pnpm v7 through v10, and this workspace is on pnpm 12 (dependabot-core#14794
+# tracks v11; nothing newer is documented yet). The lockfile is format 9.0,
+# which pnpm 10 through 12 all emit, so npm updates may well work — enable
+# that ecosystem separately and watch the first run rather than discovering
+# it inside a batch of PRs.
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
