@@ -48,9 +48,10 @@ fi
 # A SigV4-signed PUT Bucket straight from curl, so the image carries no `mc`.
 # 200 is created, 409 is already there. No answer (000) or a 5xx means storage
 # is still starting, which in the split topology is normal at boot, so those
-# retry for about a minute, the same budget the embedded MinIO gets above. The
-# per-attempt timeouts keep that budget honest against an endpoint that drops
-# packets instead of refusing them.
+# retry against a 60s deadline, the same minute the embedded MinIO gets above.
+# A deadline rather than a try count, because each attempt can take up to its
+# 5s --max-time against an endpoint that drops packets instead of refusing
+# them. The last attempt can overrun the deadline by that much at most.
 #
 # Storage that never answers fails the boot. Serving without a bucket would
 # look healthy and break every upload until a restart. A real answer other than
@@ -58,14 +59,17 @@ fi
 # because a managed bucket can already exist behind it.
 if [ "${GRAFT_ENSURE_BUCKET:-1}" = "1" ]; then
   bucket_status=000
-  for i in $(seq 1 60); do
+  bucket_deadline=$((SECONDS + 60))
+  while :; do
     bucket_status=$(curl -s -o /dev/null -w '%{http_code}' -X PUT \
       --connect-timeout 2 --max-time 5 \
       -H 'Content-Length: 0' \
       --aws-sigv4 "aws:amz:${S3_REGION:-us-east-1}:s3" \
       --user "${MINIO_ROOT_USER:-$S3_ACCESS_KEY}:${MINIO_ROOT_PASSWORD:-$S3_SECRET_KEY}" \
       "${S3_ENDPOINT%/}/${S3_BUCKET}") || true
-    case "$bucket_status" in 000 | 5??) sleep 1 ;; *) break ;; esac
+    case "$bucket_status" in 000 | 5??) ;; *) break ;; esac
+    [ "$SECONDS" -ge "$bucket_deadline" ] && break
+    sleep 1
   done
   case "$bucket_status" in
     200 | 409) log "asset bucket ${S3_BUCKET} ready" ;;
