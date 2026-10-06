@@ -141,7 +141,7 @@ describe("Steps", () => {
 describe("TierBadge", () => {
   it("renders the tier's own wording", async () => {
     expect(await render('<TierBadge tier="postgres" />')).toContain("needs Postgres");
-    expect(await render('<TierBadge tier="static" />')).toContain(">static<");
+    expect(await render('<TierBadge tier="static" />')).toContain(">works on static<");
   });
 
   it("renders nothing for a tier that does not exist", async () => {

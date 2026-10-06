@@ -1,5 +1,5 @@
 /**
- * TierBadge — which tier a feature needs.
+ * TierBadge — which storage engine a feature needs.
  *
  * Graft ships two: a static SQLite artifact with no services at all, and
  * Postgres for functions, branches, approvals and audit. Nearly every page
@@ -21,7 +21,7 @@ const COPY = new Map<string, { label: string; title: string }>([
   [
     "static",
     {
-      label: "static",
+      label: "works on static",
       title: "Works on the static storage engine. No database, no services.",
     },
   ],
@@ -36,7 +36,7 @@ const COPY = new Map<string, { label: string; title: string }>([
   [
     "either",
     {
-      label: "either tier",
+      label: "static or Postgres",
       title: "Works the same on the static engine and on Postgres.",
     },
   ],

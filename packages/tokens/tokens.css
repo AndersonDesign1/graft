@@ -181,6 +181,7 @@
   --leading-body: 1.65;
   --tracking-display: -0.03em; /* serif display, sizes ≥ --text-2xl */
   --tracking-label: 0.08em; /* uppercase mono labels */
+  --measure: 68ch; /* reading measure for prose — .prose consumes this, never a literal */
 
   /* ---- space (4px base) ---- */
   --space-1: 0.25rem;

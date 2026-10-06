@@ -46,6 +46,7 @@ const toc = extractHeadings(doc.body)
   title={`${doc.data.title} — Graft docs`}
   description={doc.data.description}
   markdownHref={`/docs/${doc.slug}.md`}
+  ogImage={`/og/${doc.slug}.png`}
 >
   <DocsShell
     tree={tree}
@@ -53,7 +54,7 @@ const toc = extractHeadings(doc.body)
     params={Astro.params}
     toc={toc}
     title={doc.data.title}
-    description={doc.data.description}
+    slug={doc.slug}
     client:load
   >
     <div class="prose" set:html={bodyHtml} />

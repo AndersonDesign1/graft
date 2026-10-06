@@ -132,7 +132,7 @@ button:active,
 .prose {
   font-size: var(--text-base);
   line-height: var(--leading-body);
-  max-width: 68ch;
+  max-width: var(--measure);
 }
 
 .prose > * + * {
@@ -146,7 +146,6 @@ button:active,
   letter-spacing: -0.015em;
   margin-block-start: var(--space-12);
   padding-block-start: var(--space-6);
-  border-block-start: 1px solid var(--hairline);
 }
 
 .prose h3 {
@@ -225,7 +224,7 @@ button:active,
 /* Callout — the MDX map's aside; subtle rounded card in the accent without vertical lines. */
 .callout {
   border-radius: var(--radius-inner);
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-5) var(--space-6);
   margin-block: var(--space-6);
   border: 1px solid color-mix(in oklch, var(--callout-note) 25%, transparent);
   background: color-mix(in oklch, var(--callout-note) 6%, var(--paper));
@@ -235,7 +234,7 @@ button:active,
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .callout-icon {
@@ -287,6 +286,134 @@ button:active,
 
 .callout-body > p {
   margin: 0;
+}
+
+/* Executive opening primitives — same contract as fumadocs.css.
+   .prose here serves non-fumadocs MDX bodies; keep the two in sync. */
+/* Payoff line — one plain sentence stating what the page gives the reader.
+   Sans, slightly above body size, muted. Never a mono tag, never a label. */
+.prose .kicker {
+  font-size: var(--text-md);
+  color: var(--ink-muted);
+  max-width: var(--measure);
+  margin: 0 0 var(--space-5);
+}
+
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-6);
+  border-top: 1px solid var(--hairline-strong);
+  padding-top: var(--space-5);
+  margin-block: var(--space-6) var(--space-8);
+}
+
+.stat-strip .stat-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-faint);
+  margin-bottom: var(--space-1);
+}
+
+.stat-strip .stat-value {
+  display: block;
+  font-size: var(--text-h3);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.stat-strip .stat-desc {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  margin-top: var(--space-1);
+  line-height: 1.5;
+}
+
+/* Steps — numbered procedure in the "three moves" pattern (see
+   fumadocs.css). Same contract here for non-fumadocs MDX bodies. */
+.prose ol.steps {
+  list-style: none;
+  padding: 0;
+  margin-block: var(--space-8);
+  counter-reset: step;
+}
+
+.prose ol.steps > li.step {
+  padding: 0;
+  margin-block-end: var(--space-10);
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: var(--space-1) var(--space-4);
+}
+
+.prose ol.steps > li.step:last-child {
+  margin-block-end: 0;
+}
+
+.prose ol.steps > li.step::before {
+  content: counter(step);
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+
+.step-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-h3);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  scroll-margin-top: 5rem; /* sticky docs nav would otherwise cover a deep-linked step */
+}
+
+/* Deep-link to the step. Hidden until hover so the procedure reads clean. */
+.step-anchor {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-left: var(--space-2);
+  vertical-align: baseline;
+  color: var(--ink-faint);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.step-anchor svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.step-title:hover .step-anchor,
+.step-anchor:focus-visible {
+  opacity: 1;
+}
+
+.step-body {
+  margin-inline-start: 0;
+  grid-column: 2; /* title and body share the content track; the badge owns column 1 */
+}
+
+.step-body > :first-child {
+  margin-block-start: 0;
+}
+
+.step-body > :last-child {
+  margin-block-end: 0;
 }
 
 .doc-cards {

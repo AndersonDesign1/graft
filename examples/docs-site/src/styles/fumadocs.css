@@ -45,14 +45,17 @@ header#nd-subnav {
   border-block-end: 1px solid var(--hairline) !important;
 }
 
-/* Sidebar section group labels */
+/* Sidebar section group labels: sentence-case mono. Short operational labels
+   keep the mono voice; all-caps tracking is banned (it slows scanning and
+   turns every group into emphasis, so nothing is). Source text in lib/nav.ts
+   is already sentence-case ("Get Started"); this just stops uppercasing it. */
 #nd-sidebar p.inline-flex,
 aside p.inline-flex {
   font-family: var(--font-mono) !important;
   font-size: var(--text-xs) !important;
   font-weight: 500 !important;
-  letter-spacing: var(--tracking-label) !important;
-  text-transform: uppercase !important;
+  letter-spacing: 0.02em !important;
+  text-transform: none !important;
   color: var(--ink-faint) !important;
   margin-top: var(--space-6) !important;
   margin-bottom: var(--space-2) !important;
@@ -129,13 +132,37 @@ kbd {
   color: var(--ink-faint);
 }
 
-/* Display voice for doc page title (h1) — clean IBM Plex Sans with confident weight */
+/* Doc page title (h1). Fumadocs sizes it at 1.75em, which equals the 28px h2
+   below, so the page title and its sections read as the same level. The scale
+   steps 36 → 28 → 20 (1.29×, 1.4×), each level also set apart by weight. */
 .font-serif,
 #nd-page h1,
 .prose h1 {
   font-family: var(--font-display);
-  font-weight: 600;
+  font-weight: 650;
   letter-spacing: -0.02em;
+}
+
+#nd-page > h1 {
+  font-size: var(--text-xl);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+/* Running text: 65 to 70 characters per line (measured 67). 68ch measured 74,
+   because the ch unit is the width of "0", which is narrower than average
+   prose. Tables, code and cards keep the full column. */
+#nd-page .prose > p,
+#nd-page .prose > ul,
+#nd-page .prose > ol,
+#nd-page .prose > blockquote {
+  max-width: 52ch;
+}
+
+/* Inline code at 0.875em (14px on 16px body) instead of 13px, so identifiers
+   stay as legible as the sentence around them. */
+#nd-page .prose :not(pre) > code {
+  font-size: 0.875em;
 }
 
 .prose h2 {
@@ -145,7 +172,6 @@ kbd {
   letter-spacing: -0.015em;
   margin-top: var(--space-12);
   padding-top: var(--space-6);
-  border-top: 1px solid var(--hairline);
 }
 
 .prose h3 {
@@ -174,7 +200,7 @@ kbd {
 /* Callout — renderMdx emits static HTML; styled as subtle rounded cards without harsh vertical lines */
 .callout {
   border-radius: var(--radius-inner);
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-5) var(--space-6);
   margin-block: var(--space-6);
   border: 1px solid color-mix(in oklch, var(--callout-note) 25%, transparent);
   background: color-mix(in oklch, var(--callout-note) 6%, var(--paper));
@@ -184,7 +210,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .callout-icon {
@@ -198,8 +224,7 @@ kbd {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-label);
+  letter-spacing: 0.02em;
   color: var(--callout-note);
 }
 
@@ -238,6 +263,55 @@ kbd {
 
 .callout-body > p {
   margin: 0;
+}
+
+/* Executive opening primitives (two-speed reading).
+   The 15-second path — kicker, title, lede, stat strip, captions — carries
+   the argument. The audit path below keeps exact names, units, and terms.
+   MDX authors: open with <p class="kicker"> + a claim, then .stat-strip,
+   then mechanism. Never a boxed KPI card grid; one composed strip. */
+/* Payoff line — one plain sentence stating what the page gives the reader.
+   Sans, slightly above body size, muted. Never a mono tag, never a label. */
+.prose .kicker {
+  font-size: var(--text-md);
+  color: var(--ink-muted);
+  max-width: var(--measure);
+  margin: 0 0 var(--space-5);
+}
+
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-6);
+  border-top: 1px solid var(--hairline-strong);
+  padding-top: var(--space-5);
+  margin-block: var(--space-6) var(--space-12);
+}
+
+.stat-strip .stat-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-faint);
+  margin-bottom: var(--space-1);
+}
+
+.stat-strip .stat-value {
+  display: block;
+  font-size: var(--text-h3);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.stat-strip .stat-desc {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  margin-top: var(--space-1);
+  line-height: 1.5;
 }
 
 /* Path / explore cards on intro hubs — gap lines must read as clickable cells */
@@ -477,33 +551,81 @@ kbd {
   box-shadow: none;
 }
 
-/* Steps — clean instruction hierarchy where typography speaks for itself, without vertical lines or mechanical numbers */
+/* Steps — numbered procedure in the "three moves" pattern: a circled
+   mono number, a bold title, then description and command boxes in the
+   content column. Numbers come from a CSS counter, so inserting a step
+   never renumbers anything by hand. */
 .prose ol.steps {
   list-style: none;
   padding: 0;
   margin-block: var(--space-8);
+  counter-reset: step;
 }
 
 .prose ol.steps > li.step {
   position: relative;
   padding: 0;
   margin-block-end: var(--space-10);
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: var(--space-1) var(--space-4);
 }
 
 .prose ol.steps > li.step:last-child {
   margin-block-end: 0;
 }
 
+.prose ol.steps > li.step::before {
+  content: counter(step);
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+
 .step-title {
   margin: 0 0 var(--space-3);
-  font-size: 1.15rem;
+  font-size: var(--text-h3);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ink);
+  scroll-margin-top: 5rem; /* sticky docs nav would otherwise cover a deep-linked step */
+}
+
+/* Deep-link to the step. Hidden until hover so the procedure reads clean. */
+.step-anchor {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-left: var(--space-2);
+  vertical-align: baseline;
+  color: var(--ink-faint);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.step-anchor svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.step-title:hover .step-anchor,
+.step-anchor:focus-visible {
+  opacity: 1;
 }
 
 .step-body {
   margin-inline-start: 0;
+  grid-column: 2; /* title and body share the content track; the badge owns column 1 */
 }
 
 .step-body > :first-child {
@@ -664,4 +786,61 @@ html[data-theme="dark"] .powered-by-graft-on-ink {
   .pressable:active {
     transform: none;
   }
+}
+
+/* Skip link: off-screen until focused, then pinned top-left above the shell. */
+.skip-link {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-inner);
+  background: var(--paper-raised);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  box-shadow: 0 0 0 2px var(--mark);
+  transform: translateY(-200%);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}
+
+/* Page actions under the title: copy as Markdown, view source, edit, report. */
+.doc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-block: calc(var(--space-2) * -1) var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+}
+
+.doc-actions a,
+.doc-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-inner);
+  color: inherit;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.doc-actions a:hover,
+.doc-actions button:hover {
+  color: var(--ink);
+}
+
+.doc-actions a:focus-visible,
+.doc-actions button:focus-visible {
+  outline: 2px solid var(--mark);
+  outline-offset: 2px;
 }

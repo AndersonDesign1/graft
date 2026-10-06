@@ -8,11 +8,70 @@ import type { AstroProviderProps } from "fumadocs-core/framework/astro";
 import type { Root } from "fumadocs-core/page-tree";
 import type { TOCItemType } from "fumadocs-core/toc";
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
-import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/page";
+import { DocsBody, DocsPage, DocsTitle } from "fumadocs-ui/page";
 import { RootProvider } from "fumadocs-ui/provider/astro";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { PoweredByGraft } from "./powered-by-graft";
 import SearchDialog from "./search";
+
+const REPO = "https://github.com/AndersonDesign1/graft";
+
+/**
+ * Where a page's words live. Every doc is an MDX file, except the error
+ * reference, which is generated from the error registry. Pointing its edit
+ * link at the generated file would invite an edit the next regeneration erases.
+ */
+function sourcePath(slug: string): string {
+  return slug === "errors"
+    ? "packages/mcp/src/explain.ts"
+    : `examples/docs-site/content/docs/${slug}.mdx`;
+}
+
+/**
+ * Copy as Markdown, view the Markdown, edit on GitHub, report a problem.
+ * Edits open against feat/core, the branch every change lands on.
+ */
+function DocActions({ slug, title }: { slug: string; title: string }) {
+  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
+  const markdownHref = `/docs/${slug}.md`;
+
+  async function copyMarkdown() {
+    try {
+      const response = await fetch(markdownHref);
+      if (!response.ok) throw new Error(String(response.status));
+      await navigator.clipboard.writeText(await response.text());
+      setCopied("done");
+    } catch {
+      setCopied("failed");
+    }
+    setTimeout(() => setCopied("idle"), 2000);
+  }
+
+  const issue = new URL(`${REPO}/issues/new`);
+  issue.searchParams.set("title", `Docs: ${title}`);
+  issue.searchParams.set(
+    "body",
+    `Page: https://graft.page/docs/${slug}
+
+What is wrong or missing:
+`,
+  );
+
+  return (
+    <div className="doc-actions">
+      <button type="button" onClick={copyMarkdown} aria-live="polite">
+        {copied === "done" ? "Copied" : copied === "failed" ? "Copy failed" : "Copy as Markdown"}
+      </button>
+      <a href={markdownHref}>View as Markdown</a>
+      <a href={`${REPO}/edit/feat/core/${sourcePath(slug)}`} target="_blank" rel="noreferrer">
+        Edit this page
+      </a>
+      <a href={issue.href} target="_blank" rel="noreferrer">
+        Report a problem
+      </a>
+    </div>
+  );
+}
 
 export function DocsShell({
   tree,
@@ -20,7 +79,7 @@ export function DocsShell({
   params,
   toc,
   title,
-  description,
+  slug,
   children,
 }: {
   tree: Root;
@@ -28,7 +87,7 @@ export function DocsShell({
   params: AstroProviderProps["params"];
   toc: TOCItemType[];
   title: string;
-  description?: string;
+  slug: string;
   children: ReactNode;
 }) {
   return (
@@ -79,7 +138,7 @@ export function DocsShell({
       >
         <DocsPage toc={toc}>
           <DocsTitle>{title}</DocsTitle>
-          {description ? <DocsDescription>{description}</DocsDescription> : null}
+          <DocActions slug={slug} title={title} />
           <DocsBody>{children}</DocsBody>
           <div className="powered-by-graft-docs">
             <PoweredByGraft />
