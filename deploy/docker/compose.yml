@@ -26,18 +26,19 @@ services:
     # Same digest-pinned release as deploy/docker/Dockerfile (see its MinIO
     # comment): the split topology must run the same storage bytes as the
     # single-container image, not whatever `latest` points at this week.
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    image: cgr.dev/chainguard/minio:latest@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034
+    # The image runs as uid 65532, and a fresh named volume is owned by root,
+    # so MinIO could not write /data. Root matches the old MinIO image.
+    user: "0:0"
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: graft
       MINIO_ROOT_PASSWORD: graftsecret
     volumes:
       - graft_minio:/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+    # No healthcheck: the image has no shell and no curl to run one. The graft
+    # entrypoint retries the bucket step until storage answers, so starting
+    # alongside it is enough.
 
   graft:
     build:
@@ -47,7 +48,7 @@ services:
       db:
         condition: service_healthy
       storage:
-        condition: service_healthy
+        condition: service_started
     environment:
       GRAFT_MODE: serve
       DATABASE_URL: postgres://graft:graft@db:5432/graft

@@ -45,11 +45,24 @@ fi
 : "${DATABASE_URL:?DATABASE_URL is required in GRAFT_MODE=serve (point it at your Postgres)}"
 
 # ── Asset bucket (idempotent; skip with GRAFT_ENSURE_BUCKET=0 for R2 etc.) ──
+# A SigV4-signed PUT Bucket straight from curl, so the image carries no `mc`.
+# 200 is created, 409 is already there. No answer (000) or a 5xx means storage
+# is still starting, which in the split topology is normal at boot, so those
+# retry. Anything else is a real answer, such as 403 for wrong credentials.
 if [ "${GRAFT_ENSURE_BUCKET:-1}" = "1" ]; then
-  mc alias set graftlocal "$S3_ENDPOINT" "${MINIO_ROOT_USER:-$S3_ACCESS_KEY}" "${MINIO_ROOT_PASSWORD:-$S3_SECRET_KEY}" >/dev/null 2>&1 \
-    && mc mb --ignore-existing "graftlocal/${S3_BUCKET}" >/dev/null 2>&1 \
-    && log "asset bucket ${S3_BUCKET} ready" \
-    || log "WARNING: could not ensure bucket ${S3_BUCKET} (set GRAFT_ENSURE_BUCKET=0 if it is managed elsewhere)"
+  bucket_status=000
+  for i in $(seq 1 30); do
+    bucket_status=$(curl -s -o /dev/null -w '%{http_code}' -X PUT \
+      -H 'Content-Length: 0' \
+      --aws-sigv4 "aws:amz:${S3_REGION:-us-east-1}:s3" \
+      --user "${MINIO_ROOT_USER:-$S3_ACCESS_KEY}:${MINIO_ROOT_PASSWORD:-$S3_SECRET_KEY}" \
+      "${S3_ENDPOINT%/}/${S3_BUCKET}") || true
+    case "$bucket_status" in 000 | 5??) sleep 1 ;; *) break ;; esac
+  done
+  case "$bucket_status" in
+    200 | 409) log "asset bucket ${S3_BUCKET} ready" ;;
+    *) log "WARNING: could not ensure bucket ${S3_BUCKET} (HTTP ${bucket_status}; set GRAFT_ENSURE_BUCKET=0 if it is managed elsewhere)" ;;
+  esac
 fi
 
 # ── Project selection ───────────────────────────────────────────────────────
