@@ -1,14 +1,20 @@
 ---
 title: Deploy
-description: Self-host Graft — one container, split compose, or handlers embedded in your app.
-section: Operations & Deploy
+description: Self-host Graft with one container, split compose, or handlers embedded in your app.
+section: Deploy & operate
 order: 0
 ---
 
-## Self-host Graft
+<p className="kicker">Run Graft on your infrastructure. No Graft cloud required.</p>
 
-Graft is self-hostable. You run the source against your Postgres and your object
-store. There is no required Graft cloud.
+This page covers running Graft yourself, for a project on the Postgres engine.
+You provide the database, the file storage, and somewhere to run a container.
+There is no Graft cloud service to sign up for.
+
+A static project usually needs none of this: compile at build time and deploy
+your app as normal, with `.graft/index.db` included.
+
+## Self-host Graft
 
 ### Container quick path
 
@@ -22,13 +28,13 @@ Mount your project at `/project`. Boot also creates a hardened runtime role and
 serves under it, because this container owns its database. Full recipes live
 under `deploy/` in the repo.
 
-## Topologies
+## Ways to deploy
 
 Runtime work is a stateless `Request → Response` handler. Two wrappers, same bytes:
 
-1. **Embedded** — your app (Next, Astro, SvelteKit, TanStack Start, React
-   Router) mounts the handlers as routes.
-2. **Headless** — `graft serve` binds those handlers to a Node HTTP server:
+- **Embedded.** Your app (Next, Astro, SvelteKit, TanStack Start, React
+  Router) mounts the handlers as routes.
+- **Headless.** `graft serve` binds those handlers to a Node HTTP server:
    `POST /api/fn/<name>`, `POST /api/mcp`, `GET /api/content/v1/documents`,
    `GET /api/content/v1/search`, `GET /healthz`. A frontend can read authored
    content through `@usegraft/content-api` without a database of its own. See
@@ -38,9 +44,9 @@ Runtime work is a stateless `Request → Response` handler. Two wrappers, same b
    collection in your config. They carry a 60-per-60s rate limit under
    `graft serve`, which is a backstop against exhaustion, not an access control.
    Anything reachable beyond a trusted proxy should be fronted by one that
-   checks. See [The content API](/docs/content-api#it-authenticates-nobody).
+   checks. See [The content API](/docs/content-api#it-does-not-authenticate-requests).
 
-## Adapters
+## Embed Graft in your own app
 
 | Adapter | Topology | Runs |
 | --- | --- | --- |
@@ -51,7 +57,7 @@ Runtime work is a stateless `Request → Response` handler. Two wrappers, same b
 
 This docs site uses the Vercel embedded path from Astro.
 
-## Credential recipe
+## Set up database credentials
 
 Give the deployment a **runtime** credential that can execute mounted endpoints
 but cannot decide approvals:
@@ -72,7 +78,7 @@ database is yours.
 | `graft compile`, `migrate --apply`, `merge`, `approve` | operator |
 | Functions, MCP (incl. content writes), reads, approval request/consume | runtime |
 
-The runtime role **can** project content — `graft harden` grants
+The runtime role **can** project content. `graft harden` grants
 `INSERT`/`UPDATE` on `content_index` because compile needs it. What it cannot
 do is decide approvals. A stolen runtime credential can rewrite or hide index
 rows; the human gate on MCP `delete_content` is an application control, not a
@@ -80,6 +86,6 @@ database lock. Keep the operator URL for compile, migrate, merge, and approve.
 
 ## Next steps
 
-- [Configuration](/docs/configuration) — env vars for serve, auth, and assets
-- [Audit & approvals](/docs/audit-and-approvals) — how the human gate survives deploy
-- [What is Graft](/docs/what-is-graft) — product overview
+- [Configuration](/docs/configuration) lists env vars for serve, auth, and assets.
+- [Audit & approvals](/docs/audit-and-approvals) explains how the human gate survives deploy.
+- [What is Graft](/docs/what-is-graft) gives the product overview.

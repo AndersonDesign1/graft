@@ -1,13 +1,21 @@
 ---
 title: Owned primitives
-description: graft add copies real source into your repo — the shadcn model, not plugins.
-section: Core Concepts
-order: 5
+description: graft add copies real source into your repo. The shadcn model, not plugins.
+section: Content
+order: 4
 ---
 
-A primitive is owned, copy-in code. `graft add comments` drops TypeScript under
-`graft/`, regenerates the barrel, and leaves the files yours to edit. There is
-no `@usegraft/comments` runtime dependency and no plugin API boundary.
+<p className="kicker">Add ready-made features, such as comments, as code you own and can edit.</p>
+
+Graft ships ready-made features, such as comments or a product catalog, as
+source code you copy into your project, the way shadcn/ui ships components. We
+call them **primitives**. There is no plugin system and no package to keep
+updated: once added, the code is yours.
+
+`graft add comments` copies the comments primitive into your `graft/` folder,
+along with anything it depends on. It also updates `graft/index.ts`, a file
+that re-exports everything in that folder (a "barrel" file), so your config
+picks the new code up automatically.
 
 ```sh
 graft add                # list available items
@@ -15,7 +23,7 @@ graft add comments       # copy item + transitive deps into graft/
 graft add commerce --dry-run
 ```
 
-## Wiring
+## How added code is wired in
 
 The generated `graft/index.ts` barrel aggregates collections and functions.
 Your config merges it once:
@@ -29,7 +37,7 @@ export const { collections, functions } = mergePrimitives([
 
 Duplicate keys fail with `CONFIG_INVALID`.
 
-## What ships today
+## Available primitives
 
 | Primitive | What you get |
 | --- | --- |
@@ -46,7 +54,7 @@ Browse before you add:
 MCP: list_registry → describe_item
 ```
 
-## Registry shape
+## How a registry item is structured
 
 Items live in `@usegraft/registry` as local manifests (`block` / `field` /
 `access` / `bundle`). Remote HTTP registries are format-compatible later. Today

@@ -1,9 +1,11 @@
 ---
 title: Studio API
 description: The HTTP surface the Studio UI is a client of, and the rules a state-changing request has to satisfy.
-section: API Reference
+section: Reference
 order: 4
 ---
+
+<p className="kicker">Every Studio action is an API call you can make yourself.</p>
 
 The Studio UI has no privileged access. Everything it does goes through
 `/api/studio/v1/*`, which is documented by its own OpenAPI document and usable
@@ -55,7 +57,7 @@ and carries a write scope.
 | `studio:write` | Changing it: saving, compiling, committing, reverting |
 | `approvals:decide` | The human gate. No agent runtime token should carry it |
 
-An agent that may read the content tree has no business committing it, which is
+An agent that may read the content tree should not be able to commit it, which is
 why "authenticated" is not a permission here.
 
 ## Authentication
@@ -78,10 +80,10 @@ A principal is `{ kind, id, scopes? }`. **Absent `scopes` means none, not all.**
 Omitting `authenticate` entirely means the mount is unauthenticated, which is
 only appropriate on loopback.
 
-<Callout label="why not a boolean">
+<Callout label="Why this is not a true/false setting" type="note">
   The signature is deliberately not `(request) => boolean`. "May this actor do
   this particular thing" cannot be expressed in one boolean decided per handler,
-  so callers of the boolean version invented their own policy — and what
+  so callers of the boolean version invented their own policy. What
   `graft serve` invented was `actor.kind !== "anonymous"`, which admitted every
   agent to the approve and deny surface.
 </Callout>
@@ -102,7 +104,7 @@ content type, so a cross-origin `text/plain` POST is a simple request that
 browsers dispatch with no preflight. Requiring JSON forces one.
 
 On a loopback mount there is no authentication by design, so anything that can
-reach `127.0.0.1` can act — including a web page the operator happens to open.
+reach `127.0.0.1` can act, including a web page the operator happens to open.
 The response would be unreadable to the attacker, but the side effect already
 happened.
 
@@ -187,12 +189,12 @@ const handler = createStudioHandler({
 | `projectRoot` | Where `graft/` lives, for the project's editor component declarations. Defaults to the content directory's parent |
 | `mdxTrust` | Governs the whole-tree recompile that follows a save |
 | `defaultBranch` | Branch used for compile and the tree default |
-| `decider` | Identity approval decisions are attributed to. A value or a function. **Defaults to `{ kind: "human", id: "studio" }`** — set it, or every decision in the audit trail names the same generic identity |
+| `decider` | Identity approval decisions are attributed to. A value or a function. **Defaults to `{ kind: "human", id: "studio" }`.** Set it, or every decision in the audit trail names the same generic identity |
 | `uiBasePath` | URL prefix for the UI. Empty string serves it at `/` |
 
 API paths are always absolute `/api/studio/v1/*` regardless of `uiBasePath`.
 
-`decider` is resolved from configuration, never from the request — a caller
+`decider` is resolved from configuration, never from the request. A caller
 cannot name its own decider, which is what the requester-cannot-decide rule
 depends on. It is **not** derived from whatever `authenticate` returned, so an
 embedding that authenticates real people still attributes every approval to the
@@ -200,7 +202,7 @@ one configured identity unless you pass a function:
 
 ```ts
 createStudioApiHandler({
-  // Resolved per call, from your own session — not from anything the caller
+  // Resolved per call, from your own session. Never from anything the caller
   // sends. The audit row is only as useful as this value.
   decider: () => ({ kind: "human", id: currentOperator().email }),
 });
@@ -216,7 +218,7 @@ resolve, and pins `?branch` to the mounted branch. Without that pin,
 
 ## Next steps
 
-- [Studio](/docs/studio) — what the UI does with all of this
-- [Hardening](/docs/hardening) — why decide can fail on a deployment
-- [CLI reference](/docs/cli-reference) — the same operations as commands
-- [MCP tools](/docs/mcp-tools) — and as tools
+- [Studio](/docs/studio) shows what the UI does with all of this.
+- [Hardening](/docs/hardening) explains why decide can fail on a deployment.
+- [CLI reference](/docs/cli-reference) covers the same operations as commands.
+- [MCP tools](/docs/mcp-tools) covers them as tools.

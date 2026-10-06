@@ -1,16 +1,32 @@
 ---
 title: TanStack Start
-description: Isomorphic loaders are the wrong place for a database handle.
-section: Frameworks & Adapters
-order: 4
+description: "Read Graft content in TanStack Start through server functions, never in isomorphic loaders."
+section: Frameworks
+order: 3
 ---
+
+<p className="kicker">Read Graft content in TanStack Start through server functions.</p>
+
+This guide adds Graft to a TanStack Start project. You read content
+through server functions, so the database or index file never reaches the
+browser, and you can serve Graft's functions and MCP endpoint from server routes.
+
+**Before you start**, you need a TanStack Start project and a
+`graft.config.ts` with compiled content. If you do not have those yet, run
+through [Getting started](/docs/getting-started) first.
+
+<Callout label="Prefer to let your agent do it?" type="note">
+  Paste this into your coding agent: "Add Graft to this TanStack Start app following https://graft.page/docs/tanstack-start.md. Create the client in src/lib/graft.server.ts and read content through a createServerFn, never in a route loader."
+</Callout>
+
+## Install
 
 <Tabs labels="pnpm, npm, bun">
 
 <Tab>
 
 ```sh
-pnpm add @usegraft/sdk-tanstack-start @usegraft/auth @usegraft/mcp
+pnpm add @usegraft/sdk-tanstack-start @usegraft/db
 ```
 
 </Tab>
@@ -18,7 +34,7 @@ pnpm add @usegraft/sdk-tanstack-start @usegraft/auth @usegraft/mcp
 <Tab>
 
 ```sh
-npm i @usegraft/sdk-tanstack-start @usegraft/auth @usegraft/mcp
+npm i @usegraft/sdk-tanstack-start @usegraft/db
 ```
 
 </Tab>
@@ -26,7 +42,7 @@ npm i @usegraft/sdk-tanstack-start @usegraft/auth @usegraft/mcp
 <Tab>
 
 ```sh
-bun add @usegraft/sdk-tanstack-start @usegraft/auth @usegraft/mcp
+bun add @usegraft/sdk-tanstack-start @usegraft/db
 ```
 
 </Tab>
@@ -36,7 +52,7 @@ bun add @usegraft/sdk-tanstack-start @usegraft/auth @usegraft/mcp
 Build the handle once in a server-only module, then reach it from server
 functions and server routes.
 
-## Create the handle
+## Create the Graft client
 
 ```ts
 // src/lib/graft.server.ts
@@ -59,7 +75,15 @@ export const graft = createGraft({
 });
 ```
 
-## Read one document
+<Callout label="Do not read in a route loader" type="warning">
+  A route `loader` is the wrong place for this handle. TanStack Start loaders
+  are **isomorphic**: they run on the server for the first paint and in the
+  browser on client-side navigation. A handle that holds a database connection
+  belongs in neither the client bundle nor the browser, which is what
+  `createServerFn` is for.
+</Callout>
+
+## Read a document
 
 ```ts
 // src/routes/docs.$slug.tsx
@@ -74,7 +98,13 @@ const getDoc = createServerFn({ method: "GET" })
 There is no request-level memo. Reads go straight to the index; call sites own
 memoization.
 
-## Mount functions and MCP
+## Serve functions and MCP from your app
+
+This step is optional. It needs two more packages:
+
+```sh
+npm i @usegraft/auth @usegraft/mcp
+```
 
 Copy these mounts as written. The server-route factory name has moved across
 TanStack Start releases; the handler signature has not.
@@ -137,14 +167,14 @@ This endpoint serves content writes and asset uploads. JWT verification runs
 only when `issuers` is passed; the library does not read
 `GRAFT_TRUSTED_ISSUERS` (`graft serve` does). See [Auth](/docs/auth).
 Unauthenticated callers get 401. `allowAnonymous: true` is only for a
-loopback local server — never on anything reachable from a network. A public
+loopback local server. Never anything reachable from a network. A public
 docs surface is [`createDocsMcpHandler`](/docs/docs-mcp), which has no write
 tools and no anonymous opt-in.
 
 The parameter is typed structurally as `{ request: Request }`, so this package
 needs no `@tanstack/react-start` dependency.
 
-## Cache and invalidation
+## Refresh pages when content changes
 
 TanStack Start has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
 surrogate-key header on the responses you serve, and purge
@@ -160,13 +190,8 @@ headers.set("Cache-Tag", tagsFor("main", "pages", slug).join(","));
 `Cache-Tag` is the surrogate-key header. Purge the same strings
 `tagsForChanges` returns from your compile webhook.
 
-## The caveat you cannot infer
+## Next steps
 
-A route `loader` is the wrong place for this handle. TanStack Start loaders
-are **isomorphic**: they run on the server for the first paint and in the
-browser on client-side navigation. A handle that holds a database connection
-has no business in either the client bundle or the browser, which is what
-`createServerFn` is for.
-
-See [SDK reference](/docs/sdk-reference) for mounts across adapters and the
-honest gaps.
+- [Reading content](/docs/reading-content) covers list and search reads.
+- [SDK reference](/docs/sdk-reference) compares route mounts across frameworks.
+- [Connecting agents](/docs/connecting-agents) points an agent at your project.

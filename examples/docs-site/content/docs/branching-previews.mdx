@@ -1,58 +1,172 @@
 ---
 title: Branching & previews
-description: Copy-on-write content branches — overlay on any Postgres, or Neon physical forks.
-section: Operations & Deploy
-order: 1
+description: "Preview content changes on a branch, show them to reviewers, then merge. Production stays untouched until you do."
+section: Deploy & operate
+order: 2
 ---
 
-A branch gives an isolated view of content for previews. Two backends share the
-same commands:
+<p className="kicker">Show reviewers a content change before it reaches production.</p>
 
-| Backend | How | Cost | Where |
-| --- | --- | --- | --- |
-| `overlay` (default) | `branch_id` rows over `main`; branch wins; tombstones hide | Instant; copies nothing | Any Postgres |
-| `neon` | Physical copy-on-write database fork | Instant (Neon CoW) | Neon |
+<TierBadge tier="postgres" />
+
+You are redesigning the pricing page. The new copy is on a Git branch, but
+your reviewers do not want to read a diff. They want to click through the real
+site with the new pricing in place, while visitors keep seeing the current
+version.
+
+A **Graft branch** gives you that. It is a separate copy of the content index,
+built from the files on your Git branch. Your app can read from it instead of
+the main index, so a preview deployment shows exactly the branch's content.
+When the change is approved, you merge it.
+
+## How Git branches and Graft branches fit together
+
+They do different jobs, and you use both:
+
+- **The Git branch holds the files.** You edit, commit, and review content
+  there, as usual.
+- **The Graft branch holds the compiled index** for those files, so an app can
+  read and render them.
+
+You create a Graft branch, compile your Git branch's files into it, and point a
+preview at it. Merging happens in the same order: merge the Git branch first,
+then `graft merge` the Graft branch. `graft merge` never touches Git.
+
+Branches need the [Postgres engine](/docs/tiers). On the static engine every
+Git checkout already compiles its own index file, so there is nothing extra to
+create.
+
+## Create a branch and preview it
+
+<Steps>
+
+<Step title="Check out your Git branch and create a Graft branch">
+
+<CodeBlock title="terminal">
 
 ```sh
+git switch pricing-redesign
 graft branch create preview-pricing
-graft branch create big-redesign --backend neon
-graft branch list
+```
+
+</CodeBlock>
+
+The new branch starts empty and copies nothing. Any document you have not
+changed is read from the main index, which is why creating a branch is instant
+and dropping one is safe.
+
+</Step>
+
+<Step title="Compile your files into the branch">
+
+<CodeBlock title="terminal">
+
+```sh
 graft compile --branch preview-pricing
+```
+
+</CodeBlock>
+
+This is the same compile you already run, written into the branch instead of
+`main`. Run `graft branch list` to see every branch.
+
+</Step>
+
+<Step title="Read the branch from your app">
+
+Pass `branch` to any read. Single documents, lists, and search all respect it:
+
+<CodeBlock title="app/pricing/page.tsx">
+
+```tsx
+import { graft } from "@/lib/graft";
+
+const branch = process.env.GRAFT_PREVIEW_BRANCH; // "preview-pricing" on the preview deploy
+
+export default async function Pricing() {
+  const page = await graft.getContent("pages", "pricing", { branch });
+  return <h1>{page?.data.title}</h1>;
+}
+```
+
+</CodeBlock>
+
+On the preview deployment, set `GRAFT_PREVIEW_BRANCH=preview-pricing`. In
+production, leave it unset and reads use `main`.
+
+</Step>
+
+</Steps>
+
+To throw a branch away, drop it. `main` keeps no trace of it:
+
+```sh
 graft branch drop preview-pricing
 ```
 
-Reads are branch-aware. Pass `branch` to the SDK client. Overlay chains inherit
-parent documents; the leaf wins. Soft-deleted (tombstoned) parent rows stay hidden.
+## Choose where a branch lives
 
-## Data inheritance
+Graft can store a branch in two ways. Both answer the same commands.
 
-Previews inherit **content**, never operational data. A Neon fork starts with
-cleared `data_records` and approvals. You preview the site shape, not a copy of
-production users.
+| | Overlay (default) | Neon fork |
+| --- | --- | --- |
+| How it works | The branch's documents are stored in your existing database, labelled with the branch name | A full copy of the database, made instantly by Neon |
+| Cost | Instant, copies nothing | Instant, but needs a Neon project |
+| Use it for | Content previews and review | Rehearsing destructive changes, or previews that must never be able to reach production data |
 
-## Merge
+Create a Neon fork with `--backend neon`:
 
 ```sh
-graft merge preview-pricing            # dry-run report
-graft merge preview-pricing --apply    # replay ledger → move data rows → recompile
+graft branch create big-redesign --backend neon
 ```
 
-Content merge stays git-authoritative. Merge the git branch first so content
-migration files exist. `graft merge` never touches git. It:
+<Callout label="How an overlay hides a deleted page" type="note">
+  If you delete a page on a branch, Graft stores a small marker saying "hidden
+  on this branch", called a **tombstone**. Reads on the branch skip that page.
+  Dropping the branch removes the marker, so `main` is unaffected.
+</Callout>
 
-1. Replays the `migrations_applied` ledger onto the target
-2. Moves (or copies, for Neon) `data_records` created on the branch
-3. Recompiles the working tree into the target
+## What a branch does not copy
 
-Default is dry-run. Pass `--apply` to execute (same consent model as
-`graft migrate`).
+A branch copies **content**, never your users' data. A Neon fork starts with
+empty form submissions, orders, and approvals. You are previewing the site's
+pages, not a copy of production users.
 
-## Cache invalidation
+## Merge a branch
 
-Every projection returns a ChangeSet. SDKs map it to tags:
+<Callout label="Run a dry run first" type="danger">
+  A merge writes the branch's changes into its parent. Always run it without
+  `--apply` first and read the report, especially before merging into `main`.
+</Callout>
 
-- `tagsFor(...)` on reads
-- `tagsForChanges(branch, changeSet)` after compile
+1. Merge the Git branch, so the files and any migration files are on `main`.
+2. Run the merge as a dry run, and read what it will change:
 
-A preview branch never invalidates main's tags. See
-[Reading content](/docs/reading-content).
+   ```sh
+   graft merge preview-pricing
+   ```
+
+3. Apply it:
+
+   ```sh
+   graft merge preview-pricing --apply
+   ```
+
+Applying does three things, in order. It replays any
+[migrations](/docs/migrations) that ran on the branch but not on the target. It
+moves rows your users created on the branch to the target. Then it recompiles
+the target from your files.
+
+## Keep cached pages fresh
+
+Every compile reports which documents changed. The framework packages turn that
+into cache tags, so only the affected pages are refreshed, and a preview branch
+never clears `main`'s cache. [SDK reference](/docs/sdk-reference#cache-tags) lists
+the tag helpers.
+
+## Next steps
+
+- [Migrations](/docs/migrations) covers schema changes, which merges replay.
+- [Deploy](/docs/deploy) covers running a preview deployment.
+- [Operational data](/docs/operational-data) explains the user data a branch
+  does not copy.

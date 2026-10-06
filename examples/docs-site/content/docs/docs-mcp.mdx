@@ -2,32 +2,38 @@
 title: Public docs MCP
 description: A second, read-only MCP endpoint for your documentation, separate from the private one.
 section: Agents & MCP
-order: 2
+order: 4
 ---
 
-A Graft project can serve two MCP endpoints. They are different servers, not one
-server with a setting.
+<p className="kicker">Let anyone's agent read your published docs, with no login.</p>
+
+If your Graft project hosts documentation, people will ask their coding agents
+about it. A public docs endpoint lets those agents search and read your docs
+directly, instead of scraping web pages. It is read-only and needs no
+authentication.
+
+It is a separate server from your project's main MCP endpoint, not a setting on
+it:
 
 | Endpoint | Surface | Auth |
 | --- | --- | --- |
 | `POST /api/mcp` | Everything an agent can do | Required |
 | `POST /mcp` | Documentation only | None |
 
-## Why it exists
+## Why a separate endpoint
 
 Docs platforms already publish this shape, and agents arrive expecting it.
 Mintlify generates a docs MCP at `/mcp` for every site it hosts: public,
 unauthenticated, strictly read-only. Cloudflare runs a documentation server
 separately from its authenticated API server.
 
-Following the convention settles a design question rather than deferring it. An
-`expose` flag on the existing handler would mean maintaining "which reads are
-safe to publish" as a setting on the endpoint that also serves writes. A second
-factory retires the question.
+Keeping it separate also keeps it safe. If it were a flag on the main endpoint,
+which also handles writes, one wrong setting could publish more than your docs.
+As its own server, it can only ever serve the tools listed below.
 
 ## What it serves
 
-Four tools and the document resources.
+Five tools and the document resources.
 
 | Tool | Purpose |
 | --- | --- |
@@ -41,7 +47,7 @@ Documents are also addressable as
 `graft://<branch>/<collection>/<slug>` resources, so a client can attach a page
 rather than paste it.
 
-## What it omits, and why
+## What it leaves out, and why
 
 The exclusions are mostly not about writes, which is the part worth
 understanding.
@@ -58,7 +64,7 @@ understanding.
 Every item in the first three rows is a read. That is exactly why "read-only" is
 the wrong test for what belongs on a public endpoint.
 
-## Standing one up
+## Set one up
 
 `createDocsMcpHandler` returns the same `Request → Response` handler shape as
 the private one.
@@ -107,11 +113,11 @@ tells a client the endpoint is real and speaks a POST-only transport.
 
 Omitting them from the type is what keeps them from being configured by
 accident. A JavaScript caller who passes `functions` anyway gets it dropped at
-runtime, not merely unregistered — which is what the test asserts.
+runtime, not merely unregistered. That distinction is what the test asserts.
 
 Standing up the public endpoint cannot open the private one.
 
-## Scoping what is published
+## Choose what is published
 
 The server publishes the collections you hand it. To publish your docs but not
 your product catalog, pass only the collections you mean:
@@ -128,7 +134,7 @@ Remember that `get_content` and `list_content` read the authored files, so
 anything in a published collection's directory is published, including drafts
 you have not linked from anywhere.
 
-## Companion surfaces
+## Other ways agents can read your docs
 
 An MCP endpoint is one of several ways an agent can read documentation without
 scraping rendered HTML. This site also serves:
@@ -142,7 +148,7 @@ scraping rendered HTML. This site also serves:
 Those are generated from the content index and the sidebar's own grouping, so
 they cannot drift from the nav.
 
-<Callout label="dev server caveat">
+<Callout label="In the dev server" type="note">
   `/llms.txt` is shadowed under `astro dev`, because Vite serves the project
   root as static and a Graft project has an `llms.txt` at its root. Production
   is correct. Verify that route with `astro build`, not the dev server.
@@ -150,6 +156,6 @@ they cannot drift from the nav.
 
 ## Next steps
 
-- [Connecting agents](/docs/connecting-agents) — the private endpoint
-- [MCP tools](/docs/mcp-tools) — the full tool surface
-- [The agent surface](/docs/agent-surface) — why any of this exists
+- [Connecting agents](/docs/connecting-agents) documents the private endpoint.
+- [MCP tools](/docs/mcp-tools) lists the full tool surface.
+- [The agent surface](/docs/agent-surface) explains why any of this exists.

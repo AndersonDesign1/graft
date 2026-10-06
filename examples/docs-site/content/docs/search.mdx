@@ -1,15 +1,19 @@
 ---
 title: Search
 description: Full-text search on the content index and on operational data, on either engine.
-section: Core Concepts
-order: 3
+section: Content
+order: 2
 ---
 
-Search is a property of the index. It comes with the compile, on both engines,
-with no app-side bookkeeping and nothing extra to run.
+<p className="kicker">Add full-text search to your site with no search service to run.</p>
 
-One API covers both. The engine underneath differs, the call and the query
-syntax do not.
+Every compile also builds a full-text search index of your content. You do not
+run a search service, sync anything, or write indexing code. Call
+`searchContent` and you get the best matches first, each with a highlighted
+snippet.
+
+It works the same on both storage engines. The search technology underneath
+differs, but the call, the query syntax, and the order of results do not:
 
 | | Static index | Postgres |
 | --- | --- | --- |
@@ -22,7 +26,7 @@ The static engine translates the same websearch surface into an FTS5 `MATCH`
 expression, and its bm25 column weights mirror the Postgres A/B/C vector, so
 results come back in the same order for the same query.
 
-## Authored content
+## Search your content
 
 Surfaces:
 
@@ -42,16 +46,16 @@ overlay branches, search walks the branch chain so inherited documents appear.
 Snippets mark the matched terms with `<b>` on both engines. Render them or strip
 them, but know they are there.
 
-## Operational data
+## Search operational data
 
 Data search stays behind typed functions (`searchRecords` in core). The same
 authority and Zod rules apply as to other record helpers. Example apps expose
 gated functions such as `searchSubmissions`.
 
-Operational data requires the Postgres engine by construction, so this half has no static
+Operational data always needs the Postgres engine, so this section has no static
 equivalent. Calling it in static mode fails with `NEEDS_DATABASE`.
 
-## Language
+## Search in other languages
 
 The FTS config is English on both engines: `'english'` on Postgres, `porter
 unicode61` on FTS5. Per-collection language configs are an open follow-up.

@@ -1,9 +1,11 @@
 ---
 title: Rate limits
 description: Per-caller limits counted against the audit log, with no counter service to run.
-section: Security & Hardening
-order: 4
+section: Runtime data
+order: 3
 ---
+
+<p className="kicker">Count invocations per caller. No Redis, no counters.</p>
 
 <TierBadge tier="postgres" />
 
@@ -11,7 +13,7 @@ Rate limiting is a property of the audit log. Every invocation already writes a
 row, so counting recent rows for one caller is the limit. There is no Redis, no
 counter table, and nothing to keep in sync.
 
-## Declaring one
+## Add a limit to a function
 
 Per function:
 
@@ -35,15 +37,15 @@ createFunctionsHandler({ functions, db, rateLimit: { limit: 60, windowSeconds: 6
 ```
 
 `limit` is the maximum number of calls per caller per window. `windowSeconds` is
-the window, counted backwards from now — a rolling window, not a fixed bucket
-that resets on the minute.
+the window, counted backwards from now. It is a rolling window, not a fixed
+bucket that resets on the minute.
 
 `graft serve` already sets a backstop of 60 calls per 60 seconds, which any
 function's own `rateLimit` overrides. It applies the same backstop to the
-content API — see [The content API](#the-content-api) below, which counts
+content API. [The content API](#the-content-api) below counts
 differently.
 
-## Who a caller is
+## How callers are told apart
 
 | Actor | Counted as |
 | --- | --- |
@@ -81,7 +83,7 @@ This is deliberate, and the `fix` on the error says so:
 
 ```text
 Wait for the window to pass (Retry-After is set) before retrying. Do not
-tight-loop retries — every attempt, including rejected ones, counts against
+tight-loop retries. Every attempt, including rejected ones, counts against
 the limit.
 ```
 
@@ -93,7 +95,7 @@ which N concurrent requests all read the same count, all saw room, and all ran.
 Because the row already exists when the count is taken, the comparison is
 strict: at the limit, the row just inserted is the one over it.
 
-## When a caller is over
+## What a caller sees over the limit
 
 ```json
 {
@@ -107,7 +109,7 @@ strict: at the limit, the row just inserted is the one over it.
 The response is HTTP 429 and carries `Retry-After` set to `windowSeconds`. It
 also carries `x-graft-correlation-id`, like every other function response.
 
-## Limits need the audit log
+## Limits are counted from the audit log
 
 Rate limiting is counted against audit rows, so a handler configured with
 `audit: false` and a rate limit is a contradiction. It is refused at
@@ -118,13 +120,13 @@ Remove `audit: false` from createFunctionsHandler, or drop the rateLimit
 configuration.
 ```
 
-## It applies to MCP too
+## Agents are limited too
 
 `run_function` reuses the same handler, so a function's rate limit applies
 identically whether it was called over HTTP or by an agent. MCP is a door, not a
 bypass.
 
-## Choosing a limit
+## Choose a limit
 
 Two things to weigh.
 
@@ -174,7 +176,7 @@ on it:
 
 Identity is shared: the same `trustedProxyHops` rule, the same refusal to read
 `x-forwarded-for` unless you declare your proxy depth. A refusal is a `429`
-carrying `Retry-After`, and it is checked before the index is touched — a limit
+carrying `Retry-After`, and it is checked before the index is touched. A limit
 that fires after the query has already run protects nothing.
 
 ## What is not rate limited
@@ -184,7 +186,7 @@ that fires after the query has already run protects nothing.
 
 ## Next steps
 
-- [Functions & access](/docs/functions-and-access) — the rest of the function surface
-- [Audit & approvals](/docs/audit-and-approvals) — the rows the limit counts
-- [Observability](/docs/observability) — reading those rows back
-- [Error reference](/docs/errors) — `RATE_LIMITED` and its neighbours
+- [Functions & access](/docs/functions-and-access) documents the rest of the function surface.
+- [Audit & approvals](/docs/audit-and-approvals) documents the rows the limit counts.
+- [Observability](/docs/observability) explains reading those rows back.
+- [Error reference](/docs/errors) documents `RATE_LIMITED` and its neighbours.

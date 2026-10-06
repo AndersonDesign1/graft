@@ -1,12 +1,27 @@
 ---
 title: Migrations
-description: Schema changes as code — content codemods and transactional data backfills.
-section: Operations & Deploy
-order: 2
+description: Schema changes as code. Content codemods and transactional data backfills.
+section: Deploy & operate
+order: 3
 ---
 
-Migrations live in `migrations/<seq>-<name>.ts`. The filename is the ledger id.
-`graft migrate` is dry-run by default. Pass `--apply` to execute.
+<p className="kicker">Change your schema without breaking the content and data you already have.</p>
+
+Sooner or later you rename a field, split one into two, or change its type.
+The schema change itself is one line. The work is updating everything already
+written in the old shape, so that it still passes the new schema.
+
+A Graft migration is a TypeScript file that does that update. There are two
+kinds, depending on where the old data lives:
+
+- A **content codemod** rewrites your Markdown files, for content in Git.
+- A **data backfill** updates rows in Postgres, for
+  [operational data](/docs/operational-data).
+
+Migrations live in `migrations/<number>-<name>.ts` and run in number order.
+Graft records each one it applies in a table called the **ledger**
+(`migrations_applied`), so a migration never runs twice. `graft migrate`
+only reports what would change until you pass `--apply`.
 
 ```sh
 graft migrate            # report pending
@@ -45,7 +60,7 @@ unique race and becomes a no-op.
 
 Old index rows can look foreign to a new schema. Compile then refuses with
 `INDEX_OWNERSHIP`. That is the one legitimate use of
-`graft compile --prune-unknown` — run it once, after the rename lands.
+`graft compile --prune-unknown`. Run it once, after the rename lands.
 
 ## Merge interaction
 

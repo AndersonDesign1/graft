@@ -1,16 +1,33 @@
 ---
 title: Astro
-description: Frontmatter-only reads, graftRoute mounts, and no request memo.
-section: Frameworks & Adapters
-order: 2
+description: "Read Graft content in Astro page frontmatter, ship no client JavaScript, and serve functions from Astro routes."
+section: Frameworks
+order: 1
 ---
+
+<p className="kicker">Render Graft content in an Astro site that ships no client JavaScript.</p>
+
+This guide adds Graft to an Astro project. You read content in a page's
+frontmatter, so it is fetched at build or request time and the page ships no
+client JavaScript for it. You can also serve Graft's functions and MCP endpoint
+from Astro routes.
+
+**Before you start**, you need an Astro project and a `graft.config.ts` with
+compiled content. If you do not have those yet, run through
+[Getting started](/docs/getting-started) first.
+
+<Callout label="Prefer to let your agent do it?" type="note">
+  Paste this into your coding agent: "Add Graft to this Astro site following https://graft.page/docs/astro.md. Create the client in src/lib/graft.ts and render the pages collection at src/pages/[slug].astro."
+</Callout>
+
+## Install
 
 <Tabs labels="pnpm, npm, bun">
 
 <Tab>
 
 ```sh
-pnpm add @usegraft/sdk-astro @usegraft/auth @usegraft/mcp
+pnpm add @usegraft/sdk-astro @usegraft/db
 ```
 
 </Tab>
@@ -18,7 +35,7 @@ pnpm add @usegraft/sdk-astro @usegraft/auth @usegraft/mcp
 <Tab>
 
 ```sh
-npm i @usegraft/sdk-astro @usegraft/auth @usegraft/mcp
+npm i @usegraft/sdk-astro @usegraft/db
 ```
 
 </Tab>
@@ -26,7 +43,7 @@ npm i @usegraft/sdk-astro @usegraft/auth @usegraft/mcp
 <Tab>
 
 ```sh
-bun add @usegraft/sdk-astro @usegraft/auth @usegraft/mcp
+bun add @usegraft/sdk-astro @usegraft/db
 ```
 
 </Tab>
@@ -36,7 +53,7 @@ bun add @usegraft/sdk-astro @usegraft/auth @usegraft/mcp
 Build the handle once in a server-only module, then import it from frontmatter,
 endpoints, and middleware. Never from a client island.
 
-## Create the handle
+## Create the Graft client
 
 `graft init` scaffolds the static index. This docs site is that path:
 
@@ -63,7 +80,7 @@ export const db = createDb(process.env.DATABASE_URL!).db;
 export const graft = createGraft({ db, collections });
 ```
 
-## Read one document
+## Read a document
 
 ```astro
 ---
@@ -74,12 +91,23 @@ const page = await graft.getContent("pages", Astro.params.slug!);
 ---
 ```
 
-Astro frontmatter is server-side unconditionally — the only adapter here that
-is. There is no request-level memo, because `React.cache` has no Astro
+Astro frontmatter always runs server-side. No other adapter can promise that.
+There is no request-level memo, because `React.cache` has no Astro
 equivalent. Reads go straight to the index, which is the right default:
 prerendered pages read at build time, and an SSR page makes a handful of reads.
 
-## Mount functions and MCP
+<Callout label="Rendering the body" type="warning">
+  Bodies come back as authored source. Render them with Astro's own MDX pipeline.
+  There is no `MdxBody` here. That evaluator is Next-only.
+</Callout>
+
+## Serve functions and MCP from your app
+
+This step is optional. It needs two more packages:
+
+```sh
+npm i @usegraft/auth @usegraft/mcp
+```
 
 `graftRoute` binds a Graft handler to an Astro endpoint. It takes the handler,
 not a config object: Astro hands over an `APIContext`, and the handlers want
@@ -137,14 +165,14 @@ This endpoint serves content writes and asset uploads. JWT verification runs
 only when `issuers` is passed; the library does not read
 `GRAFT_TRUSTED_ISSUERS` (`graft serve` does). See [Auth](/docs/auth).
 Unauthenticated callers get 401. `allowAnonymous: true` is only for a
-loopback local server — never on anything reachable from a network. A public
+loopback local server. Never anything reachable from a network. A public
 docs surface is [`createDocsMcpHandler`](/docs/docs-mcp), which has no write
 tools and no anonymous opt-in.
 
 The parameter is typed structurally as `{ request: Request }`, so this package
 needs no `astro` dependency.
 
-## Cache and invalidation
+## Refresh pages when content changes
 
 Astro has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
 surrogate-key header on SSR responses, and purge
@@ -166,10 +194,8 @@ Astro.response.headers.set("Cache-Tag", tagsFor("main", "pages", slug).join(",")
 snippet should `export const db` next to `graft` so the mounts above can
 import it.
 
-## The caveat you cannot infer
+## Next steps
 
-Bodies come back as authored source. Render them with Astro's own MDX pipeline.
-There is no `MdxBody` here — that evaluator is Next-only.
-
-See [SDK reference](/docs/sdk-reference) for mounts across adapters and the
-honest gaps.
+- [Reading content](/docs/reading-content) covers list and search reads.
+- [SDK reference](/docs/sdk-reference) compares route mounts across frameworks.
+- [Connecting agents](/docs/connecting-agents) points an agent at your project.

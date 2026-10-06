@@ -43,20 +43,20 @@ export const docs = defineCollection({
   // nothing in the documents to infer it from, since `order` restarts inside
   // each section. Unlisted sections sort last, so new content never vanishes.
   sections: [
-    "Get Started",
-    "Frameworks & Adapters",
-    "Core Concepts",
-    "Security & Hardening",
+    "Get started",
+    "Frameworks",
+    "Content",
+    "Runtime data",
     "Agents & MCP",
-    "Operations & Deploy",
-    "API Reference",
+    "Deploy & operate",
+    "Reference",
   ],
   fields: {
     title: field.string({ description: "Doc page title (h1, sidebar label, <title>)." }),
     description: field.string({ description: "One-line summary shown in listings and meta." }),
     section: field.string({
       description:
-        'Sidebar group: "Get Started", "Frameworks & Adapters", "Core Concepts", "Security & Hardening", "Agents & MCP", "Operations & Deploy", or "API Reference".',
+        'Sidebar group: "Get started", "Frameworks", "Content", "Runtime data", "Agents & MCP", "Deploy & operate", or "Reference".',
     }),
     order: field.number({ optional: true, description: "Sort order within the section." }),
   },

@@ -1,12 +1,16 @@
 ---
 title: Functions & access
 description: Typed functions own operational data. Mutations deny anonymous callers by default.
-section: Operations & Deploy
-order: 3
+section: Runtime data
+order: 1
 ---
 
-Operational data (submissions, orders, comments) is written only through
-functions defined in config or under `graft/`:
+<p className="kicker">Write runtime data through typed functions.</p>
+
+Some data is written by users at runtime: submissions, orders, comments.
+None of it is authored in files. Graft calls that **operational data**, and it is
+written only through **functions**: typed, audited handlers you define in
+config or under `graft/`. Declare one:
 
 ```ts
 export const submitContact = defineFunction({
@@ -26,7 +30,7 @@ Serve at `POST /api/fn/<name>` (JSON object body) via a framework mount or
 `graft serve`. Success returns `{ data }`. Failure returns a GraftError with
 `fix`. Every response carries `x-graft-correlation-id`.
 
-<Callout label="invariant">
+<Callout label="Runs anywhere" type="note">
   Every function is a **stateless** Web-standard handler (`Request → Response`).
   The same bytes run embedded in any of the framework adapters, in a container,
   or on request-scoped compute.
@@ -36,10 +40,10 @@ Serve at `POST /api/fn/<name>` (JSON object body) via a framework mount or
 
 - Mutations reject anonymous callers unless `public: true`
 - `access: requireScopes("submissions:read")` replaces the default with a scope rule
-- `rateLimit` counts against the audit log — no separate counter service
+- `rateLimit` counts against the audit log. No separate counter service.
 - Every invocation writes an `audit_log` row (actor, correlation id, git SHA)
 
-## Context
+## What the handler receives
 
 Handlers receive `FunctionContext`: `{ input, db, actor, branch, request, correlationId }`.
 Use core helpers (`insertRecord`, `listRecords`, `updateRecord`, `deleteRecord`,

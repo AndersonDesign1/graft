@@ -1,13 +1,19 @@
 ---
 title: Observability
 description: Correlation ids, the audit log, the compilation trail, and what /healthz reports.
-section: Operations & Deploy
+section: Deploy & operate
 order: 4
 ---
 
-Graft records what happened in three tables and one endpoint. All of them are
-readable with ordinary SQL, and the ones an agent needs are also on MCP and the
-CLI.
+<p className="kicker">Find out what happened when a user reports a problem.</p>
+
+A user says the contact form failed. This page shows how to go from that report
+to the exact call, who made it, which version of your code handled it, and how
+it ended.
+
+Graft records this in three Postgres tables and reports health on one endpoint.
+You can read all of them with ordinary SQL, and the parts an agent needs are
+also available over MCP and the CLI.
 
 ## Correlation ids
 
@@ -118,7 +124,7 @@ A failed round-trip answers 503 with `{ "ok": false, "error": "…" }`.
 Point your platform's liveness probe at it. The `gitSha` field also makes it a
 cheap way to confirm which build is live.
 
-## What Graft does not do
+## Limitations
 
 - **No log shipping.** Handlers write to stdout. Collect it however your
   platform does.
@@ -148,7 +154,7 @@ intended answer.
 
 ## Next steps
 
-- [Audit & approvals](/docs/audit-and-approvals) — what the log is for
-- [Rate limits](/docs/rate-limits) — the other job these rows do
-- [Hardening](/docs/hardening) — which credential may write what
-- [Deploy](/docs/deploy) — where `/healthz` lives
+- [Audit & approvals](/docs/audit-and-approvals) explains what the log is for.
+- [Rate limits](/docs/rate-limits) covers the other job these rows do.
+- [Hardening](/docs/hardening) states which credential may write what.
+- [Deploy](/docs/deploy) tells where `/healthz` lives.

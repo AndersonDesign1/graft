@@ -2,10 +2,13 @@
 title: MCP tools
 description: All eighteen tools, what each one needs, and the annotations and output schemas a client can rely on.
 section: Agents & MCP
-order: 3
+order: 2
 ---
 
-The project MCP server exposes eighteen tools. This page is the full list. For
+<p className="kicker">Every tool an agent can call, with its inputs and results.</p>
+
+Use this page to look up a tool. The project MCP server exposes eighteen tools,
+grouped below by what they do. For
 how to connect one, see [Connecting agents](/docs/connecting-agents).
 
 Tools are not a bypass. `run_function` reuses the same functions handler as
@@ -168,7 +171,7 @@ code.
 `openWorldHint` is false on all eighteen. Graft's domain is the collections a
 project declares, which is a closed set known at config load.
 
-<Callout label="hints, not a boundary">
+<Callout label="Annotations are hints, not security" type="warning">
   Annotations are hints. The MCP spec says a client must not make an
   authorization decision on annotations from a server it does not trust, and
   that is right. Graft's real gates are the scope check, the one-shot
@@ -184,7 +187,7 @@ Results also carry `structuredContent` alongside the text block.
 
 The two exemptions are deliberate. `run_function` returns whatever the project's
 function returns, and `delete_content` spreads the deleted function's own return
-over the top level. Both are open by construction, and a schema saying `unknown`
+over the top level. Both are open by design, and a schema saying `unknown`
 would be a contract promising nothing.
 
 ## Scopes
@@ -201,7 +204,7 @@ function.
 
 A credential without the scope gets `UNAUTHORIZED` naming what was required and
 what it holds. An unauthenticated mount that opted into anonymous callers is
-unscoped by construction, so nothing is refused there — which is why anonymous
+unscoped by design, so nothing is refused there. That is why anonymous
 MCP is loopback-only.
 
 One failure mode is worth knowing because it shipped in one of Graft's own
@@ -210,14 +213,14 @@ pass every scope check silently. That now fails closed with `CONFIG_INVALID`.
 
 ## Static projects
 
-Postgres-engine tools stay registered on a static project and answer
+Tools that need Postgres stay listed on a static project and answer
 `NEEDS_DATABASE` with the upgrade rather than vanishing. `delete_content` and
 `list_compilations` refuse for reasons covered in
-[Storage Engines](/docs/tiers#agents-work-on-both-engines).
+[Storage engines](/docs/tiers#agents-on-the-static-engine).
 
 ## Next steps
 
-- [Connecting agents](/docs/connecting-agents) — transports, identity, and setup
-- [MCP resources & prompts](/docs/mcp-resources-and-prompts) — the rest of the surface
-- [The agent surface](/docs/agent-surface) — why this exists in place of a dashboard
-- [Error reference](/docs/errors) — every code a tool can return
+- [Connecting agents](/docs/connecting-agents) covers transports, identity, and setup.
+- [MCP resources & prompts](/docs/mcp-resources-and-prompts) covers the rest of the surface.
+- [The agent surface](/docs/agent-surface) explains why this exists in place of a dashboard.
+- [Error reference](/docs/errors) lists every code a tool can return.

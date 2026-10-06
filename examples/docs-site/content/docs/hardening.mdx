@@ -1,16 +1,25 @@
 ---
 title: Hardening
 description: Two database credentials, and the one thing a runtime role can never do.
-section: Security & Hardening
-order: 2
+section: Deploy & operate
+order: 1
 ---
+
+<p className="kicker">Limit what your deployed app's database login can do.</p>
 
 <TierBadge tier="postgres" />
 
-A deployed Graft app holds a database credential. `graft harden` makes that
-credential unable to approve its own destructive calls.
+Your deployed app connects to Postgres with a username and password. If that
+password leaks, or a bug in your app misuses it, whoever holds it can do
+anything that database user can do. That includes approving its own deletions,
+which would defeat [human approvals](/docs/audit-and-approvals).
 
-## Two credentials
+`graft harden` fixes this by splitting access into two database roles. The
+role your app runs as can serve content and run functions, but can never
+approve a destructive action. Approvals need the other role, which stays on
+your machine or in CI.
+
+## Use two database roles
 
 | Role | Holds | Does |
 | --- | --- | --- |
@@ -28,13 +37,13 @@ Run `graft harden` with the **operator** `DATABASE_URL`. It applies grants to an
 existing role; it does not create one. A role that does not exist yet fails with
 `INPUT_VALIDATION_FAILED` and a `fix` containing the `CREATE ROLE` line.
 
-<Callout label="it grants, it does not revoke">
+<Callout label="It only adds permissions" type="warning">
   `graft harden` issues `GRANT` statements and nothing else. It cannot take a
   privilege away, so **the guarantee below only holds for a role that started
   with none.** Point it at a superuser, or a role that inherits from a group
   with broad rights, or one you granted something to earlier, and it will add
   the Graft grants on top and report success while the role keeps everything it
-  already had — including the `UPDATE` on `approvals` this whole page exists to
+  already had, including the `UPDATE` on `approvals` this whole page exists to
   deny it.
 
   Create the role fresh, as above, and grant it nothing else. Then verify rather
@@ -56,7 +65,7 @@ SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'graft_runtime';
 Then deploy with the runtime role's URL, and keep the operator URL for compile,
 migrate, merge, and approve.
 
-## What the runtime role gets
+## What your app's role can do
 
 Wide enough that hardening costs a deployment nothing:
 
@@ -75,20 +84,20 @@ flips an approved row to consumed.
 That is why the container applies hardening by default rather than offering it
 as an opt-in that trades a working feature for a second layer.
 
-## What it never gets
+## What your app's role can never do
 
 No schema changes. No `CREATE`, no DDL, no write to `migrations_applied`.
 Branch create and merge stay operator work.
 
 And, the point of the whole exercise, two denials on `approvals`:
 
-1. **No `UPDATE`.** It cannot flip a pending row to approved.
-2. **Column-scoped `INSERT` only.** It can file a request, but it cannot name
-   `status`.
+- **No `UPDATE`.** It cannot flip a pending row to approved.
+- **Column-scoped `INSERT` only.** It can file a request, but it cannot name
+  `status`.
 
-Both halves are load-bearing. Withholding `UPDATE` alone left the runtime able
+Both parts are required. Withholding `UPDATE` alone left the runtime able
 to mint a row that was already `approved` and consume it, which is cheaper than
-flipping one — `status` is plain text with a `DEFAULT` rather than a `CHECK`.
+flipping one. `status` is plain text with a `DEFAULT` rather than a `CHECK`.
 Then `decideApproval` never runs, so the separation-of-duties check never runs
 either.
 
@@ -97,7 +106,7 @@ The seven columns it may insert are exactly the ones the approval store writes:
 `requested_by_id`, `correlation_id`. `id`, `status` and `created_at` take their
 defaults, and the `decided_*` columns stay null until an operator decides.
 
-## What hardening does not buy
+## Limitations
 
 Worth being precise about, because the wrong mental model here is worse than
 none.
@@ -105,7 +114,7 @@ none.
 The runtime role holds `UPDATE` on `content_index`, because `write_content`
 compiles and compile is the step that reaches Postgres. A stolen runtime
 credential can therefore rewrite or hide every document by raw SQL, including
-setting `deleted = true` — which is the effect `delete_content` gates behind a
+setting `deleted = true`. That is the effect `delete_content` gates behind a
 human.
 
 Withholding `DELETE` would not prevent that. Removal here **is** an `UPDATE` of
@@ -121,17 +130,17 @@ The approval gate is different, and that difference is the reason it is enforced
 in the database rather than trusted to the application. It survives a stolen
 credential.
 
-## Consequences for a hardened deployment
+## What changes after hardening
 
 Some operations move to the operator path. That is intended, not a gap.
 
 | Operation | On a hardened deployment |
 | --- | --- |
 | `graft approve` / `graft deny` | Operator credential only |
-| `decide_approval` over MCP | Fails — the role cannot `UPDATE approvals` |
+| `decide_approval` over MCP | Fails. The role cannot `UPDATE approvals` |
 | Studio's approve and deny | Same, so the approvals view is effectively read-only |
-| Elicited approvals | Fails by construction, which is the intended answer |
-| `graft compile` from a remote MCP write | Works — the runtime may project content |
+| Elicited approvals | Always fail, by design |
+| `graft compile` from a remote MCP write | Works. The runtime may project content |
 | `graft migrate --apply` | Operator credential only |
 
 `decided_role` is stamped server-side from `current_user`, so the audit trail
@@ -153,7 +162,7 @@ behalf.
 
 See [Configuration](/docs/configuration#serve) for those variables.
 
-## Checking it worked
+## Check that it worked
 
 `graft harden` returns the statements it applied. To verify the denial that
 matters, connect as the runtime role and try:
@@ -167,7 +176,7 @@ holds against raw SQL, not just against the application.
 
 ## Next steps
 
-- [Audit & approvals](/docs/audit-and-approvals) — the gate this protects
-- [Deploy](/docs/deploy) — where each credential goes
-- [Studio](/docs/studio) — what a hardened deployment's approvals view can do
-- [Configuration](/docs/configuration) — the container's hardening variables
+- [Audit & approvals](/docs/audit-and-approvals) documents the gate this protects.
+- [Deploy](/docs/deploy) explains where each credential goes.
+- [Studio](/docs/studio) shows what a hardened deployment's approvals view can do.
+- [Configuration](/docs/configuration) lists the container's hardening variables.

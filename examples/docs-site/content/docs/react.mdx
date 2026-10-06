@@ -1,22 +1,31 @@
 ---
 title: React
-description: Browser reads over HTTP. No db. Hooks stay a typed binding.
-section: Frameworks & Adapters
-order: 1
+description: "Read Graft content from browser React code with hooks that call the Content API."
+section: Frameworks
+order: 5
 ---
 
-The `@usegraft/sdk-react` package provides React hooks for reading content
-in the browser over HTTP.
+<p className="kicker">Read Graft content from React code that runs in the browser.</p>
 
-Use this package when building client-side Single Page Apps (Vite, Create React App)
-or client components that need dynamic data (such as live search bars, inline previews,
-or interactive filters).
+`@usegraft/sdk-react` gives you React hooks that read content over HTTP. Use it
+when your React code runs in the browser and cannot open the index itself:
 
-<Callout label="Server vs Browser" type="note">
-  If you are using Next.js, Astro, SvelteKit, TanStack Start, or React Router with
-  Server Components or loaders, use the corresponding server SDK instead.
-  The server SDKs query your database or static SQLite index directly without an
-  extra HTTP network roundtrip.
+- a single-page app built with Vite, or
+- an interactive component that loads content after the page is on screen,
+  such as a live search box or a filter.
+
+The hooks call Graft's [Content API](/docs/content-api), so something has to
+serve it: `graft serve`, or the Content API handler mounted in your own
+backend. The browser never receives a database connection or the index file.
+
+<Callout label="Server-rendered app?" type="note">
+  If you use Next.js, Astro, SvelteKit, TanStack Start, or React Router with
+  loaders, read on the server with that framework's package instead. It reads
+  the index directly, with no extra HTTP request.
+</Callout>
+
+<Callout label="Prefer to let your agent do it?" type="note">
+  Paste this into your coding agent: "Add Graft content to this React app following https://graft.page/docs/react.md. Use createGraftHooks with the Content API endpoint at /api/content/v1."
 </Callout>
 
 ---
@@ -229,17 +238,17 @@ export function usePostQuery(slug: string) {
 
 ---
 
-## Architecture & Security Notes
+## What the browser can and cannot reach
 
-- **No Direct Database Access:** `@usegraft/sdk-react` communicates strictly over
+- **No database access:** `@usegraft/sdk-react` communicates strictly over
   HTTP. It does not accept a `db` connection or database credentials, ensuring your
   database connection strings never leak into client-side bundles.
-- **Branch Pinning:** A remote Content API endpoint is pinned to a specific branch on the
+- **One branch per endpoint:** A remote Content API endpoint is pinned to a specific branch on the
   server. To preview branch content, point your client at the preview deployment's
   URL.
 
 ## Next steps
 
-- [Content API](/docs/content-api) — How to serve the HTTP endpoint with `graft serve` or custom mounts.
-- [Schema](/docs/schema) — Define your collections and field validations.
-- [SDK reference](/docs/sdk-reference) — Complete API reference across all client and server SDKs.
+- [Content API](/docs/content-api) explains how to serve the HTTP endpoint with `graft serve` or custom mounts.
+- [Schema](/docs/schema) defines collections and field validations.
+- [SDK reference](/docs/sdk-reference) is the complete API reference across all client and server SDKs.

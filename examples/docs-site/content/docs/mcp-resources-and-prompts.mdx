@@ -2,8 +2,10 @@
 title: MCP resources & prompts
 description: Documents addressable by URI, workflows filled in from the live project, and arguments that autocomplete.
 section: Agents & MCP
-order: 4
+order: 3
 ---
+
+<p className="kicker">Attach documents and workflows, not just tools.</p>
 
 Tools are requests to do something. Resources are things that exist, and prompts
 are workflows a person picks on purpose. Graft serves both alongside its
@@ -32,7 +34,7 @@ Resource reads go to the authored MDX, not the index. Two consequences:
 - A resource reflects the working tree, not the last compile.
 - Resources work on a static project with no database at all.
 
-Reads are byte-exact — the same promise `write_content` makes in the other
+Reads are byte-exact. The same promise `write_content` makes in the other
 direction.
 
 ### The schema resource
@@ -106,11 +108,11 @@ they have no authored documents to write or revise.
 
 Resources and prompts are asserted on the HTTP transport as well as stdio. That
 transport builds a fresh server per request, and "it is the same factory" is
-exactly how an earlier identity bug survived — correct on stdio, broken over
+exactly how an earlier identity bug survived. Correct on stdio, broken over
 HTTP.
 
 ## Next steps
 
-- [MCP tools](/docs/mcp-tools) — the eighteen tools
-- [Connecting agents](/docs/connecting-agents) — how to reach the server
-- [Public docs MCP](/docs/docs-mcp) — the read-only mount, and what it omits
+- [MCP tools](/docs/mcp-tools) lists the eighteen tools.
+- [Connecting agents](/docs/connecting-agents) explains how to reach the server.
+- [Public docs MCP](/docs/docs-mcp) documents the read-only mount and what it omits.

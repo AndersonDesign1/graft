@@ -1,15 +1,23 @@
 ---
 title: Schema
-description: defineCollection and field builders — the single Zod layer for content and functions.
-section: Core Concepts
+description: defineCollection and field builders. The single Zod layer for content and functions.
+section: Content
 order: 0
 ---
 
-Define collections and fields in `graft.config.ts` (and under `graft/` when you
-add primitives). The same definitions type the compiler, SDK reads, MCP tools,
-and function inputs.
+<p className="kicker">Describe content once. Type everything from it.</p>
 
-## defineCollection
+The schema says what fields each kind of content has. Graft uses it to check
+every file when you compile, to check inputs to your functions, and to type
+everything your app reads. You write it once, in `graft.config.ts`.
+
+It is built on [Zod](https://zod.dev), so there is no code generation step:
+TypeScript reads the types straight from what you declare. This page shows how
+to declare a collection, choose field types, and export it from your config.
+
+## Declare a collection
+
+Name the collection, describe it for agents, and list its fields:
 
 ```ts
 import { defineCollection, field } from "@usegraft/core";
@@ -33,7 +41,7 @@ export const pages = defineCollection({
 | `fields` | Map of `field.*` builders |
 | `authority` | Omit for file-authoritative. Set `"db-authoritative"` for operational rows |
 
-## Field builders
+## Choose a field type
 
 | Builder | Stores | Notes |
 | --- | --- | --- |
@@ -49,7 +57,7 @@ export const pages = defineCollection({
 
 All builders accept `{ optional: true, description: "…" }`.
 
-### Nested example
+### Nest fields
 
 ```ts
 faqs: field.array({
@@ -63,7 +71,7 @@ faqs: field.array({
 }),
 ```
 
-### What a collection looks like once declared
+### See it live: this page's own schema
 
 This is the `docs` collection that renders the page you are reading, generated
 from its own schema rather than written out here. The same descriptor answers
@@ -72,7 +80,7 @@ drift from what the compiler enforces.
 
 <FieldTable collection="docs" />
 
-## Merge with primitives
+## Combine with owned primitives
 
 `graft add` drops source under `graft/`. Merge your collections with the generated
 barrel:
@@ -89,13 +97,13 @@ export const { collections, functions } = mergePrimitives([
 
 Duplicate keys throw `CONFIG_INVALID`. Nothing is overridden silently.
 
-## Wire the config
+## Export collections and functions
 
 Export `collections` (and `functions` when you define them). The CLI loads the
 file with jiti. Framework apps import the same module for typed reads.
 
 ## Next steps
 
-- [Reading content](/docs/reading-content) — typed reads across frameworks
-- [Assets](/docs/assets) — `field.asset` and uploads
-- [Functions & access](/docs/functions-and-access) — operational data mutations
+- [Reading content](/docs/reading-content) covers typed reads across frameworks.
+- [Assets](/docs/assets) covers `field.asset` and uploads.
+- [Functions & access](/docs/functions-and-access) covers operational data mutations.

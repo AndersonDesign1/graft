@@ -13,21 +13,21 @@ describe("groupDocsNav", () => {
   it("sorts declared sections and their pages while retaining unknown sections", () => {
     const grouped = groupDocsNav(
       [
-        doc("concepts-later", "Core Concepts", 2),
+        doc("concepts-later", "Content", 2),
         doc("unknown-b", "Troubleshooting", 1),
-        doc("frameworks-unordered", "Frameworks & Adapters"),
-        doc("start", "Get Started", 1),
-        doc("frameworks-first", "Frameworks & Adapters", 1),
+        doc("frameworks-unordered", "Frameworks"),
+        doc("start", "Get started", 1),
+        doc("frameworks-first", "Frameworks", 1),
         doc("unknown-a", "Appendix", 1),
-        doc("concepts-first", "Core Concepts", 1),
+        doc("concepts-first", "Content", 1),
       ],
       SECTION_ORDER,
     );
 
     expect(grouped.map(({ section }) => section)).toEqual([
-      "Get Started",
-      "Frameworks & Adapters",
-      "Core Concepts",
+      "Get started",
+      "Frameworks",
+      "Content",
       "Appendix",
       "Troubleshooting",
     ]);

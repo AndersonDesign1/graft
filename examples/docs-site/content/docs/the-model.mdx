@@ -1,59 +1,81 @@
 ---
-title: The model
-description: Git owns authored content. Postgres is a derived index. One Zod layer validates everything.
-section: Get Started
+title: How Graft works
+description: "Where your content lives, what compiling does, and the one schema that checks everything."
+section: Get started
 order: 2
 ---
 
-<Callout label="invariant">
-  **Git is authoritative for authored content. Postgres is a derived index.**
-  If they disagree, recompile. Git wins.
+<p className="kicker">Four ideas that explain the rest of the docs.</p>
+
+After [Getting started](/docs/getting-started) you have a project that compiles
+and a page that reads content. This page explains what happened, so the rest of
+the docs make sense. It introduces four ideas, one at a time:
+
+1. Your files are the source of truth.
+2. Content and user data are kept apart.
+3. One schema checks everything.
+4. Errors tell you what to do next.
+
+## Your files are the source of truth
+
+You write content as files in Git. Your app does not read those files directly,
+because searching and filtering hundreds of files on every request would be
+slow. Instead, `graft compile` reads them, checks each one, and builds an
+**index**: a copy of your content organized for fast queries.
+
+The index is always a copy. If it is lost, deleted, or out of date, run
+`graft compile` and it is rebuilt from your files. This is why Graft calls the
+index **derived**: everything in it comes from Git.
+
+<Callout label="The rule" type="note">
+  If the index and your files ever disagree, your files are right. Recompile.
 </Callout>
 
-Authored content is MDX in your repo. `graft compile` validates each file and
-projects it into `content_index`. The projection is atomic and hash-diffed:
-unchanged rows keep timestamps; the ChangeSet lists what moved.
+Compiling only changes what changed. Graft compares each file with what the
+index already holds and updates just the documents that differ, so unchanged
+documents keep their timestamps. The list of documents a compile added,
+changed, or removed is called a **ChangeSet**. Framework packages use it to
+refresh only the cached pages that changed.
 
-Authoring and ops go through files, the CLI, and MCP. There is no mandatory
-admin dashboard. Graft is open source and self-hostable on your own Postgres.
+## Content and user data are kept apart
 
-## Two kinds of data
+Some data cannot live in files. When a visitor submits a form, places an order,
+or leaves a comment, that data is created at runtime, by your users, and there
+is no file in Git to rebuild it from. Graft calls this **operational data**.
 
-| | Authored content | Operational data |
+The two kinds are stored and written differently:
+
+| | Content | Operational data |
 | --- | --- | --- |
-| Owner | git (files) | Postgres (rows) |
 | Examples | pages, docs, products | form submissions, orders, comments |
-| Written by | MDX + compile, or MCP `write_content` | typed functions only |
-| Collection flag | default (`file-authoritative`) | `authority: "db-authoritative"` |
+| Source of truth | files in Git | rows in Postgres |
+| Who writes it | you and agents, by editing files | your users, through typed functions |
+| How you declare it | a normal collection | a collection with `authority: "db-authoritative"` |
 
-Operational data never lives in files. Authored content is never written through
-the function API as rows. Mixing the two raises `AUTHORITY_MISMATCH` at compile
-time and at the function boundary.
+Operational data needs the [Postgres engine](/docs/tiers), because that is
+where its rows live. If a collection is declared one way and written the other,
+Graft stops with `AUTHORITY_MISMATCH` and tells you which collection is wrong.
+[Operational data](/docs/operational-data) covers it in full.
 
-## Edit surfaces
+## One schema checks everything
 
-| Surface | Authored content | Operational data |
-| --- | --- | --- |
-| Agent (MCP / CLI) | Write files → compile | Call typed mutations |
-| You (editor / git) | Same files; commit as usual | Same functions (or CLI approve for destructive calls) |
-| Frontend SDK | Read (+ optional future visual-edit → file diffs) | Read / policy-scoped write |
+You describe each collection once, in `graft.config.ts`. That one description
+is used everywhere data crosses a boundary:
 
-## One Zod layer
+- `graft compile` checks every file's frontmatter against it.
+- Typed functions check their inputs against it.
+- Reads check documents on the way out.
 
-The schema in `graft.config.ts` is Zod under the hood. It is the only validation
-layer:
+The schema is built on [Zod](https://zod.dev), a TypeScript validation
+library, so you get its types for free. There is no code generation step:
+`getContent("pages", "home")` is typed by the same object that checked the
+file. [Schema](/docs/schema) shows how to write one.
 
-- the **compiler** validates frontmatter against it
-- **functions** validate inputs against it
-- **reads** re-validate on the way out
+## Errors tell you what to do next
 
-There is no codegen step. `defineCollection` infers document types, so
-`getContent("pages", "home")` is typed by the same object that validated the file.
-
-## Errors teach
-
-Every boundary error is a `GraftError` with a `fix` — the next concrete step,
-written so an agent can act:
+Every Graft error has a `code`, a `message` saying what happened, and a `fix`
+naming the next step. The `fix` is written so that both you and an agent can
+act on it without searching the docs:
 
 ```json
 {
@@ -63,17 +85,24 @@ written so an agent can act:
 }
 ```
 
+The [Error reference](/docs/errors) lists every code.
+
 ## One database per project
 
-Projection makes the index match your content tree. Pointing two projects at one
-`DATABASE_URL` would let each purge the other's documents. Graft refuses: if a
-compile would remove collections your schema does not know, it aborts with
-`INDEX_OWNERSHIP` and writes nothing.
+On the Postgres engine, compiling makes the index match your current schema
+exactly. That includes removing collections your schema no longer declares. If
+two projects pointed at the same database, each compile would delete the other
+project's content.
 
-Use `--prune-unknown` only when you renamed or deleted a collection on purpose.
+Graft prevents this. If a compile would remove collections your schema does not
+know about, it stops with `INDEX_OWNERSHIP` and writes nothing. Give each
+project its own database, or its own [branch](/docs/branching-previews) of one.
+
+If you renamed or deleted a collection on purpose, run the compile with
+`--prune-unknown` to allow the removal.
 
 ## Next steps
 
-- [Schema](/docs/schema) — define collections and fields
-- [Getting started](/docs/getting-started) — run the loop
-- [Branching & previews](/docs/branching-previews) — overlay and Neon backends
+- [Storage engines](/docs/tiers) helps you choose between static and Postgres.
+- [Schema](/docs/schema) shows how to describe your collections.
+- [Reading content](/docs/reading-content) covers reads in every framework.

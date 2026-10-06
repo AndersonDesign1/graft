@@ -1,9 +1,11 @@
 ---
 title: Studio
-description: The optional editing UI — content tree, rich and raw editors, a Changes drawer that commits, and revert from a compilation.
-section: Core Concepts
-order: 6
+description: The optional editing UI. Content tree, editors, a Changes drawer that commits, and revert from a compilation.
+section: Content
+order: 5
 ---
+
+<p className="kicker">Edit content visually. Every action exists on the CLI too.</p>
 
 Studio is an editing UI for a Graft project. It is opt-in: nothing requires it,
 and every operation it performs also exists on the CLI and on MCP.
@@ -51,9 +53,9 @@ hiding it.
 | State | Meaning |
 | --- | --- |
 | `synced` | On disk, in the index, hashes match |
-| `drifted` | On disk and in the index, hashes differ — edited since the last compile |
-| `unindexed` | On disk only — never compiled |
-| `orphaned` | In the index only — the file is gone and the index is stale |
+| `drifted` | On disk and in the index, hashes differ. Edited since the last compile. |
+| `unindexed` | On disk only. Never compiled. |
+| `orphaned` | In the index only. The file is gone and the index is stale. |
 
 The tree is built filesystem-first and enriched from the index, so a project
 that has never compiled still shows its documents. Anything that is not
@@ -94,11 +96,11 @@ document.
 Saving is automatic, with two independent guards against writing a file you did
 not edit.
 
-1. Changes are ignored until a real interaction proves a human is driving. The
-   rich editor emits an update on mount from its own re-serialization, and
-   treating that as an edit would mean opening a document rewrote it.
-2. A save that would write bytes identical to what was loaded is refused
-   outright.
+- Changes are ignored until a real interaction proves a human is driving. The
+  rich editor emits an update on mount from its own re-serialization, and
+  treating that as an edit would mean opening a document rewrote it.
+- A save that would write bytes identical to what was loaded is refused
+  outright.
 
 Keep both in mind if you are reading the source: the first is a heuristic about
 intent, the second is a fact about bytes.
@@ -131,8 +133,8 @@ knowing:
 | Identity checked first | Committer identity is verified before anything is staged, so a failure leaves the git index untouched |
 | Pathspec-scoped | The commit records exactly the selected paths and leaves the rest of your staged work alone |
 
-A project not under git is not an error. The drawer says so and explains why —
-content still compiles and serves without git.
+A project not under git is not an error. The drawer says so and explains why.
+Content still compiles and serves without git.
 
 ## Revert from a compilation
 
@@ -151,7 +153,7 @@ operator's call.
 ## Who can do what
 
 Studio's API separates three permissions, because an agent that may read the
-content tree has no business committing it, and deciding approvals is the human
+content tree should not be able to commit it, and deciding approvals is the human
 gate.
 
 | Scope | Covers |
@@ -171,7 +173,7 @@ mount authenticates anyone:
 | Mount | Decider recorded |
 | --- | --- |
 | `graft studio` | The OS user this process runs as |
-| `graft serve --studio` on loopback | `studio-serve`, the mount identity — there is no caller to attribute to |
+| `graft serve --studio` on loopback | `studio-serve`, the mount identity. There is no caller to attribute to |
 | `graft serve --studio` off loopback | The authenticated bearer/OIDC principal |
 
 Off loopback the principal wins because there *is* a verified caller, and
@@ -182,9 +184,9 @@ requester-cannot-decide rule exists to prevent.
 
 Deciding an approval is a plain `UPDATE` on `approvals`, which a hardened
 runtime role cannot perform. On a hardened deployment the approvals view is
-read-only by construction. See [Hardening](/docs/hardening).
+read-only by design. See [Hardening](/docs/hardening).
 
-## Headless parity
+## Everything Studio does, without Studio
 
 Every Studio operation exists elsewhere. Nothing is UI-only.
 
@@ -202,7 +204,7 @@ The UI is a client of `/api/studio/v1/*`, documented at
 
 ## Next steps
 
-- [Studio API](/docs/studio-api) — the endpoints the UI calls
-- [Hardening](/docs/hardening) — why a runtime role cannot approve
-- [Audit & approvals](/docs/audit-and-approvals) — the gate Studio surfaces
-- [MDX safety](/docs/mdx-safety) — what a save refuses
+- [Studio API](/docs/studio-api) documents the endpoints the UI calls.
+- [Hardening](/docs/hardening) explains why a runtime role cannot approve.
+- [Audit & approvals](/docs/audit-and-approvals) documents the gate Studio surfaces.
+- [MDX safety](/docs/mdx-safety) documents what a save refuses.

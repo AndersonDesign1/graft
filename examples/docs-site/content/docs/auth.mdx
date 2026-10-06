@@ -1,23 +1,32 @@
 ---
 title: Auth
 description: Graft verifies identity. It never mints it. OIDC issuers and local dev tokens.
-section: Security & Hardening
-order: 1
+section: Runtime data
+order: 2
 ---
 
-`@usegraft/auth` resolves `Request → FunctionActor`. Graft checks tokens. Your app
-(or IdP) issues them.
+<p className="kicker">Tell Graft who is calling, using the login your app already has.</p>
 
-## Resolver inputs
+When someone calls one of your [typed functions](/docs/functions-and-access),
+or an agent connects over MCP, Graft needs to know who they are. It uses that
+to decide what they may do, and to record who did what in the audit log.
+
+Graft does not create accounts or log anyone in. Your app, or an identity
+provider such as Auth0, Clerk, or WorkOS, already does that and issues a
+token. `@usegraft/auth` checks that token on each request and turns it into
+the caller's identity, which Graft calls the **actor** (`FunctionActor` in
+code).
+
+## Where a caller's identity comes from
 
 | Source | Use |
 | --- | --- |
 | OIDC bearer JWT | Production. Verified with jose against trusted issuers (JWKS inline, URL, or discovery). Checks `iss`, `exp`, `aud`. Scopes from `scope` / `scopes` / `permissions` |
 | `GRAFT_DEV_TOKEN` | Local bootstrap. Optional `GRAFT_DEV_SCOPES` |
 | No token | Anonymous |
-| Bad token | `TOKEN_INVALID` (401) — never a silent downgrade to anonymous |
+| Bad token | `TOKEN_INVALID` (401). The server never downgrades silently to anonymous |
 
-## Env
+## Configure it
 
 ```sh
 GRAFT_DEV_TOKEN=dev-secret
@@ -27,10 +36,10 @@ GRAFT_TRUSTED_ISSUERS=https://your-idp.example
 
 `GRAFT_TRUSTED_ISSUERS` is a comma-separated list of issuer URLs. Discovery loads
 JWKS for each. `graft serve` parses that env itself. An embedded
-`createActorResolver` does not — JWT verification is created only when you pass
+`createActorResolver` does not. The library creates JWT verification only when you pass
 `issuers`. Omit them and a valid bearer is `TOKEN_INVALID` (401).
 
-## Resolver
+## Create a resolver in code
 
 ```ts
 import { createActorResolver } from "@usegraft/auth";
@@ -67,14 +76,14 @@ access: requireScopes("submissions:read"),
 Anonymous and unscoped callers are denied. Combine with `public: true` only on
 mutations that must accept strangers (contact forms).
 
-## Example issuer
+## Example: trust an identity provider
 
 The Next example hosts Better Auth and mints a JWT for browser sessions. That
 path is an **example**, not a Graft core dependency. Any OIDC issuer that
 matches an `issuers` entry (or `GRAFT_TRUSTED_ISSUERS` on `graft serve`) works
 the same way.
 
-## MCP identity
+## Identity for agents
 
 - **stdio (`graft mcp`):** server holds `GRAFT_DEV_TOKEN` as default authorization.
   The secret does not enter the agent context.

@@ -1,9 +1,11 @@
 ---
 title: Operational data
 description: db-authoritative collections and the record helpers that read and write them.
-section: Core Concepts
-order: 4
+section: Runtime data
+order: 0
 ---
+
+<p className="kicker">User-written data lives in Postgres, behind typed functions.</p>
 
 <TierBadge tier="postgres" />
 
@@ -39,7 +41,7 @@ validates on the way in, and re-validates on the way out.
 Bound your fields. An anonymous form writing into an unbounded `jsonb` column is
 a storage-exhaustion vector no rate limit fixes.
 
-## The two authorities never mix
+## Content and operational data cannot be mixed
 
 | | `file-authoritative` (default) | `db-authoritative` |
 | --- | --- | --- |
@@ -55,7 +57,7 @@ Crossing the line fails at every boundary that could catch it:
   the same code, and point at the function endpoint.
 - A record helper aimed at a file-authoritative collection refuses too.
 
-## The record helpers
+## Read and write records
 
 Handlers call these. They enforce authority, validate against the collection's
 Zod schema, and stamp actor and correlation id on every row.
@@ -112,7 +114,7 @@ const removed = await deleteRecord(ctx, submissions, id);
 // → { id, data }
 ```
 
-<Callout label="irreversible">
+<Callout label="This cannot be undone" type="danger">
   `deleteRecord` is a hard delete. There is no tombstone, no soft-delete column,
   and git does not restore it, because git never had it. Mark any function that
   calls this `destructive: true`.
@@ -196,7 +198,7 @@ Queries are open by default, so a query returning anyone's data needs an
 
 ## Next steps
 
-- [Functions & access](/docs/functions-and-access) — the function surface
-- [Rate limits](/docs/rate-limits) — protecting a public mutation
-- [Audit & approvals](/docs/audit-and-approvals) — gating a destructive one
-- [Migrations](/docs/migrations) — backfilling records when the schema changes
+- [Functions & access](/docs/functions-and-access) documents the function surface.
+- [Rate limits](/docs/rate-limits) protects a public mutation.
+- [Audit & approvals](/docs/audit-and-approvals) gates a destructive one.
+- [Migrations](/docs/migrations) backfills records when the schema changes.

@@ -1,18 +1,36 @@
 ---
 title: Next.js
-description: Typed reads in Server Components, React.cache, MdxBody, and withGraft.
-section: Frameworks & Adapters
+description: "Read typed content in Next.js Server Components, render MDX, and refresh only the pages that changed."
+section: Frameworks
 order: 0
 ---
 
-The `@usegraft/sdk-next` package provides first-class support for Next.js App
-Router and React Server Components.
+<p className="kicker">Render Graft content in a Next.js App Router project, from install to cache refresh.</p>
 
-It features:
-- **Zero-waterfall reads:** Automatic request deduplication via `React.cache`.
-- **Complete type inference:** Return types are inferred directly from your `graft.config.ts`.
-- **Secure Server-side MDX:** The `<MdxBody />` component evaluates authored MDX in Server Components without exposing client-side AST parsers.
-- **On-demand revalidation:** Cache-tag helpers (`revalidateContent`) integrate with Next.js Data Cache.
+This guide adds Graft to a Next.js App Router project. By the end, your pages
+read typed content in Server Components, render its Markdown with your own
+components, and refresh only the pages whose content changed.
+
+**Before you start**, you need a Next.js 15 or newer project using the App
+Router, and a `graft.config.ts` with compiled content. If you have not got
+those yet, run through [Getting started](/docs/getting-started) first. It takes
+about ten minutes.
+
+What `@usegraft/sdk-next` gives you:
+
+- **Typed reads in Server Components.** Every result is typed from your schema.
+- **One read per document per request.** If a layout and a page read the same
+  document, Graft reads it once, using `React.cache`.
+- **Markdown rendering on the server.** `<MdxBody />` renders a document's body
+  without sending an MDX parser to the browser.
+- **Targeted cache refresh.** `revalidateContent` refreshes only the pages whose
+  content changed.
+
+<Callout label="Prefer to let your agent do it?" type="note">
+  Paste this into your coding agent: "Add Graft to this Next.js app following
+  https://graft.page/docs/next.md. Put the client in lib/graft.ts and render
+  the pages collection at app/[slug]/page.tsx."
+</Callout>
 
 ---
 
@@ -52,8 +70,11 @@ bun add @usegraft/sdk-next @usegraft/db
 
 ## 1. Configure next.config.ts
 
-Wrap your Next.js config with `withGraft`. This ensures that Graft's runtime
-modules remain external to the server bundle:
+Wrap your Next.js config with `withGraft`. Today it does one thing: it keeps
+`@usegraft/registry` out of the server bundle, because that package reads files
+from disk at runtime. You need it when you mount Graft's MCP route
+([step 5](#5-mounting-functions-and-mcp-route-handlers)). Plain content reads
+work without it, but adding it now means you will not have to remember later:
 
 ```ts
 // next.config.ts
@@ -73,7 +94,7 @@ export default withGraft(nextConfig);
 
 Create a server-only client instance.
 
-### Static Engine (Default — no database required)
+### Static Engine (no database required)
 
 ```ts
 // lib/graft.ts
@@ -173,7 +194,7 @@ export default function DocumentBody({ source }: { source: string }) {
 }
 ```
 
-<Callout label="MDX Safety" type="note">
+<Callout label="Safe by default" type="note">
   By default, `MdxBody` runs in `trust: "restricted"` mode. This allows standard
   Markdown, GFM, and safe JSX components with string attributes, while blocking
   unsafe runtime script execution (`{process.env.SECRET}`, `import`, `export`).
@@ -302,6 +323,6 @@ export async function POST(request: NextRequest) {
 
 ## Next steps
 
-- [Schema](/docs/schema) — Configure collections, fields, and validation rules.
-- [SDK reference](/docs/sdk-reference) — Complete API reference for query options and caching.
-- [Connecting agents](/docs/connecting-agents) — Connect Cursor or Claude to your Next.js project.
+- [Schema](/docs/schema) configures collections, fields, and validation rules.
+- [SDK reference](/docs/sdk-reference) is the complete API reference for query options and caching.
+- [Connecting agents](/docs/connecting-agents) connects Cursor or Claude to your Next.js project.

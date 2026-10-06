@@ -1,0 +1,153 @@
+---
+title: Glossary
+description: "Plain definitions of the terms used across the Graft docs, each linked to the page that covers it."
+section: Reference
+order: 6
+---
+
+<p className="kicker">What Graft's terms mean, in plain language.</p>
+
+Look up a term you met in the docs, an error message, or an agent's output.
+Each entry links to the page that covers it in full.
+
+## Content and compiling
+
+**Collection.** A named group of documents that share fields, such as `pages`
+or `posts`. Declared in `graft.config.ts`. See [Schema](/docs/schema).
+
+**Slug.** A document's name inside its collection. `content/pages/about.mdx`
+has the slug `about`.
+
+**Frontmatter.** The block between the `---` lines at the top of a content
+file. Its fields must match the collection's schema.
+
+**MDX.** Markdown that can include components. Graft refuses the parts of MDX
+that can run code unless you allow them. See [MDX safety](/docs/mdx-safety).
+
+**Schema.** The description of each collection's fields, written in
+`graft.config.ts` with Zod. It checks files, function inputs, and reads. See
+[Schema](/docs/schema).
+
+**Compile.** Running `graft compile`: Graft checks every content file against
+the schema and builds the index. See [How Graft works](/docs/the-model).
+
+**Index.** The searchable copy of your content that your app reads from. It is
+built by compiling, and it can always be rebuilt from your files.
+
+**Derived.** Built entirely from something else. The index is derived from your
+files, so the files are the source of truth.
+
+**Project, projection.** What a compile does to the index: it makes the index
+match your files. You will see "project" in error messages such as
+`INDEX_OWNERSHIP`.
+
+**ChangeSet.** The list of documents a compile added, changed, or removed.
+Framework packages use it to refresh only the cached pages that changed.
+
+**`content_index`.** The Postgres table that holds the index on the Postgres
+engine.
+
+**Compilation trail.** The record of past compiles, with what each one changed.
+`graft compilations` and the `list_compilations` tool read it.
+
+## Storage engines
+
+**Storage engine.** Where the index lives: a SQLite file (static) or a Postgres
+database. See [Storage engines](/docs/tiers).
+
+**Static engine, static index.** The index as a single SQLite file,
+`.graft/index.db`. Needs nothing running.
+
+**Postgres engine.** The index in a Postgres database. Needed for operational
+data, typed functions, branches, approvals, and Studio.
+
+**Artifact.** The static index file, `.graft/index.db`. It is generated, so it
+stays out of Git.
+
+## Runtime data and access
+
+**Operational data.** Data your users create at runtime, such as form
+submissions, orders, and comments. Git cannot rebuild it, so it lives in
+Postgres. See [Operational data](/docs/operational-data).
+
+**File-authoritative, db-authoritative.** Whether a collection's source of
+truth is files in Git (the default) or rows in Postgres
+(`authority: "db-authoritative"`).
+
+**Typed function.** A function you declare in your config that reads or writes
+operational data, callable at `POST /api/fn/<name>`. See
+[Functions & access](/docs/functions-and-access).
+
+**Actor.** Whoever is making a request: a signed-in user, an agent, or
+anonymous. Graft works it out from the request's token. `FunctionActor` in
+code. See [Auth](/docs/auth).
+
+**Scope.** A permission an actor holds, such as `submissions:read`. Not to be
+confused with branch scope.
+
+**Approval.** A human sign-off that a destructive action, such as a delete,
+must wait for. See [Audit & approvals](/docs/audit-and-approvals).
+
+**Audit log.** A table with one row for every function call: who, what, when,
+and how it ended. See [Observability](/docs/observability).
+
+**Correlation id.** An id in the `x-graft-correlation-id` response header that
+links a user's report to the audit log row for that request.
+
+**Operator, runtime role.** The two database logins used after
+[hardening](/docs/hardening). The operator role stays with you or your CI. The
+runtime role is what your deployed app uses, and it can never approve its own
+destructive actions.
+
+## Branches and changes
+
+**Branch (Graft branch).** A separate copy of the index, compiled from the files
+on a Git branch, used for previews. See
+[Branching & previews](/docs/branching-previews).
+
+**Overlay.** The default way to store a branch: its documents sit in your
+existing database, labelled with the branch name.
+
+**Neon fork.** A branch stored as a full copy of the database, made by Neon.
+
+**Tombstone.** A marker on a branch saying a document is deleted there. The
+main index is not affected.
+
+**Branch scope.** The set of documents a read on a branch can see: the branch's
+own changes plus everything it inherits. Not related to permission scopes.
+
+**Migration.** A file that updates existing content or data to a new schema
+shape. See [Migrations](/docs/migrations).
+
+**Codemod, backfill.** The two kinds of migration. A codemod rewrites content
+files. A backfill updates operational data rows.
+
+**Ledger.** The `migrations_applied` table, which records every migration that
+has run so none runs twice.
+
+## Agents and extending
+
+**MCP (Model Context Protocol).** The open standard agents use to call tools.
+Graft serves its operations as MCP tools. See [Agents overview](/docs/agent-surface).
+
+**Tool.** One operation an agent can call, such as `write_content`. See
+[MCP tools](/docs/mcp-tools).
+
+**Resource, prompt.** Documents an agent can attach as context, and ready-made
+workflows a person can pick. See
+[Resources & prompts](/docs/mcp-resources-and-prompts).
+
+**`fix`.** The part of every Graft error that names the next step. Written so an
+agent can act on it. See the [Error reference](/docs/errors).
+
+**Primitive.** A ready-made feature, such as comments, that `graft add` copies
+into your project as code you own. See [Owned primitives](/docs/owned-primitives).
+
+**Registry.** The catalog of primitives that `graft add` and the
+`list_registry` tool read from.
+
+**Barrel.** `graft/index.ts`, a file that re-exports everything in `graft/`, so
+your config picks up added primitives automatically.
+
+**Studio.** The optional editing UI. Everything it does is also available on
+the CLI and over MCP. See [Studio](/docs/studio).

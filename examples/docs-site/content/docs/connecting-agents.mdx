@@ -5,15 +5,23 @@ section: Agents & MCP
 order: 1
 ---
 
-Two transports reach the same server. Which one you want depends on whether the
-agent can spawn a process on the machine that holds the project.
+<p className="kicker">Point Claude Code, Cursor, or any MCP client at your project.</p>
+
+This page gets an agent connected to your Graft project and explains what it is
+allowed to do once connected. There are two ways to connect, and they reach the
+same tools:
+
+- **Stdio**, when the agent runs on the same machine as your project. This is
+  the usual setup for Claude Code and Cursor.
+- **HTTP**, when the agent runs somewhere else, such as a hosted agent calling
+  your deployed app.
 
 | Transport | Who it is for | Identity |
 | --- | --- | --- |
 | Stdio (`graft mcp`) | An IDE or a local agent | The CLI's own identity, plus `GRAFT_DEV_TOKEN` scopes |
 | HTTP (`POST /api/mcp`) | Remote agents | A bearer on the connection |
 
-## Stdio
+## Connect a local agent (stdio)
 
 ```sh
 graft mcp                 # serve this project over stdio
@@ -48,7 +56,7 @@ protocol stream.
 
 Stdio is a local process the developer started, so there is no untrusted caller
 to authenticate. The server acts as `agent:graft-cli`, and that identity carries
-`content:write` — which is what makes authoring work out of the box.
+`content:write`. That scope is what makes authoring work out of the box.
 
 `GRAFT_DEV_SCOPES` adds scopes on top, for `run_function` access rules. It is
 not what grants authoring.
@@ -75,7 +83,7 @@ The decider recorded is the OS user, which is the same person `graft approve`
 would record. See
 [Audit & approvals](/docs/audit-and-approvals#asking-in-band-opt-in).
 
-## HTTP
+## Connect a remote agent (HTTP)
 
 `POST /api/mcp` speaks MCP Streamable HTTP, statelessly: a fresh server per
 request, no session, no state between calls. The same handler runs in a Next.js
@@ -100,7 +108,7 @@ per-framework mount.
 The connection's bearer is verified by `@usegraft/auth` and forwarded into
 `run_function`. `graft serve` reads `GRAFT_TRUSTED_ISSUERS` (and
 `GRAFT_DEV_TOKEN` for local bootstrapping). An embedded handler must pass
-`issuers` into `createActorResolver` — the library does not read that env.
+`issuers` into `createActorResolver`. The library does not read that env.
 See [Auth](/docs/auth).
 
 Anonymous callers are the interesting case, and the bind address decides rather
@@ -117,7 +125,7 @@ endpoint with their own auth proxy.
 Binding beyond loopback with no identity configured also warns, because MCP will
 then refuse every caller.
 
-<Callout label="fails at construction">
+<Callout label="Missing auth fails at startup" type="warning">
   `createGraftMcpHandler` throws if you give it neither an `actor` resolver nor
   an explicit `allowAnonymous: true`. This endpoint serves content writes, asset
   uploads and approval decisions, so a deployer who forgets gets a startup
@@ -146,7 +154,7 @@ Content authoring, asset upload, and approval decisions are deliberately
 separate from ordinary read scopes. An app that hands every signed-up user a
 narrow read token should not be handing out content-admin rights.
 
-## Checking it works
+## Check that it works
 
 Ask the agent to call `list_collections`. It needs no arguments, no scope, and
 no database, so a failure isolates the connection rather than the project.
@@ -154,15 +162,15 @@ no database, so a failure isolates the connection rather than the project.
 From there, `describe_schema` gives it everything it needs to author, and
 `explain_error` turns any failure into a next step.
 
-## Two endpoints, not one server with a setting
+## The public docs endpoint is a separate server
 
-A Graft project can also publish a read-only documentation endpoint at `/mcp`.
-It is a separate server built by a separate factory, so standing it up cannot
-open the private one. See [Public docs MCP](/docs/docs-mcp).
+A Graft project can also publish its documentation at `/mcp`. A separate
+server with no access to content, functions, or approvals. See
+[Public docs MCP](/docs/docs-mcp).
 
 ## Next steps
 
-- [MCP tools](/docs/mcp-tools) — everything an agent can call
-- [MCP resources & prompts](/docs/mcp-resources-and-prompts) — the rest of the surface
-- [Auth](/docs/auth) — how bearers are verified
-- [The agent surface](/docs/agent-surface) — the argument for operating this way
+- [MCP tools](/docs/mcp-tools) lists everything an agent can call.
+- [MCP resources & prompts](/docs/mcp-resources-and-prompts) covers the rest of the surface.
+- [Auth](/docs/auth) explains how bearers are verified.
+- [The agent surface](/docs/agent-surface) argues for operating this way.

@@ -1,11 +1,13 @@
 ---
 title: Audit & approvals
 description: Every invocation leaves a row. Destructive operations wait for a human decision.
-section: Security & Hardening
-order: 3
+section: Runtime data
+order: 4
 ---
 
-Agents drive Graft hard. Two mechanisms keep that safe: an audit log and
+<p className="kicker">Hold agents accountable with an audit log and human-gated approvals.</p>
+
+Agents act on their own. Two mechanisms keep that safe: an audit log and
 human-gated approvals.
 
 ## Audit log
@@ -43,13 +45,13 @@ graft:  200 { data: … }
 ### MCP form
 
 Pass `approval: "<id>"` on `run_function` or `delete_content`. Do not send the
-HTTP header name over MCP — the bridge maps the argument for you.
+HTTP header name over MCP. The bridge maps the argument for you.
 
 ### Asking in-band (opt-in)
 
 The loop above sends the human to another terminal. On a local server, where
 that human is sitting at the same machine, the server can ask them directly
-instead — MCP calls this elicitation.
+instead. MCP calls this elicitation.
 
 ```ts
 createGraftMcp({
@@ -71,13 +73,13 @@ to confirm destructive actions in real-time.
 ### Separation of duties
 To prevent an agent or service from approving its own destructive mutations,
 Graft enforces separation of duties:
-1. **No self-decision:** A request filed by an identity cannot be approved or denied
-   by that same identity (`requested_by_id <> decided_by`).
-2. **Input-bound:** The approval row records a cryptographic hash of the exact
-   function inputs. Changing arguments invalidates the approval token.
-3. **Database-level immutability:** Hardened runtime database roles are denied
-   `UPDATE` privileges on the `approvals` table. Only an authenticated operator
-   credential can approve or deny a request.
+- **No self-decision.** A request filed by an identity cannot be approved or denied
+  by that same identity (`requested_by_id <> decided_by`).
+- **Input-bound.** The approval row records a cryptographic hash of the exact
+  function inputs. Changing arguments invalidates the approval token.
+- **Database-level immutability.** Hardened runtime database roles are denied
+  `UPDATE` privileges on the `approvals` table. Only an authenticated operator
+  credential can approve or deny a request.
 </details>
 
 ### Policy
@@ -95,7 +97,7 @@ Policy is code: greppable and reviewable.
 `"unattended"` is **not part of the MCP surface**. `GraftMcpOptions` does not
 accept it, so no server setting makes `run_function` stop asking for a
 destructive call. An MCP mount exists because an agent is calling it, and the
-agent is the party the gate is there to stop — one option that turned every
+agent is the party the gate is there to stop. An option that turned every
 destructive tool into an ungated one is not a trade worth offering. On
 `graft serve` the split is visible: `approvalPolicy: "unattended"` lifts the
 gate on `POST /api/fn` and leaves `POST /api/mcp` gated.
@@ -119,7 +121,7 @@ export const approvalPolicy = "unattended";
 
 It is config rather than an env var deliberately. This is the setting that
 turns off the gate on irreversible work, and a dashboard variable is invisible
-to review — in config it appears in a diff. The server also warns on every boot
+to review. In config it appears in a diff. The server also warns on every boot
 while it is on, because the log is where a mistake actually gets noticed.
 
 Understand what you are accepting. Git restores authored content, so a deleted
