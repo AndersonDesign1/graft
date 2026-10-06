@@ -15,6 +15,11 @@ overrides:
   esbuild@0.21.5: 0.28.2
   esbuild@0.25.12: 0.28.2
   esbuild@0.27.7: 0.28.2
+  # better-auth lists vitest as an optional peer (^2 || ^3 || ^4), and pnpm
+  # kept resolving it to 3.2.7 for the landing page, which pulled in vite 5 and
+  # five Dependabot alerts for a package that never runs a test. The root's
+  # vitest 5 is outside that range, so drop the peer instead of satisfying it.
+  "better-auth>vitest": "-"
 
 # Allow esbuild (tsup + vitest) and sharp (Next image optimization) to run
 # their install scripts (pnpm 12 model).
