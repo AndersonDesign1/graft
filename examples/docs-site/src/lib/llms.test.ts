@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { renderDocMarkdown, renderLlmsFull, renderLlmsIndex, textResponse } from "./llms";
+import {
+  componentsToMarkdown,
+  renderDocMarkdown,
+  renderLlmsFull,
+  renderLlmsIndex,
+  textResponse,
+} from "./llms";
 import type { DocNavSection } from "./nav";
 
 const sections: DocNavSection[] = [
@@ -114,5 +120,68 @@ describe("the configured site origin", () => {
     expect(site, "astro.config.mjs declares no `site`").toBeDefined();
     expect(site).toMatch(/^https:\/\//);
     expect(site).not.toMatch(/localhost/);
+  });
+});
+
+describe("componentsToMarkdown", () => {
+  it("turns the site's components into the Markdown they stand for", () => {
+    const body = [
+      '<p className="kicker">Read content anywhere.</p>',
+      "",
+      '<TierBadge tier="postgres" />',
+      "",
+      '<Callout label="Run a dry run first" type="danger">',
+      "  Always run it without --apply first.",
+      "",
+      "  Then read the report.",
+      "</Callout>",
+      "",
+      '<Tabs labels="npm, pnpm">',
+      "<Tab>",
+      "npm i x",
+      "</Tab>",
+      "<Tab>",
+      "pnpm add x",
+      "</Tab>",
+      "</Tabs>",
+      "",
+      "<DocCards>",
+      '  <DocCard title="Schema" href="/docs/schema" icon="typescript">',
+      "    Describe your collections.",
+      "  </DocCard>",
+      "</DocCards>",
+    ].join("\n");
+
+    expect(componentsToMarkdown(body)).toBe(
+      [
+        "*Read content anywhere.*",
+        "",
+        "> Needs the Postgres storage engine.",
+        "",
+        "> **Run a dry run first.**",
+        "> Always run it without --apply first.",
+        ">",
+        "> Then read the report.",
+        "",
+        "**npm:**",
+        "npm i x",
+        "**pnpm:**",
+        "pnpm add x",
+        "",
+        "- [Schema](/docs/schema): Describe your collections.",
+      ].join("\n"),
+    );
+  });
+
+  it("leaves components inside code fences alone", () => {
+    const body = ["```mdx", '<Callout label="Note">', "  Text.", "</Callout>", "```"].join("\n");
+    expect(componentsToMarkdown(body)).toBe(body);
+  });
+
+  it("keeps a question mark instead of adding a period to a callout label", () => {
+    const body = ['<Callout label="Prefer an agent?" type="note">', "Text.", "</Callout>"].join(
+      "\n",
+    );
+    expect(componentsToMarkdown(body)).toBe("> **Prefer an agent?**\n> Text.");
   });
 });

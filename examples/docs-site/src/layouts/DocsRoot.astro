@@ -22,7 +22,10 @@ interface Props {
 }
 
 const { title, description, markdownHref, ogImage } = Astro.props;
-const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://graft.page").href;
+// The static build serves /docs/<slug>/ as a directory index, but every link on
+// the site and in llms.txt uses the form without the slash. Canonical matches those.
+const canonicalPath = Astro.url.pathname.replace(/(.)\/$/, "$1");
+const canonical = new URL(canonicalPath, Astro.site ?? "https://graft.page").href;
 const ogImageUrl = ogImage ? new URL(ogImage, Astro.site ?? "https://graft.page").href : undefined;
 ---
 
