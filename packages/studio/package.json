@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/studio",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "Graft's optional editing UI. Headless-first: every operation also exists on MCP and the CLI.",
   "keywords": [
     "admin-ui",
@@ -89,7 +89,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "sonner": "^2.0.8",
-    "vite": "^8.2.2"
+    "vite": "^8.3.0"
   },
   "peerDependencies": {
     "@base-ui-components/react": "^1.0.0-rc.0",

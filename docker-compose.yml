@@ -17,8 +17,12 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    # Same digest-pinned release as deploy/docker/Dockerfile (see its MinIO
+    # comment): dev must run the same storage bytes as the self-host image.
+    image: cgr.dev/chainguard/minio:latest@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034
     container_name: graft-minio
+    # The image runs as uid 65532 and a fresh named volume is owned by root.
+    user: "0:0"
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: graft

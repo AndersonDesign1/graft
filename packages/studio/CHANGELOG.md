@@ -1,5 +1,18 @@
 # @usegraft/studio
 
+## 1.0.0-beta.2
+
+### Patch Changes
+
+- 98ff4ba: Clear leftover CodeQL findings: no ReDoS regex on storage URLs, no exception text on `/healthz` or Studio asset-url failures, and `graft studio` only opens a validated loopback URL.
+- Updated dependencies [98ff4ba]
+  - @usegraft/assets@1.0.0-beta.2
+  - @usegraft/compiler@1.0.0-beta.2
+  - @usegraft/contracts@1.0.0-beta.2
+  - @usegraft/core@1.0.0-beta.2
+  - @usegraft/db@1.0.0-beta.2
+  - @usegraft/mdx-safety@1.0.0-beta.2
+
 ## 1.0.0-beta.1
 
 ### Patch Changes

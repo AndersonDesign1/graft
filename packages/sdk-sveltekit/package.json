@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/sdk-sveltekit",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "SvelteKit adapter: typed content reads and endpoint mounts over Graft's stateless handlers.",
   "keywords": [
     "agent",

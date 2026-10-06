@@ -33,13 +33,13 @@ jobs:
           persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           # 22.16 is the floor: node:sqlite bundles FTS5 (the static index's
-          # search) from 22.16.0, which is also >= pnpm 11's 22.13 requirement.
+          # search) from 22.16.0, which is also >= pnpm 12's >=18 requirement.
           # One number everywhere; pinning keeps CI honest about what we advertise.
           node-version: 22.16
           # Explicit: setup-node v5 began auto-caching from `packageManager`
@@ -119,7 +119,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7

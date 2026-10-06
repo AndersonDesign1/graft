@@ -1,5 +1,13 @@
 # @usegraft/sdk-next
 
+## 1.0.0-beta.2
+
+### Patch Changes
+
+- @usegraft/db@1.0.0-beta.2
+- @usegraft/mdx-safety@1.0.0-beta.2
+- @usegraft/sdk-core@1.0.0-beta.2
+
 ## 1.0.0-beta.1
 
 ### Patch Changes
