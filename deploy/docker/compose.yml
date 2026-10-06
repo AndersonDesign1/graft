@@ -27,8 +27,11 @@ services:
     # comment): the split topology must run the same storage bytes as the
     # single-container image, not whatever `latest` points at this week.
     image: cgr.dev/chainguard/minio:latest@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034
-    # The image runs as uid 65532, and a fresh named volume is owned by root,
-    # so MinIO could not write /data. Root matches the old MinIO image.
+    # A deliberate trade-off. The image runs as uid 65532, and a fresh named
+    # volume is owned by root, so MinIO could not write /data. Root inside this
+    # container matches what the previous MinIO image did, and existing
+    # graft_minio volumes were written as root. Running unprivileged needs a
+    # volume owned by 65532 (a chowned bind mount, for example).
     user: "0:0"
     command: server /data --console-address ":9001"
     environment:
@@ -37,8 +40,8 @@ services:
     volumes:
       - graft_minio:/data
     # No healthcheck: the image has no shell and no curl to run one. The graft
-    # entrypoint retries the bucket step until storage answers, so starting
-    # alongside it is enough.
+    # entrypoint waits up to a minute for storage to answer the bucket step and
+    # exits if it never does, so starting alongside it is enough.
 
   graft:
     build:

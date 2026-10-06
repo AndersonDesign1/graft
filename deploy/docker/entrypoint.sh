@@ -48,11 +48,19 @@ fi
 # A SigV4-signed PUT Bucket straight from curl, so the image carries no `mc`.
 # 200 is created, 409 is already there. No answer (000) or a 5xx means storage
 # is still starting, which in the split topology is normal at boot, so those
-# retry. Anything else is a real answer, such as 403 for wrong credentials.
+# retry for about a minute, the same budget the embedded MinIO gets above. The
+# per-attempt timeouts keep that budget honest against an endpoint that drops
+# packets instead of refusing them.
+#
+# Storage that never answers fails the boot. Serving without a bucket would
+# look healthy and break every upload until a restart. A real answer other than
+# 200 or 409, such as 403 from a key that may not create buckets, only warns,
+# because a managed bucket can already exist behind it.
 if [ "${GRAFT_ENSURE_BUCKET:-1}" = "1" ]; then
   bucket_status=000
-  for i in $(seq 1 30); do
+  for i in $(seq 1 60); do
     bucket_status=$(curl -s -o /dev/null -w '%{http_code}' -X PUT \
+      --connect-timeout 2 --max-time 5 \
       -H 'Content-Length: 0' \
       --aws-sigv4 "aws:amz:${S3_REGION:-us-east-1}:s3" \
       --user "${MINIO_ROOT_USER:-$S3_ACCESS_KEY}:${MINIO_ROOT_PASSWORD:-$S3_SECRET_KEY}" \
@@ -61,6 +69,10 @@ if [ "${GRAFT_ENSURE_BUCKET:-1}" = "1" ]; then
   done
   case "$bucket_status" in
     200 | 409) log "asset bucket ${S3_BUCKET} ready" ;;
+    000 | 5??)
+      log "storage at ${S3_ENDPOINT} did not answer (last HTTP ${bucket_status}); set GRAFT_ENSURE_BUCKET=0 if the bucket is managed elsewhere"
+      exit 1
+      ;;
     *) log "WARNING: could not ensure bucket ${S3_BUCKET} (HTTP ${bucket_status}; set GRAFT_ENSURE_BUCKET=0 if it is managed elsewhere)" ;;
   esac
 fi
