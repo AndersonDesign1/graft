@@ -188,11 +188,14 @@ for (const page of pages) {
 
 // A prerendered absolute-URL manifest built without `site` points at Astro's
 // localhost placeholder, which is not a build error and breaks every link in it.
+// Only link targets count. llms-full.txt also carries every page's prose, and
+// "open http://localhost:3000" in a getting-started step is an instruction to
+// the reader, not a broken link, so matching any localhost failed that page.
 for (const manifest of ["llms.txt", "llms-full.txt"]) {
   if (!staticFiles.has(manifest)) continue;
   const text = readFileSync(join(STATIC, manifest), "utf8");
-  if (/localhost:\d+/.test(text)) {
-    fail(`/${manifest} contains a localhost URL — it was built without a canonical \`site\`.`);
+  if (/\]\(https?:\/\/localhost:\d+/.test(text)) {
+    fail(`/${manifest} links to a localhost URL — it was built without a canonical \`site\`.`);
   }
 }
 
