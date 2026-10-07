@@ -47,11 +47,11 @@ nothing to refresh. On the Postgres engine, send the output to your app's
 revalidate route so it refreshes only the pages that changed:
 
 ```sh
-payload=$(graft compile --json) || exit 1
+graft compile --json > changes.json || exit 1
 curl --fail -X POST https://example.com/api/revalidate \
   -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" \
   -H "content-type: application/json" \
-  --data "$payload"
+  --data-binary @changes.json
 ```
 
 See [Refresh pages when content changes](/docs/next#refresh-pages-when-content-changes)

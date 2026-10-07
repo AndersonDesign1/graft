@@ -219,11 +219,11 @@ In a deploy script, send it to your route. The script stops if the compile
 fails, and `--fail` makes a refused request fail the script too:
 
 ```sh
-payload=$(graft compile --json) || exit 1
+graft compile --json > changes.json || exit 1
 curl --fail -X POST https://example.com/api/revalidate \
   -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" \
   -H "content-type: application/json" \
-  --data "$payload"
+  --data-binary @changes.json
 ```
 
 Your route reads `branch` and `changes` from the body and passes them to
