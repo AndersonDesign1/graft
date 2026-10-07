@@ -174,9 +174,28 @@ const EPHEMERAL = new Set(["npx", "pnpm dlx", "bunx"]);
 
 const want = (runner) => (EPHEMERAL.has(runner) ? "@latest" : "");
 
+/**
+ * The rest of an installer's command: every argument after `npm i`,
+ * `pnpm add` or `yarn add` on the same line, up to a closing backtick.
+ *
+ * INSTALL only sees the first package. `npm i @usegraft/core
+ * @usegraft/db@latest` matched on `core`, and the tag on `db` passed `--check`
+ * untouched. An installer takes any number of packages, and each one follows
+ * the rule. Ephemeral runners are left to INSTALL: the first package is the one
+ * they run, and anything after it is that program's arguments.
+ */
+const INSTALLER_RUN = new RegExp(
+  String.raw`(?:${RUNNERS.filter((runner) => !EPHEMERAL.has(runner))
+    .sort((a, b) => b.length - a.length)
+    .join("|")})(?:[ \t]+[^\s\x60]+)+`,
+  "g",
+);
+const TAGGED_PACKAGE = /(@usegraft\/[a-z-]+)@[a-z0-9.-]+/g;
+
 /** Apply the rule to one blob of text, in both spellings of a command. */
 const retag = (text) =>
   text
+    .replace(INSTALLER_RUN, (run) => run.replace(TAGGED_PACKAGE, "$1"))
     .replace(INSTALL, (_match, command, runner) => `${command}${want(runner)}`)
     .replace(JSON_ARGS, (_match, upToPackage, runner) => `${upToPackage}${want(runner)}"`);
 
@@ -210,6 +229,18 @@ const CASES = [
   ["npm install @usegraft/sdk-next", "npm install @usegraft/sdk-next"],
   ["pnpm add @usegraft/core", "pnpm add @usegraft/core"],
   ["yarn add @usegraft/core", "yarn add @usegraft/core"],
+  // Every package an installer names, not only the first.
+  ["npm i @usegraft/core @usegraft/db@latest", "npm i @usegraft/core @usegraft/db"],
+  [
+    "npm i -D @usegraft/cli@beta tsx @usegraft/mcp@latest",
+    "npm i -D @usegraft/cli tsx @usegraft/mcp",
+  ],
+  ["pnpm add @usegraft/core @usegraft/db@1.0.0", "pnpm add @usegraft/core @usegraft/db"],
+  // The run ends at the inline code span. Prose after it is not the command.
+  [
+    "`npm i @usegraft/core` then read @usegraft/core@0.2.0",
+    "`npm i @usegraft/core` then read @usegraft/core@0.2.0",
+  ],
   [
     '{ "command": "npx", "args": ["-y", "@usegraft/cli", "mcp"] }',
     '{ "command": "npx", "args": ["-y", "@usegraft/cli@latest", "mcp"] }',
