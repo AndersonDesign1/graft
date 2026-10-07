@@ -5,7 +5,7 @@
  * the message, and the `fix` — printed instead of JSON-encoded.
  */
 import type { CompileResult } from "@usegraft/compiler";
-import type { GraftError } from "@usegraft/contracts";
+import type { ChangeSet, GraftError } from "@usegraft/contracts";
 
 export function printGraftError(error: GraftError): void {
   console.error(`error ${error.code}: ${error.message}`);
@@ -22,4 +22,21 @@ export function formatCompileResult(result: CompileResult): string {
   for (const key of [...added, ...changed]) lines.push(`  upserted ${key}`);
   for (const key of removed) lines.push(`  removed  ${key}`);
   return lines.join("\n");
+}
+
+/** What `graft compile --json` prints: the payload a revalidate route reads. */
+export interface CompileJson {
+  branch: string;
+  gitSha: string | null;
+  changes: ChangeSet;
+}
+
+export function formatCompileJson(branch: string, result: CompileResult): string {
+  const { added, changed, removed, unchanged } = result.changes;
+  const output: CompileJson = {
+    branch,
+    gitSha: result.gitSha,
+    changes: { added, changed, removed, unchanged },
+  };
+  return JSON.stringify(output);
 }
