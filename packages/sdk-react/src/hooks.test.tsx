@@ -51,18 +51,20 @@ interface PendingRead {
 /** A reader whose reads hang until the test says otherwise. */
 function controllable() {
   const reads: PendingRead[] = [];
+  const searches: string[] = [];
   const index: Reader = {
     readContent(options) {
       return new Promise((resolve, reject) => {
         reads.push({ slug: options.slug, settle: resolve, fail: reject });
       });
     },
-    async searchContent() {
+    async searchContent(options) {
+      searches.push(options.query);
       return [{ row: row("intro", "Intro"), rank: 0.5, snippet: "<b>Intro</b>" }];
     },
     async close() {},
   };
-  return { reads, graft: createGraft({ index, collections: { docs } }) };
+  return { reads, searches, graft: createGraft({ index, collections: { docs } }) };
 }
 
 describe("useContent", () => {
@@ -178,6 +180,40 @@ describe("useContentList and useContentSearch", () => {
 
     expect(result.current.data?.[0].rank).toBe(0.5);
     expect(result.current.data?.[0].snippet).toBe("<b>Intro</b>");
+  });
+
+  it.each(["", "   "])("answers a blank query (%j) with no hits and no request", async (query) => {
+    // A search box starts empty. The content API refuses a blank query, so
+    // asking it would put the box in its error state before anyone typed.
+    const { searches, graft } = controllable();
+    const hooks = createGraftHooks(graft);
+    const { result } = renderHook(() => hooks.useContentSearch("docs", query));
+
+    // Settled on the first render, with no loading flash.
+    expect(result.current.data).toEqual([]);
+    expect(result.current.error).toBeUndefined();
+    expect(result.current.loading).toBe(false);
+
+    await act(async () => result.current.refresh());
+
+    expect(result.current.data).toEqual([]);
+    expect(result.current.loading).toBe(false);
+    expect(searches).toEqual([]);
+  });
+
+  it("searches once the query is no longer blank", async () => {
+    const { searches, graft } = controllable();
+    const hooks = createGraftHooks(graft);
+    const { result, rerender } = renderHook(({ query }) => hooks.useContentSearch("docs", query), {
+      initialProps: { query: "" },
+    });
+
+    rerender({ query: "intro" });
+
+    expect(result.current.loading).toBe(true);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data?.[0].slug).toBe("intro");
+    expect(searches).toEqual(["intro"]);
   });
 });
 

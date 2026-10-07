@@ -136,8 +136,8 @@ written. Render it with your own Markdown or MDX renderer.
 ## Add a search box
 
 `useContentSearch` runs a full-text search in one collection, best match first.
-The Content API refuses an empty query, so only search once the reader has
-typed something:
+An empty query returns no results and sends no request, so you can pass the
+input's value straight in:
 
 <CodeBlock title="src/SearchBox.tsx">
 
@@ -147,29 +147,21 @@ import { useContentSearch } from "./graft";
 
 export function SearchBox() {
   const [query, setQuery] = useState("");
+  const { data: hits, loading, error } = useContentSearch("docs", query, { limit: 10 });
+
   return (
     <div>
       <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} />
-      {query.trim() !== "" && <SearchResults query={query} />}
+      {loading && <p>Searching…</p>}
+      {error && <p>Search failed.</p>}
+      <ul>
+        {hits?.map((hit) => (
+          <li key={hit.slug}>
+            <a href={`/docs/${hit.slug}`}>{hit.data.title}</a>
+          </li>
+        ))}
+      </ul>
     </div>
-  );
-}
-
-function SearchResults({ query }: { query: string }) {
-  const { data: hits, loading, error } = useContentSearch("docs", query, { limit: 10 });
-
-  if (loading) return <p>Searching…</p>;
-  if (error) return <p>Search failed.</p>;
-  if (hits?.length === 0) return <p>No results.</p>;
-
-  return (
-    <ul>
-      {hits?.map((hit) => (
-        <li key={hit.slug}>
-          <a href={`/docs/${hit.slug}`}>{hit.data.title}</a>
-        </li>
-      ))}
-    </ul>
   );
 }
 ```

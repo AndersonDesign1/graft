@@ -59,7 +59,10 @@ export interface Graft<TCollections extends Record<string, AnyCollection>> {
     collection: K,
     options?: ListOptions,
   ): Promise<Document<TCollections[K]>[]>;
-  /** Typed searchDocuments (full-text, best-ranked first). */
+  /**
+   * Typed searchDocuments (full-text, best-ranked first). A blank query
+   * resolves to [] without a request.
+   */
   searchContent<K extends keyof TCollections & string>(
     collection: K,
     query: string,
@@ -148,6 +151,9 @@ export function createGraft<TCollections extends Record<string, AnyCollection>>(
     },
     async searchContent(collection, query, opts) {
       assertNoBranch(opts);
+      // The content API refuses a blank query as an input error. Nothing
+      // matches nothing, so answer without the round trip.
+      if (query.trim() === "") return [];
       return client.searchDocuments(collection, query, opts);
     },
   };

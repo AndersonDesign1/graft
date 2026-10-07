@@ -58,6 +58,10 @@ type ReadState<TData> = Omit<AsyncState<TData>, "refresh">;
 // rather than a second render.
 const PENDING: ReadState<never> = { data: undefined, error: undefined, loading: true };
 
+// What a search for nothing reports. Shared for the same reason, and so `data`
+// keeps its identity from one render to the next.
+const NO_HITS: ReadState<never[]> = { data: [], error: undefined, loading: false };
+
 function asError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error(String(cause));
 }
@@ -66,14 +70,21 @@ function asError(cause: unknown): Error {
  * Run `read` and report its state, re-running whenever its identity changes.
  * Callers pass a `useCallback` keyed on the read's own arguments, which is what
  * makes "the arguments changed" and "run it again" the same mechanism.
+ *
+ * `settled` is an answer known without asking. While it is set, `read` does
+ * not run and `settled` is what the hook reports. Passing it, rather than
+ * skipping the call, is what keeps the hook unconditional.
  */
-function useRead<TData>(read: () => Promise<TData>): AsyncState<TData> {
+function useRead<TData>(read: () => Promise<TData>, settled?: ReadState<TData>): AsyncState<TData> {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<ReadState<TData>>(PENDING);
 
   useEffect(() => {
     let live = true;
     setState(PENDING);
+    // Reset even when skipping, so the first render after `settled` clears
+    // shows loading rather than whatever an earlier read left behind.
+    if (settled !== undefined) return;
     read().then(
       (data) => {
         if (live) setState({ data, error: undefined, loading: false });
@@ -89,10 +100,10 @@ function useRead<TData>(read: () => Promise<TData>): AsyncState<TData> {
     return () => {
       live = false;
     };
-  }, [read, attempt]);
+  }, [read, attempt, settled]);
 
   const refresh = useCallback(() => setAttempt((previous) => previous + 1), []);
-  return { ...state, refresh };
+  return { ...(settled ?? state), refresh };
 }
 
 export interface GraftHooks<TCollections extends Record<string, AnyCollection>> {
@@ -115,7 +126,10 @@ export interface GraftHooks<TCollections extends Record<string, AnyCollection>> 
     collection: K,
     options?: ListOptions,
   ) => AsyncState<Document<TCollections[K]>[]>;
-  /** Full-text search within one collection, best-ranked first. */
+  /**
+   * Full-text search within one collection, best-ranked first. A blank query
+   * reports no hits and sends no request.
+   */
   useContentSearch: <K extends keyof TCollections & string>(
     collection: K,
     query: string,
@@ -201,7 +215,10 @@ export function createGraftHooks<TCollections extends Record<string, AnyCollecti
         () => handle.searchContent(collection, query, { branch, limit }),
         [handle, collection, query, branch, limit],
       );
-      return useRead(read);
+      // The content API refuses a blank query, and a search box starts blank.
+      // Nothing matches nothing, so answer here instead of reporting an error
+      // before the reader has typed anything.
+      return useRead(read, query.trim() === "" ? NO_HITS : undefined);
     },
   };
 }
