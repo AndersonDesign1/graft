@@ -1,28 +1,33 @@
 ---
 title: Rate limits
-description: Per-caller limits counted against the audit log, with no counter service to run.
+description: "Stop a script from flooding a public function by limiting how often each caller can run it, with no extra service to run."
 section: Runtime data
 order: 3
 ---
 
-<p className="kicker">Count invocations per caller. No Redis, no counters.</p>
+<p className="kicker">Limit how often each caller can run a function.</p>
 
 <TierBadge tier="postgres" />
 
-Rate limiting is a property of the audit log. Every invocation already writes a
-row, so counting recent rows for one caller is the limit. There is no Redis, no
-counter table, and nothing to keep in sync.
+Your contact form accepts anonymous visitors, so anything on the internet can
+call it, including a script that submits ten thousand times a minute. A rate
+limit caps how many times each caller can run a function in a given window, and
+refuses the rest.
+
+Graft counts calls from the [audit log](/docs/audit-and-approvals), which
+already has a row for every call. You do not run Redis or keep a separate
+counter.
 
 ## Add a limit to a function
 
-Per function:
+<CodeBlock title="graft.config.ts">
 
 ```ts
 export const submitContact = defineFunction({
   name: "submitContact",
   kind: "mutation",
   public: true,
-  rateLimit: { limit: 5, windowSeconds: 60 },
+  rateLimit: { limit: 5, windowSeconds: 60 }, // 5 calls per caller per minute
   input: submissions.fields,
   handler: async (ctx) => {
     /* … */
@@ -30,72 +35,25 @@ export const submitContact = defineFunction({
 });
 ```
 
-Or as a handler-wide default, which any function's own `rateLimit` overrides:
+</CodeBlock>
+
+The window rolls: it always covers the last `windowSeconds`, rather than
+resetting at the top of each minute. So a caller cannot fire 5 calls at 12:00:59
+and 5 more at 12:01:00.
+
+To set a default for every function, pass `rateLimit` to the handler. A
+function's own `rateLimit` overrides it:
 
 ```ts
 createFunctionsHandler({ functions, db, rateLimit: { limit: 60, windowSeconds: 60 } });
 ```
 
-`limit` is the maximum number of calls per caller per window. `windowSeconds` is
-the window, counted backwards from now. It is a rolling window, not a fixed
-bucket that resets on the minute.
+`graft serve` sets that default for you: 60 calls per 60 seconds.
 
-`graft serve` already sets a backstop of 60 calls per 60 seconds, which any
-function's own `rateLimit` overrides. It applies the same backstop to the
-content API. [The content API](#the-content-api) below counts
-differently.
+## What a limited caller sees
 
-## How callers are told apart
-
-| Actor | Counted as |
-| --- | --- |
-| Authenticated | The actor's kind and id |
-| Anonymous | The client IP |
-
-That means two authenticated agents do not share a bucket, and one signed-in
-user cannot be locked out by another.
-
-### Client IP behind a proxy
-
-By default `x-forwarded-for` is **ignored entirely** and the identity comes from
-the peer address the adapter reports. Anything else trusts a header the client
-writes.
-
-```ts
-createFunctionsHandler({ functions, db, trustedProxyHops: 1 });
-```
-
-Set it to the number of proxies you run, not the number you have. Behind a
-single nginx or one CDN layer, that is 1.
-
-The header is append-ordered, so the leftmost entry is whatever the original
-client supplied. With `trustedProxyHops: n`, the nth entry from the **right** is
-used: the address your own nearest proxy observed, which a client cannot forge
-past. Reading `split(",")[0]` instead would let an attacker mint a fresh bucket
-per request by rotating the header.
-
-## Every attempt counts
-
-Including the ones that were refused. A caller who fails validation twenty times
-has used twenty calls.
-
-This is deliberate, and the `fix` on the error says so:
-
-```text
-Wait for the window to pass (Retry-After is set) before retrying. Do not
-tight-loop retries. Every attempt, including rejected ones, counts against
-the limit.
-```
-
-The mechanism is the reason. The audit row is reserved as soon as the caller is
-known, before validation, before the access check, before the handler. Counting
-first and recording last would leave a window spanning the whole invocation, in
-which N concurrent requests all read the same count, all saw room, and all ran.
-
-Because the row already exists when the count is taken, the comparison is
-strict: at the limit, the row just inserted is the one over it.
-
-## What a caller sees over the limit
+The call after the limit is refused with HTTP `429` and a `Retry-After` header
+saying how many seconds to wait:
 
 ```json
 {
@@ -106,50 +64,55 @@ strict: at the limit, the row just inserted is the one over it.
 }
 ```
 
-The response is HTTP 429 and carries `Retry-After` set to `windowSeconds`. It
-also carries `x-graft-correlation-id`, like every other function response.
+## How callers are counted
 
-## Limits are counted from the audit log
+- **Signed-in callers** are counted by who they are. Two users never share a
+  limit, so one cannot lock out the other.
+- **Anonymous callers** are counted by IP address.
 
-Rate limiting is counted against audit rows, so a handler configured with
-`audit: false` and a rate limit is a contradiction. It is refused at
-construction rather than silently not limiting:
+Every attempt counts, including ones that are refused. A caller who sends
+twenty invalid requests has used twenty calls. Graft records each call before
+checking it, which is also what stops a burst of simultaneous requests from all
+slipping under the limit at once.
 
-```text
-Remove `audit: false` from createFunctionsHandler, or drop the rateLimit
-configuration.
+### If your app is behind a proxy or CDN
+
+Behind a proxy, every request seems to come from the proxy's IP address. The
+real client address is in the `x-forwarded-for` header, but a client can write
+that header too, so Graft ignores it unless you say how many proxies you run:
+
+```ts
+createFunctionsHandler({ functions, db, trustedProxyHops: 1 });
 ```
 
-## Agents are limited too
-
-`run_function` reuses the same handler, so a function's rate limit applies
-identically whether it was called over HTTP or by an agent. MCP is a door, not a
-bypass.
+Set it to the number of proxies in front of your app. Behind one nginx or one
+CDN, that is `1`. Graft then uses the address your own nearest proxy saw, which
+a client cannot fake.
 
 ## Choose a limit
 
-Two things to weigh.
-
-**Anonymous endpoints need one.** A `public: true` mutation accepts strangers,
-so its limit is the only thing between the endpoint and a script. The contact
-form in the docs site's own config uses 5 per 60 seconds.
-
-**Bounded inputs matter as much as the count.** A limit caps how often, not how
-much. A public form writing into an unbounded column is a storage-exhaustion
-vector at any rate, which is why the same collection bounds its fields:
+- **Every public function needs one.** A `public: true` function accepts
+  anyone, so its limit is all that stands between it and a script. The docs
+  site's own contact form uses 5 per 60 seconds.
+- **Limit the size of each input too.** A rate limit caps how often someone can
+  call, not how much they send each time. Give every field a maximum length:
 
 ```ts
 email: field.string({ maxLength: 320, pattern: /^[^@\s]+@[^@\s]+\.[^@\s]+$/ }),
 message: field.text({ maxLength: 4000, optional: true }),
 ```
 
+## Agents are limited too
+
+Agents run functions through the `run_function` MCP tool, which uses the same
+handler. A function's limit applies the same way whether a browser or an agent
+calls it.
+
 ## The content API
 
-`createContentApiHandler` takes its own `rateLimit`, and `graft serve` gives it
-the same 60 per 60 seconds it gives functions. It needs one for a reason the
-function routes do not: these routes **authenticate nobody**, and they run
-database listings and full-text searches, so without a limit a single anonymous
-caller can keep the index busy indefinitely.
+The [Content API](/docs/content-api) serves your content to frontends over HTTP
+without checking who is asking, and it runs searches. Without a limit, one
+anonymous caller could keep your index busy. Give it its own limit:
 
 ```ts
 createContentApiHandler({
@@ -160,33 +123,40 @@ createContentApiHandler({
 });
 ```
 
-Omitting `rateLimit` means unlimited, which is the right default when the
-handler is mounted behind something that already limits.
+`graft serve` sets 60 per 60 seconds here too. If you mount the handler behind a
+proxy that already limits requests, you can leave `rateLimit` out.
 
-Two differences from the function limiter, both worth knowing before you rely
-on it:
+This limit works differently from the function limit, in two ways:
 
-- **It counts in memory, not in the audit table.** These are reads that write
-  nothing, and adding a write per read to enforce a read limit inverts the cost
-  of the thing being protected. The consequence is that it is **per process**:
-  N replicas allow N times the limit, and a restart resets the counters. A
-  deployment needing an exact global limit puts it in the proxy already
-  terminating TLS.
-- **It is a fixed window**, not the rolling one functions use.
+- **It counts in memory, per server process.** Writing a database row for every
+  read would cost more than the reads it protects. So three server instances
+  allow three times the limit, and a restart resets the count. If you need one
+  exact limit across instances, set it in your proxy or CDN.
+- **Its window resets on a fixed schedule**, rather than rolling.
 
-Identity is shared: the same `trustedProxyHops` rule, the same refusal to read
-`x-forwarded-for` unless you declare your proxy depth. A refusal is a `429`
-carrying `Retry-After`, and it is checked before the index is touched. A limit
-that fires after the query has already run protects nothing.
+It identifies callers the same way, including the `trustedProxyHops` setting,
+and refuses with `429` before running the query.
 
 ## What is not rate limited
 
-- Content reads through the SDK. Those touch the index, not a handler.
+- Reads through the SDKs in your own app. They read the index directly and never
+  pass through a handler.
 - MCP tools other than `run_function`.
+
+## Limits need the audit log
+
+Function limits are counted from audit rows, so they cannot work with the audit
+log turned off. If a handler sets both `audit: false` and a rate limit, Graft
+refuses to start it, rather than quietly not limiting anything:
+
+```text
+Remove `audit: false` from createFunctionsHandler, or drop the rateLimit
+configuration.
+```
 
 ## Next steps
 
-- [Functions & access](/docs/functions-and-access) documents the rest of the function surface.
-- [Audit & approvals](/docs/audit-and-approvals) documents the rows the limit counts.
-- [Observability](/docs/observability) explains reading those rows back.
-- [Error reference](/docs/errors) documents `RATE_LIMITED` and its neighbours.
+- [Functions & access](/docs/functions-and-access) covers who may call a function.
+- [Audit & approvals](/docs/audit-and-approvals) explains the rows the limit
+  counts.
+- [Error reference](/docs/errors) documents `RATE_LIMITED`.

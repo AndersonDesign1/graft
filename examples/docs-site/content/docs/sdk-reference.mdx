@@ -109,12 +109,14 @@ the caller nothing.
 
 | Helper | Use |
 | --- | --- |
-| `tagsFor(collection, slug?)` | What a read depends on |
-| `tagsForChanges(branch, changeSet)` | What a compile invalidated |
+| `tagsFor(branch, collection, slug?)` | The tags a read depends on |
+| `tagsForChanges(branch, changes)` | The tags to refresh after content changes |
 
-Next maps tags onto `'use cache'` + `revalidateTag`. Every other adapter stamps
-CDN headers and purges from a compile webhook. Unchanged documents invalidate
-nothing. Preview branches do not bust main.
+In Next.js, tag cached reads with `cacheTag` and refresh them with
+`revalidateContent` ([how](/docs/next#refresh-pages-when-content-changes)).
+Every other framework sends the tags in a CDN header and purges them at the
+CDN. Unchanged documents are never refreshed, and a change on a preview branch
+never refreshes `main`.
 
 ## Where the frameworks differ
 
@@ -128,7 +130,7 @@ nothing. Preview branches do not bust main.
   connection belongs in a server function or server route and never in a loader.
 - **No tag-based data cache outside Next.** Everything else maps the
   `@usegraft/sdk-core` tag contract onto HTTP: stamp `tagsFor(...)` into a CDN
-  surrogate-key header and purge `tagsForChanges(...)` from the compile webhook.
+  header and purge `tagsForChanges(...)` at the CDN when content changes.
 - **`sdk-react` has no cache and no `db` option,** by design. See above.
 - **Next.js apps that mount the MCP route need `withGraft(nextConfig)`.** It keeps
   `@usegraft/registry` out of the server bundle, because that package reads its

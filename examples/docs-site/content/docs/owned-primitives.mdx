@@ -1,63 +1,91 @@
 ---
 title: Owned primitives
-description: graft add copies real source into your repo. The shadcn model, not plugins.
+description: "Add ready-made features such as comments, SEO fields, or a product catalog as source code you own and can change."
 section: Content
 order: 4
 ---
 
 <p className="kicker">Add ready-made features, such as comments, as code you own and can edit.</p>
 
-Graft ships ready-made features, such as comments or a product catalog, as
-source code you copy into your project, the way shadcn/ui ships components. We
-call them **primitives**. There is no plugin system and no package to keep
-updated: once added, the code is yours.
+You want comments on your blog. You could write the collection, the functions
+to post and moderate, and the access rules yourself, or you could start from
+one that already works.
 
-`graft add comments` copies the comments primitive into your `graft/` folder,
-along with anything it depends on. It also updates `graft/index.ts`, a file
-that re-exports everything in that folder (a "barrel" file), so your config
-picks the new code up automatically.
+Graft ships ready-made features like this as source code you copy into your
+project, the way shadcn/ui ships components. We call them **primitives**. There
+is no plugin system and no package to keep updated: once added, the code is
+yours to read and change.
+
+## See what is available
 
 ```sh
-graft add                # list available items
-graft add comments       # copy item + transitive deps into graft/
-graft add commerce --dry-run
+graft add
 ```
 
-## How added code is wired in
+| Primitive | What you get | Needs |
+| --- | --- | --- |
+| `comments` | A comments collection, plus functions to post, list, moderate, and delete | Postgres |
+| `commerce` | Products as content, orders as runtime data, plus functions to place, list, update, and cancel orders | Postgres |
+| `scoped-access` | Named permission scopes and helpers for access rules | Either engine |
+| `seo` | SEO fields to add to any collection | Either engine |
+| `faq` | Structured FAQ fields and a block to render them | Either engine |
+| `callout` | A callout content block and its MDX component | Either engine |
 
-The generated `graft/index.ts` barrel aggregates collections and functions.
-Your config merges it once:
+Agents can browse the same list with the `list_registry` and `describe_item`
+MCP tools.
+
+## Add one
+
+Preview what it will create, then add it:
+
+```sh
+graft add comments --dry-run   # show the files, change nothing
+graft add comments
+```
+
+This copies the primitive's TypeScript into your `graft/` folder, along with
+anything it depends on, such as `scoped-access`. It also updates
+`graft/index.ts`, a file that re-exports everything in `graft/`.
+
+## Connect it to your config
+
+Your config combines your own collections with everything in `graft/`, using
+`mergePrimitives`. Projects created with `graft init` already do this:
+
+<CodeBlock title="graft.config.ts">
 
 ```ts
+import { mergePrimitives } from "@usegraft/core";
+import * as primitives from "./graft";
+
 export const { collections, functions } = mergePrimitives([
-  { collections: { pages }, functions: { /* project fns */ } },
+  { collections: { pages }, functions: {} },
   primitives,
 ]);
 ```
 
-Duplicate keys fail with `CONFIG_INVALID`.
+</CodeBlock>
 
-## Available primitives
+Run `graft compile`, and the new collection and functions are live. If a
+primitive's name clashes with one of yours, the config stops loading with
+`CONFIG_INVALID` instead of silently replacing either.
 
-| Primitive | What you get |
-| --- | --- |
-| `scoped-access` | Named token scopes + access-rule helpers |
-| `comments` | Db-authoritative collection + post / list / moderate / delete |
-| `seo` | Composable SEO frontmatter fields |
-| `callout` | Content block + MDX component |
-| `faq` | Structured FAQ fields + block |
-| `commerce` | Products (file) + orders (db) + place / list / update / cancel |
+## Change it
 
-Browse before you add:
+The files in `graft/` are yours. Rename fields, change the moderation rules,
+or delete functions you do not need. Graft never overwrites them. If you need
+to undo your changes, Git has the original.
 
-```text
-MCP: list_registry → describe_item
-```
+## Where primitives come from
 
-## How a registry item is structured
+Primitives ship inside the `@usegraft/registry` package, versioned with the rest
+of Graft and tested with it. Each one is a small manifest: a content block, a
+set of fields, access rules, or a bundle of those. Third-party registries are
+not supported yet. The format is designed so they can be added later.
 
-Items live in `@usegraft/registry` as local manifests (`block` / `field` /
-`access` / `bundle`). Remote HTTP registries are format-compatible later. Today
-the registry is in-repo, versioned with core, and testable.
+## Next steps
 
-See [Schema](/docs/schema) for `mergePrimitives` and field nesting.
+- [Schema](/docs/schema) covers combining collections.
+- [Operational data](/docs/operational-data) explains the runtime data that
+  `comments` and `commerce` use.
+- [Functions & access](/docs/functions-and-access) covers the functions they add.

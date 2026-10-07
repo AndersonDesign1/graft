@@ -1,22 +1,33 @@
 ---
 title: Functions & access
-description: Typed functions own operational data. Mutations deny anonymous callers by default.
+description: "Write server code that reads or changes your users' data, call it over HTTP, and control who may call it."
 section: Runtime data
 order: 1
 ---
 
-<p className="kicker">Write runtime data through typed functions.</p>
+<p className="kicker">Define a function once, call it from your app or an agent, and decide who may run it.</p>
 
-Some data is written by users at runtime: submissions, orders, comments.
-None of it is authored in files. Graft calls that **operational data**, and it is
-written only through **functions**: typed, audited handlers you define in
-config or under `graft/`. Declare one:
+<TierBadge tier="postgres" />
+
+A **typed function** is a piece of server code you declare in your config, such
+as "save a contact-form submission" or "list this week's orders". It is the
+only way to read or write [operational data](/docs/operational-data), and it
+is how agents run your business logic too.
+
+You write the handler. Graft does the rest around it: it checks the input
+against a schema, decides whether the caller is allowed in, applies rate
+limits, records the call in the audit log, and returns errors with a `fix`.
+This page shows how to declare a function, call it, and control access.
+
+## Declare a function
+
+<CodeBlock title="graft.config.ts">
 
 ```ts
 export const submitContact = defineFunction({
   name: "submitContact",
-  kind: "mutation",
-  public: true, // greppable opt-out of the anonymous deny default
+  kind: "mutation", // "mutation" changes data, "query" only reads it
+  public: true,     // allow visitors who are not signed in
   rateLimit: { limit: 5, windowSeconds: 60 },
   input: submissions.fields,
   handler: async (ctx) => {
@@ -26,37 +37,95 @@ export const submitContact = defineFunction({
 });
 ```
 
-Serve at `POST /api/fn/<name>` (JSON object body) via a framework mount or
-`graft serve`. Success returns `{ data }`. Failure returns a GraftError with
-`fix`. Every response carries `x-graft-correlation-id`.
+</CodeBlock>
 
-<Callout label="Runs anywhere" type="note">
-  Every function is a **stateless** Web-standard handler (`Request → Response`).
-  The same bytes run embedded in any of the framework adapters, in a container,
-  or on request-scoped compute.
-</Callout>
+Export it from `graft.config.ts`, or put it in a file under `graft/`, and it is
+served at `POST /api/fn/submitContact`.
 
-## Secure by default
+## Call it from your app
 
-- Mutations reject anonymous callers unless `public: true`
-- `access: requireScopes("submissions:read")` replaces the default with a scope rule
-- `rateLimit` counts against the audit log. No separate counter service.
-- Every invocation writes an `audit_log` row (actor, correlation id, git SHA)
+Send the input as a JSON object:
 
-## What the handler receives
+<CodeBlock title="app/contact/actions.ts">
 
-Handlers receive `FunctionContext`: `{ input, db, actor, branch, request, correlationId }`.
-Use core helpers (`insertRecord`, `listRecords`, `updateRecord`, `deleteRecord`,
-`searchRecords`) so authority and Zod validation stay enforced.
+```ts
+const response = await fetch("/api/fn/submitContact", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ email, message }),
+});
+const result = await response.json();
+// success: { data: { id, receivedAt } }
+// failure: { error, message, fix }
+```
 
-## Destructive operations
+</CodeBlock>
 
-Mark `destructive: true` for irreversible work. First call files an approval and
-returns 403 with the id. A human runs `graft approve <id>`. The caller retries
-with `x-graft-approval` (HTTP) or `approval` (MCP). Approvals are one-shot and
-input-bound. See [Audit & approvals](/docs/audit-and-approvals).
+Every response, success or failure, carries an `x-graft-correlation-id` header.
+Log it: it is how you find this exact call in the
+[audit log](/docs/observability) when a user reports a problem.
 
-## Identity
+Agents call the same function through the `run_function` MCP tool, with the same
+checks. To serve the endpoint, mount Graft in your framework (see your
+[framework guide](/docs/next#serve-functions-and-mcp-from-your-app)) or
+run `graft serve`.
 
-`@usegraft/auth` verifies bearers. Graft does not mint identities. See
-[Auth](/docs/auth).
+## Who can call it
+
+| Setting | Effect |
+| --- | --- |
+| A `mutation` with no `access` rule | Signed-in callers only. Anonymous calls are refused. |
+| `public: true` | Anyone, including anonymous visitors. Use it for public forms. |
+| A `query` with no `access` rule | Anyone. Add a rule to any query that returns private data. |
+| `access: requireScopes("submissions:read")` | Only callers whose token carries that scope. |
+
+Graft works out who the caller is from their token. [Auth](/docs/auth) covers
+how tokens are checked and where scopes come from.
+
+## What your handler receives
+
+The handler gets one argument, `ctx`:
+
+| Field | What it is |
+| --- | --- |
+| `ctx.input` | The request body, already checked against `input` and typed |
+| `ctx.actor` | Who is calling: a user, an agent, or anonymous |
+| `ctx.branch` | The content branch the call runs on, usually `main` |
+| `ctx.db` | The database handle, for the record helpers |
+| `ctx.request` | The original HTTP request |
+| `ctx.correlationId` | The id returned in `x-graft-correlation-id` |
+
+Read and write data with the record helpers (`insertRecord`, `listRecords`,
+`updateRecord`, `deleteRecord`, `searchRecords`). Pass `ctx` as the first
+argument. They check every record against its schema and stamp it with the
+caller and correlation id. [Operational data](/docs/operational-data) shows
+each one.
+
+## Protect functions that destroy data
+
+Mark a function `destructive: true` when its effect cannot be undone, such as
+deleting records. It then needs a human's approval before it runs:
+
+1. The first call does not run. It files an approval request and answers `403`
+   with the request's id.
+2. A person approves it, with `graft approve <id>` or in Studio.
+3. The caller repeats the call with the id, in the `x-graft-approval` header
+   (HTTP) or the `approval` argument (MCP). Now it runs.
+
+An approval works once, and only for the exact input that was approved.
+[Audit & approvals](/docs/audit-and-approvals) covers the details, including
+asking for approval from inside an agent's session.
+
+## Where functions can run
+
+A function is a standard web handler: it takes a `Request` and returns a
+`Response`, and keeps no state between calls. The same function runs inside any
+of the framework adapters, in the Graft container, or on serverless platforms,
+without changes.
+
+## Next steps
+
+- [Operational data](/docs/operational-data) shows the record helpers in a
+  complete example.
+- [Auth](/docs/auth) sets up identity and scopes.
+- [Rate limits](/docs/rate-limits) protects public functions.

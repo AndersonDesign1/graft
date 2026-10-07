@@ -1,61 +1,84 @@
 ---
 title: Search
-description: Full-text search on the content index and on operational data, on either engine.
+description: "Add full-text search to your site, with ranked results and highlighted snippets, and no search service to run."
 section: Content
 order: 2
 ---
 
 <p className="kicker">Add full-text search to your site with no search service to run.</p>
 
+<TierBadge tier="either" />
+
 Every compile also builds a full-text search index of your content. You do not
 run a search service, sync anything, or write indexing code. Call
-`searchContent` and you get the best matches first, each with a highlighted
-snippet.
+`searchContent` and you get the best matches first, each with a snippet
+showing where the words matched.
 
-It works the same on both storage engines. The search technology underneath
-differs, but the call, the query syntax, and the order of results do not:
+## Search a collection
 
-| | Static index | Postgres |
-| --- | --- | --- |
-| Engine | SQLite FTS5, porter stemming | Generated `tsvector` columns, GIN |
-| Ranking | `bm25` with column weights | `ts_rank` over a weighted vector |
-| Weighting | slug > frontmatter strings > body | slug (A) > frontmatter strings (B) > body (C) |
-| Needs | nothing | a database |
+```ts
+const hits = await graft.searchContent("docs", "preview branch");
 
-The static engine translates the same websearch surface into an FTS5 `MATCH`
-expression, and its bm25 column weights mirror the Postgres A/B/C vector, so
-results come back in the same order for the same query.
+for (const hit of hits) {
+  hit.slug;       // which document
+  hit.data.title; // typed, like any read
+  hit.snippet;    // the matching passage, with matched words in <b>
+}
+```
 
-## Search your content
+Agents search the same way with the `search_content` MCP tool. Each of their
+results also includes `sourcePath`, the file to edit.
 
-Surfaces:
+On a [preview branch](/docs/branching-previews), search covers the branch's
+changes plus everything it inherits from `main`, the same as any other read.
 
-| Surface | Call |
+## What readers can type
+
+The query syntax is the one people already use in web search engines:
+
+| Type | Finds |
 | --- | --- |
-| SDK | `graft.searchContent(collection, query)` |
-| MCP | `search_content` |
-| db | `searchContent` (used under the hood) |
+| `preview branch` | Documents with both words |
+| `"preview branch"` | That exact phrase |
+| `preview or draft` | Either word |
+| `branch -neon` | "branch", but not "neon" |
 
-Query syntax is the `websearch_to_tsquery` surface: words, `"quoted phrases"`,
-`or`, and `-exclusions`. Empty queries fail with `INPUT_VALIDATION_FAILED`.
-Stopword-only queries return `[]`.
+An empty query fails with `INPUT_VALIDATION_FAILED`. A query made only of
+common words such as "the" returns no results rather than an error.
 
-Hits include rank, headline snippets, and `sourcePath` (the file to edit). On
-overlay branches, search walks the branch chain so inherited documents appear.
+## Show the snippets safely
 
-Snippets mark the matched terms with `<b>` on both engines. Render them or strip
-them, but know they are there.
+Snippets wrap the matched words in `<b>` tags, on both engines. To show the
+highlighting, render the snippet as HTML. Snippets come from your own content,
+but if writers you do not fully trust can edit it, strip every tag except `<b>`
+first. To show plain text instead, remove the tags.
 
-## Search operational data
+## How results are ranked
 
-Data search stays behind typed functions (`searchRecords` in core). The same
-authority and Zod rules apply as to other record helpers. Example apps expose
-gated functions such as `searchSubmissions`.
+Matches in the slug count most, then matches in frontmatter text fields, then
+matches in the body. The underlying technology depends on the
+[storage engine](/docs/tiers), but the ranking and query syntax are the same,
+so the same query returns results in the same order on both:
 
-Operational data always needs the Postgres engine, so this section has no static
-equivalent. Calling it in static mode fails with `NEEDS_DATABASE`.
+| | Static engine | Postgres engine |
+| --- | --- | --- |
+| Search technology | SQLite FTS5 | Postgres full-text search (`tsvector`, GIN index) |
+| Ranking | `bm25`, weighted by field | `ts_rank`, weighted by field |
+| Extra setup | None | None beyond the database |
 
-## Search in other languages
+## Search your users' data
 
-The FTS config is English on both engines: `'english'` on Postgres, `porter
-unicode61` on FTS5. Per-collection language configs are an open follow-up.
+To search [operational data](/docs/operational-data), such as form submissions,
+use `searchRecords` inside a typed function. It takes the same query syntax.
+Like every read of user data, it only runs inside a function, so access rules
+apply. It needs the Postgres engine.
+
+## Language
+
+Search uses English word rules on both engines: it matches "branches" when
+someone types "branch". Other languages are not configurable yet.
+
+## Next steps
+
+- [Reading content](/docs/reading-content) covers the other two reads.
+- [Operational data](/docs/operational-data) covers `searchRecords`.

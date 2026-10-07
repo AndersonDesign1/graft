@@ -27,10 +27,13 @@ Start static. Move to Postgres the day you need one of the features in
 
 Look for the `index` export in `graft.config.ts`:
 
+<CodeBlock title="graft.config.ts">
+
 ```ts
-// graft.config.ts
 export const index = "static"; // or "postgres"
 ```
+
+</CodeBlock>
 
 `graft init` writes `"static"` for you. If a config has no `index` export at
 all, Graft uses Postgres, so older projects keep working. Set it explicitly and
@@ -141,10 +144,13 @@ DATABASE_URL=postgres://…
 
 <Step title="Switch the index">
 
+<CodeBlock title="graft.config.ts">
+
 ```ts
-// graft.config.ts
 export const index = "postgres";
 ```
+
+</CodeBlock>
 
 </Step>
 

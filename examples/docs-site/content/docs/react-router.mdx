@@ -50,12 +50,13 @@ bun add @usegraft/sdk-react-router @usegraft/db
 </Tabs>
 
 For framework mode, which is where React Router runs loaders and actions on a
-server. Build the handle once in a `.server.ts` module.
+server. Create the client once in a `.server.ts` module.
 
 ## Create the Graft client
 
+<CodeBlock title="app/lib/graft.server.ts">
+
 ```ts
-// app/lib/graft.server.ts
 import { createDb } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-react-router";
 import { collections } from "../../graft.config";
@@ -63,6 +64,8 @@ import { collections } from "../../graft.config";
 export const db = createDb(process.env.DATABASE_URL!).db;
 export const graft = createGraft({ db, collections });
 ```
+
+</CodeBlock>
 
 Static index instead of Postgres:
 
@@ -77,8 +80,9 @@ export const graft = createGraft({
 
 ## Read a document
 
+<CodeBlock title="app/routes/docs.$slug.tsx">
+
 ```ts
-// app/routes/docs.$slug.tsx
 import { graft } from "../lib/graft.server";
 import type { Route } from "./+types/docs.$slug";
 
@@ -86,6 +90,8 @@ export async function loader({ params }: Route.LoaderArgs) {
   return { doc: await graft.getContent("docs", params.slug) };
 }
 ```
+
+</CodeBlock>
 
 `loader` and `action` run on the server and React Router strips them from the
 browser bundle. The `.server.ts` name is belt and braces on top of that: it
@@ -106,8 +112,9 @@ npm i @usegraft/auth @usegraft/mcp
 `graftRoute` binds a Graft handler to a resource route. That is a route module with
 no default export, whose loader and action return raw Responses.
 
+<CodeBlock title="app/routes/api.fn.$name.ts">
+
 ```ts
-// app/routes/api.fn.$name.ts
 import { createFunctionsHandler } from "@usegraft/core";
 import { graftRoute } from "@usegraft/sdk-react-router";
 import { functions } from "../../graft.config";
@@ -119,8 +126,11 @@ export const action = graftRoute(handler); // POST
 export const loader = graftRoute(handler); // GET, which 405s with Allow and a fix
 ```
 
+</CodeBlock>
+
+<CodeBlock title="app/routes/api.mcp.ts">
+
 ```ts
-// app/routes/api.mcp.ts
 import { createActorResolver } from "@usegraft/auth";
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftRoute } from "@usegraft/sdk-react-router";
@@ -154,6 +164,8 @@ export const action = graftRoute(
 );
 ```
 
+</CodeBlock>
+
 This endpoint serves content writes and asset uploads. JWT verification runs
 only when `issuers` is passed; the library does not read
 `GRAFT_TRUSTED_ISSUERS` (`graft serve` does). See [Auth](/docs/auth).
@@ -164,8 +176,9 @@ tools and no anonymous opt-in.
 
 Register them the way you register any route:
 
+<CodeBlock title="app/routes.ts">
+
 ```ts
-// app/routes.ts
 import { route, type RouteConfig } from "@react-router/dev/routes";
 
 export default [
@@ -173,6 +186,8 @@ export default [
   route("api/mcp", "routes/api.mcp.ts"),
 ] satisfies RouteConfig;
 ```
+
+</CodeBlock>
 
 <Callout label="Why the route exports a loader" type="warning">
   React Router handles GET requests with a route's `loader` export and all
@@ -185,9 +200,15 @@ export default [
 
 ## Refresh pages when content changes
 
-React Router has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
-surrogate-key header from the route's `headers` export, and purge
-`tagsForChanges(branch, changeSet)` from your compile webhook.
+<TierBadge tier="postgres" />
+
+On the static engine, content changes ship with a new deploy, so there is
+nothing to refresh. On Postgres, content can change while your app is running,
+from Studio or from an agent. React Router has no tag-based data cache, so let your
+CDN cache pages and purge only the ones whose content changed.
+
+First, send each page with a header that lists the content it read. `tagsFor`
+builds that list:
 
 ```ts
 import { tagsFor } from "@usegraft/sdk-react-router";
@@ -198,8 +219,15 @@ export function headers({ params }: Route.HeadersArgs) {
 }
 ```
 
-`Cache-Tag` is the surrogate-key header. Purge the same strings
-`tagsForChanges` returns from your compile webhook.
+Then, when content changes, purge those tags at your CDN.
+`tagsForChanges(branch, changes)` turns a change list into the tags to purge:
+each changed document, and the collection it is in. Graft does not purge your
+CDN for you. An agent's `write_content` call returns the change list as
+`changes`.
+
+`Cache-Tag` is the header Cloudflare reads, with tags separated by commas.
+Fastly reads `Surrogate-Key`, with tags separated by spaces. Use the header
+your CDN expects.
 
 ## Next steps
 

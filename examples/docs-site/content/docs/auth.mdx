@@ -1,45 +1,81 @@
 ---
 title: Auth
-description: Graft verifies identity. It never mints it. OIDC issuers and local dev tokens.
+description: "Tell Graft who is calling your functions and MCP endpoint, using the login system your app already has."
 section: Runtime data
 order: 2
 ---
 
 <p className="kicker">Tell Graft who is calling, using the login your app already has.</p>
 
+<TierBadge tier="postgres" />
+
 When someone calls one of your [typed functions](/docs/functions-and-access),
 or an agent connects over MCP, Graft needs to know who they are. It uses that
 to decide what they may do, and to record who did what in the audit log.
 
 Graft does not create accounts or log anyone in. Your app, or an identity
-provider such as Auth0, Clerk, or WorkOS, already does that and issues a
-token. `@usegraft/auth` checks that token on each request and turns it into
-the caller's identity, which Graft calls the **actor** (`FunctionActor` in
-code).
+provider such as Auth0, Clerk, or WorkOS, already does that and gives the
+signed-in user a token. Graft checks that token on each request and turns it
+into the caller's identity, which it calls the **actor**.
 
-## Where a caller's identity comes from
+This page gets you a working identity locally in one step, then connects your
+real identity provider for production, then shows how to require permissions.
 
-| Source | Use |
+## How Graft decides who is calling
+
+Each request falls into one of four cases:
+
+| The request carries | Graft treats the caller as |
 | --- | --- |
-| OIDC bearer JWT | Production. Verified with jose against trusted issuers (JWKS inline, URL, or discovery). Checks `iss`, `exp`, `aud`. Scopes from `scope` / `scopes` / `permissions` |
-| `GRAFT_DEV_TOKEN` | Local bootstrap. Optional `GRAFT_DEV_SCOPES` |
+| A valid token from an identity provider you trust | That user, with the scopes the token lists |
+| Your local development token (`GRAFT_DEV_TOKEN`) | You, with the scopes you set |
 | No token | Anonymous |
-| Bad token | `TOKEN_INVALID` (401). The server never downgrades silently to anonymous |
+| A token that is expired, forged, or from an issuer you do not trust | Refused with `TOKEN_INVALID` (401) |
 
-## Configure it
+The last row matters. A bad token is never quietly treated as anonymous, so a
+broken login shows up as an error instead of as a signed-out user who can still
+reach public functions.
+
+## Try it locally with a development token
+
+Set a token and the scopes it should carry in your `.env`:
+
+<CodeBlock title=".env">
 
 ```sh
 GRAFT_DEV_TOKEN=dev-secret
 GRAFT_DEV_SCOPES=submissions:read,submissions:admin
-GRAFT_TRUSTED_ISSUERS=https://your-idp.example
 ```
 
-`GRAFT_TRUSTED_ISSUERS` is a comma-separated list of issuer URLs. Discovery loads
-JWKS for each. `graft serve` parses that env itself. An embedded
-`createActorResolver` does not. The library creates JWT verification only when you pass
-`issuers`. Omit them and a valid bearer is `TOKEN_INVALID` (401).
+</CodeBlock>
 
-## Create a resolver in code
+Requests that send `Authorization: Bearer dev-secret` now act as you, with
+those scopes. Use this only on your machine, never in a deployment.
+
+## Connect your identity provider
+
+In production, Graft checks tokens from identity providers you trust. They must
+be OpenID Connect providers, which almost all of them are.
+
+**If you run `graft serve`**, list each provider's issuer URL:
+
+<CodeBlock title=".env">
+
+```sh
+GRAFT_TRUSTED_ISSUERS=https://your-tenant.auth0.com/
+```
+
+</CodeBlock>
+
+Graft looks up each provider's public keys and checks every token's signature,
+issuer, expiry, and audience. Scopes are read from the token's `scope`,
+`scopes`, or `permissions` claim.
+
+**If Graft runs inside your own app**, create the resolver in code and pass it
+to Graft's handlers. `GRAFT_TRUSTED_ISSUERS` is not read automatically here, so
+pass the issuers yourself:
+
+<CodeBlock title="lib/graft-auth.ts">
 
 ```ts
 import { createActorResolver } from "@usegraft/auth";
@@ -61,33 +97,56 @@ export const actor = createActorResolver({
 });
 ```
 
-Hand `actor` to `createGraftMcpHandler` and `createFunctionsHandler`. Each
-`{ issuer }` URL is trusted for OIDC discovery. A Better Auth instance your app
-hosts uses `betterAuthIssuer({ url })` instead of a bare issuer URL.
+</CodeBlock>
 
-## Access rules
+Pass `actor` to `createFunctionsHandler` and `createGraftMcpHandler`. Without
+any `issuers`, every real token is refused with `TOKEN_INVALID`.
+
+If your app hosts its own [Better Auth](https://www.better-auth.com) instance,
+use `betterAuthIssuer({ url })` in place of a plain `{ issuer }`. The Next.js
+example app does this. It is one option, not a requirement: any OpenID Connect
+provider works the same way.
+
+## Require a permission
+
+Add an `access` rule to a function so only callers with a given scope can run
+it:
+
+<CodeBlock title="graft.config.ts">
 
 ```ts
 import { requireScopes } from "@usegraft/auth";
 
-access: requireScopes("submissions:read"),
+export const recentSubmissions = defineFunction({
+  name: "recentSubmissions",
+  kind: "query",
+  access: requireScopes("submissions:read"),
+  // …
+});
 ```
 
-Anonymous and unscoped callers are denied. Combine with `public: true` only on
-mutations that must accept strangers (contact forms).
+</CodeBlock>
 
-## Example: trust an identity provider
-
-The Next example hosts Better Auth and mints a JWT for browser sessions. That
-path is an **example**, not a Graft core dependency. Any OIDC issuer that
-matches an `issuers` entry (or `GRAFT_TRUSTED_ISSUERS` on `graft serve`) works
-the same way.
+Anonymous callers and callers without the scope are refused. To let anyone call
+a function, such as a public contact form, set `public: true` instead.
+[Functions & access](/docs/functions-and-access) lists the defaults.
 
 ## Identity for agents
 
-- **stdio (`graft mcp`):** server holds `GRAFT_DEV_TOKEN` as default authorization.
-  The secret does not enter the agent context.
-- **HTTP:** connection bearer forwards into `run_function`. Optional
-  `authorization` argument overrides (acting-as).
+How an agent is identified depends on how it connects:
 
-See [The agent surface](/docs/agent-surface).
+- **On your machine (`graft mcp`).** The server uses `GRAFT_DEV_TOKEN` as the
+  agent's identity. The token stays in the server, so it never appears in the
+  agent's conversation.
+- **Over HTTP (`POST /api/mcp`).** The agent sends a token when it connects, and
+  that token is used for every function it runs. A single call can pass a
+  different token to act as another user, if that token is valid.
+
+[Connecting agents](/docs/connecting-agents) covers both setups.
+
+## Next steps
+
+- [Functions & access](/docs/functions-and-access) shows the access defaults
+  for each kind of function.
+- [Audit & approvals](/docs/audit-and-approvals) records who did what.
+- [Connecting agents](/docs/connecting-agents) gives an agent an identity.

@@ -7,13 +7,13 @@ order: 2
 
 <p className="kicker">Every tool an agent can call, with its inputs and results.</p>
 
-Use this page to look up a tool. The project MCP server exposes eighteen tools,
-grouped below by what they do. For
-how to connect one, see [Connecting agents](/docs/connecting-agents).
+Use this page to look up a tool. The project MCP server offers eighteen tools,
+grouped below by what they do. To connect an agent, see
+[Connecting agents](/docs/connecting-agents).
 
-Tools are not a bypass. `run_function` reuses the same functions handler as
-`POST /api/fn/<name>`, so access rules, audit rows, rate limits, and approval
-gates apply identically.
+Tools give an agent no extra powers. `run_function` goes through the same
+handler as `POST /api/fn/<name>`, so access rules, the audit log, rate limits,
+and approvals apply exactly as they do for your app's users.
 
 ## Discovery
 
@@ -24,8 +24,8 @@ gates apply identically.
 | `list_functions` | none | Every typed function |
 | `describe_function` | `name` | One function's input fields, kind, and flags |
 
-`describe_schema` returns the same descriptor the Studio's schema view renders
-and `FieldTable` builds its table from, so the three cannot drift.
+`describe_schema` returns the same description that Studio's schema view and the
+field tables in these docs are built from, so all three always agree.
 
 ## Reading content
 
@@ -35,17 +35,18 @@ and `FieldTable` builds its table from, so the three cannot drift.
 | `get_content` | `collection`, `slug` | Returns data, body, and `sourcePath` |
 | `search_content` | `query`, `collection?`, `limit?` | Reads the compiled index; default limit 20 |
 
-`list_content` and `get_content` read files because git is the source of truth,
-so they reflect the working tree rather than the last compile.
+`list_content` and `get_content` read your files, which are the source of truth,
+so they show your latest edits even before you compile.
 
-`search_content` reads the index, so results are as fresh as the last compile.
-`write_content` compiles, so authoring keeps search current on its own. Query
-syntax is websearch: words, `"quoted phrases"`, `or`, and `-exclusions`. On an
-overlay branch it searches the whole parent chain, so inherited documents
-appear and branch overrides win.
+`search_content` searches the index, so it reflects the last compile. Writes
+through `write_content` compile as they go, so they are searchable at once. The
+query syntax is the familiar web-search one: words, `"quoted phrases"`, `or`,
+and `-exclusions`. On a preview branch, results include the documents the
+branch inherits from `main`, with the branch's own versions taking priority.
 
-All three carry `resource_link`s to the documents they name, so a client can
-attach a document without a second call.
+All three include a link to each document's
+[resource](/docs/mcp-resources-and-prompts), so a client can attach a document
+without another call.
 
 ## Writing content
 
@@ -126,9 +127,9 @@ requester can never decide its own approval.
 It also needs a database role that may `UPDATE approvals`. A hardened runtime
 role cannot, by design. See [Hardening](/docs/hardening).
 
-Note that `graft mcp` deliberately does **not** carry `approvals:decide`. The
-CLI files approvals and `graft approve` decides them, and those have to stay
-different identities.
+`graft mcp` does **not** have `approvals:decide`, on purpose. The agent files
+the approval and a person decides it with `graft approve`, and those have to
+be different identities.
 
 ## Packages, registry and errors
 
@@ -163,13 +164,13 @@ without parsing prose.
 | Write, not destructive | `write_content` |
 | Destructive | `delete_content`, `put_asset`, `decide_approval`, `run_function` |
 
-`write_content` claims a non-destructive change because git is its undo.
-`put_asset` does not get that claim, because the asset store keeps no history.
-`run_function` is destructive because it can be: what it runs is the project's
-code.
+`write_content` is marked non-destructive, because Git can undo any content
+change. `put_asset` is not, because the asset store keeps no history.
+`run_function` is marked destructive, because it runs whatever your function
+does.
 
-`openWorldHint` is false on all eighteen. Graft's domain is the collections a
-project declares, which is a closed set known at config load.
+`openWorldHint` is false on every tool, because each one only touches the
+collections your project declares.
 
 <Callout label="Annotations are hints, not security" type="warning">
   Annotations are hints. The MCP spec says a client must not make an
@@ -185,10 +186,10 @@ result against it before the answer leaves the server, so a tool that quietly
 changes shape fails there rather than inside whatever the agent did next.
 Results also carry `structuredContent` alongside the text block.
 
-The two exemptions are deliberate. `run_function` returns whatever the project's
-function returns, and `delete_content` spreads the deleted function's own return
-over the top level. Both are open by design, and a schema saying `unknown`
-would be a contract promising nothing.
+The two without one are `run_function`, which returns whatever your function
+returns, and `delete_content`, whose result includes the deleting function's
+own return value. Their shape depends on your code, so a fixed schema could not
+describe them.
 
 ## Scopes
 
@@ -202,14 +203,13 @@ Three tools check a scope at the MCP layer.
 Everything else is ungated at this layer, and `run_function` defers to the
 function.
 
-A credential without the scope gets `UNAUTHORIZED` naming what was required and
-what it holds. An unauthenticated mount that opted into anonymous callers is
-unscoped by design, so nothing is refused there. That is why anonymous
-MCP is loopback-only.
+A token without the scope gets `UNAUTHORIZED`, naming the scope required and
+the scopes it has. A server that allows anonymous callers checks no scopes at
+all, which is why anonymous MCP is only allowed on your own machine by default.
 
-One failure mode is worth knowing because it shipped in one of Graft's own
-examples: a server built with an actor resolver but no `connectionActor` would
-pass every scope check silently. That now fails closed with `CONFIG_INVALID`.
+A server given an identity resolver but no `connectionActor` refuses to start
+with `CONFIG_INVALID`. Without that check, it would pass every scope check
+without verifying anything.
 
 ## Static projects
 
@@ -222,5 +222,5 @@ Tools that need Postgres stay listed on a static project and answer
 
 - [Connecting agents](/docs/connecting-agents) covers transports, identity, and setup.
 - [MCP resources & prompts](/docs/mcp-resources-and-prompts) covers the rest of the surface.
-- [The agent surface](/docs/agent-surface) explains why this exists in place of a dashboard.
+- [Agents overview](/docs/agent-surface) explains what agents can do.
 - [Error reference](/docs/errors) lists every code a tool can return.

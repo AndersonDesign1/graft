@@ -50,7 +50,8 @@ what operational data, typed functions, and copy-on-write branches need.
 | --- | --- |
 | `S3_BUCKET` | Bucket name |
 | `S3_ENDPOINT` | API endpoint (R2, MinIO, Tigris, …) |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Credentials |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | Credentials |
+| `S3_REGION` | Optional. Defaults to `auto`, which suits R2 |
 | `S3_PUBLIC_URL` | Optional stable public base; else presigned GET |
 | `GRAFT_ENSURE_BUCKET` | Container: set `0` when the bucket already exists |
 
@@ -86,10 +87,13 @@ Set `"full"` only when every author of the repository has commit access. Renderi
 evaluates MDX as JavaScript on the server, so on a Studio hosted for writers,
 "can author a page" would otherwise mean "can execute code on the render host".
 
+<CodeBlock title="graft.config.ts">
+
 ```ts
-// graft.config.ts
 export const mdxTrust = "full";
 ```
+
+</CodeBlock>
 
 `MdxBody` has its own `trust` prop with the same default, and the two have to
 agree: set `mdxTrust` here and pass `trust="full"` at the render site. Compile

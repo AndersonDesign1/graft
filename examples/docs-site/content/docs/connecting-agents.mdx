@@ -1,6 +1,6 @@
 ---
 title: Connecting agents
-description: Point an agent at a Graft project over stdio or HTTP, and decide what identity it carries.
+description: "Connect Claude Code, Cursor, or any MCP client to your Graft project, on your machine or over HTTP, and control what it may do."
 section: Agents & MCP
 order: 1
 ---
@@ -8,36 +8,30 @@ order: 1
 <p className="kicker">Point Claude Code, Cursor, or any MCP client at your project.</p>
 
 This page gets an agent connected to your Graft project and explains what it is
-allowed to do once connected. There are two ways to connect, and they reach the
+allowed to do once connected. There are two ways to connect, and both reach the
 same tools:
 
-- **Stdio**, when the agent runs on the same machine as your project. This is
-  the usual setup for Claude Code and Cursor.
-- **HTTP**, when the agent runs somewhere else, such as a hosted agent calling
-  your deployed app.
+- **On your machine (stdio).** The agent starts `graft mcp` as a local process.
+  This is the usual setup for Claude Code and Cursor. Start here.
+- **Over HTTP.** The agent connects to your deployed app at `POST /api/mcp`,
+  for example a hosted agent working on your live site.
 
-| Transport | Who it is for | Identity |
-| --- | --- | --- |
-| Stdio (`graft mcp`) | An IDE or a local agent | The CLI's own identity, plus `GRAFT_DEV_TOKEN` scopes |
-| HTTP (`POST /api/mcp`) | Remote agents | A bearer on the connection |
+## Connect an agent on your machine
 
-## Connect a local agent (stdio)
+<Steps>
 
-```sh
-graft mcp                 # serve this project over stdio
-graft mcp --branch preview
-```
+<Step title="Register Graft with your agent">
 
-Register it the way your client expects. Most use an `mcpServers` map:
+Most clients read an `mcpServers` map. Add Graft to it:
 
-<CodeBlock title=".mcp.json">
+<CodeBlock title=".mcp.json (Claude Code) or .cursor/mcp.json (Cursor)">
 
 ```json
 {
   "mcpServers": {
     "graft": {
-      "command": "graft",
-      "args": ["mcp"]
+      "command": "npx",
+      "args": ["graft", "mcp"]
     }
   }
 }
@@ -45,132 +39,120 @@ Register it the way your client expects. Most use an `mcpServers` map:
 
 </CodeBlock>
 
-Run `graft mcp` from the project directory, or point the client's working
-directory at it. The command walks up from the working directory to find
-`graft.config.ts` and the nearest `.env`.
+Put the file in your project's root folder. Graft looks for `graft.config.ts`
+and `.env` starting from the folder it runs in, so the client must start it in
+your project.
 
-Never write to stdout from a hook or wrapper around this command. Stdout is the
-protocol stream.
+</Step>
 
-### What identity stdio carries
+<Step title="Check that it works">
 
-Stdio is a local process the developer started, so there is no untrusted caller
-to authenticate. The server acts as `agent:graft-cli`, and that identity carries
-`content:write`. That scope is what makes authoring work out of the box.
+Ask the agent to call `list_collections`. It needs no arguments, no permissions,
+and no database, so if it fails, the problem is the connection rather than your
+project.
 
-`GRAFT_DEV_SCOPES` adds scopes on top, for `run_function` access rules. It is
-not what grants authoring.
+From there, `describe_schema` tells the agent everything it needs to write
+content, and `explain_error` turns any failure into a next step.
 
-`approvals:decide` is deliberately absent. The CLI files approvals and
-`graft approve` decides them, and those have to stay different identities or the
-requester-cannot-decide rule means nothing.
+</Step>
 
-If `GRAFT_DEV_TOKEN` is set, the server holds it as the default authorization
-for `run_function`, so the secret never enters the agent's context.
+</Steps>
 
-### Approving in the same terminal
+To work on a [preview branch](/docs/branching-previews), add `--branch` to the
+arguments: `["graft", "mcp", "--branch", "preview"]`.
+
+If you wrap `graft mcp` in a script, never print anything from the script.
+The client reads standard output as the protocol, and stray text breaks it.
+
+### What a local agent may do
+
+The agent is a process you started on your own machine, so Graft trusts it to
+write content: it can call `write_content`, `delete_content`, and `put_asset`
+without any setup.
+
+It cannot approve its own destructive actions. A delete waits for you to run
+`graft approve` in another terminal, unless you start the server with
+`--elicit-approvals`:
 
 ```sh
 graft mcp --elicit-approvals
 ```
 
-The destructive call then pauses and the client asks the human to confirm,
-instead of failing with an id to approve elsewhere. It is opt-in even here,
-where the human is by definition present, because it changes what happens when
-an agent tries something destructive.
+Then the agent's client asks you to confirm right there, and approving finishes
+the call. See [Audit & approvals](/docs/audit-and-approvals#asking-in-band-opt-in).
 
-The decider recorded is the OS user, which is the same person `graft approve`
-would record. See
-[Audit & approvals](/docs/audit-and-approvals#asking-in-band-opt-in).
+To let the agent run functions that require scopes, add them to
+`GRAFT_DEV_SCOPES` in `.env`. If `GRAFT_DEV_TOKEN` is set, the server uses it as
+the agent's identity for those calls, and the token itself never appears in the
+agent's conversation.
 
-## Connect a remote agent (HTTP)
+## Connect an agent over HTTP
 
-`POST /api/mcp` speaks MCP Streamable HTTP, statelessly: a fresh server per
-request, no session, no state between calls. The same handler runs in a Next.js
-route, `graft serve`, a container, or a Worker.
-
-Because it is stateless, it is POST-only. A `GET` or `DELETE` answers 405, and
-clients read that as "no server-initiated messages" and carry on.
-
-`graft serve` mounts it:
+A deployed app serves MCP at `POST /api/mcp`. `graft serve` mounts it for you:
 
 ```sh
 graft serve --port 3903
-# POST /api/mcp
 ```
 
-To embed it yourself, `createGraftMcpHandler` returns the same
-`Request → Response` handler. See [SDK reference](/docs/sdk-reference) for the
-per-framework mount.
+To mount it inside your own app, use `createGraftMcpHandler`. Your
+[framework guide](/docs/next#serve-functions-and-mcp-from-your-app) shows
+the route.
 
-### Identity over HTTP
+The endpoint is stateless: each request is handled on its own, so it runs on
+serverless platforms too. It only answers `POST`. A `GET` returns `405`, which
+MCP clients understand as "this server does not push messages".
 
-The connection's bearer is verified by `@usegraft/auth` and forwarded into
-`run_function`. `graft serve` reads `GRAFT_TRUSTED_ISSUERS` (and
-`GRAFT_DEV_TOKEN` for local bootstrapping). An embedded handler must pass
-`issuers` into `createActorResolver`. The library does not read that env.
-See [Auth](/docs/auth).
+### Give the agent an identity
 
-Anonymous callers are the interesting case, and the bind address decides rather
-than an env var an operator has to remember:
+Over HTTP, the agent sends a token when it connects, just like a user of your
+app. Graft checks it the same way, then uses it for every function the agent
+runs. [Auth](/docs/auth) covers setting up the providers Graft trusts.
 
-| Bind | Anonymous MCP |
+An agent that holds a user's token can act as that user for a single call by
+passing it as the `authorization` argument to `run_function`.
+
+### Anonymous agents
+
+Whether an agent without a token is allowed depends on where the server
+listens:
+
+| The server listens on | Agents without a token are |
 | --- | --- |
-| Loopback | Served. Zero-config local development |
-| Anywhere else | Refused, unless `GRAFT_MCP_ALLOW_ANONYMOUS=1` |
+| Your machine only (loopback) | Allowed, so local development needs no setup |
+| Anything else | Refused, unless you set `GRAFT_MCP_ALLOW_ANONYMOUS=1` |
 
-Setting that variable warns at startup. It exists for an operator who fronts the
-endpoint with their own auth proxy.
-
-Binding beyond loopback with no identity configured also warns, because MCP will
-then refuse every caller.
+Only set that variable if your own proxy checks identity in front of Graft. The
+server warns at startup while it is set.
 
 <Callout label="Missing auth fails at startup" type="warning">
-  `createGraftMcpHandler` throws if you give it neither an `actor` resolver nor
-  an explicit `allowAnonymous: true`. This endpoint serves content writes, asset
-  uploads and approval decisions, so a deployer who forgets gets a startup
-  failure with a fix line rather than an open endpoint.
+  `createGraftMcpHandler` refuses to start unless you give it an `actor`
+  resolver or set `allowAnonymous: true`. This endpoint can write content,
+  upload files, and decide approvals, so forgetting auth stops the server with a
+  fix line instead of leaving the endpoint open.
 </Callout>
 
-### Acting as someone else
+## Permissions an agent needs
 
-`run_function` takes an optional `authorization` argument that overrides the
-connection's identity for one call. Use it when an agent acts on behalf of a
-user whose token it holds. Omit it and the server's configured identity applies.
-
-## Scopes an agent needs
-
-| To do this | It needs |
+| To | The agent needs |
 | --- | --- |
-| Read content, schema, functions, registry | Nothing beyond reaching the endpoint |
-| `write_content`, `delete_content`, `put_asset` | `content:write` |
-| `decide_approval` | `approvals:decide`, and an authenticated connection |
-| `run_function` | Whatever that function's `access` rule requires |
+| Read content, the schema, functions, and the registry | Nothing beyond reaching the endpoint |
+| Write or delete content, or upload files | The `content:write` scope |
+| Approve or deny actions | The `approvals:decide` scope, on an authenticated connection |
+| Run a function | Whatever that function's `access` rule requires |
 
-Mint tokens with the narrowest set that works. On `graft serve`, add scopes to
-`GRAFT_DEV_SCOPES` for the dev token.
+Give each token the fewest scopes that work. Writing content is a separate
+scope from reading, so you can hand every user of your app a read token without
+letting them edit content.
 
-Content authoring, asset upload, and approval decisions are deliberately
-separate from ordinary read scopes. An app that hands every signed-up user a
-narrow read token should not be handing out content-admin rights.
+## A separate, public endpoint for your docs
 
-## Check that it works
-
-Ask the agent to call `list_collections`. It needs no arguments, no scope, and
-no database, so a failure isolates the connection rather than the project.
-
-From there, `describe_schema` gives it everything it needs to author, and
-`explain_error` turns any failure into a next step.
-
-## The public docs endpoint is a separate server
-
-A Graft project can also publish its documentation at `/mcp`. A separate
-server with no access to content, functions, or approvals. See
-[Public docs MCP](/docs/docs-mcp).
+A project can also publish its documentation to agents at `/mcp`, with no
+token. It is a different server with no access to content writes, functions,
+or approvals. See [Public docs MCP](/docs/docs-mcp).
 
 ## Next steps
 
 - [MCP tools](/docs/mcp-tools) lists everything an agent can call.
-- [MCP resources & prompts](/docs/mcp-resources-and-prompts) covers the rest of the surface.
-- [Auth](/docs/auth) explains how bearers are verified.
-- [The agent surface](/docs/agent-surface) argues for operating this way.
+- [Resources & prompts](/docs/mcp-resources-and-prompts) covers documents and
+  workflows an agent can attach.
+- [Auth](/docs/auth) explains how tokens are checked.

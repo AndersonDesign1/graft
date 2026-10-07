@@ -49,13 +49,14 @@ bun add @usegraft/sdk-sveltekit @usegraft/db
 
 </Tabs>
 
-Build the handle in `$lib/server/`, so SvelteKit's server-only enforcement
-guards it. The client holds a database handle and must never reach the browser.
+Create the client in `$lib/server/`, so SvelteKit's server-only enforcement
+guards it. The client holds a database connection and must never reach the browser.
 
 ## Create the Graft client
 
+<CodeBlock title="src/lib/server/graft.ts">
+
 ```ts
-// src/lib/server/graft.ts
 import { DATABASE_URL } from "$env/static/private";
 import { createDb } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-sveltekit";
@@ -64,6 +65,8 @@ import { collections } from "../../../graft.config";
 export const db = createDb(DATABASE_URL).db;
 export const graft = createGraft({ db, collections });
 ```
+
+</CodeBlock>
 
 Static index instead of Postgres:
 
@@ -87,8 +90,9 @@ export const graft = createGraft({
 
 ## Read a document
 
+<CodeBlock title="src/routes/[slug]/+page.server.ts">
+
 ```ts
-// src/routes/[slug]/+page.server.ts
 import { error } from "@sveltejs/kit";
 import { graft } from "$lib/server/graft";
 import type { PageServerLoad } from "./$types";
@@ -100,6 +104,8 @@ export const load: PageServerLoad = async ({ params }) => {
 };
 ```
 
+</CodeBlock>
+
 ## Serve functions and MCP from your app
 
 This step is optional. It needs two more packages:
@@ -108,8 +114,9 @@ This step is optional. It needs two more packages:
 npm i @usegraft/auth @usegraft/mcp
 ```
 
+<CodeBlock title="src/routes/api/fn/[name]/+server.ts">
+
 ```ts
-// src/routes/api/fn/[name]/+server.ts
 import { createFunctionsHandler } from "@usegraft/core";
 import { graftRoute } from "@usegraft/sdk-sveltekit";
 import { functions } from "../../../../graft.config";
@@ -121,8 +128,11 @@ export const POST = graftRoute(handler);
 export const GET = graftRoute(handler); // 405s with Allow and a fix
 ```
 
+</CodeBlock>
+
+<CodeBlock title="src/routes/api/mcp/+server.ts">
+
 ```ts
-// src/routes/api/mcp/+server.ts
 import { createActorResolver } from "@usegraft/auth";
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftRoute } from "@usegraft/sdk-sveltekit";
@@ -156,6 +166,8 @@ export const POST = graftRoute(
 );
 ```
 
+</CodeBlock>
+
 This endpoint serves content writes and asset uploads. JWT verification runs
 only when `issuers` is passed; the library does not read
 `GRAFT_TRUSTED_ISSUERS` (`graft serve` does). See [Auth](/docs/auth).
@@ -169,9 +181,15 @@ needs no `@sveltejs/kit` dependency.
 
 ## Refresh pages when content changes
 
-SvelteKit has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
-surrogate-key header with `setHeaders` in `load`, and purge
-`tagsForChanges(branch, changeSet)` from your compile webhook.
+<TierBadge tier="postgres" />
+
+On the static engine, content changes ship with a new deploy, so there is
+nothing to refresh. On Postgres, content can change while your app is running,
+from Studio or from an agent. SvelteKit has no tag-based data cache, so let your
+CDN cache pages and purge only the ones whose content changed.
+
+First, send each page with a header that lists the content it read. `tagsFor`
+builds that list:
 
 ```ts
 import { tagsFor } from "@usegraft/sdk-sveltekit";
@@ -183,8 +201,15 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
 };
 ```
 
-`Cache-Tag` is the surrogate-key header. Purge the same strings
-`tagsForChanges` returns from your compile webhook.
+Then, when content changes, purge those tags at your CDN.
+`tagsForChanges(branch, changes)` turns a change list into the tags to purge:
+each changed document, and the collection it is in. Graft does not purge your
+CDN for you. An agent's `write_content` call returns the change list as
+`changes`.
+
+`Cache-Tag` is the header Cloudflare reads, with tags separated by commas.
+Fastly reads `Surrogate-Key`, with tags separated by spaces. Use the header
+your CDN expects.
 
 ## Next steps
 

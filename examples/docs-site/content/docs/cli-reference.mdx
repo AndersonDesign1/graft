@@ -1,6 +1,6 @@
 ---
 title: CLI reference
-description: Every graft command with flags that matter.
+description: "Every graft command, what it does, and the flags that matter, grouped by task."
 section: Reference
 order: 0
 ---
@@ -11,65 +11,71 @@ Look up a command here. Run `graft --help` or `graft <command> --help` for the
 same information in your terminal. `graft migrate` and `graft merge` only
 report what they would change until you pass `--apply`.
 
-## Project loop
+## Set up and write content
 
 | Command | What it does |
 | --- | --- |
-| `graft init [dir]` | Scaffold config, `content/`, `graft/` barrel |
-| `graft compile` | Project the content tree into `content_index` once |
-| `graft dev` | Watch `content/` + config; recompile on change |
-| `graft asset put <file> [key]` | Upload a binary; print frontmatter snippet |
+| `graft init [dir]` | Create a Graft project: `graft.config.ts`, `content/`, sample content, and `llms.txt`. Add `--postgres` for the Postgres engine. |
+| `graft compile` | Check every content file against the schema and build the index, once |
+| `graft dev` | Watch `content/` and `graft.config.ts`, and recompile on every change |
+| `graft asset put <file> [key]` | Upload a file to your bucket and print the frontmatter that points to it |
+| `graft add [item]` | Copy a ready-made [primitive](/docs/owned-primitives) into `graft/`. With no item, list them. |
 
-## Operator loop
-
-| Command | What it does |
-| --- | --- |
-| `graft approvals` | List pending approvals |
-| `graft approve <id>` / `graft deny <id>` | Decide one; caller retries with approval |
-| `graft migrate [--apply]` | Run pending migrations (dry-run by default) |
-| `graft harden <role>` | Grant runtime least-privilege on an existing role |
-
-## Branching
+## Run Graft
 
 | Command | What it does |
 | --- | --- |
-| `graft branch create <name> [--from main] [--backend neon]` | Create overlay (default) or Neon fork |
-| `graft branch list` / `graft branch drop <name>` | Inspect / remove (drop purges transactionally) |
-| `graft merge <name> [--into main] [--apply]` | Replay ledger → move data → recompile |
+| `graft mcp` | Serve your project to an agent on this machine, over stdio |
+| `graft serve [--port 3903]` | Run Graft's HTTP endpoints: functions, MCP, the Content API, and `/healthz`. Add `--studio` to include Studio. |
+| `graft studio` | Open Studio on this machine, at port 4983 |
 
-## Extending and serving
+## Manage the database (Postgres engine)
 
 | Command | What it does |
 | --- | --- |
-| `graft add [item]` | Copy an owned primitive into `graft/` (no name: list) |
-| `graft mcp` | Serve project MCP over stdio |
-| `graft serve [--port 3903] [--studio]` | Headless runtime: `/api/fn/<name>`, `/api/mcp`, `/api/content/v1/*`, `/healthz`; `--studio` mounts opt-in Studio at `/studio` |
-| `graft studio` | Opt-in Studio UI for edits, approvals, and branch browsing (default port 4983) |
-| `graft content` | List the content tree from the compiled index (Studio/OpenAPI parity) |
-| `graft compilations` | List recent projection trail rows (Studio/OpenAPI parity) |
+| `graft db migrate` | Create or update the tables Graft needs. Safe to run again. |
+| `graft migrate [--apply]` | Run your own [migrations](/docs/migrations). Lists them only, until `--apply`. |
+| `graft harden <role>` | Give an existing database role the limited rights a deployed app needs. See [Hardening](/docs/hardening). |
+| `graft content` | List documents in the compiled index |
+| `graft compilations` | List recent compiles and what each one changed |
 
-Studio is optional. The UI is a client of `/api/studio/v1/*` (see
-`openapi.json`). Same ops on MCP/CLI: content tree + `write_content` / Studio
-Save, `list_compilations`, `list_branches`, `list_approvals` +
-`decide_approval` (or `graft approve` / `deny`).
+## Approve actions
+
+| Command | What it does |
+| --- | --- |
+| `graft approvals` | List actions waiting for approval |
+| `graft approve <id>` | Approve one. The caller then repeats its call with the id. |
+| `graft deny <id>` | Deny one |
+
+## Work with preview branches
+
+| Command | What it does |
+| --- | --- |
+| `graft branch` | List branches |
+| `graft branch create <name>` | Create a preview branch. `--from <parent>` (default `main`), `--backend neon` for a Neon fork. |
+| `graft branch drop <name>` | Delete a branch |
+| `graft merge <name> [--apply]` | Merge a branch into `--into` (default `main`). Reports only, until `--apply`. |
 
 ## Flags
 
-| Flag | Applies to | Meaning |
+| Flag | Works with | Meaning |
 | --- | --- | --- |
-| `--branch <id>` | compile, dev, migrate, mcp, serve, studio, content, compilations | Operate on a content branch |
-| `--apply` | migrate, merge | Execute (default is dry-run) |
-| `--prune-unknown` | compile | Remove index rows for collections this schema does not know |
-| `--dry-run` / `--overwrite` | add | Preview / replace differing files |
-| `--port` / `--host` | serve, studio | Bind address (default loopback) |
-| `--studio` | serve | Mount opt-in Studio (or set `GRAFT_STUDIO=1`) |
+| `--branch <name>` | compile, dev, migrate, mcp, serve, studio, content, compilations | Work on a preview branch instead of `main` |
+| `--apply` | migrate, merge | Make the change. Without it, these only report. |
+| `--prune-unknown` | compile | Remove index entries for collections the schema no longer has. Use after renaming or deleting a collection. |
+| `--dry-run` / `--overwrite` | add | Preview the files, or replace files that differ |
+| `--port` / `--host` | serve, studio | Where to listen. Defaults to this machine only. |
+| `--studio` | serve | Include Studio. `GRAFT_STUDIO=1` does the same. |
 
-## Environment discovery
+## Which commands need a database
 
-Commands walk up from the working directory to locate `.env`.
+Graft reads `.env` from the current folder or any folder above it.
 
-- **Static Engine (Default):** `DATABASE_URL` is **not required** for `graft compile`,
-  `graft dev`, or `graft mcp`. The index is compiled directly to `.graft/index.db`.
-- **Postgres Engine:** `DATABASE_URL` is required when `graft.config.ts` sets
-  `index = "postgres"`, or when running database operations: `graft db migrate`,
-  `graft branch`, `graft merge`, and `graft serve`.
+- **Static engine:** `graft compile`, `graft dev`, and `graft mcp` need no
+  database. The index is written to `.graft/index.db`.
+- **Postgres engine:** `DATABASE_URL` is required when `graft.config.ts` sets
+  `index = "postgres"`, and for `graft db migrate`, `graft branch`,
+  `graft merge`, and `graft serve`.
+
+Studio uses the same operations as the CLI and MCP. See
+[Studio](/docs/studio#do-it-without-studio) for the mapping.

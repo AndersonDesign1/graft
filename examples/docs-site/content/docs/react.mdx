@@ -18,6 +18,10 @@ The hooks call Graft's [Content API](/docs/content-api), so something has to
 serve it: `graft serve`, or the Content API handler mounted in your own
 backend. The browser never receives a database connection or the index file.
 
+**Before you start**, you need a `graft.config.ts` and a running Content API.
+By the end of this page you have a typed client, a component that shows one
+document, and a search box.
+
 <Callout label="Server-rendered app?" type="note">
   If you use Next.js, Astro, SvelteKit, TanStack Start, or React Router with
   loaders, read on the server with that framework's package instead. It reads
@@ -28,9 +32,7 @@ backend. The browser never receives a database connection or the index file.
   Paste this into your coding agent: "Add Graft content to this React app following https://graft.page/docs/react.md. Use createGraftHooks with the Content API endpoint at /api/content/v1."
 </Callout>
 
----
-
-## Installation
+## Install
 
 <Tabs labels="npm, pnpm, bun">
 
@@ -60,175 +62,152 @@ bun add @usegraft/sdk-react
 
 </Tabs>
 
-`react` (v18 or v19) is a peer dependency.
+It needs React 18 or 19.
 
----
+## Create the client and hooks
 
-## 1. Create your client and hooks
+Create the client once, pointed at your Content API, and build the hooks from
+it:
 
-Initialize the client and generate typed hooks in `src/graft.ts`:
+<CodeBlock title="src/graft.ts">
 
 ```ts
-// src/graft.ts
 import { createGraft, createGraftHooks } from "@usegraft/sdk-react";
 import { collections } from "../graft.config";
 
-// Point at your Graft Content API endpoint (e.g. running via `graft serve`)
 export const graft = createGraft({
   endpoint: "https://cms.example.com/api/content/v1",
   collections,
 });
 
-export const {
-  GraftProvider,
-  useGraft,
-  useContent,
-  useContentList,
-  useContentSearch,
-} = createGraftHooks(graft);
+export const { GraftProvider, useContent, useContentList, useContentSearch } =
+  createGraftHooks(graft);
 ```
 
-Because your frontend imports your own `graft.config.ts`, all hooks are
-fully typed without generating code or downloading remote schemas.
+</CodeBlock>
 
----
+The hooks are typed from your own `graft.config.ts`, so `post.data.title` is
+checked at compile time. There is no code generation step and no schema to
+download.
 
-## 2. Wrap your application
+The hooks read from this client by default, so you do not need a provider. Wrap
+a part of your app in `<GraftProvider graft={other}>` only when it should read
+from somewhere else, such as a preview deployment's endpoint or a fake client
+in tests.
 
-Wrap your component tree in `<GraftProvider>`:
+## Show one document
 
-```tsx
-// src/App.tsx
-import { GraftProvider, graft } from "./graft";
-import { BlogPost } from "./BlogPost";
+`useContent` reads a document by collection and slug. It returns `loading`,
+`error`, `data`, and a `refresh` function to try again:
 
-export default function App() {
-  return (
-    <GraftProvider graft={graft}>
-      <BlogPost slug="hello-world" />
-    </GraftProvider>
-  );
-}
-```
-
----
-
-## 3. Read a single document
-
-Use `useContent` to fetch a document by collection and slug:
+<CodeBlock title="src/BlogPost.tsx">
 
 ```tsx
-// src/BlogPost.tsx
 import { useContent } from "./graft";
 
 export function BlogPost({ slug }: { slug: string }) {
   const { data: post, loading, error, refresh } = useContent("posts", slug);
 
-  if (loading) {
-    return <div className="spinner">Loading post...</div>;
-  }
-
+  if (loading) return <p>Loading…</p>;
   if (error) {
     return (
-      <div className="error-box">
-        <p>Failed to load: {error.message}</p>
-        <button onClick={() => refresh()}>Retry</button>
-      </div>
+      <p>
+        Could not load this post. <button onClick={refresh}>Try again</button>
+      </p>
     );
   }
-
-  if (!post) {
-    return <p>Post not found.</p>;
-  }
+  if (!post) return <p>Post not found.</p>;
 
   return (
     <article>
       <h1>{post.data.title}</h1>
-      {post.data.publishedAt && (
-        <time>{new Date(post.data.publishedAt).toLocaleDateString()}</time>
-      )}
-      <div className="body-content">{post.body}</div>
+      <pre>{post.body}</pre>
     </article>
   );
 }
 ```
 
----
+</CodeBlock>
 
-## 4. Full-text search in the browser
+`data` is `null` when the collection has no document with that slug, so a
+missing post is not an error. `post.body` is the Markdown or MDX source as
+written. Render it with your own Markdown or MDX renderer.
 
-Use `useContentSearch` to build responsive search inputs:
+## Add a search box
+
+`useContentSearch` runs a full-text search in one collection, best match first.
+The Content API refuses an empty query, so only search once the reader has
+typed something:
+
+<CodeBlock title="src/SearchBox.tsx">
 
 ```tsx
-// src/SearchBar.tsx
 import { useState } from "react";
 import { useContentSearch } from "./graft";
 
-export function SearchBar() {
+export function SearchBox() {
   const [query, setQuery] = useState("");
-  const { data: hits, loading } = useContentSearch("docs", query, { limit: 10 });
-
   return (
     <div>
-      <input
-        type="search"
-        placeholder="Search documentation..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-
-      {loading && <p>Searching...</p>}
-
-      <ul>
-        {hits?.map((hit) => (
-          <li key={hit.slug}>
-            <a href={`/docs/${hit.slug}`}>
-              <strong>{hit.data.title}</strong>
-              <HighlightSnippet snippet={hit.snippet} />
-            </a>
-          </li>
-        ))}
-      </ul>
+      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} />
+      {query.trim() !== "" && <SearchResults query={query} />}
     </div>
   );
 }
 
-// Safely render search matches: escapes all markup while honoring <b> tags
-function HighlightSnippet({ snippet }: { snippet: string }) {
-  const parts = snippet.split(/(<\/?b>)/g);
-  let isBold = false;
+function SearchResults({ query }: { query: string }) {
+  const { data: hits, loading, error } = useContentSearch("docs", query, { limit: 10 });
+
+  if (loading) return <p>Searching…</p>;
+  if (error) return <p>Search failed.</p>;
+  if (hits?.length === 0) return <p>No results.</p>;
 
   return (
+    <ul>
+      {hits?.map((hit) => (
+        <li key={hit.slug}>
+          <a href={`/docs/${hit.slug}`}>{hit.data.title}</a>
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+</CodeBlock>
+
+Each change to `query` sends one request. For a busy endpoint, debounce the
+input before you pass it on.
+
+Each hit also has a `snippet`: the matching text with each match wrapped in
+`<b>…</b>`. The tags come from the index and the rest of the snippet is your
+content, so do not insert it with `dangerouslySetInnerHTML` unless you trust
+everyone who can write content. Split on the tags instead:
+
+```tsx
+function Snippet({ text }: { text: string }) {
+  return (
     <p>
-      {parts.map((part, index) => {
-        if (part === "<b>") {
-          isBold = true;
-          return null;
-        }
-        if (part === "</b>") {
-          isBold = false;
-          return null;
-        }
-        return isBold ? <mark key={index}>{part}</mark> : <span key={index}>{part}</span>;
-      })}
+      {text.split(/<b>([\s\S]*?)<\/b>/g).map((part, i) =>
+        i % 2 === 1 ? <mark key={i}>{part}</mark> : part,
+      )}
     </p>
   );
 }
 ```
 
----
+## Use TanStack Query or SWR instead
 
-## 5. Integrating with TanStack Query or SWR
-
-Graft hooks provide simple state management (`data`, `error`, `loading`).
-For advanced caching features like automatic deduplication, retry exponential backoff,
-or stale-while-revalidate, use `graft.getContent` with TanStack Query or SWR:
+The hooks keep the latest result in component state, and nothing more. If you
+want shared caching, retries, or background refresh, call the client from your
+data library instead. It has the same methods: `getContent`, `listContent`, and
+`searchContent`.
 
 ```tsx
 import { useQuery } from "@tanstack/react-query";
 import { graft } from "./graft";
 
-export function usePostQuery(slug: string) {
+export function usePost(slug: string) {
   return useQuery({
     queryKey: ["posts", slug],
     queryFn: () => graft.getContent("posts", slug),
@@ -236,19 +215,21 @@ export function usePostQuery(slug: string) {
 }
 ```
 
----
+## What the browser cannot do
 
-## What the browser can and cannot reach
-
-- **No database access:** `@usegraft/sdk-react` communicates strictly over
-  HTTP. It does not accept a `db` connection or database credentials, ensuring your
-  database connection strings never leak into client-side bundles.
-- **One branch per endpoint:** A remote Content API endpoint is pinned to a specific branch on the
-  server. To preview branch content, point your client at the preview deployment's
-  URL.
+- **Reach the database.** The client only speaks HTTP. It has no option for a
+  database connection, so a connection string cannot end up in your bundle.
+- **Choose a branch.** Each Content API endpoint serves one branch, set by the
+  server. Passing `branch` to the client or to a read throws `CONFIG_INVALID`.
+  To read a preview branch, point a second client at the preview deployment's
+  endpoint.
+- **Render on the server.** During server rendering the hooks return their
+  loading state. Content that must be in the first HTML belongs in your
+  framework's server package.
 
 ## Next steps
 
-- [Content API](/docs/content-api) explains how to serve the HTTP endpoint with `graft serve` or custom mounts.
-- [Schema](/docs/schema) defines collections and field validations.
-- [SDK reference](/docs/sdk-reference) is the complete API reference across all client and server SDKs.
+- [Content API](/docs/content-api) shows how to serve the endpoint, with
+  `graft serve` or mounted in your own backend.
+- [Schema](/docs/schema) defines the collections your hooks are typed from.
+- [SDK reference](/docs/sdk-reference) lists every method on the client.

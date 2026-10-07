@@ -7,9 +7,9 @@ order: 6
 
 <p className="kicker">Let writers and agents edit content without letting them run code.</p>
 
-MDX is Markdown that can include components, and it is more powerful than it
-looks. A `{expression}` in an MDX file runs JavaScript when the page renders,
-and an `import` can load any module. That code runs on your server, with
+MDX is Markdown that can include components. It can also run code. A
+`{expression}` in an MDX file runs JavaScript when the page renders, and an
+`import` can load any module. That code runs on your server, with
 access to `process.env`, `fetch`, and everything else your app can reach.
 
 When you are the only author and every change goes through review in Git, that
@@ -27,10 +27,13 @@ and how to allow full MDX for content you write yourself.
 `mdxTrust` defaults to `"restricted"`, so you get this without configuring
 anything.
 
+<CodeBlock title="graft.config.ts">
+
 ```ts
-// graft.config.ts
 export const mdxTrust = "restricted"; // the default
 ```
+
+</CodeBlock>
 
 Under `"restricted"`, a body may be prose, Markdown, GFM, and components with
 literal string attributes. Everything that evaluates is refused.
@@ -114,10 +117,13 @@ for source it could not read.
 
 ## Allowing full MDX for content you trust
 
+<CodeBlock title="graft.config.ts">
+
 ```ts
-// graft.config.ts
 export const mdxTrust = "full";
 ```
+
+</CodeBlock>
 
 Set this only when every author of the repository has commit access, because
 then code review is the control and MDX is just part of the source.

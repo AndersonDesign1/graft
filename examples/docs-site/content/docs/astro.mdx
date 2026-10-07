@@ -50,15 +50,16 @@ bun add @usegraft/sdk-astro @usegraft/db
 
 </Tabs>
 
-Build the handle once in a server-only module, then import it from frontmatter,
+Create the client once in a server-only module, then import it from frontmatter,
 endpoints, and middleware. Never from a client island.
 
 ## Create the Graft client
 
 `graft init` scaffolds the static index. This docs site is that path:
 
+<CodeBlock title="src/lib/graft.ts">
+
 ```ts
-// src/lib/graft.ts
 import { openStaticIndex } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-astro";
 import { collections } from "../../graft.config";
@@ -68,6 +69,8 @@ export const graft = createGraft({
   collections,
 });
 ```
+
+</CodeBlock>
 
 On Postgres:
 
@@ -82,19 +85,23 @@ export const graft = createGraft({ db, collections });
 
 ## Read a document
 
+<CodeBlock title="src/pages/[slug].astro">
+
 ```astro
 ---
-// src/pages/[slug].astro
 import { graft } from "../lib/graft";
 
 const page = await graft.getContent("pages", Astro.params.slug!);
 ---
 ```
 
+</CodeBlock>
+
 Astro frontmatter always runs server-side. No other adapter can promise that.
-There is no request-level memo, because `React.cache` has no Astro
-equivalent. Reads go straight to the index, which is the right default:
-prerendered pages read at build time, and an SSR page makes a handful of reads.
+Unlike Next.js, Astro has no built-in way to share one read across a request,
+so reading the same document twice reads the index twice. That is rarely worth
+worrying about: prerendered pages read once at build time, and a server-rendered
+page makes only a few reads.
 
 <Callout label="Rendering the body" type="warning">
   Bodies come back as authored source. Render them with Astro's own MDX pipeline.
@@ -113,8 +120,9 @@ npm i @usegraft/auth @usegraft/mcp
 not a config object: Astro hands over an `APIContext`, and the handlers want
 its `request`.
 
+<CodeBlock title="src/pages/api/fn/[name].ts">
+
 ```ts
-// src/pages/api/fn/[name].ts
 import { createFunctionsHandler } from "@usegraft/core";
 import { graftRoute } from "@usegraft/sdk-astro";
 import { functions } from "../../../graft.config";
@@ -126,8 +134,11 @@ export const POST = graftRoute(handler);
 export const GET = graftRoute(handler); // 405s with Allow and a fix
 ```
 
+</CodeBlock>
+
+<CodeBlock title="src/pages/api/mcp.ts">
+
 ```ts
-// src/pages/api/mcp.ts
 import { createActorResolver } from "@usegraft/auth";
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftRoute } from "@usegraft/sdk-astro";
@@ -161,6 +172,8 @@ export const POST = graftRoute(
 );
 ```
 
+</CodeBlock>
+
 This endpoint serves content writes and asset uploads. JWT verification runs
 only when `issuers` is passed; the library does not read
 `GRAFT_TRUSTED_ISSUERS` (`graft serve` does). See [Auth](/docs/auth).
@@ -174,9 +187,15 @@ needs no `astro` dependency.
 
 ## Refresh pages when content changes
 
-Astro has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
-surrogate-key header on SSR responses, and purge
-`tagsForChanges(branch, changeSet)` from your compile webhook.
+<TierBadge tier="postgres" />
+
+On the static engine, content changes ship with a new deploy, so there is
+nothing to refresh. On Postgres, content can change while your app is running,
+from Studio or from an agent. Astro has no tag-based data cache, so let your
+CDN cache pages and purge only the ones whose content changed.
+
+First, send each page with a header that lists the content it read. `tagsFor`
+builds that list:
 
 ```astro
 ---
@@ -189,10 +208,15 @@ Astro.response.headers.set("Cache-Tag", tagsFor("main", "pages", slug).join(",")
 ---
 ```
 
-`Cache-Tag` is the surrogate-key header. Purge the same strings
-`tagsForChanges` returns from your compile webhook. The Postgres handle
-snippet should `export const db` next to `graft` so the mounts above can
-import it.
+Then, when content changes, purge those tags at your CDN.
+`tagsForChanges(branch, changes)` turns a change list into the tags to purge:
+each changed document, and the collection it is in. Graft does not purge your
+CDN for you. An agent's `write_content` call returns the change list as
+`changes`.
+
+`Cache-Tag` is the header Cloudflare reads, with tags separated by commas.
+Fastly reads `Surrogate-Key`, with tags separated by spaces. Use the header
+your CDN expects.
 
 ## Next steps
 

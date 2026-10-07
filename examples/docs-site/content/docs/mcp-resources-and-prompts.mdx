@@ -1,118 +1,95 @@
 ---
 title: MCP resources & prompts
-description: Documents addressable by URI, workflows filled in from the live project, and arguments that autocomplete.
+description: "Attach documents to an agent's conversation, and start ready-made workflows filled in from your project."
 section: Agents & MCP
 order: 3
 ---
 
-<p className="kicker">Attach documents and workflows, not just tools.</p>
+<p className="kicker">Attach documents and workflows to an agent, not just tools.</p>
 
-Tools are requests to do something. Resources are things that exist, and prompts
-are workflows a person picks on purpose. Graft serves both alongside its
-[tools](/docs/mcp-tools).
+Besides [tools](/docs/mcp-tools), MCP has two other features that Graft uses:
 
-## Resources
+- **Resources** are documents an agent's client can attach to the conversation
+  directly, like attaching a file to an email. You pick a page, and the agent
+  sees it, without the agent spending a step fetching it.
+- **Prompts** are ready-made workflows you pick from a menu in your client,
+  such as "write a new document" or "fix this error". Graft fills each one in
+  with real details from your project.
 
-Documents are addressable:
+Most clients show resources as attachable items and prompts as slash commands
+or a menu.
+
+## Attach a document
+
+Every document has an address:
 
 ```text
 graft://<branch>/<collection>/<slug>
 ```
 
-A client can list them, attach one to a conversation, and re-read it without
-spending a turn deciding to. Before resources existed, attaching a document
-meant calling `get_content` and pasting the answer.
+For example, `graft://main/pages/pricing`. Your client lists these, so you can
+attach a page to the conversation and ask the agent to revise it.
 
-The branch is baked into the template rather than left as a variable. A server
-is pinned to one branch, so a URI naming a branch it cannot serve would be a URI
-it has to refuse. What a client fills in is what the server can actually vary.
+Resources are read from your files, not from the index. So an attached document
+shows your latest edit even before you compile, and resources work on a static
+project with no database. The text is exactly what is in the file.
 
-### Reads come from files
+When an agent lists, reads, searches, or writes content with a tool, each
+result also carries a link to the document's resource, so the agent can open it
+in one step.
 
-Resource reads go to the authored MDX, not the index. Two consequences:
-
-- A resource reflects the working tree, not the last compile.
-- Resources work on a static project with no database at all.
-
-Reads are byte-exact. The same promise `write_content` makes in the other
-direction.
-
-### The schema resource
+### Attach your whole schema
 
 ```text
 graft://<branch>/schema
 ```
 
-Serves the `describe_schema` payload, so a client can attach the project's shape
-once instead of calling a tool every session.
+This attaches every collection and its fields, the same as the
+`describe_schema` tool. Attach it once at the start of a session instead of
+having the agent call the tool each time.
 
-This one is not published on the [public docs mount](/docs/docs-mcp), because
-`describe_schema` carries the project's functions.
+## Start a workflow from a prompt
 
-### Resource links on tool results
-
-`list_content`, `get_content`, `search_content`, and `write_content` attach a
-`resource_link` for every document they name. A search hit already knows its
-collection and slug; the link saves the client the round trip to reach the
-document itself.
-
-## Prompts
-
-Four prompts, each filled in from the live project rather than stating something
-generic. A prompt that only said "author a document nicely" is a sentence the
-user could have typed, and carries no reason to live on a server.
-
-| Prompt | Arguments | What it carries |
+| Prompt | You provide | The agent gets |
 | --- | --- | --- |
-| `author-document` | `collection`, `topic` | That collection's real field list, with required and optional marked |
-| `revise-document` | `collection`, `slug`, `goal` | The document's resource URI and the collection's fields |
-| `fix-error` | `code` | This build's meaning, typical causes, and recovery text for that code |
-| `plan-migration` | `collection`, `change` | Current fields, and the migration order of operations |
+| `author-document` | A collection and a topic | That collection's real fields, with required ones marked |
+| `revise-document` | A collection, a document, and a goal | The document's address and the collection's fields |
+| `fix-error` | An error code | What that code means in this version of Graft, its usual causes, and how to recover |
+| `plan-migration` | A collection and the change you want | The current fields, and the steps to migrate safely |
 
-They also encode the order of operations this codebase cares about, which an
-agent has no way to infer:
+Each prompt also tells the agent how this project expects work to be done:
 
-- Validate against the schema before writing.
-- Migrations are reviewable commits, not live edits.
-- `graft migrate --apply` is the operator's consent, so it is proposed and never
-  assumed.
-- A destructive call is expected to stop and wait for a human rather than route
-  around the refusal.
+- Check the schema before writing.
+- Propose migrations as reviewable commits, not live edits.
+- Never run `graft migrate --apply` without asking. Applying is your decision.
+- When a destructive call stops for approval, wait for a person. Do not look
+  for a way around it.
 
-`fix-error` given a code Graft does not know says so, and points at
-`explain_error` with no arguments to list the codes this build knows. It also
-states the rule that matters when advice conflicts: the failing call's own `fix`
-is more specific than the general explanation and beats it.
+`fix-error` with a code Graft does not know says so, and points the agent at
+`explain_error` to list the codes it does know. When the general explanation
+and the failing call's own `fix` disagree, the prompt tells the agent to follow
+the `fix`, because it is specific to that failure.
 
-Prompts are absent from the public docs mount. Three of the four instruct
-`write_content`, and telling a stranger how to author into someone else's
-project is not documentation.
+## Autocomplete
 
-## Completion
+When you fill in a prompt or a resource address, your client can suggest
+values from your project:
 
-Prompt arguments and resource-template variables autocomplete from what exists.
-
-| Argument | Completes to |
+| Argument | Suggests |
 | --- | --- |
-| `collection` | Registered file-authoritative collection names |
-| `slug` | Slugs in the collection already chosen, or all slugs if none is |
-| `code` | Error codes, matched case-insensitively |
+| `collection` | Your content collections. Operational data collections are left out, because they have no documents to write. |
+| `slug` | Documents in the collection you chose, or all documents if you have not chosen one |
+| `code` | Error codes, ignoring case |
 
-Picking a collection that is not registered is a mistake the server can prevent
-rather than diagnose.
+## Where they are available
 
-db-authoritative collections are excluded from collection completion, because
-they have no authored documents to write or revise.
-
-## Both transports
-
-Resources and prompts are asserted on the HTTP transport as well as stdio. That
-transport builds a fresh server per request, and "it is the same factory" is
-exactly how an earlier identity bug survived. Correct on stdio, broken over
-HTTP.
+Resources and prompts work the same over stdio and HTTP. The
+[public docs endpoint](/docs/docs-mcp) serves document resources but not the
+schema resource, which would reveal your functions, and no prompts, because
+they are instructions for writing to your project.
 
 ## Next steps
 
-- [MCP tools](/docs/mcp-tools) lists the eighteen tools.
-- [Connecting agents](/docs/connecting-agents) explains how to reach the server.
-- [Public docs MCP](/docs/docs-mcp) documents the read-only mount and what it omits.
+- [MCP tools](/docs/mcp-tools) lists every tool.
+- [Connecting agents](/docs/connecting-agents) gets an agent connected.
+- [Public docs MCP](/docs/docs-mcp) covers the read-only endpoint.
