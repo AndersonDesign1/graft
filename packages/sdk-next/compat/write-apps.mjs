@@ -1,21 +1,14 @@
-// One-off generator for the three compat app folders. Kept so the three stay
-// identical except for the versions they pin. Run: node compat/write-apps.mjs
+// Generator for the compat app folders, one per supported Next major. Kept so
+// they stay identical except for the versions they pin. When a pin moves, edit
+// it here, run `node compat/write-apps.mjs`, then `pnpm install`.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 
 const majors = {
-  // TypeScript 5 for 14 and 15: both write moduleResolution "node" into a new
-  // tsconfig, which TypeScript 6 rejects. Apps on those majors run TypeScript 5.
-  next14: {
-    next: "14.2.35",
-    react: "18.3.1",
-    types: "18.3.31",
-    typesDom: "18.3.7",
-    port: 3114,
-    ts: "5.9.3",
-  },
+  // TypeScript 5 for 15: it writes moduleResolution "node" into a new
+  // tsconfig, which TypeScript 6 rejects. Apps on 15 run TypeScript 5.
   next15: {
     next: "15.5.27",
     react: "19.2.8",
@@ -59,26 +52,14 @@ for (const [name, v] of Object.entries(majors)) {
   writeFileSync(`${dir}package.json`, `${JSON.stringify(pkg, null, 2)}\n`);
   writeFileSync(
     `${dir}next.config.mjs`,
-    `// .mjs because Next 14 cannot load next.config.ts.\nimport { withGraft } from "@usegraft/sdk-next/config";\n\nexport default withGraft({});\n`,
+    `import { withGraft } from "@usegraft/sdk-next/config";\n\nexport default withGraft({});\n`,
   );
   // The guide's code blocks, checked against this app's Next and React.
-  // \`paths\` applies to every import in the program, so the adapter's own
+  // `paths` applies to every import in the program, so the adapter's own
   // source (mapped by the guide config) also sees this Next.
   const guide = name === "next16" ? "tsconfig.next16.json" : "tsconfig.json";
-  // What next-env.d.ts gives a real app: Next's types, which pull in React's
-  // canary types. Those are what let an async Server Component (like MdxBody)
-  // be used as JSX on React 18. Next references them from its own folder,
-  // which under pnpm can reach a different @types/react than this app's, so
-  // they are referenced from here too, the way a flat node_modules resolves.
-  writeFileSync(
-    `${dir}guide-env.d.ts`,
-    [
-      '/// <reference types="next" />',
-      '/// <reference types="react/canary" />',
-      '/// <reference types="react-dom/canary" />',
-      "",
-    ].join("\n"),
-  );
+  // What next-env.d.ts gives a real app: Next's global types.
+  writeFileSync(`${dir}guide-env.d.ts`, '/// <reference types="next" />\n');
   const tsGuide = {
     extends: `../../guide/${guide}`,
     include: ["./guide-env.d.ts", "../../guide/**/*.ts", "../../guide/**/*.tsx"],

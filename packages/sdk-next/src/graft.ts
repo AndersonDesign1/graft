@@ -11,18 +11,18 @@
  * package can't generate it. Instead it ships the tag helpers (re-exported from
  * sdk-core — `tagsFor`, `documentTag`, `collectionTag`) that an app drops into
  * `cacheTag(...)` inside its own `'use cache'` functions (Next 16), or into
- * `unstable_cache(fn, keys, { tags })` (Next 14/15), plus the write side:
+ * `unstable_cache(fn, keys, { tags })` (Next 15), plus the write side:
  * `revalidateContent` / `updateContent`, which turn a compile's `ChangeSet`
  * into the exact `revalidateTag` / `updateTag` calls that refresh only the
  * changed pages. See the example app's llms.txt for the composition.
  *
- * Supports Next 14 through 16. `next/cache` differs across them, so it is read
+ * Supports Next 15 and 16. `next/cache` differs between them, so it is read
  * through a namespace and feature-detected at call time: a named import of
- * `updateTag` (Next 16 only) is an import of a missing export on 14/15.
+ * `updateTag` (Next 16 only) is an import of a missing export on 15.
  */
 import { GraftError } from "@usegraft/contracts";
 import * as nextCache from "next/cache";
-import * as React from "react";
+import { cache } from "react";
 import { createDbClient, type DbClientOptions } from "@usegraft/sdk-core/db";
 import {
   createClient,
@@ -71,15 +71,6 @@ export type GraftOptions<TCollections extends Record<string, AnyCollection>> =
   | ClientOptions<TCollections>
   | DbClientOptions<TCollections>;
 
-/**
- * React.cache, where React has it. Server Components on Next 14 run on the
- * React that Next bundles, which has it. Stable React 18 does not, and code
- * outside a Server Component (a script, a test, the Pages Router) can load
- * that one. There the reads are not deduped, which is what React.cache does
- * outside a render anyway, rather than `createGraft` throwing.
- */
-const cache: typeof React.cache = typeof React.cache === "function" ? React.cache : (fn) => fn;
-
 export function createGraft<TCollections extends Record<string, AnyCollection>>(
   options: GraftOptions<TCollections>,
 ): Graft<TCollections> {
@@ -126,8 +117,8 @@ export function createGraft<TCollections extends Record<string, AnyCollection>>(
 export type RevalidateProfile = string | { expire?: number };
 
 /**
- * The part of `next/cache` this module calls, typed loosely enough that 14, 15
- * and 16 all satisfy it: 14/15 declare `revalidateTag(tag)`, 16 declares
+ * The part of `next/cache` this module calls, typed loosely enough that 15
+ * and 16 both satisfy it: 15 declares `revalidateTag(tag)`, 16 declares
  * `revalidateTag(tag, profile)` and adds `updateTag`. Reading through a typed
  * value rather than named imports also keeps bundlers from checking `updateTag`
  * as a static export on versions that lack it.
@@ -148,7 +139,7 @@ const nextCacheApi: NextCacheApi = nextCache;
  *
  * `profile` is Next 16's required cache-life argument to `revalidateTag`
  * (a built-in name like `"max"`/`"hours"` or `{ expire }`); defaults to `"max"`.
- * Next 14/15 take the tag alone and ignore a second argument, so it is passed
+ * Next 15 takes the tag alone and ignores a second argument, so it is passed
  * on every version. A no-op unless the reads were tagged (`'use cache'` +
  * `cacheTag`, or `unstable_cache` with `tags`), but always safe to call.
  */
@@ -169,7 +160,7 @@ export function revalidateContent(
  * content. Returns the tags it hit. Like `revalidateContent`, a no-op unless
  * the reads were cached with `'use cache'` + `cacheTag`.
  *
- * Needs Next 16, the release that added `updateTag`. On 14/15 it throws before
+ * Needs Next 16, the release that added `updateTag`. On 15 it throws before
  * touching any tag, and the error names `revalidateContent` as the fallback.
  */
 export function updateContent(branch: string, changes: ChangeSet): string[] {
@@ -178,7 +169,7 @@ export function updateContent(branch: string, changes: ChangeSet): string[] {
     throw new GraftError({
       code: "FRAMEWORK_VERSION_UNSUPPORTED",
       message: "updateContent needs Next.js 16. This version of next/cache has no updateTag.",
-      fix: "Call revalidateContent(branch, changes) instead. It works on Next.js 14, 15 and 16 and refreshes on the next request rather than this one. Or upgrade to Next.js 16.",
+      fix: "Call revalidateContent(branch, changes) instead. It works on Next.js 15 and 16 and refreshes on the next request rather than this one. Or upgrade to Next.js 16.",
       details: { missing: "next/cache updateTag", fallback: "revalidateContent" },
     });
   }

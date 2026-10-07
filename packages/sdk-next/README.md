@@ -69,11 +69,11 @@ revalidateContent(branch, changes);
 updateContent(branch, changes);
 ```
 
-Both turn a compile's `ChangeSet` into the exact `revalidateTag` / `updateTag` calls that refresh the changed pages, and no others. A no-op unless your reads were tagged, but always safe to call. On Next.js 16, tag reads with `'use cache'` and `cacheTag`. On Next.js 14 and 15, wrap them in `unstable_cache` with `tags: tagsFor(...)`. `updateContent` needs Next.js 16 and throws on older versions. Use `revalidateContent` there.
+Both turn a compile's `ChangeSet` into the exact `revalidateTag` / `updateTag` calls that refresh the changed pages, and no others. A no-op unless your reads were tagged, but always safe to call. On Next.js 16, tag reads with `'use cache'` and `cacheTag`. On Next.js 15, wrap them in `unstable_cache` with `tags: tagsFor(...)`. `updateContent` needs Next.js 16 and throws on older versions. Use `revalidateContent` there.
 
 ## Supported versions
 
-Next.js 14.2, 15 and 16 with the App Router, on React 18 (Next.js 14.2) or React 19. CI runs the tests and the type-check against each major.
+Next.js 15.5.24 and later 15.x, and 16.3.3 and later, with the App Router and React 19. Those are the first releases with the fixes for the critical Next.js advisories published in 2026. CI builds and serves a real app on each major. Next.js 14 is not supported: it no longer gets security fixes, and it has open critical advisories.
 
 ---
 

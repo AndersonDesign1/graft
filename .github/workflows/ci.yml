@@ -85,10 +85,10 @@ jobs:
       - name: Zero-service quickstart gate
         run: pnpm test:quickstart
 
-  # @usegraft/sdk-next declares Next 14, 15 and 16 as peers, and `next/cache`
-  # differs across them: 16 added `updateTag` and made `revalidateTag`'s profile
-  # required, and 14 reads a different externals key. The workspace installs
-  # one Next (16), so `verify` alone proves one of the three. Each leg runs a
+  # @usegraft/sdk-next declares Next 15 and 16 as peers, and `next/cache`
+  # differs between them: 16 added `updateTag` and made `revalidateTag`'s
+  # profile required. The workspace installs one Next (16), so `verify` alone
+  # proves one of the two. Each leg runs a
   # real app pinned to one major in the lockfile (packages/sdk-next/compat):
   # it type-checks the Next.js guide's code blocks against that version, builds
   # with `next build`, serves with `next start`, and checks reads, MDX,
@@ -100,7 +100,7 @@ jobs:
       # One failing major must not hide the result of the others.
       fail-fast: false
       matrix:
-        next: ["14", "15", "16"]
+        next: ["15", "16"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

@@ -1,9 +1,9 @@
 /**
  * Build and run a real Next.js app on @usegraft/sdk-next, and check what the
- * adapter promises on that Next. Each folder here (next14, next15, next16)
+ * adapter promises on that Next. Each folder here (next15, next16)
  * pins one major in the lockfile and runs this from its own directory:
  *
- *   pnpm --filter sdk-next-compat-next14 smoke
+ *   pnpm --filter sdk-next-compat-next15 smoke
  *
  * It needs the adapter and its workspace dependencies built first
  * (`pnpm turbo run build --filter=@usegraft/sdk-next... --filter=@usegraft/cli...`).
@@ -15,7 +15,7 @@
  * - a tagged read stays cached until the guide's revalidate route refreshes it,
  *   and that route refuses bad input
  * - `updateContent` inside a real Server Action refreshes on Next 16, and on
- *   14 and 15 returns FRAMEWORK_VERSION_UNSUPPORTED
+ *   15 returns FRAMEWORK_VERSION_UNSUPPORTED
  */
 import { spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -94,7 +94,7 @@ rmSync(join(appDir, ".next"), { recursive: true, force: true });
 run("pnpm exec graft compile");
 
 // 3. The guide's code, against this Next and React. With the workspace's
-// TypeScript: the guide config extends the repo base, which the Next 14 app's
+// TypeScript: the guide config extends the repo base, which the Next 15 app's
 // TypeScript 5 cannot read. Its own TypeScript still runs `next build` below.
 run(`pnpm -w exec tsc --noEmit -p ${JSON.stringify(join(appDir, "tsconfig.guide.json"))}`);
 
@@ -107,13 +107,10 @@ check(
 const serverFiles = JSON.parse(
   readFileSync(join(appDir, ".next/required-server-files.json"), "utf8"),
 );
-const externals =
-  major < 15
-    ? serverFiles.config.experimental?.serverComponentsExternalPackages
-    : serverFiles.config.serverExternalPackages;
+const externals = serverFiles.config.serverExternalPackages;
 check(
   Array.isArray(externals) && externals.includes("@usegraft/registry"),
-  `withGraft set ${major < 15 ? "experimental.serverComponentsExternalPackages" : "serverExternalPackages"}`,
+  "withGraft set serverExternalPackages",
 );
 
 // 5. Serve it and check behavior over HTTP.

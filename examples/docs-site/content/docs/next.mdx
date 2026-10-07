@@ -11,10 +11,15 @@ This guide adds Graft to a Next.js App Router project. By the end, your pages
 read typed content in Server Components, render its Markdown with your own
 components, and refresh only the pages whose content changed.
 
-**Before you start**, you need a Next.js 14.2, 15 or 16 project using the App
+**Before you start**, you need a Next.js 15 or 16 project using the App
 Router, and a `graft.config.ts` with compiled content. If you have not got
 those yet, run through [Getting started](/docs/getting-started) first. It takes
 about ten minutes.
+
+Graft needs Next.js 15.5.24 or 16.3.3 or newer. Those are the first releases
+with fixes for the critical Next.js security advisories published in 2026.
+Next.js 14 is not supported. It no longer gets security fixes, and those
+advisories are still open on it.
 
 What `@usegraft/sdk-next` gives you:
 
@@ -84,10 +89,6 @@ export default withGraft(nextConfig);
 
 </CodeBlock>
 
-`withGraft` reads your installed Next.js version and sets the option that
-version expects. Next.js 14 cannot load a TypeScript config, so on 14 put the
-same code in `next.config.mjs` without the `NextConfig` type.
-
 ## Create the Graft client
 
 Create the client once, in a file only the server imports. Pick the version for
@@ -111,10 +112,6 @@ export const graft = createGraft({
 ```
 
 </CodeBlock>
-
-On Next.js 14, add `"target": "ES2017"` to `compilerOptions` in
-`tsconfig.json`. The tsconfig Next.js 14 creates has no target, and TypeScript
-refuses the top-level `await` without one.
 
 </Tab>
 
@@ -316,8 +313,8 @@ from Studio or from an agent. This section makes Next.js refresh only the pages
 whose content changed.
 
 It takes two steps. How you cache reads depends on your version. Next.js 16
-uses cached functions. Next.js 14 and 15 use `unstable_cache`. The refresh
-route is the same on all three.
+uses cached functions. Next.js 15 uses `unstable_cache`. The refresh route is
+the same on both.
 
 <Steps>
 
@@ -326,7 +323,7 @@ route is the same on all three.
 Cache each read and tag it with `tagsFor`. Use these functions in your pages
 instead of calling `graft` directly.
 
-<Tabs labels="Next.js 16, Next.js 14 and 15">
+<Tabs labels="Next.js 16, Next.js 15">
 
 <Tab>
 
@@ -469,7 +466,7 @@ the change list Graft gave you. An agent's `write_content` call returns it as
 
 To refresh inside the same request instead, for example from a Server Action
 that saves and then shows the result, use `updateContent(branch, changes)`.
-It needs Next.js 16. On 14 and 15 it throws an error that points you back to
+It needs Next.js 16. On 15 it throws an error that points you back to
 `revalidateContent`.
 
 ## Next steps

@@ -257,10 +257,10 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     meaning:
       "An adapter API needs a newer version of the framework than the app has installed. The rest of the adapter still works.",
     typicalCauses: [
-      "Calling `updateContent` from @usegraft/sdk-next on Next.js 14 or 15. It needs `updateTag`, which Next.js added in 16",
+      "Calling `updateContent` from @usegraft/sdk-next on Next.js 15. It needs `updateTag`, which Next.js added in 16",
     ],
     howToRecover:
-      "Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 14, 15 and 16. Or upgrade the framework.",
+      "Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 15 and 16. Or upgrade the framework.",
   },
   SLUG_NOT_UNIQUE: {
     code: "SLUG_NOT_UNIQUE",

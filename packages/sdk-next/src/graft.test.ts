@@ -87,8 +87,8 @@ describe("updateContent", () => {
   });
 });
 
-describe("on Next 14/15, whose next/cache has no updateTag", () => {
-  // The shape 14.2 and 15.5 actually export: revalidateTag(tag), no updateTag.
+describe("on Next 15, whose next/cache has no updateTag", () => {
+  // The shape 15.5 actually exports: revalidateTag(tag), no updateTag.
   async function loadOnOlderNext() {
     const legacyRevalidateTag = vi.fn((tag: string) => {
       void tag;
@@ -126,37 +126,6 @@ describe("on Next 14/15, whose next/cache has no updateTag", () => {
     expect((thrown as GraftError).message).toContain("Next.js 16");
     expect((thrown as GraftError).fix).toContain("revalidateContent");
     expect(legacyRevalidateTag).not.toHaveBeenCalled();
-  });
-});
-
-describe("on a React with no cache export (stable React 18)", () => {
-  it("still reads, without deduping", async () => {
-    vi.resetModules();
-    // Stable React 18 exports no `cache`. Only Next's bundled React has it.
-    vi.doMock("react", () => ({ cache: undefined }));
-    const { createGraft: create } = await import("./graft");
-    const pages = defineCollection({ name: "pages", fields: { title: field.string() } });
-    const row = {
-      branchId: "main",
-      collection: "pages",
-      slug: "home",
-      data: { title: "Home" },
-      body: "",
-      contentHash: "sha256:home",
-      sourcePath: "pages/home.mdx",
-      search: null,
-      deleted: false,
-      updatedAt: new Date("2026-10-07T00:00:00.000Z"),
-    };
-    const readContent = vi.fn(async () => [row]);
-    const graft = create({
-      index: { readContent, searchContent: async () => [], close: async () => {} },
-      collections: { pages },
-    });
-
-    expect((await graft.getContent("pages", "home"))?.data.title).toBe("Home");
-    await graft.getContent("pages", "home");
-    expect(readContent).toHaveBeenCalledTimes(2);
   });
 });
 
