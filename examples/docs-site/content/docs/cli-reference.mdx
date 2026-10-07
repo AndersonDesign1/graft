@@ -21,6 +21,42 @@ report what they would change until you pass `--apply`.
 | `graft asset put <file> [key]` | Upload a file to your bucket and print the frontmatter that points to it |
 | `graft add [item]` | Copy a ready-made [primitive](/docs/owned-primitives) into `graft/`. With no item, list them. |
 
+### Print what a compile changed
+
+`graft compile --json` prints one JSON object on stdout and nothing else. The
+summary line goes to stderr. It works on both engines.
+
+```json
+{
+  "branch": "main",
+  "gitSha": "b8eb719a468be404bae9adca4fbea4d90c642411",
+  "changes": {
+    "added": ["posts/launch"],
+    "changed": ["pages/home"],
+    "removed": [],
+    "unchanged": 42
+  }
+}
+```
+
+The real output is one line. Each key in `changes` is `collection/slug`.
+`gitSha` is `null` when the content is not in a git repository.
+
+On the static engine, a content change ships with a new deploy, so there is
+nothing to refresh. On the Postgres engine, send the output to your app's
+revalidate route so it refreshes only the pages that changed:
+
+```sh
+payload=$(graft compile --json) || exit 1
+curl --fail -X POST https://example.com/api/revalidate \
+  -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" \
+  -H "content-type: application/json" \
+  --data "$payload"
+```
+
+See [Refresh pages when content changes](/docs/next#refresh-pages-when-content-changes)
+for the route.
+
 ## Run Graft
 
 | Command | What it does |
@@ -63,6 +99,7 @@ report what they would change until you pass `--apply`.
 | `--branch <name>` | compile, dev, migrate, mcp, serve, studio, content, compilations | Work on a preview branch instead of `main` |
 | `--apply` | migrate, merge | Make the change. Without it, these only report. |
 | `--prune-unknown` | compile | Remove index entries for collections the schema no longer has. Use after renaming or deleting a collection. |
+| `--json` | compile | Print the branch, commit, and change list as JSON on stdout. See [Print what a compile changed](#print-what-a-compile-changed). |
 | `--dry-run` / `--overwrite` | add | Preview the files, or replace files that differ |
 | `--port` / `--host` | serve, studio | Where to listen. Defaults to this machine only. |
 | `--studio` | serve | Include Studio. `GRAFT_STUDIO=1` does the same. |
