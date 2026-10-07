@@ -13,7 +13,8 @@
  * Caching: Astro has no tag-based data cache, so the Phase 4 tag contract
  * maps onto HTTP — stamp `tagsFor(...)` into a CDN surrogate-key header
  * (`Cache-Tag` / `Surrogate-Key`) on SSR responses, and purge
- * `tagsForChanges(branch, changeSet)` from your compile webhook.
+ * `tagsForChanges(branch, changeSet)` from your own route, called with a
+ * compile's change list (for example the output of `graft compile --json`).
  */
 import { createDbClient, type DbClientOptions } from "@usegraft/sdk-core/db";
 import {
