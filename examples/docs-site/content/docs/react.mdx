@@ -154,6 +154,7 @@ export function SearchBox() {
       <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} />
       {loading && <p>Searching…</p>}
       {error && <p>Search failed.</p>}
+      {query.trim() !== "" && hits?.length === 0 && <p>No results.</p>}
       <ul>
         {hits?.map((hit) => (
           <li key={hit.slug}>
@@ -168,8 +169,8 @@ export function SearchBox() {
 
 </CodeBlock>
 
-Each change to `query` sends one request. For a busy endpoint, debounce the
-input before you pass it on.
+Each change to a non-blank `query` sends one request. For a busy endpoint,
+debounce the input before you pass it on.
 
 Each hit also has a `snippet`: the matching text with each match wrapped in
 `<b>…</b>`. The tags come from the index and the rest of the snippet is your

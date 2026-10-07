@@ -10,7 +10,9 @@
  * plain async function and composes with either of them.
  *
  * Browser-side. `useEffect` does not run during server rendering, so on the
- * server these hooks render their loading state and nothing else. Data that
+ * server these hooks render their loading state and nothing else. The one
+ * exception is a blank search, which is answered without a read, so it renders
+ * its empty result on the server too. Data that
  * has to be in the HTML belongs in a loader or a server adapter
  * (@usegraft/sdk-react-router, @usegraft/sdk-tanstack-start, and the rest).
  *
@@ -59,8 +61,14 @@ type ReadState<TData> = Omit<AsyncState<TData>, "refresh">;
 const PENDING: ReadState<never> = { data: undefined, error: undefined, loading: true };
 
 // What a search for nothing reports. Shared for the same reason, and so `data`
-// keeps its identity from one render to the next.
-const NO_HITS: ReadState<never[]> = { data: [], error: undefined, loading: false };
+// keeps its identity from one render to the next. Frozen because it is shared:
+// a caller that pushed into one blank result would otherwise see the item in
+// every other blank search.
+const NO_HITS: ReadState<never[]> = {
+  data: Object.freeze([]) as never[],
+  error: undefined,
+  loading: false,
+};
 
 function asError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error(String(cause));
@@ -217,8 +225,11 @@ export function createGraftHooks<TCollections extends Record<string, AnyCollecti
       );
       // The content API refuses a blank query, and a search box starts blank.
       // Nothing matches nothing, so answer here instead of reporting an error
-      // before the reader has typed anything.
-      return useRead(read, query.trim() === "" ? NO_HITS : undefined);
+      // before the reader has typed anything. A `branch` still goes through the
+      // handle, which answers a blank query with [] too but first refuses a
+      // branch it cannot serve, so a bad option is not hidden until someone types.
+      const settled = query.trim() === "" && branch === undefined ? NO_HITS : undefined;
+      return useRead(read, settled);
     },
   };
 }

@@ -215,6 +215,32 @@ describe("useContentList and useContentSearch", () => {
     expect(result.current.data?.[0].slug).toBe("intro");
     expect(searches).toEqual(["intro"]);
   });
+
+  it("shares a frozen empty result, so one caller cannot leak items into another", () => {
+    const { graft } = controllable();
+    const hooks = createGraftHooks(graft);
+    const { result } = renderHook(() => hooks.useContentSearch("docs", ""));
+
+    expect(Object.isFrozen(result.current.data)).toBe(true);
+  });
+
+  it("still refuses a branch on a blank query against an endpoint", async () => {
+    // A blank query skips the read, but a branch is checked by the handle. An
+    // endpoint pins its branch, so the option has to fail now, not once the
+    // reader types.
+    const graft = createGraft({
+      endpoint: "http://cms.test/api/content/v1",
+      collections: { docs },
+      fetch: async () => new Response("{}"),
+    });
+    const hooks = createGraftHooks(graft);
+    const { result } = renderHook(() =>
+      hooks.useContentSearch("docs", "", { branch: "preview/redesign" }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error?.message).toMatch(/`branch` cannot be passed to a read/);
+  });
 });
 
 describe("GraftProvider", () => {
