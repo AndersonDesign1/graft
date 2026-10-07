@@ -648,6 +648,9 @@ importers:
       '@mdx-js/mdx':
         specifier: ^3.1.1
         version: 3.1.1(supports-color@7.2.0)
+      '@usegraft/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@usegraft/db':
         specifier: workspace:*
         version: link:../db
@@ -667,9 +670,15 @@ importers:
       '@types/react':
         specifier: ^19.2.18
         version: 19.2.18
+      '@usegraft/auth':
+        specifier: workspace:*
+        version: link:../auth
       '@usegraft/core':
         specifier: workspace:*
         version: link:../core
+      '@usegraft/mcp':
+        specifier: workspace:*
+        version: link:../mcp
       next:
         specifier: ^16.3.8
         version: 16.3.8(@babel/core@7.29.7(supports-color@7.2.0))(@types/node@22.20.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

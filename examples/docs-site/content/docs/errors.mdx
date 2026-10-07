@@ -3,7 +3,7 @@
 # Source: ERROR_KNOWLEDGE in packages/mcp/src/explain.ts
 # Regenerate: node scripts/gen-error-docs.mjs
 title: Error reference
-description: "Every Graft error code, what it means, and how to recover. 42 codes."
+description: "Every Graft error code, what it means, and how to recover. 43 codes."
 section: Reference
 order: 5
 ---
@@ -18,7 +18,7 @@ you can tell whether the fix applies or something else is wrong.
 Agents can read the same entries without leaving their tools: the
 `explain_error` MCP tool returns them for any code.
 
-There are 42 codes, listed alphabetically.
+There are 43 codes, listed alphabetically.
 
 ## Codes
 
@@ -295,6 +295,18 @@ A required environment variable is not set.
 **How to recover**
 
 Add the variable named in `details.variable` to the project's .env (the CLI walks parent directories to find one) or export it in the environment, then retry.
+
+### FRAMEWORK_VERSION_UNSUPPORTED
+
+An adapter API needs a newer version of the framework than the app has installed. The rest of the adapter still works.
+
+**Usually because**
+
+- Calling `updateContent` from @usegraft/sdk-next on Next.js 14 or 15. It needs `updateTag`, which Next.js added in 16
+
+**How to recover**
+
+Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 14, 15 and 16. Or upgrade the framework.
 
 ### FUNCTION_EXECUTION_FAILED
 

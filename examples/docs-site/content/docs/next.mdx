@@ -11,7 +11,7 @@ This guide adds Graft to a Next.js App Router project. By the end, your pages
 read typed content in Server Components, render its Markdown with your own
 components, and refresh only the pages whose content changed.
 
-**Before you start**, you need a Next.js 15 or newer project using the App
+**Before you start**, you need a Next.js 14, 15 or 16 project using the App
 Router, and a `graft.config.ts` with compiled content. If you have not got
 those yet, run through [Getting started](/docs/getting-started) first. It takes
 about ten minutes.
@@ -83,6 +83,10 @@ export default withGraft(nextConfig);
 ```
 
 </CodeBlock>
+
+`withGraft` reads your installed Next.js version and sets the option that
+version expects. Next.js 14 cannot load a TypeScript config, so on 14 put the
+same code in `next.config.mjs` without the `NextConfig` type.
 
 ## Create the Graft client
 
@@ -301,13 +305,24 @@ read-only docs, use the [docs MCP](/docs/docs-mcp) instead.
 On the static engine, content changes ship with a new deploy, so there is
 nothing to refresh. On Postgres, content can change while your app is running,
 from Studio or from an agent. This section makes Next.js refresh only the pages
-whose content changed. It needs Next.js 16.
+whose content changed.
 
-It takes three steps.
+It takes two steps. How you cache reads depends on your version. Next.js 16
+uses cached functions. Next.js 14 and 15 use `unstable_cache`. The refresh
+route is the same on all three.
 
 <Steps>
 
-<Step title="Turn on cached functions">
+<Step title="Tag each cached read">
+
+Cache each read and tag it with `tagsFor`. Use these functions in your pages
+instead of calling `graft` directly.
+
+<Tabs labels="Next.js 16, Next.js 14 and 15">
+
+<Tab>
+
+Turn on cached functions:
 
 <CodeBlock title="next.config.ts">
 
@@ -319,12 +334,7 @@ const nextConfig: NextConfig = {
 
 </CodeBlock>
 
-</Step>
-
-<Step title="Tag each cached read">
-
-Wrap a read in a `'use cache'` function and tag it with `tagsFor`. Use these
-functions in your pages instead of calling `graft` directly:
+Then wrap each read in a `'use cache'` function:
 
 <CodeBlock title="lib/content.ts">
 
@@ -347,6 +357,39 @@ export async function listPages() {
 ```
 
 </CodeBlock>
+
+</Tab>
+
+<Tab>
+
+Wrap each read in `unstable_cache` and pass the tags:
+
+<CodeBlock title="lib/content.ts">
+
+```ts
+import { unstable_cache } from "next/cache";
+import { tagsFor } from "@usegraft/sdk-next";
+import { graft } from "@/lib/graft";
+
+export function getPage(slug: string) {
+  return unstable_cache(() => graft.getContent("pages", slug), ["graft", "pages", slug], {
+    tags: tagsFor("main", "pages", slug),
+  })();
+}
+
+export const listPages = unstable_cache(() => graft.listContent("pages"), ["graft", "pages"], {
+  tags: tagsFor("main", "pages"),
+});
+```
+
+</CodeBlock>
+
+`unstable_cache` stores results as JSON, so a cached document's `updatedAt`
+comes back as a string. Wrap it in `new Date()` before you use it as a date.
+
+</Tab>
+
+</Tabs>
 
 Without this step, `revalidateContent` has nothing to refresh and does
 nothing.
@@ -403,6 +446,8 @@ the change list Graft gave you. An agent's `write_content` call returns it as
 
 To refresh inside the same request instead, for example from a Server Action
 that saves and then shows the result, use `updateContent(branch, changes)`.
+It needs Next.js 16. On 14 and 15 it throws an error that points you back to
+`revalidateContent`.
 
 ## Next steps
 

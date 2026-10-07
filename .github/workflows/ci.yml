@@ -85,6 +85,62 @@ jobs:
       - name: Zero-service quickstart gate
         run: pnpm test:quickstart
 
+  # @usegraft/sdk-next declares Next 14, 15 and 16 as peers, and `next/cache`
+  # differs across them: 16 added `updateTag` and made `revalidateTag`'s profile
+  # required, and 14 reads a different externals key. The workspace installs
+  # one Next (16), so `verify` alone proves one of the three. Each leg swaps the
+  # adapter's Next and React for one major, then runs its tests and its
+  # type-check, which also compiles the Next.js guide's code blocks
+  # (packages/sdk-next/guide) against that version.
+  sdk-next-compat:
+    name: sdk-next on Next ${{ matrix.next }}
+    runs-on: ubuntu-latest
+    strategy:
+      # One failing major must not hide the result of the others.
+      fail-fast: false
+      matrix:
+        include:
+          # Next 14 ships with React 18. 15 and 16 need React 19.
+          - next: "14"
+            react: "18"
+          - next: "15"
+            react: "19"
+          - next: "16"
+            react: "19"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Nothing in this job pushes, and a persisted token in .git/config
+          # is one careless artifact upload away from being published.
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22.16
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Rewrites the adapter's devDependencies and the lockfile on this runner
+      # only. Nothing here is committed.
+      - name: Install Next ${{ matrix.next }} and React ${{ matrix.react }}
+        run: >-
+          pnpm --filter @usegraft/sdk-next add -D
+          next@${{ matrix.next }}
+          react@${{ matrix.react }}
+          react-dom@${{ matrix.react }}
+          @types/react@${{ matrix.react }}
+
+      # The adapter's workspace dependencies, not the adapter: tests and the
+      # type-check read its source.
+      - run: pnpm turbo run build --filter=@usegraft/sdk-next^...
+      - run: pnpm --filter @usegraft/sdk-next test
+      - run: pnpm --filter @usegraft/sdk-next typecheck
+
   # The integration suite is opt-in (RUN_INTEGRATION=1 + DATABASE_URL) and was
   # therefore never running here — including the only test that proves a
   # requester cannot approve their own destructive operation. A throwaway
