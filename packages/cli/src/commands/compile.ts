@@ -38,15 +38,22 @@ export interface CompileCommandOptions {
 
 export async function compileCommand(options: CompileCommandOptions): Promise<CompileResult> {
   if (!options.json) return (await runCompile(options)).result;
-  // Hold stdout for the JSON alone. postgres-js prints server notices with
-  // console.log, so every console.log goes to stderr while the compile runs.
-  const log = console.log;
-  console.log = console.error;
+  // Hold stdout for the JSON alone. Anything can write there mid-compile:
+  // postgres-js prints server notices with console.log, and a config or helper
+  // may call console.info, console.debug or process.stdout.write. So the
+  // stream itself points at stderr while the compile runs, and the console
+  // methods that print to stdout are swapped too, for a console that does not
+  // write through the stream (a test runner's, or one an app replaced).
+  const { log, info, debug } = console;
+  const write = process.stdout.write;
+  console.log = console.info = console.debug = console.error;
+  process.stdout.write = process.stderr.write.bind(process.stderr) as typeof process.stdout.write;
   let compiled: CompiledBranch;
   try {
     compiled = await runCompile(options);
   } finally {
-    console.log = log;
+    process.stdout.write = write;
+    Object.assign(console, { log, info, debug });
   }
   console.log(formatCompileJson(compiled.branch, compiled.result));
   return compiled.result;

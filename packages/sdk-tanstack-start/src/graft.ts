@@ -15,7 +15,8 @@
  * contract maps onto HTTP — stamp `tagsFor(...)` into a CDN surrogate-key
  * header (`Cache-Tag` / `Surrogate-Key`) on the responses you serve, and purge
  * `tagsForChanges(branch, changeSet)` from your own route, called with a
- * compile's change list (for example the output of `graft compile --json`).
+ * compile's change list. `graft compile --json` prints `{ branch, gitSha, changes }`: pass its
+ * `branch` and `changes`, not the whole object.
  */
 import { createDbClient, type DbClientOptions } from "@usegraft/sdk-core/db";
 import {

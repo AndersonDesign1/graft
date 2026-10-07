@@ -215,10 +215,15 @@ CDN for you. Do it from your own route, called with the change list.
 
 The change list comes from two places. An agent's `write_content` call returns
 it as `changes`. `graft compile --json` prints it too, along with the branch.
-In a deploy script, pipe it straight to your route:
+In a deploy script, send it to your route. The script stops if the compile
+fails, and `--fail` makes a refused request fail the script too:
 
 ```sh
-graft compile --json | curl -X POST -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" -H "content-type: application/json" --data-binary @- https://example.com/api/revalidate
+payload=$(graft compile --json) || exit 1
+curl --fail -X POST https://example.com/api/revalidate \
+  -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" \
+  -H "content-type: application/json" \
+  --data "$payload"
 ```
 
 Your route reads `branch` and `changes` from the body and passes them to

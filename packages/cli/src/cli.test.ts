@@ -248,6 +248,34 @@ describe("graft compile --json", () => {
     expect(logs).toContain("after");
   }, 30_000);
 
+  it("keeps console.info, console.debug and raw stdout writes off stdout", async () => {
+    appendFileSync(
+      join(jsonProject, "graft.config.ts"),
+      '\nconsole.info("noise-info");\nconsole.debug("noise-debug");\nprocess.stdout.write("noise-raw\\n");\n',
+    );
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const out = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      stdout.push(String(chunk));
+      return true;
+    });
+    const err = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderr.push(String(chunk));
+      return true;
+    });
+    try {
+      expect(await run(["compile", "--json"], { cwd: jsonProject })).toBe(0);
+    } finally {
+      out.mockRestore();
+      err.mockRestore();
+    }
+    expect(stdout.join("")).not.toMatch(/noise/);
+    expect(stderr.join("")).toContain("noise-raw");
+    expect(errors).toEqual(expect.arrayContaining(["noise-info", "noise-debug"]));
+    expect(logs).toHaveLength(1);
+    expect(JSON.parse(logs[0] ?? "").branch).toBe("main");
+  }, 30_000);
+
   it("prints nothing on stdout when the compile fails", async () => {
     expect(await run(["compile", "--json", "--branch", "preview"], { cwd: jsonProject })).toBe(1);
     expect(logs).toEqual([]);
