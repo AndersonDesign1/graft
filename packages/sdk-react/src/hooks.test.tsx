@@ -115,6 +115,29 @@ describe("useContent", () => {
     expect(reads).toHaveLength(2);
   });
 
+  it("does not render the previous document even for one render", async () => {
+    // The assertions above run after effects. This records every render, so a
+    // render that briefly showed the old answer would be caught here.
+    const { reads, graft } = controllable();
+    const hooks = createGraftHooks(graft);
+    const seen: Array<{ slug: string; shown: string | undefined }> = [];
+    const { rerender } = renderHook(
+      ({ slug }) => {
+        const state = hooks.useContent("docs", slug);
+        seen.push({ slug, shown: state.data?.slug });
+        return state;
+      },
+      { initialProps: { slug: "intro" } },
+    );
+    await act(async () => reads[0].settle([row("intro", "Intro")]));
+
+    rerender({ slug: "advanced" });
+
+    expect(seen.filter((render) => render.slug === "advanced").map((r) => r.shown)).not.toContain(
+      "intro",
+    );
+  });
+
   it("drops a read that settles after its arguments changed", async () => {
     const { reads, graft } = controllable();
     const hooks = createGraftHooks(graft);
@@ -214,6 +237,30 @@ describe("useContentList and useContentSearch", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.data?.[0].slug).toBe("intro");
     expect(searches).toEqual(["intro"]);
+  });
+
+  it("does not render the previous hits when the query turns blank with a branch", async () => {
+    // A branch sends a blank query through the handle, so it is not answered
+    // on the spot. Until the handle answers, the hook must report loading, not
+    // the hits for the query the reader just cleared.
+    const { graft } = controllable();
+    const hooks = createGraftHooks(graft);
+    const seen: Array<{ query: string; hits: number | undefined }> = [];
+    const { result, rerender } = renderHook(
+      ({ query, branch }: { query: string; branch?: string }) => {
+        const state = hooks.useContentSearch("docs", query, { branch });
+        seen.push({ query, hits: state.data?.length });
+        return state;
+      },
+      { initialProps: { query: "intro" } as { query: string; branch?: string } },
+    );
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+
+    rerender({ query: "", branch: "main" });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(seen.filter((render) => render.query === "").map((r) => r.hits)).not.toContain(1);
+    expect(result.current.data).toEqual([]);
   });
 
   it("shares a frozen empty result, so one caller cannot leak items into another", () => {

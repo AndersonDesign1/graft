@@ -56,8 +56,8 @@ export interface AsyncState<TData> {
 
 type ReadState<TData> = Omit<AsyncState<TData>, "refresh">;
 
-// One shared object, so setting it on mount is a no-op React can bail out of
-// rather than a second render.
+// One shared object, so every render that is still waiting reports the same
+// value.
 const PENDING: ReadState<never> = { data: undefined, error: undefined, loading: true };
 
 // What a search for nothing reports. Shared for the same reason, and so `data`
@@ -82,23 +82,36 @@ function asError(cause: unknown): Error {
  * `settled` is an answer known without asking. While it is set, `read` does
  * not run and `settled` is what the hook reports. Passing it, rather than
  * skipping the call, is what keeps the hook unconditional.
+ *
+ * An answer is kept with the read and attempt it answers, and reported only
+ * while those are still current. When the arguments change or `refresh` runs,
+ * the same render reports loading. Resetting in the effect instead left one
+ * render showing the previous arguments' result, for example old hits under a
+ * new query.
  */
 function useRead<TData>(read: () => Promise<TData>, settled?: ReadState<TData>): AsyncState<TData> {
   const [attempt, setAttempt] = useState(0);
-  const [state, setState] = useState<ReadState<TData>>(PENDING);
+  const [answer, setAnswer] = useState<{
+    read: () => Promise<TData>;
+    attempt: number;
+    state: ReadState<TData>;
+  }>();
 
   useEffect(() => {
-    let live = true;
-    setState(PENDING);
-    // Reset even when skipping, so the first render after `settled` clears
-    // shows loading rather than whatever an earlier read left behind.
     if (settled !== undefined) return;
+    let live = true;
     read().then(
       (data) => {
-        if (live) setState({ data, error: undefined, loading: false });
+        if (live) setAnswer({ read, attempt, state: { data, error: undefined, loading: false } });
       },
       (cause: unknown) => {
-        if (live) setState({ data: undefined, error: asError(cause), loading: false });
+        if (live) {
+          setAnswer({
+            read,
+            attempt,
+            state: { data: undefined, error: asError(cause), loading: false },
+          });
+        }
       },
     );
     // A read that settles after the arguments changed, or after the component
@@ -111,7 +124,8 @@ function useRead<TData>(read: () => Promise<TData>, settled?: ReadState<TData>):
   }, [read, attempt, settled]);
 
   const refresh = useCallback(() => setAttempt((previous) => previous + 1), []);
-  return { ...(settled ?? state), refresh };
+  const current = answer?.read === read && answer.attempt === attempt ? answer.state : PENDING;
+  return { ...(settled ?? current), refresh };
 }
 
 export interface GraftHooks<TCollections extends Record<string, AnyCollection>> {
