@@ -455,7 +455,19 @@ export async function POST(request: Request) {
 
 Graft does not call this route for you. Call it after content changes, with
 the change list Graft gave you. An agent's `write_content` call returns it as
-`changes`, shaped like this:
+`changes`. `graft compile --json` prints it too, along with the branch. In a
+deploy script, send it to the route. The script stops if the compile fails,
+and `--fail` makes a refused request fail the script too:
+
+```sh
+payload=$(graft compile --json) || exit 1
+curl --fail -X POST https://example.com/api/revalidate \
+  -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" \
+  -H "content-type: application/json" \
+  --data "$payload"
+```
+
+Either way, the route reads a body shaped like this:
 
 ```json
 {

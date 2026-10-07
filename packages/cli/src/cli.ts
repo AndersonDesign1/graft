@@ -84,6 +84,8 @@ function printHelp(): void {
     "  --overwrite      Let `graft add` replace files that differ",
     "  --prune-unknown  Let `graft compile` remove index rows in collections this schema",
     "                   doesn't know (default: refuse — the shared-DATABASE_URL guard)",
+    "  --json           `graft compile` prints { branch, gitSha, changes } as JSON on stdout",
+    "                   (logs go to stderr), ready to POST to a revalidate route",
     "  -h, --help       Show this help",
     "  -v, --version    Show version",
   ];
@@ -104,6 +106,7 @@ interface ParsedArgs {
   pruneUnknown: boolean;
   studio: boolean;
   elicitApprovals: boolean;
+  json: boolean;
   /** `graft init` index driver; undefined = the default (static). */
   initDriver?: "static" | "postgres";
 }
@@ -125,6 +128,7 @@ function parseArgs(rest: string[]): ParsedArgs {
   let pruneUnknown = false;
   let studio = false;
   let elicitApprovals = false;
+  let json = false;
   let initDriver: "static" | "postgres" | undefined;
 
   const value = (flag: string, raw: string | undefined): string => {
@@ -165,6 +169,8 @@ function parseArgs(rest: string[]): ParsedArgs {
       studio = true;
     } else if (arg === "--elicit-approvals") {
       elicitApprovals = true;
+    } else if (arg === "--json") {
+      json = true;
     } else if (arg === "--postgres") {
       initDriver = "postgres";
     } else if (arg === "--static") {
@@ -189,6 +195,7 @@ function parseArgs(rest: string[]): ParsedArgs {
     pruneUnknown,
     studio,
     elicitApprovals,
+    json,
     initDriver,
   };
 }
@@ -249,7 +256,12 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
       }
       case "compile": {
         const { compileCommand } = await import("./commands/compile");
-        await compileCommand({ cwd, branchId: args.branchId, pruneUnknown: args.pruneUnknown });
+        await compileCommand({
+          cwd,
+          branchId: args.branchId,
+          pruneUnknown: args.pruneUnknown,
+          json: args.json,
+        });
         return 0;
       }
       case "dev": {

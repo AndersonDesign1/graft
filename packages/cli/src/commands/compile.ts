@@ -6,11 +6,15 @@
  * unregistered ids — tolerant by design) compile into the shared DB under
  * their branch_id; a `neon` branch compiles into its own database (rows there
  * keep the default id — the fork IS the branch).
+ *
+ * `--json` prints one `{ branch, gitSha, changes }` object to stdout and
+ * nothing else, so a deploy script can pipe the ChangeSet to the app's
+ * revalidate route. Everything human-facing moves to stderr.
  */
 import type { CompileResult } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
-import { formatCompileResult } from "../report";
+import { formatCompileJson, formatCompileResult } from "../report";
 
 /** Static mode has no DB branches — the git checkout is the branch. */
 export function assertNoStaticBranch(branchId: string | undefined): void {
@@ -28,9 +32,40 @@ export interface CompileCommandOptions {
   branchId?: string;
   /** Remove index rows in collections this schema doesn't know (see INDEX_OWNERSHIP). */
   pruneUnknown?: boolean;
+  /** Print `{ branch, gitSha, changes }` as JSON on stdout; logs go to stderr. */
+  json?: boolean;
 }
 
 export async function compileCommand(options: CompileCommandOptions): Promise<CompileResult> {
+  if (!options.json) return (await runCompile(options)).result;
+  // Hold stdout for the JSON alone. Anything can write there mid-compile:
+  // postgres-js prints server notices with console.log, and a config or helper
+  // may call console.info, console.debug or process.stdout.write. So the
+  // stream itself points at stderr while the compile runs, and the console
+  // methods that print to stdout are swapped too, for a console that does not
+  // write through the stream (a test runner's, or one an app replaced).
+  const { log, info, debug } = console;
+  const write = process.stdout.write;
+  console.log = console.info = console.debug = console.error;
+  process.stdout.write = process.stderr.write.bind(process.stderr) as typeof process.stdout.write;
+  let compiled: CompiledBranch;
+  try {
+    compiled = await runCompile(options);
+  } finally {
+    process.stdout.write = write;
+    Object.assign(console, { log, info, debug });
+  }
+  console.log(formatCompileJson(compiled.branch, compiled.result));
+  return compiled.result;
+}
+
+interface CompiledBranch {
+  /** The branch the run compiled, as the cache tags name it. */
+  branch: string;
+  result: CompileResult;
+}
+
+async function runCompile(options: CompileCommandOptions): Promise<CompiledBranch> {
   loadProjectEnv(options.cwd);
   const config = await loadConfig(findConfig(options.cwd));
 
@@ -45,7 +80,7 @@ export async function compileCommand(options: CompileCommandOptions): Promise<Co
       indexPath: config.index.path,
     });
     console.log(formatCompileResult(result));
-    return result;
+    return { branch: "main", result };
   }
 
   const url = requireDatabaseUrl();
@@ -73,7 +108,7 @@ export async function compileCommand(options: CompileCommandOptions): Promise<Co
         pruneUnknown: options.pruneUnknown,
       });
       console.log(formatCompileResult(result));
-      return result;
+      return { branch: branch.name, result };
     } finally {
       await branch.close();
     }
