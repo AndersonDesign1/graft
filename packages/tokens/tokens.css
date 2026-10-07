@@ -55,6 +55,7 @@
   --n-7: oklch(0.79 0.003 95); /* #bcbcb9 — dark-scheme faint  — Lc -65 on black */
   --n-8: oklch(0.86 0.003 95); /* #d1d1cf — dark-scheme muted  — Lc -79 on black */
   --n-9: oklch(0.96 0.003 95); /* #f2f2ef — dark-scheme text/bright — Lc -99 */
+  --n-10: #ffffff; /* the top of the ramp — dark-scheme hover on a bright fill */
 
   /* light scheme neutrals — warm ivory paper, warm near-black ink */
   --paper-0: #f7f5f0; /* the page */
@@ -65,7 +66,14 @@
   --ink-1: oklch(0.44 0.006 95); /* #5c5a52 — muted */
   --ink-2: oklch(0.56 0.005 95); /* #7a7871 — faint */
 
-  /* danger — hue 25. The ONLY hue in the system; errors only, never brand.
+  /* Callout hues — docs callouts only (note and warning), never brand or UI
+     state. 500 is for the light scheme, 300 for the dark one. */
+  --note-500: oklch(0.5 0.14 245);
+  --note-300: oklch(0.75 0.14 245);
+  --warning-500: oklch(0.55 0.15 75);
+  --warning-300: oklch(0.8 0.15 75);
+
+  /* danger — hue 25. The only hue for UI state; errors only, never brand.
      A red bright enough for APCA 75 on black would be pale pink, so error
      text targets the non-body floor (Lc 60). */
   --danger-300: oklch(0.77 0.123 25); /* on black  #f9948c — Lc -60 */
@@ -106,7 +114,7 @@
   --primary: light-dark(var(--ink-0), var(--n-9));
   --primary-hover: light-dark(
     var(--ink-0-hover),
-    #ffffff
+    var(--n-10)
   ); /* fill hover: one step, same direction */
   --primary-foreground: light-dark(var(--paper-0), var(--n-0));
   /* Alpha variants derive from --primary, so they follow it.
@@ -153,8 +161,8 @@
   --mark-strong: var(--primary-hover);
   --mark-tint: var(--primary-tint);
 
-  --callout-note: light-dark(oklch(0.5 0.14 245), oklch(0.75 0.14 245));
-  --callout-warning: light-dark(oklch(0.55 0.15 75), oklch(0.8 0.15 75));
+  --callout-note: light-dark(var(--note-500), var(--note-300));
+  --callout-warning: light-dark(var(--warning-500), var(--warning-300));
   --callout-danger: var(--danger);
 
   /* ---- type ---- */
@@ -188,6 +196,7 @@
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
+  --space-5: 1.25rem;
   --space-6: 1.5rem;
   --space-8: 2rem;
   --space-12: 3rem;

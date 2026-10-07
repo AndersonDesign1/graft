@@ -82,7 +82,7 @@ export function FieldTable({ collection }: FieldTableProps) {
               <td>
                 <span className="field-type">{field.type}</span>
               </td>
-              <td>{field.optional ? "" : "yes"}</td>
+              <td>{field.optional ? "no" : "yes"}</td>
               <td>{field.description ?? ""}</td>
             </tr>
           ))}

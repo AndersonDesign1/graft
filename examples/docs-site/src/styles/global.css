@@ -116,15 +116,18 @@ table td {
   color: var(--ink-muted);
 }
 
-/* Pressables: instant tactile feedback, exact properties only. */
-button,
-.pressable {
-  transition: transform var(--duration-press) var(--ease-out);
-}
+/* Pressables: instant tactile feedback, exact properties only. Skipped
+   entirely for readers who ask for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  .pressable {
+    transition: transform var(--duration-press) var(--ease-out);
+  }
 
-button:active,
-.pressable:active {
-  transform: scale(var(--press-scale));
+  button:active,
+  .pressable:active {
+    transform: scale(var(--press-scale));
+  }
 }
 
 /* ---- .prose: rendered MDX bodies (docs pages) ---- */
@@ -389,7 +392,7 @@ button:active,
   margin-left: var(--space-2);
   vertical-align: baseline;
   color: var(--ink-faint);
-  opacity: 0;
+  opacity: 0.4;
   transition: opacity var(--duration-fast) var(--ease-out);
 }
 
@@ -399,6 +402,7 @@ button:active,
 }
 
 .step-title:hover .step-anchor,
+.step-title:focus-within .step-anchor,
 .step-anchor:focus-visible {
   opacity: 1;
 }

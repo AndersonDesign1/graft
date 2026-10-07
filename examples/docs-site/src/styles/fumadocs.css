@@ -331,8 +331,8 @@ kbd {
 .doc-card {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 1.15rem 1.1rem 1.25rem;
+  gap: var(--space-1);
+  padding: var(--space-4);
   background: var(--paper-sunken);
   text-decoration: none;
   color: inherit;
@@ -420,10 +420,17 @@ kbd {
   overflow: hidden;
 }
 
+/* Visually hidden, still focusable: the standard screen-reader-only pattern.
+   Focus is shown on the matching label (see below). */
 .tab-input {
   position: absolute;
-  opacity: 0;
-  pointer-events: none;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .tab-list {
@@ -477,10 +484,20 @@ kbd {
   margin-block-end: 0;
 }
 
-/* A focused tab must be visible, or keyboard users cannot tell where they are. */
-.tab-input:focus-visible + .tab-input + .tab-list .tab-label,
-.tab-input:focus-visible ~ .tab-list .tab-label {
-  outline: none;
+/* A focused tab must be visible, or keyboard users cannot tell where they are.
+   The radios share a name, so the set is one tab stop and the arrow keys move
+   between tabs. That is why the inputs stay focusable (clipped, not
+   display: none or visibility: hidden): hiding them would make the tabs unreachable from a keyboard.
+   The ring goes on the label of whichever radio has focus. */
+.tabs:has(.tab-input:nth-of-type(1):focus-visible) .tab-label:nth-of-type(1),
+.tabs:has(.tab-input:nth-of-type(2):focus-visible) .tab-label:nth-of-type(2),
+.tabs:has(.tab-input:nth-of-type(3):focus-visible) .tab-label:nth-of-type(3),
+.tabs:has(.tab-input:nth-of-type(4):focus-visible) .tab-label:nth-of-type(4),
+.tabs:has(.tab-input:nth-of-type(5):focus-visible) .tab-label:nth-of-type(5),
+.tabs:has(.tab-input:nth-of-type(6):focus-visible) .tab-label:nth-of-type(6) {
+  outline: 2px solid var(--mark);
+  outline-offset: -2px;
+  border-radius: var(--radius-inner);
 }
 
 .tabs:has(.tab-input:nth-of-type(1):checked) .tab-label:nth-of-type(1),
@@ -509,11 +526,6 @@ kbd {
 .tabs:has(.tab-input:nth-of-type(5):checked) .tab-panel:nth-of-type(5),
 .tabs:has(.tab-input:nth-of-type(6):checked) .tab-panel:nth-of-type(6) {
   display: block;
-}
-
-.tabs:has(.tab-input:focus-visible) .tab-list {
-  outline: 2px solid var(--mark);
-  outline-offset: -2px;
 }
 
 /* CodeBlock — a titled fence. The bar says where the code goes. */
@@ -609,7 +621,7 @@ kbd {
   margin-left: var(--space-2);
   vertical-align: baseline;
   color: var(--ink-faint);
-  opacity: 0;
+  opacity: 0.4;
   transition: opacity var(--duration-fast) var(--ease-out);
 }
 
@@ -619,6 +631,7 @@ kbd {
 }
 
 .step-title:hover .step-anchor,
+.step-title:focus-within .step-anchor,
 .step-anchor:focus-visible {
   opacity: 1;
 }
@@ -779,7 +792,7 @@ html[data-theme="dark"] .powered-by-graft-on-ink {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
+    animation-duration: 0ms !important;
     transition-duration: 60ms !important;
   }
   button:active,
