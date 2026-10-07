@@ -16,7 +16,7 @@ export const pages = defineCollection({
 export const pageCount = defineFunction({
   name: "pageCount",
   kind: "query",
-  description: "Counts the pages on the current branch.",
+  description: "A placeholder query for type-checking. Always returns zero.",
   returns: "{ count: number }",
   input: {},
   handler: async () => ({ count: 0 }),

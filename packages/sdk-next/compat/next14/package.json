@@ -1,0 +1,30 @@
+{
+  "name": "sdk-next-compat-next14",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A real Next.js 14.2.35 app that runs @usegraft/sdk-next. See ../smoke.mjs.",
+  "type": "module",
+  "scripts": {
+    "smoke": "node ../smoke.mjs --port 3114"
+  },
+  "dependencies": {
+    "@usegraft/core": "workspace:*",
+    "@usegraft/db": "workspace:*",
+    "@usegraft/sdk-next": "workspace:*",
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "@usegraft/cli": "workspace:*",
+    "typescript": "5.9.3"
+  },
+  "dependenciesMeta": {
+    "@usegraft/sdk-next": {
+      "injected": true
+    }
+  }
+}

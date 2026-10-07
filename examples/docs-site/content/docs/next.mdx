@@ -11,7 +11,7 @@ This guide adds Graft to a Next.js App Router project. By the end, your pages
 read typed content in Server Components, render its Markdown with your own
 components, and refresh only the pages whose content changed.
 
-**Before you start**, you need a Next.js 14, 15 or 16 project using the App
+**Before you start**, you need a Next.js 14.2, 15 or 16 project using the App
 Router, and a `graft.config.ts` with compiled content. If you have not got
 those yet, run through [Getting started](/docs/getting-started) first. It takes
 about ten minutes.
@@ -111,6 +111,10 @@ export const graft = createGraft({
 ```
 
 </CodeBlock>
+
+On Next.js 14, add `"target": "ES2017"` to `compilerOptions` in
+`tsconfig.json`. The tsconfig Next.js 14 creates has no target, and TypeScript
+refuses the top-level `await` without one.
 
 </Tab>
 
@@ -239,7 +243,8 @@ npm i @usegraft/auth @usegraft/mcp
 ```
 
 Both routes need to know who is calling. This resolver accepts one token from
-your environment, which is enough to try things out. [Auth](/docs/auth) shows
+your environment, which is enough to try things out. A dev token never
+expires, so the resolver ignores it in production. [Auth](/docs/auth) shows
 how to accept signed tokens from your identity provider.
 
 <CodeBlock title="lib/actor.ts">
@@ -247,10 +252,13 @@ how to accept signed tokens from your identity provider.
 ```ts
 import { createActorResolver } from "@usegraft/auth";
 
+// A dev token never expires, so it is accepted only outside production.
+const devToken = process.env.NODE_ENV === "production" ? undefined : process.env.GRAFT_DEV_TOKEN;
+
 export const actor = createActorResolver({
-  devTokens: process.env.GRAFT_DEV_TOKEN
+  devTokens: devToken
     ? {
-        [process.env.GRAFT_DEV_TOKEN]: {
+        [devToken]: {
           kind: "human",
           id: "owner",
           scopes: ["content:write", "submissions:admin"],
@@ -322,14 +330,20 @@ instead of calling `graft` directly.
 
 <Tab>
 
-Turn on cached functions:
+Turn on cached functions in the config you wrapped with `withGraft`:
 
 <CodeBlock title="next.config.ts">
 
 ```ts
+import { withGraft } from "@usegraft/sdk-next/config";
+import type { NextConfig } from "next";
+
 const nextConfig: NextConfig = {
+  // your existing Next.js options
   cacheComponents: true,
 };
+
+export default withGraft(nextConfig);
 ```
 
 </CodeBlock>
@@ -406,9 +420,17 @@ the matching tags: each changed document, and the collection it is in.
 ```ts
 import { revalidateContent, type ChangeSet } from "@usegraft/sdk-next";
 
+const isStrings = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string");
+
 function isChangeSet(value: unknown): value is ChangeSet {
   const v = value as Partial<ChangeSet> | null;
-  return Array.isArray(v?.added) && Array.isArray(v?.changed) && Array.isArray(v?.removed);
+  return (
+    isStrings(v?.added) &&
+    isStrings(v?.changed) &&
+    isStrings(v?.removed) &&
+    typeof v?.unchanged === "number"
+  );
 }
 
 export async function POST(request: Request) {
@@ -418,11 +440,12 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  if (!isChangeSet(body?.changes)) {
+  const branch = body?.branch ?? "main";
+  if (typeof branch !== "string" || !isChangeSet(body?.changes)) {
     return Response.json({ error: "Send { branch, changes }." }, { status: 400 });
   }
 
-  const tags = revalidateContent(body.branch ?? "main", body.changes);
+  const tags = revalidateContent(branch, body.changes);
   return Response.json({ revalidated: tags });
 }
 ```

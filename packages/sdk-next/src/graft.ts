@@ -22,7 +22,7 @@
  */
 import { GraftError } from "@usegraft/contracts";
 import * as nextCache from "next/cache";
-import { cache } from "react";
+import * as React from "react";
 import { createDbClient, type DbClientOptions } from "@usegraft/sdk-core/db";
 import {
   createClient,
@@ -70,6 +70,15 @@ export interface Graft<TCollections extends Record<string, AnyCollection>> {
 export type GraftOptions<TCollections extends Record<string, AnyCollection>> =
   | ClientOptions<TCollections>
   | DbClientOptions<TCollections>;
+
+/**
+ * React.cache, where React has it. Server Components on Next 14 run on the
+ * React that Next bundles, which has it. Stable React 18 does not, and code
+ * outside a Server Component (a script, a test, the Pages Router) can load
+ * that one. There the reads are not deduped, which is what React.cache does
+ * outside a render anyway, rather than `createGraft` throwing.
+ */
+const cache: typeof React.cache = typeof React.cache === "function" ? React.cache : (fn) => fn;
 
 export function createGraft<TCollections extends Record<string, AnyCollection>>(
   options: GraftOptions<TCollections>,

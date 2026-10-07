@@ -25,13 +25,17 @@ const GRAFT_SERVER_EXTERNALS = ["@usegraft/registry"];
 /**
  * The installed Next's major version, or undefined when it cannot be found.
  *
- * Resolved from the app first (the project root is the working directory when
- * Next loads its config), then from this package, which covers a monorepo
- * whose app runs from another directory. Reading package.json beats sniffing
- * for an API: it is the one thing every version ships in the same place.
+ * Resolved first from the running `next` binary, which is the Next that is
+ * loading this config even when a monorepo holds several majors or the build
+ * runs from another directory. Then from the working directory, for a custom
+ * server that loads Next programmatically, and last from this package.
+ * Reading package.json beats sniffing for an API: it is the one thing every
+ * version ships in the same place.
  */
 function installedNextMajor(): number | undefined {
-  const bases = [join(process.cwd(), "next.config.js"), import.meta.url];
+  const script = process.argv[1] ?? "";
+  const runningNext = /[\\/]next[\\/]dist[\\/]bin[\\/]next(\.js)?$/.test(script) ? [script] : [];
+  const bases = [...runningNext, join(process.cwd(), "next.config.js"), import.meta.url];
   for (const base of bases) {
     try {
       const manifest: { version?: unknown } = createRequire(base)("next/package.json");

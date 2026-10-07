@@ -1,9 +1,10 @@
 /**
  * The Next.js guide's code blocks are type-checked from guide/ (see
- * scripts/typecheck-guide.mjs), which only proves something while guide/ and
- * the page agree. This holds them together in both directions: every ts/tsx
- * block on the page appears verbatim in a guide/ file, and every guide/ file
- * carries a block from the page.
+ * scripts/typecheck-guide.mjs and compat/), which only proves something while
+ * guide/ and the page agree. This holds them together in both directions:
+ * every ts/tsx block on the page is a guide/ file, and every guide/ file is a
+ * block from the page, exactly. Containment is not enough: a file could keep
+ * the block and add code, or a `// @ts-nocheck`, that changes what is checked.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
@@ -16,12 +17,19 @@ const page = resolve(packageRoot, "../../examples/docs-site/content/docs/next.md
 /** Files that set the fixture up rather than copy the page. */
 const SCAFFOLDING = new Set(["graft.config.ts"]);
 
-const normalize = (text: string) => text.replaceAll("\r\n", "\n");
+/** Line endings and trailing whitespace are not part of what a reader copies. */
+const normalize = (text: string) =>
+  text
+    .replaceAll("\r\n", "\n")
+    .replace(/[ \t]+$/gm, "")
+    .trimEnd();
 
 function codeBlocks(mdx: string): string[] {
   const blocks: string[] = [];
   const fence = /^```(ts|tsx)\n([\s\S]*?)^```$/gm;
-  for (const match of normalize(mdx).matchAll(fence)) blocks.push(match[2] ?? "");
+  for (const match of mdx.replaceAll("\r\n", "\n").matchAll(fence)) {
+    blocks.push(normalize(match[2] ?? ""));
+  }
   return blocks;
 }
 
@@ -38,6 +46,7 @@ const files = guideFiles(guideDir).map((path) => ({
   name: relative(guideDir, path).replaceAll("\\", "/"),
   source: normalize(readFileSync(path, "utf8")),
 }));
+const copies = files.filter((file) => !SCAFFOLDING.has(file.name));
 
 describe("the Next.js guide's code blocks", () => {
   it("are found on the page", () => {
@@ -45,16 +54,23 @@ describe("the Next.js guide's code blocks", () => {
   });
 
   it.each(blocks.map((block) => [block.split("\n")[0], block]))(
-    "each appears verbatim in guide/: %s",
+    "each is a guide/ file, exactly: %s",
     (_first, block) => {
-      expect(files.some((file) => file.source.includes(block))).toBe(true);
+      expect(copies.some((file) => file.source === block)).toBe(true);
     },
   );
 
-  it.each(files.filter((file) => !SCAFFOLDING.has(file.name)).map((file) => [file.name, file]))(
-    "guide/%s carries a block from the page",
+  it.each(copies.map((file) => [file.name, file]))(
+    "guide/%s is a block from the page, exactly",
     (_name, file) => {
-      expect(blocks.some((block) => file.source.includes(block))).toBe(true);
+      expect(blocks).toContain(file.source);
+    },
+  );
+
+  it.each(files.map((file) => [file.name, file]))(
+    "guide/%s does not switch the type checker off",
+    (_name, file) => {
+      expect(file.source).not.toMatch(/@ts-(nocheck|ignore|expect-error)/);
     },
   );
 });

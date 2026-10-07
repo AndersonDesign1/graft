@@ -129,6 +129,37 @@ describe("on Next 14/15, whose next/cache has no updateTag", () => {
   });
 });
 
+describe("on a React with no cache export (stable React 18)", () => {
+  it("still reads, without deduping", async () => {
+    vi.resetModules();
+    // Stable React 18 exports no `cache`. Only Next's bundled React has it.
+    vi.doMock("react", () => ({ cache: undefined }));
+    const { createGraft: create } = await import("./graft");
+    const pages = defineCollection({ name: "pages", fields: { title: field.string() } });
+    const row = {
+      branchId: "main",
+      collection: "pages",
+      slug: "home",
+      data: { title: "Home" },
+      body: "",
+      contentHash: "sha256:home",
+      sourcePath: "pages/home.mdx",
+      search: null,
+      deleted: false,
+      updatedAt: new Date("2026-10-07T00:00:00.000Z"),
+    };
+    const readContent = vi.fn(async () => [row]);
+    const graft = create({
+      index: { readContent, searchContent: async () => [], close: async () => {} },
+      collections: { pages },
+    });
+
+    expect((await graft.getContent("pages", "home"))?.data.title).toBe("Home");
+    await graft.getContent("pages", "home");
+    expect(readContent).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("createGraft type inference", () => {
   // The no-codegen contract must survive the React.cache wrappers: a schema
   // defined in graft.config.ts types every read in a Server Component. Assert

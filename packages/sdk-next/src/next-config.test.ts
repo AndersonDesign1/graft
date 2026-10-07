@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 // withGraft reads next/package.json to pick the externals key. The fake lets
 // one run cover every major. `undefined` falls through to the Next actually
@@ -81,6 +84,43 @@ describe("withGraft on Next 14", () => {
       "sharp",
       "@usegraft/registry",
     ]);
+  });
+});
+
+describe("withGraft run by a next binary", () => {
+  // A monorepo can hold several Next majors, and the working directory can
+  // resolve a different one than the binary loading the config. The binary
+  // wins. Here the workspace resolves its own Next while the binary is 14.
+  const root = mkdtempSync(join(tmpdir(), "graft-next-bin-"));
+  const nextDir = join(root, "node_modules", "next");
+  mkdirSync(join(nextDir, "dist", "bin"), { recursive: true });
+  writeFileSync(
+    join(nextDir, "package.json"),
+    JSON.stringify({ name: "next", version: "14.2.35" }),
+  );
+  writeFileSync(join(nextDir, "dist", "bin", "next"), "");
+  const argv1 = process.argv[1];
+
+  afterEach(() => {
+    process.argv[1] = argv1 ?? "";
+  });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it("reads the version of the Next that is running", () => {
+    process.argv[1] = join(nextDir, "dist", "bin", "next");
+    const config = withGraft();
+    expect(config.experimental?.serverComponentsExternalPackages).toEqual(["@usegraft/registry"]);
+    expect(config.serverExternalPackages).toBeUndefined();
+  });
+
+  it("falls back to the working directory when the script is not the next binary", () => {
+    process.argv[1] = join(root, "server.js");
+    const config = withGraft();
+    if (Number.parseInt(installed.version, 10) >= 15) {
+      expect(config.serverExternalPackages).toEqual(["@usegraft/registry"]);
+    } else {
+      expect(config.experimental?.serverComponentsExternalPackages).toEqual(["@usegraft/registry"]);
+    }
   });
 });
 

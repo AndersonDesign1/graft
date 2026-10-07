@@ -1,9 +1,12 @@
 import { createActorResolver } from "@usegraft/auth";
 
+// A dev token never expires, so it is accepted only outside production.
+const devToken = process.env.NODE_ENV === "production" ? undefined : process.env.GRAFT_DEV_TOKEN;
+
 export const actor = createActorResolver({
-  devTokens: process.env.GRAFT_DEV_TOKEN
+  devTokens: devToken
     ? {
-        [process.env.GRAFT_DEV_TOKEN]: {
+        [devToken]: {
           kind: "human",
           id: "owner",
           scopes: ["content:write", "submissions:admin"],

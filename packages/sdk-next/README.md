@@ -73,7 +73,7 @@ Both turn a compile's `ChangeSet` into the exact `revalidateTag` / `updateTag` c
 
 ## Supported versions
 
-Next.js 14, 15 and 16 with the App Router, on React 18 (Next.js 14) or React 19. CI runs the tests and the type-check against each major.
+Next.js 14.2, 15 and 16 with the App Router, on React 18 (Next.js 14.2) or React 19. CI runs the tests and the type-check against each major.
 
 ---
 

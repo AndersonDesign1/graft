@@ -1,8 +1,16 @@
 import { revalidateContent, type ChangeSet } from "@usegraft/sdk-next";
 
+const isStrings = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string");
+
 function isChangeSet(value: unknown): value is ChangeSet {
   const v = value as Partial<ChangeSet> | null;
-  return Array.isArray(v?.added) && Array.isArray(v?.changed) && Array.isArray(v?.removed);
+  return (
+    isStrings(v?.added) &&
+    isStrings(v?.changed) &&
+    isStrings(v?.removed) &&
+    typeof v?.unchanged === "number"
+  );
 }
 
 export async function POST(request: Request) {
@@ -12,10 +20,11 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  if (!isChangeSet(body?.changes)) {
+  const branch = body?.branch ?? "main";
+  if (typeof branch !== "string" || !isChangeSet(body?.changes)) {
     return Response.json({ error: "Send { branch, changes }." }, { status: 400 });
   }
 
-  const tags = revalidateContent(body.branch ?? "main", body.changes);
+  const tags = revalidateContent(branch, body.changes);
   return Response.json({ revalidated: tags });
 }
