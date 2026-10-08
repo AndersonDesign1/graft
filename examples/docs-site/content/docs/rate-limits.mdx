@@ -95,7 +95,9 @@ header, the end your proxies write to, and uses the address your outermost
 proxy saw.
 
 This holds only if each counted proxy **appends** the address it received the
-request from to `x-forwarded-for` (or replaces the header with it). nginx with
+request from to `x-forwarded-for`. With a single proxy, replacing the header
+with that address works too. With several, each must append, or the entries
+Graft counts back through are lost. nginx with
 `$proxy_add_x_forwarded_for`, and the major CDNs, do this. A proxy that passes
 the header through unchanged leaves the client's own text at the end, and a
 client can then pick its own limit. Do not count a proxy you do not control,

@@ -66,8 +66,10 @@ Some prompts also carry this project's working rules, where they apply:
   not a live edit, and never to run `graft migrate --apply` without asking.
   Applying is your decision.
 
-No prompt covers approvals, and none needs to: a destructive call stops for a
-person's approval on the server, whatever the agent was told.
+No prompt covers approvals, and none needs to: over MCP, a destructive call
+stops for a person's approval on the server, whatever the agent was told. The
+`"unattended"` approval policy, which removes that wait, applies to HTTP
+function calls only, never to MCP.
 
 `fix-error` with a code Graft does not know says so, and points the agent at
 `explain_error` to list the codes it does know. When the general explanation

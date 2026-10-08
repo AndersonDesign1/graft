@@ -121,9 +121,10 @@ compiles and serves without Git.
 
 ## Revert from a compilation
 
-Every compile records the Git commit that was checked out when it ran. In
-History you can pick a past compile and restore your content to that commit.
-Studio restores the files and recompiles.
+Every compile in a Git repository records the commit that was checked out when
+it ran. In History you can pick such a compile and restore your content to that
+commit. Studio restores the files and recompiles. A compile outside Git, or
+before the first commit, records no commit, so it cannot be restored this way.
 
 A compile can include uncommitted edits, and the recorded commit does not
 contain them. Restoring such a compile gives you the commit, not the exact

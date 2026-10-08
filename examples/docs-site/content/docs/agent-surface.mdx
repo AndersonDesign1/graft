@@ -61,8 +61,8 @@ checks as a person using the CLI or your app:
 - **Functions apply their own rules.** `run_function` goes through the same
   handler as `POST /api/fn/<name>`, so access rules, rate limits, and the
   audit log apply exactly as they do for your app's users.
-- **Deletes wait for a human.** If the server has opted into asking in-band
-  and the agent's client supports it, the client asks you to confirm and the
+- **Deletes wait for a human.** If a local `graft mcp` server (stdio) has
+  opted into asking in-band and the agent's client supports it, the client asks you to confirm and the
   delete completes in one call. Otherwise the first `delete_content` call files
   an approval request and stops. A person approves it with `graft approve`, and
   only then does the agent's retry succeed. See

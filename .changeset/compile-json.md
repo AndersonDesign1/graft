@@ -12,7 +12,7 @@ result or calling `compile()` from `@usegraft/compiler`. The new output is the
 body a revalidate route reads, so a deploy script can pipe it on:
 
 ```sh
-graft compile --json | curl --fail -X POST -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" -H "content-type: application/json" --data-binary @- https://example.com/api/revalidate
+graft compile --json | curl --fail-with-body -X POST -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" -H "content-type: application/json" --data-binary @- https://example.com/api/revalidate
 ```
 
 postgres-js prints server notices with `console.log`, so while a `--json`

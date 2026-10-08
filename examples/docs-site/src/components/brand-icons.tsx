@@ -1,7 +1,8 @@
 /**
  * Brand marks for the "Open in" actions. The paths are the OpenAI and
  * Anthropic marks as fumadocs-ui ships them for its own page actions, so its
- * license travels with them:
+ * license travels with them, here and in the deployed site at
+ * /third-party-notices.txt (public/third-party-notices.txt):
  *
  * MIT License
  *

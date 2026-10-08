@@ -21,7 +21,9 @@ describe("tag builders", () => {
     const long = "a".repeat(300);
     const tag = documentTag("main", "pages", long);
 
-    expect(tag.length).toBeLessThanOrEqual(MAX_TAG_LENGTH);
+    // Next's own limit, written out: raising MAX_TAG_LENGTH must fail here.
+    expect(MAX_TAG_LENGTH).toBe(256);
+    expect(tag.length).toBeLessThanOrEqual(256);
     expect(tag.startsWith("graft:main:pages:aaa")).toBe(true);
     // Reads and invalidation both build it here, so they must agree.
     expect(documentTag("main", "pages", long)).toBe(tag);

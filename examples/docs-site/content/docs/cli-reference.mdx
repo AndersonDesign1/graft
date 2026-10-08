@@ -111,8 +111,10 @@ Graft reads `.env` from the current folder or any folder above it.
 
 - **Static engine:** `graft compile`, `graft dev`, and `graft mcp` need no
   database. The index is written to `.graft/index.db`.
-- **Postgres engine:** `DATABASE_URL` is required for every command when
-  `graft.config.ts` sets `index = "postgres"`.
+- **Postgres engine:** when `graft.config.ts` sets `index = "postgres"`,
+  every command that reads or writes the index needs `DATABASE_URL`, including
+  `graft compile`, `graft dev`, and `graft mcp`. `graft init`, `graft add`,
+  and `graft asset put` never need it.
 - **On either engine,** these always need `DATABASE_URL`: `graft db migrate`,
   `graft branch`, `graft merge`, `graft serve`, `graft studio`,
   `graft content`, `graft compilations`, `graft approvals`, `graft approve`,

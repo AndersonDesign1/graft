@@ -127,10 +127,10 @@ approval before it runs:
 An approval works once, and only for the exact input that was approved.
 
 The approval policy in `graft.config.ts` changes who waits. `"human"` gates
-every mutation, not only destructive ones. `"unattended"` gates nothing, so
-destructive functions run straight away. It exists for scheduled jobs with no
-person behind them. Every call is still audited either way. See
-[Audit & approvals](/docs/audit-and-approvals).
+every mutation, not only destructive ones. `"unattended"` applies to HTTP calls
+only: there it gates nothing, so destructive functions run straight away. It
+exists for scheduled jobs with no person behind them. Over MCP, destructive
+calls still wait for a person. Every call is audited either way.
 [Audit & approvals](/docs/audit-and-approvals) covers the details, including
 asking for approval from inside an agent's session.
 
