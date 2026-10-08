@@ -364,12 +364,14 @@ kbd {
   font-size: inherit !important;
 }
 
-/* The end padding leaves room for the copy button, so the first line never
-   runs under it. */
+/* The scrolling viewport stops short of the copy button: the end margin is
+   outside the scroller, so a long line is clipped before the button rather
+   than running under it. (Padding would sit inside the scroller and only add
+   trailing scroll space.) */
 .prose pre.shiki > code {
-  padding: var(--space-4) calc(var(--space-5) + 2rem) var(--space-4) var(--space-5) !important;
+  padding: var(--space-4) 0 var(--space-4) var(--space-5) !important;
+  margin-inline-end: calc(2rem + 2 * var(--space-2));
   overflow-x: auto;
-  border-radius: inherit !important;
 }
 
 /* Copy — a quiet square in the corner that lights on hover or focus. On a

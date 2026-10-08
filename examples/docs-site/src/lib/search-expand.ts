@@ -43,6 +43,18 @@ export function buildVocabulary(texts: Iterable<string>): Vocabulary {
     .map(([word]) => word);
 }
 
+/** Endings the stemmer folds together, longest first. */
+const INFLECTIONS = /(?:ings|ing|ions|ion|ed|es|e|s)$/;
+
+/**
+ * A rough stand-in for the porter stem, enough to tell that two completions
+ * would match the same pages. It only has to group the common inflections;
+ * when it misses a pair, a slot goes to a duplicate, nothing worse.
+ */
+function inflectionKey(word: string): string {
+  return word.length > 4 ? word.replace(INFLECTIONS, "") : word;
+}
+
 /**
  * The query with its last word widened to the words it could become.
  *
@@ -65,8 +77,15 @@ export function expandQuery(query: string, vocabulary: Vocabulary): string {
 
   const typed = last.toLowerCase();
   const completions: string[] = [];
+  const seen = new Set([inflectionKey(typed)]);
   for (const word of vocabulary) {
-    if (word !== typed && word.startsWith(typed)) completions.push(word);
+    if (!word.startsWith(typed)) continue;
+    // "migrate", "migration" and "migrations" match the same pages once
+    // stemmed, so only the first spends one of the slots.
+    const key = inflectionKey(word);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    completions.push(word);
     if (completions.length === MAX_COMPLETIONS) break;
   }
   if (completions.length === 0) return query;

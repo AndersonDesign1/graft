@@ -28,11 +28,21 @@ const CACHED = {
  * always a word some page contains.
  */
 let vocabulary: Promise<Vocabulary> | null = null;
+
+/** Every string in a document's frontmatter: the index searches all of them. */
+function strings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(strings);
+  if (typeof value === "object" && value !== null) return Object.values(value).flatMap(strings);
+  return [];
+}
 function docsVocabulary(): Promise<Vocabulary> {
   if (vocabulary) return vocabulary;
   const building = getGraft()
     .listContent("docs")
-    .then((docs) => buildVocabulary(docs.flatMap((doc) => [doc.data.title, doc.body])))
+    .then((docs) =>
+      buildVocabulary(docs.flatMap((doc) => [doc.slug, ...strings(doc.data), doc.body])),
+    )
     .catch((error: unknown) => {
       // Do not cache a failure: the next request tries again.
       vocabulary = null;

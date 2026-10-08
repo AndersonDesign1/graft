@@ -25,7 +25,12 @@ describe("expandQuery", () => {
   });
 
   it("keeps the earlier words in every alternative", () => {
-    expect(expandQuery("run migr", vocabulary)).toBe("run migr or run migration or run migrations");
+    expect(expandQuery("set conf", vocabulary)).toBe("set conf or set config or set configuration");
+  });
+
+  it("spends one slot per stem, not one per inflection", () => {
+    const words = buildVocabulary(["migrate migrated migration migrations migrator"]);
+    expect(expandQuery("migr", words)).toBe("migr or migrate or migrator");
   });
 
   it("leaves a finished word that completes to nothing alone", () => {
