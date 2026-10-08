@@ -183,14 +183,22 @@ const want = (runner) => (EPHEMERAL.has(runner) ? "@latest" : "");
  * untouched. An installer takes any number of packages, and each one follows
  * the rule. Ephemeral runners are left to INSTALL: the first package is the one
  * they run, and anything after it is that program's arguments.
+ *
+ * The run starts only where a command does: at the start of a line (after an
+ * optional `$ ` prompt), after an opening backtick, or after `&&`. A bare
+ * "npm i" in the middle of a sentence is prose, and the words after it ("then
+ * read @usegraft/db@0.3.0 in the changelog") are not its arguments.
  */
 const INSTALLER_RUN = new RegExp(
-  String.raw`(?:${RUNNERS.filter((runner) => !EPHEMERAL.has(runner))
+  String.raw`(?<=^[ \t]*(?:\$[ \t]+)?|\x60|&&[ \t]*)(?:${RUNNERS.filter(
+    (runner) => !EPHEMERAL.has(runner),
+  )
     .sort((a, b) => b.length - a.length)
     .join("|")})(?:[ \t]+[^\s\x60]+)+`,
-  "g",
+  "gm",
 );
-const TAGGED_PACKAGE = /(@usegraft\/[a-z-]+)@[a-z0-9.-]+/g;
+/** A package with any tag or range after it: `@beta`, `@1.0.0`, `@^1.0.0`, `@>=1`. */
+const TAGGED_PACKAGE = /(@usegraft\/[a-z-]+)@[~^<>=]*[a-z0-9.*-]+/g;
 
 /** Apply the rule to one blob of text, in both spellings of a command. */
 const retag = (text) =>
@@ -236,6 +244,13 @@ const CASES = [
     "npm i -D @usegraft/cli tsx @usegraft/mcp",
   ],
   ["pnpm add @usegraft/core @usegraft/db@1.0.0", "pnpm add @usegraft/core @usegraft/db"],
+  // Ranges are tags too, on any package in the run.
+  ["npm i @usegraft/core @usegraft/db@^1.0.0", "npm i @usegraft/core @usegraft/db"],
+  [
+    "cd app && pnpm add @usegraft/core @usegraft/db@~1.2",
+    "cd app && pnpm add @usegraft/core @usegraft/db",
+  ],
+  ["$ npm i @usegraft/core @usegraft/db@>=1", "$ npm i @usegraft/core @usegraft/db"],
   // The run ends at the inline code span. Prose after it is not the command.
   [
     "`npm i @usegraft/core` then read @usegraft/core@0.2.0",
@@ -252,6 +267,16 @@ const CASES = [
   // Prose naming a package is not a command, and must survive untouched.
   ["the @usegraft/cli package", "the @usegraft/cli package"],
   ["read @usegraft/core@0.2.0 changelog", "read @usegraft/core@0.2.0 changelog"],
+  // An installer named mid-sentence is prose too: the words after it are not
+  // its arguments.
+  [
+    "Install with npm i @usegraft/core, then read @usegraft/db@0.3.0 in the changelog.",
+    "Install with npm i @usegraft/core, then read @usegraft/db@0.3.0 in the changelog.",
+  ],
+  [
+    "We tested npm install @usegraft/sdk-next with Next 15 and @usegraft/cli@0.2.0.",
+    "We tested npm install @usegraft/sdk-next with Next 15 and @usegraft/cli@0.2.0.",
+  ],
 ];
 
 function selfTest() {

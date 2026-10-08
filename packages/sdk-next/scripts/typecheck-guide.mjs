@@ -16,18 +16,15 @@ import { fileURLToPath } from "node:url";
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const { version } = createRequire(import.meta.url)("next/package.json");
 const major = Number.parseInt(version, 10);
-const project = fileURLToPath(
-  new URL(
-    major >= 16 ? "../guide/tsconfig.next16.json" : "../guide/tsconfig.json",
-    import.meta.url,
-  ),
-);
+// Relative to packageRoot, the command's working directory. The command goes
+// through a shell, so it holds only these fixed strings and never the
+// checkout's own path, which could contain characters the shell expands.
+const project = major >= 16 ? "guide/tsconfig.next16.json" : "guide/tsconfig.json";
 
 console.log(`Type-checking the Next.js guide against next@${version} (${project})`);
 // Through pnpm so the workspace's `tsc` runs, not one on the PATH, and with
-// shell: true so the shim resolves on Windows. The only argument that varies
-// is a path built above, quoted for the shell.
-const result = spawnSync(`pnpm exec tsc --noEmit -p ${JSON.stringify(project)}`, {
+// shell: true so the shim resolves on Windows.
+const result = spawnSync(`pnpm exec tsc --noEmit -p ${project}`, {
   cwd: packageRoot,
   stdio: "inherit",
   shell: true,
