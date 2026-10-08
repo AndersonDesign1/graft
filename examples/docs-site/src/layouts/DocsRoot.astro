@@ -60,5 +60,37 @@ const ogImageUrl = ogImage ? new URL(ogImage, Astro.site ?? "https://graft.page"
         browser's focus starting point there, so Tab continues in the page. */}
     <a href="#nd-page" class="skip-link">Skip to content</a>
     <slot />
+    <script>
+      // Copy buttons on code fences (components/mdx/Pre.tsx). The body is
+      // static HTML, so one listener on the document answers every button,
+      // including any rendered after it was attached.
+      const timers = new WeakMap<HTMLElement, number>();
+      document.addEventListener("click", async (event) => {
+        if (!(event.target instanceof Element)) return;
+        const button = event.target.closest<HTMLElement>("[data-copy-code]");
+        const pre = button?.closest("pre");
+        const code = pre?.querySelector("code");
+        const status = pre?.querySelector("[data-copy-status]");
+        if (!button || !code) return;
+        clearTimeout(timers.get(button));
+        const report = (state: "done" | "failed" | null, message: string) => {
+          if (state) button.dataset.state = state;
+          else delete button.dataset.state;
+          // The status is a live region, so screen readers hear the result.
+          if (status) status.textContent = message;
+        };
+        try {
+          await navigator.clipboard.writeText(code.textContent ?? "");
+          report("done", "Copied");
+          timers.set(
+            button,
+            window.setTimeout(() => report(null, ""), 2000),
+          );
+        } catch {
+          // A failure stays until the next click, so it cannot be missed.
+          report("failed", "Copy failed");
+        }
+      });
+    </script>
   </body>
 </html>
