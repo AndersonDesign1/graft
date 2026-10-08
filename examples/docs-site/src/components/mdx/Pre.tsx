@@ -23,7 +23,13 @@ export function Pre({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
   return (
     <pre {...props}>
       {children}
-      <button type="button" className="copy-code" data-copy-code aria-label="Copy code">
+      <button
+        type="button"
+        className="copy-code"
+        data-copy-code
+        aria-label="Copy code"
+        title="Copy code"
+      >
         <Copy {...ICON} className="copy-code-idle" />
         <Check {...ICON} className="copy-code-done" />
       </button>
