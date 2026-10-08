@@ -34,7 +34,7 @@ error's `fix` says what to change.
   Run graft compile and fix anything it reports."
 </Callout>
 
-## Next release
+## 1.0.0-beta.3
 
 **`@usegraft/sdk-next` needs Next.js 15.5.24 or 16.3.3 or newer.** Those are
 the first releases with fixes for the critical Next.js security advisories
@@ -43,6 +43,14 @@ published in 2026. Older 15.x releases are refused by the peer range.
 **What to do:** upgrade Next.js. On 15, `npm i next@15` installs the latest
 15.x. Next.js 14 is not supported: it no longer gets security fixes, and those
 advisories are still open on it.
+
+**`graft asset put` refuses a key that already holds a file.** It used to
+replace the stored file, and the store keeps no history, so the old file was
+gone. It now fails with `ASSET_EXISTS`, the same error the MCP `put_asset` tool
+returns.
+
+**What to do:** if a script uploads to the same key on purpose, add
+`--overwrite`. Otherwise give each upload a new key.
 
 ## 1.0.0-beta.1 and 1.0.0-beta.2
 
