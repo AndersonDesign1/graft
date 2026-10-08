@@ -10,30 +10,30 @@ import type { TOCItemType } from "fumadocs-core/toc";
 import { DocsLayout } from "fumadocs-ui/layouts/notebook";
 import { DocsBody, DocsPage, DocsTitle } from "fumadocs-ui/layouts/notebook/page";
 import { RootProvider } from "fumadocs-ui/provider/astro";
+import { Check, Copy, FileText, History, MessageSquareWarning, SquarePen } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { docSourcePath } from "../lib/doc-source";
+import { AnthropicMark, OpenAIMark } from "./brand-icons";
 import { PoweredByGraft } from "./powered-by-graft";
 import SearchDialog from "./search";
 
 const REPO = "https://github.com/AndersonDesign1/graft";
+const SITE = "https://graft.page";
+
+/** Icons in the page chrome: one size, one stroke, decorative to readers. */
+const ICON = { size: 15, strokeWidth: 1.75, "aria-hidden": true } as const;
 
 /**
- * Where a page's words live. Every doc is an MDX file, except the error
- * reference, which is generated from the error registry. Pointing its edit
- * link at the generated file would invite an edit the next regeneration erases.
+ * Reading actions under the lede: take the page as Markdown, or hand it to an
+ * assistant with a ready prompt. The prompt names the page's URL so the
+ * assistant reads the current docs, not whatever it remembers about Graft.
  */
-function sourcePath(slug: string): string {
-  return slug === "errors"
-    ? "packages/mcp/src/explain.ts"
-    : `examples/docs-site/content/docs/${slug}.mdx`;
-}
-
-/**
- * Copy as Markdown, view the Markdown, edit on GitHub, report a problem.
- * Edits open against feat/core, the branch every change lands on.
- */
-function DocActions({ slug, title }: { slug: string; title: string }) {
+function DocActions({ slug }: { slug: string }) {
   const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
   const markdownHref = `/docs/${slug}.md`;
+  const prompt = `Read from this URL: ${SITE}/docs/${slug} and explain it to me.`;
+  const chatgpt = `https://chatgpt.com/?${new URLSearchParams({ hints: "search", prompt })}`;
+  const claude = `https://claude.ai/new?${new URLSearchParams({ q: prompt })}`;
 
   async function copyMarkdown() {
     try {
@@ -41,44 +41,91 @@ function DocActions({ slug, title }: { slug: string; title: string }) {
       if (!response.ok) throw new Error(String(response.status));
       await navigator.clipboard.writeText(await response.text());
       setCopied("done");
+      setTimeout(() => setCopied("idle"), 2000);
     } catch {
+      // A failure stays until the next click, so it cannot be missed.
       setCopied("failed");
     }
-    setTimeout(() => setCopied("idle"), 2000);
   }
 
+  return (
+    <div className="doc-actions">
+      <button type="button" onClick={copyMarkdown} aria-live="polite" data-state={copied}>
+        {copied === "done" ? <Check {...ICON} /> : <Copy {...ICON} />}
+        {copied === "done" ? "Copied" : copied === "failed" ? "Copy failed" : "Copy page"}
+      </button>
+      <a href={markdownHref}>
+        <FileText {...ICON} />
+        View as Markdown
+      </a>
+      <a href={chatgpt} target="_blank" rel="noreferrer">
+        <OpenAIMark width={14} height={14} />
+        Open in ChatGPT
+        <span className="sr-only"> (opens in a new tab)</span>
+      </a>
+      <a href={claude} target="_blank" rel="noreferrer">
+        <AnthropicMark width={14} height={14} />
+        Open in Claude
+        <span className="sr-only"> (opens in a new tab)</span>
+      </a>
+    </div>
+  );
+}
+
+/** "Oct 8, 2026", the same on the server and in every reader's time zone. */
+const DATE = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/**
+ * When the page last changed, and the two ways to change it: edit the source,
+ * or report what is wrong. Lives beside the contents on wide screens and at
+ * the end of the article when the contents rail is hidden. Edits open
+ * against feat/core, the branch every change lands on.
+ */
+function PageMeta({
+  slug,
+  title,
+  updated,
+  className,
+}: {
+  slug: string;
+  title: string;
+  updated?: string;
+  className: string;
+}) {
   const issue = new URL(`${REPO}/issues/new`);
   issue.searchParams.set("title", `Docs: ${title}`);
   issue.searchParams.set(
     "body",
-    `Page: https://graft.page/docs/${slug}
+    `Page: ${SITE}/docs/${slug}
 
 What is wrong or missing:
 `,
   );
 
   return (
-    <div className="doc-actions">
-      <button type="button" onClick={copyMarkdown} aria-live="polite" data-state={copied}>
-        {copied === "done" && (
-          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path
-              d="M3.5 8.5l3 3 6-7"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        )}
-        {copied === "done" ? "Copied" : copied === "failed" ? "Copy failed" : "Copy as Markdown"}
-      </button>
-      <a href={markdownHref}>View as Markdown</a>
-      <a href={`${REPO}/edit/feat/core/${sourcePath(slug)}`} target="_blank" rel="noreferrer">
+    <div className={`doc-meta ${className}`}>
+      {updated && (
+        <p className="doc-meta-updated">
+          <History {...ICON} />
+          <span>
+            Last updated <time dateTime={updated}>{DATE.format(new Date(updated))}</time>
+          </span>
+        </p>
+      )}
+      <a href={`${REPO}/edit/feat/core/${docSourcePath(slug)}`} target="_blank" rel="noreferrer">
+        <SquarePen {...ICON} />
         Edit this page
+        <span className="sr-only"> (opens in a new tab)</span>
       </a>
       <a href={issue.href} target="_blank" rel="noreferrer">
+        <MessageSquareWarning {...ICON} />
         Report a problem
+        <span className="sr-only"> (opens in a new tab)</span>
       </a>
     </div>
   );
@@ -94,6 +141,7 @@ export function DocsShell({
   section,
   lede,
   minutes,
+  updated,
   children,
 }: {
   tree: Root;
@@ -108,6 +156,8 @@ export function DocsShell({
   lede?: string;
   /** Estimated reading time, in whole minutes. */
   minutes: number;
+  /** ISO date of the source's last commit, when git history is available. */
+  updated?: string;
   children: ReactNode;
 }) {
   return (
@@ -132,14 +182,7 @@ export function DocsShell({
               <span className="font-serif text-lg md:text-xl">
                 graft<b style={{ color: "var(--mark)" }}>.</b> docs
               </span>
-              <span
-                className="self-center rounded px-1.5 py-0.5 font-mono text-xs uppercase tracking-wider"
-                style={{
-                  color: "var(--mark)",
-                  border: "1px solid color-mix(in oklch, var(--mark) 35%, transparent)",
-                  background: "color-mix(in oklch, var(--mark) 10%, transparent)",
-                }}
-              >
+              <span className="wordmark-badge self-center rounded px-1.5 py-0.5 font-mono text-xs uppercase tracking-wider">
                 beta
               </span>
             </span>
@@ -157,7 +200,14 @@ export function DocsShell({
         ]}
         githubUrl="https://github.com/AndersonDesign1/graft"
       >
-        <DocsPage toc={toc}>
+        <DocsPage
+          toc={toc}
+          tableOfContent={{
+            footer: (
+              <PageMeta slug={slug} title={title} updated={updated} className="doc-meta-rail" />
+            ),
+          }}
+        >
           <header className="doc-header">
             <p className="doc-eyebrow">
               <span>{section}</span>
@@ -168,9 +218,10 @@ export function DocsShell({
             {/* The lede is the page's kicker, rendered from the repository's own
                 MDX at build time, so it is trusted HTML (inline code, links). */}
             {lede && <p className="doc-lede" dangerouslySetInnerHTML={{ __html: lede }} />}
-            <DocActions slug={slug} title={title} />
+            <DocActions slug={slug} />
           </header>
           <DocsBody>{children}</DocsBody>
+          <PageMeta slug={slug} title={title} updated={updated} className="doc-meta-end" />
           <div className="powered-by-graft-docs">
             <PoweredByGraft />
           </div>

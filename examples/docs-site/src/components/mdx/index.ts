@@ -13,6 +13,7 @@ import { DocCard, DocCards } from "./DocCards";
 import { FieldTable } from "./FieldTable";
 import { InlineCode } from "./InlineCode";
 import { Step, Steps } from "./Steps";
+import { Table } from "./Table";
 import { Tab, Tabs } from "./Tabs";
 import { TierBadge } from "./TierBadge";
 
@@ -28,4 +29,5 @@ export const mdxComponents = {
   Tabs,
   TierBadge,
   code: InlineCode,
+  table: Table,
 };
