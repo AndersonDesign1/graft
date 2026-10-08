@@ -62,14 +62,18 @@ Pass `trust="full"` only when every author of the repository has commit access, 
 ```ts
 import { revalidateContent, updateContent } from "@usegraft/sdk-next";
 
-// in a route handler, after a compile webhook
+// in your own route handler, called with a compile's change list
 revalidateContent(branch, changes);
 
-// in a Server Action, for read-your-own-writes
+// in a Server Action, for read-your-own-writes (Next.js 16 only)
 updateContent(branch, changes);
 ```
 
-Both turn a compile's `ChangeSet` into the exact `revalidateTag` / `updateTag` calls that refresh the changed pages, and no others. A no-op unless your reads were cached with `'use cache'` and `cacheTag`, but always safe to call.
+Both turn a compile's `ChangeSet` into the exact `revalidateTag` / `updateTag` calls that refresh the changed pages, and no others. A no-op unless your reads were tagged, but always safe to call. On Next.js 16, tag reads with `'use cache'` and `cacheTag`. On Next.js 15, wrap them in `unstable_cache` with `tags: tagsFor(...)`. `updateContent` needs Next.js 16 and throws on older versions. Use `revalidateContent` there.
+
+## Supported versions
+
+Next.js 15.5.24 and later 15.x, and 16.3.3 and later, with the App Router and React 19. Those are the first releases with the fixes for the critical Next.js advisories published in 2026. CI builds and serves a real app on each major. Next.js 14 is not supported: it no longer gets security fixes, and it has open critical advisories.
 
 ---
 

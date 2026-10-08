@@ -10,12 +10,18 @@
  * Next 16's `'use cache'` is a compile-time directive an app authors, so this
  * package can't generate it. Instead it ships the tag helpers (re-exported from
  * sdk-core — `tagsFor`, `documentTag`, `collectionTag`) that an app drops into
- * `cacheTag(...)` inside its own `'use cache'` functions, plus the write side:
+ * `cacheTag(...)` inside its own `'use cache'` functions (Next 16), or into
+ * `unstable_cache(fn, keys, { tags })` (Next 15), plus the write side:
  * `revalidateContent` / `updateContent`, which turn a compile's `ChangeSet`
  * into the exact `revalidateTag` / `updateTag` calls that refresh only the
  * changed pages. See the example app's llms.txt for the composition.
+ *
+ * Supports Next 15 and 16. `next/cache` differs between them, so it is read
+ * through a namespace and feature-detected at call time: a named import of
+ * `updateTag` (Next 16 only) is an import of a missing export on 15.
  */
-import { revalidateTag, updateTag } from "next/cache";
+import { GraftError } from "@usegraft/contracts";
+import * as nextCache from "next/cache";
 import { cache } from "react";
 import { createDbClient, type DbClientOptions } from "@usegraft/sdk-core/db";
 import {
@@ -111,15 +117,31 @@ export function createGraft<TCollections extends Record<string, AnyCollection>>(
 export type RevalidateProfile = string | { expire?: number };
 
 /**
+ * The part of `next/cache` this module calls, typed loosely enough that 15
+ * and 16 both satisfy it: 15 declares `revalidateTag(tag)`, 16 declares
+ * `revalidateTag(tag, profile)` and adds `updateTag`. Reading through a typed
+ * value rather than named imports also keeps bundlers from checking `updateTag`
+ * as a static export on versions that lack it.
+ */
+interface NextCacheApi {
+  revalidateTag: (tag: string, profile: RevalidateProfile) => void;
+  updateTag?: (tag: string) => void;
+}
+
+const nextCacheApi: NextCacheApi = nextCache;
+
+/**
  * Background-invalidate the Data Cache for everything a compile changed, on
- * `branch`. Call it from a **route handler** (a compile webhook): the next
- * request triggers a background refresh (stale-while-revalidate). Refreshes
- * only the changed pages — per-doc + per-collection tags — and returns them.
+ * `branch`. Call it from a **route handler** (your own route, called with a
+ * compile's change list): the next request triggers a background refresh
+ * (stale-while-revalidate). Refreshes only the changed pages — per-doc +
+ * per-collection tags — and returns them.
  *
  * `profile` is Next 16's required cache-life argument to `revalidateTag`
  * (a built-in name like `"max"`/`"hours"` or `{ expire }`); defaults to `"max"`.
- * A no-op unless the reads were cached with `'use cache'` + `cacheTag`, but
- * always safe to call.
+ * Next 15 takes the tag alone and ignores a second argument, so it is passed
+ * on every version. A no-op unless the reads were tagged (`'use cache'` +
+ * `cacheTag`, or `unstable_cache` with `tags`), but always safe to call.
  */
 export function revalidateContent(
   branch: string,
@@ -127,7 +149,7 @@ export function revalidateContent(
   profile: RevalidateProfile = "max",
 ): string[] {
   const tags = tagsForChanges(branch, changes);
-  for (const tag of tags) revalidateTag(tag, profile);
+  for (const tag of tags) nextCacheApi.revalidateTag(tag, profile);
   return tags;
 }
 
@@ -137,8 +159,20 @@ export function revalidateContent(
  * in-app "publish" that compiles then updates): the same request sees fresh
  * content. Returns the tags it hit. Like `revalidateContent`, a no-op unless
  * the reads were cached with `'use cache'` + `cacheTag`.
+ *
+ * Needs Next 16, the release that added `updateTag`. On 15 it throws before
+ * touching any tag, and the error names `revalidateContent` as the fallback.
  */
 export function updateContent(branch: string, changes: ChangeSet): string[] {
+  const { updateTag } = nextCacheApi;
+  if (typeof updateTag !== "function") {
+    throw new GraftError({
+      code: "FRAMEWORK_VERSION_UNSUPPORTED",
+      message: "updateContent needs Next.js 16. This version of next/cache has no updateTag.",
+      fix: "Call revalidateContent(branch, changes) instead. It works on Next.js 15 and 16 and refreshes on the next request rather than this one. Or upgrade to Next.js 16.",
+      details: { missing: "next/cache updateTag", fallback: "revalidateContent" },
+    });
+  }
   const tags = tagsForChanges(branch, changes);
   for (const tag of tags) updateTag(tag);
   return tags;

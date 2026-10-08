@@ -252,6 +252,16 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       'Upgrade Node to 22.16+ (24 LTS recommended), or switch the project to the Postgres index (DATABASE_URL + `export const index = "postgres"`).',
   },
+  FRAMEWORK_VERSION_UNSUPPORTED: {
+    code: "FRAMEWORK_VERSION_UNSUPPORTED",
+    meaning:
+      "An adapter API needs a newer version of the framework than the app has installed. The rest of the adapter still works.",
+    typicalCauses: [
+      "Calling `updateContent` from @usegraft/sdk-next on Next.js 15. It needs `updateTag`, which Next.js added in 16",
+    ],
+    howToRecover:
+      "Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 15 and 16. Or upgrade the framework.",
+  },
   SLUG_NOT_UNIQUE: {
     code: "SLUG_NOT_UNIQUE",
     meaning: "Two documents in the same collection resolve to the same slug.",
