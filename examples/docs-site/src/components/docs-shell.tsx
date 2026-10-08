@@ -156,7 +156,7 @@ export function DocsShell({
   lede?: string;
   /** Estimated reading time, in whole minutes. */
   minutes: number;
-  /** ISO date of the source's last commit, when git history is available. */
+  /** ISO date the page's content last changed, from the compiled index. */
   updated?: string;
   children: ReactNode;
 }) {

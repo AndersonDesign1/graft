@@ -6,9 +6,7 @@
  */
 import { DocsShell } from "../../components/docs-shell";
 import DocsRoot from "../../layouts/DocsRoot.astro";
-import { docSourcePath } from "../../lib/doc-source";
 import { getGraft } from "../../lib/graft";
-import { lastUpdated } from "../../lib/last-updated";
 import { renderMdx } from "../../lib/mdx";
 import { docsPageTree } from "../../lib/nav";
 import { extractHeadings } from "../../lib/search-results";
@@ -55,8 +53,13 @@ const body = lede === undefined ? bodyHtml : bodyHtml.replace(KICKER, "");
 /** Reading time from the prose, at a plain 230 words a minute, code included. */
 const minutes = Math.max(1, Math.round(doc.body.split(/\s+/).filter(Boolean).length / 230));
 
-/** When the source last changed in git, or nothing if history is unavailable. */
-const updated = lastUpdated(docSourcePath(doc.slug))?.toISOString();
+/**
+ * When the page's content last changed. The compiled index sets a row's
+ * updatedAt only when its content changes, and the index is committed, so
+ * this is the same date on every build. (Git history was tried first and is
+ * not available in the hosting build's checkout.)
+ */
+const updated = doc.updatedAt.toISOString();
 ---
 
 <DocsRoot
