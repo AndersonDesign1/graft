@@ -334,6 +334,10 @@ kbd {
 }
 
 .prose pre.shiki {
+  /* The copy button's size and inset. The code's clip edge is derived from
+     these too, so the two cannot drift apart. */
+  --copy-size: 2rem;
+  --copy-inset: var(--space-2);
   position: relative;
   background: var(--paper-sunken) !important;
   border: 1px solid var(--hairline);
@@ -370,7 +374,7 @@ kbd {
    trailing scroll space.) */
 .prose pre.shiki > code {
   padding: var(--space-4) 0 var(--space-4) var(--space-5) !important;
-  margin-inline-end: calc(2rem + 2 * var(--space-2));
+  margin-inline-end: calc(var(--copy-size) + 2 * var(--copy-inset));
   overflow-x: auto;
 }
 
@@ -379,12 +383,12 @@ kbd {
    over the block, and fully on its own hover or focus. */
 .copy-code {
   position: absolute;
-  inset-block-start: var(--space-2);
-  inset-inline-end: var(--space-2);
+  inset-block-start: var(--copy-inset);
+  inset-inline-end: var(--copy-inset);
   display: grid;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
+  width: var(--copy-size);
+  height: var(--copy-size);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-inner);
   background: var(--paper);

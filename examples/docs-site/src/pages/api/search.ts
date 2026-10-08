@@ -4,6 +4,7 @@
  * SDK surface. Shaping the hits into fumadocs' SortedResult[] lives in
  * lib/search-results, where it can be tested without any index at all.
  */
+import { frontText } from "@usegraft/db";
 import type { APIRoute } from "astro";
 import { getGraft } from "../../lib/graft";
 import { buildVocabulary, expandQuery, type Vocabulary } from "../../lib/search-expand";
@@ -29,19 +30,14 @@ const CACHED = {
  */
 let vocabulary: Promise<Vocabulary> | null = null;
 
-/** Every string in a document's frontmatter: the index searches all of them. */
-function strings(value: unknown): string[] {
-  if (typeof value === "string") return [value];
-  if (Array.isArray(value)) return value.flatMap(strings);
-  if (typeof value === "object" && value !== null) return Object.values(value).flatMap(strings);
-  return [];
-}
 function docsVocabulary(): Promise<Vocabulary> {
   if (vocabulary) return vocabulary;
   const building = getGraft()
     .listContent("docs")
     .then((docs) =>
-      buildVocabulary(docs.flatMap((doc) => [doc.slug, ...strings(doc.data), doc.body])),
+      // frontText is the frontmatter text the index itself searches, so the
+      // two cannot disagree about which fields count.
+      buildVocabulary(docs.flatMap((doc) => [doc.slug, frontText(doc.data), doc.body])),
     )
     .catch((error: unknown) => {
       // Do not cache a failure: the next request tries again.
