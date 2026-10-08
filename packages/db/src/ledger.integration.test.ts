@@ -41,7 +41,9 @@ describe.skipIf(!runIntegration)("withMigrationLock", () => {
           await sleep(1_000);
           order.push("first:end");
         });
-        await firstHoldsLock;
+        // Raced with the first run, so a run that fails before `work` (a
+        // refused connection) fails the test at once with its own error.
+        await Promise.race([firstHoldsLock, first]);
         const second = withMigrationLock(db, "lock-idle-timeout-test", async () => {
           order.push("second");
         });
