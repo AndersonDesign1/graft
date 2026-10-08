@@ -71,12 +71,14 @@ export interface MigrationLockOptions {
  * - Two connections at once: the lock's transaction keeps one, and `work` runs
  *   on others from the same pool. A pool capped at one connection would wait
  *   on itself forever, so it is refused up front. `createDb` pools allow ten.
- * - The lock lasts only as long as its connection. The transaction pings every
- *   LOCK_KEEPALIVE_MS so `idle_in_transaction_session_timeout`, or a pooler's
- *   idle-transaction timeout, does not end it while `work` runs, as long as the
- *   timeout is longer than that. If the lock's connection itself is cut, the
- *   lock goes with it, and the commit at the end fails with the connection
- *   error, so the run reports a failure rather than a clean finish.
+ * - The lock lasts only as long as its connection. The transaction turns off
+ *   Postgres's `idle_in_transaction_session_timeout` for itself (SET LOCAL, so
+ *   nothing else changes), which would otherwise end it however short the
+ *   timeout. A pooler's own idle-transaction timeout is outside Postgres, so
+ *   the transaction also pings every LOCK_KEEPALIVE_MS, which keeps any such
+ *   timeout longer than that from firing. If the lock's connection itself is
+ *   cut, the lock goes with it, and the commit at the end fails with the
+ *   connection error, so the run reports a failure rather than a clean finish.
  */
 export async function withMigrationLock<T>(
   db: Database,
@@ -98,6 +100,8 @@ export async function withMigrationLock<T>(
 
   const key = sql`hashtextextended(${`graft:migrate:${branchId}`}, 0)`;
   return db.transaction(async (tx) => {
+    // This transaction sits idle by design while `work` runs elsewhere.
+    await tx.execute(sql`set local idle_in_transaction_session_timeout = 0`);
     const [row] = await tx.execute<{ locked: boolean }>(
       sql`select pg_try_advisory_xact_lock(${key}) as locked`,
     );
