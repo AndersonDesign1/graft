@@ -84,19 +84,18 @@ jobs:
       && github.actor != 'dependabot[bot]'
       && !startsWith(github.head_ref, 'changeset-release/')
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # `changeset status --since` needs the base branch to diff against.
+          # `changeset status --since` needs the base commit to diff against.
           fetch-depth: 0
-          # The `git fetch origin` below reaches a public repository over HTTPS
-          # and needs no credential. This job never pushes.
+          # This job never pushes.
           persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22.16
           cache: pnpm
@@ -105,10 +104,14 @@ jobs:
 
       - name: Check for a changeset
         env:
-          BASE: ${{ github.event.pull_request.base.ref }}
+          # The base commit this run's merge ref was built on, already in the
+          # full checkout. Diffing against the base branch's tip instead broke
+          # whenever the base moved after the event: the new tip is not an
+          # ancestor of HEAD, and the `--depth=1` fetch of it cut the history
+          # that connects them, so changesets could not find a merge base.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          git fetch --no-tags --depth=1 origin "$BASE"
-          if pnpm changeset status --since="origin/$BASE"; then
+          if pnpm changeset status --since="$BASE_SHA"; then
             exit 0
           fi
           echo ""

@@ -1,119 +1,130 @@
 ---
-title: Static or Postgres
-description: The one decision a new project makes, and what changes when you switch.
-section: Start here
+title: Storage engines
+description: "Where your content index lives: a SQLite file with nothing to run, or Postgres when users write data at runtime."
+section: Get started
 order: 3
 ---
 
-Graft runs on two tiers. Picking one is the first real decision in a project,
-and it is one line of config.
+<p className="kicker">Pick static or Postgres, and know when to switch.</p>
+
+When you compile, Graft builds an **index**: a searchable copy of your content
+that your app reads from. The storage engine decides where that index lives.
+It does not change how you write content, how you read it, or what your schema
+looks like.
+
+There are two engines:
+
+- **Static.** The index is a single SQLite file, `.graft/index.db`, built by
+  `graft compile`. You run no database and no services.
+- **Postgres.** The index lives in a Postgres database. You need this engine
+  when your users write data at runtime, such as form submissions, comments,
+  or orders, because that data cannot be rebuilt from files in Git.
+
+Start static. Move to Postgres the day you need one of the features in
+[What only Postgres can do](#what-only-postgres-can-do).
+
+## Which engine am I on?
+
+Look for the `index` export in `graft.config.ts`:
+
+<CodeBlock title="graft.config.ts">
 
 ```ts
-// graft.config.ts
-export const index = "static"; // or "postgres" (the default when omitted)
+export const index = "static"; // or "postgres"
 ```
 
-The tier decides where the **index** lives. It does not change how you author,
-how you read, or what your schema looks like.
+</CodeBlock>
 
-## The split
+`graft init` writes `"static"` for you. If a config has no `index` export at
+all, Graft uses Postgres, so older projects keep working. Set it explicitly and
+you never have to remember that rule.
 
-Postgres does two jobs for Graft. The tiers split them apart.
+## What works on both
 
-| Job | What it holds | Static tier | Postgres tier |
-| --- | --- | --- | --- |
-| Content index | Projected documents, full-text search, compile trail | A SQLite file | `content_index` |
-| Operational data | `data_records`, `audit_log`, `approvals`, branches | Not available | Postgres |
+<TierBadge tier="either" />
 
-The content index is derived from git, so it can be a file. Operational data is
-real state that git cannot rebuild, so it stays in Postgres.
+Everything you need to write, compile, and read content:
 
-## What you get on each
+- `graft init`, `graft compile`, and `graft dev`
+- Typed reads through every framework package
+- Full-text search, with ranking and highlighted snippets
+- Agents over MCP with `graft mcp`, including document resources and prompts
+- Uploading assets with `graft asset put`, once storage credentials are set
 
-<TierBadge tier="static" />
-
-Everything in the authoring loop, with no service to run:
-
-- `graft init`, `graft compile`, `graft dev`
-- Typed reads through `@usegraft/sdk-core` and the framework SDKs
-- Full-text search, including snippets and ranking
-- `graft mcp` — authoring over MCP works the same way
-- MCP document resources, prompts, and argument completion
-- `graft asset put`, once S3 credentials are set
+## What only Postgres can do
 
 <TierBadge tier="postgres" />
 
-Everything above, plus the parts that need real state:
+These features store data that Git cannot rebuild, so they need a database:
 
-- `authority: "db-authoritative"` collections
-- `defineFunction` and `POST /api/fn/<name>`
-- The audit log, rate limits, and human-gated approvals
-- Copy-on-write branches and `graft merge`
-- Studio, and `graft serve` (which mounts functions, MCP, and the content API)
+- **Runtime data**: collections your users write to, declared with
+  `authority: "db-authoritative"` ([Operational data](/docs/operational-data))
+- **Typed functions** that write that data, served at `POST /api/fn/<name>`
+  ([Functions & access](/docs/functions-and-access))
+- **The audit log, rate limits, and human approvals** for agent actions
+  ([Audit & approvals](/docs/audit-and-approvals))
+- **Preview branches** and `graft merge` ([Branching & previews](/docs/branching-previews))
+- **Studio**, the editing UI, and `graft serve` ([Studio](/docs/studio))
 
-## Where the line is drawn
-
-The boundary is checked when your config loads, not when a feature eventually
-breaks. A static project that declares a typed function or a db-authoritative
-collection is refused with `NEEDS_DATABASE`, and the message names the
-offenders.
+If a static project declares one of these, Graft refuses to load the config and
+tells you which declaration needs Postgres:
 
 ```text
 graft.config.ts uses the static index, but declares typed function(s)
 "submitContact" — those live in Postgres, not in the compiled artifact.
 ```
 
-The `fix` on that error is the upgrade, in order. Follow it and nothing else
-changes.
+That error is `NEEDS_DATABASE`. Its `fix` lists the steps in
+[Moving to Postgres](#moving-to-postgres).
 
-## The artifact
+## Working with the static index file
 
-`graft compile` writes `.graft/index.db` in static mode. Facts worth knowing
-about it:
+`graft compile` writes `.graft/index.db`. A few things to know about it:
 
-- It is derived from the files in git, so it is git-ignored. Rebuild it in your
-  build command: `graft compile && next build`.
-- Each compile is a full rebuild into a temporary file, then a rename. There is
-  no partial state to recover from.
-- Readers open it read-only, so a read-only deployment filesystem is fine.
-- It uses `node:sqlite`, which ships with Node. The static tier adds no npm
-  dependency and no native build step.
-- The artifact **is** the branch. A `branch` argument is accepted and ignored,
-  because each checkout compiles its own file.
+- **It is generated, so keep it out of Git.** `graft init` adds it to
+  `.gitignore`. Rebuild it as part of your build command:
+  `graft compile && next build`.
+- **A failed compile never leaves a half-written file.** Each compile builds a
+  new file and swaps it in only when it is complete.
+- **It works on a read-only filesystem.** Your app opens it read-only.
+- **It needs Node 22.16 or newer**, which ships `node:sqlite`. There is no
+  native dependency to install.
+- **Each Git checkout has its own file.** That is how branches work on the
+  static engine: a different checkout compiles a different index. The SDK's
+  `branch` option is accepted and has no effect here.
 
-Reads open it directly:
+Your app opens the file and reads from it:
 
-<CodeBlock title="app/page.ts" note="static tier">
+<CodeBlock title="lib/graft.ts" note="static engine">
 
 ```ts
 import { openStaticIndex } from "@usegraft/db";
 import { createClient } from "@usegraft/sdk-core";
-import { collections } from "./graft.config";
+import { collections } from "../graft.config";
 
 const index = await openStaticIndex(".graft/index.db");
-const graft = createClient({ index, collections });
+export const graft = createClient({ index, collections });
 ```
 
 </CodeBlock>
 
-Two errors belong to this path. `STATIC_INDEX_NOT_FOUND` means you read before
-the first compile. `STATIC_INDEX_UNSUPPORTED` means the Node version has no
-`node:sqlite`.
+If your app reads before the first compile, you get `STATIC_INDEX_NOT_FOUND`.
+If your Node version is too old, you get `STATIC_INDEX_UNSUPPORTED`.
 
-## Agents work on both tiers
+## Agents on the static engine
 
-The agent surface is not a Postgres feature. `graft mcp` serves a static
-project, `write_content` validates and recompiles the same way, and
-`search_content` reads the artifact.
+Agents work on both engines. `graft mcp` serves a static project, an agent's
+`write_content` call checks the file and recompiles it the same way, and
+`search_content` searches the static index.
 
-Postgres-tier tools stay registered rather than disappearing. Calling one
-answers `NEEDS_DATABASE` with the upgrade, because an absent tool teaches
-nothing. Two of those refusals are deliberate:
+Tools that need Postgres stay listed, so an agent can see they exist. Calling
+one returns `NEEDS_DATABASE` and the steps to upgrade. Two tools refuse on
+purpose:
 
-| Tool | Why it refuses in static mode |
+| Tool | Why it refuses on the static engine |
 | --- | --- |
-| `delete_content` | Its one-shot human approval is a Postgres table. Serving it without that would turn a gated delete into an ungated one. Delete the file and recompile instead — git history is the undo |
-| `list_compilations` | The artifact carries the last 50 runs, but the Postgres trail is the full history. Returning a truncated one under the same name would be a quieter lie than an error |
+| `delete_content` | Deletes wait for a human approval, and approvals are stored in Postgres. Allowing the delete without that check would skip the approval. On the static engine, delete the file and recompile. Git history is your undo. |
+| `list_compilations` | The static file keeps only the last 50 compile runs. Returning a partial history under the same tool name could mislead an agent, so the tool reports that it needs Postgres instead. |
 
 ## Moving to Postgres
 
@@ -123,34 +134,35 @@ Four steps, in this order.
 
 <Step title="Point at a database">
 
+Set `DATABASE_URL` in a `.env` file in your project, or in any parent folder:
+
 ```sh
 DATABASE_URL=postgres://…
 ```
 
-Any parent directory's `.env` works. Commands walk up from the working
-directory.
-
 </Step>
 
-<Step title="Change the index">
+<Step title="Switch the index">
+
+<CodeBlock title="graft.config.ts">
 
 ```ts
 export const index = "postgres";
 ```
 
+</CodeBlock>
+
 </Step>
 
-<Step title="Apply the schema">
+<Step title="Create Graft's tables">
 
 ```sh
 graft db migrate
 ```
 
-The SQL ships inside `@usegraft/db`, so there is no drizzle-kit to install and
-no migrations to check out. Unlike `graft migrate` and `graft merge`, this
-applies by default: it is generated, additive, idempotent DDL and the
-prerequisite for anything else working. Pass `--dry-run` to list what is
-pending.
+This creates the tables Graft needs. The SQL ships inside `@usegraft/db`, so
+there is nothing else to install. It is safe to run again: it only adds what is
+missing. Pass `--dry-run` to see what it would create first.
 
 </Step>
 
@@ -164,37 +176,50 @@ graft compile
 
 </Steps>
 
-Reads move from the artifact to a framework adapter, which takes the database
-instead:
+Then give your client the database instead of the file. With a framework
+package, pass `db` where you passed `index` (Next.js shown):
+
+<CodeBlock title="lib/graft.ts" note="Postgres engine">
 
 ```ts
-import { createGraft } from "@usegraft/sdk-astro";
-import { collections } from "../graft.config";
+import { createDb } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-next";
+import { collections } from "@/graft.config";
 
-const graft = createGraft({ db, collections });
+export const graft = createGraft({
+  db: createDb(process.env.DATABASE_URL!).db,
+  collections,
+});
 ```
 
-## Going the other way
+</CodeBlock>
 
-Nothing stops you setting `index = "static"` again, but the config will refuse
-to load while typed functions or db-authoritative collections are still
-declared. Remove them first. A `graft add` primitive that brought one can be
-deleted from `graft/`.
+Without a framework, use `createDbClient` from `@usegraft/sdk-core/db` in the
+same way.
 
-Postgres also owns your operational rows, and switching the index does not move
-them anywhere. They stay in the database.
+## Moving back to static
+
+Set `index = "static"` again. The config refuses to load while it still
+declares typed functions or db-authoritative collections, so remove those
+first. If one came from a `graft add` primitive, delete it from `graft/`.
+
+Switching back does not delete anything from Postgres. Rows your users wrote
+stay in the database.
 
 ## One database per project
 
-Two projects sharing a `DATABASE_URL` would each purge the other's documents on
-compile. Graft refuses: a compile that would remove collections your schema does
-not know aborts with `INDEX_OWNERSHIP` and writes nothing.
+On the Postgres engine, each project needs its own database, or its own branch
+of one. Compiling makes the index match your current schema exactly, so two
+projects sharing a database would each delete the other's content. Graft stops
+the compile with `INDEX_OWNERSHIP` before that can happen. See
+[How Graft works](/docs/the-model#one-database-per-project).
 
-The static tier cannot have this problem. The artifact lives in the project.
+The static engine cannot hit this, because each project has its own file.
 
 ## Next steps
 
-- [Getting started](/docs/getting-started) — the static loop end to end
-- [The model](/docs/the-model) — why the index is derived
-- [Configuration](/docs/configuration) — every environment variable
-- [Deploy](/docs/deploy) — self-host either tier
+- [Getting started](/docs/getting-started) runs the static setup end to end.
+- [Operational data](/docs/operational-data) shows what to build once you move
+  to Postgres.
+- [Configuration](/docs/configuration) lists every environment variable.
+- [Deploy](/docs/deploy) covers hosting either engine.

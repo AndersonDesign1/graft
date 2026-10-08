@@ -1,41 +1,77 @@
 ---
 title: Assets
-description: field.asset, graft asset put, and MCP put_asset — binaries in S3-compatible storage.
-section: Build
-order: 10
+description: "Store images and other files in S3-compatible storage, reference them from content, and turn them into URLs in your app."
+section: Content
+order: 3
 ---
 
-Asset fields store a reference, not the bytes:
+<p className="kicker">Keep images and files in object storage, and point to them from your content.</p>
 
-```ts
-image: field.asset({ optional: true }),
-// → { key: string, alt?: string }
+Images and other files do not belong in Git or in your content files. Graft
+stores them in any S3-compatible bucket, such as Cloudflare R2, AWS S3, Tigris,
+or MinIO. Your content stores only a pointer to the file: its **key** (its path
+in the bucket) and optional alt text. Your app turns the key into a URL when it
+renders the page.
+
+This page sets up storage, uploads a file, references it from a page, and shows
+it in your app.
+
+## Set up storage
+
+Add your bucket's details to `.env`:
+
+<CodeBlock title=".env">
+
+```sh
+S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com
+S3_BUCKET=my-site-assets
+S3_ACCESS_KEY=…
+S3_SECRET_KEY=…
+S3_PUBLIC_URL=https://assets.example.com   # optional, see below
 ```
 
-Keys are lowercase paths. `..` segments are invalid.
+</CodeBlock>
 
-## Upload
+`S3_REGION` defaults to `auto`, which suits R2. On AWS S3, set it to your
+bucket's region, such as `us-east-1`: AWS rejects requests signed for `auto`.
+[Configuration](/docs/configuration#assets-s3-compatible) lists every variable.
 
-### CLI
+## Add an asset field
+
+<CodeBlock title="graft.config.ts">
+
+```ts
+fields: {
+  title: field.string(),
+  image: field.asset({ optional: true }), // → { key: string, alt?: string }
+},
+```
+
+</CodeBlock>
+
+## Upload a file
+
+From your terminal:
 
 ```sh
 graft asset put ./hero.svg pages/home/hero.svg
 ```
 
-The command prints a frontmatter snippet. Content type is inferred from the file.
+The second argument is the key. Keys are lowercase paths, and `..` is not
+allowed. The command prints the frontmatter to paste into your page. The file's
+content type is worked out from its name.
 
-### MCP
+Agents upload with the `put_asset` MCP tool. An agent on your machine passes a
+file `path`. A remote agent sends the file as `base64` with a `key`.
 
-`put_asset` accepts:
+Both refuse a key that already holds a file, with the error `ASSET_EXISTS`.
+The bucket keeps no history, so a replaced file is gone. Pick a new key for a
+new version of a file. To replace the file on purpose, pass `--overwrite` to
+`graft asset put`, or `overwrite: true` to `put_asset`.
 
-| Input | When |
-| --- | --- |
-| `path` | File on the machine running stdio MCP |
-| `base64` + `key` | Remote agents |
+## Reference it from content
 
-Existing keys refuse without `overwrite: true`. The store keeps no history.
-
-## Frontmatter
+<CodeBlock title="content/pages/home.mdx">
 
 ```mdx
 ---
@@ -46,15 +82,40 @@ image:
 ---
 ```
 
-## Resolve URLs in the app
+</CodeBlock>
 
-`@usegraft/assets` exposes `url(key)` / `presignGet`. Prefer a public base
-(`S3_PUBLIC_URL`) when you have one; otherwise use a short-lived signed GET.
+## Show it in your app
 
-Compile indexes populated asset fields on each projected document so agents and
-search can see which keys a page uses.
+Turn the key into a URL with `@usegraft/assets`:
 
-## Env
+<CodeBlock title="lib/assets.ts">
 
-See [Configuration](/docs/configuration) for `S3_BUCKET`, `S3_ENDPOINT`,
-`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_PUBLIC_URL`.
+```ts
+import { createStorage } from "@usegraft/assets";
+
+const storage = createStorage(); // reads the S3_* variables
+
+export async function assetUrl(key: string): Promise<string> {
+  return storage.url(key);
+}
+```
+
+</CodeBlock>
+
+```tsx
+const home = await graft.getContent("pages", "home");
+const src = home?.data.image ? await assetUrl(home.data.image.key) : undefined;
+```
+
+If you set `S3_PUBLIC_URL`, `url()` returns a plain public URL, which browsers
+and CDNs can cache. Without it, `url()` returns a signed link that works for a
+short time. Use a public URL for anything on public pages.
+
+Compiling also records which asset keys each document uses, so search and agents
+can see which pages use a file.
+
+## Next steps
+
+- [Schema](/docs/schema) covers the other field types.
+- [Configuration](/docs/configuration) lists every storage variable.
+- [MCP tools](/docs/mcp-tools#put_asset) covers `put_asset` in full.

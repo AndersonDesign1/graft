@@ -1,16 +1,32 @@
 ---
 title: React Router
-description: Framework mode only. Export action and loader so GET answers 405.
-section: Build
-order: 7
+description: "Read Graft content in React Router framework mode loaders and serve functions from resource routes."
+section: Frameworks
+order: 4
 ---
+
+<p className="kicker">Read Graft content in React Router framework mode.</p>
+
+This guide adds Graft to a React Router app in framework mode. You read
+content in route loaders on the server, and you can serve Graft's functions and
+MCP endpoint from resource routes.
+
+**Before you start**, you need a React Router app in framework mode and a
+`graft.config.ts` with compiled content. If you do not have those yet, run
+through [Getting started](/docs/getting-started) first.
+
+<Callout label="Prefer to let your agent do it?" type="note">
+  Paste this into your coding agent: "Add Graft to this React Router app following https://graft.page/docs/react-router.md. Create the client in app/lib/graft.server.ts and read the pages collection in a route loader."
+</Callout>
+
+## Install
 
 <Tabs labels="pnpm, npm, bun">
 
 <Tab>
 
 ```sh
-pnpm add @usegraft/sdk-react-router @usegraft/auth @usegraft/mcp
+pnpm add @usegraft/sdk-react-router @usegraft/db
 ```
 
 </Tab>
@@ -18,7 +34,7 @@ pnpm add @usegraft/sdk-react-router @usegraft/auth @usegraft/mcp
 <Tab>
 
 ```sh
-npm i @usegraft/sdk-react-router @usegraft/auth @usegraft/mcp
+npm i @usegraft/sdk-react-router @usegraft/db
 ```
 
 </Tab>
@@ -26,7 +42,7 @@ npm i @usegraft/sdk-react-router @usegraft/auth @usegraft/mcp
 <Tab>
 
 ```sh
-bun add @usegraft/sdk-react-router @usegraft/auth @usegraft/mcp
+bun add @usegraft/sdk-react-router @usegraft/db
 ```
 
 </Tab>
@@ -34,12 +50,13 @@ bun add @usegraft/sdk-react-router @usegraft/auth @usegraft/mcp
 </Tabs>
 
 For framework mode, which is where React Router runs loaders and actions on a
-server. Build the handle once in a `.server.ts` module.
+server. Create the client once in a `.server.ts` module.
 
-## Create the handle
+## Create the Graft client
+
+<CodeBlock title="app/lib/graft.server.ts">
 
 ```ts
-// app/lib/graft.server.ts
 import { createDb } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-react-router";
 import { collections } from "../../graft.config";
@@ -47,6 +64,8 @@ import { collections } from "../../graft.config";
 export const db = createDb(process.env.DATABASE_URL!).db;
 export const graft = createGraft({ db, collections });
 ```
+
+</CodeBlock>
 
 Static index instead of Postgres:
 
@@ -59,10 +78,11 @@ export const graft = createGraft({
 });
 ```
 
-## Read one document
+## Read a document
+
+<CodeBlock title="app/routes/docs.$slug.tsx">
 
 ```ts
-// app/routes/docs.$slug.tsx
 import { graft } from "../lib/graft.server";
 import type { Route } from "./+types/docs.$slug";
 
@@ -71,21 +91,30 @@ export async function loader({ params }: Route.LoaderArgs) {
 }
 ```
 
+</CodeBlock>
+
 `loader` and `action` run on the server and React Router strips them from the
 browser bundle. The `.server.ts` name is belt and braces on top of that: it
 turns a stray client import into a build error rather than a database URL in
 a bundle.
 
-To read content in the browser — a search box, an editor preview — use
+To read content in the browser (a search box, an editor preview), use
 [the React adapter](/docs/react).
 
-## Mount functions and MCP
+## Serve functions and MCP from your app
 
-`graftRoute` binds a Graft handler to a resource route — a route module with
+This step is optional: it needs the Postgres engine and three more packages:
+
+```sh
+npm i @usegraft/core @usegraft/auth @usegraft/mcp
+```
+
+`graftRoute` binds a Graft handler to a resource route. That is a route module with
 no default export, whose loader and action return raw Responses.
 
+<CodeBlock title="app/routes/api.fn.$name.ts">
+
 ```ts
-// app/routes/api.fn.$name.ts
 import { createFunctionsHandler } from "@usegraft/core";
 import { graftRoute } from "@usegraft/sdk-react-router";
 import { functions } from "../../graft.config";
@@ -97,22 +126,29 @@ export const action = graftRoute(handler); // POST
 export const loader = graftRoute(handler); // GET, which 405s with Allow and a fix
 ```
 
+</CodeBlock>
+
+<CodeBlock title="app/routes/api.mcp.ts">
+
 ```ts
-// app/routes/api.mcp.ts
 import { createActorResolver } from "@usegraft/auth";
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftRoute } from "@usegraft/sdk-react-router";
 import { collections, functions } from "../../graft.config";
 import { db } from "../lib/graft.server";
 
+// A dev token never expires, so it is accepted only in development. An unset
+// NODE_ENV counts as production, so a deploy that forgets it stays closed.
+const devToken = process.env.NODE_ENV === "development" ? process.env.GRAFT_DEV_TOKEN : undefined;
+
 const actor = createActorResolver({
   issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
     .split(/[,\s]+/)
     .filter(Boolean)
     .map((issuer) => ({ issuer })),
-  devTokens: process.env.GRAFT_DEV_TOKEN
+  devTokens: devToken
     ? {
-        [process.env.GRAFT_DEV_TOKEN]: {
+        [devToken]: {
           kind: "human",
           id: "owner",
           scopes: ["content:write"],
@@ -132,18 +168,21 @@ export const action = graftRoute(
 );
 ```
 
+</CodeBlock>
+
 This endpoint serves content writes and asset uploads. JWT verification runs
 only when `issuers` is passed; the library does not read
 `GRAFT_TRUSTED_ISSUERS` (`graft serve` does). See [Auth](/docs/auth).
 Unauthenticated callers get 401. `allowAnonymous: true` is only for a
-loopback local server — never on anything reachable from a network. A public
+loopback local server. Never anything reachable from a network. A public
 docs surface is [`createDocsMcpHandler`](/docs/docs-mcp), which has no write
 tools and no anonymous opt-in.
 
 Register them the way you register any route:
 
+<CodeBlock title="app/routes.ts">
+
 ```ts
-// app/routes.ts
 import { route, type RouteConfig } from "@react-router/dev/routes";
 
 export default [
@@ -152,11 +191,28 @@ export default [
 ] satisfies RouteConfig;
 ```
 
-## Cache and invalidation
+</CodeBlock>
 
-React Router has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
-surrogate-key header from the route's `headers` export, and purge
-`tagsForChanges(branch, changeSet)` from your compile webhook.
+<Callout label="Why the route exports a loader" type="warning">
+  React Router handles GET requests with a route's `loader` export and all
+  other methods with its `action` export, so the same Graft handler is
+  exported twice. Keep the `loader` export even though functions are called
+  with POST. Without it, a GET to a function URL gets React Router's generic
+  "no loader" error. With it, the caller gets Graft's 405 response, which says
+  which method to use.
+</Callout>
+
+## Refresh pages when content changes
+
+<TierBadge tier="postgres" />
+
+On the static engine, content changes ship with a new deploy, so there is
+nothing to refresh. On Postgres, content can change while your app is running,
+from Studio or from an agent. React Router has no tag-based data cache, so let your
+CDN cache pages and purge only the ones whose content changed.
+
+First, send each page with a header that lists the content it read. `tagsFor`
+builds that list:
 
 ```ts
 import { tagsFor } from "@usegraft/sdk-react-router";
@@ -167,16 +223,33 @@ export function headers({ params }: Route.HeadersArgs) {
 }
 ```
 
-`Cache-Tag` is the surrogate-key header. Purge the same strings
-`tagsForChanges` returns from your compile webhook.
+Then, when content changes, purge those tags at your CDN.
+`tagsForChanges(branch, changes)` turns a change list into the tags to purge:
+each changed document, and the collection it is in. Graft does not purge your
+CDN for you. Do it from your own route, called with the change list.
 
-## The caveat you cannot infer
+The change list comes from two places. An agent's `write_content` call returns
+it as `changes`. `graft compile --json` prints it too, along with the branch.
+In a deploy script, send it to your route. The script stops if the compile
+fails, and `--fail` makes a refused request fail the script too:
 
-React Router splits a route by method into two exports rather than naming the
-method, so one handler is mounted twice. Exporting `loader` is not ceremony:
-it is what makes a GET to a function endpoint answer with Graft's 405 and its
-`Allow` header, instead of React Router's own "no loader" error, which teaches
-the caller nothing.
+```sh
+graft compile --json > changes.json || exit 1
+curl --fail -X POST https://example.com/api/revalidate \
+  -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" \
+  -H "content-type: application/json" \
+  --data-binary @changes.json
+```
 
-See [SDK reference](/docs/sdk-reference) for mounts across adapters and the
-honest gaps.
+Your route reads `branch` and `changes` from the body and passes them to
+`tagsForChanges`.
+
+`Cache-Tag` is the header Cloudflare reads, with tags separated by commas.
+Fastly reads `Surrogate-Key`, with tags separated by spaces. Use the header
+your CDN expects.
+
+## Next steps
+
+- [Reading content](/docs/reading-content) covers list and search reads.
+- [SDK reference](/docs/sdk-reference) compares route mounts across frameworks.
+- [Connecting agents](/docs/connecting-agents) points an agent at your project.

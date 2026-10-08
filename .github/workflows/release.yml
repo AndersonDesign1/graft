@@ -79,7 +79,7 @@ jobs:
       # uploads no artifacts, so there is nothing for a token in .git/config to
       # ride out on, and `contents: write` is scoped to this job alone.
       # zizmor: ignore[artipacked]
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # pnpm — not npm — performs the OIDC exchange. changesets picks its
       # publish tool from the lockfile and spawns `pnpm publish`; pnpm's native
@@ -100,7 +100,7 @@ jobs:
       # shape. v7 no longer writes it, and v7 is the first major documenting
       # trusted publishing (OIDC) as a supported path.
       - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # Release tooling runs on the LTS, not the advertised floor.
           # CI (ci.yml) keeps testing the 22.16 floor.

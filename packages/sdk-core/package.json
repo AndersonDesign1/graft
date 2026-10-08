@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/sdk-core",
-  "version": "1.0.0-beta.2",
+  "version": "1.0.0-beta.3",
   "description": "Framework-agnostic typed read client over the Graft content index, plus the cache-tag contract.",
   "keywords": [
     "agent",
@@ -29,6 +29,13 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "db": [
+        "./dist/db.d.ts"
+      ]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

@@ -77,6 +77,28 @@ describe.skipIf(!runIntegration)("graft compile projects a scaffolded project", 
   );
 
   it(
+    "--json prints the branch and ChangeSet on stdout and nothing else",
+    async () => {
+      const logs: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+        logs.push(args.join(" "));
+      });
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        await compileCommand({ cwd: projectDir, branchId: BRANCH, json: true });
+      } finally {
+        error.mockRestore();
+        vi.spyOn(console, "log").mockImplementation(() => {});
+      }
+      expect(logs).toHaveLength(1);
+      const output = JSON.parse(logs[0] ?? "");
+      expect(output.branch).toBe(BRANCH);
+      expect(output.changes).toEqual({ added: [], changed: [], removed: [], unchanged: 1 });
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
     "adds and soft-removes documents as files come and go",
     async () => {
       const aboutPath = join(projectDir, "content", "pages", "about.mdx");

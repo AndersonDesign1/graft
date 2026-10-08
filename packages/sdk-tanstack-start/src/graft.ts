@@ -14,7 +14,9 @@
  * Caching: TanStack Start has no tag-based data cache, so the Phase 4 tag
  * contract maps onto HTTP — stamp `tagsFor(...)` into a CDN surrogate-key
  * header (`Cache-Tag` / `Surrogate-Key`) on the responses you serve, and purge
- * `tagsForChanges(branch, changeSet)` from your compile webhook.
+ * `tagsForChanges(branch, changeSet)` from your own route, called with a
+ * compile's change list. `graft compile --json` prints `{ branch, gitSha, changes }`: pass its
+ * `branch` and `changes`, not the whole object.
  */
 import { createDbClient, type DbClientOptions } from "@usegraft/sdk-core/db";
 import {

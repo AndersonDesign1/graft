@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/studio",
-  "version": "1.0.0-beta.2",
+  "version": "1.0.0-beta.3",
   "description": "Graft's optional editing UI. Headless-first: every operation also exists on MCP and the CLI.",
   "keywords": [
     "admin-ui",
@@ -30,6 +30,13 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "panels": [
+        "./dist/panels-entry.d.ts"
+      ]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

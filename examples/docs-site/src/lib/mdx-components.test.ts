@@ -136,12 +136,59 @@ describe("Steps", () => {
     expect(html).toContain("Install");
     expect(html).toContain("Compile");
   });
+
+  it("gives a repeated step title its own id and link", async () => {
+    // The same title in two procedures (one per framework tab): both stay in
+    // the HTML, so they must not share an id.
+    const steps = [
+      "<Steps>",
+      "",
+      '<Step title="Compile">',
+      "",
+      "Run it.",
+      "",
+      "</Step>",
+      "",
+      "</Steps>",
+    ];
+    const html = await render([...steps, "", ...steps].join("\n"));
+
+    expect(html.match(/id="step-compile"/g)).toHaveLength(1);
+    expect(html.match(/id="step-compile-2"/g)).toHaveLength(1);
+    expect(html).toContain('href="#step-compile-2"');
+  });
+
+  it("never reuses an id another step's own title produced", async () => {
+    // "Foo 2" slugs to step-foo-2, so the second "Foo" must skip to -3.
+    const step = (title: string) => [`<Step title="${title}">`, "", "Text.", "", "</Step>", ""];
+    const html = await render(
+      ["<Steps>", "", ...step("Foo"), ...step("Foo 2"), ...step("Foo"), "</Steps>"].join("\n"),
+    );
+
+    expect(html.match(/id="step-foo"/g)).toHaveLength(1);
+    expect(html.match(/id="step-foo-2"/g)).toHaveLength(1);
+    expect(html.match(/id="step-foo-3"/g)).toHaveLength(1);
+  });
+});
+
+describe("table", () => {
+  it("frames a Markdown table in a keyboard-reachable region named by its columns", async () => {
+    const html = await render(
+      ["| Framework | Package |", "| --- | --- |", "| Astro | `@usegraft/astro` |"].join("\n"),
+    );
+
+    expect(html).toContain('class="table-wrap"');
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-label="Table: Framework, Package"');
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain("<table>");
+  });
 });
 
 describe("TierBadge", () => {
   it("renders the tier's own wording", async () => {
     expect(await render('<TierBadge tier="postgres" />')).toContain("needs Postgres");
-    expect(await render('<TierBadge tier="static" />')).toContain(">static<");
+    expect(await render('<TierBadge tier="static" />')).toContain(">works on static<");
   });
 
   it("renders nothing for a tier that does not exist", async () => {

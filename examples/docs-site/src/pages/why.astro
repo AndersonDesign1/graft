@@ -88,7 +88,7 @@ const receipts = [
     </section>
 
     <section class="why-pillars section" aria-label="What Graft is">
-      <p class="section-label">§00 <em>foundations</em></p>
+      <p class="section-label"><em>foundations</em></p>
       <h2>Open source. Self-hostable. <span class="marked">Yours to run.</span></h2>
       <p class="section-lede">
         No Graft cloud in the critical path. Point <code>DATABASE_URL</code> at your database,
@@ -98,7 +98,6 @@ const receipts = [
         {
           pillars.map((p) => (
             <li class="why-pillar">
-              <span class="why-pillar-n">{p.n}</span>
               <h3>{p.title}</h3>
               <p>{p.body}</p>
             </li>
@@ -108,7 +107,7 @@ const receipts = [
     </section>
 
     <section class="why-roles section" aria-label="You and your agent">
-      <p class="section-label">§01 <em>roles</em></p>
+      <p class="section-label"><em>roles</em></p>
       <h2>Same product. <span class="marked">Two operators.</span></h2>
       <div class="why-role-grid">
         {
@@ -127,7 +126,7 @@ const receipts = [
     </section>
 
     <section class="why-receipts section" aria-label="Receipts in the docs">
-      <p class="section-label">§02 <em>receipts</em></p>
+      <p class="section-label"><em>receipts</em></p>
       <h2>Claims with docs attached.</h2>
       <p class="section-lede">Every capability links to the page that teaches it.</p>
       <ul class="why-receipt-grid">
@@ -147,7 +146,7 @@ const receipts = [
     {
       faqs.length > 0 && (
         <section class="section" id="faq" aria-labelledby="why-faq-heading">
-          <p class="section-label">§03 <em>faq</em></p>
+          <p class="section-label"><em>faq</em></p>
           <h2 id="why-faq-heading">Common questions</h2>
           <LandingFaq items={faqs} />
         </section>

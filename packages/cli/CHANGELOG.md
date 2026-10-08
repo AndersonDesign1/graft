@@ -1,5 +1,115 @@
 # @usegraft/cli
 
+## 1.0.0-beta.3
+
+### Minor Changes
+
+- 56c0957: `graft asset put` refuses a key that already holds a file, like `put_asset`.
+
+  The MCP `put_asset` tool has refused a taken key with `ASSET_EXISTS` unless the
+  caller passed `overwrite: true`. The CLI did not check: it replaced whatever was
+  stored under the key. The store keeps no version history, so the old file was
+  gone, and every page pointing at the key showed the new one.
+
+  The CLI now checks first and fails with the same `ASSET_EXISTS` error. Pass
+  `--overwrite` to replace the file on purpose.
+
+  Both also make the upload itself conditional. `Storage.put` from
+  `@usegraft/assets` takes `{ ifAbsent: true }`, which sends
+  `If-None-Match: *`, and throws `AssetKeyTakenError` when the store answers 412. So the store refuses a key that a concurrent upload took between the check
+  and the write, or that a credential allowed to upload but not read cannot see.
+  A store that ignores the header writes as before, behind the existence check.
+
+  **Breaking:** a script that re-uploads to the same key now fails until it adds
+  `--overwrite` or picks a new key.
+
+- f92b97c: Add `graft compile --json`. It prints one JSON object on stdout and nothing
+  else: `{ "branch", "gitSha", "changes" }`, where `changes` is the compile's
+  ChangeSet. The summary line and any other log output go to stderr. It works on
+  the static and Postgres engines.
+
+  Until now the only ways to get a ChangeSet were an agent's `write_content`
+  result or calling `compile()` from `@usegraft/compiler`. The new output is the
+  body a revalidate route reads, so a deploy script can pipe it on:
+
+  ```sh
+  graft compile --json | curl --fail-with-body -X POST -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" -H "content-type: application/json" --data-binary @- https://example.com/api/revalidate
+  ```
+
+  `--fail-with-body` makes curl exit non-zero on an error response while still
+  printing its message and fix. It needs curl 7.76.0 or newer. On an older curl,
+  use `--fail`, which fails the same way but drops the body.
+
+  postgres-js prints server notices with `console.log`, so while a `--json`
+  compile runs, `console.log` is routed to stderr. Nothing a dependency logs can
+  corrupt the JSON.
+
+- 56c0957: `graft serve` can check the token audience and record trusted callers as people.
+
+  `GRAFT_TRUSTED_ISSUERS` built each issuer with only its URL. The token audience
+  was never checked, so a token the provider minted for another of your apps was
+  accepted, and every caller was recorded in the audit log as an agent.
+
+  Two variables now apply to every listed issuer:
+
+  - `GRAFT_TRUSTED_AUDIENCE`: the accepted `aud` values, comma-separated. When
+    issuers are set without it, `graft serve` prints a warning at startup.
+  - `GRAFT_TRUSTED_ACTOR_KIND`: `agent` (the default) or `human`. Any other value
+    stops the server from starting with `INPUT_VALIDATION_FAILED`, before it opens
+    a database connection.
+
+### Patch Changes
+
+- 56c0957: `graft <command> --help` prints that command's usage and exits 0.
+
+  Before, `--help` or `-h` after a command name failed with
+  `unknown option "--help"`. Every command now has its own usage block: the
+  usage line, what it does, and only the flags it reads. Help is answered before
+  the other arguments are parsed, so `graft merge --into --help` still prints the
+  merge usage. An unknown command with `--help` still reports the unknown command.
+
+- 56c0957: Concurrent `graft migrate --apply` runs apply each migration once.
+
+  The ledger was read before a run and written after it, so two runs started
+  together both saw a migration as pending and both applied it. The second then
+  failed on the ledger's unique index, after its content rewrite and data updates
+  had already run.
+
+  `@usegraft/db` exports `withMigrationLock(db, branchId, work)`. It holds a
+  transaction-scoped Postgres advisory lock for the branch while `work` runs.
+  `graft migrate --apply` reads the ledger only once it holds the lock, so a
+  second run waits for the first, then skips what the first applied.
+  `graft merge --apply` takes the same lock on both branches, in a fixed order:
+  it writes the target's ledger, and reads the source's, so no migration can land
+  on the source while its rows move.
+
+  The lock is transaction-scoped so it works behind a transaction-mode pooler
+  such as Neon's PgBouncer. A crashed run drops its connection, which ends the
+  transaction and frees the lock. There is no stale claim to clear.
+
+  The lock's transaction pings every 10 seconds while the run works, so an
+  idle-in-transaction timeout longer than that does not end it early. It needs a
+  pool of at least two connections, one for the lock and one for the work, and
+  refuses a smaller pool up front instead of waiting on itself.
+
+- Updated dependencies [56c0957]
+- Updated dependencies [f92b97c]
+- Updated dependencies [56c0957]
+- Updated dependencies [f92b97c]
+- Updated dependencies [f92b97c]
+  - @usegraft/mcp@1.0.0-beta.3
+  - @usegraft/assets@1.0.0-beta.3
+  - @usegraft/db@1.0.0-beta.3
+  - @usegraft/studio@1.0.0-beta.3
+  - @usegraft/contracts@1.0.0-beta.3
+  - @usegraft/compiler@1.0.0-beta.3
+  - @usegraft/content-api@1.0.0-beta.3
+  - @usegraft/core@1.0.0-beta.3
+  - @usegraft/auth@1.0.0-beta.3
+  - @usegraft/content-migrations@1.0.0-beta.3
+  - @usegraft/mdx-safety@1.0.0-beta.3
+  - @usegraft/registry@1.0.0-beta.3
+
 ## 1.0.0-beta.2
 
 ### Patch Changes

@@ -1,15 +1,21 @@
 ---
 title: SDK reference
-description: One schema types every read, on six frameworks and in the browser.
+description: "Every Graft SDK package, what each one adds, how to mount Graft routes, cache tags, and where the frameworks differ."
 section: Reference
-order: 2
+order: 1
 ---
 
-Reads flow through `@usegraft/sdk-core`. Framework packages re-export the surface
-with local ergonomics. The same `graft.config.ts` types every package. Install,
-the handle, and the one caveat you cannot infer live on the adapter pages
-under [Reading content](/docs/reading-content). This page is mounts, cache
-tags, and the honest gaps.
+<p className="kicker">Which package to use, and what differs between frameworks.</p>
+
+Use this page to look up a package, compare frameworks, mount Graft's routes,
+or wire up cache tags. To learn the three reads themselves, start with
+[Reading content](/docs/reading-content). Your framework's guide covers
+installing and creating the client.
+
+Every package reads through `@usegraft/sdk-core`. The framework packages wrap
+it, adjust it to how each framework works, and rename the reads
+(`getDocument` becomes `getContent`, and so on). The same `graft.config.ts`
+types all of them.
 
 | Package | For | Notes |
 | --- | --- | --- |
@@ -19,12 +25,12 @@ tags, and the honest gaps.
 | `@usegraft/sdk-sveltekit` | SvelteKit | `graftRoute` for `+server.ts`; CDN surrogate keys for tags |
 | `@usegraft/sdk-tanstack-start` | TanStack Start | `graftRoute` for server routes; build the handle in a server-only module |
 | `@usegraft/sdk-react-router` | React Router v7 | Framework mode; `graftRoute` returns both `action` and `loader` |
-| `@usegraft/sdk-react` | the browser | Reads over HTTP; `createGraftHooks`; no `db` option by construction |
+| `@usegraft/sdk-react` | the browser | Reads over HTTP; `createGraftHooks`; no `db` option, by design |
 
 Every adapter is typed **structurally**, so none of them takes a dependency on
 the framework it adapts and there is no peer version to keep in step.
 
-## Shared surface
+## The read API
 
 ```ts
 const graft = createGraft({ db, collections, branch: "main" });
@@ -37,13 +43,11 @@ await graft.searchContent("docs", "branching");
 Unknown collection names are compile-time errors when you pass your
 `collections` map. Reads re-validate; a poisoned index row throws.
 
-Every framework adapter takes `db` directly, as above. `createClient` in
-`@usegraft/sdk-core` does not: it takes an `index`, and a Postgres handle goes
-to `createDbClient` from `@usegraft/sdk-core/db`. Accepting `db` on the main
-entry meant importing the database package for its value, which put `postgres`
-and `drizzle-orm` into the dependency graph of everything downstream — including
-the browser client. `@usegraft/db` is an optional peer dependency now, so a
-server install resolves it and a browser install never sees it.
+Every framework package accepts `db` directly, as above. `createClient` in
+`@usegraft/sdk-core` does not: it takes an `index`. For Postgres without a
+framework, use `createDbClient` from `@usegraft/sdk-core/db`. Keeping the
+database code on its own entry point means a browser install never pulls in a
+Postgres driver.
 
 Pass `index` instead of `db` to read a static SQLite artifact or a remote
 `graft serve` through `createContentApiReader`. The SDK surface does not
@@ -53,7 +57,7 @@ change. See [Reading content](/docs/reading-content).
 `endpoint`, never a `db`, because a Postgres handle in a browser bundle is a
 database URL in a browser bundle. It also refuses `branch` with a
 `CONFIG_INVALID`, since a `graft serve` endpoint pins its own branch and ignores
-the query param — point at the preview's own endpoint instead. Its hooks come
+the query param. Point at the preview's own endpoint instead. Its hooks come
 from `createGraftHooks(graft)` rather than being importable directly, which is
 what keeps them typed to your collections.
 
@@ -68,7 +72,7 @@ They are a binding, not a cache: no deduplication, no retries, no
 stale-while-revalidate. `graft.getContent` is a plain async function, so compose
 it with TanStack Query or SWR if you want those.
 
-## Mount the runtime
+## Mount Graft's routes in your app
 
 Handlers are Web-standard. Mounts are thin:
 
@@ -105,26 +109,31 @@ the caller nothing.
 
 | Helper | Use |
 | --- | --- |
-| `tagsFor(collection, slug?)` | What a read depends on |
-| `tagsForChanges(branch, changeSet)` | What a compile invalidated |
+| `tagsFor(branch, collection, slug?)` | The tags a read depends on |
+| `tagsForChanges(branch, changes)` | The tags to refresh after content changes |
 
-Next maps tags onto `'use cache'` + `revalidateTag`. Every other adapter stamps
-CDN headers and purges from a compile webhook. Unchanged documents invalidate
-nothing. Preview branches do not bust main.
+In Next.js, tag cached reads and refresh them with `revalidateContent`. On
+Next.js 16, tag reads with `'use cache'` and `cacheTag`. On Next.js 15, wrap
+them in `unstable_cache` with `tags`
+([how](/docs/next#refresh-pages-when-content-changes)).
+Every other framework sends the tags in a CDN header and purges them at the
+CDN. Unchanged documents are never refreshed, and a change on a preview branch
+never refreshes `main`.
 
-## Honest gaps
+## Where the frameworks differ
 
 - **`MdxBody` is Next-only.** It evaluates MDX in a Server Component, which no
   other adapter here has. Astro and SvelteKit author bodies for `@astrojs/mdx`
   or mdsvex; TanStack Start and React Router render authored source with their
   own pipeline.
-- **No `React.cache` equivalent outside Next** — call sites own memoization.
+- **No `React.cache` equivalent outside Next.** Call sites own memoization.
   TanStack Start route loaders are isomorphic, running on the server for first
   paint and in the browser on client navigation, so a handle holding a database
   connection belongs in a server function or server route and never in a loader.
 - **No tag-based data cache outside Next.** Everything else maps the
   `@usegraft/sdk-core` tag contract onto HTTP: stamp `tagsFor(...)` into a CDN
-  surrogate-key header and purge `tagsForChanges(...)` from the compile webhook.
-- **`sdk-react` has no cache and no `db`,** both by construction. See above.
-- Next apps should use `withGraft(nextConfig)` so `@usegraft/registry` stays
-  externalized for the server.
+  header and purge `tagsForChanges(...)` at the CDN when content changes.
+- **`sdk-react` has no cache and no `db` option,** by design. See above.
+- **Next.js apps that mount the MCP route need `withGraft(nextConfig)`.** It keeps
+  `@usegraft/registry` out of the server bundle, because that package reads its
+  files from disk at runtime.

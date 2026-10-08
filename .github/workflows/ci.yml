@@ -26,7 +26,7 @@ jobs:
       # raising what we advertise. A no-op on newer Node.
       NODE_OPTIONS: --experimental-strip-types
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Nothing in this job pushes, and a persisted token in .git/config
           # is one careless artifact upload away from being published.
@@ -36,7 +36,7 @@ jobs:
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # 22.16 is the floor: node:sqlite bundles FTS5 (the static index's
           # search) from 22.16.0, which is also >= pnpm 12's >=18 requirement.
@@ -85,6 +85,45 @@ jobs:
       - name: Zero-service quickstart gate
         run: pnpm test:quickstart
 
+  # @usegraft/sdk-next declares Next 15 and 16 as peers, and `next/cache`
+  # differs between them: 16 added `updateTag` and made `revalidateTag`'s
+  # profile required. The workspace installs one Next (16), so `verify` alone
+  # proves one of the two. Each leg runs a
+  # real app pinned to one major in the lockfile (packages/sdk-next/compat):
+  # it type-checks the Next.js guide's code blocks against that version, builds
+  # with `next build`, serves with `next start`, and checks reads, MDX,
+  # dedupe, tagged refresh and `updateContent` in a real Server Action.
+  sdk-next-compat:
+    name: sdk-next on Next ${{ matrix.next }}
+    runs-on: ubuntu-latest
+    strategy:
+      # One failing major must not hide the result of the others.
+      fail-fast: false
+      matrix:
+        next: ["15", "16"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this job pushes, and a persisted token in .git/config
+          # is one careless artifact upload away from being published.
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.16
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The adapter, everything it imports, and the CLI that compiles the
+      # app's index.
+      - run: pnpm turbo run build --filter=@usegraft/sdk-next... --filter=@usegraft/cli...
+      - run: pnpm --filter sdk-next-compat-next${{ matrix.next }} smoke
+
   # The integration suite is opt-in (RUN_INTEGRATION=1 + DATABASE_URL) and was
   # therefore never running here — including the only test that proves a
   # requester cannot approve their own destructive operation. A throwaway
@@ -112,7 +151,7 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/graft_test
       BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Nothing in this job pushes, and a persisted token in .git/config
           # is one careless artifact upload away from being published.
@@ -122,7 +161,7 @@ jobs:
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22.16
           cache: pnpm
@@ -157,7 +196,7 @@ jobs:
   container:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Nothing in this job pushes, and a persisted token in .git/config
           # is one careless artifact upload away from being published.
@@ -195,14 +234,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Nothing in this job pushes, and a persisted token in .git/config
           # is one careless artifact upload away from being published.
           persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22.16
 

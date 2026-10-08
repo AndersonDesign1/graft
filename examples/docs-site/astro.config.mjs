@@ -9,7 +9,7 @@ import { defineConfig } from "astro/config";
 // this app's own .env overrides on top. Both loads are harmless when the file
 // is absent (CI, prod) — and this site needs no DATABASE_URL at all now that it
 // reads the compiled static index.
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 
 for (const rel of ["../../.env", "./.env"]) {
@@ -19,6 +19,53 @@ for (const rel of ["../../.env", "./.env"]) {
   } catch {
     /* file absent — rely on the ambient environment */
   }
+}
+
+/**
+ * Serve a doc as Markdown when the request asks for it with
+ * `Accept: text/markdown`, the convention agents and nextjs.org follow. Every
+ * page already prerenders a `/docs/<slug>.md` twin, so this is a routing rule,
+ * not a function: a header-matched rewrite in Vercel's Build Output config,
+ * ahead of the filesystem phase so the HTML file does not answer first.
+ *
+ * The adapter offers no option for a header-conditioned route, and edge
+ * middleware would put a function call in front of every page view. So this
+ * runs after the adapter has written .vercel/output/config.json and inserts
+ * two routes at the top: one that adds `Vary: Accept` to every doc response,
+ * so a cache never hands the HTML to an agent or the Markdown to a browser, and
+ * one that performs the rewrite.
+ */
+/** @returns {import("astro").AstroIntegration} */
+function markdownNegotiation() {
+  return {
+    name: "graft-docs:markdown-negotiation",
+    hooks: {
+      "astro:build:done": async ({ logger }) => {
+        const path = fileURLToPath(new URL("./.vercel/output/config.json", import.meta.url));
+        let config;
+        try {
+          config = JSON.parse(readFileSync(path, "utf8"));
+        } catch {
+          logger.warn("no .vercel/output/config.json; skipping Accept: text/markdown routing");
+          return;
+        }
+        const doc = "^/docs/([a-z0-9-]+)/?$";
+        if (config.routes.some((/** @type {{ src?: string }} */ route) => route.src === doc))
+          return;
+        config.routes.unshift(
+          { src: doc, headers: { Vary: "Accept" }, continue: true },
+          {
+            src: doc,
+            has: [{ type: "header", key: "accept", value: ".*text/markdown.*" }],
+            dest: "/docs/$1.md",
+            check: true,
+          },
+        );
+        writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
+        logger.info("routed Accept: text/markdown on /docs/<slug> to /docs/<slug>.md");
+      },
+    },
+  };
 }
 
 // https://astro.build/config
@@ -78,7 +125,7 @@ export default defineConfig({
   // imports, not data files, so it has to be named or the functions deploy
   // without the thing they read.
   adapter: vercel({ includeFiles: [".graft/index.db"] }),
-  integrations: [react()],
+  integrations: [react(), markdownNegotiation()],
   vite: {
     // Tailwind v4 processes the fumadocs-ui stylesheet (docs shell only; the
     // landing + tokens stay hand-written CSS).

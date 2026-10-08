@@ -165,6 +165,29 @@ describe("reads over the content API", () => {
     expect(hits[0].snippet).toBe("<b>Intro</b>");
   });
 
+  it.each(["", "   "])("answers a blank query (%j) with [] and no request", async (query) => {
+    // The server refuses a blank query as an input error. The handle answers
+    // it instead, so a search box that starts empty never sees that error.
+    const requests: string[] = [];
+    const handler = createContentApiHandler({ collections: ["docs"], branch: "main", index });
+    const graft = createGraft({
+      endpoint: "http://cms.test/api/content/v1",
+      collections: { docs },
+      fetch: async (input, init) => {
+        const request = new Request(input, init);
+        requests.push(request.url);
+        return handler(request);
+      },
+    });
+
+    expect(await graft.searchContent("docs", query)).toEqual([]);
+    expect(requests).toEqual([]);
+
+    // The same handle still sends a real query.
+    await graft.searchContent("docs", "intro");
+    expect(requests).toHaveLength(1);
+  });
+
   it("surfaces the server's GraftError rather than an HTTP status", async () => {
     // The endpoint publishes one set of collections; asking for another is the
     // server's error to explain, and it has to survive the trip back.

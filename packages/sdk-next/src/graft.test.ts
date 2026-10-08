@@ -3,6 +3,7 @@
  * revalidateTag/updateTag. next/cache and react's cache are mocked so the test
  * is pure (no RSC runtime, no database); the tag contract itself is real.
  */
+import type { GraftError } from "@usegraft/contracts";
 import { defineCollection, field } from "@usegraft/core";
 import type { Document, SearchHit } from "@usegraft/sdk-core";
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
@@ -83,6 +84,48 @@ describe("updateContent", () => {
     expect(tags.sort()).toEqual(EXPECTED.sort());
     expect(updateTag.mock.calls.map((c) => c[0]).sort()).toEqual(EXPECTED.sort());
     for (const call of updateTag.mock.calls) expect(call).toHaveLength(1);
+  });
+});
+
+describe("on Next 15, whose next/cache has no updateTag", () => {
+  // The shape 15.5 actually exports: revalidateTag(tag), no updateTag.
+  async function loadOnOlderNext() {
+    const legacyRevalidateTag = vi.fn((tag: string) => {
+      void tag;
+    });
+    vi.resetModules();
+    vi.doMock("next/cache", () => ({
+      revalidateTag: legacyRevalidateTag,
+      revalidatePath: vi.fn(),
+      unstable_cache: vi.fn(),
+      // A real namespace reads a missing export as undefined. Vitest's mock
+      // proxy throws instead, so the absence is spelled out.
+      updateTag: undefined,
+    }));
+    const graft = await import("./graft");
+    return { ...graft, legacyRevalidateTag };
+  }
+
+  it("revalidateContent still revalidates every changed tag", async () => {
+    const { revalidateContent: revalidate, legacyRevalidateTag } = await loadOnOlderNext();
+    const tags = revalidate("main", { ...CHANGES });
+    expect(tags.sort()).toEqual(EXPECTED.sort());
+    expect(legacyRevalidateTag.mock.calls.map((c) => c[0]).sort()).toEqual(EXPECTED.sort());
+  });
+
+  it("updateContent throws a GraftError that names revalidateContent, and touches no tag", async () => {
+    const { updateContent: update, legacyRevalidateTag } = await loadOnOlderNext();
+    let thrown: unknown;
+    try {
+      update("main", { ...CHANGES });
+    } catch (error) {
+      thrown = error;
+    }
+    // Matched by shape: resetModules gives graft.ts a fresh copy of the class.
+    expect(thrown).toMatchObject({ name: "GraftError", code: "FRAMEWORK_VERSION_UNSUPPORTED" });
+    expect((thrown as GraftError).message).toContain("Next.js 16");
+    expect((thrown as GraftError).fix).toContain("revalidateContent");
+    expect(legacyRevalidateTag).not.toHaveBeenCalled();
   });
 });
 

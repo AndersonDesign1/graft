@@ -1,85 +1,113 @@
 ---
 title: Deploy
-description: Self-host Graft — one container, split compose, or handlers embedded in your app.
-section: Operate
-order: 7
+description: "Ship a static Graft site with your app, or run Graft on Postgres inside your app or as its own server, on your own infrastructure."
+section: Deploy & operate
+order: 0
 ---
 
-## Self-host Graft
+<p className="kicker">Run Graft on your own infrastructure. There is no Graft cloud to sign up for.</p>
 
-Graft is self-hostable. You run the source against your Postgres and your object
-store. There is no required Graft cloud.
+How you deploy depends on your [storage engine](/docs/tiers):
 
-### Container quick path
+- **Static projects** deploy like any other site. There is no Graft server.
+- **Postgres projects** also need the database, file storage if you use assets,
+  and somewhere for Graft's endpoints to run.
+
+## Deploy a static project
+
+Compile in your build command, so the index is built from the files in the
+commit being deployed:
 
 ```sh
-docker run -p 3903:3903 graft
-# migrate → compile → serve
-# GET /healthz reports branch + git SHA
+graft compile && next build
 ```
 
-Mount your project at `/project`. Boot also creates a hardened runtime role and
-serves under it, because this container owns its database. Full recipes live
-under `deploy/` in the repo.
+Then make sure `.graft/index.db` ships with your app. Most hosts include every
+file in the build output. Vercel traces imports, not data files, so name it
+explicitly if a server function reads it (this site does this, in
+`astro.config.mjs`):
 
-## Topologies
+```js
+adapter: vercel({ includeFiles: [".graft/index.db"] }),
+```
 
-Runtime work is a stateless `Request → Response` handler. Two wrappers, same bytes:
+That is the whole deployment. Pages that prerender at build time do not need
+the file at runtime at all.
 
-1. **Embedded** — your app (Next, Astro, SvelteKit, TanStack Start, React
-   Router) mounts the handlers as routes.
-2. **Headless** — `graft serve` binds those handlers to a Node HTTP server:
-   `POST /api/fn/<name>`, `POST /api/mcp`, `GET /api/content/v1/documents`,
-   `GET /api/content/v1/search`, `GET /healthz`. A frontend can read authored
-   content through `@usegraft/content-api` without a database of its own. See
-   [Reading content](/docs/reading-content).
+## Choose where Graft runs on Postgres
 
-   The two content routes **authenticate nobody**, and they publish every
-   collection in your config. They carry a 60-per-60s rate limit under
-   `graft serve`, which is a backstop against exhaustion, not an access control.
-   Anything reachable beyond a trusted proxy should be fronted by one that
-   checks. See [The content API](/docs/content-api#it-authenticates-nobody).
+Graft's endpoints (typed functions, the MCP endpoint for agents, the Content
+API, and a health check) can run in two places. They are the same code either
+way.
 
-## Adapters
-
-| Adapter | Topology | Runs |
+| | Inside your app | As its own server (`graft serve`) |
 | --- | --- | --- |
-| Railway | container | `deploy/docker` image + managed Postgres / R2 |
-| Fly.io | container | Same image on Fly Machines; Tigris or R2 for assets |
-| VPS | container | Split compose (`db` / `storage` / `graft`) behind a reverse proxy |
-| Vercel | embedded | App mounts handlers; compile is a build step |
+| How | Your framework mounts Graft's handlers as routes | A Node server runs the endpoints for you |
+| Choose it when | You already deploy a Next.js, Astro, SvelteKit, TanStack Start, or React Router app | You want a separate content backend, or your frontend cannot open the index |
+| Setup | Your [framework guide](/docs/next#serve-functions-and-mcp-from-your-app) | One command, or the container below |
 
-This docs site uses the Vercel embedded path from Astro.
+`graft serve` exposes:
 
-## Credential recipe
+| Route | What it is |
+| --- | --- |
+| `POST /api/fn/<name>` | [Typed functions](/docs/functions-and-access) |
+| `POST /api/mcp` | The [agent endpoint](/docs/connecting-agents) |
+| `GET /api/content/v1/documents`, `GET /api/content/v1/search` | The [Content API](/docs/content-api), for frontends with no index of their own |
+| `GET /healthz` | Health, with the branch and Git commit being served |
 
-Give the deployment a **runtime** credential that can execute mounted endpoints
-but cannot decide approvals:
+<Callout label="The Content API is public" type="warning">
+  The two content routes check no identity and serve every collection in your
+  config. Their rate limit stops one caller from exhausting the server, but it
+  is not access control. If the content should not be public, put a proxy in
+  front that checks. See [The content API](/docs/content-api#it-does-not-authenticate-requests).
+</Callout>
+
+## Run the container
+
+The quickest way to self-host is the Graft container. It bundles Postgres and
+file storage, runs migrations, compiles your content, and serves. During the
+beta the image is not published, so build it from the repository first:
 
 ```sh
-CREATE ROLE graft_runtime LOGIN PASSWORD '…';
-graft harden graft_runtime
-# deploy with the runtime role URL as DATABASE_URL
-# keep the operator URL for compile / migrate / approve
+docker build -f deploy/docker/Dockerfile -t graft .
 ```
 
-The container automates this. All-in-one does it by default; `GRAFT_MODE=serve`
-waits for `GRAFT_HARDEN=1` or `GRAFT_RUNTIME_PASSWORD`, because there the
-database is yours.
+Then run it with your project mounted at `/project`, and a named volume each for
+the database and the uploaded files, so both survive a new container:
 
-| Task | Credential |
-| --- | --- |
-| `graft compile`, `migrate --apply`, `merge`, `approve` | operator |
-| Functions, MCP (incl. content writes), reads, approval request/consume | runtime |
+```sh
+docker run --init -p 3903:3903 -v ./my-site:/project -v graft_pg:/var/lib/postgresql -v graft_minio:/data graft
+```
 
-The runtime role **can** project content — `graft harden` grants
-`INSERT`/`UPDATE` on `content_index` because compile needs it. What it cannot
-do is decide approvals. A stolen runtime credential can rewrite or hide index
-rows; the human gate on MCP `delete_content` is an application control, not a
-database lock. Keep the operator URL for compile, migrate, merge, and approve.
+`GET /healthz` reports the branch and Git commit it is serving. The container also creates a [hardened](/docs/hardening)
+database role at start and serves with it. Full recipes, including split
+`db` / `storage` / `graft` compose files, are under `deploy/` in the repository.
+
+## Where to host it
+
+| Host | How | Notes |
+| --- | --- | --- |
+| Railway | The container | With managed Postgres and R2 for assets |
+| Fly.io | The container on Fly Machines | Tigris or R2 for assets |
+| A VPS | Split compose (`db`, `storage`, `graft`) | Behind your own reverse proxy |
+| Vercel | Inside your app | Compile is a build step. This docs site runs this way. |
+
+## Set up database credentials
+
+A Postgres deployment should use two database logins:
+
+| Login | Where it lives | Used for |
+| --- | --- | --- |
+| **Operator** | Your machine or CI | `graft compile`, `graft migrate --apply`, `graft merge`, `graft approve` |
+| **Runtime** | The deployment's `DATABASE_URL` | Serving reads, running functions, agent content writes, requesting approvals |
+
+The runtime login cannot approve destructive actions, so a leaked app password
+cannot approve its own deletes. [Hardening](/docs/hardening) sets it up in four
+steps. The container does it for you in all-in-one mode, and in
+`GRAFT_MODE=serve` once you set `GRAFT_HARDEN=1` or `GRAFT_RUNTIME_PASSWORD`.
 
 ## Next steps
 
-- [Configuration](/docs/configuration) — env vars for serve, auth, and assets
-- [Audit & approvals](/docs/audit-and-approvals) — how the human gate survives deploy
-- [What is Graft](/docs/what-is-graft) — product overview
+- [Hardening](/docs/hardening) sets up the two database logins.
+- [Configuration](/docs/configuration) lists every environment variable.
+- [Observability](/docs/observability) covers health checks and tracing calls.

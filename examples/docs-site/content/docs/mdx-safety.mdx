@@ -1,32 +1,43 @@
 ---
 title: MDX safety
-description: Authored bodies are prose, not code. What the gate refuses, where it runs, and when to turn it off.
-section: Build
-order: 13
+description: MDX can run code. Graft refuses the parts that run by default, so anyone who can write content cannot run code on your server.
+section: Content
+order: 6
 ---
 
-MDX is code. `{expr}` evaluates JavaScript, `import` pulls modules in, and
-rendering evaluates the compiled body with `new Function` in the host runtime —
-with `process`, `fetch`, and dynamic `import()` available.
+<p className="kicker">Let writers and agents edit content without letting them run code.</p>
 
-For content an operator wrote and reviewed in git, that is a feature. It stops
-being one the moment an author is not the operator.
+MDX is Markdown that can include components. It can also run code. A
+`{expression}` in an MDX file runs JavaScript when the page renders, and an
+`import` can load any module. That code runs on your server, with
+access to `process.env`, `fetch`, and everything else your app can reach.
 
-<Callout label="what the setting is really about">
-  On a Studio hosted for writers, or an agent authoring over MCP, "can write
-  content" would otherwise mean "can execute code on the render host". On shared
-  infrastructure that reaches other tenants.
-</Callout>
+When you are the only author and every change goes through review in Git, that
+power is useful. It becomes a risk as soon as someone else can write content:
+a writer using [Studio](/docs/studio), or an agent writing over MCP. Without a
+check, "can edit a page" would mean "can run code on your server".
 
-## The default
+So, by default, Graft checks MDX on every path it writes or compiles:
+`write_content`, Studio saves, and `graft compile`. It refuses anything that
+can run code. A body written straight into the database skips the write-time
+check. In Next.js, `MdxBody` checks again when it renders, so even that body is
+refused there. Plain Markdown and components with plain text attributes still
+work. Setting `mdxTrust = "full"` (or `trust="full"` on `MdxBody`) turns the
+check off for that path. This page lists what is refused, where the check runs,
+and how to allow full MDX for content you write yourself.
+
+## What is protected by default
 
 `mdxTrust` defaults to `"restricted"`, so you get this without configuring
 anything.
 
+<CodeBlock title="graft.config.ts">
+
 ```ts
-// graft.config.ts
 export const mdxTrust = "restricted"; // the default
 ```
+
+</CodeBlock>
 
 Under `"restricted"`, a body may be prose, Markdown, GFM, and components with
 literal string attributes. Everything that evaluates is refused.
@@ -47,7 +58,7 @@ expression at all, and MDX renders an unknown lowercase tag straight through to
 HTML. An `onerror` with a plain string value still runs in a browser, because
 React writes an unrecognized attribute into the markup as-is.
 
-## Where it runs
+## Where Graft checks
 
 Three places, and they are checking different things.
 
@@ -62,16 +73,16 @@ The compile check is what makes the failure a build-time one. Without it,
 `MdxBody` refusing at render would mean an unchecked tree fails per-request in
 production instead.
 
-<Callout label="Next only">
+<Callout label="Next.js only" type="note">
   The render-time row is `MdxBody`, which lives in `@usegraft/sdk-next` because
   it evaluates MDX in a Server Component. **No other adapter has a render-time
-  check** — Astro, SvelteKit, TanStack Start and React Router hand you the
+  check.** Astro, SvelteKit, TanStack Start and React Router hand you the
   authored source and you render it with your own pipeline, which is where that
   responsibility then sits. This documentation site is one of them.
 
   So on those stacks the write-side guards and `graft compile` are the whole
-  defence, and the case the render check exists for — content inserted straight
-  into the index with the runtime credential, which no write-side guard sees —
+  defence, and the case the render check exists for (content inserted straight
+  into the index with the runtime credential, which no write-side guard sees)
   is one your own renderer has to answer. `assertSafeMdx` from
   `@usegraft/mdx-safety` is exported for exactly that.
 </Callout>
@@ -96,24 +107,27 @@ Executable MDX in 3 document(s): docs/pricing.mdx ({price}),
 pages/home.mdx (<script>), docs/faq.mdx ({items.map}).
 ```
 
-A single write — `write_content`, or a Studio save — names the constructs
+A single write (a `write_content` call, or a Studio save) names the constructs
 instead, with kind, line, and a truncated snippet for up to five, then counts
 the rest:
 
 ```text
-Executable MDX is not accepted in docs/pricing — found a `{…}` expression
+Executable MDX is not accepted in docs/pricing. Found a `{…}` expression
 (line 12): {price}.
 ```
 
 An unparseable document gets its own message, because the checker cannot vouch
 for source it could not read.
 
-## Turning it off
+## Allowing full MDX for content you trust
+
+<CodeBlock title="graft.config.ts">
 
 ```ts
-// graft.config.ts
 export const mdxTrust = "full";
 ```
+
+</CodeBlock>
 
 Set this only when every author of the repository has commit access, because
 then code review is the control and MDX is just part of the source.
@@ -133,7 +147,7 @@ Anything other than the two known values is refused rather than defaulted, with
 `CONFIG_INVALID`. A typo would otherwise silently re-enable the restriction
 somebody was deliberately turning off, or the reverse.
 
-## What this is not
+## Limitations: it is not an HTML sanitizer
 
 It refuses constructs that **execute**. It is not an HTML sanitizer.
 
@@ -143,50 +157,53 @@ content from people you do not trust at all, put `rehype-sanitize` in the
 pipeline as well. This closes the MDX-specific hole a Markdown sanitizer would
 not even see.
 
-## Unparseable bodies are refused
-
-Source the checker cannot parse is refused, not waved through.
-
-The earlier behavior was to return "nothing found" on the reasoning that a body
-which will not parse cannot execute either. That only holds if this parser
-understands at least as much as the one that renders, and two
-independently-configured parsers will drift. The failure mode of the shortcut is
-to wave through exactly the source that sits in the gap.
-
-The checker parses with remark-gfm for the same reason: `MdxBody` compiles with
-it, so without it a body could fail to parse here while compiling fine for real.
-
 ## Writing components that pass
 
-Components are fine. Only literal string attributes are.
+Components are fully supported as long as attributes are literal strings:
 
 ```mdx
-<Callout label="invariant">
+<Callout label="Note">
   Git is authoritative for authored content.
 </Callout>
 ```
 
-Three mechanical rules from authoring this site:
+### Tips for components in MDX
 
-1. Put each JSX tag on its own line. Markdown only treats JSX as one block when
-   nothing shares its opening line.
-2. Leave a blank line around nested fences and prose inside a component.
-3. Never put a component inside a heading. It changes the heading's anchor id —
-   `## Quick start <TierBadge …>` slugs as `quick-start-` — which breaks the
-   table of contents and any external link. Put badges on their own line
-   underneath.
+- **Place each JSX tag on its own line.** Markdown parsers treat JSX as a distinct
+  block only when no markdown syntax shares its opening tag line.
+- **Leave blank lines around nested prose.** Ensure empty lines exist before and
+  after markdown lists or code blocks nested inside JSX components.
+- **Keep components outside headings.** Adding a component inside an `##` heading
+  modifies its slug anchor id and can break table-of-contents links.
 
-## Why not a sandbox
+---
 
-Removing the executable surface was chosen over containing it. `node:vm` is
-explicitly not a security boundary, and a worker thread cannot hand React
-elements back across its boundary without breaking component identity under RSC.
+<details>
+<summary><strong>Deep dive: Why Graft validates the AST instead of using a VM sandbox</strong></summary>
 
-What can be made safe is the input.
+### Why not a sandbox?
+Removing the executable surface at input validation was chosen over containing
+it at runtime. `node:vm` is explicitly not a security boundary, and running a
+worker thread sandbox cannot return real React elements back across the thread
+boundary without breaking component reference identity under React Server
+Components (RSC). What can be guaranteed safe is the input AST itself.
+
+### Refusal of unparseable source
+Source that the checker cannot parse is refused rather than passed through.
+Assuming that unparseable source cannot execute is unsafe because independent
+parsers can drift. The checker parses with `remark-gfm` to guarantee parity
+with the runtime compiler.
+
+### Executable vs HTML sanitization
+Graft's MDX gate specifically prevents arbitrary server-side code execution.
+If your application accepts content from untrusted external users, you should also
+incorporate `rehype-sanitize` into your render pipeline to strip unwanted HTML
+attributes (e.g. `style` or `srcdoc`).
+</details>
 
 ## Next steps
 
-- [Configuration](/docs/configuration#mdxtrust) — the setting in context
-- [Studio](/docs/studio) — where an author is not the operator
-- [MCP tools](/docs/mcp-tools#write_content) — the write path this guards
-- [Schema](/docs/schema) — the other half of what a document must satisfy
+- [Configuration](/docs/configuration#mdxtrust) documents the setting in context.
+- [Studio](/docs/studio) is where an author is not the operator.
+- [MCP tools](/docs/mcp-tools#write_content) documents the write path this guards.
+- [Schema](/docs/schema) is the other half of what a document must satisfy.

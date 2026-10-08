@@ -136,7 +136,7 @@ const receipts = [
     </section>
 
     <section class="section reveal" aria-label="The default position">
-      <p class="section-label">§00 <em>the default position</em></p>
+      <p class="section-label"><em>the default position</em></p>
       <h2>Safe by construction, <span class="marked">not by promise.</span></h2>
       <p class="section-lede">
         Four properties hold before you configure anything. Each one is code you
@@ -146,7 +146,6 @@ const receipts = [
         {
           pillars.map((p) => (
             <li class="why-pillar">
-              <span class="why-pillar-n">{p.n}</span>
               <h3>{p.title}</h3>
               <p>{p.body}</p>
             </li>
@@ -156,7 +155,7 @@ const receipts = [
     </section>
 
     <section class="section reveal" aria-label="The approval gate">
-      <p class="section-label">§01 <em>the gate</em></p>
+      <p class="section-label"><em>the gate</em></p>
       <h2>Destructive ops <span class="marked">ask twice.</span></h2>
       <p class="section-lede">
         A destructive function's first call never executes. It files an approval
@@ -189,7 +188,7 @@ const receipts = [
     </section>
 
     <section class="section reveal" aria-label="Role separation">
-      <p class="section-label">§02 <em>role separation</em></p>
+      <p class="section-label"><em>role separation</em></p>
       <h2>The runtime role <span class="marked">cannot self-approve.</span></h2>
       <p class="section-lede">
         Separation of duties lives in Postgres, not in a promise: consuming an
@@ -228,7 +227,7 @@ const receipts = [
     </section>
 
     <section class="section reveal" aria-label="Audit trail">
-      <p class="section-label">§03 <em>receipts</em></p>
+      <p class="section-label"><em>receipts</em></p>
       <h2>Every call leaves a row.</h2>
       <p class="section-lede">
         Actor, function, input hash, status, duration, correlation id, and the
@@ -251,7 +250,7 @@ const receipts = [
     </section>
 
     <section class="section reveal" aria-label="Blast radius">
-      <p class="section-label">§04 <em>blast radius</em></p>
+      <p class="section-label"><em>blast radius</em></p>
       <h2>An agent edit <span class="marked">is a diff.</span></h2>
       <p class="section-lede">
         An agent edit is a file edit. It shows up in <code>git status</code>, in
@@ -273,7 +272,7 @@ const receipts = [
     </section>
 
     <section class="why-receipts section reveal" aria-label="Receipts in the docs">
-      <p class="section-label">§05 <em>in the docs</em></p>
+      <p class="section-label"><em>in the docs</em></p>
       <h2>Mechanisms, documented.</h2>
       <p class="section-lede">Every claim on this page links to the page that teaches it.</p>
       <ul class="why-receipt-grid">
@@ -293,7 +292,7 @@ const receipts = [
     {
       faqs.length > 0 && (
         <section class="section reveal" id="faq" aria-labelledby="security-faq-heading">
-          <p class="section-label">§06 <em>faq</em></p>
+          <p class="section-label"><em>faq</em></p>
           <h2 id="security-faq-heading">Asked about trust</h2>
           <LandingFaq items={faqs} />
         </section>

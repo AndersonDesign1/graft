@@ -1,204 +1,390 @@
 ---
 title: Getting started
 description: Create a Graft project, compile content, and read it back typed.
-section: Start here
+section: Get started
 order: 1
 ---
 
-This page gets you from an empty folder to a typed document.
-New to Graft? Start at [What is Graft](/docs/what-is-graft).
+<p className="kicker">Go from an empty folder to your content on a page in about 10 minutes.</p>
 
-## Prerequisites
+In this guide you will:
 
-- Node.js 22.16 or newer. The static index's full-text search uses the
-  `node:sqlite` build that ships from 22.16.0.
-- Nothing else. A content project needs no database and no object store.
+- Set up Graft in a project with `graft init`
+- Compile your content, which checks each file and builds the index your app
+  reads from
+- Read a document in your app, with full TypeScript types
 
-Postgres is required only for operational data, typed functions, and
-copy-on-write branches. [Add it later](#move-to-postgres) when you need one of
-those.
+## Before you start
 
-## Quick start
+You need **Node.js 22.16 or newer**. Graft's static index uses the `node:sqlite`
+module that ships with it. You do not need a database or a cloud account.
 
-<TierBadge tier="static" />
-
-<Callout label="Graft is in beta">
-  Everything here is written against `1.0.0-beta.x`, and that is what a plain
-  install gives you — `latest` points at the beta, so no tag is needed on any
-  command on this page.
-
-  Beta means the shape is settled and the details still move. Breaking changes
-  land between betas when a review or a bug argues for one, and each is written
-  up in the changelog rather than discovered. If that is a poor fit for what you
-  are building, wait for 1.0; if you want a say in what 1.0 looks like, this is
-  the moment when feedback still changes things.
+<Callout label="Prefer to let your agent do it?" type="note">
+  Paste this into Claude Code, Cursor, or another coding agent:
+  "Add Graft to this project following https://graft.page/docs/getting-started.md.
+  Use the static engine, compile the sample content, and render the `home` page."
 </Callout>
+
+## Set up your first project
+
+Pick the tab that matches your project. Each one runs the same three steps:
+set up, compile, read. The Next.js and Astro paths end with a rendered page.
+The plain TypeScript path prints the document in your terminal, with no
+framework involved. Other frameworks are listed [after the tabs](#your-framework).
+
+<Tabs labels="Next.js, Plain TypeScript, Astro">
+
+<Tab>
+
+### Next.js (App Router)
+
+Goal: render a compiled document in a Server Component.
 
 <Steps>
 
-<Step title="Scaffold a project">
+<Step title="Install the Next.js SDK and CLI">
 
-<Tabs labels="pnpm, npm, bun">
-
-<Tab>
-
-```sh
-pnpm dlx @usegraft/cli@latest init my-site
-cd my-site
-```
-
-</Tab>
-
-<Tab>
+The SDK needs Next.js 15.5.24 or newer on 15, or 16.3.3 or newer on 16. Check
+yours with `npx next --version`, and upgrade first if it is older.
 
 ```sh
-npx @usegraft/cli@latest init my-site
-cd my-site
-```
-
-</Tab>
-
-<Tab>
-
-```sh
-bunx @usegraft/cli@latest init my-site
-cd my-site
-```
-
-</Tab>
-
-</Tabs>
-
-Run it under the full package name. The bare name `graft` on npm belongs to an
-unrelated package.
-
-`graft init` writes `graft.config.ts`, `content/pages/home.mdx`, and the
-`graft/` barrel for owned primitives. It scaffolds the static index by default.
-
-</Step>
-
-<Step title="Compile and watch">
-
-```sh
-npx @usegraft/cli@latest compile   # validate content/ and write .graft/index.db
-npx @usegraft/cli@latest dev       # recompile when content or config changes
-```
-
-Still the full package name, and still transient. `graft init` scaffolds
-`graft.config.ts`, `content/`, the `graft/` barrel and `llms.txt` — it does not
-write a `package.json` or install anything, so there is no `graft` on your PATH
-yet. Add it to the project once you have a `package.json` and the short form
-works through your package manager:
-
-```sh
-npm i -D @usegraft/cli   # then: npx graft compile, or a "compile" script
+npm i @usegraft/sdk-next @usegraft/db
+npm i -D @usegraft/cli
 ```
 
 </Step>
 
-<Step title="Read a document">
+<Step title="Initialize Graft">
 
-<CodeBlock title="app/page.ts" note="no database">
+```sh
+npx @usegraft/cli@latest init
+```
+
+This scaffolds `graft.config.ts`, creates sample content in `content/pages/home.mdx`,
+and sets up the static index.
+
+</Step>
+
+<Step title="Compile your content">
+
+```sh
+npx graft compile
+```
+
+This validates your markdown files against the schema and writes an embedded
+SQLite index to `.graft/index.db`. The index is derived state: your files in
+Git stay authoritative, and recompiling rebuilds it at any time.
+
+</Step>
+
+<Step title="Create the Graft client">
+
+The client is the object your pages read through. Create it once, in its own
+module, so every page shares it:
+
+<CodeBlock title="lib/graft.ts">
 
 ```ts
 import { openStaticIndex } from "@usegraft/db";
-import { createClient } from "@usegraft/sdk-core";
-import { collections } from "../graft.config";
+import { createGraft } from "@usegraft/sdk-next";
+import { collections } from "@/graft.config";
 
-const index = await openStaticIndex(".graft/index.db");
-const graft = createClient({ index, collections });
-
-const home = await graft.getDocument("pages", "home");
-//    ^? typed by your pages collection
+export const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});
 ```
 
 </CodeBlock>
 
-Framework adapters wrap the same surface. `graft init` leaves you on the
-static index; [Next](/docs/next) and [Astro](/docs/astro) show that path with
-`createGraft({ index, collections })`. The other adapters are under
-[Reading content](/docs/reading-content).
+It lives outside `app/` on purpose. A Next.js page file may only export the
+page and its route options, so a client exported from `app/page.tsx` fails the
+build's type check.
+
+</Step>
+
+<Step title="Read content in a Server Component">
+
+Replace `app/page.tsx` to read the sample page and render it:
+
+<CodeBlock title="app/page.tsx">
+
+```tsx
+import { MdxBody } from "@usegraft/sdk-next";
+import { notFound } from "next/navigation";
+import { graft } from "@/lib/graft";
+
+export default async function Page() {
+  const home = await graft.getContent("pages", "home");
+  if (!home) notFound();
+
+  return (
+    <main>
+      <h1>{home.data.title}</h1>
+      <p>{home.data.tagline}</p>
+      <MdxBody source={home.body} />
+    </main>
+  );
+}
+```
+
+</CodeBlock>
+
+`home.data` is typed from your schema: hover `title` in your editor and you
+will see `string`. `MdxBody` renders the Markdown body on the server.
+
+Start your dev server and open `http://localhost:3000`:
+
+```sh
+npm run dev
+```
+
+You should see the heading **Hello, Graft**, its tagline, and the body text
+from `content/pages/home.mdx`. Edit that file, run `npx graft compile` again,
+and refresh to see the change.
 
 </Step>
 
 </Steps>
 
-`.graft/index.db` is derived from the files in git, so it is git-ignored.
-Rebuild it in your build command:
+</Tab>
+
+<Tab>
+
+### Plain TypeScript (No Framework)
+
+Goal: read a compiled document from a script, with no framework involved.
+
+<Steps>
+
+<Step title="Scaffold a project folder">
 
 ```sh
-graft compile && next build
+mkdir my-graft-site && cd my-graft-site
+npm init -y
+npm pkg set type=module
+npm i @usegraft/db @usegraft/sdk-core
+npm i -D @usegraft/cli tsx typescript @types/node
+npx @usegraft/cli@latest init
 ```
 
-## Move to Postgres
+`type=module` makes the project an ES module, so the script in the last step
+can use `await` at the top level.
 
-Postgres adds operational data, typed functions with access and approvals, and
-copy-on-write branches. Reach for one of those in static mode and Graft answers
-`NEEDS_DATABASE`, whose `fix` is these three steps.
+</Step>
 
-Add your database URL to `.env`. Any parent directory works:
+<Step title="Compile content">
 
 ```sh
-DATABASE_URL=postgres://…
+npx graft compile
 ```
 
-Change one line in `graft.config.ts`:
+This compiles `content/pages/home.mdx` into `.graft/index.db`.
+
+</Step>
+
+<Step title="Read and verify output">
+
+Create `read.ts`:
+
+<CodeBlock title="read.ts">
 
 ```ts
-export const index = "postgres";
+import { openStaticIndex } from "@usegraft/db";
+import { createClient } from "@usegraft/sdk-core";
+import { collections } from "./graft.config";
+
+const index = await openStaticIndex(".graft/index.db");
+const graft = createClient({ index, collections });
+
+const home = await graft.getDocument("pages", "home");
+
+console.log("Title:", home?.data.title);
+console.log("Tagline:", home?.data.tagline);
 ```
 
-Apply the schema that ships with `@usegraft/db`, then compile:
+</CodeBlock>
+
+Without a framework you use `@usegraft/sdk-core` directly, whose read method is
+`getDocument`. The framework packages wrap the same call and name it
+`getContent`. Both return the same typed document.
+
+Run the script:
 
 ```sh
-graft db migrate
-graft compile
+npx tsx read.ts
 ```
 
-Reads move to a framework adapter. Pass `db` instead of the artifact — the
-surface does not change. [Next](/docs/next) and [Astro](/docs/astro) show both
-the static-index path `graft init` scaffolds and the Postgres swap.
+You will see the values from `content/pages/home.mdx`:
 
-## Author a document
+```text
+Title: Hello, Graft
+Tagline: Content lives in git; the index is a file.
+```
 
-Documents are MDX files. Frontmatter must satisfy the collection schema.
+</Step>
+
+</Steps>
+
+</Tab>
+
+<Tab>
+
+### In your Astro project
+
+Goal: render a compiled document in a zero-JavaScript Astro page.
+
+<Steps>
+
+<Step title="Install the Astro SDK and CLI">
+
+```sh
+npm i @usegraft/sdk-astro @usegraft/db
+npm i -D @usegraft/cli
+```
+
+</Step>
+
+<Step title="Initialize Graft">
+
+```sh
+npx @usegraft/cli@latest init
+```
+
+</Step>
+
+<Step title="Compile your content">
+
+```sh
+npx graft compile
+```
+
+</Step>
+
+<Step title="Read content in an Astro page">
+
+In `src/pages/index.astro`:
+
+```astro
+---
+import { openStaticIndex } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-astro";
+import { collections } from "../../graft.config";
+
+const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});
+
+const home = await graft.getContent("pages", "home");
+---
+
+<main>
+  <h1>{home?.data.title}</h1>
+  <p>{home?.data.tagline}</p>
+</main>
+```
+
+</Step>
+
+</Steps>
+
+</Tab>
+
+</Tabs>
+
+### Your framework
+
+Every framework reads the same index with the same typed calls. Pick your guide:
+
+| Framework | Package | Guide |
+| :--- | :--- | :--- |
+| Next.js (App Router) | `@usegraft/sdk-next` | [Next.js](/docs/next) |
+| Astro | `@usegraft/sdk-astro` | [Astro](/docs/astro) |
+| SvelteKit | `@usegraft/sdk-sveltekit` | [SvelteKit](/docs/sveltekit) |
+| TanStack Start | `@usegraft/sdk-tanstack-start` | [TanStack Start](/docs/tanstack-start) |
+| React Router (framework mode) | `@usegraft/sdk-react-router` | [React Router](/docs/react-router) |
+| React in the browser | `@usegraft/sdk-react` | [React](/docs/react) |
+| Plain Node or TypeScript | `@usegraft/sdk-core` | [SDK reference](/docs/sdk-reference) |
+
+## Add your own content
+
+Each document is a file at `content/<collection>/<slug>.mdx`:
+
+- A **collection** is a named group of documents, like `pages`. Its fields are
+  declared in `graft.config.ts`.
+- The **slug** is the document's name inside the collection. `content/pages/about.mdx`
+  has the slug `about`.
+- **Frontmatter** is the block between the `---` lines at the top. Its fields
+  must match the collection's schema, or the compile stops and says which field
+  is wrong.
+- The rest of the file is the body, in Markdown or MDX (Markdown that can
+  include components).
+
+Create `content/pages/about.mdx`:
+
+<CodeBlock title="content/pages/about.mdx">
 
 ```mdx
 ---
-title: Hello, Graft
-tagline: Content lives in git. Postgres is the index.
+title: About us
+tagline: We build with code and AI agents.
 ---
 
-Body prose is real MDX. It is searchable and versioned with the repo.
+Welcome! This page lives in Git, next to your code.
 ```
 
-Path shape: `content/<collection>/<slug>.mdx`. Slugs are kebab-case. A
-frontmatter `slug:` field overrides the filename.
+</CodeBlock>
 
-## Terms
+Then compile again, or leave `graft dev` running so it recompiles whenever a
+file changes:
 
-| Term | Meaning |
-| --- | --- |
-| **compile** | Validate MDX against the schema and write it to the index |
-| **index** | The queryable projection of your content. A SQLite artifact, or the `content_index` table on Postgres. Derived from git, so rebuild it with compile |
-| **project** | Your Graft app directory (config + `content/` + optional `graft/`) |
+```sh
+npx graft compile    # compile once
+npx graft dev        # recompile on every change
+```
 
-## Common failures
+Read it the same way you read `home`: `graft.getContent("pages", "about")`.
 
-| Error | Meaning | Fix |
-| --- | --- | --- |
-| `CONFIG_NOT_FOUND` | No `graft.config.ts` above cwd | Run `graft init` or cd into the project |
-| `ENV_VAR_MISSING` | `DATABASE_URL` (or other required env) absent | Set it in `.env` |
-| `NEEDS_DATABASE` | A Postgres-tier feature was used in static mode | Follow [Move to Postgres](#move-to-postgres) |
-| `INDEX_OWNERSHIP` | Compile would purge another project's collections | Use a dedicated database (or branch) per project |
-| `CONTENT_DIR_NOT_FOUND` | `content/` missing | Create it or fix `contentDir` in config |
+## When you need Postgres
 
-Every Graft error includes a `fix` field. Do what it says, then retry.
+The project you just made uses the static engine, which needs nothing running.
+Move to Postgres when users of your site write data at runtime, such as
+comments, orders, or form submissions. Git cannot rebuild that data, so it
+needs a database. Preview branches need Postgres too.
+
+Switching is one line in `graft.config.ts` (`export const index = "postgres"`)
+plus a database URL. [Storage engines](/docs/tiers) walks you through it.
+
+## If something goes wrong
+
+These are the errors people hit most often while getting started:
+
+| Error code | What it means | What to do |
+| :--- | :--- | :--- |
+| `STATIC_INDEX_NOT_FOUND` | Your app read the index before it was compiled | Run `npx graft compile`, then start your app |
+| `STATIC_INDEX_UNSUPPORTED` | Your Node.js version is older than 22.16 | Upgrade Node.js |
+| `SCHEMA_VALIDATION_FAILED` | A file's frontmatter does not match its schema | The message names the file and field. Fix it and compile again |
+| `NEEDS_DATABASE` | Your config uses a feature that needs Postgres | See [When you need Postgres](#when-you-need-postgres) |
+
+Every error also prints a `fix` line with the exact next step. The
+[Error reference](/docs/errors) explains all of them.
 
 ## Next steps
 
-- [Schema](/docs/schema) — define collections and fields with `defineCollection`
-- [Reading content](/docs/reading-content) — one page per framework adapter
-- [Powered by Graft](/docs/powered-by-graft) — the footer badge, as a paste
-- [The agent surface](/docs/agent-surface) — operate via MCP and the CLI
-- [Deploy](/docs/deploy) — self-host with a container or embed handlers
+You have content in Git, a compiled index, and a typed read. From here:
+
+<DocCards>
+  <DocCard title="How Graft works" href="/docs/the-model">
+    What compiling does, and why your files stay the source of truth.
+  </DocCard>
+  <DocCard title="Schema" href="/docs/schema" icon="typescript">
+    Describe your own collections and fields.
+  </DocCard>
+  <DocCard title="Your framework guide" href="/docs/next" icon="next">
+    Rendering MDX, caching, and route handlers, starting with Next.js.
+  </DocCard>
+  <DocCard title="Connecting an agent" href="/docs/connecting-agents" icon="agent">
+    Let Claude Code, Cursor, or any MCP client edit your content.
+  </DocCard>
+</DocCards>

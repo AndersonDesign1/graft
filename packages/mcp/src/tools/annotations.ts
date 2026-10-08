@@ -15,9 +15,11 @@
  * separation in Postgres. These make an honest client's UX good; they do not
  * make a dishonest one safe.
  *
- * `openWorldHint` is false on every tool. Graft's domain is the collections a
- * project declares — a closed set, known at config load. Nothing here searches
- * the web or reaches an open-ended set of external entities.
+ * `openWorldHint` is false on every tool but one. Graft's domain is the
+ * collections a project declares — a closed set, known at config load. Nothing
+ * Graft itself does searches the web or reaches an open-ended set of external
+ * entities. `run_function` is the exception: it runs the project's own code,
+ * and that code can call any service it likes (RUNS_PROJECT_CODE).
  */
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 
@@ -49,4 +51,14 @@ export const DESTROYS: ToolAnnotations = {
   destructiveHint: true,
   idempotentHint: false,
   openWorldHint: false,
+};
+
+/**
+ * Runs a function the project wrote. Destructive, because Graft cannot know
+ * what the function does, and open-world for the same reason: a function can
+ * send email, charge a card, or call any other API.
+ */
+export const RUNS_PROJECT_CODE: ToolAnnotations = {
+  ...DESTROYS,
+  openWorldHint: true,
 };

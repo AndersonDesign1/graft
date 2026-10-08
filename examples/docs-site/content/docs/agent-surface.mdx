@@ -1,99 +1,96 @@
 ---
-title: The agent surface
-description: MCP tools and self-teaching errors. Operate without an admin UI.
-section: Operate
-order: 6
+title: Agents overview
+description: "What an AI agent can do in a Graft project, how it connects, and the limits that keep it safe."
+section: Agents & MCP
+order: 0
 ---
 
-Day-to-day content work goes through MCP and the CLI — the same ops a dashboard
-would expose, without locking agents behind a mouse UI.
+<p className="kicker">Let an AI agent write and manage content, under the same rules you follow.</p>
 
-Every error carries a `fix`. Tools expose schema, content, functions, and the
-registry. CI enforces a cold-agent contract: tool descriptions and error
-messages alone are enough to author content and call functions.
+Graft is built so that an AI agent can do the content work a person would do
+in a CMS dashboard: draft a page, fix a typo across fifty documents, upload an
+image, or look up why a compile failed. Graft has no admin dashboard that the
+agent would have to click through. Instead, it offers the agent the same
+operations you use from the command line, as **tools**.
 
-## Install
+Agents reach those tools through the **Model Context Protocol (MCP)**, the
+open standard that Claude Code, Cursor, and most other agents use to call
+tools. You run one command, register it with your agent, and the agent can
+start working.
+
+## Connect an agent in one step
+
+For an agent running on your machine, such as Claude Code or Cursor, serve the
+project over MCP:
 
 ```sh
-graft mcp        # stdio for local agents (.mcp.json)
-# HTTP: POST /api/mcp  (Streamable HTTP, stateless)
+graft mcp
 ```
 
-| Transport | Who | Auth |
-| --- | --- | --- |
-| Stdio | IDE / local agents | Server default from `GRAFT_DEV_TOKEN` |
-| HTTP | Remote agents | Bearer on the connection; anonymous callers refused outside loopback |
+Then register it with your agent, usually in an `.mcp.json` file. For an agent
+running elsewhere, Graft also serves MCP over HTTP at `POST /api/mcp`.
+[Connecting agents](/docs/connecting-agents) covers both, with the exact
+configuration for each client.
 
-## Tools
+## What an agent can do
 
-| Tools | Role |
+| To… | The agent calls |
 | --- | --- |
-| `list_collections`, `describe_schema` | Discover collections, fields, and functions |
-| `list_content`, `get_content`, `search_content` | Read authored content (search hits include `sourcePath`) |
-| `write_content`, `delete_content` | Author or remove MDX; compile in the same call |
-| `put_asset` | Upload binaries for `field.asset` |
-| `list_functions`, `describe_function`, `run_function` | Same gates as `POST /api/fn/<name>` |
-| `list_registry`, `describe_item` | Browse owned primitives before `graft add` |
-| `explain_error` | Map any GraftError code to causes + recovery |
+| Learn your collections and fields | `list_collections`, `describe_schema` |
+| Read and search content | `list_content`, `get_content`, `search_content` |
+| Write or delete a document | `write_content`, `delete_content` (each compiles in the same call) |
+| Upload an image or file | `put_asset` |
+| Call your typed functions | `list_functions`, `describe_function`, `run_function` |
+| Find ready-made features to add | `list_registry`, `describe_item` |
+| Understand an error | `explain_error` |
 
-`run_function` reuses the functions handler. Access rules, audit rows, rate
-limits, and approval gates apply identically. MCP is a door, not a bypass.
+[MCP tools](/docs/mcp-tools) lists every tool with its inputs and results.
+Beyond tools, an agent can attach documents directly as context, and pick from
+ready-made workflows such as "author a document" or "fix an error". See
+[Resources & prompts](/docs/mcp-resources-and-prompts).
 
-`delete_content` is destructive and human-gated. First call files an approval;
-retry with `approval: "<id>"` after `graft approve`.
+## What keeps an agent in bounds
 
-Tools also carry MCP annotations, so a client can tell a read from a deletion
-without parsing a description. Results carry `structuredContent` alongside the
-text, and the sixteen tools with a fixed shape declare an `outputSchema` the
-server validates against before answering.
+An agent gets no special access. Everything it does goes through the same
+checks as a person using the CLI or your app:
 
-## Resources and prompts
+- **Every write is checked against your schema**, and a bad document is
+  refused with a message saying what to fix.
+- **MDX that could run code is refused** by default. See
+  [MDX safety](/docs/mdx-safety).
+- **Functions apply their own rules.** `run_function` goes through the same
+  handler as `POST /api/fn/<name>`, so access rules, rate limits, and the
+  audit log apply exactly as they do for your app's users.
+- **Deletes wait for a human.** If a local `graft mcp` server (stdio) has
+  opted into asking in-band and the agent's client supports it, the client asks
+  you to confirm and the delete completes in one call. Otherwise the first
+  `delete_content` call files an approval request and stops. A person approves it with `graft approve`, and
+  only then does the agent's retry succeed. See
+  [Audit & approvals](/docs/audit-and-approvals).
 
-Documents are addressable as resources at `graft://<branch>/<collection>/<slug>`,
-so a client can attach one as context instead of spending a turn on
-`get_content`. Reads come from the authored files, so a resource reflects the
-working tree rather than the last compile. `graft://<branch>/schema` serves the
-`describe_schema` payload for attaching once.
+## Errors the agent can act on
 
-Prompts carry the workflows filled in from the live project: `author-document`
-and `plan-migration` include the collection's real field list, `revise-document`
-the document's URI, `fix-error` this build's recovery text. Prompt arguments and
-resource variables autocomplete from what exists.
+Every Graft error includes a `fix`: the next step, written plainly. An agent
+reads it and recovers without searching the docs. `explain_error` returns the
+full entry from the [Error reference](/docs/errors) for any code.
 
-## Two endpoints
+Graft's test suite checks this on every change. It simulates an agent that
+knows nothing about the project except what the tools tell it. The simulated
+agent discovers the schema, writes a page, hits a validation error, recovers
+using `explain_error`, and reads the page back. If a change to a tool or an
+error message breaks that path, the build fails.
 
-A Graft project can serve two MCP endpoints, and they are different servers
-rather than one server with a setting.
+## A second, public endpoint for your docs
 
-| | Surface | Auth |
-| --- | --- | --- |
-| `POST /api/mcp` | Everything above | Required |
-| `POST /mcp` | Documentation only | None |
-
-The public one is built by `createDocsMcpHandler`, and it exists because docs
-platforms already publish this: Mintlify generates a docs MCP at `/mcp` for
-every site it hosts, and Cloudflare runs a documentation server separately from
-its authenticated API server. Agents arrive looking there.
-
-It serves `list_collections`, `list_content`, `get_content`, `search_content`,
-`explain_error` and the document resources. Nothing else, and mostly for
-reasons that are not about writes: `describe_schema` carries the project's
-functions, `list_registry` its owned primitives, and the branch, compilation and
-approval listings its operations. Those are all reads, which is why "read-only"
-is the wrong test for what belongs on a public endpoint.
-
-It is a separate factory rather than a flag on the authenticated one. There is
-no option on it that widens the surface and no `allowAnonymous` escape, so
-standing up the public endpoint cannot open the private one.
-
-## Proof
-
-The test suite includes offline cold-agent runs (stdio and remote HTTP) under
-`pnpm test:cold-agent`. A live off-repo exercise authored a page and walked a
-human-gated delete with only the network MCP endpoint as context.
+A project can also serve a read-only MCP endpoint at `POST /mcp`, with no
+authentication, so agents can read your published documentation. It is a
+separate server, not a setting on the private one, so turning it on cannot
+expose anything else. [Public docs MCP](/docs/docs-mcp) explains what it serves
+and how to set it up.
 
 ## Next steps
 
-- [CLI reference](/docs/cli-reference) — every graft command
-- [Auth](/docs/auth) — verify-don't-mint identity
-- [Audit & approvals](/docs/audit-and-approvals) — human gates on destructive ops
+- [Connecting agents](/docs/connecting-agents) gets your agent connected.
+- [MCP tools](/docs/mcp-tools) lists every tool an agent can call.
+- [Audit & approvals](/docs/audit-and-approvals) covers the human checks on
+  destructive actions.

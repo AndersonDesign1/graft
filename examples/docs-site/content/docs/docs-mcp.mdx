@@ -1,33 +1,39 @@
 ---
 title: Public docs MCP
 description: A second, read-only MCP endpoint for your documentation, separate from the private one.
-section: Operate
-order: 9
+section: Agents & MCP
+order: 4
 ---
 
-A Graft project can serve two MCP endpoints. They are different servers, not one
-server with a setting.
+<p className="kicker">Let anyone's agent read your published docs, with no login.</p>
+
+If your Graft project hosts documentation, people will ask their coding agents
+about it. A public docs endpoint lets those agents search and read your docs
+directly, instead of scraping web pages. It is read-only and needs no
+authentication.
+
+It is a separate server from your project's main MCP endpoint, not a setting on
+it:
 
 | Endpoint | Surface | Auth |
 | --- | --- | --- |
 | `POST /api/mcp` | Everything an agent can do | Required |
 | `POST /mcp` | Documentation only | None |
 
-## Why it exists
+## Why a separate endpoint
 
 Docs platforms already publish this shape, and agents arrive expecting it.
 Mintlify generates a docs MCP at `/mcp` for every site it hosts: public,
 unauthenticated, strictly read-only. Cloudflare runs a documentation server
 separately from its authenticated API server.
 
-Following the convention settles a design question rather than deferring it. An
-`expose` flag on the existing handler would mean maintaining "which reads are
-safe to publish" as a setting on the endpoint that also serves writes. A second
-factory retires the question.
+Keeping it separate also keeps it safe. If it were a flag on the main endpoint,
+which also handles writes, one wrong setting could publish more than your docs.
+As its own server, it can only ever serve the tools listed below.
 
 ## What it serves
 
-Four tools and the document resources.
+Five tools and the document resources.
 
 | Tool | Purpose |
 | --- | --- |
@@ -41,10 +47,11 @@ Documents are also addressable as
 `graft://<branch>/<collection>/<slug>` resources, so a client can attach a page
 rather than paste it.
 
-## What it omits, and why
+## What it leaves out, and why
 
-The exclusions are mostly not about writes, which is the part worth
-understanding.
+It leaves out every write, as you would expect. It also leaves out several
+reads, because they reveal how your project works rather than what your docs
+say:
 
 | Left out | Reason |
 | --- | --- |
@@ -55,34 +62,35 @@ understanding.
 | Prompts | Three of the four instruct `write_content`, which is not here |
 | `write_content`, `delete_content`, `put_asset`, `run_function`, `decide_approval` | Writes and execution |
 
-Every item in the first three rows is a read. That is exactly why "read-only" is
-the wrong test for what belongs on a public endpoint.
+So the test for what belongs on a public endpoint is not "is it read-only?" but
+"is it documentation?".
 
-## Standing one up
+## Set one up
 
-`createDocsMcpHandler` returns the same `Request → Response` handler shape as
-the private one.
+Create the handler with `createDocsMcpHandler` and mount it at `/mcp` on your
+docs domain, which is where agents look. This is the route this site runs, on
+the static engine:
 
 <CodeBlock title="src/pages/mcp.ts" note="Astro">
 
 ```ts
 import type { APIRoute } from "astro";
 import { resolve } from "node:path";
-import { createDb } from "@usegraft/db";
 import { createDocsMcpHandler, type GraftMcpHandler } from "@usegraft/mcp";
 import { collections } from "../../graft.config";
+import { staticIndexPath } from "../lib/graft";
+
+export const prerender = false;
 
 let handler: GraftMcpHandler | null = null;
 
 function getHandler(): GraftMcpHandler {
-  if (!handler) {
-    handler = createDocsMcpHandler({
-      name: "graft-docs",
-      contentDir: resolve(process.cwd(), "content"),
-      collections,
-      db: createDb(process.env.DATABASE_URL as string).db,
-    });
-  }
+  handler ??= createDocsMcpHandler({
+    name: "graft-docs",
+    contentDir: resolve(import.meta.dirname, "../..", "content"),
+    collections,
+    staticIndexPath, // or db: createDb(url).db on Postgres
+  });
   return handler;
 }
 
@@ -92,26 +100,24 @@ export const GET: APIRoute = ({ request }) => getHandler()(request);
 
 </CodeBlock>
 
-Mount it at `/mcp` on the docs domain. That is where clients look.
+`staticIndexPath` is the same absolute path your app's own reads open, imported
+from where you resolve it. Avoid a relative path such as `".graft/index.db"`:
+it is resolved from the working directory, and on a serverless host that is not
+your project folder, so the handler would not find the index.
 
-Both methods are exported because the transport is stateless and POST-only. The
-`GET` export exists so the route answers 405 with `Allow` rather than 404, which
-tells a client the endpoint is real and speaks a POST-only transport.
+Export both `POST` and `GET`. Agents only send `POST`, but a `GET` should
+answer `405` rather than `404`, which tells a client the endpoint exists and
+only accepts `POST`.
 
-### It cannot be widened
+### Options it does not accept
 
-`DocsMcpOptions` accepts only `contentDir`, `collections`, `db`,
-`staticIndexPath`, `branchId`, `scope`, `name`, and `version`. There is no
-`functions`, no `actor`, no asset store, no approval elicitation, and no
-`allowAnonymous`.
+The docs handler only accepts `contentDir`, `collections`, `db`,
+`staticIndexPath`, `branchId`, `scope`, `name`, and `version`. It has no option
+for functions, identities, file uploads, or approvals, so they cannot be turned
+on by mistake. Even if JavaScript code passes `functions` anyway, the handler
+ignores it. Setting up the public endpoint can never expose the private one.
 
-Omitting them from the type is what keeps them from being configured by
-accident. A JavaScript caller who passes `functions` anyway gets it dropped at
-runtime, not merely unregistered — which is what the test asserts.
-
-Standing up the public endpoint cannot open the private one.
-
-## Scoping what is published
+## Choose what is published
 
 The server publishes the collections you hand it. To publish your docs but not
 your product catalog, pass only the collections you mean:
@@ -124,11 +130,12 @@ createDocsMcpHandler({
 });
 ```
 
-Remember that `get_content` and `list_content` read the authored files, so
-anything in a published collection's directory is published, including drafts
-you have not linked from anywhere.
+<Callout label="Drafts are published too" type="warning">
+  The endpoint reads your files directly. Anything in a published collection's
+  folder is readable, including drafts you have not linked from any page.
+</Callout>
 
-## Companion surfaces
+## Other ways agents can read your docs
 
 An MCP endpoint is one of several ways an agent can read documentation without
 scraping rendered HTML. This site also serves:
@@ -139,10 +146,11 @@ scraping rendered HTML. This site also serves:
 | `/llms-full.txt` | Every page's content in one file |
 | `/docs/<slug>.md` | Any page as markdown |
 
-Those are generated from the content index and the sidebar's own grouping, so
-they cannot drift from the nav.
+They are generated from the same content and grouping as the sidebar, so they
+always match the site. Each page also answers `Accept: text/markdown` with its
+Markdown version.
 
-<Callout label="dev server caveat">
+<Callout label="In the dev server" type="note">
   `/llms.txt` is shadowed under `astro dev`, because Vite serves the project
   root as static and a Graft project has an `llms.txt` at its root. Production
   is correct. Verify that route with `astro build`, not the dev server.
@@ -150,6 +158,6 @@ they cannot drift from the nav.
 
 ## Next steps
 
-- [Connecting agents](/docs/connecting-agents) — the private endpoint
-- [MCP tools](/docs/mcp-tools) — the full tool surface
-- [The agent surface](/docs/agent-surface) — why any of this exists
+- [Connecting agents](/docs/connecting-agents) documents the private endpoint.
+- [MCP tools](/docs/mcp-tools) lists the full tool surface.
+- [Agents overview](/docs/agent-surface) explains what agents can do.

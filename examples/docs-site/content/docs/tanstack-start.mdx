@@ -1,16 +1,32 @@
 ---
 title: TanStack Start
-description: Isomorphic loaders are the wrong place for a database handle.
-section: Build
-order: 6
+description: "Read Graft content in TanStack Start through server functions, never in isomorphic loaders."
+section: Frameworks
+order: 3
 ---
+
+<p className="kicker">Read Graft content in TanStack Start through server functions.</p>
+
+This guide adds Graft to a TanStack Start project. You read content
+through server functions, so the database or index file never reaches the
+browser, and you can serve Graft's functions and MCP endpoint from server routes.
+
+**Before you start**, you need a TanStack Start project and a
+`graft.config.ts` with compiled content. If you do not have those yet, run
+through [Getting started](/docs/getting-started) first.
+
+<Callout label="Prefer to let your agent do it?" type="note">
+  Paste this into your coding agent: "Add Graft to this TanStack Start app following https://graft.page/docs/tanstack-start.md. Create the client in src/lib/graft.server.ts and read content through a createServerFn, never in a route loader."
+</Callout>
+
+## Install
 
 <Tabs labels="pnpm, npm, bun">
 
 <Tab>
 
 ```sh
-pnpm add @usegraft/sdk-tanstack-start @usegraft/auth @usegraft/mcp
+pnpm add @usegraft/sdk-tanstack-start @usegraft/db
 ```
 
 </Tab>
@@ -18,7 +34,7 @@ pnpm add @usegraft/sdk-tanstack-start @usegraft/auth @usegraft/mcp
 <Tab>
 
 ```sh
-npm i @usegraft/sdk-tanstack-start @usegraft/auth @usegraft/mcp
+npm i @usegraft/sdk-tanstack-start @usegraft/db
 ```
 
 </Tab>
@@ -26,20 +42,21 @@ npm i @usegraft/sdk-tanstack-start @usegraft/auth @usegraft/mcp
 <Tab>
 
 ```sh
-bun add @usegraft/sdk-tanstack-start @usegraft/auth @usegraft/mcp
+bun add @usegraft/sdk-tanstack-start @usegraft/db
 ```
 
 </Tab>
 
 </Tabs>
 
-Build the handle once in a server-only module, then reach it from server
+Create the client once in a server-only module, then reach it from server
 functions and server routes.
 
-## Create the handle
+## Create the Graft client
+
+<CodeBlock title="src/lib/graft.server.ts">
 
 ```ts
-// src/lib/graft.server.ts
 import { createDb } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-tanstack-start";
 import { collections } from "../../graft.config";
@@ -47,6 +64,8 @@ import { collections } from "../../graft.config";
 export const db = createDb(process.env.DATABASE_URL!).db;
 export const graft = createGraft({ db, collections });
 ```
+
+</CodeBlock>
 
 Static index instead of Postgres:
 
@@ -59,10 +78,19 @@ export const graft = createGraft({
 });
 ```
 
-## Read one document
+<Callout label="Do not read in a route loader" type="warning">
+  A route `loader` is the wrong place for this client. TanStack Start loaders
+  are **isomorphic**: they run on the server for the first paint and in the
+  browser on client-side navigation. A client that holds a database connection
+  belongs in neither the client bundle nor the browser, which is what
+  `createServerFn` is for.
+</Callout>
+
+## Read a document
+
+<CodeBlock title="src/routes/docs.$slug.tsx">
 
 ```ts
-// src/routes/docs.$slug.tsx
 import { createServerFn } from "@tanstack/react-start";
 import { graft } from "../lib/graft.server";
 
@@ -71,16 +99,25 @@ const getDoc = createServerFn({ method: "GET" })
   .handler(({ data: slug }) => graft.getContent("docs", slug));
 ```
 
-There is no request-level memo. Reads go straight to the index; call sites own
-memoization.
+</CodeBlock>
 
-## Mount functions and MCP
+Each call reads the index. If one request reads the same document in several
+places, cache the result yourself.
+
+## Serve functions and MCP from your app
+
+This step is optional: it needs the Postgres engine and three more packages:
+
+```sh
+npm i @usegraft/core @usegraft/auth @usegraft/mcp
+```
 
 Copy these mounts as written. The server-route factory name has moved across
 TanStack Start releases; the handler signature has not.
 
+<CodeBlock title="src/routes/api/fn/$name.ts">
+
 ```ts
-// src/routes/api/fn/$name.ts
 import { createServerFileRoute } from "@tanstack/react-start/server";
 import { createFunctionsHandler } from "@usegraft/core";
 import { graftRoute } from "@usegraft/sdk-tanstack-start";
@@ -95,8 +132,11 @@ export const ServerRoute = createServerFileRoute("/api/fn/$name").methods({
 });
 ```
 
+</CodeBlock>
+
+<CodeBlock title="src/routes/api/mcp.ts">
+
 ```ts
-// src/routes/api/mcp.ts
 import { createActorResolver } from "@usegraft/auth";
 import { createServerFileRoute } from "@tanstack/react-start/server";
 import { createGraftMcpHandler } from "@usegraft/mcp";
@@ -104,14 +144,18 @@ import { graftRoute } from "@usegraft/sdk-tanstack-start";
 import { collections, functions } from "../../graft.config";
 import { db } from "../lib/graft.server";
 
+// A dev token never expires, so it is accepted only in development. An unset
+// NODE_ENV counts as production, so a deploy that forgets it stays closed.
+const devToken = process.env.NODE_ENV === "development" ? process.env.GRAFT_DEV_TOKEN : undefined;
+
 const actor = createActorResolver({
   issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
     .split(/[,\s]+/)
     .filter(Boolean)
     .map((issuer) => ({ issuer })),
-  devTokens: process.env.GRAFT_DEV_TOKEN
+  devTokens: devToken
     ? {
-        [process.env.GRAFT_DEV_TOKEN]: {
+        [devToken]: {
           kind: "human",
           id: "owner",
           scopes: ["content:write"],
@@ -133,40 +177,77 @@ export const ServerRoute = createServerFileRoute("/api/mcp").methods({
 });
 ```
 
+</CodeBlock>
+
 This endpoint serves content writes and asset uploads. JWT verification runs
 only when `issuers` is passed; the library does not read
 `GRAFT_TRUSTED_ISSUERS` (`graft serve` does). See [Auth](/docs/auth).
 Unauthenticated callers get 401. `allowAnonymous: true` is only for a
-loopback local server — never on anything reachable from a network. A public
+loopback local server. Never anything reachable from a network. A public
 docs surface is [`createDocsMcpHandler`](/docs/docs-mcp), which has no write
 tools and no anonymous opt-in.
 
 The parameter is typed structurally as `{ request: Request }`, so this package
 needs no `@tanstack/react-start` dependency.
 
-## Cache and invalidation
+## Refresh pages when content changes
 
-TanStack Start has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
-surrogate-key header on the responses you serve, and purge
-`tagsForChanges(branch, changeSet)` from your compile webhook.
+<TierBadge tier="postgres" />
+
+On the static engine, content changes ship with a new deploy, so there is
+nothing to refresh. On Postgres, content can change while your app is running,
+from Studio or from an agent. TanStack Start has no tag-based data cache, so let your
+CDN cache pages and purge only the ones whose content changed.
+
+First, send each page with a header that lists the content it read. `tagsFor`
+builds that list:
 
 ```ts
+import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
 import { tagsFor } from "@usegraft/sdk-tanstack-start";
+import { graft } from "../lib/graft.server";
 
-const slug = "home";
-headers.set("Cache-Tag", tagsFor("main", "pages", slug).join(","));
+const getDoc = createServerFn({ method: "GET" })
+  .validator((slug: string) => slug)
+  .handler(({ data: slug }) => {
+    setResponseHeader("Cache-Tag", tagsFor("main", "docs", slug).join(","));
+    return graft.getContent("docs", slug);
+  });
 ```
 
-`Cache-Tag` is the surrogate-key header. Purge the same strings
-`tagsForChanges` returns from your compile webhook.
+The header goes on whichever response ran the function. On a full page load
+that is the page's HTML. On client-side navigation, the browser calls the
+server function directly, so it is that `GET` response. Let your CDN cache both:
+they carry the same tags, so one purge refreshes both.
 
-## The caveat you cannot infer
+Then, when content changes, purge those tags at your CDN.
+`tagsForChanges(branch, changes)` turns a change list into the tags to purge:
+each changed document, and the collection it is in. Graft does not purge your
+CDN for you. Do it from your own route, called with the change list.
 
-A route `loader` is the wrong place for this handle. TanStack Start loaders
-are **isomorphic**: they run on the server for the first paint and in the
-browser on client-side navigation. A handle that holds a database connection
-has no business in either the client bundle or the browser, which is what
-`createServerFn` is for.
+The change list comes from two places. An agent's `write_content` call returns
+it as `changes`. `graft compile --json` prints it too, along with the branch.
+In a deploy script, send it to your route. The script stops if the compile
+fails, and `--fail` makes a refused request fail the script too:
 
-See [SDK reference](/docs/sdk-reference) for mounts across adapters and the
-honest gaps.
+```sh
+graft compile --json > changes.json || exit 1
+curl --fail -X POST https://example.com/api/revalidate \
+  -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" \
+  -H "content-type: application/json" \
+  --data-binary @changes.json
+```
+
+Your route reads `branch` and `changes` from the body and passes them to
+`tagsForChanges`.
+
+`Cache-Tag` is the header Cloudflare reads, with tags separated by commas.
+Fastly reads `Surrogate-Key`, with tags separated by spaces. Use the header
+your CDN expects.
+
+## Next steps
+
+- [Reading content](/docs/reading-content) covers list and search reads.
+- [SDK reference](/docs/sdk-reference) compares route mounts across frameworks.
+- [Connecting agents](/docs/connecting-agents) points an agent at your project.

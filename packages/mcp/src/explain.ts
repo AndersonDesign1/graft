@@ -188,7 +188,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
   NEEDS_DATABASE: {
     code: "NEEDS_DATABASE",
     meaning:
-      'This project runs in static index mode (index = "static" in graft.config), and the requested feature is Postgres-tier: db-authoritative collections, typed functions, or database branching.',
+      'This project runs on the static storage engine (index = "static" in graft.config), and the requested feature needs the Postgres engine: db-authoritative collections, typed functions, or database branching.',
     typicalCauses: [
       "A db-authoritative collection or a defineFunction was added to a static-mode project",
       "graft compile --branch <name> was run in static mode (branches are git branches there)",
@@ -251,6 +251,16 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     typicalCauses: ["Node older than 22.16 running the CLI or the app server"],
     howToRecover:
       'Upgrade Node to 22.16+ (24 LTS recommended), or switch the project to the Postgres index (DATABASE_URL + `export const index = "postgres"`).',
+  },
+  FRAMEWORK_VERSION_UNSUPPORTED: {
+    code: "FRAMEWORK_VERSION_UNSUPPORTED",
+    meaning:
+      "An adapter API needs a newer version of the framework than the app has installed. The rest of the adapter still works.",
+    typicalCauses: [
+      "Calling `updateContent` from @usegraft/sdk-next on Next.js 15. It needs `updateTag`, which Next.js added in 16",
+    ],
+    howToRecover:
+      "Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 15 and 16. Or upgrade the framework.",
   },
   SLUG_NOT_UNIQUE: {
     code: "SLUG_NOT_UNIQUE",
@@ -427,7 +437,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     meaning: "`graft add` was asked for a registry item (a copy-in primitive) that does not exist.",
     typicalCauses: [
       "A typo in the item name",
-      "Expecting a community/remote item — only the bundled Tier-1 registry ships today",
+      "Expecting a community/remote item — only the bundled core registry ships today",
       "The item was renamed or removed",
     ],
     howToRecover:
@@ -465,7 +475,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "Two documents' assets colliding on a generic key like assets/hero.png",
     ],
     howToRecover:
-      "Pick a distinct key (e.g. prefix it with the document: pages/pricing/hero.png) — that is almost always right. Only pass `overwrite: true` when replacing the existing binary is the actual intent; every document referencing that key will show the new bytes.",
+      "Pick a distinct key (e.g. prefix it with the document: pages/pricing/hero.png) — that is almost always right. Only pass `overwrite: true` (put_asset) or `--overwrite` (graft asset put) when replacing the existing binary is the actual intent; every document referencing that key will show the new bytes.",
   },
   NOT_IMPLEMENTED: {
     code: "NOT_IMPLEMENTED",

@@ -165,4 +165,37 @@ describe.skipIf(!runIntegration)("graft migrate end to end", () => {
     },
     TEST_TIMEOUT,
   );
+
+  it(
+    "two concurrent --apply runs apply each migration once",
+    async () => {
+      // Back to the pre-migration state: original file, uppercase row, empty ledger.
+      await handle.sql`delete from migrations_applied where branch_id = ${BRANCH}`;
+      await handle.sql`
+        update data_records set data = '{"email":"ADA@Example.com"}'::jsonb
+        where branch_id = ${BRANCH}
+      `;
+      writeFileSync(join(projectDir, "content", "pages", "home.mdx"), "---\ntitle: Home\n---\nHi");
+
+      // Without the lock, both runs read an empty ledger, and the second fails
+      // on the ledger's unique index after it has already run the migrations.
+      const results = await Promise.all([
+        migrateCommand({ cwd: projectDir, branchId: BRANCH, apply: true }),
+        migrateCommand({ cwd: projectDir, branchId: BRANCH, apply: true }),
+      ]);
+      expect(results.map((r) => r.pending.length).sort()).toEqual([0, 2]);
+      const waited = results.find((r) => r.pending.length === 0);
+      expect(waited?.applied).toEqual(["0001-pages-description", "0002-lowercase-emails"]);
+
+      const ledger = await handle.sql`
+        select migration_id from migrations_applied
+        where branch_id = ${BRANCH} order by migration_id
+      `;
+      expect(ledger.map((r) => r.migration_id)).toEqual([
+        "0001-pages-description",
+        "0002-lowercase-emails",
+      ]);
+    },
+    TEST_TIMEOUT,
+  );
 });

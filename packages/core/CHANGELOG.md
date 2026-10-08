@@ -1,5 +1,14 @@
 # @usegraft/core
 
+## 1.0.0-beta.3
+
+### Patch Changes
+
+- Updated dependencies [56c0957]
+- Updated dependencies [f92b97c]
+  - @usegraft/db@1.0.0-beta.3
+  - @usegraft/contracts@1.0.0-beta.3
+
 ## 1.0.0-beta.2
 
 ### Patch Changes

@@ -1,15 +1,31 @@
 ---
 title: Schema
-description: defineCollection and field builders — the single Zod layer for content and functions.
-section: Build
-order: 1
+description: "Describe the fields of each kind of content once, and get checked files, checked inputs, and typed reads from it."
+section: Content
+order: 0
 ---
 
-Define collections and fields in `graft.config.ts` (and under `graft/` when you
-add primitives). The same definitions type the compiler, SDK reads, MCP tools,
-and function inputs.
+<p className="kicker">Describe your content once, and get types everywhere from it.</p>
 
-## defineCollection
+The schema says what fields each kind of content has: a page has a title and
+an optional tagline, a product has a name and a price. You write it once, in
+`graft.config.ts`, and Graft uses it in three places:
+
+- `graft compile` checks every file against it, and stops with a clear error
+  when one does not match.
+- [Typed functions](/docs/functions-and-access) check their inputs against it.
+- Every read in your app is typed from it, so your editor knows each field.
+
+It is built on [Zod](https://zod.dev), a TypeScript validation library, so
+there is no code generation step. This page declares a collection, shows the
+file and the typed read that go with it, and lists every field type.
+
+## Declare a collection
+
+A **collection** is a group of documents with the same fields, stored in
+`content/<collection name>/`:
+
+<CodeBlock title="graft.config.ts">
 
 ```ts
 import { defineCollection, field } from "@usegraft/core";
@@ -18,84 +34,139 @@ export const pages = defineCollection({
   name: "pages",
   description: "Marketing and site pages.",
   fields: {
-    title: field.string({ description: "Headline and <title>." }),
+    title: field.string({ maxLength: 120, description: "Headline and <title>." }),
     tagline: field.string({ optional: true }),
-    description: field.string({ optional: true }),
     image: field.asset({ optional: true }),
   },
 });
 ```
 
-| Option | Purpose |
-| --- | --- |
-| `name` | Collection id. Matches `content/<name>/` |
-| `description` | Shown to agents via `describe_schema` |
-| `fields` | Map of `field.*` builders |
-| `authority` | Omit for file-authoritative. Set `"db-authoritative"` for operational rows |
+</CodeBlock>
 
-## Field builders
+The `description`s are for agents. An agent that calls `describe_schema` reads
+them to learn what each collection and field is for, so write them as you would
+explain the field to a new teammate.
 
-| Builder | Stores | Notes |
+## What a matching file looks like
+
+Each document is a file whose frontmatter matches the fields:
+
+<CodeBlock title="content/pages/about.mdx">
+
+```mdx
+---
+title: About us
+tagline: We build with code and AI agents.
+---
+
+The body is Markdown or MDX.
+```
+
+</CodeBlock>
+
+And your app reads it with full types:
+
+```ts
+const about = await graft.getContent("pages", "about");
+about?.data.title;   // string
+about?.data.tagline; // string | undefined
+about?.data.color;   // TypeScript error: pages has no field "color"
+```
+
+## What happens when a file does not match
+
+If a file is missing a required field, or a value has the wrong type or is too
+long, `graft compile` stops with `SCHEMA_VALIDATION_FAILED`. The message names
+the file and the field, so you know exactly what to fix. Nothing is written to
+the index until every file passes.
+
+## Choose a field type
+
+| Builder | Holds | Use it for |
 | --- | --- | --- |
-| `field.string()` | short string | Frontmatter scalars |
-| `field.text()` | long string | Bodies and blurbs |
-| `field.number()` | number | |
-| `field.boolean()` | boolean | |
-| `field.datetime()` | ISO datetime | |
-| `field.json()` | arbitrary JSON | Prefer typed object/array when you can |
-| `field.asset()` | `{ key, alt? }` | See [Assets](/docs/assets) |
-| `field.object({ fields })` | nested object | Recursive in `describe_schema` |
-| `field.array({ of })` | list | `of` is another field |
+| `field.string()` | A short string | Titles, names, slugs |
+| `field.text()` | A long string | Summaries and longer text |
+| `field.number()` | A number | Prices, quantities, ratings |
+| `field.boolean()` | `true` or `false` | Flags such as `featured` |
+| `field.datetime()` | An ISO date and time | Publish dates |
+| `field.asset()` | `{ key, alt? }` | Images and files. See [Assets](/docs/assets) |
+| `field.object({ fields })` | A nested group of fields | An author with a name and a URL |
+| `field.array({ of })` | A list of another field | Tags, FAQ entries |
+| `field.json()` | Any JSON value | A last resort. Prefer an object or array, which are checked and typed |
 
-All builders accept `{ optional: true, description: "…" }`.
+Every builder accepts `optional: true` and a `description`.
 
-### Nested example
+## Limit what a field accepts
+
+| Option | Applies to | Effect |
+| --- | --- | --- |
+| `maxLength` | `string`, `text` | The longest allowed value |
+| `pattern` | `string`, `text` | A regular expression the value must match |
+| `min`, `max` | `number` | The allowed range |
+| `int: true` | `number` | Whole numbers only |
+| `maxItems` | `array` | The most entries allowed |
+
+Set `maxLength` on any string or text field a public form writes to, and
+`maxItems` on any array, so one request cannot store megabytes. Set `max` on
+numbers that get multiplied, such as a quantity times a price. `field.json()`
+has no size limit, so keep it out of public forms.
+
+## Nest fields
+
+Combine `field.array` and `field.object` for repeated groups, such as FAQ
+entries:
 
 ```ts
 faqs: field.array({
   of: field.object({
     fields: {
       question: field.string(),
-      answer: field.string(),
+      answer: field.text(),
     },
   }),
   optional: true,
 }),
 ```
 
-### What a collection looks like once declared
+## Export your collections
 
-This is the `docs` collection that renders the page you are reading, generated
-from its own schema rather than written out here. The same descriptor answers
-MCP's `describe_schema` and fills the Studio's schema view, so this table cannot
-drift from what the compiler enforces.
+Your config must export `collections`, and `functions` if you define any. The
+CLI loads the file directly, so there is no build step, and your app imports
+the same file for its typed reads.
 
-<FieldTable collection="docs" />
+If you added ready-made features with `graft add`, combine them with your own
+collections using `mergePrimitives`:
 
-## Merge with primitives
-
-`graft add` drops source under `graft/`. Merge your collections with the generated
-barrel:
+<CodeBlock title="graft.config.ts">
 
 ```ts
 import { mergePrimitives } from "@usegraft/core";
 import * as primitives from "./graft";
 
 export const { collections, functions } = mergePrimitives([
-  { collections: { pages }, functions: { /* … */ } },
+  { collections: { pages }, functions: {} },
   primitives,
 ]);
 ```
 
-Duplicate keys throw `CONFIG_INVALID`. Nothing is overridden silently.
+</CodeBlock>
 
-## Wire the config
+Two collections or functions with the same name stop the config from loading
+with `CONFIG_INVALID`. Nothing is overridden silently.
+[Owned primitives](/docs/owned-primitives) covers `graft add`.
 
-Export `collections` (and `functions` when you define them). The CLI loads the
-file with jiti. Framework apps import the same module for typed reads.
+## See it live: this page's own schema
+
+This table is generated from the schema of the `docs` collection that renders
+the page you are reading. The same description answers an agent's
+`describe_schema` call and fills Studio's schema view, so it always matches
+what the compiler enforces.
+
+<FieldTable collection="docs" />
 
 ## Next steps
 
-- [Reading content](/docs/reading-content) — typed reads across frameworks
-- [Assets](/docs/assets) — `field.asset` and uploads
-- [Functions & access](/docs/functions-and-access) — operational data mutations
+- [Reading content](/docs/reading-content) covers the three reads.
+- [Assets](/docs/assets) covers image and file fields.
+- [Operational data](/docs/operational-data) covers collections your users
+  write to.

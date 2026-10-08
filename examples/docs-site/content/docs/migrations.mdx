@@ -1,54 +1,141 @@
 ---
 title: Migrations
-description: Schema changes as code — content codemods and transactional data backfills.
-section: Operate
-order: 5
+description: "Change your schema without breaking content and data written in the old shape: rewrite files, update rows, and record what ran."
+section: Deploy & operate
+order: 3
 ---
 
-Migrations live in `migrations/<seq>-<name>.ts`. The filename is the ledger id.
-`graft migrate` is dry-run by default. Pass `--apply` to execute.
+<p className="kicker">Change your schema without breaking the content and data you already have.</p>
 
-```sh
-graft migrate            # report pending
-graft migrate --apply    # run; record in migrations_applied
-```
+Sooner or later you rename a field, split one into two, or add a required one.
+The schema change itself is one line. The real work is updating everything
+already written in the old shape, so it still passes the new schema.
 
-## Content codemods
+A Graft migration is a TypeScript file that does that update. There are two
+kinds, depending on where the old data lives:
 
-For file-authoritative collections, change the **files**. Changing only the index
-would be overwritten on the next compile.
+| Kind | Updates | Use it for |
+| --- | --- | --- |
+| **Content migration** (a "codemod") | Your Markdown files in Git | Normal collections |
+| **Data migration** (a "backfill") | Rows in Postgres | [Operational data](/docs/operational-data) collections |
+
+This page walks through one of each, then covers how they run and how they
+interact with renames and branches.
+
+## Example: add a required field to your pages
+
+You add a required `description` field to `pages`. Every existing page lacks
+it, so the next compile would fail. Write a content migration that fills it in
+from the tagline:
+
+<CodeBlock title="migrations/0001-pages-description.ts">
 
 ```ts
-// migrations/0001-pages-description.ts
+import type { DocumentData } from "@usegraft/core";
 import { defineContentMigration } from "@usegraft/content-migrations";
+import { pages } from "../graft.config";
+
+type Page = DocumentData<typeof pages>;
 
 export default defineContentMigration({
-  collection: "pages",
-  describe: "backfill description from tagline",
-  transform(doc) {
-    doc.data.description ??= doc.data.tagline ?? "";
-    return doc;
-  },
+  collection: pages,
+  description: "Fill in description from tagline",
+  transform: (doc) => ({
+    data: {
+      // Start from every field the file has. A field left out of `data` is
+      // removed from the file, so listing fields one by one drops the rest.
+      ...(doc.data as Omit<Page, "description">),
+      description: String(doc.data.tagline ?? ""),
+    },
+  }),
 });
 ```
 
-The migration validates every output against the current schema, rewrites files
-in place, and fails all-or-nothing. Review the diff and commit it.
+</CodeBlock>
 
-## Data backfills
+`transform` receives each document's frontmatter (`doc.data`) and body
+(`doc.body`) as they are on disk, in the old shape. It returns the new
+frontmatter, and a new `body` if you want to change that too.
 
-For db-authoritative collections, use `defineDataMigration` from `@usegraft/core`.
-Updates and the ledger row commit in one transaction. A second apply loses the
-unique race and becomes a no-op.
+The old frontmatter is untyped, because it no longer matches your schema. The
+example keeps every existing field by spreading `doc.data`, cast to the fields
+it already had, and adds the new one. TypeScript checks the new field against
+your current schema, and the run checks every rewritten file against the
+schema before writing any of them.
 
-## After a rename or delete
+The migration changes the **files**, not the index. Changing only the index
+would be undone by the next compile, which rebuilds the index from the files.
 
-Old index rows can look foreign to a new schema. Compile then refuses with
-`INDEX_OWNERSHIP`. That is the one legitimate use of
-`graft compile --prune-unknown` — run it once, after the rename lands.
+## Run it
 
-## Merge interaction
+```sh
+graft migrate            # list what would run, change nothing
+graft migrate --apply    # run it
+```
 
-`graft merge` replays the ledger onto the target before moving data rows. Content
-migrations only record a ledger entry on merge; their file rewrites arrive via
-the git merge you do first. See [Branching & previews](/docs/branching-previews).
+A content migration checks every rewritten file against the current schema
+before writing any of them. If one would fail, none are written. When it
+succeeds, review the diff with `git diff` and commit it like any other change.
+
+Migrations run in file-number order. Graft records each one it applies in a
+table called the **ledger** (`migrations_applied`), and later runs skip it.
+`graft migrate --apply` takes a lock on the branch before it reads the ledger.
+If two deploys start a run at the same moment, the second waits for the first to
+finish, then skips every migration the first one applied. `graft merge --apply`
+takes the same lock on both the branch it merges and the branch it merges into.
+The lock holds one database connection for the whole run, so the pool needs at
+least two.
+
+## Example: tidy up existing rows
+
+For operational data, use `defineDataMigration`. This one lowercases every
+stored email address:
+
+<CodeBlock title="migrations/0002-lowercase-emails.ts">
+
+```ts
+import { defineDataMigration } from "@usegraft/core";
+import { submissions } from "../graft.config";
+
+export default defineDataMigration({
+  collection: submissions,
+  description: "Normalize emails to lowercase",
+  transform: ({ data }) => ({ ...data, email: String(data.email).toLowerCase() }),
+});
+```
+
+</CodeBlock>
+
+The row updates and the ledger entry are saved in one transaction. Either both
+happen or neither does.
+
+## After renaming or deleting a collection
+
+If you rename or delete a whole collection, the index still holds documents
+under the old name. Graft does not recognize them, so the next compile stops
+with `INDEX_OWNERSHIP` rather than deleting content it does not know about.
+
+When the rename is intentional, compile once with `--prune-unknown` to remove
+the old documents:
+
+```sh
+graft compile --prune-unknown
+```
+
+Use it only for this. Normally that error means something is wrong, such as two
+projects sharing one database.
+
+## Migrations and branches
+
+When you [merge a preview branch](/docs/branching-previews#merge-a-branch),
+`graft merge` first replays any migrations that ran on the branch but not on
+the target, then moves the branch's data rows. Merge the Git branch first: a
+content migration's rewritten files arrive through that Git merge, and
+`graft merge` only records its ledger entry.
+
+## Next steps
+
+- [Schema](/docs/schema) covers declaring fields.
+- [Branching & previews](/docs/branching-previews) covers merging.
+- [Operational data](/docs/operational-data) explains the rows a data migration
+  updates.

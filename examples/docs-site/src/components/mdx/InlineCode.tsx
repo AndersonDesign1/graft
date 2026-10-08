@@ -6,6 +6,22 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
 type Props = ComponentPropsWithoutRef<"code">;
 
+/** Programs that can open a command line, colored as the binary rather than a subcommand. */
+const CLI_BINS = new Set([
+  "graft",
+  "npm",
+  "npx",
+  "pnpm",
+  "bun",
+  "bunx",
+  "yarn",
+  "node",
+  "tsx",
+  "git",
+  "docker",
+  "curl",
+]);
+
 /** Split a CLI-ish string into colored spans. */
 function tokenize(text: string): ReactNode[] {
   // Paths keep a trailing `/`; bare `/` between commands stays a separator.
@@ -60,7 +76,7 @@ function tokenize(text: string): ReactNode[] {
     }
     if (word) {
       const isPath = /[.]/.test(word);
-      const isBin = atCommandHead && (word === "graft" || word === "pnpm");
+      const isBin = atCommandHead && CLI_BINS.has(word);
       const cls = isBin ? "cli-bin" : isPath ? "cli-path" : "cli-cmd";
       out.push(
         <span key={key} className={cls}>

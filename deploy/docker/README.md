@@ -29,7 +29,7 @@ curl -X POST http://localhost:3903/api/fn/pageStats -H "content-type: applicatio
 Serve your own project (a directory with `graft.config.ts` + `content/`):
 
 ```sh
-docker run --init -p 3903:3903 -v ./my-site:/project -v graft_pg:/var/lib/postgresql graft
+docker run --init -p 3903:3903 -v ./my-site:/project -v graft_pg:/var/lib/postgresql -v graft_minio:/data graft
 ```
 
 The entrypoint symlinks `/project/node_modules` to the image's packages (the
