@@ -228,9 +228,8 @@ export async function migrateCommand(
     if (!options.apply) return await run();
     return await withMigrationLock(branch.db, writeBranch, run, {
       onWait: () =>
-        console.log(
-          `Another \`graft migrate --apply\` is running on "${branchId}"; waiting for it to finish…`,
-        ),
+        // A merge into this branch holds the same lock, so name both.
+        console.log(`A migration or merge is running on "${branchId}"; waiting for it to finish…`),
     });
   } finally {
     await branch.close();

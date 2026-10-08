@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { run } from "./cli";
+import { COMMAND_HELP, run } from "./cli";
 
 let logs: string[];
 let errors: string[];
@@ -44,30 +44,16 @@ describe("run", () => {
     expect(errors.join("\n")).toContain('unknown command "frobnicate"');
   });
 
-  it.each([
-    "init",
-    "compile",
-    "dev",
-    "db",
-    "asset",
-    "approvals",
-    "approve",
-    "deny",
-    "migrate",
-    "branch",
-    "merge",
-    "add",
-    "mcp",
-    "serve",
-    "studio",
-    "content",
-    "compilations",
-    "harden",
-  ])("graft %s --help prints that command's usage and exits 0", async (command) => {
-    expect(await run([command, "--help"])).toBe(0);
-    expect(logs.join("\n")).toMatch(new RegExp(`^Usage: graft ${command}\\b`));
-    expect(errors).toEqual([]);
-  });
+  // Every command with help, read from the table itself, so a command added
+  // later is covered without editing this list.
+  it.each([...COMMAND_HELP.keys()])(
+    "graft %s --help prints that command's usage and exits 0",
+    async (command) => {
+      expect(await run([command, "--help"])).toBe(0);
+      expect(logs.join("\n")).toMatch(new RegExp(`^Usage: graft ${command}\\b`));
+      expect(errors).toEqual([]);
+    },
+  );
 
   it("answers -h after other arguments, even incomplete ones, without running the command", async () => {
     expect(await run(["asset", "put", "-h"])).toBe(0);

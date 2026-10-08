@@ -54,7 +54,7 @@ function printHelp(): void {
     "  add <item>               Copy an owned primitive from the registry into graft/",
     "                           (+ its deps; regenerates the graft/ barrel — no config edit)",
     "  mcp                      Serve the project MCP over stdio (content + function tools;",
-    "                           for .mcp.json / local agents). Requires DATABASE_URL.",
+    "                           for .mcp.json / local agents). Postgres needs DATABASE_URL.",
     "  serve                    Run the headless Graft runtime over HTTP: POST /api/fn/<name>,",
     "                           POST /api/mcp, GET /healthz (what a self-host container runs)",
     "  studio                   Opt-in Studio UI (edit content, approve/deny, OpenAPI)",
@@ -99,7 +99,7 @@ const BRANCH_OPTION = "  --branch <id>    Content branch (default: main)";
  * `graft <command> --help`: the usage line, what the command does, and only
  * the options it reads. Every command in the switch in run() has an entry.
  */
-const COMMAND_HELP = new Map<string, string[]>([
+export const COMMAND_HELP = new Map<string, string[]>([
   [
     "init",
     [
@@ -226,7 +226,7 @@ const COMMAND_HELP = new Map<string, string[]>([
     [
       "Usage: graft mcp [--branch <id>] [--elicit-approvals]",
       "",
-      "Serve the project MCP over stdio (content and function tools). Requires DATABASE_URL.",
+      "Serve the project MCP over stdio (content and function tools). On the Postgres engine it needs DATABASE_URL.",
       "",
       BRANCH_OPTION,
       "  --elicit-approvals",

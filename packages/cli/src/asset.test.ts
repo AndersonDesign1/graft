@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Storage } from "@usegraft/assets";
+import { AssetKeyTakenError, type Storage } from "@usegraft/assets";
 import { GraftError } from "@usegraft/contracts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assetPutCommand, contentTypeFor, defaultKeyFor } from "./commands/asset";
@@ -60,18 +60,26 @@ describe("assetPutCommand failures", () => {
   });
 });
 
-/** An in-memory store: enough of Storage for put/exists. */
-function memoryStorage(initial: Record<string, string> = {}): Storage & {
+/**
+ * An in-memory store: enough of Storage for put/exists. `blindExists` makes
+ * exists() always answer false, as a HEAD does for a credential that may upload
+ * but not read, so only the conditional put stands between a key and a reuse.
+ */
+function memoryStorage(
+  initial: Record<string, string> = {},
+  { blindExists = false } = {},
+): Storage & {
   objects: Map<string, Uint8Array | string>;
 } {
   const objects = new Map<string, Uint8Array | string>(Object.entries(initial));
   const unused = () => Promise.reject(new Error("not used by asset put"));
   return {
     objects,
-    put: async (key, body) => {
+    put: async (key, body, _contentType, options) => {
+      if (options?.ifAbsent && objects.has(key)) throw new AssetKeyTakenError(key);
       objects.set(key, body);
     },
-    exists: async (key) => objects.has(key),
+    exists: async (key) => !blindExists && objects.has(key),
     get: unused,
     delete: unused,
     presignPut: unused,
@@ -119,6 +127,14 @@ describe("assetPutCommand key guard", () => {
     await expect(
       assetPutCommand({ cwd: dir, file, key: "pages/home/hero.png", storage }),
     ).rejects.toMatchObject({ code: "ASSET_EXISTS" });
+  });
+
+  it("still refuses a taken key when exists() cannot see it, because the put is conditional", async () => {
+    const storage = memoryStorage({ "assets/hero.png": "old bytes" }, { blindExists: true });
+    await expect(assetPutCommand({ cwd: dir, file, storage })).rejects.toMatchObject({
+      code: "ASSET_EXISTS",
+    });
+    expect(storage.objects.get("assets/hero.png")).toBe("old bytes");
   });
 
   it("replaces a taken key with overwrite", async () => {

@@ -82,7 +82,9 @@ table called the **ledger** (`migrations_applied`), and later runs skip it.
 `graft migrate --apply` takes a lock on the branch before it reads the ledger.
 If two deploys start a run at the same moment, the second waits for the first to
 finish, then skips every migration the first one applied. `graft merge --apply`
-takes the same lock on the branch it merges into.
+takes the same lock on both the branch it merges and the branch it merges into.
+The lock holds one database connection for the whole run, so the pool needs at
+least two.
 
 ## Example: tidy up existing rows
 

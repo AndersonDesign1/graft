@@ -233,6 +233,15 @@ describe("trustedIssuersFromEnv", () => {
     expect(issuer?.audience).toEqual(["api-one", "api-two"]);
   });
 
+  it("refuses an audience made only of separators, which would turn the check off silently", () => {
+    expect(() =>
+      trustedIssuersFromEnv({
+        GRAFT_TRUSTED_ISSUERS: "https://a.example",
+        GRAFT_TRUSTED_AUDIENCE: " , ",
+      }),
+    ).toThrow(expect.objectContaining({ code: "INPUT_VALIDATION_FAILED" }));
+  });
+
   it("refuses an actor kind it does not know, instead of guessing", () => {
     expect(() =>
       trustedIssuersFromEnv({

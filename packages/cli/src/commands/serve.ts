@@ -237,6 +237,16 @@ function listFromEnv(raw: string | undefined): string[] {
 export function trustedIssuersFromEnv(env: NodeJS.ProcessEnv = process.env): TrustedIssuer[] {
   const issuers = listFromEnv(env.GRAFT_TRUSTED_ISSUERS);
   const audience = listFromEnv(env.GRAFT_TRUSTED_AUDIENCE);
+  // Set but empty once parsed (",", " , "): a typo, not a choice. Treating it
+  // as unset would turn the audience check off without the warning unset gets.
+  if (env.GRAFT_TRUSTED_AUDIENCE?.trim() && audience.length === 0) {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `GRAFT_TRUSTED_AUDIENCE is "${env.GRAFT_TRUSTED_AUDIENCE}", which names no audience.`,
+      fix: "Set GRAFT_TRUSTED_AUDIENCE to the audience your provider puts in tokens for this API (comma-separated for several), or unset it.",
+      details: { variable: "GRAFT_TRUSTED_AUDIENCE", value: env.GRAFT_TRUSTED_AUDIENCE },
+    });
+  }
   const kind = env.GRAFT_TRUSTED_ACTOR_KIND?.trim() || "agent";
   if (kind !== "agent" && kind !== "human") {
     throw new GraftError({
@@ -299,10 +309,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   const writeBranch = scopeWriteBranch(branch.scope);
 
   const devToken = process.env.GRAFT_DEV_TOKEN;
-  const scopes = (process.env.GRAFT_DEV_SCOPES ?? "")
-    .split(/[,\s]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const scopes = listFromEnv(process.env.GRAFT_DEV_SCOPES);
   const resolveActor = createActorResolver({
     issuers,
     devTokens: devToken ? { [devToken]: { kind: "agent", id: "graft-serve", scopes } } : undefined,
@@ -448,7 +455,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
         "Set GRAFT_DEV_TOKEN or GRAFT_TRUSTED_ISSUERS.",
     );
   }
-  if (issuers.length > 0 && !process.env.GRAFT_TRUSTED_AUDIENCE?.trim()) {
+  if (issuers.length > 0 && issuers.every((issuer) => issuer.audience === undefined)) {
     console.warn(
       "[graft serve] WARNING: GRAFT_TRUSTED_ISSUERS is set without GRAFT_TRUSTED_AUDIENCE — " +
         "any token those issuers sign is accepted, including one minted for another of your apps. " +

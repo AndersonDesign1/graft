@@ -1,6 +1,7 @@
 ---
 "@usegraft/cli": minor
 "@usegraft/mcp": patch
+"@usegraft/assets": minor
 ---
 
 `graft asset put` refuses a key that already holds a file, like `put_asset`.
@@ -12,6 +13,12 @@ gone, and every page pointing at the key showed the new one.
 
 The CLI now checks first and fails with the same `ASSET_EXISTS` error. Pass
 `--overwrite` to replace the file on purpose.
+
+Both also make the upload itself conditional. `Storage.put` from
+`@usegraft/assets` takes `{ ifAbsent: true }`, which sends
+`If-None-Match: *`, and throws `AssetKeyTakenError` when the store answers 412. So the store refuses a key that a concurrent upload took between the check
+and the write, or that a credential allowed to upload but not read cannot see.
+A store that ignores the header writes as before, behind the existence check.
 
 **Breaking:** a script that re-uploads to the same key now fails until it adds
 `--overwrite` or picks a new key.
