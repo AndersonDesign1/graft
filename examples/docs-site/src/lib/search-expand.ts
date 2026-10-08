@@ -53,6 +53,10 @@ export function buildVocabulary(texts: Iterable<string>): Vocabulary {
  * duplicate at worst.
  */
 function pluralKey(word: string): string {
+  // SQLite's porter leaves very short and very long tokens alone (it stems
+  // "ies" to "ie", and skips anything over 64 bytes), so those keep their
+  // own key rather than risk merging words the index keeps apart.
+  if (word.length <= 4 || new TextEncoder().encode(word).length > 64) return word;
   if (word.endsWith("sses")) return word.slice(0, -2);
   if (word.endsWith("ies")) return word.slice(0, -2);
   if (word.endsWith("ss")) return word;
