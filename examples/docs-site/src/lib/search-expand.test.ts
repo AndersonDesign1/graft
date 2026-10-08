@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildVocabulary, expandQuery } from "./search-expand";
+import { buildVocabulary, completionTarget, expandQuery } from "./search-expand";
 
 describe("buildVocabulary", () => {
   it("splits like the index tokenizer and ranks by frequency", () => {
@@ -28,9 +28,15 @@ describe("expandQuery", () => {
     expect(expandQuery("set conf", vocabulary)).toBe("set conf or set config or set configuration");
   });
 
-  it("spends one slot per stem, not one per inflection", () => {
-    const words = buildVocabulary(["migrate migrated migration migrations migrator"]);
-    expect(expandQuery("migr", words)).toBe("migr or migrate or migrator");
+  it("spends one slot per plural pair", () => {
+    const words = buildVocabulary(["migration migrations migrate class classes"]);
+    expect(expandQuery("migr", words)).toBe("migr or migrate or migration");
+    expect(expandQuery("cla", words)).toBe("cla or class");
+  });
+
+  it("keeps words the index stems apart, like mill and million", () => {
+    const words = buildVocabulary(["mill mill million"]);
+    expect(expandQuery("mi", words)).toBe("mi or mill or million");
   });
 
   it("leaves a finished word that completes to nothing alone", () => {
@@ -47,5 +53,15 @@ describe("expandQuery", () => {
 
   it("lowercases the typed word so it matches the vocabulary", () => {
     expect(expandQuery("Conf", vocabulary)).toBe("conf or config or configuration");
+  });
+});
+
+describe("completionTarget", () => {
+  it("names the word to complete, or null when nothing can be", () => {
+    expect(completionTarget("run Migr")).toEqual({ head: ["run"], typed: "migr" });
+    expect(completionTarget('"exact phrase"')).toBeNull();
+    expect(completionTarget("-conf")).toBeNull();
+    expect(completionTarget("a or b")).toBeNull();
+    expect(completionTarget("   ")).toBeNull();
   });
 });

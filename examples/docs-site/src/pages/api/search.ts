@@ -7,7 +7,12 @@
 import { frontText } from "@usegraft/db";
 import type { APIRoute } from "astro";
 import { getGraft } from "../../lib/graft";
-import { buildVocabulary, expandQuery, type Vocabulary } from "../../lib/search-expand";
+import {
+  buildVocabulary,
+  completionTarget,
+  expandQuery,
+  type Vocabulary,
+} from "../../lib/search-expand";
 import { toSearchResults, type SortedResult } from "../../lib/search-results";
 
 /** Takes a query string, so it answers per request rather than prerendering. */
@@ -27,6 +32,10 @@ const CACHED = {
  * Every word in the docs, for completing the word being typed. Built once per
  * function instance from the same index the search reads, so a completion is
  * always a word some page contains.
+ *
+ * It lives as long as the instance, like the index handle in lib/graft.ts. A
+ * deployment's index never changes, so that is exact in production; under
+ * `astro dev`, restart the server after a `graft compile` to pick up new words.
  */
 let vocabulary: Promise<Vocabulary> | null = null;
 
@@ -56,7 +65,8 @@ export const GET: APIRoute = async ({ url }) => {
 
   // Partial last word ("conf") widened to the words it could become, so
   // results show while the reader is still typing. See lib/search-expand.
-  const expanded = expandQuery(query, await docsVocabulary());
+  // The vocabulary is only read when the last word could be completed.
+  const expanded = completionTarget(query) ? expandQuery(query, await docsVocabulary()) : query;
   const hits = await getGraft().searchContent("docs", expanded, { limit: 8 });
   return Response.json(
     toSearchResults(
