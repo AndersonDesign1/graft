@@ -1,8 +1,9 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Storage } from "@usegraft/assets";
 import { GraftError } from "@usegraft/contracts";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assetPutCommand, contentTypeFor, defaultKeyFor } from "./commands/asset";
 
 describe("contentTypeFor", () => {
@@ -56,5 +57,75 @@ describe("assetPutCommand failures", () => {
       }
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+/** An in-memory store: enough of Storage for put/exists. */
+function memoryStorage(initial: Record<string, string> = {}): Storage & {
+  objects: Map<string, Uint8Array | string>;
+} {
+  const objects = new Map<string, Uint8Array | string>(Object.entries(initial));
+  const unused = () => Promise.reject(new Error("not used by asset put"));
+  return {
+    objects,
+    put: async (key, body) => {
+      objects.set(key, body);
+    },
+    exists: async (key) => objects.has(key),
+    get: unused,
+    delete: unused,
+    presignPut: unused,
+    presignGet: unused,
+    url: unused,
+  };
+}
+
+describe("assetPutCommand key guard", () => {
+  let dir: string;
+  let file: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "graft-asset-"));
+    file = join(dir, "hero.png");
+    writeFileSync(file, "new bytes");
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("uploads to a free key", async () => {
+    const storage = memoryStorage();
+    const result = await assetPutCommand({ cwd: dir, file, storage });
+    expect(result).toEqual({ key: "assets/hero.png", contentType: "image/png", bytes: 9 });
+    expect(storage.objects.has("assets/hero.png")).toBe(true);
+  });
+
+  it("refuses a taken key with ASSET_EXISTS and leaves the stored binary alone", async () => {
+    const storage = memoryStorage({ "assets/hero.png": "old bytes" });
+    try {
+      await assetPutCommand({ cwd: dir, file, storage });
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      expect((error as GraftError).code).toBe("ASSET_EXISTS");
+      expect((error as GraftError).fix).toContain("--overwrite");
+      expect((error as GraftError).details).toEqual({ key: "assets/hero.png" });
+    }
+    expect(storage.objects.get("assets/hero.png")).toBe("old bytes");
+  });
+
+  it("checks an explicit key too", async () => {
+    const storage = memoryStorage({ "pages/home/hero.png": "old bytes" });
+    await expect(
+      assetPutCommand({ cwd: dir, file, key: "pages/home/hero.png", storage }),
+    ).rejects.toMatchObject({ code: "ASSET_EXISTS" });
+  });
+
+  it("replaces a taken key with overwrite", async () => {
+    const storage = memoryStorage({ "assets/hero.png": "old bytes" });
+    await assetPutCommand({ cwd: dir, file, storage, overwrite: true });
+    expect(new TextDecoder().decode(storage.objects.get("assets/hero.png") as Uint8Array)).toBe(
+      "new bytes",
+    );
   });
 });

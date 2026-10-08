@@ -95,6 +95,7 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
       copyDataRecords,
       resolveBranchHandle,
       scopeWriteBranch,
+      withMigrationLock,
     },
     { runDataMigration },
   ] = await Promise.all([
@@ -123,7 +124,7 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
   const targetWrite = scopeWriteBranch(target.scope);
   const sameDb = src.scope.kind === "overlay" && target.scope.kind === "overlay";
 
-  try {
+  const run = async (): Promise<MergeCommandResult> => {
     const [branchLedger, targetLedger] = await Promise.all([
       listAppliedMigrations(src.db, srcWrite),
       listAppliedMigrations(target.db, targetWrite),
@@ -242,6 +243,16 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
     }
 
     return { replayed, dataMoved, compiled, didApply: options.apply === true };
+  };
+
+  try {
+    // --apply writes the target's ledger, so it holds the same lock as
+    // `graft migrate --apply` on the target and reads the ledger inside it.
+    if (!options.apply) return await run();
+    return await withMigrationLock(target.db, targetWrite, run, {
+      onWait: () =>
+        console.log(`A migration or merge is running on "${into}"; waiting for it to finish…`),
+    });
   } finally {
     await src.close();
     await target.close();

@@ -81,15 +81,218 @@ function printHelp(): void {
     "  --postgres       Scaffold `graft init` for the Postgres index (default: static)",
     "  --static         Scaffold `graft init` for the static index (the default)",
     "  --dry-run        Preview `graft add` without writing; list pending `graft db migrate`",
-    "  --overwrite      Let `graft add` replace files that differ",
+    "  --overwrite      Let `graft add` replace files that differ, and `graft asset put`",
+    "                   replace a binary already stored under the key",
     "  --prune-unknown  Let `graft compile` remove index rows in collections this schema",
     "                   doesn't know (default: refuse — the shared-DATABASE_URL guard)",
     "  --json           `graft compile` prints { branch, gitSha, changes } as JSON on stdout",
     "                   (logs go to stderr), ready to POST to a revalidate route",
-    "  -h, --help       Show this help",
+    "  -h, --help       Show this help, or one command's help after the command name",
     "  -v, --version    Show version",
   ];
   console.log(lines.join("\n"));
+}
+
+const BRANCH_OPTION = "  --branch <id>    Content branch (default: main)";
+
+/**
+ * `graft <command> --help`: the usage line, what the command does, and only
+ * the options it reads. Every command in the switch in run() has an entry.
+ */
+const COMMAND_HELP = new Map<string, string[]>([
+  [
+    "init",
+    [
+      "Usage: graft init [dir] [--static | --postgres]",
+      "",
+      "Scaffold a Graft project (graft.config.ts, content/, llms.txt) in dir (default: here).",
+      "",
+      "  --static         Static index: no database, no env (the default)",
+      "  --postgres       Postgres index: operational data, functions, DB branching",
+    ],
+  ],
+  [
+    "compile",
+    [
+      "Usage: graft compile [--branch <id>] [--prune-unknown] [--json]",
+      "",
+      "Project the content tree into the content index once.",
+      "",
+      BRANCH_OPTION,
+      "  --prune-unknown  Remove index rows in collections this schema doesn't know",
+      "                   (default: refuse, the shared-DATABASE_URL guard)",
+      "  --json           Print { branch, gitSha, changes } as JSON on stdout (logs go to stderr)",
+    ],
+  ],
+  [
+    "dev",
+    [
+      "Usage: graft dev [--branch <id>]",
+      "",
+      "Watch content/ and graft.config.ts and recompile on change.",
+      "",
+      BRANCH_OPTION,
+    ],
+  ],
+  [
+    "db",
+    [
+      "Usage: graft db migrate [--dry-run]",
+      "",
+      "Apply the Postgres schema migrations that ship with @usegraft/db.",
+      "",
+      "  --dry-run        List pending schema migrations without applying them",
+    ],
+  ],
+  [
+    "asset",
+    [
+      "Usage: graft asset put <file> [key] [--overwrite]",
+      "",
+      "Upload a binary to the asset store (S3_* env) and print the frontmatter reference.",
+      "The key defaults to assets/<sanitized file name>. A key that already holds a",
+      "binary is refused with ASSET_EXISTS, because the store keeps no version history.",
+      "",
+      "  --overwrite      Replace the binary already stored under the key",
+    ],
+  ],
+  [
+    "approvals",
+    [
+      "Usage: graft approvals",
+      "",
+      "List pending approvals for human-gated (destructive) function calls.",
+    ],
+  ],
+  [
+    "approve",
+    [
+      "Usage: graft approve <approval-id>",
+      "",
+      "Approve a pending approval. The caller retries with x-graft-approval: <id>.",
+    ],
+  ],
+  ["deny", ["Usage: graft deny <approval-id>", "", "Deny a pending approval."]],
+  [
+    "migrate",
+    [
+      "Usage: graft migrate [--apply] [--branch <id>]",
+      "",
+      "Show pending content and data migrations (dry-run). --apply runs them and records",
+      "each in the ledger. A concurrent --apply on the same branch waits for this one",
+      "and then skips what it applied.",
+      "",
+      BRANCH_OPTION,
+      "  --apply          Run the pending migrations (default is a dry-run report)",
+    ],
+  ],
+  [
+    "branch",
+    [
+      "Usage: graft branch",
+      "       graft branch create <name> [--from <parent>] [--backend overlay|neon]",
+      "       graft branch drop <name>",
+      "",
+      "List, register, or drop preview branches.",
+      "",
+      "  --from <name>    Parent to fork from (default: main)",
+      "  --backend <kind> overlay (default) or neon (forks a physical Neon branch)",
+    ],
+  ],
+  [
+    "merge",
+    [
+      "Usage: graft merge <branch> [--into <target>] [--apply]",
+      "",
+      "Merge a branch into its target: replay the ledger, move data rows, recompile.",
+      "",
+      "  --into <name>    Merge target (default: main)",
+      "  --apply          Execute the merge (default is a dry-run report)",
+    ],
+  ],
+  [
+    "add",
+    [
+      "Usage: graft add <item...> [--dry-run] [--overwrite]",
+      "",
+      "Copy an owned primitive (and its deps) from the registry into graft/.",
+      "",
+      "  --dry-run        Preview without writing",
+      "  --overwrite      Replace files that differ",
+    ],
+  ],
+  [
+    "mcp",
+    [
+      "Usage: graft mcp [--branch <id>] [--elicit-approvals]",
+      "",
+      "Serve the project MCP over stdio (content and function tools). Requires DATABASE_URL.",
+      "",
+      BRANCH_OPTION,
+      "  --elicit-approvals",
+      "                   Ask this terminal's operator to decide a destructive call instead",
+      "                   of failing with an id for `graft approve`",
+    ],
+  ],
+  [
+    "serve",
+    [
+      "Usage: graft serve [--port <n>] [--host <h>] [--branch <id>] [--studio]",
+      "",
+      "Run the headless Graft runtime over HTTP: POST /api/fn/<name>, POST /api/mcp,",
+      "GET /api/content/v1/*, GET /healthz.",
+      "",
+      BRANCH_OPTION,
+      "  --port <n>       Port (default: 3903, or PORT)",
+      "  --host <h>       Host (default: 127.0.0.1, or HOST)",
+      "  --studio         Mount Studio at /studio (or GRAFT_STUDIO=1)",
+    ],
+  ],
+  [
+    "studio",
+    [
+      "Usage: graft studio [--port <n>] [--host <h>] [--branch <id>]",
+      "",
+      "Run the opt-in Studio UI (edit content, approve/deny, OpenAPI).",
+      "",
+      BRANCH_OPTION,
+      "  --port <n>       Port (default: 4983, or GRAFT_STUDIO_PORT)",
+      "  --host <h>       Host (default: 127.0.0.1, or HOST)",
+    ],
+  ],
+  [
+    "content",
+    [
+      "Usage: graft content [--branch <id>]",
+      "",
+      "List the content tree from the compiled index.",
+      "",
+      BRANCH_OPTION,
+    ],
+  ],
+  [
+    "compilations",
+    [
+      "Usage: graft compilations [--branch <id>]",
+      "",
+      "List recent content projection trail rows.",
+      "",
+      BRANCH_OPTION,
+    ],
+  ],
+  [
+    "harden",
+    [
+      "Usage: graft harden <role>",
+      "",
+      "Grant an existing Postgres role the runtime privilege set: it can request and",
+      "consume approvals but never decide them.",
+    ],
+  ],
+]);
+
+function isHelpFlag(arg: string): boolean {
+  return arg === "--help" || arg === "-h";
 }
 
 interface ParsedArgs {
@@ -175,6 +378,9 @@ function parseArgs(rest: string[]): ParsedArgs {
       initDriver = "postgres";
     } else if (arg === "--static") {
       initDriver = "static";
+    } else if (isHelpFlag(arg)) {
+      // run() answers help for every known command before parsing, so this is
+      // an unknown command: let the switch report that instead of the flag.
     } else if (arg.startsWith("-")) {
       throw new UsageError(`unknown option "${arg}"`);
     } else {
@@ -212,8 +418,16 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
     console.log(VERSION);
     return 0;
   }
-  if (!command || command === "-h" || command === "--help") {
+  if (!command || isHelpFlag(command)) {
     printHelp();
+    return 0;
+  }
+  // `graft <command> --help` anywhere after the command name. Checked before
+  // parsing, so the other arguments may be incomplete or wrong (that is often
+  // why someone asks for help). An unknown command still fails below.
+  const usage = COMMAND_HELP.get(command);
+  if (usage && rest.some(isHelpFlag)) {
+    console.log(usage.join("\n"));
     return 0;
   }
 
@@ -286,10 +500,10 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
       case "asset": {
         const [subcommand, file, key] = args.positionals;
         if (subcommand !== "put" || !file) {
-          throw new UsageError("usage: graft asset put <file> [key]");
+          throw new UsageError("usage: graft asset put <file> [key] [--overwrite]");
         }
         const { assetPutCommand } = await import("./commands/asset");
-        const result = await assetPutCommand({ cwd, file, key });
+        const result = await assetPutCommand({ cwd, file, key, overwrite: args.overwrite });
         console.log(`Uploaded ${result.key} (${result.contentType}, ${result.bytes} bytes)`);
         console.log(
           [

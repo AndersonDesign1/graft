@@ -27,7 +27,7 @@ Each request falls into one of four cases:
 
 | The request carries | Graft treats the caller as |
 | --- | --- |
-| A valid token from an identity provider you trust | The token's subject, with the scopes the token lists. It is recorded as an agent unless the issuer is set with `actorKind: "human"` |
+| A valid token from an identity provider you trust | The token's subject, with the scopes the token lists. It is recorded as an agent unless the issuer is set with `actorKind: "human"` (`GRAFT_TRUSTED_ACTOR_KIND=human` for `graft serve`) |
 | Your local development token (`GRAFT_DEV_TOKEN`) | You, with the scopes you set |
 | No token | Anonymous |
 | A token that is expired, forged, or from an issuer you do not trust | Refused with `TOKEN_INVALID` (401) |
@@ -57,12 +57,16 @@ those scopes. Use this only on your machine, never in a deployment.
 In production, Graft checks tokens from identity providers you trust. They must
 be OpenID Connect providers, which almost all of them are.
 
-**If you run `graft serve`**, list each provider's issuer URL:
+**If you run `graft serve`**, list each provider's issuer URL, and the audience
+your provider puts in tokens for this API:
 
 <CodeBlock title=".env">
 
 ```sh
 GRAFT_TRUSTED_ISSUERS=https://your-tenant.auth0.com/
+GRAFT_TRUSTED_AUDIENCE=https://api.example.com
+# Optional. Record callers as people in the audit log. The default is agent.
+GRAFT_TRUSTED_ACTOR_KIND=human
 ```
 
 </CodeBlock>
@@ -71,18 +75,23 @@ Graft looks up each provider's public keys and checks every token's signature,
 issuer, and expiry. Scopes are read from the token's `scope`, `scopes`, or
 `permissions` claim.
 
-Two limits apply to issuers set this way:
+Two settings apply to every issuer in the list:
 
-- **The audience is not checked.** Any token the provider issues is accepted,
-  including one minted for another of your apps. If the provider serves more
-  than one app, run Graft inside your app instead and set `audience`.
-- **Callers are recorded as agents.** The audit log records each caller as an
-  agent. To record signed-in people as humans, set `actorKind: "human"` in
-  your own app's resolver.
+- **`GRAFT_TRUSTED_AUDIENCE`** is the token audience (`aud`) Graft accepts.
+  List more than one with commas. A token minted for another of your apps
+  carries a different audience and is refused. If you leave it unset, the
+  audience is not checked and any token the provider signs is accepted.
+  `graft serve` prints a warning at startup when that happens.
+- **`GRAFT_TRUSTED_ACTOR_KIND`** is what the audit log records callers as:
+  `agent` (the default) or `human`. Any other value stops `graft serve` from
+  starting, with `INPUT_VALIDATION_FAILED`.
+
+If your issuers need different audiences or actor kinds, run Graft inside your
+app and set them per issuer, as below.
 
 **If Graft runs inside your own app**, create the resolver in code and pass it
-to Graft's handlers. `GRAFT_TRUSTED_ISSUERS` is not read automatically here, so
-pass the issuers yourself:
+to Graft's handlers. None of the `GRAFT_TRUSTED_*` variables are read
+automatically here, so pass the issuers and their settings yourself:
 
 <CodeBlock title="lib/graft-auth.ts">
 

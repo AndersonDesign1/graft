@@ -9,7 +9,12 @@ import { createServer, request, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { getRequestPeer } from "@usegraft/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { createNodeListener, createServeRouter, type FetchHandler } from "./commands/serve";
+import {
+  createNodeListener,
+  createServeRouter,
+  trustedIssuersFromEnv,
+  type FetchHandler,
+} from "./commands/serve";
 
 const echo =
   (label: string): FetchHandler =>
@@ -190,5 +195,50 @@ describe("createNodeListener", () => {
     const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe("FUNCTION_EXECUTION_FAILED");
     expect(body.message).toBe("graft serve failed to relay the request.");
+  });
+});
+
+describe("trustedIssuersFromEnv", () => {
+  it("reads nothing when no issuer is set", () => {
+    expect(trustedIssuersFromEnv({ GRAFT_TRUSTED_AUDIENCE: "api" })).toEqual([]);
+  });
+
+  it("defaults to agent callers with the audience unchecked", () => {
+    expect(
+      trustedIssuersFromEnv({ GRAFT_TRUSTED_ISSUERS: "https://a.example, https://b.example" }),
+    ).toEqual([
+      { issuer: "https://a.example", actorKind: "agent" },
+      { issuer: "https://b.example", actorKind: "agent" },
+    ]);
+  });
+
+  it("applies the audience and actor kind to every issuer", () => {
+    expect(
+      trustedIssuersFromEnv({
+        GRAFT_TRUSTED_ISSUERS: "https://a.example https://b.example",
+        GRAFT_TRUSTED_AUDIENCE: "https://api.example.com",
+        GRAFT_TRUSTED_ACTOR_KIND: "human",
+      }),
+    ).toEqual([
+      { issuer: "https://a.example", actorKind: "human", audience: ["https://api.example.com"] },
+      { issuer: "https://b.example", actorKind: "human", audience: ["https://api.example.com"] },
+    ]);
+  });
+
+  it("accepts several audiences as a list", () => {
+    const [issuer] = trustedIssuersFromEnv({
+      GRAFT_TRUSTED_ISSUERS: "https://a.example",
+      GRAFT_TRUSTED_AUDIENCE: "api-one,api-two",
+    });
+    expect(issuer?.audience).toEqual(["api-one", "api-two"]);
+  });
+
+  it("refuses an actor kind it does not know, instead of guessing", () => {
+    expect(() =>
+      trustedIssuersFromEnv({
+        GRAFT_TRUSTED_ISSUERS: "https://a.example",
+        GRAFT_TRUSTED_ACTOR_KIND: "humans",
+      }),
+    ).toThrow(expect.objectContaining({ code: "INPUT_VALIDATION_FAILED" }));
   });
 });

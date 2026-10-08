@@ -44,6 +44,44 @@ describe("run", () => {
     expect(errors.join("\n")).toContain('unknown command "frobnicate"');
   });
 
+  it.each([
+    "init",
+    "compile",
+    "dev",
+    "db",
+    "asset",
+    "approvals",
+    "approve",
+    "deny",
+    "migrate",
+    "branch",
+    "merge",
+    "add",
+    "mcp",
+    "serve",
+    "studio",
+    "content",
+    "compilations",
+    "harden",
+  ])("graft %s --help prints that command's usage and exits 0", async (command) => {
+    expect(await run([command, "--help"])).toBe(0);
+    expect(logs.join("\n")).toMatch(new RegExp(`^Usage: graft ${command}\\b`));
+    expect(errors).toEqual([]);
+  });
+
+  it("answers -h after other arguments, even incomplete ones, without running the command", async () => {
+    expect(await run(["asset", "put", "-h"])).toBe(0);
+    expect(logs.join("\n")).toContain("--overwrite");
+    logs = [];
+    expect(await run(["merge", "--into", "--help"])).toBe(0);
+    expect(logs.join("\n")).toContain("Usage: graft merge");
+  });
+
+  it("an unknown command with --help still reports the unknown command", async () => {
+    expect(await run(["frobnicate", "--help"])).toBe(1);
+    expect(errors.join("\n")).toContain('unknown command "frobnicate"');
+  });
+
   it("graft add with no item name fails, listing what's available", async () => {
     expect(await run(["add"])).toBe(1);
     const output = errors.join("\n");
