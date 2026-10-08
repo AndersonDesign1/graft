@@ -106,10 +106,10 @@ Every builder accepts `optional: true` and a `description`.
 | `int: true` | `number` | Whole numbers only |
 | `maxItems` | `array` | The most entries allowed |
 
-Set `maxLength` on any string a public form writes to, and `maxItems` on any
-array, so one request cannot store megabytes. Set `max` on numbers that get
-multiplied, such as a quantity times a price. `field.json()` has no size limit,
-so keep it out of public forms.
+Set `maxLength` on any string or text field a public form writes to, and
+`maxItems` on any array, so one request cannot store megabytes. Set `max` on
+numbers that get multiplied, such as a quantity times a price. `field.json()`
+has no size limit, so keep it out of public forms.
 
 ## Nest fields
 

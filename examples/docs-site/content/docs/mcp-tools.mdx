@@ -168,13 +168,15 @@ without parsing prose.
 
 `write_content` is marked non-destructive, because Git can undo a content
 change once the earlier version is committed. Uncommitted edits it overwrites,
-and new files never committed, cannot be recovered from Git. `put_asset` is not, because the asset store keeps no history.
+and new files never committed, cannot be recovered from Git. `put_asset` is
+not, because the asset store keeps no history.
 `run_function` is marked destructive, because it runs whatever your function
 does.
 
-`openWorldHint` is false on every tool, because each one works inside your own
-project: its content, its functions, its registry and error catalog. None
-reaches out to the open web or other systems.
+`openWorldHint` is false on every tool except `run_function`. The others work
+inside your own project: its content, its registry, and its error catalog.
+`run_function` runs a function you wrote, and that function can call any
+service, so it sets `openWorldHint: true`.
 
 <Callout label="Annotations are hints, not security" type="warning">
   Annotations are hints. The MCP spec says a client must not make an

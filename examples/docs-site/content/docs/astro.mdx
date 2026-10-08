@@ -115,7 +115,7 @@ audit log they write live in the database. The routes below import the `db`
 exported by the Postgres version of `src/lib/graft.ts` above. The static setup
 exports no `db`, so these routes do not work on it.
 
-It needs three more packages:
+It also needs three more packages:
 
 ```sh
 npm i @usegraft/core @usegraft/auth @usegraft/mcp

@@ -178,7 +178,7 @@ const handler = createStudioHandler({
 | `projectRoot` | Where `graft/` lives, for the project's editor component declarations. Defaults to the content directory's parent |
 | `mdxTrust` | Governs the whole-tree recompile that follows a save |
 | `defaultBranch` | Branch used for compile and the tree default |
-| `decider` | Identity approval decisions are attributed to when `authenticate` returns no caller. A value or a function. **Defaults to `{ kind: "human", id: "studio" }`** |
+| `decider` | Identity approval decisions are attributed to when `authenticate` is not configured. A value or a function. **Defaults to `{ kind: "human", id: "studio" }`** |
 | `uiBasePath` | URL prefix for the UI. Empty string serves it at `/` |
 
 API paths are always absolute `/api/studio/v1/*` regardless of `uiBasePath`.
@@ -188,13 +188,15 @@ setting that matters when several people share one Studio: return each
 person's own identity from `authenticate`, and the approval history says who
 approved what. A decision is never attributed to a name the request supplies.
 
-`decider` applies only when `authenticate` returns no caller, as on a local
-Studio for one person. If you leave it unset there, decisions are recorded
+`decider` applies only when `authenticate` is not configured, as on a local
+Studio for one person. When `authenticate` is configured and returns `null`,
+the request is refused with `UNAUTHORIZED`, so nothing falls back to `decider`. If you leave it unset there, decisions are recorded
 against `{ kind: "human", id: "studio" }`, which works with no setup.
 
 The UI opens on the branch Studio was started on. A `?branch=` in the URL
-picks a different one, and the API uses the started branch only when the URL
-names none.
+picks a different one. The branch-scoped routes, such as the content tree and
+compile, use the started branch only when the URL names none. The compilation
+history is the exception: without `?branch`, it lists every branch.
 
 ## Next steps
 

@@ -157,6 +157,18 @@ describe("Steps", () => {
     expect(html.match(/id="step-compile-2"/g)).toHaveLength(1);
     expect(html).toContain('href="#step-compile-2"');
   });
+
+  it("never reuses an id another step's own title produced", async () => {
+    // "Foo 2" slugs to step-foo-2, so the second "Foo" must skip to -3.
+    const step = (title: string) => [`<Step title="${title}">`, "", "Text.", "", "</Step>", ""];
+    const html = await render(
+      ["<Steps>", "", ...step("Foo"), ...step("Foo 2"), ...step("Foo"), "</Steps>"].join("\n"),
+    );
+
+    expect(html.match(/id="step-foo"/g)).toHaveLength(1);
+    expect(html.match(/id="step-foo-2"/g)).toHaveLength(1);
+    expect(html.match(/id="step-foo-3"/g)).toHaveLength(1);
+  });
 });
 
 describe("table", () => {

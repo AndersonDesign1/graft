@@ -24,8 +24,9 @@ npm i -D @usegraft/cli
 ```
 
 On another framework, swap `@usegraft/sdk-next` for your adapter, such as
-`@usegraft/sdk-astro`. Mixing versions is not supported. Then run `graft compile`. If anything in your project relies on an
-old behavior, the error's `fix` says what to change.
+`@usegraft/sdk-astro`. Mixing versions is not supported. Then run
+`graft compile`. If anything in your project relies on an old behavior, the
+error's `fix` says what to change.
 
 <Callout label="Prefer to let your agent do it?" type="note">
   Paste this into your coding agent: "Upgrade every @usegraft package in this
@@ -99,8 +100,10 @@ MCP over HTTP now refuses anonymous callers by default.
   `allowAnonymous: true`.
 - `graft serve` allows anonymous agents only when it listens on your own
   machine, or when you opt in with `GRAFT_MCP_ALLOW_ANONYMOUS=1`. Use the opt-in
-  only behind your own authenticating proxy: it opens every MCP tool to anyone
-  who can reach the server, and `graft serve` warns at start while it is set.
+  only behind your own authenticating proxy: it opens the MCP tools to anyone
+  who can reach the server. `decide_approval` still refuses anonymous callers.
+  `graft serve` warns at start when the opt-in is set and it listens beyond
+  your own machine.
 
 **What to do:** give your HTTP endpoint an `actor` resolver. See
 [Auth](/docs/auth) and [Connecting agents](/docs/connecting-agents).
