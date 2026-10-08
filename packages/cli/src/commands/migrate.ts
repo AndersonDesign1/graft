@@ -119,6 +119,7 @@ export async function migrateCommand(
       recordAppliedMigration,
       resolveBranchHandle,
       scopeWriteBranch,
+      withMigrationLock,
     },
   ] = await Promise.all([import("@usegraft/compiler"), import("@usegraft/db")]);
   const control = createDb(url);
@@ -127,7 +128,7 @@ export async function migrateCommand(
   const branch = await resolveBranchHandle(control.db, branchId, { databaseUrl: url });
   const writeBranch = scopeWriteBranch(branch.scope);
 
-  try {
+  const run = async (): Promise<MigrateCommandResult> => {
     const appliedRows = await listAppliedMigrations(branch.db, writeBranch);
     const appliedIds = new Set(appliedRows.map((row) => row.migrationId));
     const applied = migrations.filter((m) => appliedIds.has(m.id)).map((m) => m.id);
@@ -219,6 +220,17 @@ export async function migrateCommand(
       );
     }
     return { applied, pending: outcomes, didApply: options.apply === true };
+  };
+
+  try {
+    // A dry run reads the ledger without the lock. --apply reads it only once
+    // the lock is held, so a run that had to wait skips what the other applied.
+    if (!options.apply) return await run();
+    return await withMigrationLock(branch.db, writeBranch, run, {
+      onWait: () =>
+        // A merge into this branch holds the same lock, so name both.
+        console.log(`A migration or merge is running on "${branchId}"; waiting for it to finish…`),
+    });
   } finally {
     await branch.close();
     await control.close();

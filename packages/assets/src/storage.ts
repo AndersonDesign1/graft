@@ -11,8 +11,33 @@ export interface PresignOptions {
   expiresIn?: number;
 }
 
+export interface PutOptions {
+  /**
+   * Write only if nothing is stored under the key yet. Sent as
+   * `If-None-Match: *`, so the store decides, not a separate existence check
+   * that a concurrent upload could slip past. A taken key throws
+   * AssetKeyTakenError. A store that ignores the header writes as usual.
+   */
+  ifAbsent?: boolean;
+}
+
+/** The key already held an object, and the put asked for `ifAbsent`. */
+export class AssetKeyTakenError extends Error {
+  readonly key: string;
+  constructor(key: string) {
+    super(`An object is already stored under "${key}".`);
+    this.name = "AssetKeyTakenError";
+    this.key = key;
+  }
+}
+
 export interface Storage {
-  put(key: string, body: Uint8Array | string, contentType?: string): Promise<void>;
+  put(
+    key: string,
+    body: Uint8Array | string,
+    contentType?: string,
+    options?: PutOptions,
+  ): Promise<void>;
   get(key: string): Promise<Uint8Array>;
   delete(key: string): Promise<void>;
   exists(key: string): Promise<boolean>;
@@ -53,12 +78,12 @@ export function createStorage(config: StorageConfig = storageConfigFromEnv()): S
   };
 
   return {
-    async put(key, body, contentType) {
-      const res = await aws.fetch(urlFor(key), {
-        method: "PUT",
-        body,
-        headers: contentType ? { "content-type": contentType } : undefined,
-      });
+    async put(key, body, contentType, options = {}) {
+      const headers: Record<string, string> = {};
+      if (contentType) headers["content-type"] = contentType;
+      if (options.ifAbsent) headers["if-none-match"] = "*";
+      const res = await aws.fetch(urlFor(key), { method: "PUT", body, headers });
+      if (res.status === 412 && options.ifAbsent) throw new AssetKeyTakenError(key);
       if (!res.ok) throw new Error(`storage put failed (${res.status}): ${await res.text()}`);
     },
     async get(key) {

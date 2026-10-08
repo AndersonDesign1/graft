@@ -79,9 +79,12 @@ succeeds, review the diff with `git diff` and commit it like any other change.
 
 Migrations run in file-number order. Graft records each one it applies in a
 table called the **ledger** (`migrations_applied`), and later runs skip it.
-The ledger is checked before a run starts, so two runs started at the same
-moment can both apply the same migration. Run `graft migrate --apply` from one
-place at a time, such as a single deploy step.
+`graft migrate --apply` takes a lock on the branch before it reads the ledger.
+If two deploys start a run at the same moment, the second waits for the first to
+finish, then skips every migration the first one applied. `graft merge --apply`
+takes the same lock on both the branch it merges and the branch it merges into.
+The lock holds one database connection for the whole run, so the pool needs at
+least two.
 
 ## Example: tidy up existing rows
 

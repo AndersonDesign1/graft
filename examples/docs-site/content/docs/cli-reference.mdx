@@ -8,8 +8,9 @@ order: 0
 <p className="kicker">Every graft command, grouped by when you use it.</p>
 
 Look up a command here. Run `graft --help` for the list of commands in your
-terminal. `graft migrate` and `graft merge` only
-report what they would change until you pass `--apply`.
+terminal, or `graft <command> --help` for one command's usage and flags.
+`graft migrate` and `graft merge` only report what they would change until you
+pass `--apply`.
 
 ## Set up and write content
 
@@ -18,7 +19,7 @@ report what they would change until you pass `--apply`.
 | `graft init [dir]` | Create a Graft project: `graft.config.ts`, `content/`, sample content, and `llms.txt`. Add `--postgres` for the Postgres engine. |
 | `graft compile` | Check every content file against the schema and build the index, once |
 | `graft dev` | Watch `content/` and `graft.config.ts`, and recompile on every change |
-| `graft asset put <file> [key]` | Upload a file to your bucket and print the frontmatter that points to it |
+| `graft asset put <file> [key]` | Upload a file to your bucket and print the frontmatter that points to it. Refuses a key that already holds a file. |
 | `graft add [item]` | Copy a ready-made [primitive](/docs/owned-primitives) into `graft/`. With no item, list them. |
 
 ### Print what a compile changed
@@ -101,7 +102,8 @@ for the route.
 | `--apply` | migrate, merge | Make the change. Without it, these only report. |
 | `--prune-unknown` | compile | Remove index entries for collections the schema no longer has. Use after renaming or deleting a collection. |
 | `--json` | compile | Print the branch, commit, and change list as JSON on stdout. See [Print what a compile changed](#print-what-a-compile-changed). |
-| `--dry-run` / `--overwrite` | add | Preview the files, or replace files that differ |
+| `--dry-run` | add | Preview the files without writing them |
+| `--overwrite` | add, asset put | Replace files that differ (add), or the file already stored under the key (asset put) |
 | `--port` / `--host` | serve, studio | Where to listen. Defaults to this machine only. |
 | `--studio` | serve | Include Studio. `GRAFT_STUDIO=1` does the same. |
 

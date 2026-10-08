@@ -64,10 +64,10 @@ content type is worked out from its name.
 Agents upload with the `put_asset` MCP tool. An agent on your machine passes a
 file `path`. A remote agent sends the file as `base64` with a `key`.
 
-`put_asset` refuses a key that already exists unless the agent passes
-`overwrite: true`. `graft asset put` does not check: it replaces the file at
-that key without asking. The bucket keeps no history, so a replaced file is
-gone. Pick a new key for a new version of a file.
+Both refuse a key that already holds a file, with the error `ASSET_EXISTS`.
+The bucket keeps no history, so a replaced file is gone. Pick a new key for a
+new version of a file. To replace the file on purpose, pass `--overwrite` to
+`graft asset put`, or `overwrite: true` to `put_asset`.
 
 ## Reference it from content
 

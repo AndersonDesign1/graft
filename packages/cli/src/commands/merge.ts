@@ -95,6 +95,7 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
       copyDataRecords,
       resolveBranchHandle,
       scopeWriteBranch,
+      withMigrationLock,
     },
     { runDataMigration },
   ] = await Promise.all([
@@ -123,7 +124,7 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
   const targetWrite = scopeWriteBranch(target.scope);
   const sameDb = src.scope.kind === "overlay" && target.scope.kind === "overlay";
 
-  try {
+  const run = async (): Promise<MergeCommandResult> => {
     const [branchLedger, targetLedger] = await Promise.all([
       listAppliedMigrations(src.db, srcWrite),
       listAppliedMigrations(target.db, targetWrite),
@@ -242,6 +243,29 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
     }
 
     return { replayed, dataMoved, compiled, didApply: options.apply === true };
+  };
+
+  try {
+    // --apply writes the target's ledger and reads the source's, so it holds the
+    // `graft migrate --apply` lock on both branches and reads both ledgers inside
+    // them: a migration cannot land on the source between its ledger snapshot
+    // and the rows moving. The locks are taken in registry-name order (two Neon
+    // forks both write "main", each in its own database), so two
+    // merges running in opposite directions cannot each hold one and wait on
+    // the other.
+    if (!options.apply) return await run();
+    const [first, second] = [
+      { db: src.db, branch: srcWrite, name: options.branch },
+      { db: target.db, branch: targetWrite, name: into },
+    ].sort((a, b) => a.name.localeCompare(b.name));
+    const waitFor = (name: string) => () =>
+      console.log(`A migration or merge is running on "${name}"; waiting for it to finish…`);
+    return await withMigrationLock(
+      first.db,
+      first.branch,
+      () => withMigrationLock(second.db, second.branch, run, { onWait: waitFor(second.name) }),
+      { onWait: waitFor(first.name) },
+    );
   } finally {
     await src.close();
     await target.close();

@@ -475,7 +475,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "Two documents' assets colliding on a generic key like assets/hero.png",
     ],
     howToRecover:
-      "Pick a distinct key (e.g. prefix it with the document: pages/pricing/hero.png) — that is almost always right. Only pass `overwrite: true` when replacing the existing binary is the actual intent; every document referencing that key will show the new bytes.",
+      "Pick a distinct key (e.g. prefix it with the document: pages/pricing/hero.png) — that is almost always right. Only pass `overwrite: true` (put_asset) or `--overwrite` (graft asset put) when replacing the existing binary is the actual intent; every document referencing that key will show the new bytes.",
   },
   NOT_IMPLEMENTED: {
     code: "NOT_IMPLEMENTED",

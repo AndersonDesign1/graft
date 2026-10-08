@@ -4,7 +4,7 @@
  * The `path` argument reads from the machine running the server and therefore exists only when the mount granted a root to read from.
  */
 import { readFileSync } from "node:fs";
-import { contentTypeFor, defaultKeyFor } from "@usegraft/assets";
+import { AssetKeyTakenError, contentTypeFor, defaultKeyFor } from "@usegraft/assets";
 import { AssetRef } from "@usegraft/core";
 import { resolveContained } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
@@ -128,17 +128,24 @@ export const registerAssetTools: RegisterTools = (server, deps) => {
         }
 
         const storage = await getStorage();
-        if (overwrite !== true && (await storage.exists(key))) {
-          throw new GraftError({
+        // exists() answers early. The put carries If-None-Match too, so the store
+        // refuses a key a concurrent upload took, or one this credential cannot HEAD.
+        const keyTaken = () =>
+          new GraftError({
             code: "ASSET_EXISTS",
             message: `Asset key "${key}" already holds a binary.`,
             fix: "Pick a distinct key (the store keeps no version history), or pass overwrite: true if replacing the existing binary is the actual intent.",
             details: { key },
           });
-        }
+        if (overwrite !== true && (await storage.exists(key))) throw keyTaken();
 
         const type = contentType ?? contentTypeFor(key);
-        await storage.put(key, bytes, type);
+        try {
+          await storage.put(key, bytes, type, { ifAbsent: overwrite !== true });
+        } catch (error) {
+          if (error instanceof AssetKeyTakenError) throw keyTaken();
+          throw error;
+        }
         return {
           key,
           contentType: type,

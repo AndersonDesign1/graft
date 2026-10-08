@@ -18,7 +18,8 @@
  * Identity: the same env contract as `graft mcp` (GRAFT_DEV_TOKEN /
  * GRAFT_DEV_SCOPES) plus GRAFT_TRUSTED_ISSUERS — comma/space-separated OIDC
  * issuer URLs verified via discovery, so a deployed server accepts
- * externally-minted agent tokens without new code.
+ * externally-minted tokens without new code. GRAFT_TRUSTED_AUDIENCE and
+ * GRAFT_TRUSTED_ACTOR_KIND apply to every issuer (see trustedIssuersFromEnv).
  *
  * Anonymous MCP callers are served on loopback (zero-config local dev) and
  * refused anywhere else, with no env var to remember. Off loopback it takes a
@@ -216,12 +217,50 @@ function localGitSha(cwd: string): string | undefined {
   }
 }
 
-function trustedIssuersFromEnv(): TrustedIssuer[] {
-  return (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
+function listFromEnv(raw: string | undefined): string[] {
+  return (raw ?? "")
     .split(/[,\s]+/)
-    .map((issuer) => issuer.trim())
-    .filter(Boolean)
-    .map((issuer) => ({ issuer }));
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+/**
+ * GRAFT_TRUSTED_ISSUERS plus the two settings an embedded resolver gets per
+ * issuer, applied to every issuer listed:
+ *   GRAFT_TRUSTED_AUDIENCE   — accepted `aud` values (comma/space-separated).
+ *                              Unset leaves the audience unchecked, which serve
+ *                              warns about at boot.
+ *   GRAFT_TRUSTED_ACTOR_KIND — "agent" (default) or "human": what the audit log
+ *                              records these callers as.
+ * Issuers that need different settings each belong in an embedded resolver.
+ */
+export function trustedIssuersFromEnv(env: NodeJS.ProcessEnv = process.env): TrustedIssuer[] {
+  const issuers = listFromEnv(env.GRAFT_TRUSTED_ISSUERS);
+  const audience = listFromEnv(env.GRAFT_TRUSTED_AUDIENCE);
+  // Set but empty once parsed (",", " , "): a typo, not a choice. Treating it
+  // as unset would turn the audience check off without the warning unset gets.
+  if (env.GRAFT_TRUSTED_AUDIENCE?.trim() && audience.length === 0) {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `GRAFT_TRUSTED_AUDIENCE is "${env.GRAFT_TRUSTED_AUDIENCE}", which names no audience.`,
+      fix: "Set GRAFT_TRUSTED_AUDIENCE to the audience your provider puts in tokens for this API (comma-separated for several), or unset it.",
+      details: { variable: "GRAFT_TRUSTED_AUDIENCE", value: env.GRAFT_TRUSTED_AUDIENCE },
+    });
+  }
+  const kind = env.GRAFT_TRUSTED_ACTOR_KIND?.trim() || "agent";
+  if (kind !== "agent" && kind !== "human") {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `GRAFT_TRUSTED_ACTOR_KIND is "${kind}"; it must be "agent" or "human".`,
+      fix: "Set GRAFT_TRUSTED_ACTOR_KIND=human to record token holders as people, or unset it to record them as agents.",
+      details: { variable: "GRAFT_TRUSTED_ACTOR_KIND", value: kind },
+    });
+  }
+  return issuers.map((issuer) => {
+    const trusted: TrustedIssuer = { issuer, actorKind: kind };
+    if (audience.length > 0) trusted.audience = audience;
+    return trusted;
+  });
 }
 
 export interface ServeCommandOptions {
@@ -262,17 +301,15 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     enableStudio ? import("@usegraft/studio") : Promise.resolve(null),
   ]);
 
+  // Before any connection opens: a bad value here stops the boot.
+  const issuers = trustedIssuersFromEnv();
   const control = createDb(url);
   const branchName = options.branchId ?? "main";
   const branch = await resolveBranchHandle(control.db, branchName, { databaseUrl: url });
   const writeBranch = scopeWriteBranch(branch.scope);
 
   const devToken = process.env.GRAFT_DEV_TOKEN;
-  const scopes = (process.env.GRAFT_DEV_SCOPES ?? "")
-    .split(/[,\s]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const issuers = trustedIssuersFromEnv();
+  const scopes = listFromEnv(process.env.GRAFT_DEV_SCOPES);
   const resolveActor = createActorResolver({
     issuers,
     devTokens: devToken ? { [devToken]: { kind: "agent", id: "graft-serve", scopes } } : undefined,
@@ -416,6 +453,13 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
       "[graft serve] WARNING: binding beyond loopback with no identity configured — " +
         "MCP will refuse every caller, because there is nothing to authenticate them against. " +
         "Set GRAFT_DEV_TOKEN or GRAFT_TRUSTED_ISSUERS.",
+    );
+  }
+  if (issuers.length > 0 && issuers.every((issuer) => issuer.audience === undefined)) {
+    console.warn(
+      "[graft serve] WARNING: GRAFT_TRUSTED_ISSUERS is set without GRAFT_TRUSTED_AUDIENCE — " +
+        "any token those issuers sign is accepted, including one minted for another of your apps. " +
+        "Set GRAFT_TRUSTED_AUDIENCE to the audience your provider puts in tokens for this API.",
     );
   }
 
