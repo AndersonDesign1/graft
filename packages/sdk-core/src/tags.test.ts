@@ -1,7 +1,7 @@
 /** Unit: the cache-tag contract (pure). */
 import type { ChangeSet } from "@usegraft/db";
 import { describe, expect, it } from "vitest";
-import { collectionTag, documentTag, tagsFor, tagsForChanges } from "./tags";
+import { collectionTag, documentTag, MAX_TAG_LENGTH, tagsFor, tagsForChanges } from "./tags";
 
 describe("tag builders", () => {
   it("document and collection tags are distinct and structured", () => {
@@ -13,6 +13,24 @@ describe("tag builders", () => {
     expect(documentTag("preview/x", "pages", "home")).toBe("graft:preview/x:pages:home");
     expect(documentTag("preview/x", "pages", "home")).not.toBe(
       documentTag("main", "pages", "home"),
+    );
+  });
+
+  it("keeps a long slug's tag within Next's 256-character limit, the same way every time", () => {
+    // Next skips a longer tag, so the page it guards would never refresh.
+    const long = "a".repeat(300);
+    const tag = documentTag("main", "pages", long);
+
+    expect(tag.length).toBeLessThanOrEqual(MAX_TAG_LENGTH);
+    expect(tag.startsWith("graft:main:pages:aaa")).toBe(true);
+    // Reads and invalidation both build it here, so they must agree.
+    expect(documentTag("main", "pages", long)).toBe(tag);
+    expect(
+      tagsForChanges("main", { added: [`pages/${long}`], changed: [], removed: [], unchanged: 0 }),
+    ).toContain(tag);
+    // Two long slugs that differ only past the cut still get different tags.
+    expect(documentTag("main", "pages", `${long}b`)).not.toBe(
+      documentTag("main", "pages", `${long}c`),
     );
   });
 });

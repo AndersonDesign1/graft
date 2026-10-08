@@ -12,14 +12,43 @@ import type { ChangeSet } from "@usegraft/contracts";
 /** Every Graft tag starts here, so an app can namespace or bulk-clear them. */
 export const TAG_NAMESPACE = "graft";
 
+/**
+ * Next.js skips a cache tag longer than 256 characters, with a warning rather
+ * than an error, and a skipped tag is never invalidated: the page stays stale.
+ * A long slug (or branch) could reach that, so every tag is kept within it.
+ */
+export const MAX_TAG_LENGTH = 256;
+
+/** FNV-1a, 32-bit, from a given offset basis: small, sync, and the same everywhere. */
+function fnv1a(text: string, basis: number): string {
+  let hash = basis;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+/**
+ * A tag at most MAX_TAG_LENGTH long. A longer one keeps its readable start and
+ * ends in a digest of the whole tag. Reads and invalidation both build tags
+ * here, so they still agree, and two long tags sharing a digest only means one
+ * extra page refreshes.
+ */
+function bounded(tag: string): string {
+  if (tag.length <= MAX_TAG_LENGTH) return tag;
+  const digest = fnv1a(tag, 0x811c9dc5) + fnv1a(tag, 0x01234567);
+  return `${tag.slice(0, MAX_TAG_LENGTH - digest.length - 1)}#${digest}`;
+}
+
 /** Cache tag for one document — invalidated when that doc is added/changed/removed. */
 export function documentTag(branch: string, collection: string, slug: string): string {
-  return `${TAG_NAMESPACE}:${branch}:${collection}:${slug}`;
+  return bounded(`${TAG_NAMESPACE}:${branch}:${collection}:${slug}`);
 }
 
 /** Cache tag for a collection's list/search reads — invalidated when ANY of its docs changes. */
 export function collectionTag(branch: string, collection: string): string {
-  return `${TAG_NAMESPACE}:${branch}:${collection}`;
+  return bounded(`${TAG_NAMESPACE}:${branch}:${collection}`);
 }
 
 /**
