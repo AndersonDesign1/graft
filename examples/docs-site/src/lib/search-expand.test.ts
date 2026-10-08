@@ -39,8 +39,14 @@ describe("expandQuery", () => {
     expect(expandQuery("mi", words)).toBe("mi or mill or million");
     // "state" stems apart from "stat", so typing "stat" must still offer it.
     expect(expandQuery("stat", buildVocabulary(["state states"]))).toBe("stat or state");
-    // Too short for the index to stem the way the plural rule would.
+    // The index stems a bare "ies" to "ie", not "i", so it keeps its own slot.
     expect(expandQuery("i", buildVocabulary(["ies"]))).toBe("i or ies");
+  });
+
+  it("still folds short plurals the index folds", () => {
+    // SQLite's porter: "runs" -> "run", "cats" -> "cat", "has" -> "ha".
+    expect(expandQuery("run", buildVocabulary(["runs"]))).toBe("run");
+    expect(expandQuery("ca", buildVocabulary(["cat cat cats"]))).toBe("ca or cat");
   });
 
   it("leaves a finished word that completes to nothing alone", () => {
