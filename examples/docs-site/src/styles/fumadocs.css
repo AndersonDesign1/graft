@@ -173,12 +173,12 @@ kbd {
 }
 
 /* Once the sidebar shows, the sidebar and contents rail sit a gutter in from
-   the window edges (24px at 768, about 48px at 1440, 64px at most), so they
+   the window edges (12px at 768, about 24px at 1440, 32px at most), so they
    do not run into the edges. The fumadocs grid gives the
    space outside --fd-layout-width to its two outer columns. */
 @media (min-width: 48rem) {
   #nd-notebook-layout {
-    --doc-gutter: clamp(1.5rem, 3.4vw, 4rem);
+    --doc-gutter: clamp(0.75rem, 1.7vw, 2rem);
     --fd-layout-width: calc(100vw - 2 * var(--doc-gutter));
   }
 }
@@ -334,19 +334,21 @@ kbd {
 }
 
 .prose pre.shiki {
+  position: relative;
   background: var(--paper-sunken) !important;
   border: 1px solid var(--hairline);
   box-shadow: none;
   border-radius: var(--radius-outer);
-  padding: var(--space-4) var(--space-5);
-  overflow-x: auto;
+  padding: 0;
+  overflow: visible;
   font-size: var(--text-sm);
   line-height: 1.7;
 }
 
 /* A long line scrolls inside the block; the bar is a thin hairline, not the
-   platform's default trough. */
-.prose pre.shiki,
+   platform's default trough. The <code> scrolls rather than the <pre>, so the
+   copy button pinned to the <pre> stays put while the line slides under it. */
+.prose pre.shiki > code,
 .prose table {
   scrollbar-width: thin;
   scrollbar-color: var(--hairline-strong) transparent;
@@ -360,6 +362,79 @@ kbd {
   background: none !important;
   box-shadow: none !important;
   font-size: inherit !important;
+}
+
+/* The end padding leaves room for the copy button, so the first line never
+   runs under it. */
+.prose pre.shiki > code {
+  padding: var(--space-4) calc(var(--space-5) + 2rem) var(--space-4) var(--space-5) !important;
+  overflow-x: auto;
+  border-radius: inherit !important;
+}
+
+/* Copy — a quiet square in the corner that lights on hover or focus. On a
+   touch screen there is no hover, so it simply stays visible. */
+.copy-code {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-end: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-inner);
+  background: var(--paper);
+  color: var(--ink-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.copy-code > svg {
+  grid-area: 1 / 1;
+}
+
+.prose pre.shiki:hover .copy-code,
+.copy-code:focus-visible,
+.copy-code[data-state] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .copy-code {
+    opacity: 1;
+  }
+}
+
+.copy-code:hover {
+  color: var(--ink);
+  border-color: var(--hairline-strong);
+}
+
+.copy-code:focus-visible {
+  outline: 2px solid var(--mark);
+  outline-offset: 1px;
+}
+
+.copy-code .copy-code-done,
+.copy-code[data-state="done"] .copy-code-idle {
+  display: none;
+}
+
+.copy-code[data-state="done"] .copy-code-done {
+  display: block;
+}
+
+.copy-code[data-state="done"] {
+  color: var(--ink);
+}
+
+.copy-code[data-state="failed"] {
+  color: var(--mark);
 }
 
 .prose pre.shiki .line {
@@ -1351,19 +1426,16 @@ html[data-theme="dark"] .powered-by-graft-on-ink {
 }
 
 /* ---- Contents rail ---------------------------------------------------------
-   Fumadocs draws the stepped line, lights the stretch you are reading with a
-   clip-path, and moves a dot along it. The mechanics stay; the look is
-   Graft's: hairline track, an ink stroke for the lit stretch, and the dot is
-   the period from the "graft." wordmark, an ink dot with a ring of paper. */
+   Drawn by toc-rail.tsx, the same on every page: one straight hairline track,
+   entries indented by depth in their text only, and an ink thumb that slides
+   along the track to cover the part of the page on screen. Fumadocs' stock
+   rail bent its line in at every h3, so its shape changed from page to page. */
 #nd-toc #toc-title {
+  margin: 0;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   letter-spacing: 0.02em;
   color: var(--ink-faint);
-}
-
-#nd-toc #toc-title svg {
-  display: none;
 }
 
 #nd-toc a {
@@ -1376,17 +1448,82 @@ html[data-theme="dark"] .powered-by-graft-on-ink {
   color: var(--ink);
 }
 
-#nd-toc a svg path {
-  stroke: var(--hairline-strong);
+.toc-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
-#nd-toc .stroke-fd-primary {
-  stroke: var(--ink);
-  stroke-width: 1.5;
+.toc-rail::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 1px;
+  background: var(--hairline-strong);
 }
 
-#nd-toc svg.absolute {
-  transition: clip-path var(--duration-base) var(--ease-out);
+.toc-thumb {
+  position: absolute;
+  top: 0;
+  inset-inline-start: -0.5px;
+  width: 2px;
+  height: 0;
+  border-radius: 1px;
+  background: var(--ink);
+  opacity: 0;
+  will-change: transform;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    height var(--duration-base) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out);
+}
+
+.toc-link {
+  padding-block: 0.3125rem;
+  padding-inline-start: 0.875rem;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  scroll-margin: 1rem;
+}
+
+.toc-link[data-depth="3"] {
+  padding-inline-start: 1.625rem;
+}
+
+.toc-link[data-depth="4"],
+.toc-link[data-depth="5"],
+.toc-link[data-depth="6"] {
+  padding-inline-start: 2.375rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toc-thumb {
+    transition: none;
+  }
+}
+
+/* The phone's contents list is fumadocs' popover. Its stepped line and
+   travelling dot are hidden, and the list takes the rail's look: a straight
+   hairline, the entries on screen marked in ink on it. */
+[data-toc-popover-content] a > svg,
+[data-toc-popover-content] .flex-col > div.absolute {
+  display: none;
+}
+
+[data-toc-popover-content] .flex-col:has(> a) {
+  border-inline-start: 1px solid var(--hairline-strong);
+}
+
+[data-toc-popover-content] a {
+  padding-block: 0.3125rem !important;
+  color: var(--ink-faint);
+}
+
+[data-toc-popover-content] a[data-active="true"] {
+  color: var(--ink);
+  box-shadow: inset 2px 0 0 var(--ink);
 }
 
 /* The phone's version: the reading-progress ring in the contents bar under
@@ -1406,15 +1543,6 @@ html[data-theme="dark"] .powered-by-graft-on-ink {
 #nd-notebook-layout svg[role="progressbar"] circle:last-child {
   stroke: var(--ink);
   transition: none;
-}
-
-#nd-toc .rounded-full[class*="bg-fd-primary"] {
-  width: 7px;
-  height: 7px;
-  background: var(--ink);
-  box-shadow:
-    0 0 0 3px var(--paper),
-    0 0 0 4px var(--hairline-strong);
 }
 
 /* The "beta" mark beside the wordmark in the top bar. */
