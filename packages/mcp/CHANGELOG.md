@@ -1,5 +1,73 @@
 # @usegraft/mcp
 
+## 1.0.0-beta.3
+
+### Patch Changes
+
+- 56c0957: `graft asset put` refuses a key that already holds a file, like `put_asset`.
+
+  The MCP `put_asset` tool has refused a taken key with `ASSET_EXISTS` unless the
+  caller passed `overwrite: true`. The CLI did not check: it replaced whatever was
+  stored under the key. The store keeps no version history, so the old file was
+  gone, and every page pointing at the key showed the new one.
+
+  The CLI now checks first and fails with the same `ASSET_EXISTS` error. Pass
+  `--overwrite` to replace the file on purpose.
+
+  Both also make the upload itself conditional. `Storage.put` from
+  `@usegraft/assets` takes `{ ifAbsent: true }`, which sends
+  `If-None-Match: *`, and throws `AssetKeyTakenError` when the store answers 412. So the store refuses a key that a concurrent upload took between the check
+  and the write, or that a credential allowed to upload but not read cannot see.
+  A store that ignores the header writes as before, behind the existence check.
+
+  **Breaking:** a script that re-uploads to the same key now fails until it adds
+  `--overwrite` or picks a new key.
+
+- f92b97c: Clearer wording for two error explanations. `NEEDS_DATABASE` now says the project runs on the static storage engine and the feature needs the Postgres engine, instead of "static index mode" and "Postgres-tier". The registry entry now says "core registry" instead of "Tier-1 registry". `@usegraft/tokens` adds a `--measure` token for the reading width of prose. It also defines `--space-5`, which eight declarations already used while it was undefined, so callouts and other spaced elements lost their padding. Callouts get their own note and warning hues instead of reusing the accent, and `--n-10` names pure white for text on the primary color in dark mode.
+- f92b97c: `run_function` now sets `openWorldHint: true`. It runs the project's own
+  functions, and a function can call any external service, so it cannot promise
+  the closed world every other tool does. Every other tool keeps
+  `openWorldHint: false`.
+- f92b97c: `@usegraft/sdk-next` now works on Next.js 15 as well as 16, and needs a
+  release with the 2026 security fixes. The peer ranges are
+  `next@^15.5.24 || ^16.3.3` and `react@^19.0.0`. CI builds and serves a real app
+  on each major, type-checks the Next.js guide's examples against it, and checks
+  reads, MDX, targeted refresh and `updateContent` in a real Server Action.
+
+  The package used to declare Next.js 15 or newer while calling APIs that only
+  Next.js 16 has. What changed for you:
+
+  - **Breaking:** the peer range now starts at 15.5.24 and 16.3.3, the first
+    releases that fix the critical Next.js advisories published in 2026. Upgrade
+    Next.js if you are on an older 15.x. Next.js 14 is not supported: it no
+    longer gets security fixes, and those advisories are still open on it.
+  - `createGraft`, `MdxBody` and `revalidateContent` work on 15 and 16. On
+    Next.js 15, tag your reads with `unstable_cache(fn, keys, { tags: tagsFor(...) })`.
+    The Next.js guide shows both paths.
+  - `updateContent` still needs Next.js 16. On 15 it now throws a `GraftError`
+    with code `FRAMEWORK_VERSION_UNSUPPORTED` whose `fix` names
+    `revalidateContent`. Before, the package imported `updateTag` by name, and
+    Next.js 15 does not export it.
+  - `@usegraft/sdk-next/config`, `@usegraft/sdk-core/db` and
+    `@usegraft/studio/panels` now resolve their types under
+    `moduleResolution: "node"`, the setting Next.js 15 writes into a new
+    tsconfig. Before, those imports had no types there, and reads came back
+    typed as `unknown`.
+
+  `FRAMEWORK_VERSION_UNSUPPORTED` is a new error code, with an entry in the error
+  reference and in `explain_error`.
+
+- Updated dependencies [56c0957]
+- Updated dependencies [56c0957]
+- Updated dependencies [f92b97c]
+  - @usegraft/assets@1.0.0-beta.3
+  - @usegraft/db@1.0.0-beta.3
+  - @usegraft/contracts@1.0.0-beta.3
+  - @usegraft/compiler@1.0.0-beta.3
+  - @usegraft/core@1.0.0-beta.3
+  - @usegraft/mdx-safety@1.0.0-beta.3
+  - @usegraft/registry@1.0.0-beta.3
+
 ## 1.0.0-beta.2
 
 ### Patch Changes

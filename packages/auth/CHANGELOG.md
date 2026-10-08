@@ -1,5 +1,13 @@
 # @usegraft/auth
 
+## 1.0.0-beta.3
+
+### Patch Changes
+
+- Updated dependencies [f92b97c]
+  - @usegraft/contracts@1.0.0-beta.3
+  - @usegraft/core@1.0.0-beta.3
+
 ## 1.0.0-beta.2
 
 ### Patch Changes
