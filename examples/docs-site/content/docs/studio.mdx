@@ -14,8 +14,11 @@ Studio is a web UI for them: they browse the content, edit a document in a
 rich editor, review what they changed, and commit it. Everything still ends up
 as files in Git, exactly as if a developer had edited them.
 
-Studio is optional. Every action in it also exists in the CLI and over MCP, so
-nothing is locked inside the UI. It needs the [Postgres engine](/docs/tiers),
+Studio is optional. Your content stays plain files in Git, so nothing is locked
+inside the UI: anything Studio does to content, you can also do by editing the
+files and using Git. Some actions also have CLI or MCP equivalents, such as
+`graft compile`, `graft approve`, and `write_content`. Committing and
+reverting a compilation are Studio's own. It needs the [Postgres engine](/docs/tiers),
 because it compares your files with the compiled index.
 
 ## Open Studio
@@ -118,9 +121,13 @@ compiles and serves without Git.
 
 ## Revert from a compilation
 
-Every compile records the Git commit it read. So in History you can pick a past
-compile and restore your content to exactly how it was then. Studio restores
-the files and recompiles.
+Every compile records the Git commit that was checked out when it ran. In
+History you can pick a past compile and restore your content to that commit.
+Studio restores the files and recompiles.
+
+A compile can include uncommitted edits, and the recorded commit does not
+contain them. Restoring such a compile gives you the commit, not the exact
+content that compile served.
 
 It only offers this when it is safe. It first checks that the commit exists in
 this copy of the repository and that you have no uncommitted content changes

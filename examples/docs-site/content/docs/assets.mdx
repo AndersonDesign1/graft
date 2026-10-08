@@ -32,7 +32,8 @@ S3_PUBLIC_URL=https://assets.example.com   # optional, see below
 
 </CodeBlock>
 
-`S3_REGION` is optional and defaults to `auto`, which suits R2.
+`S3_REGION` defaults to `auto`, which suits R2. On AWS S3, set it to your
+bucket's region, such as `us-east-1`: AWS rejects requests signed for `auto`.
 [Configuration](/docs/configuration#assets-s3-compatible) lists every variable.
 
 ## Add an asset field
@@ -63,8 +64,10 @@ content type is worked out from its name.
 Agents upload with the `put_asset` MCP tool. An agent on your machine passes a
 file `path`. A remote agent sends the file as `base64` with a `key`.
 
-Uploading to a key that already exists is refused unless you pass
-`overwrite: true`. The bucket keeps no history, so an overwritten file is gone.
+`put_asset` refuses a key that already exists unless the agent passes
+`overwrite: true`. `graft asset put` does not check: it replaces the file at
+that key without asking. The bucket keeps no history, so a replaced file is
+gone. Pick a new key for a new version of a file.
 
 ## Reference it from content
 

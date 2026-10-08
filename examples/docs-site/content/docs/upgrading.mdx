@@ -14,15 +14,17 @@ what to do about each one.
 
 ## Upgrade your packages
 
-All `@usegraft/*` packages share one version number. Upgrade them together:
+All `@usegraft/*` packages share one version number. Upgrade them together,
+naming every `@usegraft/*` package your project already uses and no others.
+For a Next.js project on Postgres, that might be:
 
 ```sh
 npm i @usegraft/core @usegraft/db @usegraft/sdk-next
 npm i -D @usegraft/cli
 ```
 
-List every `@usegraft/*` package your project uses. Mixing versions is not
-supported. Then run `graft compile`. If anything in your project relies on an
+On another framework, swap `@usegraft/sdk-next` for your adapter, such as
+`@usegraft/sdk-astro`. Mixing versions is not supported. Then run `graft compile`. If anything in your project relies on an
 old behavior, the error's `fix` says what to change.
 
 <Callout label="Prefer to let your agent do it?" type="note">
@@ -60,6 +62,20 @@ export const approvalPolicy = "unattended";
 An unknown value is refused rather than replaced with a default, so a typo
 cannot quietly weaken the policy. See [Audit & approvals](/docs/audit-and-approvals).
 
+**If you call `createClient` from `@usegraft/sdk-core` directly with a `db`,**
+it no longer takes one. It reads a compiled index (`index`) only. Pass your
+Postgres handle to `createDbClient` from `@usegraft/sdk-core/db` instead:
+
+```ts
+// before: createClient({ db, collections })
+import { createDbClient } from "@usegraft/sdk-core/db";
+
+export const client = createDbClient({ db, collections });
+```
+
+Framework adapters' `createGraft` still accepts either, so app code that goes
+through an adapter needs no change.
+
 Other changes in this release need no action from you, but change behavior:
 
 - An approval used on an unattended call is now marked as used, so it cannot
@@ -82,7 +98,9 @@ MCP over HTTP now refuses anonymous callers by default.
 - `createGraftMcpHandler` refuses to start with neither an `actor` resolver nor
   `allowAnonymous: true`.
 - `graft serve` allows anonymous agents only when it listens on your own
-  machine.
+  machine, or when you opt in with `GRAFT_MCP_ALLOW_ANONYMOUS=1`. Use the opt-in
+  only behind your own authenticating proxy: it opens every MCP tool to anyone
+  who can reach the server, and `graft serve` warns at start while it is set.
 
 **What to do:** give your HTTP endpoint an `actor` resolver. See
 [Auth](/docs/auth) and [Connecting agents](/docs/connecting-agents).
@@ -110,8 +128,9 @@ MCP over HTTP now refuses anonymous callers by default.
 
 ### Executable MDX is refused
 
-`graft compile` now fails on MDX containing `{…}` expressions, `import`, or
-`export`, and on MDX it cannot parse.
+`graft compile` now fails on MDX containing `{…}` expressions, `import`,
+`export`, or spread attributes (`<Card {...props} />`), and on MDX it cannot
+parse.
 
 **What to do:** remove executable MDX from your content, or, if every author
 has commit access to your repository, set `mdxTrust = "full"`. See

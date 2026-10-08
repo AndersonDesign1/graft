@@ -73,8 +73,9 @@ primitive's name clashes with one of yours, the config stops loading with
 ## Change it
 
 The files in `graft/` are yours. Rename fields, change the moderation rules,
-or delete functions you do not need. Graft never overwrites them. If you need
-to undo your changes, Git has the original.
+or delete functions you do not need. Graft does not overwrite them: running
+`graft add` again refuses to replace a file you changed, unless you pass
+`--overwrite`. If you need to undo your changes, Git has the original.
 
 ## Where primitives come from
 

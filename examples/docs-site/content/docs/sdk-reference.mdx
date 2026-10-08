@@ -112,8 +112,10 @@ the caller nothing.
 | `tagsFor(branch, collection, slug?)` | The tags a read depends on |
 | `tagsForChanges(branch, changes)` | The tags to refresh after content changes |
 
-In Next.js, tag cached reads with `cacheTag` and refresh them with
-`revalidateContent` ([how](/docs/next#refresh-pages-when-content-changes)).
+In Next.js, tag cached reads and refresh them with `revalidateContent`. On
+Next.js 16, tag reads with `'use cache'` and `cacheTag`. On Next.js 15, wrap
+them in `unstable_cache` with `tags`
+([how](/docs/next#refresh-pages-when-content-changes)).
 Every other framework sends the tags in a CDN header and purges them at the
 CDN. Unchanged documents are never refreshed, and a change on a preview branch
 never refreshes `main`.

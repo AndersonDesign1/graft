@@ -65,7 +65,7 @@ One row for every function call, whatever the outcome:
 | --- | --- |
 | `correlation_id` | The id returned in the response header |
 | `function_name`, `function_kind` | What ran |
-| `actor_kind`, `actor_id` | Who ran it. `actor_id` is empty for anonymous callers |
+| `actor_kind`, `actor_id` | Who ran it. `actor_id` is `NULL` for anonymous callers |
 | `status` | `"ok"`, or the error code it failed with |
 | `duration_ms` | How long it took |
 | `git_sha` | The commit of the code that served it |

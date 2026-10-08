@@ -106,8 +106,9 @@ who sent it and a correlation id, so you can trace it later in the
 ## List submissions for your team
 
 There is no read SDK for operational data, on purpose: every read goes through
-a function, so it gets the same access check as a write. Write a **query**
-function:
+a function, so who may read is decided in the same place as who may write. The
+defaults differ, though: a query is open to anyone until you give it an
+`access` rule. Write a **query** function with one:
 
 <CodeBlock title="graft.config.ts">
 

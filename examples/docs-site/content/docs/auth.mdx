@@ -27,7 +27,7 @@ Each request falls into one of four cases:
 
 | The request carries | Graft treats the caller as |
 | --- | --- |
-| A valid token from an identity provider you trust | That user, with the scopes the token lists |
+| A valid token from an identity provider you trust | The token's subject, with the scopes the token lists. It is recorded as an agent unless the issuer is set with `actorKind: "human"` |
 | Your local development token (`GRAFT_DEV_TOKEN`) | You, with the scopes you set |
 | No token | Anonymous |
 | A token that is expired, forged, or from an issuer you do not trust | Refused with `TOKEN_INVALID` (401) |
@@ -68,8 +68,17 @@ GRAFT_TRUSTED_ISSUERS=https://your-tenant.auth0.com/
 </CodeBlock>
 
 Graft looks up each provider's public keys and checks every token's signature,
-issuer, expiry, and audience. Scopes are read from the token's `scope`,
-`scopes`, or `permissions` claim.
+issuer, and expiry. Scopes are read from the token's `scope`, `scopes`, or
+`permissions` claim.
+
+Two limits apply to issuers set this way:
+
+- **The audience is not checked.** Any token the provider issues is accepted,
+  including one minted for another of your apps. If the provider serves more
+  than one app, run Graft inside your app instead and set `audience`.
+- **Callers are recorded as agents.** The audit log records each caller as an
+  agent. To record signed-in people as humans, set `actorKind: "human"` in
+  your own app's resolver.
 
 **If Graft runs inside your own app**, create the resolver in code and pass it
 to Graft's handlers. `GRAFT_TRUSTED_ISSUERS` is not read automatically here, so
@@ -80,14 +89,23 @@ pass the issuers yourself:
 ```ts
 import { createActorResolver } from "@usegraft/auth";
 
-// A dev token never expires, so it is accepted only outside production.
-const devToken = process.env.NODE_ENV === "production" ? undefined : process.env.GRAFT_DEV_TOKEN;
+// A dev token never expires, so it is accepted only in development. An unset
+// NODE_ENV counts as production, so a deploy that forgets it stays closed.
+const devToken = process.env.NODE_ENV === "development" ? process.env.GRAFT_DEV_TOKEN : undefined;
 
 export const actor = createActorResolver({
   issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
     .split(/[,\s]+/)
     .filter(Boolean)
-    .map((issuer) => ({ issuer })),
+    .map((issuer) => ({
+      issuer,
+      // Only tokens minted for this app. Without it, any token from the
+      // provider is accepted.
+      audience: "https://api.example.com",
+      // These tokens are people signing in. The default, "agent", suits
+      // tokens your agents use.
+      actorKind: "human",
+    })),
   devTokens: devToken
     ? {
         [devToken]: {
@@ -141,9 +159,12 @@ How an agent is identified depends on how it connects:
 - **On your machine (`graft mcp`).** The server uses `GRAFT_DEV_TOKEN` as the
   agent's identity. The token stays in the server, so it never appears in the
   agent's conversation.
-- **Over HTTP (`POST /api/mcp`).** The agent sends a token when it connects, and
-  that token is used for every function it runs. A single call can pass a
-  different token to act as another user, if that token is valid.
+- **Over HTTP (`POST /api/mcp`).** The agent sends its token in the
+  `Authorization` header of every request. The endpoint keeps no session, so a
+  token sent only when the agent first connects does not cover later calls.
+  MCP clients send the header on every request when it is set in their config.
+  A single call can pass a different token to act as another user, if that
+  token is valid.
 
 [Connecting agents](/docs/connecting-agents) covers both setups.
 

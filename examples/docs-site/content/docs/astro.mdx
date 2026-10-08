@@ -110,10 +110,15 @@ page makes only a few reads.
 
 ## Serve functions and MCP from your app
 
-This step is optional. It needs two more packages:
+This step is optional, and it needs the Postgres engine: functions and the
+audit log they write live in the database. The routes below import the `db`
+exported by the Postgres version of `src/lib/graft.ts` above. The static setup
+exports no `db`, so these routes do not work on it.
+
+It needs three more packages:
 
 ```sh
-npm i @usegraft/auth @usegraft/mcp
+npm i @usegraft/core @usegraft/auth @usegraft/mcp
 ```
 
 `graftRoute` binds a Graft handler to an Astro endpoint. It takes the handler,
@@ -145,8 +150,9 @@ import { graftRoute } from "@usegraft/sdk-astro";
 import { collections, functions } from "../../graft.config";
 import { db } from "../lib/graft";
 
-// A dev token never expires, so it is accepted only outside production.
-const devToken = process.env.NODE_ENV === "production" ? undefined : process.env.GRAFT_DEV_TOKEN;
+// A dev token never expires, so it is accepted only in development. An unset
+// NODE_ENV counts as production, so a deploy that forgets it stays closed.
+const devToken = process.env.NODE_ENV === "development" ? process.env.GRAFT_DEV_TOKEN : undefined;
 
 const actor = createActorResolver({
   issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")

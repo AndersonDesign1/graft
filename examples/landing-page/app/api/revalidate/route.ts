@@ -4,7 +4,7 @@
  * compile's ChangeSet here and the app refreshes exactly the pages that changed.
  * `graft compile --json` prints that body as-is, so a deploy script pipes it:
  *
- *   graft compile --json | curl -X POST -H "Authorization: Bearer $TOKEN" \
+ *   graft compile --json | curl --fail -X POST -H "Authorization: Bearer $TOKEN" \
  *     -H "content-type: application/json" --data-binary @- https://<app>/api/revalidate
  *
  * The body (an agent's write_content result carries the same `changes`):

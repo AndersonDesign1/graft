@@ -68,7 +68,11 @@ saying how many seconds to wait:
 
 - **Signed-in callers** are counted by who they are. Two users never share a
   limit, so one cannot lock out the other.
-- **Anonymous callers** are counted by IP address.
+- **Anonymous callers** are counted by IP address, when Graft knows it.
+  `graft serve` records each connection's address. Inside your own app, Graft
+  only knows it once you set `trustedProxyHops` (below). Until then, every
+  anonymous caller shares one limit, which is strict: one busy caller can use
+  it up for everyone.
 
 Every attempt counts, including ones that are refused. A caller who sends
 twenty invalid requests has used twenty calls. Graft records each call before
@@ -86,8 +90,16 @@ createFunctionsHandler({ functions, db, trustedProxyHops: 1 });
 ```
 
 Set it to the number of proxies in front of your app. Behind one nginx or one
-CDN, that is `1`. Graft then uses the address your own nearest proxy saw, which
-a client cannot fake.
+CDN, that is `1`. Graft then reads that many entries from the right of the
+header, the end your proxies write to, and uses the address your outermost
+proxy saw.
+
+This holds only if each counted proxy **appends** the address it received the
+request from to `x-forwarded-for` (or replaces the header with it). nginx with
+`$proxy_add_x_forwarded_for`, and the major CDNs, do this. A proxy that passes
+the header through unchanged leaves the client's own text at the end, and a
+client can then pick its own limit. Do not count a proxy you do not control,
+and do not set the number higher than the proxies you run.
 
 ## Choose a limit
 

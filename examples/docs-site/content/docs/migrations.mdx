@@ -31,16 +31,20 @@ from the tagline:
 <CodeBlock title="migrations/0001-pages-description.ts">
 
 ```ts
+import type { DocumentData } from "@usegraft/core";
 import { defineContentMigration } from "@usegraft/content-migrations";
 import { pages } from "../graft.config";
+
+type Page = DocumentData<typeof pages>;
 
 export default defineContentMigration({
   collection: pages,
   description: "Fill in description from tagline",
   transform: (doc) => ({
     data: {
-      title: String(doc.data.title),
-      tagline: typeof doc.data.tagline === "string" ? doc.data.tagline : undefined,
+      // Start from every field the file has. A field left out of `data` is
+      // removed from the file, so listing fields one by one drops the rest.
+      ...(doc.data as Omit<Page, "description">),
       description: String(doc.data.tagline ?? ""),
     },
   }),
@@ -53,9 +57,11 @@ export default defineContentMigration({
 (`doc.body`) as they are on disk, in the old shape. It returns the new
 frontmatter, and a new `body` if you want to change that too.
 
-The old frontmatter is untyped, because it no longer matches your schema. So
-the transform builds the new frontmatter field by field, and TypeScript checks
-the result against your current schema.
+The old frontmatter is untyped, because it no longer matches your schema. The
+example keeps every existing field by spreading `doc.data`, cast to the fields
+it already had, and adds the new one. TypeScript checks the new field against
+your current schema, and the run checks every rewritten file against the
+schema before writing any of them.
 
 The migration changes the **files**, not the index. Changing only the index
 would be undone by the next compile, which rebuilds the index from the files.
@@ -72,8 +78,10 @@ before writing any of them. If one would fail, none are written. When it
 succeeds, review the diff with `git diff` and commit it like any other change.
 
 Migrations run in file-number order. Graft records each one it applies in a
-table called the **ledger** (`migrations_applied`), so a migration never runs
-twice, even if two deploys apply at the same moment.
+table called the **ledger** (`migrations_applied`), and later runs skip it.
+The ledger is checked before a run starts, so two runs started at the same
+moment can both apply the same migration. Run `graft migrate --apply` from one
+place at a time, such as a single deploy step.
 
 ## Example: tidy up existing rows
 

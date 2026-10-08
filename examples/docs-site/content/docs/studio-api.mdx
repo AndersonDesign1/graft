@@ -178,30 +178,23 @@ const handler = createStudioHandler({
 | `projectRoot` | Where `graft/` lives, for the project's editor component declarations. Defaults to the content directory's parent |
 | `mdxTrust` | Governs the whole-tree recompile that follows a save |
 | `defaultBranch` | Branch used for compile and the tree default |
-| `decider` | Identity approval decisions are attributed to. A value or a function. **Defaults to `{ kind: "human", id: "studio" }`.** Set it, or every decision in the audit trail names the same generic identity |
+| `decider` | Identity approval decisions are attributed to when `authenticate` returns no caller. A value or a function. **Defaults to `{ kind: "human", id: "studio" }`** |
 | `uiBasePath` | URL prefix for the UI. Empty string serves it at `/` |
 
 API paths are always absolute `/api/studio/v1/*` regardless of `uiBasePath`.
 
-`decider` is who approvals are recorded against. It comes from your
-configuration, never from the request. A fixed value records every approval
-against one identity, even if `authenticate` knows who each person is. When
-several people use the same Studio, pass a function that reads the signed-in
-person from your own session:
+An approval is recorded against the caller `authenticate` returns. That is the
+setting that matters when several people share one Studio: return each
+person's own identity from `authenticate`, and the approval history says who
+approved what. A decision is never attributed to a name the request supplies.
 
-```ts
-createStudioApiHandler({
-  // Resolved per call, from your own session. Never from anything the caller
-  // sends. The audit row is only as useful as this value.
-  decider: () => ({ kind: "human", id: currentOperator().email }),
-});
-```
+`decider` applies only when `authenticate` returns no caller, as on a local
+Studio for one person. If you leave it unset there, decisions are recorded
+against `{ kind: "human", id: "studio" }`, which works with no setup.
 
-If you leave it unset, a local Studio for one person works with no setup. With
-more than one person, the approval history could not say who approved what.
-
-The UI keeps `?branch` set to the branch Studio was started on, so it always
-shows the branch the server is serving.
+The UI opens on the branch Studio was started on. A `?branch=` in the URL
+picks a different one, and the API uses the started branch only when the URL
+names none.
 
 ## Next steps
 

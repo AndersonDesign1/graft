@@ -39,8 +39,19 @@ export const submitContact = defineFunction({
 
 </CodeBlock>
 
-Export it from `graft.config.ts`, or put it in a file under `graft/`, and it is
-served at `POST /api/fn/submitContact`.
+Then add it to the `functions` record the same file exports. Graft serves only
+the functions in that record. Exporting the function on its own is not enough:
+a call to it answers `404 FUNCTION_NOT_FOUND`.
+
+<CodeBlock title="graft.config.ts">
+
+```ts
+export const functions = { submitContact };
+```
+
+</CodeBlock>
+
+It is now served at `POST /api/fn/submitContact`.
 
 ## Call it from your app
 
@@ -75,7 +86,7 @@ run `graft serve`.
 | Setting | Effect |
 | --- | --- |
 | A `mutation` with no `access` rule | Signed-in callers only. Anonymous calls are refused. |
-| `public: true` | Anyone, including anonymous visitors. Use it for public forms. |
+| `public: true` and no `access` rule | Anyone, including anonymous visitors. Use it for public forms. When `access` is set, `public` is ignored and the rule decides. |
 | A `query` with no `access` rule | Anyone. Add a rule to any query that returns private data. |
 | `access: requireScopes("submissions:read")` | Only callers whose token carries that scope. |
 
@@ -104,7 +115,8 @@ each one.
 ## Protect functions that destroy data
 
 Mark a function `destructive: true` when its effect cannot be undone, such as
-deleting records. It then needs a human's approval before it runs:
+deleting records. Under the default approval policy, it then needs a human's
+approval before it runs:
 
 1. The first call does not run. It files an approval request and answers `403`
    with the request's id.
@@ -113,6 +125,12 @@ deleting records. It then needs a human's approval before it runs:
    (HTTP) or the `approval` argument (MCP). Now it runs.
 
 An approval works once, and only for the exact input that was approved.
+
+The approval policy in `graft.config.ts` changes who waits. `"human"` gates
+every mutation, not only destructive ones. `"unattended"` gates nothing, so
+destructive functions run straight away. It exists for scheduled jobs with no
+person behind them. Every call is still audited either way. See
+[Audit & approvals](/docs/audit-and-approvals).
 [Audit & approvals](/docs/audit-and-approvals) covers the details, including
 asking for approval from inside an agent's session.
 

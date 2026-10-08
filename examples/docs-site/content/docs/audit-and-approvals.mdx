@@ -60,8 +60,9 @@ Three rules make an approval hard to misuse:
 | **The requester cannot approve it.** | An agent approving its own request |
 
 On a [hardened](/docs/hardening) deployment, the database enforces these too.
-Your app's database login can use an approval, but it cannot create one: only
-the operator login on your machine or in CI can approve or deny. A leaked app
+Your app's database login can file an approval request and use an approved
+one, but it cannot decide one: only the operator login on your machine or in
+CI can approve or deny. A leaked app
 password still cannot approve its own deletes.
 
 ### Asking in-band (opt-in)
@@ -69,7 +70,9 @@ password still cannot approve its own deletes.
 The flow above sends the person to a second terminal. When you run the MCP
 server on your own machine, you are already sitting at it, so the server can ask
 you directly instead. The agent's client shows a confirmation, and saying yes
-completes the call in one step. MCP calls this **elicitation**.
+completes the call in one step. MCP calls this **elicitation**. If the client
+does not support it, or the request fails, the call falls back to the
+approval-id flow above.
 
 ```ts
 createGraftMcp({

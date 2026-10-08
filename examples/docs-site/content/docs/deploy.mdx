@@ -72,11 +72,11 @@ beta the image is not published, so build it from the repository first:
 docker build -f deploy/docker/Dockerfile -t graft .
 ```
 
-Then run it with your project mounted at `/project`, and named volumes so your
-data survives a restart:
+Then run it with your project mounted at `/project`, and a named volume each for
+the database and the uploaded files, so both survive a new container:
 
 ```sh
-docker run --init -p 3903:3903 -v ./my-site:/project -v graft_pg:/var/lib/postgresql graft
+docker run --init -p 3903:3903 -v ./my-site:/project -v graft_pg:/var/lib/postgresql -v graft_minio:/data graft
 ```
 
 `GET /healthz` reports the branch and Git commit it is serving. The container also creates a [hardened](/docs/hardening)

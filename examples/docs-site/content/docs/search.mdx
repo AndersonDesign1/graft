@@ -43,8 +43,10 @@ The query syntax is the one people already use in web search engines:
 | `preview or draft` | Either word |
 | `branch -neon` | "branch", but not "neon" |
 
-An empty query fails with `INPUT_VALIDATION_FAILED`. A query made only of
-common words such as "the" returns no results rather than an error.
+An empty query fails with `INPUT_VALIDATION_FAILED`. On Postgres, a query made
+only of common words such as "the" returns no results rather than an error,
+because Postgres drops those words. The static engine keeps them, so the same
+query matches the documents that contain them.
 
 ## Show the snippets safely
 
@@ -56,9 +58,9 @@ first. To show plain text instead, remove the tags.
 ## How results are ranked
 
 Matches in the slug count most, then matches in frontmatter text fields, then
-matches in the body. The underlying technology depends on the
-[storage engine](/docs/tiers), but the ranking and query syntax are the same,
-so the same query returns results in the same order on both:
+matches in the body, on both [storage engines](/docs/tiers). The query syntax
+is the same too. The scoring formula is not, so the same query finds the same
+kind of matches on both but can list them in a different order:
 
 | | Static engine | Postgres engine |
 | --- | --- | --- |

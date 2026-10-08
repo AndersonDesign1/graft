@@ -233,10 +233,10 @@ Skip this section unless you need it. Mount these routes when you want to:
   `POST /api/fn/<name>`, or
 - let remote agents read and write content over MCP at `POST /api/mcp`.
 
-Both need the Postgres engine and two more packages:
+Both need the Postgres engine and three more packages:
 
 ```sh
-npm i @usegraft/auth @usegraft/mcp
+npm i @usegraft/core @usegraft/auth @usegraft/mcp
 ```
 
 Both routes need to know who is calling. This resolver accepts one token from
@@ -249,8 +249,9 @@ how to accept signed tokens from your identity provider.
 ```ts
 import { createActorResolver } from "@usegraft/auth";
 
-// A dev token never expires, so it is accepted only outside production.
-const devToken = process.env.NODE_ENV === "production" ? undefined : process.env.GRAFT_DEV_TOKEN;
+// A dev token never expires, so it is accepted only in development. An unset
+// NODE_ENV counts as production, so a deploy that forgets it stays closed.
+const devToken = process.env.NODE_ENV === "development" ? process.env.GRAFT_DEV_TOKEN : undefined;
 
 export const actor = createActorResolver({
   devTokens: devToken
@@ -382,21 +383,35 @@ import { unstable_cache } from "next/cache";
 import { tagsFor } from "@usegraft/sdk-next";
 import { graft } from "@/lib/graft";
 
-export function getPage(slug: string) {
-  return unstable_cache(() => graft.getContent("pages", slug), ["graft", "pages", slug], {
-    tags: tagsFor("main", "pages", slug),
-  })();
+// unstable_cache stores results as JSON, so `updatedAt` comes back as a
+// string. Turn it back into a Date, so every value matches its type.
+function revive<T extends { updatedAt: Date }>(doc: T): T {
+  return { ...doc, updatedAt: new Date(doc.updatedAt) };
 }
 
-export const listPages = unstable_cache(() => graft.listContent("pages"), ["graft", "pages"], {
+export async function getPage(slug: string) {
+  const page = await unstable_cache(
+    () => graft.getContent("pages", slug),
+    ["graft", "pages", slug],
+    { tags: tagsFor("main", "pages", slug) },
+  )();
+  return page && revive(page);
+}
+
+const cachedPages = unstable_cache(() => graft.listContent("pages"), ["graft", "pages"], {
   tags: tagsFor("main", "pages"),
 });
+
+export async function listPages() {
+  return (await cachedPages()).map(revive);
+}
 ```
 
 </CodeBlock>
 
-`unstable_cache` stores results as JSON, so a cached document's `updatedAt`
-comes back as a string. Wrap it in `new Date()` before you use it as a date.
+`unstable_cache` stores results as JSON, which has no date type, so
+`revive` turns each `updatedAt` back into a `Date`. Schema fields are not
+affected: `field.datetime()` values are ISO strings already.
 
 </Tab>
 

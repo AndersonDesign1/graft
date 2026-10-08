@@ -63,7 +63,10 @@ You describe each collection once, in `graft.config.ts`. That one description
 is used everywhere data crosses a boundary:
 
 - `graft compile` checks every file's frontmatter against it.
-- Typed functions check their inputs against it.
+- Typed functions check their inputs against the `input` schema each one
+  declares. That can reuse a collection's fields (`input: submissions.fields`)
+  or describe something else entirely, so a collection's rules apply to a
+  function only when its input uses them.
 - Reads check documents on the way out.
 
 The schema is built on [Zod](https://zod.dev), a TypeScript validation

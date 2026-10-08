@@ -7,8 +7,8 @@ order: 0
 
 <p className="kicker">Every graft command, grouped by when you use it.</p>
 
-Look up a command here. Run `graft --help` or `graft <command> --help` for the
-same information in your terminal. `graft migrate` and `graft merge` only
+Look up a command here. Run `graft --help` for the list of commands in your
+terminal. `graft migrate` and `graft merge` only
 report what they would change until you pass `--apply`.
 
 ## Set up and write content
@@ -39,7 +39,8 @@ summary line goes to stderr. It works on both engines.
 }
 ```
 
-The real output is one line. Each key in `changes` is `collection/slug`.
+The real output is one line. `added`, `changed`, and `removed` are lists of
+`collection/slug` ids, and `unchanged` is a count.
 `gitSha` is `null` when the content is not in a git repository.
 
 On the static engine, a content change ships with a new deploy, so there is
@@ -110,9 +111,13 @@ Graft reads `.env` from the current folder or any folder above it.
 
 - **Static engine:** `graft compile`, `graft dev`, and `graft mcp` need no
   database. The index is written to `.graft/index.db`.
-- **Postgres engine:** `DATABASE_URL` is required when `graft.config.ts` sets
-  `index = "postgres"`, and for `graft db migrate`, `graft branch`,
-  `graft merge`, and `graft serve`.
+- **Postgres engine:** `DATABASE_URL` is required for every command when
+  `graft.config.ts` sets `index = "postgres"`.
+- **On either engine,** these always need `DATABASE_URL`: `graft db migrate`,
+  `graft branch`, `graft merge`, `graft serve`, `graft studio`,
+  `graft content`, `graft compilations`, `graft approvals`, `graft approve`,
+  `graft deny`, and `graft harden`. `graft migrate` needs it once the project
+  has migrations.
 
 Studio uses the same operations as the CLI and MCP. See
 [Studio](/docs/studio#do-it-without-studio) for the mapping.

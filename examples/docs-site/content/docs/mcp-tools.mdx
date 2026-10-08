@@ -42,7 +42,9 @@ so they show your latest edits even before you compile.
 through `write_content` compile as they go, so they are searchable at once. The
 query syntax is the familiar web-search one: words, `"quoted phrases"`, `or`,
 and `-exclusions`. On a preview branch, results include the documents the
-branch inherits from `main`, with the branch's own versions taking priority.
+branch inherits from its parent chain (the branch it was forked from, and that
+branch's parent, up to `main`), with the nearest branch's version taking
+priority.
 
 All three include a link to each document's
 [resource](/docs/mcp-resources-and-prompts), so a client can attach a document
@@ -164,13 +166,15 @@ without parsing prose.
 | Write, not destructive | `write_content` |
 | Destructive | `delete_content`, `put_asset`, `decide_approval`, `run_function` |
 
-`write_content` is marked non-destructive, because Git can undo any content
-change. `put_asset` is not, because the asset store keeps no history.
+`write_content` is marked non-destructive, because Git can undo a content
+change once the earlier version is committed. Uncommitted edits it overwrites,
+and new files never committed, cannot be recovered from Git. `put_asset` is not, because the asset store keeps no history.
 `run_function` is marked destructive, because it runs whatever your function
 does.
 
-`openWorldHint` is false on every tool, because each one only touches the
-collections your project declares.
+`openWorldHint` is false on every tool, because each one works inside your own
+project: its content, its functions, its registry and error catalog. None
+reaches out to the open web or other systems.
 
 <Callout label="Annotations are hints, not security" type="warning">
   Annotations are hints. The MCP spec says a client must not make an

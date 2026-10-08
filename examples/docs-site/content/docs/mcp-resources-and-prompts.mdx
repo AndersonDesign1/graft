@@ -57,13 +57,17 @@ having the agent call the tool each time.
 | `fix-error` | An error code | What that code means in this version of Graft, its usual causes, and how to recover |
 | `plan-migration` | A collection and the change you want | The current fields, and the steps to migrate safely |
 
-Each prompt also tells the agent how this project expects work to be done:
+Some prompts also carry this project's working rules, where they apply:
 
-- Check the schema before writing.
-- Propose migrations as reviewable commits, not live edits.
-- Never run `graft migrate --apply` without asking. Applying is your decision.
-- When a destructive call stops for approval, wait for a person. Do not look
-  for a way around it.
+- `author-document` and `revise-document` give the agent the collection's
+  real fields before it writes. `author-document` also tells it to read a
+  schema failure's `fix` and correct the data, not retry unchanged.
+- `plan-migration` tells it to propose the migration as a reviewable commit,
+  not a live edit, and never to run `graft migrate --apply` without asking.
+  Applying is your decision.
+
+No prompt covers approvals, and none needs to: a destructive call stops for a
+person's approval on the server, whatever the agent was told.
 
 `fix-error` with a code Graft does not know says so, and points the agent at
 `explain_error` to list the codes it does know. When the general explanation

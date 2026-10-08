@@ -44,6 +44,9 @@ Goal: render a compiled document in a Server Component.
 
 <Step title="Install the Next.js SDK and CLI">
 
+The SDK needs Next.js 15.5.24 or newer on 15, or 16.3.3 or newer on 16. Check
+yours with `npx next --version`, and upgrade first if it is older.
+
 ```sh
 npm i @usegraft/sdk-next @usegraft/db
 npm i -D @usegraft/cli
@@ -159,10 +162,14 @@ Goal: read a compiled document from a script, with no framework involved.
 ```sh
 mkdir my-graft-site && cd my-graft-site
 npm init -y
+npm pkg set type=module
 npm i @usegraft/db @usegraft/sdk-core
 npm i -D @usegraft/cli tsx typescript @types/node
 npx @usegraft/cli@latest init
 ```
+
+`type=module` makes the project an ES module, so the script in the last step
+can use `await` at the top level.
 
 </Step>
 

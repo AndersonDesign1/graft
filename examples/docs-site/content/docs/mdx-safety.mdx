@@ -17,8 +17,11 @@ power is useful. It becomes a risk as soon as someone else can write content:
 a writer using [Studio](/docs/studio), or an agent writing over MCP. Without a
 check, "can edit a page" would mean "can run code on your server".
 
-So Graft checks every MDX body before it is stored or compiled, and refuses
-anything that can run code. Plain Markdown and components with plain text
+So Graft checks MDX on every path it writes or compiles: `write_content`,
+Studio saves, and `graft compile`. It refuses anything that can run code. A
+body written straight into the database skips the write-time check. In Next.js,
+`MdxBody` checks again when it renders, so even that body is refused there.
+Plain Markdown and components with plain text
 attributes still work. This page lists what is refused, where the check runs,
 and how to allow full MDX for content you write yourself.
 

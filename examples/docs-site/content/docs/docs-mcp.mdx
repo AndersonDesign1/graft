@@ -78,6 +78,7 @@ import type { APIRoute } from "astro";
 import { resolve } from "node:path";
 import { createDocsMcpHandler, type GraftMcpHandler } from "@usegraft/mcp";
 import { collections } from "../../graft.config";
+import { staticIndexPath } from "../lib/graft";
 
 export const prerender = false;
 
@@ -88,7 +89,7 @@ function getHandler(): GraftMcpHandler {
     name: "graft-docs",
     contentDir: resolve(import.meta.dirname, "../..", "content"),
     collections,
-    staticIndexPath: ".graft/index.db", // or db: createDb(url).db on Postgres
+    staticIndexPath, // or db: createDb(url).db on Postgres
   });
   return handler;
 }
@@ -98,6 +99,11 @@ export const GET: APIRoute = ({ request }) => getHandler()(request);
 ```
 
 </CodeBlock>
+
+`staticIndexPath` is the same absolute path your app's own reads open, imported
+from where you resolve it. Avoid a relative path such as `".graft/index.db"`:
+it is resolved from the working directory, and on a serverless host that is not
+your project folder, so the handler would not find the index.
 
 Export both `POST` and `GET`. Agents only send `POST`, but a `GET` should
 answer `405` rather than `404`, which tells a client the endpoint exists and

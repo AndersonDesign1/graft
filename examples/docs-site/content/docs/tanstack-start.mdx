@@ -106,10 +106,11 @@ places, cache the result yourself.
 
 ## Serve functions and MCP from your app
 
-This step is optional. It needs two more packages:
+This step is optional, and it needs the Postgres engine. It needs three more
+packages:
 
 ```sh
-npm i @usegraft/auth @usegraft/mcp
+npm i @usegraft/core @usegraft/auth @usegraft/mcp
 ```
 
 Copy these mounts as written. The server-route factory name has moved across
@@ -144,8 +145,9 @@ import { graftRoute } from "@usegraft/sdk-tanstack-start";
 import { collections, functions } from "../../graft.config";
 import { db } from "../lib/graft.server";
 
-// A dev token never expires, so it is accepted only outside production.
-const devToken = process.env.NODE_ENV === "production" ? undefined : process.env.GRAFT_DEV_TOKEN;
+// A dev token never expires, so it is accepted only in development. An unset
+// NODE_ENV counts as production, so a deploy that forgets it stays closed.
+const devToken = process.env.NODE_ENV === "development" ? process.env.GRAFT_DEV_TOKEN : undefined;
 
 const actor = createActorResolver({
   issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
@@ -214,6 +216,11 @@ const getDoc = createServerFn({ method: "GET" })
     return graft.getContent("docs", slug);
   });
 ```
+
+The header goes on whichever response ran the function. On a full page load
+that is the page's HTML. On client-side navigation, the browser calls the
+server function directly, so it is that `GET` response. Let your CDN cache both:
+they carry the same tags, so one purge refreshes both.
 
 Then, when content changes, purge those tags at your CDN.
 `tagsForChanges(branch, changes)` turns a change list into the tags to purge:

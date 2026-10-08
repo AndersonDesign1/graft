@@ -112,7 +112,7 @@ Graft can store a branch in two ways. Both answer the same commands.
 | --- | --- | --- |
 | How it works | The branch's documents are stored in your existing database, labelled with the branch name | A full copy of the database, made instantly by Neon |
 | Cost | Instant, copies nothing | Instant, but needs a Neon project |
-| Use it for | Content previews and review | Rehearsing destructive changes, or previews that must never be able to reach production data |
+| Use it for | Content previews and review | Rehearsing destructive changes, or previews that must not be able to change production |
 
 Create a Neon fork with `--backend neon`:
 
@@ -126,11 +126,20 @@ graft branch create big-redesign --backend neon
   Dropping the branch removes the marker, so `main` is unaffected.
 </Callout>
 
-## What a branch does not copy
+## What a branch copies
 
-A branch copies **content**, never your users' data. A Neon fork starts with
-empty form submissions, orders, and approvals. You are previewing the site's
-pages, not a copy of production users.
+The two backends differ here, and it matters if production holds personal data.
+
+- **Overlay.** The branch lives in your existing database, but operational
+  data (form submissions, orders) is stored per branch, so the branch starts
+  with none of `main`'s.
+- **Neon fork.** The fork starts as a full copy of the database. Graft then
+  empties the operational data (`data_records`) and the approvals, but
+  nothing else. The audit log, including who did what, and any tables of your
+  own come across as they are.
+
+Treat a Neon fork as holding production data. Give it the same access controls
+as production, and do not share its credentials more widely.
 
 ## Merge a branch
 

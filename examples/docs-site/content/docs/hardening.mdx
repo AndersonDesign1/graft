@@ -68,11 +68,11 @@ you started. Check it is not a superuser and has no `UPDATE` on `approvals`:
 ```sql
 SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'graft_runtime';
 
-SELECT privilege_type FROM information_schema.table_privileges
-WHERE table_name = 'approvals' AND grantee = 'graft_runtime' AND privilege_type = 'UPDATE';
+SELECT has_table_privilege('graft_runtime', 'approvals', 'UPDATE');
 ```
 
-Both should come back false or empty.
+All three should come back false. `has_table_privilege` counts rights the role
+inherits from any group it belongs to, not only rights granted to it by name.
 
 </Step>
 

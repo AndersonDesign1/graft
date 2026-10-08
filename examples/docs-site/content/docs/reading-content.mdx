@@ -48,9 +48,12 @@ const hits = await graft.searchContent("docs", "preview branch");
 
 [Search](/docs/search) explains the query syntax and how results are ranked.
 
-Every read checks the document against your schema on the way out, and skips
-documents that fail the check or were deleted. You never receive a document
-whose fields do not match its type.
+Every read checks each document against your schema on the way out. Deleted
+documents are skipped. A document that fails the check is not: the read throws
+`SCHEMA_VALIDATION_FAILED`, naming the document and the field, and a list or
+search that includes it fails as a whole. You never receive a document whose
+fields do not match its type. `graft compile` runs the same check, so this only
+happens when the index was built from files that no longer match the schema.
 
 ## Why the names differ outside a framework
 

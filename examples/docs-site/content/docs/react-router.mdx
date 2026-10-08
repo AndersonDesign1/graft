@@ -103,10 +103,11 @@ To read content in the browser (a search box, an editor preview), use
 
 ## Serve functions and MCP from your app
 
-This step is optional. It needs two more packages:
+This step is optional, and it needs the Postgres engine. It needs three more
+packages:
 
 ```sh
-npm i @usegraft/auth @usegraft/mcp
+npm i @usegraft/core @usegraft/auth @usegraft/mcp
 ```
 
 `graftRoute` binds a Graft handler to a resource route. That is a route module with
@@ -137,8 +138,9 @@ import { graftRoute } from "@usegraft/sdk-react-router";
 import { collections, functions } from "../../graft.config";
 import { db } from "../lib/graft.server";
 
-// A dev token never expires, so it is accepted only outside production.
-const devToken = process.env.NODE_ENV === "production" ? undefined : process.env.GRAFT_DEV_TOKEN;
+// A dev token never expires, so it is accepted only in development. An unset
+// NODE_ENV counts as production, so a deploy that forgets it stays closed.
+const devToken = process.env.NODE_ENV === "development" ? process.env.GRAFT_DEV_TOKEN : undefined;
 
 const actor = createActorResolver({
   issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
