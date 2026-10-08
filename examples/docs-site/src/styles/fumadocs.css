@@ -32,16 +32,19 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Sidebar canvas unification: sidebar background matches main paper background seamlessly */
+/* Sidebar on the page's own paper with no rule beside it: the column of
+   links and the white space around it are enough to set it apart. */
 #nd-sidebar,
 aside#nd-sidebar,
 [data-sidebar-placeholder] aside {
   background-color: var(--paper) !important;
-  border-inline-end: 1px solid var(--hairline) !important;
+  border-inline-end: 0 !important;
 }
 
+/* Top bar: translucent over scrolling content, one hairline below. */
 header#nd-subnav {
-  background-color: var(--paper) !important;
+  background-color: color-mix(in oklch, var(--paper) 85%, transparent) !important;
+  backdrop-filter: blur(16px);
   border-block-end: 1px solid var(--hairline) !important;
 }
 
@@ -79,8 +82,8 @@ aside a[data-active="true"] {
   color: var(--ink) !important;
   font-weight: 600 !important;
   border-inline-start: none !important;
-  background: light-dark(rgba(0, 0, 0, 0.07), rgba(255, 255, 255, 0.09)) !important;
-  box-shadow: inset 0 0 0 1px light-dark(rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.08)) !important;
+  background: light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08)) !important;
+  box-shadow: none !important;
 }
 
 /* Sidebar scroll area padding fix to prevent items overlapping with bottom docked footer */
@@ -132,9 +135,41 @@ kbd {
   color: var(--ink-faint);
 }
 
-/* Doc page title (h1). Fumadocs sizes it at 1.75em, which equals the 28px h2
-   below, so the page title and its sections read as the same level. The scale
-   steps 36 → 28 → 20 (1.29×, 1.4×), each level also set apart by weight. */
+/* ---- Layout: one centered group ------------------------------------------
+   Sidebar, article and contents rail sit together in the middle of the
+   window instead of pinned to its edges. At 75rem the article column is
+   664px, a 600px text width that holds the 17px body at about 70 characters
+   a line, so prose, code and tables share one left edge and one width. */
+#nd-notebook-layout {
+  --fd-layout-width: 75rem;
+  --doc-body: 1.0625rem; /* 17 — reading size for long-form docs */
+  --doc-title: clamp(2.25rem, 1.75rem + 1.4vw, 2.875rem); /* 36 → 46 */
+  --doc-lede: 1.25rem; /* 20 */
+}
+
+/* ---- Page header ----------------------------------------------------------
+   Where you are, how long it takes, what the page is, what it gives you. The
+   hairline closes the header so the body starts on a clean line. */
+.doc-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-block-end: var(--space-8);
+  margin-block-end: var(--space-4);
+  border-block-end: 1px solid var(--hairline);
+}
+
+.doc-eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+}
+
 .font-serif,
 #nd-page h1,
 .prose h1 {
@@ -143,67 +178,157 @@ kbd {
   letter-spacing: -0.02em;
 }
 
-#nd-page > h1 {
-  font-size: var(--text-xl);
-  line-height: 1.15;
+/* The title steps 46 → 26 → 20 down to h3, each level also set apart by
+   weight or tracking, so the page title is unmistakably the top of the page. */
+#nd-page .doc-header h1 {
+  margin: 0;
+  font-size: var(--doc-title);
+  line-height: 1.06;
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
-/* Running text: 65 to 70 characters per line (measured 67). 68ch measured 74,
-   because the ch unit is the width of "0", which is narrower than average
-   prose. Tables, code and cards keep the full column. */
-#nd-page .prose > p,
-#nd-page .prose > ul,
-#nd-page .prose > ol,
-#nd-page .prose > blockquote {
-  max-width: 52ch;
+.doc-lede {
+  margin: 0;
+  max-width: 60ch;
+  font-size: var(--doc-lede);
+  line-height: 1.5;
+  color: var(--ink-muted);
+  text-wrap: pretty;
 }
 
-/* Inline code at 0.875em (14px on 16px body) instead of 13px, so identifiers
-   stay as legible as the sentence around them. */
+.doc-lede code {
+  font-size: 0.85em;
+}
+
+/* ---- Reading ---------------------------------------------------------------
+   17px on a 1.7 line, in the muted reading ink; headings and bold text step
+   up to full ink. The measure is a cap for wide windows, not a squeeze: in
+   the 664px column the text already fills the line at about 70 characters. */
+#nd-page .prose {
+  font-size: var(--doc-body);
+  line-height: 1.7;
+  color: var(--ink-muted);
+}
+
+#nd-page .prose > :is(p, ul, ol, blockquote) {
+  max-width: var(--measure);
+  text-wrap: pretty;
+}
+
+#nd-page .prose :is(strong, b, h2, h3, h4) {
+  color: var(--ink);
+}
+
+#nd-page .prose a:not(.doc-card):not(.step-anchor) {
+  color: var(--ink);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  text-decoration-color: var(--hairline-strong);
+  transition: text-decoration-color var(--duration-fast) var(--ease-out);
+}
+
+#nd-page .prose a:not(.doc-card):not(.step-anchor):hover {
+  text-decoration-color: var(--ink);
+}
+
+/* Inline code at 0.85em of the 17px body, so identifiers stay as legible as
+   the sentence around them without shouting over it. */
 #nd-page .prose :not(pre) > code {
-  font-size: 0.875em;
+  font-size: 0.85em;
 }
 
-.prose h2 {
+/* Sections open on a hairline with room above it: the page reads as a
+   sequence of chapters, not one continuous wall. */
+#nd-page .prose h2 {
   font-family: var(--font-sans);
-  font-size: var(--text-h2);
+  font-size: 1.625rem;
   font-weight: 600;
-  letter-spacing: -0.015em;
-  margin-top: var(--space-12);
-  padding-top: var(--space-6);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin-block: var(--space-16) var(--space-4);
+  padding-block-start: var(--space-8);
+  border-block-start: 1px solid var(--hairline);
 }
 
-.prose h3 {
+/* A body that opens on a section heading already has the header's rule. */
+#nd-page .prose > h2:first-child {
+  margin-block-start: var(--space-4);
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+
+#nd-page .prose h3 {
   font-family: var(--font-sans);
   font-size: var(--text-h3);
   font-weight: 600;
+  line-height: 1.3;
   letter-spacing: -0.01em;
+  text-wrap: balance;
+  margin-block: var(--space-12) var(--space-3);
 }
 
-/* Shiki dual themes from renderMdx (defaultColor: false). */
+#nd-page .prose li::marker {
+  color: var(--ink-faint);
+}
+
+#nd-page .prose li + li {
+  margin-block-start: var(--space-2);
+}
+
+/* ---- Code ------------------------------------------------------------------
+   One surface per block. The inline-code chip (fill, border, padding) used to
+   reach the <code> inside every <pre>, and because that <code> is an inline
+   box it broke into a small box per line. Inside a block it is plain text. */
 .prose pre.shiki,
 .prose pre.shiki span {
   color: light-dark(var(--shiki-light), var(--shiki-dark));
 }
 
 .prose pre.shiki {
-  background: var(--paper-raised) !important;
-  box-shadow: var(--shadow-raised);
-  border-radius: var(--radius);
-  padding: var(--space-4) var(--space-6);
+  background: var(--paper-sunken) !important;
+  border: 1px solid var(--hairline);
+  box-shadow: none;
+  border-radius: var(--radius-outer);
+  padding: var(--space-4) var(--space-5);
   overflow-x: auto;
   font-size: var(--text-sm);
-  line-height: 1.55;
+  line-height: 1.7;
 }
 
-/* Callout — renderMdx emits static HTML; styled as subtle rounded cards without harsh vertical lines */
+/* A long line scrolls inside the block; the bar is a thin hairline, not the
+   platform's default trough. */
+.prose pre.shiki,
+.prose table {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+
+.prose pre.shiki code {
+  display: block;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  font-size: inherit !important;
+}
+
+.prose pre.shiki .line {
+  padding: 0;
+}
+
+/* Callout — renderMdx emits static HTML. A quiet panel on the sunken surface:
+   the label and icon carry the kind (note, warning, danger), the panel does
+   not, so a page with three callouts is not three colored boxes. */
 .callout {
-  border-radius: var(--radius-inner);
+  border-radius: var(--radius-outer);
   padding: var(--space-5) var(--space-6);
-  margin-block: var(--space-6);
-  border: 1px solid color-mix(in oklch, var(--callout-note) 25%, transparent);
-  background: color-mix(in oklch, var(--callout-note) 6%, var(--paper));
+  margin-block: var(--space-8);
+  border: 1px solid var(--hairline);
+  background: var(--paper-sunken);
 }
 
 .callout-header {
@@ -228,41 +353,38 @@ kbd {
   color: var(--callout-note);
 }
 
-.callout.callout-warning {
-  border-color: color-mix(in oklch, var(--callout-warning) 28%, transparent);
-  background: color-mix(in oklch, var(--callout-warning) 7%, var(--paper));
-}
 .callout.callout-warning .callout-icon,
 .callout.callout-warning .callout-label {
   color: var(--callout-warning);
 }
 
+/* Danger is the one kind that earns a tinted edge: it is the only chromatic
+   UI color the system allows, and it should stop the reader. */
 .callout.callout-danger {
-  border-color: color-mix(in oklch, var(--callout-danger) 28%, transparent);
-  background: color-mix(in oklch, var(--callout-danger) 7%, var(--paper));
+  border-color: color-mix(in oklch, var(--callout-danger) 35%, var(--hairline));
 }
 .callout.callout-danger .callout-icon,
 .callout.callout-danger .callout-label {
   color: var(--callout-danger);
 }
 
-.callout.callout-note {
-  border-color: color-mix(in oklch, var(--callout-note) 28%, transparent);
-  background: color-mix(in oklch, var(--callout-note) 6%, var(--paper));
-}
 .callout.callout-note .callout-icon,
 .callout.callout-note .callout-label {
   color: var(--callout-note);
 }
 
 .callout-body {
-  font-size: var(--text-sm);
-  line-height: var(--leading-body);
-  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 1.65;
+  color: var(--ink-muted);
 }
 
 .callout-body > p {
   margin: 0;
+}
+
+.callout-body > p + p {
+  margin-block-start: var(--space-3);
 }
 
 /* Executive opening primitives (two-speed reading).
@@ -413,10 +535,14 @@ kbd {
    radio is checked. Six is the ceiling, which covers npm/pnpm/yarn/bun with
    room to spare, and an author who needs more should probably be writing
    sections. */
+/* Tabs and titled code blocks are one frame each: a bar on the sunken
+   surface, then the content, with no second box inside. Code inside the frame
+   drops its own border, radius and fill; prose inside gets the frame's inset. */
 .tabs {
   margin-block: var(--space-6);
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-outer);
+  background: var(--paper-sunken);
   overflow: hidden;
 }
 
@@ -433,21 +559,26 @@ kbd {
   border: 0;
 }
 
+/* Scrolls sideways when the labels outgrow a narrow screen. The active
+   label's underline sits 1px into the row's own rule, which made the row
+   overflow vertically and draw a scrollbar; only the x axis may scroll. */
 .tab-list {
   display: flex;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-2) 0;
-  background: var(--paper-sunken);
-  border-block-end: 1px solid var(--hairline-strong);
+  padding: 0 var(--space-3);
+  border-block-end: 1px solid var(--hairline);
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
 
 .tab-label {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
+  padding: var(--space-3) var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   color: var(--ink-muted);
   cursor: pointer;
   white-space: nowrap;
@@ -473,15 +604,68 @@ kbd {
 
 .tab-panel {
   display: none;
-  padding: var(--space-4);
 }
 
-/* The panel's own block spacing would double the padding above. */
-.tab-panel > :first-child {
-  margin-block-start: 0;
+.tab-panel > :is(pre.shiki, .codeblock),
+.codeblock-body pre.shiki {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
 }
-.tab-panel > :last-child {
-  margin-block-end: 0;
+
+/* A titled block inside a tab: its bar becomes a second, quieter row. */
+.tab-panel > .codeblock + :is(pre.shiki, .codeblock) {
+  border-block-start: 1px solid var(--hairline);
+}
+
+/* Prose inside a tab (a note under the code) sits on the frame's inset,
+   divided from the code by a hairline. */
+.tab-panel > :not(pre.shiki, .codeblock) {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--text-base);
+}
+
+.tab-panel > :not(pre.shiki, .codeblock):not(:first-child) {
+  border-block-start: 1px solid var(--hairline);
+}
+
+/* Tabs that hold prose (a whole setup guide per framework) are not a code
+   frame. Filling them would put the guide in one grey box with more boxes
+   inside. The labels become a row of section tabs over the page, and code
+   inside keeps its own frame. */
+.tabs:has(.tab-panel > :not(pre.shiki, .codeblock)) {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  overflow: visible;
+}
+
+.tabs:has(.tab-panel > :not(pre.shiki, .codeblock)) .tab-list {
+  padding: 0;
+}
+
+.tabs:has(.tab-panel > :not(pre.shiki, .codeblock)) .tab-panel {
+  padding-block-start: var(--space-6);
+}
+
+.tabs:has(.tab-panel > :not(pre.shiki, .codeblock)) .tab-panel > :is(pre.shiki, .codeblock) {
+  margin-block: var(--space-6);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-outer);
+  background: var(--paper-sunken) !important;
+}
+
+.tabs:has(.tab-panel > :not(pre.shiki, .codeblock)) .tab-panel > :not(pre.shiki, .codeblock) {
+  margin-block: 0 1.25em;
+  padding: 0;
+  border: 0;
+  font-size: inherit;
+}
+
+.tabs:has(.tab-panel > :not(pre.shiki, .codeblock)) .tab-panel > ol.steps {
+  margin-block: var(--space-8);
 }
 
 /* A focused tab must be visible, or keyboard users cannot tell where they are.
@@ -531,9 +715,16 @@ kbd {
 /* CodeBlock — a titled fence. The bar says where the code goes. */
 .codeblock {
   margin-block: var(--space-6);
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-outer);
+  background: var(--paper-sunken);
   overflow: hidden;
+}
+
+.tab-panel > .codeblock {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .codeblock-bar {
@@ -541,26 +732,18 @@ kbd {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  background: var(--paper-sunken);
-  border-block-end: 1px solid var(--hairline-strong);
+  padding: var(--space-3) var(--space-5);
+  border-block-end: 1px solid var(--hairline);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
 
 .codeblock-title {
-  color: var(--ink);
+  color: var(--ink-muted);
 }
 
 .codeblock-note {
   color: var(--ink-faint);
-}
-
-/* The fence brings its own card; inside the frame it would be a second one. */
-.codeblock-body pre {
-  margin: 0;
-  border-radius: 0;
-  box-shadow: none;
 }
 
 /* Steps — numbered procedure in the "three moves" pattern: a circled
@@ -574,14 +757,16 @@ kbd {
   counter-reset: step;
 }
 
+/* `--space-10` was used here but never defined, so steps had no space between
+   them. The scale has 8 and 12; 12 gives a procedure room to breathe. */
 .prose ol.steps > li.step {
   position: relative;
   padding: 0;
-  margin-block-end: var(--space-10);
+  margin-block-end: var(--space-12);
   counter-increment: step;
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
-  gap: var(--space-1) var(--space-4);
+  gap: var(--space-1) var(--space-5);
 }
 
 .prose ol.steps > li.step:last-child {
@@ -594,13 +779,30 @@ kbd {
   height: 28px;
   border: 1px solid var(--hairline-strong);
   border-radius: 50%;
+  background: var(--paper-sunken);
   display: grid;
   place-items: center;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 500;
-  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
   margin-top: 2px;
+}
+
+/* A rule from each badge down to the next, so the steps read as one path. */
+.prose ol.steps > li.step::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 13.5px;
+  top: 38px;
+  bottom: calc(var(--space-12) * -1 + 8px);
+  width: 1px;
+  background: var(--hairline);
+}
+
+.prose ol.steps > li.step:last-child::after {
+  display: none;
 }
 
 .step-title {
@@ -628,6 +830,18 @@ kbd {
 .step-anchor svg {
   width: 0.9rem;
   height: 0.9rem;
+}
+
+/* The icon is 20px; the target around it is 44px, so the deep link is easy
+   to hit without growing the mark next to the title. */
+.step-anchor {
+  position: relative;
+}
+
+.step-anchor::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
 }
 
 .step-title:hover .step-anchor,
@@ -707,11 +921,6 @@ kbd {
 .prose ul,
 .prose ol {
   padding-inline-start: 1.25em;
-  margin: 0;
-}
-
-.prose li + li {
-  margin-block-start: var(--space-2);
 }
 
 .prose blockquote {
@@ -719,32 +928,97 @@ kbd {
   padding: var(--space-4) var(--space-5);
   border-inline-start: none;
   border: 1px solid var(--hairline);
-  border-radius: var(--radius-inner);
+  border-radius: var(--radius-outer);
   background: var(--paper-sunken);
   color: var(--ink-muted);
 }
 
+/* Tables read as ledgers: mono column labels, hairline rows, no grid. */
 .prose table {
   border-collapse: collapse;
   width: 100%;
+  margin-block: var(--space-8);
   font-size: var(--text-sm);
+  line-height: 1.55;
 }
 
 .prose th {
-  text-align: left;
-  font-weight: 600;
+  text-align: start;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
   border-block-end: 1px solid var(--hairline-strong);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-2) 0;
 }
 
 .prose td {
   border-block-end: 1px solid var(--hairline);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-3) 0;
+  vertical-align: top;
 }
 
-/* Quiet mark in the article column. Hairline badge, 24px tall. */
+.prose td:first-child {
+  color: var(--ink);
+}
+
+/* Previous / next. Fumadocs renders a title row then a "Previous Page"
+   caption; reversed, the caption becomes a small mono label above a larger
+   page title, the way the page header reads. */
+#nd-page > div[class~="@container"] {
+  margin-block-start: var(--space-16);
+  gap: var(--space-4);
+}
+
+#nd-page > div[class~="@container"] > a {
+  flex-direction: column-reverse;
+  gap: var(--space-1);
+  padding: var(--space-5) var(--space-6);
+  border-color: var(--hairline);
+  border-radius: var(--radius-outer);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+#nd-page > div[class~="@container"] > a > p {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+}
+
+#nd-page > div[class~="@container"] > a > div {
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #nd-page > div[class~="@container"] > a:hover {
+    border-color: var(--hairline-strong);
+    background: var(--paper-sunken);
+    color: inherit;
+  }
+}
+
+/* Press feedback only with a fine pointer: on iOS :active sticks after a tap,
+   which would leave the card shrunk until the next touch. */
+@media (hover: hover) and (pointer: fine) {
+  #nd-page > div[class~="@container"] > a:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Quiet mark at the very end of the article, after the previous/next links
+   (fumadocs renders those after the page's children, so the mark is moved
+   below them with `order` rather than by restructuring the page). */
 .powered-by-graft-docs {
-  margin-block-start: var(--space-12);
+  order: 1;
+  margin-block-start: var(--space-8);
   padding-block-start: var(--space-6);
   border-block-start: 1px solid var(--hairline);
 }
@@ -821,35 +1095,79 @@ html[data-theme="dark"] .powered-by-graft-on-ink {
   transform: none;
 }
 
-/* Page actions under the title: copy as Markdown, view source, edit, report. */
+/* Page actions under the lede: copy as Markdown, view source, edit, report.
+   Small pills on a hairline, quiet until hovered, and they answer a press. */
 .doc-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-  margin-block: calc(var(--space-2) * -1) var(--space-6);
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
   font-size: var(--text-sm);
   color: var(--ink-muted);
 }
 
+/* 40px targets with a pointer, 44px on touch screens. */
 .doc-actions a,
 .doc-actions button {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  min-height: 2rem;
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-inner);
+  min-height: 2.5rem;
+  padding: 0 var(--space-3);
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: transparent;
   color: inherit;
   text-decoration: none;
-  background: none;
-  border: 0;
   font: inherit;
   cursor: pointer;
+  user-select: none;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
 }
 
-.doc-actions a:hover,
-.doc-actions button:hover {
+@media (hover: hover) and (pointer: fine) {
+  .doc-actions a:hover,
+  .doc-actions button:hover {
+    color: var(--ink);
+    border-color: var(--hairline-strong);
+    background: var(--paper-sunken);
+  }
+}
+
+@media (pointer: coarse) {
+  .doc-actions a,
+  .doc-actions button {
+    min-height: 2.75rem;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .doc-actions a:active,
+  .doc-actions button:active {
+    transform: scale(0.96);
+  }
+}
+
+/* "Copied" holds full ink, a stronger edge and a check mark, so the result
+   is visible at a glance; a failure reads in the danger color. */
+.doc-actions button[data-state="done"] {
   color: var(--ink);
+  border-color: var(--hairline-strong);
+}
+
+.doc-actions button[data-state="failed"] {
+  color: var(--callout-danger);
+  border-color: color-mix(in oklch, var(--callout-danger) 35%, var(--hairline));
+}
+
+.doc-actions svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: none;
 }
 
 .doc-actions a:focus-visible,

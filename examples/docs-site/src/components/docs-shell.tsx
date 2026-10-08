@@ -7,8 +7,8 @@
 import type { AstroProviderProps } from "fumadocs-core/framework/astro";
 import type { Root } from "fumadocs-core/page-tree";
 import type { TOCItemType } from "fumadocs-core/toc";
-import { DocsLayout } from "fumadocs-ui/layouts/docs";
-import { DocsBody, DocsPage, DocsTitle } from "fumadocs-ui/page";
+import { DocsLayout } from "fumadocs-ui/layouts/notebook";
+import { DocsBody, DocsPage, DocsTitle } from "fumadocs-ui/layouts/notebook/page";
 import { RootProvider } from "fumadocs-ui/provider/astro";
 import { type ReactNode, useState } from "react";
 import { PoweredByGraft } from "./powered-by-graft";
@@ -59,7 +59,18 @@ What is wrong or missing:
 
   return (
     <div className="doc-actions">
-      <button type="button" onClick={copyMarkdown} aria-live="polite">
+      <button type="button" onClick={copyMarkdown} aria-live="polite" data-state={copied}>
+        {copied === "done" && (
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path
+              d="M3.5 8.5l3 3 6-7"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
         {copied === "done" ? "Copied" : copied === "failed" ? "Copy failed" : "Copy as Markdown"}
       </button>
       <a href={markdownHref}>View as Markdown</a>
@@ -80,6 +91,9 @@ export function DocsShell({
   toc,
   title,
   slug,
+  section,
+  lede,
+  minutes,
   children,
 }: {
   tree: Root;
@@ -88,6 +102,12 @@ export function DocsShell({
   toc: TOCItemType[];
   title: string;
   slug: string;
+  /** Sidebar group the page belongs to, shown above the title. */
+  section: string;
+  /** The page's kicker as HTML, lifted out of the body to sit under the title. */
+  lede?: string;
+  /** Estimated reading time, in whole minutes. */
+  minutes: number;
   children: ReactNode;
 }) {
   return (
@@ -101,18 +121,19 @@ export function DocsShell({
         tree={tree}
         themeSwitch={{ enabled: false }}
         nav={{
+          mode: "top",
           // A span, not a link like its counterpart on the landing: fumadocs
           // wraps this whole title in its own <a href={url}>, and an anchor
           // inside an anchor is invalid. The explanation lives one click away
           // on getting-started, which the badge sits next to in the sidebar
           // anyway.
           title: (
-            <span className="inline-flex items-baseline gap-2">
-              <span className="font-serif text-xl">
+            <span className="inline-flex items-baseline gap-2 whitespace-nowrap">
+              <span className="font-serif text-lg md:text-xl">
                 graft<b style={{ color: "var(--mark)" }}>.</b> docs
               </span>
               <span
-                className="self-center rounded px-1.5 py-0.5 font-mono text-[0.625rem] uppercase tracking-wider"
+                className="self-center rounded px-1.5 py-0.5 font-mono text-xs uppercase tracking-wider"
                 style={{
                   color: "var(--mark)",
                   border: "1px solid color-mix(in oklch, var(--mark) 35%, transparent)",
@@ -137,8 +158,18 @@ export function DocsShell({
         githubUrl="https://github.com/AndersonDesign1/graft"
       >
         <DocsPage toc={toc}>
-          <DocsTitle>{title}</DocsTitle>
-          <DocActions slug={slug} title={title} />
+          <header className="doc-header">
+            <p className="doc-eyebrow">
+              <span>{section}</span>
+              <span aria-hidden="true">·</span>
+              <span>{minutes} min read</span>
+            </p>
+            <DocsTitle>{title}</DocsTitle>
+            {/* The lede is the page's kicker, rendered from the repository's own
+                MDX at build time, so it is trusted HTML (inline code, links). */}
+            {lede && <p className="doc-lede" dangerouslySetInnerHTML={{ __html: lede }} />}
+            <DocActions slug={slug} title={title} />
+          </header>
           <DocsBody>{children}</DocsBody>
           <div className="powered-by-graft-docs">
             <PoweredByGraft />

@@ -40,6 +40,18 @@ const [tree, bodyHtml] = await Promise.all([docsPageTree(), renderMdx(doc.body)]
 const toc = extractHeadings(doc.body)
   .filter((heading) => heading.depth >= 2 && heading.depth <= 3)
   .map((heading) => ({ title: heading.text, url: `#${heading.id}`, depth: heading.depth }));
+
+/**
+ * The page header: the kicker is the page's one-sentence promise, so it sits
+ * under the title as the lede instead of as the first line of the body. The
+ * Markdown twin keeps it in place (llms.ts reads the source, not this HTML).
+ */
+const KICKER = /^\s*<p class="kicker">([\s\S]*?)<\/p>/;
+const lede = KICKER.exec(bodyHtml)?.[1];
+const body = lede === undefined ? bodyHtml : bodyHtml.replace(KICKER, "");
+
+/** Reading time from the prose, at a plain 230 words a minute, code included. */
+const minutes = Math.max(1, Math.round(doc.body.split(/\s+/).filter(Boolean).length / 230));
 ---
 
 <DocsRoot
@@ -55,8 +67,11 @@ const toc = extractHeadings(doc.body)
     toc={toc}
     title={doc.data.title}
     slug={doc.slug}
+    section={doc.data.section}
+    lede={lede}
+    minutes={minutes}
     client:load
   >
-    <div class="prose" set:html={bodyHtml} />
+    <div class="prose" set:html={body} />
   </DocsShell>
 </DocsRoot>
