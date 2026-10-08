@@ -1,5 +1,25 @@
 # @usegraft/sdk-react
 
+## 1.0.0-beta.3
+
+### Patch Changes
+
+- f92b97c: `useContentSearch` and `graft.searchContent` now treat an empty or
+  whitespace-only query as a search with no results. They return `[]` without
+  sending a request, so a search box that starts empty no longer shows an error
+  before anyone types.
+
+  All three hooks also stop showing the previous answer for one render when
+  their arguments change. `useContent` with a new slug, or `useContentSearch`
+  with a new query, now reports loading in that same render instead of briefly
+  rendering the old document or hits.
+
+- Updated dependencies [f92b97c]
+- Updated dependencies [f92b97c]
+  - @usegraft/sdk-core@1.0.0-beta.3
+  - @usegraft/contracts@1.0.0-beta.3
+  - @usegraft/content-api@1.0.0-beta.3
+
 ## 1.0.0-beta.2
 
 ### Patch Changes

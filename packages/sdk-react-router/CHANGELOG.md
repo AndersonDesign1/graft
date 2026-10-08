@@ -1,5 +1,19 @@
 # @usegraft/sdk-react-router
 
+## 1.0.0-beta.3
+
+### Patch Changes
+
+- f92b97c: Fix the caching note in each adapter's JSDoc. It said to purge
+  `tagsForChanges(branch, changeSet)` "from your compile webhook", but Graft sends
+  no webhook. It now says to purge from your own route, called with a compile's
+  change list, for example the output of `graft compile --json`.
+- Updated dependencies [f92b97c]
+- Updated dependencies [56c0957]
+- Updated dependencies [f92b97c]
+  - @usegraft/sdk-core@1.0.0-beta.3
+  - @usegraft/db@1.0.0-beta.3
+
 ## 1.0.0-beta.2
 
 ### Patch Changes
