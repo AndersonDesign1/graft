@@ -348,7 +348,7 @@ table td {
 
 .prose ol.steps > li.step {
   padding: 0;
-  margin-block-end: var(--space-10);
+  margin-block-end: var(--space-12);
   counter-increment: step;
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);

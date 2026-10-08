@@ -63,7 +63,14 @@ export function FieldTable({ collection }: FieldTableProps) {
   if (rows.length === 0) return <p className="field-table-missing">No fields declared.</p>;
 
   return (
-    <div className="field-table-wrap">
+    // Scrolls sideways on a narrow screen, so it is reachable by keyboard and
+    // named, the same as the Markdown table frame (Table.tsx).
+    <div
+      className="field-table-wrap"
+      role="region"
+      aria-label={`Fields of the ${collection} collection`}
+      tabIndex={0}
+    >
       <table className="field-table">
         <thead>
           <tr>

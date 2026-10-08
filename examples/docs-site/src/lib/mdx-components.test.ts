@@ -136,6 +136,41 @@ describe("Steps", () => {
     expect(html).toContain("Install");
     expect(html).toContain("Compile");
   });
+
+  it("gives a repeated step title its own id and link", async () => {
+    // The same title in two procedures (one per framework tab): both stay in
+    // the HTML, so they must not share an id.
+    const steps = [
+      "<Steps>",
+      "",
+      '<Step title="Compile">',
+      "",
+      "Run it.",
+      "",
+      "</Step>",
+      "",
+      "</Steps>",
+    ];
+    const html = await render([...steps, "", ...steps].join("\n"));
+
+    expect(html.match(/id="step-compile"/g)).toHaveLength(1);
+    expect(html.match(/id="step-compile-2"/g)).toHaveLength(1);
+    expect(html).toContain('href="#step-compile-2"');
+  });
+});
+
+describe("table", () => {
+  it("frames a Markdown table in a keyboard-reachable region named by its columns", async () => {
+    const html = await render(
+      ["| Framework | Package |", "| --- | --- |", "| Astro | `@usegraft/astro` |"].join("\n"),
+    );
+
+    expect(html).toContain('class="table-wrap"');
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-label="Table: Framework, Package"');
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain("<table>");
+  });
 });
 
 describe("TierBadge", () => {

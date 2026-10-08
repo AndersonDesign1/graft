@@ -10,7 +10,21 @@
  * The number is generated rather than typed, which means inserting a step in
  * the middle does not renumber anything by hand.
  */
-import type { ReactNode } from "react";
+import { createContext, createElement, type ReactNode, useContext } from "react";
+
+/**
+ * Ids already handed out in one rendered body. Two procedures can share a step
+ * title (the Next.js and Astro tabs of one guide both "Initialize Graft"), and
+ * both stay in the HTML, so a title alone would give two elements one id and
+ * every link would land on the first, possibly hidden, one. The second gets
+ * `-2`, the third `-3`.
+ */
+const StepIds = createContext<Map<string, number> | null>(null);
+
+/** One id registry per rendered body. renderMdx wraps every body in this. */
+export function StepIdScope({ children }: { children: ReactNode }) {
+  return createElement(StepIds.Provider, { value: new Map() }, children);
+}
 
 export function Steps({ children }: { children: ReactNode }) {
   return <ol className="steps">{children}</ol>;
@@ -32,8 +46,19 @@ function stepSlug(title: string): string {
     .replace(/(^-|-$)/g, "")}`;
 }
 
+/** The step's id, unique within the body when a StepIdScope is present. */
+function useStepId(title: string | undefined): string | undefined {
+  const seen = useContext(StepIds);
+  if (!title) return undefined;
+  const base = stepSlug(title);
+  if (!seen) return base;
+  const count = (seen.get(base) ?? 0) + 1;
+  seen.set(base, count);
+  return count === 1 ? base : `${base}-${count}`;
+}
+
 export function Step({ title, children }: StepProps) {
-  const id = title ? stepSlug(title) : undefined;
+  const id = useStepId(title);
   return (
     <li className="step">
       {title ? (

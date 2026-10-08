@@ -41,11 +41,34 @@ aside#nd-sidebar,
   border-inline-end: 0 !important;
 }
 
-/* Top bar: translucent over scrolling content, one hairline below. */
+/* Top bar: translucent over scrolling content, one hairline below. The bar
+   sits inside the layout's gutters, so its surface is drawn by ::before,
+   which runs out through the gutters to the window edges. */
 header#nd-subnav {
-  background-color: color-mix(in oklch, var(--paper) 85%, transparent) !important;
+  isolation: isolate;
+  background-color: transparent !important;
+  /* A blur here would make the bar a backdrop root and leave ::before
+     nothing to blur. */
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  border-block-end: 0 !important;
+}
+
+/* The bar's own inner row draws a border too; ::before has the one line. */
+header#nd-subnav > div {
+  border-block-end-color: transparent !important;
+}
+
+header#nd-subnav::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline: calc(-1 * var(--doc-gutter));
+  z-index: -1;
+  background-color: color-mix(in oklch, var(--paper) 85%, transparent);
+  -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
-  border-block-end: 1px solid var(--hairline) !important;
+  border-block-end: 1px solid var(--hairline);
 }
 
 /* Sidebar section group labels: sentence-case mono. Short operational labels
@@ -142,10 +165,22 @@ kbd {
    both sides of the text evenly instead of stretching the lines. */
 #nd-notebook-layout {
   --fd-layout-width: 100vw;
+  --doc-gutter: 0px;
   --doc-column: 50rem; /* 800 — the article column's widest */
   --doc-body: 1.0625rem; /* 17 — reading size for long-form docs */
   --doc-title: clamp(2.25rem, 1.75rem + 1.4vw, 2.875rem); /* 36 → 46 */
   --doc-lede: 1.25rem; /* 20 */
+}
+
+/* Once the sidebar shows, the sidebar and contents rail sit a gutter in from
+   the window edges (24px at 768, about 48px at 1440, 64px at most), so they
+   do not run into the edges. The fumadocs grid gives the
+   space outside --fd-layout-width to its two outer columns. */
+@media (min-width: 48rem) {
+  #nd-notebook-layout {
+    --doc-gutter: clamp(1.5rem, 3.4vw, 4rem);
+    --fd-layout-width: calc(100vw - 2 * var(--doc-gutter));
+  }
 }
 
 /* ---- Page header ----------------------------------------------------------
@@ -630,18 +665,6 @@ kbd {
   border-block-start: 1px solid var(--hairline);
 }
 
-/* Prose inside a tab (a note under the code) sits on the frame's inset,
-   divided from the code by a hairline. */
-.tab-panel > :not(pre.shiki, .codeblock) {
-  margin: 0;
-  padding: var(--space-4) var(--space-5);
-  font-size: var(--text-base);
-}
-
-.tab-panel > :not(pre.shiki, .codeblock):not(:first-child) {
-  border-block-start: 1px solid var(--hairline);
-}
-
 /* Tabs that hold prose (a whole setup guide per framework) are not a code
    frame. Filling them would put the guide in one grey box with more boxes
    inside. The labels become a row of section tabs over the page, and code
@@ -672,7 +695,10 @@ kbd {
   background: var(--paper-sunken) !important;
 }
 
-.tabs:has(.tab-panel > :not(pre.shiki, .codeblock)) .tab-panel > :not(pre.shiki, .codeblock) {
+/* Plain text only: a callout or quote inside the tab keeps its own frame. */
+.tabs:has(.tab-panel > :not(pre.shiki, .codeblock))
+  .tab-panel
+  > :is(p, ul, ol:not(.steps), h2, h3, h4) {
   margin-block: 0 1.25em;
   padding: 0;
   border: 0;
@@ -1002,7 +1028,7 @@ kbd {
 
 /* Code in a cell is plain mono, not a chip: in a column of package names the
    boxes would turn the table into a grid of buttons. */
-.prose td code {
+#nd-page .prose td code {
   padding: 0;
   border: 0;
   background: none;
@@ -1010,7 +1036,8 @@ kbd {
   color: var(--ink);
 }
 
-.prose .table-wrap:focus-visible {
+.prose .table-wrap:focus-visible,
+.prose .field-table-wrap:focus-visible {
   outline: 2px solid var(--mark);
   outline-offset: 2px;
 }
@@ -1074,7 +1101,7 @@ kbd {
 
 /* Press feedback only with a fine pointer: on iOS :active sticks after a tap,
    which would leave the card shrunk until the next touch. */
-@media (hover: hover) and (pointer: fine) {
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   #nd-page > div[class~="@container"] > a:active {
     transform: scale(0.98);
   }
@@ -1212,7 +1239,7 @@ html[data-theme="dark"] .powered-by-graft-on-ink {
   }
 }
 
-@media (hover: hover) and (pointer: fine) {
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .doc-actions a:active,
   .doc-actions button:active {
     transform: scale(0.96);

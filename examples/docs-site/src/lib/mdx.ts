@@ -28,6 +28,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import * as runtime from "react/jsx-runtime";
 import remarkGfm from "remark-gfm";
 import { mdxComponents } from "../components/mdx";
+import { StepIdScope } from "../components/mdx/Steps";
 import { SHIKI_THEMES } from "./highlight";
 
 export type MdxComponents = MDXComponents;
@@ -57,6 +58,10 @@ export async function renderMdx(source: string, components?: MdxComponents): Pro
   });
 
   return renderToStaticMarkup(
-    createElement(Content, { components: { ...mdxComponents, ...components } }),
+    createElement(
+      StepIdScope,
+      null,
+      createElement(Content, { components: { ...mdxComponents, ...components } }),
+    ),
   );
 }

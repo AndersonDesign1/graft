@@ -184,4 +184,11 @@ describe("componentsToMarkdown", () => {
     );
     expect(componentsToMarkdown(body)).toBe("> **Prefer an agent?**\n> Text.");
   });
+
+  it("keeps a code block's note, which tells two blocks with one file name apart", () => {
+    const body = ['<CodeBlock title="lib/graft.ts" note="static engine">', "</CodeBlock>"].join(
+      "\n",
+    );
+    expect(componentsToMarkdown(body)).toBe("`lib/graft.ts` (static engine):");
+  });
 });

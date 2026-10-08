@@ -100,8 +100,12 @@ export function componentsToMarkdown(body: string): string {
       const title = attr(trimmed, "title");
       if (title) out.push(`**${title}**`);
     } else if (trimmed.startsWith("<CodeBlock")) {
+      // The note tells two blocks with one file name apart ("lib/graft.ts",
+      // static engine vs Postgres engine), so it stays with the title.
       const title = attr(trimmed, "title");
-      if (title && title !== "terminal") out.push(`\`${title}\`:`);
+      const note = attr(trimmed, "note");
+      if (title && title !== "terminal") out.push(`\`${title}\`${note ? ` (${note})` : ""}:`);
+      else if (note) out.push(`(${note})`);
     } else if (trimmed.startsWith("<DocCard ")) {
       const title = attr(trimmed, "title");
       const href = attr(trimmed, "href");
