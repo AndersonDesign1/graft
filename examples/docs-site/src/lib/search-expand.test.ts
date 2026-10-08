@@ -37,6 +37,8 @@ describe("expandQuery", () => {
   it("keeps words the index stems apart, like mill and million", () => {
     const words = buildVocabulary(["mill mill million"]);
     expect(expandQuery("mi", words)).toBe("mi or mill or million");
+    // "state" stems apart from "stat", so typing "stat" must still offer it.
+    expect(expandQuery("stat", buildVocabulary(["state states"]))).toBe("stat or state");
   });
 
   it("leaves a finished word that completes to nothing alone", () => {
