@@ -2,10 +2,13 @@
 title: Configuration
 description: Environment variables for compile, serve, auth, MCP, and assets.
 section: Reference
-order: 3
+order: 2
 ---
 
-Commands and runtimes walk up from the working directory for `.env`.
+<p className="kicker">Every environment variable, in one place. A static project needs none of them.</p>
+
+Look up an environment variable or a `graft.config.ts` export here. Graft
+reads `.env` from the current folder or any folder above it.
 
 ## Required: none
 
@@ -47,7 +50,8 @@ what operational data, typed functions, and copy-on-write branches need.
 | --- | --- |
 | `S3_BUCKET` | Bucket name |
 | `S3_ENDPOINT` | API endpoint (R2, MinIO, Tigris, …) |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Credentials |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | Credentials |
+| `S3_REGION` | Optional. Defaults to `auto`, which suits R2 |
 | `S3_PUBLIC_URL` | Optional stable public base; else presigned GET |
 | `GRAFT_ENSURE_BUCKET` | Container: set `0` when the bucket already exists |
 
@@ -69,7 +73,7 @@ required.
 | `functions` | `{}` | Record of `defineFunction` results; enables `list_functions` and `run_function` |
 | `contentDir` | `"content"` | Content root, relative to the config file |
 | `migrationsDir` | `"migrations"` | Migrations directory, relative to the config file |
-| `index` | `"postgres"` | `"static"` for the zero-service tier |
+| `index` | `"postgres"` when the export is missing. `graft init` writes `"static"`. | `"static"` for the storage engine that needs no services |
 | `mdxTrust` | `"restricted"` | How much of MDX an authored body may be |
 
 ### mdxTrust
@@ -83,10 +87,13 @@ Set `"full"` only when every author of the repository has commit access. Renderi
 evaluates MDX as JavaScript on the server, so on a Studio hosted for writers,
 "can author a page" would otherwise mean "can execute code on the render host".
 
+<CodeBlock title="graft.config.ts">
+
 ```ts
-// graft.config.ts
 export const mdxTrust = "full";
 ```
+
+</CodeBlock>
 
 `MdxBody` has its own `trust` prop with the same default, and the two have to
 agree: set `mdxTrust` here and pass `trust="full"` at the render site. Compile
@@ -96,8 +103,8 @@ says so in the error when it refuses a document.
 
 Keep two URLs in production:
 
-1. **Operator** — compile, migrate, merge, approve (CI or your machine)
-2. **Runtime** — `DATABASE_URL` for the deployment after `graft harden`
+- **Operator.** Compiles, migrates, merges, and approves from CI or your machine.
+- **Runtime.** Serves the deployment on `DATABASE_URL` after `graft harden`.
 
 On Vercel embedded deploys, run compile in the build step with the operator URL,
 then serve the app with the runtime URL. See [Deploy](/docs/deploy).

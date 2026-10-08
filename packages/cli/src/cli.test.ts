@@ -1,7 +1,8 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { run } from "./cli";
 
@@ -191,4 +192,93 @@ describe("run", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+});
+
+// Inside the package so the scaffolded config's `@usegraft/core` import resolves.
+// Own subdir of .test-tmp: test files run in parallel.
+const jsonProject = resolve(fileURLToPath(new URL(".", import.meta.url)), "../.test-tmp/cli-json");
+
+describe("graft compile --json", () => {
+  beforeEach(async () => {
+    rmSync(jsonProject, { recursive: true, force: true });
+    expect(await run(["init", jsonProject])).toBe(0);
+    logs = [];
+    errors = [];
+  });
+
+  afterEach(() => {
+    rmSync(jsonProject, { recursive: true, force: true });
+  });
+
+  it("prints only the ChangeSet JSON on stdout and the human report on stderr", async () => {
+    expect(await run(["compile", "--json"], { cwd: jsonProject })).toBe(0);
+    expect(logs).toHaveLength(1);
+    const output = JSON.parse(logs[0] ?? "");
+    expect(Object.keys(output).sort()).toEqual(["branch", "changes", "gitSha"]);
+    expect(output.branch).toBe("main");
+    expect(output.gitSha === null || typeof output.gitSha === "string").toBe(true);
+    expect(output.changes).toEqual({
+      added: ["pages/home"],
+      changed: [],
+      removed: [],
+      unchanged: 0,
+    });
+    expect(errors.join("\n")).toContain("Compiled 1 doc(s)");
+
+    logs = [];
+    expect(await run(["compile", "--json"], { cwd: jsonProject })).toBe(0);
+    expect(JSON.parse(logs[0] ?? "").changes).toEqual({
+      added: [],
+      changed: [],
+      removed: [],
+      unchanged: 1,
+    });
+  }, 30_000);
+
+  it("keeps stray console.log output off stdout", async () => {
+    // Anything that logs mid-compile (here the config itself, in production a
+    // Postgres notice) must not corrupt the JSON a deploy script pipes on.
+    appendFileSync(join(jsonProject, "graft.config.ts"), '\nconsole.log("noise");\n');
+    expect(await run(["compile", "--json"], { cwd: jsonProject })).toBe(0);
+    expect(logs).toHaveLength(1);
+    expect(JSON.parse(logs[0] ?? "").branch).toBe("main");
+    expect(errors).toContain("noise");
+    // The redirect ends with the compile.
+    console.log("after");
+    expect(logs).toContain("after");
+  }, 30_000);
+
+  it("keeps console.info, console.debug and raw stdout writes off stdout", async () => {
+    appendFileSync(
+      join(jsonProject, "graft.config.ts"),
+      '\nconsole.info("noise-info");\nconsole.debug("noise-debug");\nprocess.stdout.write("noise-raw\\n");\n',
+    );
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const out = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      stdout.push(String(chunk));
+      return true;
+    });
+    const err = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderr.push(String(chunk));
+      return true;
+    });
+    try {
+      expect(await run(["compile", "--json"], { cwd: jsonProject })).toBe(0);
+    } finally {
+      out.mockRestore();
+      err.mockRestore();
+    }
+    expect(stdout.join("")).not.toMatch(/noise/);
+    expect(stderr.join("")).toContain("noise-raw");
+    expect(errors).toEqual(expect.arrayContaining(["noise-info", "noise-debug"]));
+    expect(logs).toHaveLength(1);
+    expect(JSON.parse(logs[0] ?? "").branch).toBe("main");
+  }, 30_000);
+
+  it("prints nothing on stdout when the compile fails", async () => {
+    expect(await run(["compile", "--json", "--branch", "preview"], { cwd: jsonProject })).toBe(1);
+    expect(logs).toEqual([]);
+    expect(errors.join("\n")).toContain("NEEDS_DATABASE");
+  }, 30_000);
 });

@@ -4,8 +4,10 @@
  * stylesheet. Theme follows the reader (tokens.css color-scheme); the
  * fumadocs island renders all chrome.
  */
-import "@fontsource/instrument-serif";
-import "@fontsource-variable/instrument-sans";
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-sans/700.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "../styles/fumadocs.css";
@@ -15,9 +17,16 @@ interface Props {
   description?: string;
   /** This page's Markdown twin, advertised to agents that prefer the source. */
   markdownHref?: string;
+  /** Path of this page's social card, from /og/<slug>.png. */
+  ogImage?: string;
 }
 
-const { title, description, markdownHref } = Astro.props;
+const { title, description, markdownHref, ogImage } = Astro.props;
+// The static build serves /docs/<slug>/ as a directory index, but every link on
+// the site and in llms.txt uses the form without the slash. Canonical matches those.
+const canonicalPath = Astro.url.pathname.replace(/(.)\/$/, "$1");
+const canonical = new URL(canonicalPath, Astro.site ?? "https://graft.page").href;
+const ogImageUrl = ogImage ? new URL(ogImage, Astro.site ?? "https://graft.page").href : undefined;
 ---
 
 <!doctype html>
@@ -27,6 +36,16 @@ const { title, description, markdownHref } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Graft docs" />
+    <meta property="og:title" content={title} />
+    {description && <meta property="og:description" content={description} />}
+    <meta property="og:url" content={canonical} />
+    {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+    {ogImageUrl && <meta property="og:image:width" content="1200" />}
+    {ogImageUrl && <meta property="og:image:height" content="630" />}
+    <meta name="twitter:card" content={ogImageUrl ? "summary_large_image" : "summary"} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     {/* Discovery for agents: the Markdown source of this page, and the index
         of every page. Advertised in the head so a crawler finds them without
@@ -36,6 +55,10 @@ const { title, description, markdownHref } = Astro.props;
     <meta name="generator" content={Astro.generator} />
   </head>
   <body class="flex flex-col min-h-screen">
+    {/* Keyboard and screen-reader users skip the sidebar's ~40 links. The
+        target is the fumadocs article. Following a fragment link moves the
+        browser's focus starting point there, so Tab continues in the page. */}
+    <a href="#nd-page" class="skip-link">Skip to content</a>
     <slot />
   </body>
 </html>

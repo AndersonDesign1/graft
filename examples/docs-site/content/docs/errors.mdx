@@ -3,20 +3,22 @@
 # Source: ERROR_KNOWLEDGE in packages/mcp/src/explain.ts
 # Regenerate: node scripts/gen-error-docs.mjs
 title: Error reference
-description: "Every Graft error code, what it means, and how to recover. 42 codes."
+description: "Every Graft error code, what it means, and how to recover. 43 codes."
 section: Reference
-order: 4
+order: 5
 ---
 
-Every error Graft throws across a package boundary is a `GraftError`. It carries
-a `code` from this list, a `message` saying what happened, and a `fix` naming
-the next action. The `fix` is specific to the one failure. This page is the
-general lesson behind the code.
+Look up an error code you saw in a terminal, a log, or an agent's tool result.
 
-Agents get the same content without leaving the tool surface: the
-`explain_error` MCP tool returns these fields for any code.
+Every Graft error has three parts: a `code` from this list, a `message` saying
+what happened, and a `fix` naming the next step. The `fix` in your terminal is
+specific to your failure. The entry on this page explains the general cause, so
+you can tell whether the fix applies or something else is wrong.
 
-There are 42 codes.
+Agents can read the same entries without leaving their tools: the
+`explain_error` MCP tool returns them for any code.
+
+There are 43 codes, listed alphabetically.
 
 ## Codes
 
@@ -294,6 +296,18 @@ A required environment variable is not set.
 
 Add the variable named in `details.variable` to the project's .env (the CLI walks parent directories to find one) or export it in the environment, then retry.
 
+### FRAMEWORK_VERSION_UNSUPPORTED
+
+An adapter API needs a newer version of the framework than the app has installed. The rest of the adapter still works.
+
+**Usually because**
+
+- Calling `updateContent` from @usegraft/sdk-next on Next.js 15. It needs `updateTag`, which Next.js added in 16
+
+**How to recover**
+
+Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 15 and 16. Or upgrade the framework.
+
 ### FUNCTION_EXECUTION_FAILED
 
 The function's handler threw an unexpected (non-Graft) error — a bug in the handler or its environment, not in the caller's input.
@@ -415,7 +429,7 @@ Run the pending migration (content migrations update the files; DB migrations vi
 
 ### NEEDS_DATABASE
 
-This project runs in static index mode (index = "static" in graft.config), and the requested feature is Postgres-tier: db-authoritative collections, typed functions, or database branching.
+This project runs on the static storage engine (index = "static" in graft.config), and the requested feature needs the Postgres engine: db-authoritative collections, typed functions, or database branching.
 
 **Usually because**
 
@@ -485,7 +499,7 @@ The error names what failed (a manifest field or the version mismatch). For a ve
 **Usually because**
 
 - A typo in the item name
-- Expecting a community/remote item — only the bundled Tier-1 registry ships today
+- Expecting a community/remote item — only the bundled core registry ships today
 - The item was renamed or removed
 
 **How to recover**

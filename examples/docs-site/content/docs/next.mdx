@@ -1,16 +1,50 @@
 ---
 title: Next.js
-description: Typed reads in Server Components, React.cache, MdxBody, and withGraft.
-section: Build
-order: 3
+description: "Read typed content in Next.js Server Components, render MDX, and refresh only the pages that changed."
+section: Frameworks
+order: 0
 ---
 
-<Tabs labels="pnpm, npm, bun">
+<p className="kicker">Render Graft content in a Next.js App Router project, from install to cache refresh.</p>
+
+This guide adds Graft to a Next.js App Router project. By the end, your pages
+read typed content in Server Components, render its Markdown with your own
+components, and refresh only the pages whose content changed.
+
+**Before you start**, you need a Next.js 15 or 16 project using the App
+Router, and a `graft.config.ts` with compiled content. If you have not got
+those yet, run through [Getting started](/docs/getting-started) first. It takes
+about ten minutes.
+
+Graft needs Next.js 15.5.24 or 16.3.3 or newer. Those are the first releases
+with fixes for the critical Next.js security advisories published in 2026.
+Next.js 14 is not supported. It no longer gets security fixes, and those
+advisories are still open on it.
+
+What `@usegraft/sdk-next` gives you:
+
+- **Typed reads in Server Components.** Every result is typed from your schema.
+- **One read per document per request.** If a layout and a page read the same
+  document, Graft reads it once, using `React.cache`.
+- **Markdown rendering on the server.** `<MdxBody />` renders a document's body
+  without sending an MDX parser to the browser.
+- **Targeted cache refresh.** `revalidateContent` refreshes only the pages whose
+  content changed.
+
+<Callout label="Prefer to let your agent do it?" type="note">
+  Paste this into your coding agent: "Add Graft to this Next.js app following
+  https://graft.page/docs/next.md. Put the client in lib/graft.ts and render
+  the pages collection at app/[slug]/page.tsx."
+</Callout>
+
+## Install
+
+<Tabs labels="npm, pnpm, bun">
 
 <Tab>
 
 ```sh
-pnpm add @usegraft/sdk-next
+npm i @usegraft/sdk-next @usegraft/db
 ```
 
 </Tab>
@@ -18,7 +52,7 @@ pnpm add @usegraft/sdk-next
 <Tab>
 
 ```sh
-npm i @usegraft/sdk-next
+pnpm add @usegraft/sdk-next @usegraft/db
 ```
 
 </Tab>
@@ -26,24 +60,47 @@ npm i @usegraft/sdk-next
 <Tab>
 
 ```sh
-bun add @usegraft/sdk-next
+bun add @usegraft/sdk-next @usegraft/db
 ```
 
 </Tab>
 
 </Tabs>
 
-`createGraft` wraps the read client with `React.cache`, so repeated reads of
-the same document within one render are deduped. Server-only: the handle holds
-a database connection or an open index.
+## Wrap your Next.js config
 
-## Create the handle
+Wrap your config with `withGraft`. Today it does one thing: it keeps
+`@usegraft/registry` out of the server bundle, because that package reads files
+from disk at runtime. Plain content reads work without it, but the
+[MCP route](#serve-functions-and-mcp-from-your-app) needs it, so add it now:
 
-`graft init` scaffolds the static index. Pass that artifact and nothing else
-has to be running:
+<CodeBlock title="next.config.ts">
 
 ```ts
-// lib/graft.ts
+import { withGraft } from "@usegraft/sdk-next/config";
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  // your existing Next.js options
+};
+
+export default withGraft(nextConfig);
+```
+
+</CodeBlock>
+
+## Create the Graft client
+
+Create the client once, in a file only the server imports. Pick the version for
+your [storage engine](/docs/tiers).
+
+<Tabs labels="Static, Postgres">
+
+<Tab>
+
+<CodeBlock title="lib/graft.ts">
+
+```ts
 import { openStaticIndex } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-next";
 import { collections } from "@/graft.config";
@@ -54,83 +111,395 @@ export const graft = createGraft({
 });
 ```
 
-On Postgres, swap `index` for `db`:
+</CodeBlock>
+
+</Tab>
+
+<Tab>
+
+<CodeBlock title="lib/graft.ts">
 
 ```ts
 import { createDb } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-next";
 import { collections } from "@/graft.config";
 
-export const graft = createGraft({
-  db: createDb(process.env.DATABASE_URL!).db,
-  collections,
-});
+export const { db } = createDb(process.env.DATABASE_URL!);
+export const graft = createGraft({ db, collections });
 ```
 
-## Read one document
+</CodeBlock>
 
-```ts
-// in a Server Component
-const page = await graft.getContent("pages", "home");
-```
+The Postgres version also exports `db`, because the function and MCP routes
+below need it.
 
-Return types come from your `defineCollection` schemas. A renamed field is a
-build error rather than a runtime `undefined`.
+</Tab>
 
-## Render MDX
+</Tabs>
+
+Every read goes through `React.cache`. If a layout and a page both read the
+same document during one request, the index is read once.
+
+## Show a document
+
+A page reads its document by slug and renders the body with `<MdxBody />`.
+`getContent` returns `null` for a slug that does not exist, so send that to
+`notFound()`:
+
+<CodeBlock title="app/[slug]/page.tsx">
 
 ```tsx
+import { notFound } from "next/navigation";
 import { MdxBody } from "@usegraft/sdk-next";
-import { mdxComponents } from "@/components/mdx-components";
+import { graft } from "@/lib/graft";
 
-<MdxBody source={page.body} components={mdxComponents} />;
+// Optional: build every page ahead of time.
+export async function generateStaticParams() {
+  const pages = await graft.listContent("pages");
+  return pages.map((page) => ({ slug: page.slug }));
+}
+
+export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const page = await graft.getContent("pages", slug);
+  if (!page) notFound();
+
+  return (
+    <article>
+      <h1>{page.data.title}</h1>
+      {page.data.tagline && <p>{page.data.tagline}</p>}
+      <MdxBody source={page.body} />
+    </article>
+  );
+}
 ```
 
-`MdxBody` is Next-only. It defaults to `trust: "restricted"`, which refuses
-`{…}` expressions, `import`, `export`, and spread attributes. Pass
-`trust="full"` only when every author has commit access, and set
-`export const mdxTrust = "full"` in `graft.config.ts` to match.
+</CodeBlock>
 
-## Mount functions and MCP
+`page.data` is typed from the `pages` collection in your schema, so a misspelled
+field is a compile error, not an empty heading.
 
-```ts
-// app/api/fn/[name]/route.ts
-export const POST = functionsHandler;
+## Use your own components in Markdown
+
+Pass `components` to `<MdxBody />` to render a tag in your content with your
+own React component. This content uses a `Callout`:
+
+<CodeBlock title="content/pages/home.mdx">
+
+```mdx
+<Callout title="Heads up">Prices change on 1 March.</Callout>
 ```
 
-MCP mounts the same way with `createGraftMcpHandler`. Next's App Router takes
-the handler directly — there is no `graftRoute` wrapper here.
+</CodeBlock>
 
-## Cache and invalidation
+And this renders it:
 
-```ts
-import { revalidateContent, updateContent } from "@usegraft/sdk-next";
+<CodeBlock title="components/document-body.tsx">
 
-// in a route handler, after a compile webhook
-revalidateContent(branch, changes);
+```tsx
+import type { ReactNode } from "react";
+import { MdxBody } from "@usegraft/sdk-next";
 
-// in a Server Action, for read-your-own-writes
-updateContent(branch, changes);
+const components = {
+  Callout: ({ title, children }: { title?: string; children: ReactNode }) => (
+    <aside className="callout">
+      {title && <strong>{title}</strong>}
+      {children}
+    </aside>
+  ),
+};
+
+export function DocumentBody({ source }: { source: string }) {
+  return <MdxBody source={source} components={components} />;
+}
 ```
 
-Both turn a compile's `ChangeSet` into the exact `revalidateTag` / `updateTag`
-calls that refresh the changed pages, and no others. A no-op unless your reads
-were cached with `'use cache'` and `cacheTag`, but always safe to call.
+</CodeBlock>
 
-## The caveat you cannot infer
+<Callout label="Content cannot run code" type="note">
+  By default `<MdxBody />` refuses `{…}` expressions, `import`, and `export`,
+  because those would run as JavaScript on your server. Components with plain
+  string attributes, like the `Callout` above, are allowed. See
+  [MDX safety](/docs/mdx-safety).
+</Callout>
 
-Wrap the Next config with `withGraft` so `@usegraft/registry` stays external
-to the server bundle. Forgetting it breaks `list_registry` / `describe_item`
-at runtime with no build-time error.
+## Serve functions and MCP from your app
+
+<TierBadge tier="postgres" />
+
+Skip this section unless you need it. Mount these routes when you want to:
+
+- call your [typed functions](/docs/functions-and-access) at
+  `POST /api/fn/<name>`, or
+- let remote agents read and write content over MCP at `POST /api/mcp`.
+
+Both need the Postgres engine and three more packages:
+
+```sh
+npm i @usegraft/core @usegraft/auth @usegraft/mcp
+```
+
+Both routes need to know who is calling. This resolver accepts one token from
+your environment, which is enough to try things out. A dev token never
+expires, so the resolver ignores it in production. [Auth](/docs/auth) shows
+how to accept signed tokens from your identity provider.
+
+<CodeBlock title="lib/actor.ts">
 
 ```ts
-// next.config.ts
-import { withGraft } from "@usegraft/sdk-next/config";
+import { createActorResolver } from "@usegraft/auth";
 
-export default withGraft({
-  // your Next config
+// A dev token never expires, so it is accepted only in development. An unset
+// NODE_ENV counts as production, so a deploy that forgets it stays closed.
+const devToken = process.env.NODE_ENV === "development" ? process.env.GRAFT_DEV_TOKEN : undefined;
+
+export const actor = createActorResolver({
+  devTokens: devToken
+    ? {
+        [devToken]: {
+          kind: "human",
+          id: "owner",
+          scopes: ["content:write", "submissions:admin"],
+        },
+      }
+    : undefined,
 });
 ```
 
-See [SDK reference](/docs/sdk-reference) for mounts across adapters and the
-honest gaps.
+</CodeBlock>
+
+<CodeBlock title="app/api/fn/[name]/route.ts">
+
+```ts
+import { createFunctionsHandler } from "@usegraft/core";
+import { functions } from "@/graft.config";
+import { actor } from "@/lib/actor";
+import { db } from "@/lib/graft";
+
+export const POST = createFunctionsHandler({ db, functions, actor });
+```
+
+</CodeBlock>
+
+<CodeBlock title="app/api/mcp/route.ts">
+
+```ts
+import { createGraftMcpHandler } from "@usegraft/mcp";
+import { collections, functions } from "@/graft.config";
+import { actor } from "@/lib/actor";
+import { db } from "@/lib/graft";
+
+export const POST = createGraftMcpHandler({
+  contentDir: "./content",
+  db,
+  collections,
+  functions,
+  actor,
+});
+```
+
+</CodeBlock>
+
+A request without a valid token gets a `401`. Never mount the MCP route with
+`allowAnonymous: true` on a server that others can reach. For public,
+read-only docs, use the [docs MCP](/docs/docs-mcp) instead.
+
+## Refresh pages when content changes
+
+<TierBadge tier="postgres" />
+
+On the static engine, content changes ship with a new deploy, so there is
+nothing to refresh. On Postgres, content can change while your app is running,
+from Studio or from an agent. This section makes Next.js refresh only the pages
+whose content changed.
+
+It takes two steps. How you cache reads depends on your version. Next.js 16
+uses cached functions. Next.js 15 uses `unstable_cache`. The refresh route is
+the same on both.
+
+<Steps>
+
+<Step title="Tag each cached read">
+
+Cache each read and tag it with `tagsFor`. Use these functions in your pages
+instead of calling `graft` directly.
+
+<Tabs labels="Next.js 16, Next.js 15">
+
+<Tab>
+
+Turn on cached functions in the config you wrapped with `withGraft`:
+
+<CodeBlock title="next.config.ts">
+
+```ts
+import { withGraft } from "@usegraft/sdk-next/config";
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  // your existing Next.js options
+  cacheComponents: true,
+};
+
+export default withGraft(nextConfig);
+```
+
+</CodeBlock>
+
+Then wrap each read in a `'use cache'` function:
+
+<CodeBlock title="lib/content.ts">
+
+```ts
+import { cacheTag } from "next/cache";
+import { tagsFor } from "@usegraft/sdk-next";
+import { graft } from "@/lib/graft";
+
+export async function getPage(slug: string) {
+  "use cache";
+  cacheTag(...tagsFor("main", "pages", slug));
+  return graft.getContent("pages", slug);
+}
+
+export async function listPages() {
+  "use cache";
+  cacheTag(...tagsFor("main", "pages"));
+  return graft.listContent("pages");
+}
+```
+
+</CodeBlock>
+
+</Tab>
+
+<Tab>
+
+Wrap each read in `unstable_cache` and pass the tags:
+
+<CodeBlock title="lib/content.ts">
+
+```ts
+import { unstable_cache } from "next/cache";
+import { tagsFor } from "@usegraft/sdk-next";
+import { graft } from "@/lib/graft";
+
+// unstable_cache stores results as JSON, so `updatedAt` comes back as a
+// string. Turn it back into a Date, so every value matches its type.
+function revive<T extends { updatedAt: Date }>(doc: T): T {
+  return { ...doc, updatedAt: new Date(doc.updatedAt) };
+}
+
+export async function getPage(slug: string) {
+  const page = await unstable_cache(
+    () => graft.getContent("pages", slug),
+    ["graft", "pages", slug],
+    { tags: tagsFor("main", "pages", slug) },
+  )();
+  return page && revive(page);
+}
+
+const cachedPages = unstable_cache(() => graft.listContent("pages"), ["graft", "pages"], {
+  tags: tagsFor("main", "pages"),
+});
+
+export async function listPages() {
+  return (await cachedPages()).map(revive);
+}
+```
+
+</CodeBlock>
+
+`unstable_cache` stores results as JSON, which has no date type, so
+`revive` turns each `updatedAt` back into a `Date`. Schema fields are not
+affected: `field.datetime()` values are ISO strings already.
+
+</Tab>
+
+</Tabs>
+
+Without this step, `revalidateContent` has nothing to refresh and does
+nothing.
+
+</Step>
+
+<Step title="Add a route that refreshes what changed">
+
+`revalidateContent` takes the list of documents a compile changed and refreshes
+the matching tags: each changed document, and the collection it is in.
+
+<CodeBlock title="app/api/revalidate/route.ts">
+
+```ts
+import { revalidateContent, type ChangeSet } from "@usegraft/sdk-next";
+
+const isStrings = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string");
+
+function isChangeSet(value: unknown): value is ChangeSet {
+  const v = value as Partial<ChangeSet> | null;
+  return (
+    isStrings(v?.added) &&
+    isStrings(v?.changed) &&
+    isStrings(v?.removed) &&
+    typeof v?.unchanged === "number"
+  );
+}
+
+export async function POST(request: Request) {
+  const secret = process.env.GRAFT_WEBHOOK_SECRET;
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const branch = body?.branch ?? "main";
+  if (typeof branch !== "string" || !isChangeSet(body?.changes)) {
+    return Response.json({ error: "Send { branch, changes }." }, { status: 400 });
+  }
+
+  const tags = revalidateContent(branch, body.changes);
+  return Response.json({ revalidated: tags });
+}
+```
+
+</CodeBlock>
+
+</Step>
+
+</Steps>
+
+Graft does not call this route for you. Call it after content changes, with
+the change list Graft gave you. An agent's `write_content` call returns it as
+`changes`. `graft compile --json` prints it too, along with the branch. In a
+deploy script, send it to the route. The script stops if the compile fails,
+and `--fail` makes a refused request fail the script too:
+
+```sh
+graft compile --json > changes.json || exit 1
+curl --fail -X POST https://example.com/api/revalidate \
+  -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" \
+  -H "content-type: application/json" \
+  --data-binary @changes.json
+```
+
+Either way, the route reads a body shaped like this:
+
+```json
+{
+  "branch": "main",
+  "changes": { "added": ["pages/pricing"], "changed": ["pages/home"], "removed": [], "unchanged": 12 }
+}
+```
+
+To refresh inside the same request instead, for example from a Server Action
+that saves and then shows the result, use `updateContent(branch, changes)`.
+It needs Next.js 16. On 15 it throws an error that points you back to
+`revalidateContent`.
+
+## Next steps
+
+- [Schema](/docs/schema) defines the collections and fields your pages read.
+- [Reading content](/docs/reading-content) covers lists, search, and
+  pagination.
+- [Connecting agents](/docs/connecting-agents) points Cursor or Claude at your
+  project.

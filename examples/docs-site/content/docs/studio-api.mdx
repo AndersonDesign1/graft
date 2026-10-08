@@ -1,23 +1,25 @@
 ---
 title: Studio API
-description: The HTTP surface the Studio UI is a client of, and the rules a state-changing request has to satisfy.
+description: "Every Studio action as an HTTP call you can script: routes, scopes, the checks on changes, and mounting it yourself."
 section: Reference
-order: 6
+order: 4
 ---
 
-The Studio UI has no privileged access. Everything it does goes through
-`/api/studio/v1/*`, which is documented by its own OpenAPI document and usable
-without the UI.
+<p className="kicker">Every Studio action is an API call you can make yourself.</p>
+
+Use this page to script anything [Studio](/docs/studio) does, or to build your
+own editing UI. Studio has no special access: everything it does is a call to
+`/api/studio/v1/*`, and you can make the same calls.
 
 <TierBadge tier="postgres" />
 
-## The document
+## The OpenAPI document
 
 ```sh
 curl http://127.0.0.1:4983/api/studio/v1/openapi.json
 ```
 
-That is the authoritative shape. The tables below are the map.
+It describes every route and payload exactly. The tables below are a summary.
 
 ## Routes
 
@@ -43,9 +45,8 @@ That is the authoritative shape. The tables below are the map.
 
 All paths are prefixed with `/api/studio/v1`.
 
-Revert is two routes on one path because they are two different questions.
-`GET` previews whether a revert is safe and carries a read scope; `POST` does it
-and carries a write scope.
+Revert has two methods on one path. `GET` checks whether a revert is safe and
+needs only a read scope. `POST` performs it and needs a write scope.
 
 ## The three scopes
 
@@ -55,13 +56,13 @@ and carries a write scope.
 | `studio:write` | Changing it: saving, compiling, committing, reverting |
 | `approvals:decide` | The human gate. No agent runtime token should carry it |
 
-An agent that may read the content tree has no business committing it, which is
-why "authenticated" is not a permission here.
+Being signed in grants nothing by itself. A caller needs the scope for each
+kind of action, so an agent can be allowed to read without being able to commit.
 
 ## Authentication
 
-`authenticate` resolves a request to a principal, or returns `null` to refuse
-it.
+Pass an `authenticate` function that turns a request into a principal (who is
+calling, and with which scopes), or returns `null` to refuse it.
 
 ```ts
 createStudioHandler({
@@ -78,35 +79,27 @@ A principal is `{ kind, id, scopes? }`. **Absent `scopes` means none, not all.**
 Omitting `authenticate` entirely means the mount is unauthenticated, which is
 only appropriate on loopback.
 
-<Callout label="why not a boolean">
-  The signature is deliberately not `(request) => boolean`. "May this actor do
-  this particular thing" cannot be expressed in one boolean decided per handler,
-  so callers of the boolean version invented their own policy — and what
-  `graft serve` invented was `actor.kind !== "anonymous"`, which admitted every
-  agent to the approve and deny surface.
+<Callout label="Why this is not a true/false setting" type="note">
+  A yes or no per request cannot say what a caller may do, only whether they
+  may do anything. Returning scopes lets Studio allow reads but refuse commits
+  or approvals for the same caller. An earlier yes-or-no version let any signed-in
+  agent approve and deny.
 </Callout>
 
-## State-changing requests
+## Requests that change data
 
-Two checks apply to every `POST` and `PUT`. Either alone has a gap.
+Every `POST` and `PUT` must pass two checks. Together they stop a web page you
+happen to have open from making changes through a Studio running on your
+machine, which asks for no login:
 
-**Origin.** If the request carries an `Origin` header, its **host** must match
-the server's. The scheme is not compared, because the Node adapter synthesizes
-the request URL as `http://<host>` and comparing whole origins rejected every
-legitimate save behind an HTTPS-terminating proxy. `Origin: null` has no host
-and is refused rather than treated as absent.
+- **Same host.** If the request has an `Origin` header, its host must match the
+  server's. `Origin: null` is refused. Only the host is compared, not `http`
+  versus `https`, so saves still work behind a proxy that handles HTTPS.
+- **JSON only.** The request must send `Content-Type: application/json`. A
+  browser cannot send that to another site without first asking permission,
+  which Studio never grants.
 
-**Content type.** `Content-Type: application/json` is required. This is a CSRF
-control as much as a parsing one: `Request.json()` does not care about the
-content type, so a cross-origin `text/plain` POST is a simple request that
-browsers dispatch with no preflight. Requiring JSON forces one.
-
-On a loopback mount there is no authentication by design, so anything that can
-reach `127.0.0.1` can act — including a web page the operator happens to open.
-The response would be unreadable to the attacker, but the side effect already
-happened.
-
-## Deciding approvals
+## Decide an approval
 
 ```sh
 curl -X POST http://127.0.0.1:4983/api/studio/v1/approvals/ap_123/decide \
@@ -117,13 +110,13 @@ curl -X POST http://127.0.0.1:4983/api/studio/v1/approvals/ap_123/decide \
 `decision` must be `"approved"` or `"denied"`. Anything else is
 `INPUT_VALIDATION_FAILED`.
 
-There is no `decidedBy` field, and that absence is the design. The decision is
-attributed to the identity the Studio was **mounted** with, so a caller cannot
-name a decider other than itself and defeat the requester-cannot-decide check.
+There is no field to say who decided. The decision is recorded against the
+identity Studio was set up with (see `decider` below), so a caller cannot name
+someone else as the decider and approve their own request.
 
 Deciding a row that is not pending answers `APPROVAL_INVALID`.
 
-## Committing
+## Commit changes
 
 ```sh
 curl -X POST http://127.0.0.1:4983/api/studio/v1/changes/commit \
@@ -131,9 +124,8 @@ curl -X POST http://127.0.0.1:4983/api/studio/v1/changes/commit \
   -d '{"paths":["docs/tiers.mdx"],"message":"Add the tier page"}'
 ```
 
-Paths are relative to the content directory. Requested paths are intersected
-with the live change set, so this endpoint cannot commit a file the change list
-never contained.
+Paths are relative to the content folder. Only files in the current list of
+changes can be committed, so this endpoint cannot commit an arbitrary file.
 
 An empty message or an empty path list is `INPUT_VALIDATION_FAILED`. A path that
 is not in the current change set is too, and says to reload the list. A project
@@ -154,14 +146,13 @@ GraftErrors throughout, mapped to status codes.
 | 409 | `GIT_UNAVAILABLE`, `COMMIT_FAILED` |
 | 500 | Anything unexpected |
 
-`GIT_UNAVAILABLE` and `COMMIT_FAILED` are 409 rather than 500 because neither is
-a malformed request or a server fault. The repository is in a state that cannot
-satisfy the request.
+`GIT_UNAVAILABLE` and `COMMIT_FAILED` are `409`: the request is fine and the
+server works, but the repository is in a state that cannot do what was asked.
 
 A route id containing malformed percent-encoding is a bad request rather than a
 server error, and says so.
 
-## Mounting it yourself
+## Mount it yourself
 
 `createStudioApiHandler` gives you the API alone. `createStudioHandler` adds the
 SPA.
@@ -187,36 +178,29 @@ const handler = createStudioHandler({
 | `projectRoot` | Where `graft/` lives, for the project's editor component declarations. Defaults to the content directory's parent |
 | `mdxTrust` | Governs the whole-tree recompile that follows a save |
 | `defaultBranch` | Branch used for compile and the tree default |
-| `decider` | Identity approval decisions are attributed to. A value or a function. **Defaults to `{ kind: "human", id: "studio" }`** — set it, or every decision in the audit trail names the same generic identity |
+| `decider` | Identity approval decisions are attributed to when `authenticate` is not configured. A value or a function. **Defaults to `{ kind: "human", id: "studio" }`** |
 | `uiBasePath` | URL prefix for the UI. Empty string serves it at `/` |
 
 API paths are always absolute `/api/studio/v1/*` regardless of `uiBasePath`.
 
-`decider` is resolved from configuration, never from the request — a caller
-cannot name its own decider, which is what the requester-cannot-decide rule
-depends on. It is **not** derived from whatever `authenticate` returned, so an
-embedding that authenticates real people still attributes every approval to the
-one configured identity unless you pass a function:
+An approval is recorded against the caller `authenticate` returns. That is the
+setting that matters when several people share one Studio: return each
+person's own identity from `authenticate`, and the approval history says who
+approved what. A decision is never attributed to a name the request supplies.
 
-```ts
-createStudioApiHandler({
-  // Resolved per call, from your own session — not from anything the caller
-  // sends. The audit row is only as useful as this value.
-  decider: () => ({ kind: "human", id: currentOperator().email }),
-});
-```
+`decider` applies only when `authenticate` is not configured, as on a local
+Studio for one person. When `authenticate` is configured and returns `null`,
+the request is refused with `UNAUTHORIZED`, so nothing falls back to `decider`. If you leave it unset there, decisions are recorded
+against `{ kind: "human", id: "studio" }`, which works with no setup.
 
-The default exists so a local single-operator mount works with no configuration.
-On anything with more than one person behind it, leaving it unset makes the
-approval trail unable to answer who approved what.
-
-The shell redirects to add a trailing slash, so relative asset references
-resolve, and pins `?branch` to the mounted branch. Without that pin,
-`graft serve --studio --branch preview` served the UI for `main`.
+The UI opens on the branch Studio was started on. A `?branch=` in the URL
+picks a different one. The branch-scoped routes, such as the content tree and
+compile, use the started branch only when the URL names none. The compilation
+history is the exception: without `?branch`, it lists every branch.
 
 ## Next steps
 
-- [Studio](/docs/studio) — what the UI does with all of this
-- [Hardening](/docs/hardening) — why decide can fail on a deployment
-- [CLI reference](/docs/cli-reference) — the same operations as commands
-- [MCP tools](/docs/mcp-tools) — and as tools
+- [Studio](/docs/studio) shows what the UI does with all of this.
+- [Hardening](/docs/hardening) explains why decide can fail on a deployment.
+- [CLI reference](/docs/cli-reference) covers the same operations as commands.
+- [MCP tools](/docs/mcp-tools) covers them as tools.

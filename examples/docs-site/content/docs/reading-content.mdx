@@ -1,60 +1,86 @@
 ---
 title: Reading content
-description: Typed reads with sdk-core and the six framework adapters that wrap it.
-section: Build
-order: 2
+description: "Get one document, list a collection, or search it, with the same three typed calls in every framework."
+section: Content
+order: 1
 ---
 
-All reads go through `@usegraft/sdk-core`: `getDocument`, `listDocuments`, and
-`searchDocuments`. Each call re-validates against your Zod schema. Soft-deleted
-index rows are excluded. Framework packages wrap that surface; pick the page
-for the app you are in.
+<p className="kicker">Get a document, list a collection, or search it. The same three calls work in every framework.</p>
 
-<DocCards>
-  <DocCard title="Next.js" href="/docs/next">
-    `@usegraft/sdk-next` — React.cache, MdxBody, withGraft.
-  </DocCard>
-  <DocCard title="Astro" href="/docs/astro">
-    `@usegraft/sdk-astro` — frontmatter, graftRoute, no request memo.
-  </DocCard>
-  <DocCard title="SvelteKit" href="/docs/sveltekit">
-    `@usegraft/sdk-sveltekit` — +page.server.ts, graftRoute.
-  </DocCard>
-  <DocCard title="TanStack Start" href="/docs/tanstack-start">
-    `@usegraft/sdk-tanstack-start` — keep the handle out of isomorphic loaders.
-  </DocCard>
-  <DocCard title="React Router" href="/docs/react-router">
-    `@usegraft/sdk-react-router` — framework mode; action plus loader.
-  </DocCard>
-  <DocCard title="React (browser)" href="/docs/react">
-    `@usegraft/sdk-react` — HTTP only. No db. createGraftHooks.
-  </DocCard>
-</DocCards>
+Once your content is compiled, your app reads it through a Graft client. This
+page covers the three reads you will use everywhere, the options they take, and
+how to read from a branch or from another server.
 
-Mounts, cache tags, and the honest gaps live on
-[SDK reference](/docs/sdk-reference). This page is the index.
+Your framework guide shows where to create the client. Every example below
+assumes one called `graft`.
 
-## Shared API
+## Read one document
+
+`getContent` takes a collection and a slug, and returns the document or
+`null` if it does not exist:
 
 ```ts
-const graft = createGraft({ db, collections, branch: "main" });
+const home = await graft.getContent("pages", "home");
 
-await graft.getContent("pages", "home");       // Document | null
-await graft.listContent("docs");               // Document[]
-await graft.searchContent("docs", "branching"); // ranked hits + snippets
+if (home) {
+  home.data.title; // string, typed from your schema
+  home.body;       // the Markdown or MDX body, as written
+}
 ```
 
-Pass `branch` to resolve overlay or Neon preview branches. See
-[Branching & previews](/docs/branching-previews). Pass `index` instead of `db`
-to read a static SQLite artifact or a remote `graft serve` — the surface does
-not change.
+## List a collection
 
-## Remote runtime
+`listContent` returns every document in a collection. Pass `limit` and
+`offset` to page through a long one:
 
-`createContentApiReader` implements the same `index` seam against a
-`graft serve` process. Every server SDK keeps its existing surface; only the
-transport changes. The endpoint is one branch, so a caller cannot switch a
-production read onto preview content.
+```ts
+const posts = await graft.listContent("posts", { limit: 20, offset: 0 });
+```
+
+## Search a collection
+
+`searchContent` runs a full-text search and returns the best matches first,
+each with a highlighted snippet of the matching text:
+
+```ts
+const hits = await graft.searchContent("docs", "preview branch");
+```
+
+[Search](/docs/search) explains the query syntax and how results are ranked.
+
+Every read checks each document against your schema on the way out. Deleted
+documents are skipped. A document that fails the check is not: the read throws
+`SCHEMA_VALIDATION_FAILED`, naming the document and the field, and a list or
+search that includes it fails as a whole. You never receive a document whose
+fields do not match its type. `graft compile` runs the same check, so this only
+happens when the index was built from files that no longer match the schema.
+
+## Why the names differ outside a framework
+
+The framework packages call these reads `getContent`, `listContent`, and
+`searchContent`. Underneath, they all use `@usegraft/sdk-core`, whose methods
+are named `getDocument`, `listDocuments`, and `searchDocuments`. They take
+the same arguments and return the same types. Use the `sdk-core` names only
+when you call it directly, in a script or a tool with no framework.
+
+## Read from a preview branch
+
+Pass `branch` to any read to get content from a [preview branch](/docs/branching-previews)
+instead of `main`:
+
+```ts
+const page = await graft.getContent("pages", "pricing", { branch: "preview-pricing" });
+```
+
+Branches need the Postgres engine. On the static engine the option is accepted
+and ignored, because each Git checkout compiles its own index.
+
+## Read from another server
+
+Sometimes the app that renders pages cannot open the index itself, for example
+when it runs on a different host from your content. In that case, point the
+client at a [Content API](/docs/content-api) served by `graft serve`. Your
+reads stay exactly the same:
 
 ```ts
 import { createContentApiReader } from "@usegraft/content-api";
@@ -70,5 +96,28 @@ export const graft = createGraft({
 });
 ```
 
-`graft serve` mounts the matching handler at `/api/content/v1/documents` and
-`/api/content/v1/search`. See [Content API](/docs/content-api).
+Each Content API endpoint serves one branch, so a production app cannot be
+switched onto preview content by a request parameter.
+
+## Your framework
+
+<DocCards>
+  <DocCard title="Next.js" href="/docs/next" icon="next">
+    Server Components, MDX rendering, and cache refresh.
+  </DocCard>
+  <DocCard title="Astro" href="/docs/astro" icon="astro">
+    Frontmatter reads with no client JavaScript.
+  </DocCard>
+  <DocCard title="SvelteKit" href="/docs/sveltekit" icon="svelte">
+    Server load functions and server routes.
+  </DocCard>
+  <DocCard title="TanStack Start" href="/docs/tanstack-start" icon="tanstack">
+    Server functions, never isomorphic loaders.
+  </DocCard>
+  <DocCard title="React Router" href="/docs/react-router" icon="react">
+    Framework-mode loaders and resource routes.
+  </DocCard>
+  <DocCard title="React in the browser" href="/docs/react" icon="react">
+    Hooks that read over HTTP.
+  </DocCard>
+</DocCards>

@@ -42,12 +42,21 @@ export const docs = defineCollection({
   // nav so the sidebar, the Studio and agents all sort identically — there is
   // nothing in the documents to infer it from, since `order` restarts inside
   // each section. Unlisted sections sort last, so new content never vanishes.
-  sections: ["Start here", "Build", "Operate", "Reference"],
+  sections: [
+    "Get started",
+    "Frameworks",
+    "Content",
+    "Runtime data",
+    "Agents & MCP",
+    "Deploy & operate",
+    "Reference",
+  ],
   fields: {
     title: field.string({ description: "Doc page title (h1, sidebar label, <title>)." }),
     description: field.string({ description: "One-line summary shown in listings and meta." }),
     section: field.string({
-      description: 'Sidebar group: "Start here", "Build", "Operate", or "Reference".',
+      description:
+        'Sidebar group: "Get started", "Frameworks", "Content", "Runtime data", "Agents & MCP", "Deploy & operate", or "Reference".',
     }),
     order: field.number({ optional: true, description: "Sort order within the section." }),
   },

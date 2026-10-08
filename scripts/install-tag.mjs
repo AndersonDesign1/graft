@@ -174,9 +174,46 @@ const EPHEMERAL = new Set(["npx", "pnpm dlx", "bunx"]);
 
 const want = (runner) => (EPHEMERAL.has(runner) ? "@latest" : "");
 
+/**
+ * The rest of an installer's command: every argument after `npm i`,
+ * `pnpm add` or `yarn add` on the same line, up to a closing backtick.
+ *
+ * INSTALL only sees the first package. `npm i @usegraft/core
+ * @usegraft/db@latest` matched on `core`, and the tag on `db` passed `--check`
+ * untouched. An installer takes any number of packages, and each one follows
+ * the rule. Ephemeral runners are left to INSTALL: the first package is the one
+ * they run, and anything after it is that program's arguments.
+ *
+ * The run starts only where a command does: at the start of a line (after an
+ * optional `$ ` prompt), after an opening backtick, or after a shell separator
+ * (`&&`, `||`, `;`). A bare "npm i" in the middle of a sentence is prose, and
+ * the words after it ("then read @usegraft/db@0.3.0 in the changelog") are not
+ * its arguments. A run's arguments are quoted strings or plain words, and a
+ * plain word stops at a separator, so the next command starts its own run.
+ */
+const INSTALLER_RUN = new RegExp(
+  String.raw`(?<=^[ \t]*(?:\$[ \t]+)?|\x60|(?:&&|\|\||;)[ \t]*)(?:${RUNNERS.filter(
+    (runner) => !EPHEMERAL.has(runner),
+  )
+    .sort((a, b) => b.length - a.length)
+    .join("|")})(?:[ \t]+(?:"[^"\n\x60]*"|'[^'\n\x60]*'|[^\s\x60;|&"']+))+`,
+  "gm",
+);
+/** A package with any tag or range after it: `@beta`, `@1.0.0`, `@^1.0.0`, `@>=1`. */
+const TAGGED_PACKAGE = /(@usegraft\/[a-z-]+)@[~^<>=]*[a-z0-9.*-]+/g;
+/**
+ * A quoted package with a spec, which is how a range with spaces or `||` is
+ * written: `"@usegraft/db@>=1 <2"`. The whole quoted spec goes, and the quotes
+ * with it, since a bare package name needs none.
+ */
+const QUOTED_TAGGED_PACKAGE = /(["'])(@usegraft\/[a-z-]+)@[^"'\n]*\1/g;
+
 /** Apply the rule to one blob of text, in both spellings of a command. */
 const retag = (text) =>
   text
+    .replace(INSTALLER_RUN, (run) =>
+      run.replace(QUOTED_TAGGED_PACKAGE, "$2").replace(TAGGED_PACKAGE, "$1"),
+    )
     .replace(INSTALL, (_match, command, runner) => `${command}${want(runner)}`)
     .replace(JSON_ARGS, (_match, upToPackage, runner) => `${upToPackage}${want(runner)}"`);
 
@@ -210,6 +247,31 @@ const CASES = [
   ["npm install @usegraft/sdk-next", "npm install @usegraft/sdk-next"],
   ["pnpm add @usegraft/core", "pnpm add @usegraft/core"],
   ["yarn add @usegraft/core", "yarn add @usegraft/core"],
+  // Every package an installer names, not only the first.
+  ["npm i @usegraft/core @usegraft/db@latest", "npm i @usegraft/core @usegraft/db"],
+  [
+    "npm i -D @usegraft/cli@beta tsx @usegraft/mcp@latest",
+    "npm i -D @usegraft/cli tsx @usegraft/mcp",
+  ],
+  ["pnpm add @usegraft/core @usegraft/db@1.0.0", "pnpm add @usegraft/core @usegraft/db"],
+  // Ranges are tags too, on any package in the run.
+  ["npm i @usegraft/core @usegraft/db@^1.0.0", "npm i @usegraft/core @usegraft/db"],
+  [
+    "cd app && pnpm add @usegraft/core @usegraft/db@~1.2",
+    "cd app && pnpm add @usegraft/core @usegraft/db",
+  ],
+  ["$ npm i @usegraft/core @usegraft/db@>=1", "$ npm i @usegraft/core @usegraft/db"],
+  // A range with a space or `||` has to be quoted, and the quotes go with it.
+  ['npm i "@usegraft/db@>=1 <2"', "npm i @usegraft/db"],
+  ["pnpm add @usegraft/core '@usegraft/db@1 || 2'", "pnpm add @usegraft/core @usegraft/db"],
+  // Every shell separator starts a new command.
+  ["npm i @usegraft/core; npm i @usegraft/db@^1", "npm i @usegraft/core; npm i @usegraft/db"],
+  ["true || npm i @usegraft/core @usegraft/db@beta", "true || npm i @usegraft/core @usegraft/db"],
+  // The run ends at the inline code span. Prose after it is not the command.
+  [
+    "`npm i @usegraft/core` then read @usegraft/core@0.2.0",
+    "`npm i @usegraft/core` then read @usegraft/core@0.2.0",
+  ],
   [
     '{ "command": "npx", "args": ["-y", "@usegraft/cli", "mcp"] }',
     '{ "command": "npx", "args": ["-y", "@usegraft/cli@latest", "mcp"] }',
@@ -221,6 +283,16 @@ const CASES = [
   // Prose naming a package is not a command, and must survive untouched.
   ["the @usegraft/cli package", "the @usegraft/cli package"],
   ["read @usegraft/core@0.2.0 changelog", "read @usegraft/core@0.2.0 changelog"],
+  // An installer named mid-sentence is prose too: the words after it are not
+  // its arguments.
+  [
+    "Install with npm i @usegraft/core, then read @usegraft/db@0.3.0 in the changelog.",
+    "Install with npm i @usegraft/core, then read @usegraft/db@0.3.0 in the changelog.",
+  ],
+  [
+    "We tested npm install @usegraft/sdk-next with Next 15 and @usegraft/cli@0.2.0.",
+    "We tested npm install @usegraft/sdk-next with Next 15 and @usegraft/cli@0.2.0.",
+  ],
 ];
 
 function selfTest() {

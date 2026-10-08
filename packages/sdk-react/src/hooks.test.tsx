@@ -51,18 +51,20 @@ interface PendingRead {
 /** A reader whose reads hang until the test says otherwise. */
 function controllable() {
   const reads: PendingRead[] = [];
+  const searches: string[] = [];
   const index: Reader = {
     readContent(options) {
       return new Promise((resolve, reject) => {
         reads.push({ slug: options.slug, settle: resolve, fail: reject });
       });
     },
-    async searchContent() {
+    async searchContent(options) {
+      searches.push(options.query);
       return [{ row: row("intro", "Intro"), rank: 0.5, snippet: "<b>Intro</b>" }];
     },
     async close() {},
   };
-  return { reads, graft: createGraft({ index, collections: { docs } }) };
+  return { reads, searches, graft: createGraft({ index, collections: { docs } }) };
 }
 
 describe("useContent", () => {
@@ -111,6 +113,29 @@ describe("useContent", () => {
     expect(result.current.data).toBeUndefined();
     expect(result.current.loading).toBe(true);
     expect(reads).toHaveLength(2);
+  });
+
+  it("does not render the previous document even for one render", async () => {
+    // The assertions above run after effects. This records every render, so a
+    // render that briefly showed the old answer would be caught here.
+    const { reads, graft } = controllable();
+    const hooks = createGraftHooks(graft);
+    const seen: Array<{ slug: string; shown: string | undefined }> = [];
+    const { rerender } = renderHook(
+      ({ slug }) => {
+        const state = hooks.useContent("docs", slug);
+        seen.push({ slug, shown: state.data?.slug });
+        return state;
+      },
+      { initialProps: { slug: "intro" } },
+    );
+    await act(async () => reads[0].settle([row("intro", "Intro")]));
+
+    rerender({ slug: "advanced" });
+
+    expect(seen.filter((render) => render.slug === "advanced").map((r) => r.shown)).not.toContain(
+      "intro",
+    );
   });
 
   it("drops a read that settles after its arguments changed", async () => {
@@ -178,6 +203,90 @@ describe("useContentList and useContentSearch", () => {
 
     expect(result.current.data?.[0].rank).toBe(0.5);
     expect(result.current.data?.[0].snippet).toBe("<b>Intro</b>");
+  });
+
+  it.each(["", "   "])("answers a blank query (%j) with no hits and no request", async (query) => {
+    // A search box starts empty. The content API refuses a blank query, so
+    // asking it would put the box in its error state before anyone typed.
+    const { searches, graft } = controllable();
+    const hooks = createGraftHooks(graft);
+    const { result } = renderHook(() => hooks.useContentSearch("docs", query));
+
+    // Settled on the first render, with no loading flash.
+    expect(result.current.data).toEqual([]);
+    expect(result.current.error).toBeUndefined();
+    expect(result.current.loading).toBe(false);
+
+    await act(async () => result.current.refresh());
+
+    expect(result.current.data).toEqual([]);
+    expect(result.current.loading).toBe(false);
+    expect(searches).toEqual([]);
+  });
+
+  it("searches once the query is no longer blank", async () => {
+    const { searches, graft } = controllable();
+    const hooks = createGraftHooks(graft);
+    const { result, rerender } = renderHook(({ query }) => hooks.useContentSearch("docs", query), {
+      initialProps: { query: "" },
+    });
+
+    rerender({ query: "intro" });
+
+    expect(result.current.loading).toBe(true);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data?.[0].slug).toBe("intro");
+    expect(searches).toEqual(["intro"]);
+  });
+
+  it("does not render the previous hits when the query turns blank with a branch", async () => {
+    // A branch sends a blank query through the handle, so it is not answered
+    // on the spot. Until the handle answers, the hook must report loading, not
+    // the hits for the query the reader just cleared.
+    const { graft } = controllable();
+    const hooks = createGraftHooks(graft);
+    const seen: Array<{ query: string; hits: number | undefined }> = [];
+    const { result, rerender } = renderHook(
+      ({ query, branch }: { query: string; branch?: string }) => {
+        const state = hooks.useContentSearch("docs", query, { branch });
+        seen.push({ query, hits: state.data?.length });
+        return state;
+      },
+      { initialProps: { query: "intro" } as { query: string; branch?: string } },
+    );
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+
+    rerender({ query: "", branch: "main" });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(seen.filter((render) => render.query === "").map((r) => r.hits)).not.toContain(1);
+    expect(result.current.data).toEqual([]);
+  });
+
+  it("shares a frozen empty result, so one caller cannot leak items into another", () => {
+    const { graft } = controllable();
+    const hooks = createGraftHooks(graft);
+    const { result } = renderHook(() => hooks.useContentSearch("docs", ""));
+
+    expect(Object.isFrozen(result.current.data)).toBe(true);
+  });
+
+  it("still refuses a branch on a blank query against an endpoint", async () => {
+    // A blank query skips the read, but a branch is checked by the handle. An
+    // endpoint pins its branch, so the option has to fail now, not once the
+    // reader types.
+    const graft = createGraft({
+      endpoint: "http://cms.test/api/content/v1",
+      collections: { docs },
+      fetch: async () => new Response("{}"),
+    });
+    const hooks = createGraftHooks(graft);
+    const { result } = renderHook(() =>
+      hooks.useContentSearch("docs", "", { branch: "preview/redesign" }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error?.message).toMatch(/`branch` cannot be passed to a read/);
   });
 });
 

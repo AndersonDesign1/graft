@@ -1,16 +1,33 @@
 ---
 title: Astro
-description: Frontmatter-only reads, graftRoute mounts, and no request memo.
-section: Build
-order: 4
+description: "Read Graft content in Astro page frontmatter, ship no client JavaScript, and serve functions from Astro routes."
+section: Frameworks
+order: 1
 ---
+
+<p className="kicker">Render Graft content in an Astro site that ships no client JavaScript.</p>
+
+This guide adds Graft to an Astro project. You read content in a page's
+frontmatter, so it is fetched at build or request time and the page ships no
+client JavaScript for it. You can also serve Graft's functions and MCP endpoint
+from Astro routes.
+
+**Before you start**, you need an Astro project and a `graft.config.ts` with
+compiled content. If you do not have those yet, run through
+[Getting started](/docs/getting-started) first.
+
+<Callout label="Prefer to let your agent do it?" type="note">
+  Paste this into your coding agent: "Add Graft to this Astro site following https://graft.page/docs/astro.md. Create the client in src/lib/graft.ts and render the pages collection at src/pages/[slug].astro."
+</Callout>
+
+## Install
 
 <Tabs labels="pnpm, npm, bun">
 
 <Tab>
 
 ```sh
-pnpm add @usegraft/sdk-astro @usegraft/auth @usegraft/mcp
+pnpm add @usegraft/sdk-astro @usegraft/db
 ```
 
 </Tab>
@@ -18,7 +35,7 @@ pnpm add @usegraft/sdk-astro @usegraft/auth @usegraft/mcp
 <Tab>
 
 ```sh
-npm i @usegraft/sdk-astro @usegraft/auth @usegraft/mcp
+npm i @usegraft/sdk-astro @usegraft/db
 ```
 
 </Tab>
@@ -26,22 +43,23 @@ npm i @usegraft/sdk-astro @usegraft/auth @usegraft/mcp
 <Tab>
 
 ```sh
-bun add @usegraft/sdk-astro @usegraft/auth @usegraft/mcp
+bun add @usegraft/sdk-astro @usegraft/db
 ```
 
 </Tab>
 
 </Tabs>
 
-Build the handle once in a server-only module, then import it from frontmatter,
+Create the client once in a server-only module, then import it from frontmatter,
 endpoints, and middleware. Never from a client island.
 
-## Create the handle
+## Create the Graft client
 
 `graft init` scaffolds the static index. This docs site is that path:
 
+<CodeBlock title="src/lib/graft.ts">
+
 ```ts
-// src/lib/graft.ts
 import { openStaticIndex } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-astro";
 import { collections } from "../../graft.config";
@@ -51,6 +69,8 @@ export const graft = createGraft({
   collections,
 });
 ```
+
+</CodeBlock>
 
 On Postgres:
 
@@ -63,30 +83,51 @@ export const db = createDb(process.env.DATABASE_URL!).db;
 export const graft = createGraft({ db, collections });
 ```
 
-## Read one document
+## Read a document
+
+<CodeBlock title="src/pages/[slug].astro">
 
 ```astro
 ---
-// src/pages/[slug].astro
 import { graft } from "../lib/graft";
 
 const page = await graft.getContent("pages", Astro.params.slug!);
 ---
 ```
 
-Astro frontmatter is server-side unconditionally — the only adapter here that
-is. There is no request-level memo, because `React.cache` has no Astro
-equivalent. Reads go straight to the index, which is the right default:
-prerendered pages read at build time, and an SSR page makes a handful of reads.
+</CodeBlock>
 
-## Mount functions and MCP
+Astro frontmatter always runs server-side. No other adapter can promise that.
+Unlike Next.js, Astro has no built-in way to share one read across a request,
+so reading the same document twice reads the index twice. That is rarely worth
+worrying about: prerendered pages read once at build time, and a server-rendered
+page makes only a few reads.
+
+<Callout label="Rendering the body" type="warning">
+  Bodies come back as authored source. Render them with Astro's own MDX pipeline.
+  There is no `MdxBody` here. That evaluator is Next-only.
+</Callout>
+
+## Serve functions and MCP from your app
+
+This step is optional, and it needs the Postgres engine: functions and the
+audit log they write live in the database. The routes below import the `db`
+exported by the Postgres version of `src/lib/graft.ts` above. The static setup
+exports no `db`, so these routes do not work on it.
+
+It also needs three more packages:
+
+```sh
+npm i @usegraft/core @usegraft/auth @usegraft/mcp
+```
 
 `graftRoute` binds a Graft handler to an Astro endpoint. It takes the handler,
 not a config object: Astro hands over an `APIContext`, and the handlers want
 its `request`.
 
+<CodeBlock title="src/pages/api/fn/[name].ts">
+
 ```ts
-// src/pages/api/fn/[name].ts
 import { createFunctionsHandler } from "@usegraft/core";
 import { graftRoute } from "@usegraft/sdk-astro";
 import { functions } from "../../../graft.config";
@@ -98,22 +139,29 @@ export const POST = graftRoute(handler);
 export const GET = graftRoute(handler); // 405s with Allow and a fix
 ```
 
+</CodeBlock>
+
+<CodeBlock title="src/pages/api/mcp.ts">
+
 ```ts
-// src/pages/api/mcp.ts
 import { createActorResolver } from "@usegraft/auth";
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftRoute } from "@usegraft/sdk-astro";
 import { collections, functions } from "../../graft.config";
 import { db } from "../lib/graft";
 
+// A dev token never expires, so it is accepted only in development. An unset
+// NODE_ENV counts as production, so a deploy that forgets it stays closed.
+const devToken = process.env.NODE_ENV === "development" ? process.env.GRAFT_DEV_TOKEN : undefined;
+
 const actor = createActorResolver({
   issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
     .split(/[,\s]+/)
     .filter(Boolean)
     .map((issuer) => ({ issuer })),
-  devTokens: process.env.GRAFT_DEV_TOKEN
+  devTokens: devToken
     ? {
-        [process.env.GRAFT_DEV_TOKEN]: {
+        [devToken]: {
           kind: "human",
           id: "owner",
           scopes: ["content:write"],
@@ -133,22 +181,30 @@ export const POST = graftRoute(
 );
 ```
 
+</CodeBlock>
+
 This endpoint serves content writes and asset uploads. JWT verification runs
 only when `issuers` is passed; the library does not read
 `GRAFT_TRUSTED_ISSUERS` (`graft serve` does). See [Auth](/docs/auth).
 Unauthenticated callers get 401. `allowAnonymous: true` is only for a
-loopback local server — never on anything reachable from a network. A public
+loopback local server. Never anything reachable from a network. A public
 docs surface is [`createDocsMcpHandler`](/docs/docs-mcp), which has no write
 tools and no anonymous opt-in.
 
 The parameter is typed structurally as `{ request: Request }`, so this package
 needs no `astro` dependency.
 
-## Cache and invalidation
+## Refresh pages when content changes
 
-Astro has no tag-based data cache. Stamp `tagsFor(...)` into a CDN
-surrogate-key header on SSR responses, and purge
-`tagsForChanges(branch, changeSet)` from your compile webhook.
+<TierBadge tier="postgres" />
+
+On the static engine, content changes ship with a new deploy, so there is
+nothing to refresh. On Postgres, content can change while your app is running,
+from Studio or from an agent. Astro has no tag-based data cache, so let your
+CDN cache pages and purge only the ones whose content changed.
+
+First, send each page with a header that lists the content it read. `tagsFor`
+builds that list:
 
 ```astro
 ---
@@ -161,15 +217,33 @@ Astro.response.headers.set("Cache-Tag", tagsFor("main", "pages", slug).join(",")
 ---
 ```
 
-`Cache-Tag` is the surrogate-key header. Purge the same strings
-`tagsForChanges` returns from your compile webhook. The Postgres handle
-snippet should `export const db` next to `graft` so the mounts above can
-import it.
+Then, when content changes, purge those tags at your CDN.
+`tagsForChanges(branch, changes)` turns a change list into the tags to purge:
+each changed document, and the collection it is in. Graft does not purge your
+CDN for you. Do it from your own route, called with the change list.
 
-## The caveat you cannot infer
+The change list comes from two places. An agent's `write_content` call returns
+it as `changes`. `graft compile --json` prints it too, along with the branch.
+In a deploy script, send it to your route. The script stops if the compile
+fails, and `--fail` makes a refused request fail the script too:
 
-Bodies come back as authored source. Render them with Astro's own MDX pipeline.
-There is no `MdxBody` here — that evaluator is Next-only.
+```sh
+graft compile --json > changes.json || exit 1
+curl --fail -X POST https://example.com/api/revalidate \
+  -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" \
+  -H "content-type: application/json" \
+  --data-binary @changes.json
+```
 
-See [SDK reference](/docs/sdk-reference) for mounts across adapters and the
-honest gaps.
+Your route reads `branch` and `changes` from the body and passes them to
+`tagsForChanges`.
+
+`Cache-Tag` is the header Cloudflare reads, with tags separated by commas.
+Fastly reads `Surrogate-Key`, with tags separated by spaces. Use the header
+your CDN expects.
+
+## Next steps
+
+- [Reading content](/docs/reading-content) covers list and search reads.
+- [SDK reference](/docs/sdk-reference) compares route mounts across frameworks.
+- [Connecting agents](/docs/connecting-agents) points an agent at your project.

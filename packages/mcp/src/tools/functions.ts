@@ -7,7 +7,7 @@ import { GraftError } from "@usegraft/contracts";
 import { z } from "zod";
 import { invokeFunctionWithApproval } from "../tool-helpers";
 import { guarded } from "../tool-result";
-import { DESTROYS } from "./annotations";
+import { RUNS_PROJECT_CODE } from "./annotations";
 import type { RegisterTools } from "./deps";
 
 export const registerFunctionTools: RegisterTools = (server, deps) => {
@@ -17,7 +17,7 @@ export const registerFunctionTools: RegisterTools = (server, deps) => {
     "run_function",
     {
       title: "Run a typed function",
-      annotations: DESTROYS,
+      annotations: RUNS_PROJECT_CODE,
       description:
         "Invoke a defineFunction by name with a JSON input object. Same pipeline as POST /api/fn/<name>: Zod validation, access rules, rate limits, audit log, and the human gate for destructive ops. The server may already act with a configured identity (graft mcp uses GRAFT_DEV_TOKEN; over HTTP your connection's bearer is forwarded) — only pass authorization to override it. Pass approval after a human runs `graft approve <id>` for gated calls — or, where the server has opted into elicited approvals and your client supports elicitation, expect to be asked to confirm in-band and the call completes in one step. The gate is the same either way. Success returns { data, correlationId }; failures are GraftError JSON with a fix.",
       inputSchema: {

@@ -116,11 +116,13 @@ describe("tool annotations", () => {
     expect(write?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
   });
 
-  it("claims no open world: the domain is the collections the project declares", async () => {
+  it("claims no open world except for run_function, which runs the project's own code", async () => {
     const { tools } = await client.listTools();
 
     for (const tool of tools) {
-      expect(tool.annotations?.openWorldHint, tool.name).toBe(false);
+      // A function can call any external service, so run_function cannot
+      // promise a closed world. Everything else stays inside the project.
+      expect(tool.annotations?.openWorldHint, tool.name).toBe(tool.name === "run_function");
     }
   });
 

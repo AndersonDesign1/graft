@@ -1,19 +1,30 @@
 ---
 title: Observability
-description: Correlation ids, the audit log, the compilation trail, and what /healthz reports.
-section: Operate
-order: 12
+description: "Trace a user's problem to the exact call, see what each compile changed, and check that your deployment is healthy."
+section: Deploy & operate
+order: 4
 ---
 
-Graft records what happened in three tables and one endpoint. All of them are
-readable with ordinary SQL, and the ones an agent needs are also on MCP and the
-CLI.
+<p className="kicker">Find out what happened when a user reports a problem.</p>
 
-## Correlation ids
+<TierBadge tier="postgres" />
 
-Every function response carries `x-graft-correlation-id`, on success and on
-failure. It is the join key between a user's report, your logs, and the audit
-row.
+A user says the contact form failed. This page walks you from that report to
+the exact call, who made it, which version of your code handled it, and how it
+ended. Then it covers spotting patterns across many calls, seeing what each
+compile changed, and health checks.
+
+Everything here is stored in ordinary Postgres tables, so you can read it with
+SQL. The parts an agent needs are also available over MCP and the CLI.
+
+## Trace one failed call
+
+<Steps>
+
+<Step title="Get the correlation id">
+
+Every function response carries an `x-graft-correlation-id` header, whether the
+call worked or failed:
 
 ```sh
 curl -i -X POST https://cms.example.com/api/fn/submitContact \
@@ -22,40 +33,62 @@ curl -i -X POST https://cms.example.com/api/fn/submitContact \
 # x-graft-correlation-id: 4f1c…
 ```
 
+Show it in your app's error message, or log it, so a user's report can include
+it.
+
+</Step>
+
+<Step title="Look it up in the audit log">
+
 ```sql
 select * from audit_log where correlation_id = '4f1c…';
 ```
 
-There is an index on `correlation_id`, so that lookup is cheap.
+The lookup is indexed, so it is fast even on a large log.
 
-## The audit log
+</Step>
 
-One row per invocation, written whatever the outcome.
+<Step title="Read the row">
+
+The row tells you who called, what ran, how it ended, and which commit of your
+code served it. The next section lists every column.
+
+</Step>
+
+</Steps>
+
+## What the audit log records
+
+One row for every function call, whatever the outcome:
 
 | Column | What it holds |
 | --- | --- |
 | `correlation_id` | The id returned in the response header |
-| `branch_id` | Which content branch the call targeted |
 | `function_name`, `function_kind` | What ran |
-| `actor_kind`, `actor_id` | Who ran it. `actor_id` is null for anonymous |
-| `rate_key` | What the rate limit counted against: actor id, or client IP |
-| `status` | `"ok"`, or the GraftError code it failed with |
+| `actor_kind`, `actor_id` | Who ran it. `actor_id` is `NULL` for anonymous callers |
+| `status` | `"ok"`, or the error code it failed with |
 | `duration_ms` | How long it took |
-| `git_sha` | The commit of the serving code, or null |
+| `git_sha` | The commit of the code that served it |
+| `branch_id` | Which content branch the call ran on |
+| `rate_key` | What the rate limit counted: the caller's id, or their IP |
 | `created_at` | When |
 
-Inputs are not recorded. The row says who ran what and how it went. If you need
-the exact input of a gated call, it is on the `approvals` row, which is what
-binds a decision to one invocation.
+The inputs are not recorded, so the log never holds a copy of your users'
+data. If you need the exact input of a call that waited for approval, it is on
+that call's row in the `approvals` table.
 
-### The row exists before the call runs
+A row is written even when the call is refused, for example for bad input or
+a missing permission. Graft writes the row as soon as it knows who is calling,
+then fills in the result.
 
-It is reserved as soon as the caller is known, then settled with its outcome.
-That ordering is what makes rate limiting immune to concurrency, and it means a
-refused call still leaves a row. A caller who fails validation twenty times
-produced twenty rows.
+`git_sha` comes from `VERCEL_GIT_COMMIT_SHA` or `GITHUB_SHA` when your platform
+sets them, and `graft serve` reads it from the local checkout. It answers
+"which deploy did this?" without searching your logs.
 
-Useful consequence: `status` is a census of your failure modes.
+## Spot patterns across calls
+
+Because refused calls are logged too, `status` shows how your functions fail.
+For example, the errors from the last day:
 
 ```sql
 select status, count(*)
@@ -65,43 +98,33 @@ group by status
 order by count(*) desc;
 ```
 
-### Which code served it
+## See what each compile changed
 
-`git_sha` is stamped from the environment, defaulting to
-`VERCEL_GIT_COMMIT_SHA` or `GITHUB_SHA` when present, and `graft serve` resolves
-it from the local checkout. It answers "which deploy did this" without a log
-correlation exercise.
+The `compilations` table records every compile: the branch, the Git commit it
+read, the number of documents, and how many it added, changed, and removed.
 
-## The compilation trail
-
-`compilations` records every projection: the branch, the git SHA it read,
-document count, and how many documents were added, changed, and removed.
-
-| Surface | Call |
+| Where | How |
 | --- | --- |
 | CLI | `graft compilations` |
 | MCP | `list_compilations` |
 | Studio | The History view |
 | HTTP | `GET /api/studio/v1/compilations` |
 
-The git SHA on each row is what makes revert possible: a compilation knows the
-tree it saw, so restoring it restores real files. See
-[Studio](/docs/studio#revert-from-a-compilation).
+Each row records the Git commit it compiled, so you can restore your content to
+exactly how it was then. See [Studio](/docs/studio#revert-from-a-compilation).
 
-## Approvals as a record
+## Review past approvals
 
-The `approvals` table is an audit surface in its own right. Every destructive
-call that was gated leaves a row with the requester, the exact input, the
-decision, and who decided.
-
-`decided_role` is stamped server-side from `current_user`, so it records which
-database credential decided rather than which one claimed to. See
+The `approvals` table is a record in its own right. Every destructive call that
+waited for approval has a row with who asked, the exact input, the decision,
+and who decided. Which database login made the decision is recorded by the
+database itself, so it cannot be faked by the app. See
 [Hardening](/docs/hardening).
 
-## Health checks
+## Check the server is healthy
 
-`graft serve` answers `GET /healthz`. It is not a static 200: it runs a real
-database round-trip first.
+`graft serve` answers `GET /healthz`. It makes a real round trip to the
+database before answering:
 
 ```json
 {
@@ -113,42 +136,37 @@ database round-trip first.
 }
 ```
 
-A failed round-trip answers 503 with `{ "ok": false, "error": "…" }`.
+If the database does not answer, it returns `503` with
+`{ "ok": false, "error": "…" }`. Point your platform's health check at it. The
+`gitSha` field also confirms which build is live.
 
-Point your platform's liveness probe at it. The `gitSha` field also makes it a
-cheap way to confirm which build is live.
+## Keep the log a manageable size
 
-## What Graft does not do
-
-- **No log shipping.** Handlers write to stdout. Collect it however your
-  platform does.
-- **No metrics endpoint.** The audit log is the source; aggregate it with SQL or
-  export it.
-- **No tracing.** The correlation id is the thread to follow, and it is yours to
-  propagate into your own spans if you run them.
-
-Audit writes are best-effort in one specific sense: a failure to write the row is
-logged to stderr with the correlation id rather than failing the call. Losing
-the record of a successful call is bad, and failing a user's request because the
-bookkeeping failed is worse.
-
-## Retention
-
-Graft never deletes audit rows. On a busy deployment that grows, and rate
-limiting only ever reads recent rows, so old ones are dead weight.
-
-Trim them on your own schedule, keeping whatever your compliance needs require:
+Graft never deletes audit rows. On a busy site the table grows, and rate limits
+only read recent rows. Delete old ones on your own schedule, keeping whatever
+your compliance rules require:
 
 ```sql
 delete from audit_log where created_at < now() - interval '90 days';
 ```
 
-A hardened runtime role cannot run that. It is operator work, which is the
-intended answer.
+Run it with the operator login. A [hardened](/docs/hardening) app login cannot
+delete audit rows, on purpose.
+
+## What Graft leaves to your platform
+
+- **Logs.** Graft writes to standard output. Collect it the way your host does.
+- **Metrics.** There is no metrics endpoint. The audit log is the source, so
+  aggregate it with SQL or export it.
+- **Tracing.** Graft does not emit traces. Pass the correlation id into your own
+  spans if you use tracing.
+
+If writing an audit row fails, Graft logs the failure with the correlation id
+and still completes the call. Failing a user's request because the record could
+not be written would be worse than missing one record.
 
 ## Next steps
 
-- [Audit & approvals](/docs/audit-and-approvals) — what the log is for
-- [Rate limits](/docs/rate-limits) — the other job these rows do
-- [Hardening](/docs/hardening) — which credential may write what
-- [Deploy](/docs/deploy) — where `/healthz` lives
+- [Audit & approvals](/docs/audit-and-approvals) explains what the log is for.
+- [Rate limits](/docs/rate-limits) covers the other job these rows do.
+- [Deploy](/docs/deploy) shows where `/healthz` lives.

@@ -1,27 +1,53 @@
 ---
 title: Operational data
-description: db-authoritative collections and the record helpers that read and write them.
-section: Build
-order: 14
+description: "Store data your users create at runtime, such as form submissions, orders, and comments, and read it back safely."
+section: Runtime data
+order: 0
 ---
+
+<p className="kicker">Save what your visitors submit, and read it back with the same types as your content.</p>
 
 <TierBadge tier="postgres" />
 
-Some data is not content. Form submissions, orders, and comments are written by
-users at runtime, not authored in git, and git cannot rebuild them.
+Your site has a contact form. When a visitor submits it, the message has to be
+saved somewhere. It cannot be a Markdown file in Git: nobody wrote it ahead of
+time, and there is no file to rebuild it from. Graft calls data like this,
+created by your users while the site is running, **operational data**.
 
-Graft calls that operational data. It lives in Postgres, in `data_records`, and
-it is reachable only through typed functions.
+Operational data lives in Postgres. Your app never writes it directly. It goes
+through a **typed function** you define, which checks the input against a
+schema, records who sent it, and applies your access rules and rate limits.
 
-## Declaring a collection
+By the end of this page you will have a contact form that saves submissions, a
+query that lists them for your team, and a picture of what changes when you add
+moderation, edits, and deletes.
 
-One flag separates it from authored content.
+## How operational data differs from content
+
+| | Content | Operational data |
+| --- | --- | --- |
+| Example | A pricing page | A contact-form submission |
+| Stored as | A file in `content/` | A row in Postgres |
+| Written by | You and agents, by editing files | Your users, through typed functions |
+| Read by | Your pages, search, and agents | Typed functions only |
+| Declared as | A normal collection | A collection with `authority: "db-authoritative"` |
+
+Graft keeps the two apart. A Markdown file in an operational collection's folder
+fails the compile, and an agent cannot write operational data with
+`write_content`. Both stop with `AUTHORITY_MISMATCH`, which tells you which
+collection is involved.
+
+## Declare a collection
+
+Declare it like any other collection, plus one flag:
+
+<CodeBlock title="graft.config.ts">
 
 ```ts
 export const submissions = defineCollection({
   name: "submissions",
   authority: "db-authoritative",
-  description: "Landing-page contact submissions. Write via submitContact.",
+  description: "Contact-form submissions. Written by submitContact.",
   fields: {
     email: field.string({
       maxLength: 320,
@@ -33,105 +59,18 @@ export const submissions = defineCollection({
 });
 ```
 
-The schema does the same job it does for content: it types the function's input,
-validates on the way in, and re-validates on the way out.
+</CodeBlock>
 
-Bound your fields. An anonymous form writing into an unbounded `jsonb` column is
-a storage-exhaustion vector no rate limit fixes.
+Give every field a maximum length. Anyone on the internet can submit a public
+form, and an unbounded field lets them fill your database, however strict your
+rate limit is.
 
-## The two authorities never mix
+## Save a submission from a function
 
-| | `file-authoritative` (default) | `db-authoritative` |
-| --- | --- | --- |
-| Lives in | `content/<collection>/<slug>.mdx` | `data_records` |
-| Written by | Compile, `write_content`, Studio | Typed functions only |
-| Read by | The SDKs, search, MCP | Typed functions only |
+A typed function receives the form's input, already checked against the
+schema, and saves it with `insertRecord`:
 
-Crossing the line fails at every boundary that could catch it:
-
-- A `.mdx` file in a db-authoritative collection's folder fails compile with
-  `AUTHORITY_MISMATCH`.
-- `write_content` and `delete_content` refuse a db-authoritative collection with
-  the same code, and point at the function endpoint.
-- A record helper aimed at a file-authoritative collection refuses too.
-
-## The record helpers
-
-Handlers call these. They enforce authority, validate against the collection's
-Zod schema, and stamp actor and correlation id on every row.
-
-Pass the handler's `ctx` straight through as the first argument.
-
-### insertRecord
-
-```ts
-const record = await insertRecord(ctx, submissions, ctx.input);
-// → { id, branch, collection, data, actorKind, actorId, correlationId, createdAt }
-```
-
-Validates, then inserts. The returned `data` is typed by the collection.
-
-### listRecords
-
-```ts
-const rows = await listRecords(ctx, comments, {
-  limit: 20,
-  match: { pageSlug: "pricing", approved: true },
-});
-```
-
-Newest first, re-validated on read.
-
-`limit` defaults to 50 and is clamped to 500. It is clamped rather than trusted
-because it routinely comes from a function input, and an unclamped one reaches
-Postgres directly.
-
-`match` applies equality filters **in SQL**, and using it is a correctness
-matter rather than a performance one. The row cap applies to the scan, so rows
-that do not match still consume the window. A public "list approved comments"
-that filtered in JavaScript could be emptied site-wide by posting enough newer
-unapproved rows to fill it.
-
-### updateRecord
-
-```ts
-const updated = await updateRecord(ctx, orders, id, { status: "shipped" });
-```
-
-A partial patch, merged and then validated against the full schema. An update
-that would violate the schema fails with `SCHEMA_VALIDATION_FAILED` and writes
-nothing.
-
-This is the moderation and status-change primitive: approve a comment, advance
-an order.
-
-### deleteRecord
-
-```ts
-const removed = await deleteRecord(ctx, submissions, id);
-// → { id, data }
-```
-
-<Callout label="irreversible">
-  `deleteRecord` is a hard delete. There is no tombstone, no soft-delete column,
-  and git does not restore it, because git never had it. Mark any function that
-  calls this `destructive: true`.
-</Callout>
-
-### searchRecords
-
-```ts
-const hits = await searchRecords(ctx, submissions, 'refund "order 41" -spam');
-```
-
-Full-text over every string value in the record's `data`. Same websearch syntax
-as content search: words, `"quoted phrases"`, `or`, and `-exclusions`.
-
-Search is a read, so it stays behind the typed-function boundary and
-re-validates rows on the way out. There is deliberately no open MCP or HTTP
-surface for searching operational data.
-
-## A complete function
+<CodeBlock title="graft.config.ts">
 
 ```ts
 export const submitContact = defineFunction({
@@ -149,33 +88,29 @@ export const submitContact = defineFunction({
 });
 ```
 
-`input: submissions.fields` reuses the collection's fields as the function's
-input schema, so the two cannot drift.
+</CodeBlock>
 
-`public: true` is the greppable opt-out of the anonymous-mutation deny default.
-Without it, this endpoint would refuse the anonymous visitors a contact form
-exists for.
+Three lines in it are worth a closer look:
 
-## Branches and operational data
+- **`input: submissions.fields`** reuses the collection's fields as the
+  function's input, so the form and the stored row can never disagree.
+- **`public: true`** lets visitors who are not signed in call it. Functions that
+  write data refuse anonymous callers unless you say otherwise.
+- **`rateLimit`** allows each caller five submissions a minute. See
+  [Rate limits](/docs/rate-limits).
 
-Preview branches inherit **content**, never operational data. Both backends
-arrive at that, by different routes:
+Your form posts to `POST /api/fn/submitContact`. Every saved row also records
+who sent it and a correlation id, so you can trace it later in the
+[audit log](/docs/observability).
 
-- **Overlay** branches read data at the exact branch, so a branch simply has no
-  rows until something writes them.
-- **Neon** forks copy storage, so `data_records` and `approvals` are cleared on
-  create. `audit_log` stays, because that is history.
+## List submissions for your team
 
-Approvals are cleared for a specific reason: a one-shot approval consumed on a
-fork would not mark the parent's copy consumed, which would let one gated
-destructive call execute once per fork.
+There is no read SDK for operational data, on purpose: every read goes through
+a function, so who may read is decided in the same place as who may write. The
+defaults differ, though: a query is open to anyone until you give it an
+`access` rule. Write a **query** function with one:
 
-The result is that a preview shows you the site's shape, not a copy of
-production users.
-
-## Reading it in a page
-
-There is no read SDK for operational data. Write a query function and call it:
+<CodeBlock title="graft.config.ts">
 
 ```ts
 export const recentSubmissions = defineFunction({
@@ -191,12 +126,89 @@ export const recentSubmissions = defineFunction({
 });
 ```
 
-Queries are open by default, so a query returning anyone's data needs an
-`access` rule. That is the one default worth double-checking in your own config.
+</CodeBlock>
+
+<Callout label="Queries are open by default" type="warning">
+  Unlike mutations, query functions accept anonymous callers unless you add an
+  `access` rule. Any query that returns personal data, like this one, needs one.
+  [Auth](/docs/auth) explains scopes.
+</Callout>
+
+`listRecords` returns the newest rows first. `limit` defaults to 50 and is
+capped at 500, because it often comes straight from a caller's input.
+
+## Filter in the query, not afterwards
+
+Suppose a page lists approved comments. Use `match` so the database does the
+filtering:
+
+```ts
+const approved = await listRecords(ctx, comments, {
+  limit: 20,
+  match: { pageSlug: "pricing", approved: true },
+});
+```
+
+This matters for correctness, not just speed. The limit applies before any
+filtering you do in JavaScript. If you fetched the 20 newest comments and then
+dropped the unapproved ones, anyone could hide every approved comment by posting
+20 new unapproved ones.
+
+## Search submissions
+
+`searchRecords` runs a full-text search over every text value in a record,
+with the same syntax as [content search](/docs/search): words,
+`"quoted phrases"`, `or`, and `-exclusions`.
+
+```ts
+const hits = await searchRecords(ctx, submissions, 'refund "order 41" -spam');
+```
+
+Like every read, it only runs inside a function. Graft has no open search
+endpoint for operational data.
+
+## Change or remove a record
+
+To approve a comment or mark an order shipped, use `updateRecord`. It merges
+your change into the record and checks the result against the full schema. A
+change that would break the schema fails with `SCHEMA_VALIDATION_FAILED` and
+writes nothing.
+
+```ts
+const updated = await updateRecord(ctx, orders, id, { status: "shipped" });
+```
+
+To remove a record, use `deleteRecord`:
+
+```ts
+const removed = await deleteRecord(ctx, submissions, id);
+```
+
+<Callout label="Deletes cannot be undone" type="danger">
+  `deleteRecord` removes the row for good. Git cannot restore it, because Git
+  never had it. Mark any function that calls it `destructive: true`, so it waits
+  for a human [approval](/docs/audit-and-approvals) before it runs.
+</Callout>
+
+## What previews do with this data
+
+[Preview branches](/docs/branching-previews) copy your content, never your
+users' data. A preview shows the site's pages without exposing real
+submissions:
+
+- An **overlay** branch starts with no operational rows at all.
+- A **Neon fork** starts with submissions and approvals cleared. The audit log
+  is kept, because it is history.
+
+Approvals are cleared for a security reason. If a fork kept them, an approval
+used on the fork would still look unused on the original, so one approved
+delete could run once per fork.
 
 ## Next steps
 
-- [Functions & access](/docs/functions-and-access) — the function surface
-- [Rate limits](/docs/rate-limits) — protecting a public mutation
-- [Audit & approvals](/docs/audit-and-approvals) — gating a destructive one
-- [Migrations](/docs/migrations) — backfilling records when the schema changes
+- [Functions & access](/docs/functions-and-access) covers everything a function
+  can declare.
+- [Rate limits](/docs/rate-limits) protects a public form.
+- [Audit & approvals](/docs/audit-and-approvals) puts a human check on deletes.
+- [Migrations](/docs/migrations) updates existing records when the schema
+  changes.

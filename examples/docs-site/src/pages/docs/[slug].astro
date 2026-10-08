@@ -40,12 +40,33 @@ const [tree, bodyHtml] = await Promise.all([docsPageTree(), renderMdx(doc.body)]
 const toc = extractHeadings(doc.body)
   .filter((heading) => heading.depth >= 2 && heading.depth <= 3)
   .map((heading) => ({ title: heading.text, url: `#${heading.id}`, depth: heading.depth }));
+
+/**
+ * The page header: the kicker is the page's one-sentence promise, so it sits
+ * under the title as the lede instead of as the first line of the body. The
+ * Markdown twin keeps it in place (llms.ts reads the source, not this HTML).
+ */
+const KICKER = /^\s*<p class="kicker">([\s\S]*?)<\/p>/;
+const lede = KICKER.exec(bodyHtml)?.[1];
+const body = lede === undefined ? bodyHtml : bodyHtml.replace(KICKER, "");
+
+/** Reading time from the prose, at a plain 230 words a minute, code included. */
+const minutes = Math.max(1, Math.round(doc.body.split(/\s+/).filter(Boolean).length / 230));
+
+/**
+ * When the page's content last changed. The compiled index sets a row's
+ * updatedAt only when its content changes, and the index is committed, so
+ * this is the same date on every build. (Git history was tried first and is
+ * not available in the hosting build's checkout.)
+ */
+const updated = doc.updatedAt.toISOString();
 ---
 
 <DocsRoot
   title={`${doc.data.title} — Graft docs`}
   description={doc.data.description}
   markdownHref={`/docs/${doc.slug}.md`}
+  ogImage={`/og/${doc.slug}.png`}
 >
   <DocsShell
     tree={tree}
@@ -53,9 +74,13 @@ const toc = extractHeadings(doc.body)
     params={Astro.params}
     toc={toc}
     title={doc.data.title}
-    description={doc.data.description}
+    slug={doc.slug}
+    section={doc.data.section}
+    lede={lede}
+    minutes={minutes}
+    updated={updated}
     client:load
   >
-    <div class="prose" set:html={bodyHtml} />
+    <div class="prose" set:html={body} />
   </DocsShell>
 </DocsRoot>

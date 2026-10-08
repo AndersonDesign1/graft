@@ -1,12 +1,17 @@
 /**
- * Content-revalidation webhook — the write side of the Phase 4 cache-tag
- * contract. After `graft compile` runs (CLI, CI, or an agent), POST the branch
- * and the compile's ChangeSet here and the app refreshes exactly the pages that
- * changed:
+ * Content-revalidation route — the write side of the Phase 4 cache-tag
+ * contract. Graft never calls it. After a compile, POST the branch and the
+ * compile's ChangeSet here and the app refreshes exactly the pages that changed.
+ * `graft compile --json` prints that body as-is, so a deploy script pipes it:
+ *
+ *   graft compile --json | curl --fail-with-body -X POST -H "Authorization: Bearer $TOKEN" \
+ *     -H "content-type: application/json" --data-binary @- https://<app>/api/revalidate
+ *
+ * The body (an agent's write_content result carries the same `changes`):
  *
  *   POST /api/revalidate
  *   Authorization: Bearer <GRAFT_DEV_TOKEN or a JWT>
- *   { "branch": "main", "changes": { "added": [...], "changed": [...], "removed": [...], "unchanged": 0 } }
+ *   { "branch": "main", "gitSha": "…", "changes": { "added": [...], "changed": [...], "removed": [...], "unchanged": 0 } }
  *
  * revalidateContent turns the ChangeSet into per-doc + per-collection
  * revalidateTag calls (background revalidation). It is a no-op until the app
@@ -40,7 +45,7 @@ export async function POST(request: Request): Promise<Response> {
         new GraftError({
           code: "UNAUTHORIZED",
           message: "Revalidation requires an authenticated caller.",
-          fix: "Send Authorization: Bearer <GRAFT_DEV_TOKEN or a JWT>. This webhook is machine-to-machine (run after `graft compile`).",
+          fix: "Send Authorization: Bearer <GRAFT_DEV_TOKEN or a JWT>. This route is machine-to-machine (call it after `graft compile --json`).",
         }).toJSON(),
         401,
       );
@@ -56,7 +61,7 @@ export async function POST(request: Request): Promise<Response> {
         new GraftError({
           code: "INPUT_VALIDATION_FAILED",
           message: "Body must be { branch?: string, changes: ChangeSet }.",
-          fix: 'POST the JSON that `graft compile` prints as its ChangeSet, e.g. { "branch": "main", "changes": { "added": ["pages/home"], "changed": [], "removed": [], "unchanged": 2 } }.',
+          fix: 'POST the JSON that `graft compile --json` prints, e.g. { "branch": "main", "changes": { "added": ["pages/home"], "changed": [], "removed": [], "unchanged": 2 } }.',
         }).toJSON(),
         400,
       );

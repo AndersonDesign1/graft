@@ -10,7 +10,9 @@
  * plain async function and composes with either of them.
  *
  * Browser-side. `useEffect` does not run during server rendering, so on the
- * server these hooks render their loading state and nothing else. Data that
+ * server these hooks render their loading state and nothing else. The one
+ * exception is a blank search, which is answered without a read, so it renders
+ * its empty result on the server too. Data that
  * has to be in the HTML belongs in a loader or a server adapter
  * (@usegraft/sdk-react-router, @usegraft/sdk-tanstack-start, and the rest).
  *
@@ -54,9 +56,19 @@ export interface AsyncState<TData> {
 
 type ReadState<TData> = Omit<AsyncState<TData>, "refresh">;
 
-// One shared object, so setting it on mount is a no-op React can bail out of
-// rather than a second render.
+// One shared object, so every render that is still waiting reports the same
+// value.
 const PENDING: ReadState<never> = { data: undefined, error: undefined, loading: true };
+
+// What a search for nothing reports. Shared for the same reason, and so `data`
+// keeps its identity from one render to the next. Frozen because it is shared:
+// a caller that pushed into one blank result would otherwise see the item in
+// every other blank search.
+const NO_HITS: ReadState<never[]> = {
+  data: Object.freeze([]) as never[],
+  error: undefined,
+  loading: false,
+};
 
 function asError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error(String(cause));
@@ -66,20 +78,40 @@ function asError(cause: unknown): Error {
  * Run `read` and report its state, re-running whenever its identity changes.
  * Callers pass a `useCallback` keyed on the read's own arguments, which is what
  * makes "the arguments changed" and "run it again" the same mechanism.
+ *
+ * `settled` is an answer known without asking. While it is set, `read` does
+ * not run and `settled` is what the hook reports. Passing it, rather than
+ * skipping the call, is what keeps the hook unconditional.
+ *
+ * An answer is kept with the read and attempt it answers, and reported only
+ * while those are still current. When the arguments change or `refresh` runs,
+ * the same render reports loading. Resetting in the effect instead left one
+ * render showing the previous arguments' result, for example old hits under a
+ * new query.
  */
-function useRead<TData>(read: () => Promise<TData>): AsyncState<TData> {
+function useRead<TData>(read: () => Promise<TData>, settled?: ReadState<TData>): AsyncState<TData> {
   const [attempt, setAttempt] = useState(0);
-  const [state, setState] = useState<ReadState<TData>>(PENDING);
+  const [answer, setAnswer] = useState<{
+    read: () => Promise<TData>;
+    attempt: number;
+    state: ReadState<TData>;
+  }>();
 
   useEffect(() => {
+    if (settled !== undefined) return;
     let live = true;
-    setState(PENDING);
     read().then(
       (data) => {
-        if (live) setState({ data, error: undefined, loading: false });
+        if (live) setAnswer({ read, attempt, state: { data, error: undefined, loading: false } });
       },
       (cause: unknown) => {
-        if (live) setState({ data: undefined, error: asError(cause), loading: false });
+        if (live) {
+          setAnswer({
+            read,
+            attempt,
+            state: { data: undefined, error: asError(cause), loading: false },
+          });
+        }
       },
     );
     // A read that settles after the arguments changed, or after the component
@@ -89,10 +121,11 @@ function useRead<TData>(read: () => Promise<TData>): AsyncState<TData> {
     return () => {
       live = false;
     };
-  }, [read, attempt]);
+  }, [read, attempt, settled]);
 
   const refresh = useCallback(() => setAttempt((previous) => previous + 1), []);
-  return { ...state, refresh };
+  const current = answer?.read === read && answer.attempt === attempt ? answer.state : PENDING;
+  return { ...(settled ?? current), refresh };
 }
 
 export interface GraftHooks<TCollections extends Record<string, AnyCollection>> {
@@ -115,7 +148,10 @@ export interface GraftHooks<TCollections extends Record<string, AnyCollection>> 
     collection: K,
     options?: ListOptions,
   ) => AsyncState<Document<TCollections[K]>[]>;
-  /** Full-text search within one collection, best-ranked first. */
+  /**
+   * Full-text search within one collection, best-ranked first. A blank query
+   * reports no hits and sends no request.
+   */
   useContentSearch: <K extends keyof TCollections & string>(
     collection: K,
     query: string,
@@ -201,7 +237,13 @@ export function createGraftHooks<TCollections extends Record<string, AnyCollecti
         () => handle.searchContent(collection, query, { branch, limit }),
         [handle, collection, query, branch, limit],
       );
-      return useRead(read);
+      // The content API refuses a blank query, and a search box starts blank.
+      // Nothing matches nothing, so answer here instead of reporting an error
+      // before the reader has typed anything. A `branch` still goes through the
+      // handle, which answers a blank query with [] too but first refuses a
+      // branch it cannot serve, so a bad option is not hidden until someone types.
+      const settled = query.trim() === "" && branch === undefined ? NO_HITS : undefined;
+      return useRead(read, settled);
     },
   };
 }

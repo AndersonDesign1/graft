@@ -46,9 +46,6 @@ interface Beat {
   note?: React.ReactNode;
 }
 
-/** Displayed beat number. Derived from position so a reorder renumbers itself. */
-const num = (i: number): string => String(i + 1).padStart(2, "0");
-
 // The problem leads. The hero states the claim and does not argue it, so the
 // first beat is the argument: why a dashboard is the wrong shape for the thing
 // doing most of the edits. The loop then answers it. Running the loop first
@@ -194,9 +191,6 @@ export function Stage({ compile, selfhost }: { compile: TermLine[]; selfhost: Te
                 <i key={b.id} data-on={i === active} data-done={i < active} />
               ))}
             </div>
-            <span className="stage-frame-count">
-              {num(active)} / {num(BEATS.length - 1)}
-            </span>
           </div>
 
           {/* All panels share one grid cell, so the frame is as tall as the
@@ -222,7 +216,7 @@ export function Stage({ compile, selfhost }: { compile: TermLine[]; selfhost: Te
         {BEATS.map((b, i) => (
           <div className="stage-beat" key={b.id} data-beat={i} data-active={i === active}>
             <p className="section-label">
-              §{num(i)} <em>{b.kicker}</em>
+              <em>{b.kicker}</em>
             </p>
             <h2>{b.head}</h2>
             <p className="section-lede">{b.lede}</p>

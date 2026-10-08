@@ -1,85 +1,106 @@
 ---
 title: What is Graft
-description: The open-source, self-hostable CMS for agents and the people who run them.
-section: Start here
+description: An open-source CMS that keeps your content in Git, types it with your schema, and lets AI agents edit it safely.
+section: Get started
 order: 0
 ---
 
-Content is MDX in git. A Zod schema validates it. A derived index makes it
-queryable. You and your agent work through the CLI and MCP, with no dashboard
-required.
+<p className="kicker">What Graft does, how it works, and where to start reading.</p>
 
-<Callout label="Graft is in beta, and under active development">
-  These docs describe `1.0.0-beta.x`, which is what a plain install gives you.
+Most sites need content that someone other than the developer edits: pages,
+docs, product listings. The usual answer is a hosted CMS, which moves that
+content out of your repository and into someone else's database. You lose diffs,
+review, and branches, and your app reads it back through an API with no types.
 
-  The shape is settled — content in git, a derived index, one Zod schema, CLI
-  and MCP — and the details still move. Breaking changes land between betas when
-  a review or a report argues for one, and several already have: the MDX safety
-  gate, per-route scopes, and `approvalPolicy` moving out of an environment
-  variable into `graft.config.ts` all came from someone reading the code and
-  saying it was wrong. Every one is written up in the changelog.
+Graft keeps the content in your repository as Markdown files. It checks every
+file against a schema you write in TypeScript, builds an index your app can
+query, and gives your components fully typed results. AI agents can edit the
+same files through the Model Context Protocol (MCP), the open standard that
+lets agents use tools, within limits you set.
 
-  So: usable, worth building against, and still changing on purpose. If that is
-  a poor fit, wait for 1.0. If you would rather have a say in what 1.0 becomes,
-  now is when saying so still changes it.
+<Callout label="Beta" type="note">
+  These docs describe `1.0.0-beta.x`. The overall design is settled. Details
+  still change between betas, and every change is listed in the changelog.
 </Callout>
 
-## You'll need
+## How it works
 
-1. Node.js 22.16 or newer. The index's full-text search uses the `node:sqlite`
-   build that ships from 22.16.0.
+```text
+┌────────────────────────┐      ┌────────────────────────┐      ┌────────────────────────┐
+│   Markdown in Git      │ ───► │     graft compile      │ ───► │   Typed reads in app   │
+│  content/pages/*.mdx   │      │  check + build index   │      │  Next.js, Astro, React │
+└────────────────────────┘      └────────────────────────┘      └────────────────────────┘
+            ▲                                                                │
+            │                                                                │
+            └─────────── You (editor, Git, CLI) and agents (MCP) ────────────┘
+```
 
-That is the whole list. `graft compile` writes the index to a SQLite artifact
-your app reads embedded, so a content project runs with no database and no
-object store.
+1. **You write content as files.** Markdown, or MDX (Markdown that can include
+   components), in your project's `content/` folder. You commit, branch, and
+   review it like code.
+2. **`graft compile` checks it and builds an index.** Every file is checked
+   against your schema, and a bad file stops the compile with a message saying
+   what to fix. The index is a searchable copy of your content. Your files stay
+   the source of truth, so the index can be deleted and rebuilt at any time.
+3. **Your app reads typed content.** Graft has a package for each major
+   framework. A read returns the document with types taken from your schema, so
+   your editor knows every field.
+4. **Agents work the same loop.** An agent connected over MCP can draft pages,
+   search content, and read your schema. It uses the same operations you do, so
+   the same checks apply.
 
-Two things need more. Postgres backs operational data, typed functions, and
-copy-on-write branches. An S3-compatible store holds assets. Reach for either
-and Graft says so: a Postgres-tier feature in static mode fails with
-`NEEDS_DATABASE`, whose `fix` is the upgrade. See
-[Getting started](/docs/getting-started#move-to-postgres) and
-[Configuration](/docs/configuration).
+## Static or Postgres?
 
-## Quickstart
+The index lives in one of two storage engines. You write and read content the
+same way on both.
 
-Pick a path:
+| Storage engine | Use it for | What you run |
+| :--- | :--- | :--- |
+| **Static** (what `graft init` sets up) | Blogs, documentation, marketing sites, portfolios | Nothing. The index is a SQLite file built by `graft compile`. |
+| **Postgres** | Sites where users write data at runtime, such as form submissions, comments, and orders. Also preview branches. | A Postgres database. |
+
+Start with static. Switching later is one line in `graft.config.ts`, and
+[Storage engines](/docs/tiers) explains when to switch and how.
+
+## How these docs are organized
+
+- **Get started** explains what Graft is and walks you through a first project.
+- **Frameworks** has one guide per framework, from install to a rendered page.
+- **Content** covers the schema, reading, search, assets, and the editing UI.
+- **Runtime data** covers data your users write, such as form submissions and
+  orders, and who may write it. This needs the Postgres engine.
+- **Agents & MCP** covers connecting agents and every tool they can call.
+- **Deploy & operate** covers hosting, security, previews, and migrations.
+- **Reference** lists every command, setting, API, and error code, plus a
+  [glossary](/docs/glossary) of Graft's terms.
+
+You should be comfortable with TypeScript and with one of the frameworks below.
+You do not need to know Zod, MCP, or Postgres before you start. Each one is
+introduced where you first need it.
+
+## Where to go next
+
+New to Graft? Read [Getting started](/docs/getting-started) next. It takes
+about ten minutes and ends with your content rendered in your app. If you
+already know what you are building, jump straight to it:
 
 <DocCards>
-  <DocCard title="Getting started" href="/docs/getting-started">
-    Init a project, compile MDX, read it typed.
+  <DocCard title="Next.js" href="/docs/next" icon="next">
+    Typed reads in Server Components, MDX rendering, and cache revalidation.
   </DocCard>
-  <DocCard title="Reading content" href="/docs/reading-content">
-    One page per adapter — Next through the browser.
+  <DocCard title="React in the browser" href="/docs/react" icon="react">
+    Hooks that read content over HTTP. No database in the client.
   </DocCard>
-  <DocCard title="Self-host" href="/docs/deploy">
-    One container, split compose, or embed handlers.
+  <DocCard title="Astro" href="/docs/astro" icon="astro">
+    Read content in page frontmatter and ship zero client JavaScript.
   </DocCard>
-  <DocCard title="Agents" href="/docs/agent-surface">
-    MCP tools, self-teaching errors, cold-agent gate.
+  <DocCard title="SvelteKit" href="/docs/sveltekit" icon="svelte">
+    Read in server load functions and mount Graft on a server route.
   </DocCard>
-</DocCards>
-
-## Explore
-
-<DocCards>
-  <DocCard title="The model" href="/docs/the-model">
-    Git owns content. The index is derived.
+  <DocCard title="Securing a deployment" href="/docs/hardening" icon="security">
+    Give your app a database role that cannot approve its own destructive changes.
   </DocCard>
-  <DocCard title="Branching" href="/docs/branching-previews">
-    Copy-on-write overlays or Neon forks.
-  </DocCard>
-  <DocCard title="Owned primitives" href="/docs/owned-primitives">
-    graft add copies source into your repo.
-  </DocCard>
-  <DocCard title="Error reference" href="/docs/errors">
-    Every code, what it means, how to recover.
+  <DocCard title="Connecting an agent" href="/docs/connecting-agents" icon="agent">
+    Point Claude Code, Cursor, or any MCP client at your project.
   </DocCard>
 </DocCards>
-
-## Load-bearing ideas
-
-1. **Git owns authored content.** The index is derived. Recompile if they disagree.
-2. **One Zod layer** types compile, reads, functions, and MCP.
-3. **MCP and the CLI** are first-class. Errors carry a `fix`.
-4. **Preview branches** are copy-on-write.
-5. **Owned primitives** land as source via `graft add`.

@@ -1,0 +1,171 @@
+---
+title: Upgrading
+description: "Move a project to the latest Graft beta, with every breaking change since 0.x and what to change for each."
+section: Reference
+order: 7
+---
+
+<p className="kicker">What changed between versions, and what you need to change.</p>
+
+Graft is in beta. Most releases need nothing from you, but some change a
+default to make it safer, and those can need a change in your project. This
+page lists every change that can break an existing project, newest first, with
+what to do about each one.
+
+## Upgrade your packages
+
+All `@usegraft/*` packages share one version number. Upgrade them together,
+naming every `@usegraft/*` package your project already uses and no others.
+For a Next.js project on Postgres, that might be:
+
+```sh
+npm i @usegraft/core @usegraft/db @usegraft/sdk-next
+npm i -D @usegraft/cli
+```
+
+On another framework, swap `@usegraft/sdk-next` for your adapter, such as
+`@usegraft/sdk-astro`. Mixing versions is not supported. Then run
+`graft compile`. If anything in your project relies on an old behavior, the
+error's `fix` says what to change.
+
+<Callout label="Prefer to let your agent do it?" type="note">
+  Paste this into your coding agent: "Upgrade every @usegraft package in this
+  project to the latest version, following https://graft.page/docs/upgrading.md.
+  Run graft compile and fix anything it reports."
+</Callout>
+
+## Next release
+
+**`@usegraft/sdk-next` needs Next.js 15.5.24 or 16.3.3 or newer.** Those are
+the first releases with fixes for the critical Next.js security advisories
+published in 2026. Older 15.x releases are refused by the peer range.
+
+**What to do:** upgrade Next.js. On 15, `npm i next@15` installs the latest
+15.x. Next.js 14 is not supported: it no longer gets security fixes, and those
+advisories are still open on it.
+
+## 1.0.0-beta.1 and 1.0.0-beta.2
+
+No breaking changes. These releases raise dependency versions past known
+security advisories and fix security findings.
+
+## 1.0.0-beta.0
+
+**The approval policy moved from an environment variable into your config.**
+`GRAFT_APPROVAL_POLICY` is ignored, and `graft serve` warns once at start if it
+is still set. Move it to `graft.config.ts`:
+
+```ts
+// before: GRAFT_APPROVAL_POLICY=unattended in .env
+export const approvalPolicy = "unattended";
+```
+
+An unknown value is refused rather than replaced with a default, so a typo
+cannot quietly weaken the policy. See [Audit & approvals](/docs/audit-and-approvals).
+
+**If you call `createClient` from `@usegraft/sdk-core` directly with a `db`,**
+it no longer takes one. It reads a compiled index (`index`) only. Pass your
+Postgres handle to `createDbClient` from `@usegraft/sdk-core/db` instead:
+
+```ts
+// before: createClient({ db, collections })
+import { createDbClient } from "@usegraft/sdk-core/db";
+
+export const client = createDbClient({ db, collections });
+```
+
+Framework adapters' `createGraft` still accepts either, so app code that goes
+through an adapter needs no change.
+
+Other changes in this release need no action from you, but change behavior:
+
+- An approval used on an unattended call is now marked as used, so it cannot
+  authorize a later call if you tighten the policy.
+- `run_function` over MCP now gets the same default rate limit as
+  `POST /api/fn` under `graft serve`.
+- MDX that cannot be parsed now returns `INPUT_VALIDATION_FAILED` from
+  `write_content` and Studio saves, instead of a plain error.
+
+## From 0.x to 1.0
+
+0.x is deprecated. The 0.2.0 release tightened security defaults, and each item
+below can stop an older project from working until you change it.
+
+### Agents over HTTP need an identity
+
+MCP over HTTP now refuses anonymous callers by default.
+
+- `requireActor` is replaced by `allowAnonymous`, which defaults to `false`.
+- `createGraftMcpHandler` refuses to start with neither an `actor` resolver nor
+  `allowAnonymous: true`.
+- `graft serve` allows anonymous agents only when it listens on your own
+  machine, or when you opt in with `GRAFT_MCP_ALLOW_ANONYMOUS=1`. Use the opt-in
+  only behind your own authenticating proxy: it opens the MCP tools to anyone
+  who can reach the server. `decide_approval` still refuses anonymous callers.
+  `graft serve` warns at start when the opt-in is set and it listens beyond
+  your own machine.
+
+**What to do:** give your HTTP endpoint an `actor` resolver. See
+[Auth](/docs/auth) and [Connecting agents](/docs/connecting-agents).
+
+### Permissions are scopes, not just "signed in"
+
+- `write_content`, `put_asset`, and `delete_content` require the
+  `content:write` scope. `graft mcp` on your own machine has it automatically.
+- Studio routes require `studio:read`, `studio:write`, or `approvals:decide`.
+- Studio's `authorize` option is replaced by `authenticate`, which returns the
+  caller and their scopes.
+
+**What to do:** add the scopes your agents and users need to their tokens. See
+[Studio API](/docs/studio-api) for `authenticate`.
+
+### Approvals are recorded against a verified identity
+
+- `decide_approval` (MCP) no longer accepts `decidedBy`, and the Studio API
+  ignores it.
+- `decideApproval(db, id, decision, decidedBy)` now takes an `ApprovalDecider`.
+- A function that needs approval refuses callers with no stable identity, since
+  nobody could later tell who asked.
+
+**What to do:** remove `decidedBy` from any code that decides approvals.
+
+### Executable MDX is refused
+
+`graft compile` now fails on MDX containing `{…}` expressions, `import`,
+`export`, or spread attributes (`<Card {...props} />`), and on MDX it cannot
+parse.
+
+**What to do:** remove executable MDX from your content, or, if every author
+has commit access to your repository, set `mdxTrust = "full"`. See
+[MDX safety](/docs/mdx-safety).
+
+### Rate limits use the real client address
+
+`x-forwarded-for` is ignored unless you set `trustedProxyHops`, and the old
+`x-graft-peer` header is gone.
+
+**What to do:** behind a proxy or CDN, set `trustedProxyHops` to the number of
+proxies. See [Rate limits](/docs/rate-limits#if-your-app-is-behind-a-proxy-or-cdn).
+
+### Hardened roles need one new permission
+
+The runtime role now needs `UPDATE (status, duration_ms)` on `audit_log`.
+
+**What to do:** run `graft harden <role>` again with the operator login.
+
+### Safer file handling
+
+- `put_asset` over MCP only reads files inside your project, and only on a
+  local server. Remote agents send the file's contents instead.
+- Studio and the registry refuse paths that escape their folders, including
+  through symlinks.
+- The local Studio refuses requests from other sites. See
+  [Studio API](/docs/studio-api#requests-that-change-data).
+
+**What to do:** nothing, unless you relied on reading files outside the
+project.
+
+## Full changelog
+
+Every release's complete notes are in each package's `CHANGELOG.md`, for example
+[`packages/cli/CHANGELOG.md`](https://github.com/AndersonDesign1/graft/blob/main/packages/cli/CHANGELOG.md).

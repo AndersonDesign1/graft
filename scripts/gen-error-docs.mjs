@@ -113,18 +113,20 @@ const page = `---
 title: Error reference
 description: ${quote(`Every Graft error code, what it means, and how to recover. ${codes.length} codes.`)}
 section: Reference
-order: 4
+order: 5
 ---
 
-Every error Graft throws across a package boundary is a \`GraftError\`. It carries
-a \`code\` from this list, a \`message\` saying what happened, and a \`fix\` naming
-the next action. The \`fix\` is specific to the one failure. This page is the
-general lesson behind the code.
+Look up an error code you saw in a terminal, a log, or an agent's tool result.
 
-Agents get the same content without leaving the tool surface: the
-\`explain_error\` MCP tool returns these fields for any code.
+Every Graft error has three parts: a \`code\` from this list, a \`message\` saying
+what happened, and a \`fix\` naming the next step. The \`fix\` in your terminal is
+specific to your failure. The entry on this page explains the general cause, so
+you can tell whether the fix applies or something else is wrong.
 
-There are ${codes.length} codes.
+Agents can read the same entries without leaving their tools: the
+\`explain_error\` MCP tool returns them for any code.
+
+There are ${codes.length} codes, listed alphabetically.
 
 ## Codes
 

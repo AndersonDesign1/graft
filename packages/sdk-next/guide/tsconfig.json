@@ -1,0 +1,18 @@
+{
+  // The Next.js guide's code blocks, type-checked as an app would see them.
+  // next16/ holds the blocks that only exist on Next 16 ('use cache',
+  // cacheTag, cacheComponents). scripts/typecheck-guide.mjs adds them when
+  // the installed Next is 16 or later.
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "jsx": "preserve",
+    "paths": {
+      "@/*": ["./*"],
+      "@usegraft/sdk-next": ["../src/index.ts"],
+      "@usegraft/sdk-next/config": ["../src/next-config.ts"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["next16"]
+}
