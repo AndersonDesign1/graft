@@ -11,7 +11,14 @@
 # builds the workspace itself):
 #   docker build -f deploy/docker/Dockerfile -t graft .
 
-FROM node:24-bookworm AS builder
+# Where the Docker Hub base images come from. The default is Docker Hub itself,
+# so a local, Fly or Railway build is unchanged. CI passes
+# `--build-arg DOCKER_HUB=mirror.gcr.io`, Google's public pull-through mirror:
+# GitHub runners share IPs, so anonymous Docker Hub pulls hit its rate limit
+# (429) and failed the container job over and over on 2026-10-09.
+ARG DOCKER_HUB=docker.io
+
+FROM ${DOCKER_HUB}/library/node:24-bookworm AS builder
 RUN npm install -g pnpm@12.4.2
 WORKDIR /opt/graft
 COPY . .
@@ -44,7 +51,7 @@ FROM cgr.dev/chainguard/minio:latest@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716d
 
 # Runtime rides the official postgres image: its entrypoint owns initdb +
 # role/db bootstrap, we add Node, MinIO, and the built workspace on top.
-FROM postgres:18
+FROM ${DOCKER_HUB}/library/postgres:18
 RUN apt-get update \
   && apt-get install -y --no-install-recommends curl ca-certificates openssl \
   && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
