@@ -17,7 +17,7 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "changeset": "changeset",
-    "version-packages": "changeset version",
+    "version-packages": "changeset version && node scripts/gen-changelog.mjs",
     "release": "pnpm build && changeset publish",
     "version:canary": "changeset version --snapshot canary",
     "release:canary": "pnpm build && changeset publish --tag canary --no-git-tag",
@@ -34,6 +34,8 @@
     "install-tag": "node scripts/install-tag.mjs",
     "check:error-docs": "node scripts/gen-error-docs.mjs --check",
     "docs:errors": "node scripts/gen-error-docs.mjs",
+    "check:changelog": "node scripts/gen-changelog.mjs --check",
+    "docs:changelog": "node scripts/gen-changelog.mjs",
     "coverage": "node scripts/coverage.mjs",
     "coverage:update": "node scripts/coverage.mjs --update"
   },
