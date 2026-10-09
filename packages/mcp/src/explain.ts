@@ -232,6 +232,31 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       'The error\'s `details.stderr` carries git\'s own words. For an unset identity, run `git config user.name "…"` and `git config user.email "…"`. Selected files may already be staged; `git status` shows the current state, and committing from a terminal always remains available.',
   },
+  CONTENT_CONFLICT: {
+    code: "CONTENT_CONFLICT",
+    meaning:
+      "A write or a publish was refused because the document changed underneath it: someone (a person in Studio, an agent over MCP, a developer's push) saved a newer version after this one was read. Nothing was written.",
+    typicalCauses: [
+      "Two people, or two browser tabs, editing the same document",
+      "An agent called write_content on a document a person had open in Studio",
+      "A publish where the production branch changed the same document since the draft began",
+    ],
+    howToRecover:
+      "Read the document again (`details.path`) and reapply the change on the current version. For a publish, `details.conflicts` lists each document; publish again choosing, per document, to keep the draft version or take the published one.",
+  },
+  REMOTE_STORE_FAILED: {
+    code: "REMOTE_STORE_FAILED",
+    meaning:
+      "The content store that writes to a remote repository (GitHub) refused or failed a request. Authored content lives in git, so when the remote cannot be written, the save did not happen.",
+    typicalCauses: [
+      "The token or GitHub App lacks Contents or Pull requests write access to the repository",
+      "GRAFT_GITHUB_REPO or GRAFT_GITHUB_BRANCH names a repository or branch that does not exist",
+      "A branch protection rule forbids direct pushes to the production branch",
+      "GitHub rate limiting or an outage",
+    ],
+    howToRecover:
+      "Read `details.status` and `details.message`, which carry GitHub's own answer. A 401 or 403 is credentials or permissions; a 404 is the repository or branch name; a protected branch needs `GRAFT_STUDIO_PUBLISH=pull-request`. Retry once the cause is fixed: drafts already saved stay on their branch.",
+  },
   STATIC_INDEX_NOT_FOUND: {
     code: "STATIC_INDEX_NOT_FOUND",
     meaning:
