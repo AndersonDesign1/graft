@@ -42,10 +42,12 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
     [schema.data, collection],
   );
   const headline = titleField(fields);
-  const readOnly = workspace.data ? !workspace.data.canWrite : false;
+  const canWrite = workspace.data ? workspace.data.canWrite : true;
   const remote = workspace.data?.storage === "github";
 
   const [entry, setEntry] = useState<EntryDto | null>(null);
+  // A deleted entry shows its published copy, to read or restore, not to edit.
+  const readOnly = !canWrite || entry?.status === "deleted";
   const [edits, setEdits] = useState<Record<string, unknown>>({});
   const [body, setBody] = useState("");
   const [raw, setRaw] = useState("");
@@ -274,7 +276,23 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
     }
   }
 
+  async function restoreThis(): Promise<void> {
+    if (!entry) return;
+    try {
+      await api("/drafts/discard", {
+        method: "POST",
+        body: JSON.stringify({ paths: [entry.path] }),
+      });
+      drafts.refresh();
+      toast.success("Restored");
+      await load();
+    } catch (error) {
+      toast.error(plainError(error));
+    }
+  }
+
   async function discardThis(): Promise<void> {
+    if (status === "deleted") return restoreThis();
     if (!entry) return;
     if (
       !window.confirm("Discard your changes to this entry? The published version stays as it is.")
@@ -472,8 +490,8 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
               Copy link
             </MenuItem>
             {status !== "published" ? (
-              <MenuItem disabled={readOnly} onClick={() => void discardThis()}>
-                Discard changes
+              <MenuItem disabled={!canWrite} onClick={() => void discardThis()}>
+                {status === "deleted" ? "Restore" : "Discard changes"}
               </MenuItem>
             ) : null}
             <MenuSeparator />
@@ -491,13 +509,33 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
           className="btn"
           data-variant="primary"
           data-size="sm"
-          disabled={readOnly || status === "published" || autosave.state === "saving"}
+          disabled={!canWrite || status === "published" || autosave.state === "saving"}
           onClick={() => void publishThis()}
           title={status === "published" ? "No unpublished changes" : undefined}
         >
           {action === "review" ? "Submit" : publishVerb(action)}
         </button>
       </div>
+
+      {status === "deleted" && !conflict ? (
+        <div className="banner" data-tone="conflict" role="status">
+          <IconWarning size={14} />
+          <span>
+            You deleted this {singular(collection)}. It stays live until you{" "}
+            {action === "review" ? "submit" : action === "commit" ? "commit" : "publish"} the
+            deletion.
+          </span>
+          <button
+            type="button"
+            className="btn"
+            data-size="sm"
+            disabled={!canWrite}
+            onClick={() => void restoreThis()}
+          >
+            Restore
+          </button>
+        </div>
+      ) : null}
 
       {conflict ? (
         <div className="banner" data-tone="conflict" role="alert">

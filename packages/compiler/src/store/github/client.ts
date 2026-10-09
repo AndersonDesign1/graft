@@ -293,18 +293,33 @@ export class GitHubClient {
     );
   }
 
-  /** "admin" | "maintain" | "write" | "triage" | "read" | "none". */
+  /**
+   * "admin" | "maintain" | "write" | "triage" | "read", or "none" when the
+   * login is not a collaborator. GitHub lists this endpoint under the
+   * Metadata permission (read), which every fine-grained token and App
+   * installation has. A 403 therefore means the credential itself is wrong,
+   * and is an error rather than "none": answering "none" would turn every
+   * editor away with nothing saying why.
+   */
   async permissionOf(login: string): Promise<string> {
     try {
       const result = await this.request<{ permission: string; role_name?: string }>(
         "GET",
         this.repoPath(`/collaborators/${encodeURIComponent(login)}/permission`),
         undefined,
-        [403, 404],
+        [404],
       );
       return result.role_name ?? result.permission;
     } catch (error) {
       if (error instanceof GitHubStatus) return "none";
+      if (error instanceof GraftError && error.details?.status === 403) {
+        throw new GraftError({
+          code: "REMOTE_STORE_FAILED",
+          message: `GitHub would not say whether ${login} can access ${this.repo} (403).`,
+          fix: `Signing in with GitHub reads collaborator permissions, which needs Metadata: read on ${this.repo}. Every fine-grained token and GitHub App gets it, so check the credential is for this repository. Or list who may sign in with GRAFT_STUDIO_EDITORS.`,
+          details: { login, status: 403 },
+        });
+      }
       throw error;
     }
   }

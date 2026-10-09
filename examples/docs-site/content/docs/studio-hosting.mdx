@@ -88,8 +88,11 @@ and set:
 | `GRAFT_GITHUB_CLIENT_SECRET` | Its client secret |
 | `GRAFT_STUDIO_URL` | The public origin, such as `https://shop.example.com` |
 
-Without a list, anyone with write access to the repository can sign in. To
-choose who can, and with which role, set `GRAFT_STUDIO_EDITORS`:
+Without a list, anyone with write access to the repository can sign in. Studio
+asks GitHub with its own credential, which needs Metadata read on the
+repository; every fine-grained token and GitHub App has it. If GitHub refuses,
+the sign-in screen says access couldn't be checked and the server log says why.
+To choose who can sign in, and with which role, set `GRAFT_STUDIO_EDITORS`:
 
 ```sh
 GRAFT_STUDIO_EDITORS="ana@shop.example.com=admin, octocat, ben@shop.example.com=contributor"

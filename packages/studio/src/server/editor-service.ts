@@ -14,7 +14,6 @@ import {
   type ContentChangeNotice,
   composeDocument,
   parseDocument,
-  requireCollection,
   SLUG_RE,
   type ContentStore,
   type DraftChange,
@@ -37,6 +36,7 @@ import type {
   SaveEntryResult,
 } from "../editor-types";
 import type { SchemaFieldDto } from "../types";
+import { requireCollection } from "../content";
 import { readChanges } from "../git";
 import {
   DiskCatalog,
@@ -116,9 +116,11 @@ export class EditorService {
     try {
       const changes = await this.drafts.changes(actor);
       return new Map(changes.map((change) => [change.path, change]));
-    } catch {
-      // No git, or no repository: everything reads as published, which is
-      // what the editor can act on.
+    } catch (error) {
+      // Locally: no git, or no repository, so everything reads as published,
+      // which is what the editor can act on. Hosted, the failure is GitHub's
+      // and the editor should hear it.
+      if (this.remote) throw error;
       return new Map();
     }
   }
@@ -129,6 +131,35 @@ export class EditorService {
     return applyOverlay(disk, await this.store.overlay(actor), name);
   }
 
+  /**
+   * The entries plus the ones this person deleted in their draft, read from
+   * the published version: a pending deletion stays in the list, marked
+   * Deleted, until it is published or restored. Only the person's own
+   * deletions come back; one already published is gone.
+   */
+  private async listed(
+    name: string,
+    actor: StoreActor,
+    changes: ReadonlyMap<string, DraftChange>,
+  ): Promise<CatalogEntry[]> {
+    const entries = await this.entries(name, actor);
+    const present = new Set(entries.map((entry) => entry.path));
+    const deleted = [...changes.values()].filter(
+      (change) =>
+        change.kind === "deleted" &&
+        change.path.startsWith(`${name}/`) &&
+        /\.mdx?$/.test(change.path) &&
+        !present.has(change.path),
+    );
+    const restored = await Promise.all(
+      deleted.map(async (change) => {
+        const published = await this.drafts.readPublished(change.path).catch(() => null);
+        return published ? parseEntry(change.path, published.raw) : null;
+      }),
+    );
+    return [...entries, ...restored.filter((entry): entry is CatalogEntry => entry !== null)];
+  }
+
   async list(
     name: string,
     fields: SchemaFieldDto[],
@@ -136,10 +167,8 @@ export class EditorService {
     actor: StoreActor,
   ): Promise<EntryList> {
     const collection = this.fileCollection(name);
-    const [entries, changes] = await Promise.all([
-      this.entries(name, actor),
-      this.changeMap(actor),
-    ]);
+    const changes = await this.changeMap(actor);
+    const entries = await this.listed(name, actor, changes);
     return queryEntries(
       name,
       summarise(name, entries, fields, changes),
@@ -157,14 +186,23 @@ export class EditorService {
     // A slug names a file: "shirts/blue" would save a nested file listed
     // under a different slug. Every entry's own slug already has this shape.
     if (!SLUG_RE.test(slug)) throw invalidSlug(slug);
-    const match = (await this.entries(name, actor)).find((entry) => entry.slug === slug);
+    const changes = await this.changeMap(actor);
+    const match = (await this.listed(name, actor, changes)).find((entry) => entry.slug === slug);
     return match?.path ?? `${name}/${slug}.mdx`;
   }
 
   async read(name: string, slug: string, actor: StoreActor): Promise<EntryDto> {
     this.fileCollection(name);
     const path = await this.pathFor(name, slug, actor);
-    const file = await this.store.read(path, actor);
+    const change = (await this.changeMap(actor)).get(path);
+    let file = await this.store.read(path, actor);
+    let version = file?.version ?? null;
+    // Deleted in this person's draft: show the published copy so they can
+    // read it or restore it. Its draft version is "absent" (null).
+    if (!file && change?.kind === "deleted") {
+      file = await this.drafts.readPublished(path).catch(() => null);
+      version = null;
+    }
     if (!file) {
       throw new GraftError({
         code: "DOCUMENT_NOT_FOUND",
@@ -174,7 +212,6 @@ export class EditorService {
       });
     }
     const parsed = matter(file.raw, {});
-    const change = (await this.changeMap(actor)).get(path);
     return {
       collection: name,
       slug,
@@ -182,7 +219,7 @@ export class EditorService {
       data: parsed.data as Record<string, unknown>,
       body: parsed.content.replace(/^\n/, ""),
       raw: file.raw,
-      version: file.version,
+      version,
       status: statusOf(change),
       conflict: change?.conflict ?? false,
     };

@@ -170,7 +170,18 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
         : undefined;
     }
 
-    const role = await roleFor(user.login, email);
+    let role: StudioRole | null;
+    try {
+      role = await roleFor(user.login, email);
+    } catch (error) {
+      // The person may well be allowed; the check itself failed. Say so on the
+      // sign-in screen, and give the operator the reason in the log.
+      console.error(
+        `graft studio: could not check ${user.login}'s access:`,
+        error instanceof Error ? error.message : error,
+      );
+      return failed(request, "access_unchecked");
+    }
     if (!role) return failed(request, "not_allowed");
     return signedIn(
       request,

@@ -78,6 +78,27 @@ function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
 
+async function deletionStaysListed(handler: Handler): Promise<void> {
+  const opened = await call<EntryDto>(handler, "GET", "/entry?collection=products&slug=wool-hat");
+  await call(handler, "DELETE", "/entry", {
+    collection: "products",
+    slug: "wool-hat",
+    baseVersion: opened.json.version,
+  });
+  const listed = await call<EntryList>(handler, "GET", "/entries?collection=products");
+  expect(listed.json.items.find((item) => item.slug === "wool-hat")).toMatchObject({
+    status: "deleted",
+    title: "Wool Hat",
+  });
+  const deleted = await call<EntryDto>(handler, "GET", "/entry?collection=products&slug=wool-hat");
+  expect(deleted.json).toMatchObject({ status: "deleted", version: null });
+  expect(deleted.json.data).toMatchObject({ title: "Wool Hat" });
+
+  await call(handler, "POST", "/drafts/discard", { paths: [opened.json.path] });
+  const restored = await call<EntryDto>(handler, "GET", "/entry?collection=products&slug=wool-hat");
+  expect(restored.json).toMatchObject({ status: "published", version: opened.json.version });
+}
+
 describe("editor API on a local checkout", () => {
   let contentDir: string;
   let handler: Handler;
@@ -138,6 +159,10 @@ describe("editor API on a local checkout", () => {
     expect(published.status).toBe(200);
     expect(git(root, "status", "--porcelain")).toBe("");
     expect(git(root, "log", "-1", "--name-status", "--format=")).toContain("older-shirt.mdx");
+  });
+
+  it("keeps an entry deleted in the draft listed, readable and restorable", async () => {
+    await deletionStaysListed(handler);
   });
 
   it("lists, searches, filters and sorts on the server", async () => {
@@ -434,6 +459,10 @@ describe("editor API on GitHub (hosted)", () => {
     return { fake, handler, contentDir };
   }
 
+  it("keeps an entry deleted in the draft listed, readable and restorable", async () => {
+    await deletionStaysListed(hosted().handler);
+  });
+
   it("restores a deleted entry only while it is still deleted", async () => {
     const { handler } = hosted();
     const opened = await call<EntryDto>(handler, "GET", "/entry?collection=products&slug=wool-hat");
@@ -459,11 +488,6 @@ describe("editor API on GitHub (hosted)", () => {
     const { handler, contentDir } = hosted();
     const before = readFileSync(join(contentDir, "products", "wool-hat.mdx"), "utf8");
     for (const [method, path, body] of [
-      [
-        "PUT",
-        "/document",
-        { collection: "products", slug: "wool-hat", raw: "---\ntitle: x\n---\n" },
-      ],
       ["POST", "/compile", {}],
       ["POST", "/changes/commit", { paths: ["products/wool-hat.mdx"], message: "x" }],
       ["POST", "/compilations/c1/revert", {}],

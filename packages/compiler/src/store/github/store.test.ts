@@ -394,6 +394,24 @@ describe("GitHubStore: layout and listing", () => {
     expect((await caught(app.read("a.mdx"))).code).toBe("REMOTE_STORE_FAILED");
   });
 
+  it("reads a collaborator's permission, and says why when GitHub won't", async () => {
+    const fake = createGitHubFake({
+      repo: "acme/shop",
+      permissions: { ana: "write", ben: "forbidden" },
+    });
+    const store = new GitHubStore({
+      repo: "acme/shop",
+      auth: tokenAuth(fake.token),
+      apiUrl: fake.apiUrl,
+      fetch: fake.fetch,
+    });
+    expect(await store.permissionOf("ana")).toBe("write");
+    expect(await store.permissionOf("stranger")).toBe("none");
+    const error = await caught(store.permissionOf("ben"));
+    expect(error.code).toBe("REMOTE_STORE_FAILED");
+    expect(error.fix).toContain("Metadata: read");
+  });
+
   it("explains a missing production branch", async () => {
     const { store } = setup(undefined, { branch: "production" });
     const error = await caught(store.read("products/shirt.mdx"));

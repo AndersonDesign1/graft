@@ -11,6 +11,8 @@ const REASONS: Record<string, string> = {
   expired: "Sign-in took too long. Try again.",
   github_refused: "GitHub didn't complete the sign-in. Try again.",
   github_off: "Signing in with GitHub isn't set up for this Studio. Use the link you were sent.",
+  access_unchecked:
+    "Studio couldn't check your access with GitHub. Whoever runs the site can see why in its log.",
 };
 
 interface SessionInfo {

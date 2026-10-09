@@ -386,6 +386,9 @@ export function createGitHubFake(options: GitHubFakeOptions = {}): GitHubFake {
     if (method === "GET" && (match = /^\/collaborators\/([^/]+)\/permission$/.exec(rest))) {
       const login = decodeURIComponent(match[1] as string);
       const permission = permissions[login];
+      // "forbidden" stands in for a credential GitHub won't answer for.
+      if (permission === "forbidden")
+        return json(403, { message: "Resource not accessible by integration" });
       return permission ? json(200, { permission, role_name: permission }) : notFound();
     }
     return notFound();

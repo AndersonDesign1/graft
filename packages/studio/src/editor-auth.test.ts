@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createStudioHandler } from "./handler";
 import {
   SESSION_COOKIE,
@@ -278,6 +278,23 @@ describe("Sign in with GitHub", () => {
     });
     const denied = await flow(refused);
     expect(denied.headers.get("location")).toBe("/studio/?signin=not_allowed");
+
+    // A failed check is not a "no": the screen says access couldn't be checked.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { stub: devStub } = githubStub({ login: "dev" });
+    const broken = createStudioHandler({
+      ...base,
+      uiBasePath: "/studio",
+      editors: {
+        secret,
+        github: { clientId: "id", clientSecret: "cs", fetch: devStub },
+        permissionOf: async () => {
+          throw new Error("GitHub would not say (403)");
+        },
+      },
+    });
+    const unchecked = await flow(broken);
+    expect(unchecked.headers.get("location")).toBe("/studio/?signin=access_unchecked");
   });
 
   it("never redirects off-site after sign-in", async () => {
