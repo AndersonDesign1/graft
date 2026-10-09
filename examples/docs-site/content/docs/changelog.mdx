@@ -342,7 +342,7 @@ Released September 2, 2026.
 
 Released September 1, 2026.
 
-### Features
+### Breaking changes
 
 - **BREAKING:** approval policy moves from `GRAFT_APPROVAL_POLICY` to
   `approvalPolicy` in `graft.config.ts`. The env var is ignored, and `graft serve`
@@ -385,61 +385,6 @@ Released September 1, 2026.
   All four found by cubic on the pull request.
 
   `cli`, `core`, `mdx-safety` · [2561b47](https://github.com/AndersonDesign1/graft/commit/2561b47)
-
-- Let the content API be read from a browser on another origin.
-
-  `@usegraft/sdk-react` reads over HTTP from a browser, and the handler sent no
-  CORS headers at all — so unless the app and the content API shared an origin,
-  every read was blocked by the browser. That is the ordinary deployment for the
-  browser client, which made it largely unusable as shipped. cubic raised it on
-  the pull request.
-
-  `createContentApiHandler` takes `allowedOrigins`: a list, or `"*"`. Omitted
-  means no CORS headers and same-origin only, which stays the default because
-  publishing an endpoint to other origins is the deployer's decision rather than
-  a library's. `graft serve` reads `GRAFT_CONTENT_ALLOWED_ORIGINS` (comma
-  separated, or `*`).
-
-  Details that are easy to get wrong and are tested:
-
-  - An allowed origin is echoed with `Vary: Origin`. Without `Vary`, a shared
-    cache can hand one origin the response it stored for another and the
-    allowlist stops meaning anything.
-  - A disallowed origin gets an ordinary response with no CORS header, not a
-    refusal. The browser enforces it; answering differently would turn the
-    allowlist into an origin oracle for non-browser callers, who are not bound by
-    CORS in the first place.
-  - `OPTIONS` preflight is answered before method validation and before the rate
-    limiter, so a browser asking permission is neither a `405` nor a charge
-    against the budget for the read it precedes.
-  - Error responses carry the headers too, or the browser hides the body and a
-    developer debugging a `400` sees an opaque network failure instead of the
-    `fix` this API took care to send.
-
-  `cli`, `content-api` · [d5f5567](https://github.com/AndersonDesign1/graft/commit/d5f5567)
-
-- Add `list_packages`, so an agent can answer "what do I install?"
-
-  The tool surface could already introspect a project that exists — its
-  collections, functions, errors, owned primitives. Nothing said which
-  `@usegraft/*` package to reach for, so a user on SvelteKit could only be told
-  about `@usegraft/sdk-sveltekit` if the model happened to have read the docs.
-  That is the first question anyone asks, and it was the one question with no
-  surface.
-
-  Filter by `framework` and you get that adapter plus the packages every project
-  needs, never a competing one. Filter by `tier` and a static project is never
-  told to install something that cannot work without Postgres. It is registered
-  on the public documentation mount too: it carries nothing about the project,
-  only which of Graft's own packages exists, which is documentation in the
-  plainest sense.
-
-  `PACKAGE_KNOWLEDGE` is held in lockstep with what actually ships by a test, the
-  same way `ERROR_KNOWLEDGE` is with `ErrorCodes` — a package added without an
-  entry is a package no agent will ever suggest. It caught `@usegraft/tokens`
-  missing on its first run.
-
-  `cli`, `mcp` · [76baf51](https://github.com/AndersonDesign1/graft/commit/76baf51)
 
 - **BREAKING:** `writeDocumentFile(root, sourcePath, raw)` replaces
   `writeDocumentFile(fullPath, raw)`, and contains the path itself. It returns
@@ -511,26 +456,6 @@ Released September 1, 2026.
 
   `content-api`, `contracts`, `db`, `sdk-astro`, `sdk-core`, `sdk-next`, `sdk-react`, `sdk-react-router`, `sdk-sveltekit`, `sdk-tanstack-start` · [e2829b4](https://github.com/AndersonDesign1/graft/commit/e2829b4)
 
-- Let `endpoint` be a same-origin path, which is what the docs already tell you
-  to write.
-
-  `createGraft({ endpoint: "/api/content/v1" })` threw `TypeError: Invalid URL`
-  before a single read. `normalizeEndpoint` called bare `new URL(endpoint)` with
-  no base, and a relative path has no origin to parse against.
-
-  That form is not a stray idea — it is the example in
-  `/docs/reading-content` and in the `createGraft` JSDoc that ships inside
-  `@usegraft/sdk-react`. So the first thing a browser reader copied out of the
-  documentation crashed at construction. cubic raised it on the pull request.
-
-  A string endpoint now resolves against `location.href` when one exists. An
-  absolute endpoint is unchanged, and a `URL` instance is unchanged. Outside a
-  browser there is no origin to resolve against, and guessing one would send
-  content reads somewhere arbitrary, so a relative path there is refused as
-  `CONFIG_INVALID` with that reason rather than a bare `TypeError`.
-
-  `content-api`, `sdk-react` · [655e4d1](https://github.com/AndersonDesign1/graft/commit/655e4d1)
-
 - **BREAKING:** `@usegraft/db` is an optional peer dependency of
   `@usegraft/core` rather than a dependency.
 
@@ -557,6 +482,83 @@ Released September 1, 2026.
   `@usegraft/db` to your own dependencies.
 
   `core`, `sdk-core`, `sdk-react` · [655e4d1](https://github.com/AndersonDesign1/graft/commit/655e4d1)
+
+### Features
+
+- Let the content API be read from a browser on another origin.
+
+  `@usegraft/sdk-react` reads over HTTP from a browser, and the handler sent no
+  CORS headers at all — so unless the app and the content API shared an origin,
+  every read was blocked by the browser. That is the ordinary deployment for the
+  browser client, which made it largely unusable as shipped. cubic raised it on
+  the pull request.
+
+  `createContentApiHandler` takes `allowedOrigins`: a list, or `"*"`. Omitted
+  means no CORS headers and same-origin only, which stays the default because
+  publishing an endpoint to other origins is the deployer's decision rather than
+  a library's. `graft serve` reads `GRAFT_CONTENT_ALLOWED_ORIGINS` (comma
+  separated, or `*`).
+
+  Details that are easy to get wrong and are tested:
+
+  - An allowed origin is echoed with `Vary: Origin`. Without `Vary`, a shared
+    cache can hand one origin the response it stored for another and the
+    allowlist stops meaning anything.
+  - A disallowed origin gets an ordinary response with no CORS header, not a
+    refusal. The browser enforces it; answering differently would turn the
+    allowlist into an origin oracle for non-browser callers, who are not bound by
+    CORS in the first place.
+  - `OPTIONS` preflight is answered before method validation and before the rate
+    limiter, so a browser asking permission is neither a `405` nor a charge
+    against the budget for the read it precedes.
+  - Error responses carry the headers too, or the browser hides the body and a
+    developer debugging a `400` sees an opaque network failure instead of the
+    `fix` this API took care to send.
+
+  `cli`, `content-api` · [d5f5567](https://github.com/AndersonDesign1/graft/commit/d5f5567)
+
+- Add `list_packages`, so an agent can answer "what do I install?"
+
+  The tool surface could already introspect a project that exists — its
+  collections, functions, errors, owned primitives. Nothing said which
+  `@usegraft/*` package to reach for, so a user on SvelteKit could only be told
+  about `@usegraft/sdk-sveltekit` if the model happened to have read the docs.
+  That is the first question anyone asks, and it was the one question with no
+  surface.
+
+  Filter by `framework` and you get that adapter plus the packages every project
+  needs, never a competing one. Filter by `tier` and a static project is never
+  told to install something that cannot work without Postgres. It is registered
+  on the public documentation mount too: it carries nothing about the project,
+  only which of Graft's own packages exists, which is documentation in the
+  plainest sense.
+
+  `PACKAGE_KNOWLEDGE` is held in lockstep with what actually ships by a test, the
+  same way `ERROR_KNOWLEDGE` is with `ErrorCodes` — a package added without an
+  entry is a package no agent will ever suggest. It caught `@usegraft/tokens`
+  missing on its first run.
+
+  `cli`, `mcp` · [76baf51](https://github.com/AndersonDesign1/graft/commit/76baf51)
+
+- Let `endpoint` be a same-origin path, which is what the docs already tell you
+  to write.
+
+  `createGraft({ endpoint: "/api/content/v1" })` threw `TypeError: Invalid URL`
+  before a single read. `normalizeEndpoint` called bare `new URL(endpoint)` with
+  no base, and a relative path has no origin to parse against.
+
+  That form is not a stray idea — it is the example in
+  `/docs/reading-content` and in the `createGraft` JSDoc that ships inside
+  `@usegraft/sdk-react`. So the first thing a browser reader copied out of the
+  documentation crashed at construction. cubic raised it on the pull request.
+
+  A string endpoint now resolves against `location.href` when one exists. An
+  absolute endpoint is unchanged, and a `URL` instance is unchanged. Outside a
+  browser there is no origin to resolve against, and guessing one would send
+  content reads somewhere arbitrary, so a relative path there is refused as
+  `CONFIG_INVALID` with that reason rather than a bare `TypeError`.
+
+  `content-api`, `sdk-react` · [655e4d1](https://github.com/AndersonDesign1/graft/commit/655e4d1)
 
 ### Fixes
 
@@ -1509,17 +1511,6 @@ Released August 25, 2026.
   asserted `toContain("0.0.0")` — so it passed _because_ of the bug. The version is
   now read from the manifest at runtime, and the test asserts against that value
   rather than a literal.
-
-  - @usegraft/assets@0.1.1
-  - @usegraft/auth@0.1.1
-  - @usegraft/compiler@0.1.1
-  - @usegraft/content-migrations@0.1.1
-  - @usegraft/contracts@0.1.1
-  - @usegraft/core@0.1.1
-  - @usegraft/db@0.1.1
-  - @usegraft/mcp@0.1.1
-  - @usegraft/registry@0.1.1
-  - @usegraft/studio@0.1.1
 
   `cli` · [6737b5b](https://github.com/AndersonDesign1/graft/commit/6737b5b)
 

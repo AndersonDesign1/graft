@@ -57,7 +57,12 @@ function parseChangelog(text) {
   let item;
   const flush = () => {
     if (!item) return;
-    const body = item.lines.join("\n").replace(/\s+$/, "");
+    // Early releases nested the bumps under a real change instead
+    // (`  - @usegraft/assets@0.1.1`), so drop those lines from inside a body too.
+    const body = item.lines
+      .filter((line) => !/^\s+- @usegraft\/[\w-]+@\S+$/.test(line))
+      .join("\n")
+      .replace(/\s+$/, "");
     // A bare `- @usegraft/core@1.0.0-beta.2` is the same restatement, written
     // without the "Updated dependencies" line when a package only re-released.
     if (!/^Updated dependencies/.test(body) && !/^@usegraft\/[\w-]+@\S+$/.test(body)) {
@@ -156,7 +161,8 @@ function escapeMdx(text) {
 
 /** Which group a change goes in. Pre-1.0, breaks ship as minors, so read the text too. */
 function group(kind, body) {
-  if (kind === "major" || /\*\*Breaking/.test(body)) return "breaking";
+  // Older entries write the marker as **BREAKING:**.
+  if (kind === "major" || /\*\*Breaking/i.test(body)) return "breaking";
   return kind === "minor" ? "features" : "fixes";
 }
 
