@@ -43,16 +43,45 @@ export function buildVocabulary(texts: Iterable<string>): Vocabulary {
     .map(([word]) => word);
 }
 
-/** Endings the stemmer folds together, longest first. */
-const INFLECTIONS = /(?:ings|ing|ions|ion|ed|es|e|s)$/;
+/**
+ * Step 1a of the porter stemmer: the plural endings. Porter runs its steps in
+ * order, so two words that agree after step 1a get the same final stem and
+ * match the same pages. That makes this key safe to merge completions on: it
+ * only ever folds words the index folds too. ("migration" and "migrations"
+ * share a slot; "mill" and "million" do not.) Words the later steps would also
+ * fold, like "migrate" and "migration", each keep a slot, which costs a
+ * duplicate at worst.
+ */
+function pluralKey(word: string): string {
+  // Where SQLite's porter departs from the plain rule, checked against its
+  // FTS5 tokenizer: tokens of up to two bytes and over 64 bytes are left
+  // as is, and a bare "ies" becomes "ie", not "i". Every other token gets
+  // the rule ("has" -> "ha", "runs" -> "run").
+  const bytes = new TextEncoder().encode(word).length;
+  if (bytes <= 2 || bytes > 64 || word === "ies") return word;
+  if (word.endsWith("sses")) return word.slice(0, -2);
+  if (word.endsWith("ies")) return word.slice(0, -2);
+  if (word.endsWith("ss")) return word;
+  if (word.endsWith("s")) return word.slice(0, -1);
+  return word;
+}
 
 /**
- * A rough stand-in for the porter stem, enough to tell that two completions
- * would match the same pages. It only has to group the common inflections;
- * when it misses a pair, a slot goes to a duplicate, nothing worse.
+ * The words before the last and the last word itself, when the last word is
+ * one that can be completed; null otherwise. Cheap and syntactic, so a caller
+ * can skip building the vocabulary when nothing could be expanded.
+ *
+ * Not completed: a quoted phrase or -exclusion at the end (the reader was
+ * precise on purpose), and any query that already uses `or` (repeating its
+ * groups would change what it means).
  */
-function inflectionKey(word: string): string {
-  return word.length > 4 ? word.replace(INFLECTIONS, "") : word;
+export function completionTarget(query: string): { head: string[]; typed: string } | null {
+  const tokens = query.trim().match(/"[^"]*"?|\S+/g) ?? [];
+  if (tokens.length === 0) return null;
+  if (tokens.some((token) => /^or$/i.test(token))) return null;
+  const last = tokens[tokens.length - 1];
+  if (!/^[\p{L}\p{N}]+$/u.test(last)) return null;
+  return { head: tokens.slice(0, -1), typed: last.toLowerCase() };
 }
 
 /**
@@ -60,29 +89,22 @@ function inflectionKey(word: string): string {
  *
  * "migr" becomes `migr or migration or migrations or …`, and the words before
  * it ride along with every alternative, so "run migr" still needs "run". The
- * typed word stays first, so a finished word still finds itself.
- *
- * Left alone: a quoted phrase or -exclusion at the end (the reader was
- * precise on purpose), a query that already uses `or` (repeating its groups
- * would change what it means), and a last word with no completions.
+ * typed word stays first, so a finished word still finds itself. A query with
+ * no completionTarget, or whose last word completes to nothing, is returned
+ * as written.
  */
 export function expandQuery(query: string, vocabulary: Vocabulary): string {
-  const tokens = query.trim().match(/"[^"]*"?|\S+/g) ?? [];
-  if (tokens.length === 0) return query;
-  if (tokens.some((token) => /^or$/i.test(token))) return query;
+  const target = completionTarget(query);
+  if (!target) return query;
+  const { head, typed } = target;
 
-  const last = tokens[tokens.length - 1];
-  const head = tokens.slice(0, -1);
-  if (!/^[\p{L}\p{N}]+$/u.test(last)) return query;
-
-  const typed = last.toLowerCase();
   const completions: string[] = [];
-  const seen = new Set([inflectionKey(typed)]);
+  const seen = new Set([pluralKey(typed)]);
   for (const word of vocabulary) {
     if (!word.startsWith(typed)) continue;
-    // "migrate", "migration" and "migrations" match the same pages once
-    // stemmed, so only the first spends one of the slots.
-    const key = inflectionKey(word);
+    // "migration" and "migrations" match the same pages, so only the first
+    // spends one of the slots.
+    const key = pluralKey(word);
     if (seen.has(key)) continue;
     seen.add(key);
     completions.push(word);

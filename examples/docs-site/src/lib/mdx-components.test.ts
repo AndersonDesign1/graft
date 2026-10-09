@@ -107,6 +107,22 @@ describe("CodeBlock", () => {
   });
 });
 
+describe("pre", () => {
+  it("gives every fence a copy button and status outside the copied <code>", async () => {
+    const html = await render(["```sh", "pnpm add @usegraft/cli", "```"].join("\n"));
+
+    // The listener copies the <code> element's text, so nothing of the
+    // control may sit inside it, or it would be copied along with the command.
+    const code = html.match(/<code[^>]*>[\s\S]*?<\/code>/)?.[0] ?? "";
+    expect(code).toContain("pnpm");
+    expect(code).not.toContain("data-copy");
+
+    expect(html).toMatch(/<\/code><button[^>]*data-copy-code/);
+    expect(html).toContain('aria-label="Copy code"');
+    expect(html).toMatch(/role="status"[^>]*data-copy-status|data-copy-status[^>]*role="status"/);
+  });
+});
+
 describe("Steps", () => {
   it("numbers from a counter rather than from the author", async () => {
     const html = await render(
