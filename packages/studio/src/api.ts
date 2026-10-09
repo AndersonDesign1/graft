@@ -94,6 +94,9 @@ export interface StudioApiOptions {
 export interface StudioPrincipal {
   kind: string;
   id: string;
+  /** For commit attribution when a save lands in git on this person's behalf. */
+  name?: string;
+  email?: string;
   /** Scopes the credential carries. Absent means none — not "all". */
   scopes?: readonly string[];
 }
@@ -186,7 +189,7 @@ function assertSameOrigin(request: Request, url: URL): void {
  * tree has no business committing it, and deciding approvals is separated from
  * both: it is the human gate, and no agent runtime token should carry it.
  */
-export type StudioScope = "studio:read" | "studio:write" | "approvals:decide";
+export type StudioScope = "studio:read" | "studio:write" | "studio:publish" | "approvals:decide";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {

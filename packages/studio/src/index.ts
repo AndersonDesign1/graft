@@ -9,6 +9,18 @@
 export { createStudioApiHandler, type StudioApiOptions, type StudioFetchHandler } from "./api";
 export { createStudioHandler, type StudioHandlerOptions } from "./handler";
 export { STUDIO_OPENAPI } from "./openapi";
+export {
+  EDITOR_AUTH_ENV,
+  ROLE_SCOPES,
+  STUDIO_ROLES,
+  createInviteLink,
+  editorAccessFromEnv,
+  isStudioRole,
+  parseEditorList,
+  type EditorAccessConfig,
+  type StudioRole,
+} from "./session";
+export type { EditorAuthOptions, GitHubSignInOptions } from "./editor-auth";
 export type {
   ApprovalList,
   BranchDto,

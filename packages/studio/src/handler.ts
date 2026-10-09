@@ -6,6 +6,7 @@ import { dirname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { GraftError } from "@usegraft/contracts";
 import { createStudioApiHandler, type StudioApiOptions, type StudioFetchHandler } from "./api";
+import { createEditorAuth, type EditorAuthOptions } from "./editor-auth";
 
 export interface StudioHandlerOptions extends StudioApiOptions {
   /**
@@ -13,6 +14,12 @@ export interface StudioHandlerOptions extends StudioApiOptions {
    * Empty string = UI at `/` (local `graft studio`).
    */
   uiBasePath?: string;
+  /**
+   * Let people sign in: GitHub, invite links, a session cookie. When set,
+   * every API request needs a session or a bearer credential, and a signed-out
+   * browser is shown the sign-in screen instead of a wall of 401s.
+   */
+  editors?: Omit<EditorAuthOptions, "uiBasePath">;
 }
 
 function uiRoot(): string {
@@ -118,12 +125,32 @@ function serveUiAsset(pathname: string, uiBase: string): Response | null {
  * UI lives at `/` (local) or `uiBasePath` (hosted).
  */
 export function createStudioHandler(options: StudioHandlerOptions): StudioFetchHandler {
-  const api = createStudioApiHandler(options);
   const uiBase = (options.uiBasePath ?? "").replace(/\/$/, "");
+  const editors = options.editors
+    ? createEditorAuth({ ...options.editors, uiBasePath: uiBase })
+    : undefined;
+  const bearer = options.authenticate;
+  const api = createStudioApiHandler(
+    editors
+      ? {
+          ...options,
+          // A session first, then whatever credential the mount already took
+          // (an agent's bearer token keeps working beside people's cookies).
+          // With neither, refuse: configuring sign-in makes it required.
+          authenticate: async (request) =>
+            editors.authenticate(request) ?? (bearer ? await bearer(request) : null),
+        }
+      : options,
+  );
 
   return async (request) => {
     const url = new URL(request.url);
     const { pathname } = url;
+
+    if (editors) {
+      const answered = await editors.handle(request);
+      if (answered) return answered;
+    }
 
     if (pathname.startsWith("/api/studio/v1")) {
       return api(request);

@@ -33,6 +33,7 @@
 import { execFileSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createActorResolver, type TrustedIssuer } from "@usegraft/auth";
+import { githubStoreFromEnv } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { setRequestPeer } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
@@ -493,12 +494,29 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
         : !loopback
           ? () => null
           : undefined;
+    // People sign in when GRAFT_STUDIO_SECRET is set. GitHub sign-in admits
+    // whoever can push to the content repository unless GRAFT_STUDIO_EDITORS
+    // narrows it, so the store's credentials answer that question.
+    const access = studioMod.editorAccessFromEnv();
+    const repository = access
+      ? githubStoreFromEnv({ contentDir: config.contentDir, projectRoot: options.cwd })
+      : undefined;
     studioHandler = studioMod.createStudioHandler({
       db: branch.db,
       collections: config.collections,
       contentDir: config.contentDir,
       mdxTrust: config.mdxTrust,
       defaultBranch: writeBranch,
+      ...(access
+        ? {
+            editors: {
+              ...access,
+              ...(repository
+                ? { permissionOf: (login: string) => repository.permissionOf(login) }
+                : {}),
+            },
+          }
+        : {}),
       // Only reached on a loopback mount, where there is no caller identity to
       // attribute to. Off loopback the authenticated principal is used instead.
       decider: { kind: "agent", id: "studio-serve" },

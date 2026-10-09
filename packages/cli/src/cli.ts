@@ -252,12 +252,19 @@ export const COMMAND_HELP = new Map<string, string[]>([
     "studio",
     [
       "Usage: graft studio [--port <n>] [--host <h>] [--branch <id>]",
+      "       graft studio invite <email> [--name <name>] [--role <role>] [--days <n>] [--url <url>]",
       "",
       "Run the opt-in Studio UI (edit content, approve/deny, OpenAPI).",
+      "",
+      "`invite` prints a sign-in link for a hosted Studio, for someone without a",
+      "GitHub account. Signed with GRAFT_STUDIO_SECRET; expires after --days (7).",
       "",
       BRANCH_OPTION,
       "  --port <n>       Port (default: 4983, or GRAFT_STUDIO_PORT)",
       "  --host <h>       Host (default: 127.0.0.1, or HOST)",
+      "  --role <role>    invite: viewer, contributor, editor (default) or admin",
+      "  --name <name>    invite: the name commits are attributed to",
+      "  --url <url>      invite: where Studio is served (default: GRAFT_STUDIO_URL)",
     ],
   ],
   [
@@ -312,6 +319,11 @@ interface ParsedArgs {
   json: boolean;
   /** `graft init` index driver; undefined = the default (static). */
   initDriver?: "static" | "postgres";
+  /** `graft studio invite` */
+  name?: string;
+  role?: string;
+  days?: number;
+  url?: string;
 }
 
 class UsageError extends Error {}
@@ -333,6 +345,10 @@ function parseArgs(rest: string[]): ParsedArgs {
   let elicitApprovals = false;
   let json = false;
   let initDriver: "static" | "postgres" | undefined;
+  let name: string | undefined;
+  let role: string | undefined;
+  let days: number | undefined;
+  let url: string | undefined;
 
   const value = (flag: string, raw: string | undefined): string => {
     if (!raw || raw.startsWith("-")) {
@@ -374,6 +390,18 @@ function parseArgs(rest: string[]): ParsedArgs {
       elicitApprovals = true;
     } else if (arg === "--json") {
       json = true;
+    } else if (arg === "--name") {
+      name = value("--name", rest[++i]);
+    } else if (arg === "--role") {
+      role = value("--role", rest[++i]);
+    } else if (arg === "--url") {
+      url = value("--url", rest[++i]);
+    } else if (arg === "--days") {
+      const raw = rest[++i];
+      if (raw === undefined || !/^\d+$/.test(raw)) {
+        throw new UsageError("--days requires a number, e.g. --days 7");
+      }
+      days = Number(raw);
     } else if (arg === "--postgres") {
       initDriver = "postgres";
     } else if (arg === "--static") {
@@ -403,6 +431,10 @@ function parseArgs(rest: string[]): ParsedArgs {
     elicitApprovals,
     json,
     initDriver,
+    name,
+    role,
+    days,
+    url,
   };
 }
 
@@ -645,6 +677,34 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
         return 0;
       }
       case "studio": {
+        if (args.positionals[0] === "invite") {
+          const email = args.positionals[1];
+          if (!email) {
+            throw new UsageError(
+              "usage: graft studio invite <email> [--role editor] [--url <url>]",
+            );
+          }
+          const { studioInviteCommand } = await import("./commands/studio");
+          const invite = await studioInviteCommand({
+            cwd,
+            email,
+            name: args.name,
+            role: args.role,
+            days: args.days,
+            url: args.url,
+          });
+          console.log(
+            [
+              `Sign-in link for ${email} (${invite.role}), valid until ${invite.expiresAt.toISOString().slice(0, 10)}:`,
+              "",
+              `  ${invite.url}`,
+              "",
+              "Anyone holding this link can sign in as this person until it expires. Send it",
+              "privately. Rotating GRAFT_STUDIO_SECRET revokes every link and session.",
+            ].join("\n"),
+          );
+          return 0;
+        }
         const { studioCommand } = await import("./commands/studio");
         await studioCommand({
           cwd,

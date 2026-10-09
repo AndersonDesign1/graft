@@ -210,3 +210,59 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
     await control.close();
   }
 }
+
+export interface StudioInviteOptions {
+  cwd: string;
+  email: string;
+  name?: string;
+  role?: string;
+  days?: number;
+  /** Public base URL of the hosted Studio; GRAFT_STUDIO_URL otherwise. */
+  url?: string;
+}
+
+/**
+ * `graft studio invite <email>`: a sign-in link for someone with no GitHub
+ * account. Signed with GRAFT_STUDIO_SECRET, so it is only valid on a Studio
+ * that shares the secret, and it expires. Nothing is sent; the person running
+ * the command passes the link on.
+ */
+export async function studioInviteCommand(
+  options: StudioInviteOptions,
+): Promise<{ url: string; expiresAt: Date; role: string }> {
+  loadProjectEnv(options.cwd);
+  const { createInviteLink, isStudioRole, STUDIO_ROLES } = await import("@usegraft/studio");
+  const role = options.role ?? "editor";
+  if (!isStudioRole(role)) {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `"${role}" is not a Studio role.`,
+      fix: `Use --role with one of: ${STUDIO_ROLES.join(", ")}.`,
+    });
+  }
+  const baseUrl = options.url ?? process.env.GRAFT_STUDIO_URL;
+  if (!baseUrl) {
+    throw new GraftError({
+      code: "ENV_VAR_MISSING",
+      message: "No public URL to build the link from.",
+      fix: "Pass --url https://your-site.com (where Studio is served), or set GRAFT_STUDIO_URL.",
+    });
+  }
+  const days = options.days ?? 7;
+  if (!Number.isInteger(days) || days < 1 || days > 30) {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `--days ${days} is out of range.`,
+      fix: "Invite links last 1 to 30 days.",
+    });
+  }
+  const link = createInviteLink({
+    secret: process.env.GRAFT_STUDIO_SECRET ?? "",
+    baseUrl,
+    email: options.email,
+    name: options.name,
+    role,
+    ttlMs: days * 24 * 60 * 60 * 1000,
+  });
+  return { ...link, role };
+}
