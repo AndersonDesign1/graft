@@ -9,24 +9,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { SaveEntryResult } from "../../editor-types";
+import { slugify } from "../../slug";
 import { ApiError, api, plainError } from "../lib/api";
 import { emptyValue, labelOf, problemsFromServer, problemsIn, titleField } from "../lib/fields";
 import { singular, useStudio } from "../lib/studio";
 import { FieldRow } from "./fields";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
-
-function slugify(text: string): string {
-  return (
-    text
-      .normalize("NFKD")
-      .replace(/[̀-ͯ]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80)
-      .replace(/-+$/g, "") || ""
-  );
-}
 
 export function CreateDialog({
   collection,
@@ -89,7 +77,7 @@ export function CreateDialog({
         body: JSON.stringify({
           collection,
           data,
-          ...(effectiveSlug ? { slug: effectiveSlug } : {}),
+          ...(slugify(effectiveSlug) ? { slug: slugify(effectiveSlug) } : {}),
         }),
       });
       toast.success(`${title || "New " + noun} created`, { description: "Saved as a draft." });

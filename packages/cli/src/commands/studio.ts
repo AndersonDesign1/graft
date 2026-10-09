@@ -256,9 +256,22 @@ export async function studioInviteCommand(
       fix: "Invite links last 1 to 30 days.",
     });
   }
+  // The sign-in route is at the site's root (/api/studio/v1/auth/link), so a
+  // URL pasted with a path, like https://shop.example.com/studio, is cut back
+  // to its origin.
+  let origin: string;
+  try {
+    origin = new URL(baseUrl).origin;
+  } catch {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `"${baseUrl}" is not a URL.`,
+      fix: "Pass --url with the site's address, such as https://shop.example.com.",
+    });
+  }
   const link = createInviteLink({
     secret: process.env.GRAFT_STUDIO_SECRET ?? "",
-    baseUrl,
+    baseUrl: origin,
     email: options.email,
     name: options.name,
     role,

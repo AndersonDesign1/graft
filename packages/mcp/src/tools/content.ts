@@ -9,11 +9,13 @@ import {
   composeDocument,
   parseDocument,
   readCollectionDocs,
+  type ProjectedDoc,
   resolveContained,
   SLUG_RE,
   writeDocumentFile,
 } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
+import type { AnyCollection } from "@usegraft/core";
 import { assertSafeMdx } from "@usegraft/mdx-safety";
 import { assertSearchQuery, scopeChain } from "@usegraft/db";
 import { z } from "zod";
@@ -57,6 +59,24 @@ function assertSlugShape(slug: string, collection: string): void {
 export const registerContentReadTools: RegisterTools = (server, deps) => {
   const { branchId, collections, contentDir, getScope, searchIndex, staticIndexPath } = deps;
 
+  /**
+   * A collection's documents as this caller sees them. Hosted, that is the
+   * deployed files with the caller's own draft on top, so an agent reads back
+   * what it just wrote with write_content.
+   */
+  async function currentDocs(name: string, collection: AnyCollection): Promise<ProjectedDoc[]> {
+    const docs = readCollectionDocs(contentDir, name, collection);
+    const overlay = await deps.remoteStore?.overlay?.(deps.storeActor());
+    if (!overlay || overlay.size === 0) return docs;
+    const byPath = new Map(docs.map((doc) => [doc.sourcePath, doc]));
+    for (const [path, file] of overlay) {
+      if (!path.startsWith(`${name}/`)) continue;
+      if (file === null) byPath.delete(path);
+      else byPath.set(path, parseDocument(file.raw, collection, path));
+    }
+    return [...byPath.values()].sort((a, b) => a.slug.localeCompare(b.slug));
+  }
+
   server.registerTool(
     "list_content",
     {
@@ -71,9 +91,9 @@ export const registerContentReadTools: RegisterTools = (server, deps) => {
     },
     ({ collection: name }) =>
       guarded(
-        () => {
+        async () => {
           const collection = requireCollection(collections, name);
-          const docs = readCollectionDocs(contentDir, name, collection);
+          const docs = await currentDocs(name, collection);
           return {
             collection: name,
             documents: docs.map((doc) => ({
@@ -102,9 +122,12 @@ export const registerContentReadTools: RegisterTools = (server, deps) => {
     },
     ({ collection: name, slug }) =>
       guarded(
-        () => {
+        async () => {
           const collection = requireCollection(collections, name);
-          const doc = findDoc(contentDir, name, collection, slug);
+          const drafted = deps.remoteStore?.overlay
+            ? (await currentDocs(name, collection)).find((candidate) => candidate.slug === slug)
+            : undefined;
+          const doc = drafted ?? findDoc(contentDir, name, collection, slug);
           return {
             collection: name,
             slug: doc.slug,
@@ -259,7 +282,13 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
             const existing = await remoteStore.read(sourcePath, actor);
             const raw = composeDocument(existing?.raw, data as Record<string, unknown>, body ?? "");
             parseDocument(raw, collection, sourcePath);
-            await remoteStore.write(sourcePath, raw, { actor });
+            assertSlugFree(contentDir, name, collection, slug, sourcePath);
+            // The version just read: a Studio save or another agent landing
+            // in between is refused with CONTENT_CONFLICT, not overwritten.
+            await remoteStore.write(sourcePath, raw, {
+              actor,
+              baseVersion: existing?.version ?? null,
+            });
             const key = `${name}/${slug}`;
             return {
               written: sourcePath,

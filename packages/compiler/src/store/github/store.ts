@@ -27,9 +27,11 @@
  * Git objects are immutable and content-addressed, so everything read by SHA
  * is cached for the life of the instance with no invalidation to get wrong.
  */
+import { createHash } from "node:crypto";
 import { GraftError } from "@usegraft/contracts";
 import { gitBlobSha } from "../blob";
 import { assertBaseVersion } from "../conflict";
+import { trimChar } from "../trim";
 import type {
   ContentStore,
   DraftChange,
@@ -113,7 +115,7 @@ export class GitHubStore implements ContentStore {
       fetch: options.fetch,
     });
     this.branch = options.branch ?? "main";
-    this.contentPath = (options.contentPath ?? "content").replace(/^\/+|\/+$/g, "");
+    this.contentPath = trimChar(options.contentPath ?? "content", "/", "both");
     this.prefix = options.branchPrefix ?? "graft-studio";
     this.publishMode = options.publishMode ?? "direct";
     this.deployedSha = options.deployedSha;
@@ -647,14 +649,18 @@ export function normalisePath(path: string): string {
   return rel;
 }
 
-/** A branch-safe key for an actor: lowercase, `[a-z0-9-]`, bounded. */
+/**
+ * A branch-safe key for an actor: lowercase, `[a-z0-9-]`, bounded, and one
+ * key per id. An id that is already a clean key (`ana`, `writer-bot`) is used
+ * as is. Any other id (`ana@shop.test`) keeps a readable prefix and gains a
+ * hash of the whole id, so `a+b@x.com` and `a-b@x.com` never share a draft.
+ */
 export function actorKey(actor: StoreActor): string {
-  const key = actor.id
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
-  return key || "editor";
+  const readable = trimChar(actor.id.toLowerCase().replace(/[^a-z0-9]+/g, "-"), "-", "both");
+  if (readable === actor.id && readable.length <= 48) return readable;
+  const hash = createHash("sha256").update(actor.id).digest("hex").slice(0, 10);
+  const prefix = trimChar(readable.slice(0, 37), "-");
+  return prefix ? `${prefix}-${hash}` : `editor-${hash}`;
 }
 
 function authorOf(actor: StoreActor): CommitAuthor {

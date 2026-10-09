@@ -7,6 +7,7 @@
  * goes through that table: a session is just another way to arrive at a
  * principal with scopes.
  */
+import { withoutTrailingSlashes } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import type { StudioPrincipal } from "./api";
 import {
@@ -80,7 +81,7 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
   }
 
   function origin(request: Request): string {
-    return (options.publicUrl ?? new URL(request.url).origin).replace(/\/+$/, "");
+    return withoutTrailingSlashes(options.publicUrl ?? new URL(request.url).origin);
   }
 
   function redirect(location: string, cookies: string[] = []): Response {
@@ -129,8 +130,8 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     }
 
     const doFetch = github.fetch ?? fetch;
-    const webUrl = (github.webUrl ?? "https://github.com").replace(/\/+$/, "");
-    const apiUrl = (github.apiUrl ?? "https://api.github.com").replace(/\/+$/, "");
+    const webUrl = withoutTrailingSlashes(github.webUrl ?? "https://github.com");
+    const apiUrl = withoutTrailingSlashes(github.apiUrl ?? "https://api.github.com");
 
     const exchange = await doFetch(`${webUrl}/login/oauth/access_token`, {
       method: "POST",
@@ -243,7 +244,7 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
             10 * 60_000,
           );
           const authorize = new URL(
-            `${(options.github.webUrl ?? "https://github.com").replace(/\/+$/, "")}/login/oauth/authorize`,
+            `${withoutTrailingSlashes(options.github.webUrl ?? "https://github.com")}/login/oauth/authorize`,
           );
           authorize.searchParams.set("client_id", options.github.clientId);
           authorize.searchParams.set("redirect_uri", `${origin(request)}${AUTH}/github/callback`);

@@ -16,7 +16,7 @@ pnpm studio                     # http://127.0.0.1:4983
 Locally, saves go to the files under `content/` and Publish is a Git commit.
 
 To try Studio on a large catalog, generate one (and put the committed
-catalog back afterwards with `git checkout content`):
+catalog back afterwards with `pnpm seed`, which writes the same 48 products):
 
 ```sh
 pnpm seed --count 2000

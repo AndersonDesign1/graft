@@ -371,7 +371,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   // GRAFT_GITHUB_REPO is set, which is what lets a read-only deployment write.
   const repository = githubStoreFromEnv({
     contentDir: config.contentDir,
-    projectRoot: options.cwd,
+    projectRoot: config.projectDir,
   });
 
   const mcpHandler = createGraftMcpHandler({

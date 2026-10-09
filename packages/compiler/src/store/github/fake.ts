@@ -13,6 +13,7 @@
  * Exported from `@usegraft/compiler/testing`.
  */
 import { createHash } from "node:crypto";
+import { withoutTrailingSlashes } from "../trim";
 import { createServer } from "node:http";
 import { gitBlobSha } from "../blob";
 
@@ -90,7 +91,7 @@ export function createGitHubFake(options: GitHubFakeOptions = {}): GitHubFake {
   const repo = options.repo ?? "acme/site";
   const token = options.token ?? "test-token";
   const defaultBranch = options.branch ?? "main";
-  let apiUrl = (options.apiUrl ?? "https://github.test/api").replace(/\/+$/, "");
+  let apiUrl = withoutTrailingSlashes(options.apiUrl ?? "https://github.test/api");
   const permissions = options.permissions ?? {};
 
   const blobs = new Map<string, string>();

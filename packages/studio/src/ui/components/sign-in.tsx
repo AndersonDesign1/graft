@@ -28,7 +28,11 @@ export function SignIn() {
       .catch(() => setSession({ methods: { github: false, invite: true } }));
   }, []);
 
-  const returnTo = `${window.location.pathname}${window.location.hash}`;
+  // Keep the query (the branch being edited), minus the sign-in reason.
+  const query = new URLSearchParams(window.location.search);
+  query.delete("signin");
+  const search = query.toString();
+  const returnTo = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
 
   return (
     <main className="signin">

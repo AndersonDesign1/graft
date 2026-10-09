@@ -352,6 +352,10 @@ function Reviews({ reviews }: { reviews: DraftsDto["reviews"] }) {
 function Done({ result, onClose }: { result: PublishResultDto; onClose: () => void }) {
   const count = result.published.length;
   const what = count === 1 ? "1 change" : `${count} changes`;
+  const kept = result.tookTheirs.length;
+  // Every conflict resolved as "keep theirs": nothing went out, and saying
+  // "Published 0 changes" would read as a failure.
+  const onlyKept = count === 0 && kept > 0;
   return (
     <div className="sheet-done">
       <span className="seal" aria-hidden="true">
@@ -364,18 +368,22 @@ function Done({ result, onClose }: { result: PublishResultDto; onClose: () => vo
         </svg>
       </span>
       <p className="sheet-done-title">
-        {result.action === "review"
-          ? `Submitted ${what} for review.`
-          : result.action === "commit"
-            ? `Committed ${what}.`
-            : `Published ${what}.`}
+        {onlyKept
+          ? `Kept the published ${kept === 1 ? "version" : "versions"}.`
+          : result.action === "review"
+            ? `Submitted ${what} for review.`
+            : result.action === "commit"
+              ? `Committed ${what}.`
+              : `Published ${what}.`}
       </p>
       <p className="sheet-done-body">
-        {result.action === "review"
-          ? "They go live when the pull request is merged."
-          : result.action === "commit"
-            ? `Commit ${result.commit?.shortSha ?? ""} is on this computer. Push it to deploy.`
-            : "The site updates as soon as it redeploys."}
+        {onlyKept
+          ? `Your ${kept === 1 ? "draft was" : "drafts were"} discarded; nothing else changed.`
+          : result.action === "review"
+            ? "They go live when the pull request is merged."
+            : result.action === "commit"
+              ? `Commit ${result.commit?.shortSha ?? ""} is on this computer. Push it to deploy.`
+              : "The site updates as soon as it redeploys."}
       </p>
       <div className="sheet-done-actions">
         {result.review ? (

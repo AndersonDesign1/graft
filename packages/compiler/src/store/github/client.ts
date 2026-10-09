@@ -7,6 +7,7 @@
  * and the in-memory GitHub the tests run against both work.
  */
 import { GraftError } from "@usegraft/contracts";
+import { withoutTrailingSlashes } from "../trim";
 import type { GitHubAuth } from "./auth";
 
 export interface GitHubClientOptions {
@@ -79,7 +80,7 @@ export class GitHubClient {
       });
     }
     this.repo = options.repo;
-    this.apiUrl = (options.apiUrl ?? "https://api.github.com").replace(/\/+$/, "");
+    this.apiUrl = withoutTrailingSlashes(options.apiUrl ?? "https://api.github.com");
     this.doFetch = options.fetch ?? fetch;
   }
 

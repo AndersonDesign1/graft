@@ -41,11 +41,13 @@ import {
   parseEntry,
   queryEntries,
   statusOf,
+  searchText,
   summarise,
   titleOf,
   type CatalogEntry,
   type EntryQuery,
 } from "./catalog";
+import { slugify as slugText } from "../slug";
 import { lineDiff } from "./line-diff";
 import { localDrafts } from "./local-drafts";
 
@@ -139,6 +141,9 @@ export class EditorService {
       fields,
       query,
       collection.sections,
+      query.q
+        ? new Map(entries.map((entry) => [entry.path, searchText(entry, fields)]))
+        : undefined,
     );
   }
 
@@ -223,7 +228,9 @@ export class EditorService {
     let body: string;
     if (typeof input.raw === "string") {
       raw = input.raw;
-      body = matter(raw, {}).content;
+      const parsed = matter(raw, {});
+      body = parsed.content;
+      assertSlugMatches(parsed.data, input.slug);
     } else {
       if (!input.data) {
         throw new GraftError({
@@ -232,6 +239,7 @@ export class EditorService {
           fix: 'Send { "data", "body" } or { "raw" }.',
         });
       }
+      assertSlugMatches(input.data, input.slug);
       body = input.body ?? "";
       raw = composeDocument(existing?.raw, input.data, body);
     }
@@ -266,6 +274,7 @@ export class EditorService {
     } else {
       slug = uniqueSlug(slugify(titleOf({ data: input.data, slug: "untitled" })), taken);
     }
+    assertSlugMatches(input.data, slug);
     const path = `${input.collection}/${slug}.mdx`;
     const body = input.body ?? "";
     const raw = composeDocument(undefined, input.data, body);
@@ -433,17 +442,24 @@ function sameValue(a: unknown, b: unknown): boolean {
   return false;
 }
 
+/**
+ * A `slug` in frontmatter overrides the file name, so one that disagrees with
+ * the entry being saved would index the file as a different entry, possibly a
+ * duplicate. The same rule `write_content` applies.
+ */
+function assertSlugMatches(data: Record<string, unknown>, slug: string): void {
+  if (data.slug === undefined || data.slug === slug) return;
+  throw new GraftError({
+    code: "INVALID_SLUG",
+    message: `The entry's slug field ("${String(data.slug)}") doesn't match its URL name ("${slug}").`,
+    fix: "Remove slug from the fields, or set it to the URL name.",
+    details: { slug, frontmatterSlug: data.slug },
+  });
+}
+
 /** "Blue Linen Shirt!" -> "blue-linen-shirt". */
 export function slugify(title: string): string {
-  const slug = title
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80)
-    .replace(/-+$/g, "");
-  return slug || "untitled";
+  return slugText(title) || "untitled";
 }
 
 export function uniqueSlug(wanted: string, taken: ReadonlySet<string>): string {

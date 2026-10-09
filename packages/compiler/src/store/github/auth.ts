@@ -7,6 +7,7 @@
  * shortest path for one person self-hosting.
  */
 import { createSign } from "node:crypto";
+import { withoutTrailingSlashes } from "../trim";
 import { GraftError } from "@usegraft/contracts";
 
 export interface GitHubAuth {
@@ -65,7 +66,7 @@ export function appJwt(appId: string, privateKey: string, nowMs: number): string
  * most rather than one per request.
  */
 export function appAuth(options: AppAuthOptions): GitHubAuth {
-  const apiUrl = (options.apiUrl ?? "https://api.github.com").replace(/\/+$/, "");
+  const apiUrl = withoutTrailingSlashes(options.apiUrl ?? "https://api.github.com");
   const doFetch = options.fetch ?? fetch;
   const now = options.now ?? Date.now;
   let installationId = options.installationId;

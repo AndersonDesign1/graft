@@ -101,7 +101,8 @@ return `gitSha: null`, because nothing was compiled: a draft must not reach the
 live site's index.
 
 `list_drafts` shows those changes, and `publish_drafts` puts them live. It opens
-a pull request unless the credential carries `content:publish`, in which case
+a pull request unless the credential carries `content:publish` and the server
+publishes directly (`GRAFT_STUDIO_PUBLISH=commit`, the default), in which case
 it commits to the production branch and the host redeploys. A document the
 production branch also changed since the draft began is refused with
 `CONTENT_CONFLICT`; send `resolve: { "<path>": "mine" }` or `"theirs"` to

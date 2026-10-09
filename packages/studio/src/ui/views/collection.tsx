@@ -159,18 +159,22 @@ export function CollectionView({ collection }: { collection: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftStamp]);
 
-  // Next page when the end of the table is in view.
+  // A selection only means something for the rows it was made on.
+  useEffect(() => setSelected(new Set()), [params]);
+
+  // Next page when the end of the table is in view. Not after a failure: the
+  // sentinel stays in view, so retrying here would loop; the notice offers it.
   const sentinel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = sentinel.current;
-    if (!el || !list?.nextCursor) return;
+    if (!el || !list?.nextCursor || error) return;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting) && !loading && list.nextCursor)
         void fetchPage(list.nextCursor);
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [list, loading, fetchPage]);
+  }, [list, loading, error, fetchPage]);
 
   const facetFields = useMemo(
     () => (list?.facets ?? []).filter((facet) => facet.values.length > 1),
@@ -401,6 +405,15 @@ export function CollectionView({ collection }: { collection: string }) {
         <p className="notice" data-tone="error">
           <IconWarning size={14} />
           <span>{error}</span>
+          <button
+            type="button"
+            className="btn notice-action"
+            onClick={() =>
+              void fetchPage(items.length > 0 ? (list?.nextCursor ?? undefined) : undefined)
+            }
+          >
+            Try again
+          </button>
         </p>
       ) : null}
 

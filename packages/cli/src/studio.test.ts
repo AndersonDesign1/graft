@@ -62,7 +62,7 @@ describe("graft studio invite", () => {
         cwd: process.cwd(),
         email: "ana@shop.test",
         role: "contributor",
-        url: "https://shop.test/",
+        url: "https://shop.test/studio/",
       });
       expect(invite.url).toMatch(/^https:\/\/shop\.test\/api\/studio\/v1\/auth\/link\?token=/);
       const handler = createStudioHandler({
@@ -92,5 +92,8 @@ describe("graft studio invite", () => {
       /public URL/,
     );
     if (saved !== undefined) process.env.GRAFT_STUDIO_URL = saved;
+    await expect(
+      studioInviteCommand({ cwd: process.cwd(), email: "a@b.c", url: "shop.test" }),
+    ).rejects.toThrow(/not a URL/);
   });
 });

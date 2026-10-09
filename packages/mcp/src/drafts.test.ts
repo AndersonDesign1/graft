@@ -99,6 +99,34 @@ describe("MCP writes through a GitHub store", () => {
     ]);
   });
 
+  it("reads back its own draft with get_content and list_content", async () => {
+    const { call } = await connect(["content:write"]);
+    await call("write_content", {
+      collection: "pages",
+      slug: "about",
+      data: { title: "About" },
+      body: "Who we are.",
+    });
+    await call("write_content", {
+      collection: "pages",
+      slug: "home",
+      data: { title: "Home, drafted" },
+      body: "Welcome back.",
+    });
+
+    const one = await call("get_content", { collection: "pages", slug: "about" });
+    expect(one.isError).toBe(false);
+    expect(one.payload.body).toContain("Who we are.");
+    const home = await call("get_content", { collection: "pages", slug: "home" });
+    expect(home.payload.data.title).toBe("Home, drafted");
+
+    const all = await call("list_content", { collection: "pages" });
+    expect(all.payload.documents.map((doc: { slug: string }) => doc.slug)).toEqual([
+      "about",
+      "home",
+    ]);
+  });
+
   it("opens a pull request unless the credential may publish", async () => {
     const { fake, call } = await connect(["content:write"]);
     await call("write_content", { collection: "pages", slug: "about", data: { title: "About" } });

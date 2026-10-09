@@ -8,6 +8,7 @@ import {
   labelOf,
   moneyInput,
   parseMoney,
+  isBlank,
   problemsFromServer,
   problemsIn,
   titleField,
@@ -63,6 +64,10 @@ describe("money", () => {
     expect(parseMoney("$1,299")).toBe(129900);
     expect(parseMoney("12,5")).toBe(1250);
     expect(parseMoney("abc")).toBeNull();
+    expect(parseMoney("abc12")).toBeNull();
+    expect(parseMoney("12x")).toBeNull();
+    expect(parseMoney("USD 12")).toBe(1200);
+    expect(parseMoney(" € 3,50 ", "EUR")).toBe(350);
     expect(moneyInput(1250)).toBe("12.50");
     expect(moneyInput(undefined)).toBe("");
   });
@@ -93,6 +98,19 @@ describe("validation in words", () => {
       }),
     }),
   ];
+
+  it("treats blank by field type", () => {
+    expect(isBlank(null, "string")).toBe(true);
+    expect(isBlank({ key: "" }, "asset")).toBe(true);
+    expect(isBlank(null, "json")).toBe(false);
+    expect(isBlank("", "json")).toBe(false);
+    expect(isBlank({ key: "" }, "object")).toBe(false);
+    expect(
+      problemsIn([f({ name: "status", type: "select", options: [{ value: "1" }] })], {
+        status: 1,
+      }).get("status"),
+    ).toBe("Choose one of the options for status.");
+  });
 
   it("passes a valid entry", () => {
     expect(

@@ -39,6 +39,7 @@ const collections = {
       status: field.select({ options: ["draft", "active", "archived"] }),
       category: field.reference({ to: "categories", optional: true }),
       image: field.asset({ optional: true }),
+      summary: field.text({ optional: true }),
     },
   }),
   categories: defineCollection({ name: "categories", fields: { title: field.string() } }),
@@ -108,6 +109,30 @@ describe("editor API on a local checkout", () => {
     });
   });
 
+  it("publishes or discards a rename from either of its entries", async () => {
+    const root = join(contentDir, "..");
+    git(root, "mv", "content/products/old-shirt.mdx", "content/products/older-shirt.mdx");
+    const drafts = await call<DraftsDto>(handler, "GET", "/drafts");
+    expect(drafts.json.changes.map((change) => change.path)).toEqual([
+      "products/old-shirt.mdx",
+      "products/older-shirt.mdx",
+    ]);
+
+    const discarded = await call(handler, "POST", "/drafts/discard", {
+      paths: ["products/old-shirt.mdx"],
+    });
+    expect(discarded.status).toBe(200);
+    expect(git(root, "status", "--porcelain")).toBe("");
+
+    git(root, "mv", "content/products/old-shirt.mdx", "content/products/older-shirt.mdx");
+    const published = await call(handler, "POST", "/drafts/publish", {
+      paths: ["products/old-shirt.mdx", "products/older-shirt.mdx"],
+    });
+    expect(published.status).toBe(200);
+    expect(git(root, "status", "--porcelain")).toBe("");
+    expect(git(root, "log", "-1", "--name-status", "--format=")).toContain("older-shirt.mdx");
+  });
+
   it("lists, searches, filters and sorts on the server", async () => {
     const all = await call<EntryList>(handler, "GET", "/entries?collection=products");
     expect(all.json.total).toBe(3);
@@ -135,6 +160,17 @@ describe("editor API on a local checkout", () => {
       { value: "active", count: 2 },
       { value: "archived", count: 1 },
     ]);
+
+    // Search reads whole fields, not the table's shortened cells.
+    writeFileSync(
+      join(contentDir, "products", "wool-hat.mdx"),
+      product("Wool Hat", 2500, "active", "hats").replace(
+        "---\n\n",
+        `summary: ${"Warm and soft. ".repeat(20)}Knitted on Fair Isle.\n---\n\n`,
+      ),
+    );
+    const deep = await call<EntryList>(handler, "GET", "/entries?collection=products&q=fair+isle");
+    expect(deep.json.items.map((item) => item.slug)).toEqual(["wool-hat"]);
 
     const paged = await call<EntryList>(handler, "GET", "/entries?collection=products&limit=2");
     expect(paged.json.items).toHaveLength(2);
@@ -164,6 +200,23 @@ describe("editor API on a local checkout", () => {
     });
     expect(clash.status).toBe(409);
     expect(clash.json.error).toBe("SLUG_NOT_UNIQUE");
+
+    // A slug field that names another entry would index the file under it.
+    for (const [method, payload] of [
+      ["POST", { collection: "products", slug: "cap", data: { title: "Cap", slug: "wool-hat" } }],
+      [
+        "PUT",
+        { collection: "products", slug: "old-shirt", data: { title: "Old", slug: "wool-hat" } },
+      ],
+    ] as const) {
+      const refused = await call<{ error: string }>(handler, method, "/entry", payload);
+      expect([refused.status, refused.json.error]).toEqual([400, "INVALID_SLUG"]);
+    }
+    const copy = await call<SaveEntryResult>(handler, "POST", "/entry/duplicate", {
+      collection: "products",
+      slug: "wool-hat",
+    });
+    expect(copy.status).toBe(201);
   });
 
   it("refuses a save made from a stale read, and keeps the newer bytes", async () => {
@@ -317,6 +370,29 @@ describe("editor API on GitHub (hosted)", () => {
     });
     return { fake, handler, contentDir };
   }
+
+  it("refuses the routes that would write the deployed files", async () => {
+    const { handler, contentDir } = hosted();
+    const before = readFileSync(join(contentDir, "products", "wool-hat.mdx"), "utf8");
+    for (const [method, path, body] of [
+      [
+        "PUT",
+        "/document",
+        { collection: "products", slug: "wool-hat", raw: "---\ntitle: x\n---\n" },
+      ],
+      ["POST", "/compile", {}],
+      ["POST", "/changes/commit", { paths: ["products/wool-hat.mdx"], message: "x" }],
+      ["POST", "/compilations/c1/revert", {}],
+    ] as const) {
+      const refused = await call<{ error: string }>(handler, method, path, body);
+      expect([path, refused.status, refused.json.error]).toEqual([
+        path,
+        409,
+        "CONTENT_TREE_READ_ONLY",
+      ]);
+    }
+    expect(readFileSync(join(contentDir, "products", "wool-hat.mdx"), "utf8")).toBe(before);
+  });
 
   it("saves to the editor's draft branch, leaving the deployed files alone", async () => {
     const { fake, handler, contentDir } = hosted();

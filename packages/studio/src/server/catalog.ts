@@ -162,6 +162,16 @@ export function titleOf(entry: Pick<CatalogEntry, "data" | "slug">): string {
   return entry.slug;
 }
 
+/** Title, slug and every text field in full, for search. */
+export function searchText(entry: CatalogEntry, fields: SchemaFieldDto[]): string {
+  const parts = [titleOf(entry), entry.slug];
+  for (const field of fields) {
+    const value = entry.data[field.name];
+    if (typeof value === "string") parts.push(value);
+  }
+  return parts.join(" ");
+}
+
 export function summarise(
   collection: string,
   entries: CatalogEntry[],
@@ -239,6 +249,8 @@ export function queryEntries(
   fields: SchemaFieldDto[],
   query: EntryQuery,
   sections?: readonly string[],
+  /** Each entry's full searchable text by path; table cells are cut short. */
+  texts?: ReadonlyMap<string, string>,
 ): EntryList {
   const unpublished = all.filter((entry) => entry.status !== "published").length;
   let items = all;
@@ -250,13 +262,14 @@ export function queryEntries(
   const terms = (query.q ?? "").toLowerCase().split(/\s+/).filter(Boolean);
   if (terms.length > 0) {
     items = items.filter((entry) => {
-      const haystack = [
-        entry.title,
-        entry.slug,
-        ...Object.values(entry.fields).filter((value) => typeof value === "string"),
-      ]
-        .join(" ")
-        .toLowerCase();
+      const haystack = (
+        texts?.get(entry.path) ??
+        [
+          entry.title,
+          entry.slug,
+          ...Object.values(entry.fields).filter((value) => typeof value === "string"),
+        ].join(" ")
+      ).toLowerCase();
       return terms.every((term) => haystack.includes(term));
     });
   }

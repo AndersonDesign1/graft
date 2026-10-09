@@ -1114,6 +1114,14 @@
   text-wrap: balance;
 }
 
+/* The title draws no box, so focus needs its own mark: the app's ring, held
+   off the glyphs so it frames the line rather than cutting through it. */
+.page-title:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 6px;
+  border-radius: var(--radius-inner);
+}
+
 .page-title::placeholder {
   color: var(--ink-faint);
 }
@@ -2308,4 +2316,10 @@
   from {
     opacity: 0;
   }
+}
+
+.notice .notice-action {
+  margin-left: auto;
+  padding: 0.1rem 0.5rem;
+  font-size: inherit;
 }

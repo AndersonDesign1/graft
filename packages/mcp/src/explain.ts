@@ -247,7 +247,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
   REMOTE_STORE_FAILED: {
     code: "REMOTE_STORE_FAILED",
     meaning:
-      "The content store that writes to a remote repository (GitHub) refused or failed a request. Authored content lives in git, so when the remote cannot be written, the save did not happen.",
+      "The content store that writes to a remote repository (GitHub) refused or failed a request. A failed save did not happen. A publish may have partly completed (the production branch moved, then tidying the draft failed), so check the repository before retrying a publish.",
     typicalCauses: [
       "The token or GitHub App lacks Contents or Pull requests write access to the repository",
       "GRAFT_GITHUB_REPO or GRAFT_GITHUB_BRANCH names a repository or branch that does not exist",

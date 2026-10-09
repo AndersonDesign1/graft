@@ -41,8 +41,9 @@ export function localDrafts(contentDir: string): DraftWorkflow {
     },
 
     async publish(options): Promise<PublishResult> {
+      const paths = await renameDestinations(contentDir, options.paths);
       const result = await commitChanges(contentDir, {
-        paths: options.paths,
+        paths,
         message: options.message?.trim() || defaultMessage(options.paths),
       });
       return {
@@ -57,7 +58,7 @@ export function localDrafts(contentDir: string): DraftWorkflow {
       const status = await readChanges(contentDir);
       const byPath = new Map(status.files.map((file) => [file.path, file]));
       const restore: string[] = [];
-      for (const path of paths) {
+      for (const path of await renameDestinations(contentDir, paths)) {
         const full = safeContentPath(contentDir, path);
         const file = byPath.get(path);
         if (!file) continue;
@@ -94,6 +95,20 @@ export function localDrafts(contentDir: string): DraftWorkflow {
       return [];
     },
   };
+}
+
+/**
+ * `changes()` lists a rename as two entries, the new path and the old one,
+ * but git holds it as one change under the new path. Map an old path to its
+ * rename so either entry, or both, can be published or discarded.
+ */
+async function renameDestinations(contentDir: string, paths: string[]): Promise<string[]> {
+  const status = await readChanges(contentDir);
+  const renamedFrom = new Map<string, string>();
+  for (const file of status.files) {
+    if (file.status === "renamed" && file.from) renamedFrom.set(file.from, file.path);
+  }
+  return [...new Set(paths.map((path) => renamedFrom.get(path) ?? path))];
 }
 
 function defaultMessage(paths: string[]): string {

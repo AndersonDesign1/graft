@@ -64,10 +64,10 @@ export function CommandPalette({
 
   useEffect(() => {
     const term = query.trim();
-    if (!open || term.length < 2) {
-      setHits([]);
-      return;
-    }
+    // Drop the last search's hits at once: each item's value carries the
+    // current query, so a stale hit would look like a match for this one.
+    setHits([]);
+    if (!open || term.length < 2) return;
     let cancelled = false;
     const timer = setTimeout(() => {
       void Promise.all(

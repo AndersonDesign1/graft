@@ -133,7 +133,14 @@ export function formatMoney(minor: number, currency = "USD", locale?: string): s
 /** "12.50", "$1,299", "12" -> minor units. Null when it is not an amount. */
 export function parseMoney(input: string, currency = "USD"): number | null {
   const digits = currencyDigits(currency);
-  const cleaned = input.replace(/[^0-9.,-]/g, "").replace(/,(?=\d{3}(\D|$))/g, "");
+  // Only a symbol, the currency's own code and spaces may surround the number:
+  // "abc12" is not an amount, and reading it as 12 would save the wrong price.
+  const bare = input
+    .replace(/\p{Sc}/gu, "")
+    .replace(new RegExp(currency, "gi"), "")
+    .replace(/\s/g, "");
+  if (/[^0-9.,-]/.test(bare)) return null;
+  const cleaned = bare.replace(/,(?=\d{3}(\D|$))/g, "");
   if (!cleaned || !/^-?\d*(?:[.,]\d*)?$/.test(cleaned)) return null;
   const value = Number(cleaned.replace(",", "."));
   if (!Number.isFinite(value)) return null;
@@ -149,11 +156,21 @@ export function moneyInput(minor: number | null | undefined, currency = "USD"): 
 
 /* ---- validation ---------------------------------------------------------- */
 
-export function isBlank(value: unknown): boolean {
-  if (value === undefined || value === null) return true;
-  if (typeof value === "string") return value.trim() === "";
-  if (Array.isArray(value)) return false;
-  if (typeof value === "object" && "key" in (value as object)) {
+const TEXTUAL = new Set(["string", "text", "datetime", "select", "reference"]);
+const TYPED = new Set([...TEXTUAL, "number", "boolean", "asset", "object", "array"]);
+
+/**
+ * Whether a field has no value yet, for its type. Only a field Studio has a
+ * control for treats `null` as empty; a JSON field may hold `null` or `""` on
+ * purpose, and only an asset's `{ key: "" }` is an unchosen file.
+ */
+export function isBlank(value: unknown, type?: string): boolean {
+  if (value === undefined) return true;
+  if (type !== undefined && !TYPED.has(type)) return false;
+  if (value === null) return true;
+  if (typeof value === "string")
+    return type === undefined || TEXTUAL.has(type) ? value.trim() === "" : false;
+  if (type === "asset" && typeof value === "object" && !Array.isArray(value)) {
     return String((value as { key?: unknown }).key ?? "").trim() === "";
   }
   return false;
@@ -171,7 +188,7 @@ export function problemsWith(
 ): Map<string, string> {
   const out = new Map<string, string>();
   const label = labelOf(field);
-  if (isBlank(value)) {
+  if (isBlank(value, field.type)) {
     if (!field.optional) out.set(path, `${label} is required.`);
     return out;
   }
@@ -222,7 +239,7 @@ export function problemsWith(
       break;
     case "select": {
       const allowed = (field.options ?? []).map((option) => option.value);
-      if (!allowed.includes(String(value))) {
+      if (typeof value !== "string" || !allowed.includes(value)) {
         out.set(path, `Choose one of the options for ${label.toLowerCase()}.`);
       }
       break;

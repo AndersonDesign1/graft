@@ -510,8 +510,16 @@ export async function commitChanges(
   // deletion of the old behind and the commit would contain both files.
   const pathspecs = [...new Set(selected.flatMap((file) => [file.path, file.from ?? []].flat()))];
 
+  // The old side of a rename is gone from the working tree, and `git add`
+  // refuses a path that matches nothing; record its removal instead.
+  const added = [...new Set(selected.map((file) => file.path))];
+  const removed = [...new Set(selected.flatMap((file) => (file.from ? [file.from] : [])))];
+
   try {
-    await git(contentDir, ["add", "--", ...pathspecs]);
+    await git(contentDir, ["add", "--", ...added]);
+    if (removed.length > 0) {
+      await git(contentDir, ["rm", "--cached", "--quiet", "--ignore-unmatch", "--", ...removed]);
+    }
     await git(contentDir, ["commit", "-m", message, "--", ...pathspecs]);
   } catch (error) {
     throw new GraftError({

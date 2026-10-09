@@ -100,7 +100,7 @@ Studio runs:
 | Studio | Publish button | What happens |
 | --- | --- | --- |
 | On your machine | Commit | A Git commit of the selected files. Nothing is pushed |
-| Hosted, editor | Publish | One commit on your production branch; the site redeploys |
+| Hosted, editor | Publish | One commit on your production branch; the site redeploys. With `GRAFT_STUDIO_PUBLISH=pull-request`, a pull request instead |
 | Hosted, contributor | Submit for review | A pull request for someone to merge |
 
 **Discard** throws a draft away and leaves the published version as it is.
@@ -136,7 +136,7 @@ settings. The index states are explained in [How Graft works](/docs/the-model).
 | Save an entry | Edit the file, then `graft compile` | `write_content` |
 | Delete an entry | Delete the file | `delete_content` |
 | Publish, locally | `git commit` | |
-| Publish, hosted | Merge the draft branch | `publish_drafts` |
+| Publish, hosted | Merge the draft branch (all of its changes at once) | `publish_drafts` |
 | Discard a draft | `git restore` | `discard_drafts` |
 | See past compiles | `graft compilations` | `list_compilations` |
 | Approve or deny | `graft approve` / `graft deny` | `decide_approval` |

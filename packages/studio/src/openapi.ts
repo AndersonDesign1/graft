@@ -165,13 +165,13 @@ export const STUDIO_OPENAPI = {
         operationId: "saveEntry",
         summary: "Save an entry through the content store",
         description:
-          "Validated like MCP write_content. Refused with CONTENT_CONFLICT (409) when baseVersion is not the current version.",
+          "Validated like MCP write_content. Send the version you read as baseVersion: it is refused with CONTENT_CONFLICT (409) when that is no longer the current version. A save without baseVersion is unconditional.",
         responses: { "200": { description: "OK" } },
       },
       post: {
         operationId: "createEntry",
         summary: "Create an entry; the slug comes from the title when omitted",
-        responses: { "200": { description: "OK" } },
+        responses: { "201": { description: "Created" } },
       },
       delete: {
         operationId: "deleteEntry",
@@ -183,7 +183,7 @@ export const STUDIO_OPENAPI = {
       post: {
         operationId: "duplicateEntry",
         summary: "Copy an entry under a new slug",
-        responses: { "200": { description: "OK" } },
+        responses: { "201": { description: "Created" } },
       },
     },
     "/api/studio/v1/drafts": {
@@ -207,7 +207,7 @@ export const STUDIO_OPENAPI = {
         summary:
           "Publish drafts: a commit locally, a commit on the production branch, or a pull request",
         description:
-          "A caller without studio:publish always opens a pull request. Conflicts are refused with CONTENT_CONFLICT listing each path; resend with resolve: { path: mine | theirs }.",
+          "On GitHub storage, a caller without studio:publish, or any caller when GRAFT_STUDIO_PUBLISH=pull-request, opens a pull request; local storage commits. Conflicts are refused with CONTENT_CONFLICT listing each path; resend with resolve: { path: mine | theirs }.",
         responses: { "200": { description: "OK" } },
       },
     },

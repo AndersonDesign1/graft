@@ -178,12 +178,12 @@ try {
     }),
   });
   check(saved.status === 200 && saved.body.status === "changed", "saved as an unpublished change");
-  const draft = github.files("graft-studio/drafts/ana-shop-test")[`content/${productPath}`];
+  const draftBranch = github
+    .branches()
+    .find((b) => b.startsWith("graft-studio/drafts/ana-shop-test-"));
+  const draft = github.files(draftBranch)[`content/${productPath}`];
   check(draft?.includes(`price: ${newPrice}`), "the draft branch has the new price");
-  check(
-    github.log("graft-studio/drafts/ana-shop-test")[0].author.name === "Ana Lima",
-    "authored by the editor",
-  );
+  check(github.log(draftBranch)[0].author.name === "Ana Lima", "authored by the editor");
   check(
     readFileSync(join(site, "content", productPath), "utf8") === before,
     "the deployed file is untouched",
@@ -227,10 +227,7 @@ try {
     github.files()[`content/${productPath}`].includes(`price: ${newPrice}`),
     "main has the new price",
   );
-  check(
-    !github.branches().includes("graft-studio/drafts/ana-shop-test"),
-    "the empty draft branch is gone",
-  );
+  check(!github.branches().includes(draftBranch), "the empty draft branch is gone");
   const after = await api(
     `/entries?collection=products&q=${encodeURIComponent(entry.body.data.title)}`,
   );

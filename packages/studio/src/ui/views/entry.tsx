@@ -84,6 +84,9 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
   /* ---- loading --------------------------------------------------------- */
 
   const seq = useRef(0);
+  // What the server last confirmed, updated the moment a save lands rather
+  // than on the next render, so a save queued behind it sends the new version.
+  const saved = useRef<EntryDto | null>(null);
   const load = useCallback(async () => {
     const mine = ++seq.current;
     setLoading(true);
@@ -92,6 +95,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
     try {
       const next = await api<EntryDto>(`/entry${qs({ collection, slug })}`);
       if (mine !== seq.current) return;
+      saved.current = next;
       setEntry(next);
       setEdits({});
       setBody(next.body);
@@ -111,21 +115,22 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
 
   /* ---- saving ---------------------------------------------------------- */
 
-  const latest = useRef({ entry, data, body, raw, mode, localProblems, conflict });
-  latest.current = { entry, data, body, raw, mode, localProblems, conflict };
+  const latest = useRef({ edits, data, body, raw, mode, localProblems, conflict });
+  latest.current = { edits, data, body, raw, mode, localProblems, conflict };
 
   const persist = useCallback(
     async (force = false) => {
       const snap = latest.current;
-      if (!snap.entry || readOnly) return;
+      const base = saved.current;
+      if (!base || readOnly) return;
       if (snap.conflict && !force) return;
-      // Identity from the snapshot the bytes came from, never from the route.
-      const { collection: name, slug: id, version } = snap.entry;
+      // Identity from what the bytes were loaded from, never from the route.
+      const { collection: name, slug: id, version } = base;
 
       const changed =
         snap.mode === "source"
-          ? snap.raw !== snap.entry.raw
-          : snap.body !== snap.entry.body || !sameValue(snap.data, snap.entry.data);
+          ? snap.raw !== base.raw
+          : snap.body !== base.body || !sameValue(snap.data, base.data);
       if (!changed) return;
       if (snap.mode === "form" && snap.localProblems.size > 0) {
         setShowAllProblems(true);
@@ -147,19 +152,24 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
         setServerProblems(new Map());
         setConflict(false);
         // What was just written becomes what later saves compare against.
-        setEntry((prev) =>
-          prev && prev.collection === name && prev.slug === id
-            ? {
-                ...prev,
-                ...(snap.mode === "source"
-                  ? { raw: snap.raw }
-                  : { data: snap.data, body: snap.body }),
-                version: result.version,
-                status: result.status,
-              }
-            : prev,
-        );
-        if (snap.mode === "form") setEdits({});
+        const next: EntryDto = {
+          ...base,
+          ...(snap.mode === "source" ? { raw: snap.raw } : { data: snap.data, body: snap.body }),
+          version: result.version,
+          status: result.status,
+        };
+        if (saved.current === base) saved.current = next;
+        setEntry((prev) => (prev && prev.collection === name && prev.slug === id ? next : prev));
+        // Keep edits made while this save was in flight; they are the next save.
+        if (snap.mode === "form") {
+          setEdits((prev) => {
+            const kept: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(prev)) {
+              if (!(key in snap.edits) || snap.edits[key] !== value) kept[key] = value;
+            }
+            return kept;
+          });
+        }
         drafts.refresh();
       } catch (error) {
         if (error instanceof ApiError && error.code === "CONTENT_CONFLICT") {
@@ -312,11 +322,14 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
       )
     )
       return;
-    const snapshot = entry;
     try {
+      // Land any pending save first, so the delete sends the latest version
+      // and the undo below brings back the latest draft.
+      await autosave.flush();
+      const snapshot = saved.current ?? entry;
       await api("/entry", {
         method: "DELETE",
-        body: JSON.stringify({ collection, slug, baseVersion: entry.version }),
+        body: JSON.stringify({ collection, slug, baseVersion: snapshot.version }),
       });
       drafts.refresh();
       navigate({ view: "collection", collection });
@@ -325,8 +338,9 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
         action: {
           label: "Undo",
           onClick: () => {
-            // A published entry comes back by discarding the deletion; one
-            // that was never published is written again from what we held.
+            // An entry with unpublished edits comes back with them, written
+            // again from what we held. An unchanged one comes back by
+            // discarding the deletion. One never published is created again.
             const undo =
               snapshot.status === "new"
                 ? api("/entry", {
@@ -338,10 +352,20 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
                       body: snapshot.body,
                     }),
                   })
-                : api("/drafts/discard", {
-                    method: "POST",
-                    body: JSON.stringify({ paths: [snapshot.path] }),
-                  });
+                : snapshot.status === "changed"
+                  ? api("/entry", {
+                      method: "PUT",
+                      body: JSON.stringify({
+                        collection,
+                        slug,
+                        data: snapshot.data,
+                        body: snapshot.body,
+                      }),
+                    })
+                  : api("/drafts/discard", {
+                      method: "POST",
+                      body: JSON.stringify({ paths: [snapshot.path] }),
+                    });
             void undo
               .then(() => {
                 drafts.refresh();

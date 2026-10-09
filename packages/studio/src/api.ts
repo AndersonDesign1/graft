@@ -231,6 +231,7 @@ function statusFor(error: GraftError): number {
     case "COMMIT_FAILED":
     case "CONTENT_CONFLICT":
     case "SLUG_NOT_UNIQUE":
+    case "CONTENT_TREE_READ_ONLY":
       return 409;
     case "REMOTE_STORE_FAILED":
       return 502;
@@ -529,6 +530,11 @@ export interface Route {
   /** Exact pathname, or a pattern with exactly one capture group. */
   path: string | RegExp;
   scope: StudioScope;
+  /**
+   * Writes the files under `contentDir` directly. Refused when saves go to a
+   * remote store, where the checkout is the deployment and not the draft.
+   */
+  writesCheckout?: true;
   handle: (ctx: RouteContext) => Promise<Response> | Response;
 }
 
@@ -610,6 +616,7 @@ const ROUTES: readonly Route[] = [
     method: "POST",
     path: `${V1}/compile`,
     scope: "studio:write",
+    writesCheckout: true,
     handle: async ({ request, url, options, defaultBranch }) => {
       const payload = (await request.json().catch(() => ({}))) as { branch?: string };
       const branch =
@@ -664,6 +671,7 @@ const ROUTES: readonly Route[] = [
     method: "POST",
     path: `${V1}/changes/commit`,
     scope: "studio:write",
+    writesCheckout: true,
     handle: async ({ request, options }) => {
       const payload = (await request.json().catch(() => ({}))) as {
         paths?: unknown;
@@ -811,6 +819,7 @@ const ROUTES: readonly Route[] = [
     method: "POST",
     path: COMPILATION_REVERT_PATH,
     scope: "studio:write",
+    writesCheckout: true,
     handle: async ({ options, id }) => {
       const row = await requireCompilation(options, id);
       const changed = await revertContentTo(options.contentDir, row.gitSha as string);
@@ -867,6 +876,7 @@ const ROUTES: readonly Route[] = [
     method: "PUT",
     path: `${V1}/document`,
     scope: "studio:write",
+    writesCheckout: true,
     handle: async ({ request, options, defaultBranch }) => {
       const payload = (await request.json()) as {
         collection?: string;
@@ -976,6 +986,15 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
             },
           });
         }
+      }
+
+      if (matched.route.writesCheckout && options.store && options.store.kind !== "filesystem") {
+        throw new GraftError({
+          code: "CONTENT_TREE_READ_ONLY",
+          message: `${method} ${pathname} writes the deployed files, and this Studio saves to ${options.store.kind} instead.`,
+          fix: "Save with PUT /api/studio/v1/entry and publish with POST /api/studio/v1/drafts/publish; the host compiles when it redeploys.",
+          details: { pathname, method, storage: options.store.kind },
+        });
       }
 
       return await matched.route.handle({

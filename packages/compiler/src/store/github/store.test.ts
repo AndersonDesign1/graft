@@ -6,6 +6,7 @@ import { appAuth, appJwt, tokenAuth } from "./auth";
 import { deployedShaFrom, githubStoreFromEnv } from "./env";
 import { createGitHubFake, type GitHubFake } from "./fake";
 import { actorKey, GitHubStore, normalisePath, type GitHubStoreOptions } from "./store";
+import { trimChar, withoutTrailingSlashes } from "../trim";
 
 const ana = { id: "ana", name: "Ana Lima", email: "ana@shop.test" };
 const ben = { id: "ben", name: "Ben", email: "ben@shop.test" };
@@ -140,7 +141,24 @@ describe("GitHubStore: drafts", () => {
     expect(() => normalisePath("../.github/workflows/x.yml")).toThrow(GraftError);
     expect(() => normalisePath("products/../../x")).toThrow(GraftError);
     expect(normalisePath("/products/a.mdx")).toBe("products/a.mdx");
-    expect(actorKey({ id: "Ana.Lima@Shop.test" })).toBe("ana-lima-shop-test");
+  });
+
+  it("gives every actor its own branch key", () => {
+    expect(actorKey({ id: "ana" })).toBe("ana");
+    expect(actorKey({ id: "writer-bot" })).toBe("writer-bot");
+    expect(actorKey({ id: "Ana.Lima@Shop.test" })).toMatch(/^ana-lima-shop-test-[0-9a-f]{10}$/);
+    expect(actorKey({ id: "a+b@x.com" })).not.toBe(actorKey({ id: "a-b@x.com" }));
+    expect(actorKey({ id: "x".repeat(200) })).toMatch(/^x{37}-[0-9a-f]{10}$/);
+    expect(actorKey({ id: "@@@" })).toMatch(/^editor-[0-9a-f]{10}$/);
+  });
+
+  it("trims configured paths and URLs in linear time", () => {
+    expect(trimChar("//content//", "/", "both")).toBe("content");
+    expect(withoutTrailingSlashes("https://api.github.com///")).toBe("https://api.github.com");
+    const slashes = "/".repeat(100_000);
+    const started = performance.now();
+    expect(trimChar(`${slashes}a${slashes}x`, "/", "both")).toBe(`a${slashes}x`);
+    expect(performance.now() - started).toBeLessThan(200);
   });
 });
 
@@ -424,6 +442,21 @@ describe("githubStoreFromEnv", () => {
       publishMode: "review",
       url: "https://github.com/acme/shop",
     });
+  });
+
+  it("uses the repository root when the content directory is the project root", async () => {
+    const fake = createGitHubFake({ repo: "acme/shop", files: { "pages/home.mdx": hat } });
+    const store = githubStoreFromEnv({
+      contentDir: "/srv/site",
+      projectRoot: "/srv/site",
+      fetch: fake.fetch,
+      env: {
+        GRAFT_GITHUB_REPO: "acme/shop",
+        GRAFT_GITHUB_TOKEN: fake.token,
+        GRAFT_GITHUB_API_URL: fake.apiUrl,
+      },
+    });
+    expect(await store?.read("pages/home.mdx", ana)).toMatchObject({ raw: hat });
   });
 
   it("rejects an unknown publish mode", () => {

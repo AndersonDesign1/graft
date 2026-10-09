@@ -13,6 +13,7 @@
  * GRAFT_STUDIO_SECRET signs everyone out and voids every unused invite.
  */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { withoutTrailingSlashes } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 
 /** What a person may do in Studio. Ordered from least to most. */
@@ -24,12 +25,14 @@ export type StudioRole = (typeof STUDIO_ROLES)[number];
  * drafts and submits for review, an editor publishes, an admin also decides
  * approvals: the familiar split for a content team.
  */
-export const ROLE_SCOPES: Record<StudioRole, readonly string[]> = {
-  viewer: ["studio:read"],
-  contributor: ["studio:read", "studio:write"],
-  editor: ["studio:read", "studio:write", "studio:publish"],
-  admin: ["studio:read", "studio:write", "studio:publish", "approvals:decide"],
-};
+// Frozen, map and arrays alike: it is exported, and it decides what a signed-in
+// role may do, so no importer can widen a role at runtime.
+export const ROLE_SCOPES: Readonly<Record<StudioRole, readonly string[]>> = Object.freeze({
+  viewer: Object.freeze(["studio:read"]),
+  contributor: Object.freeze(["studio:read", "studio:write"]),
+  editor: Object.freeze(["studio:read", "studio:write", "studio:publish"]),
+  admin: Object.freeze(["studio:read", "studio:write", "studio:publish", "approvals:decide"]),
+});
 
 export function isStudioRole(value: unknown): value is StudioRole {
   return typeof value === "string" && (STUDIO_ROLES as readonly string[]).includes(value);
@@ -146,7 +149,7 @@ export function createInviteLink(options: {
     ...(options.name?.trim() ? { name: options.name.trim() } : {}),
   };
   const token = sign(requireSecret(options.secret), "invite", data, ttl);
-  const base = options.baseUrl.replace(/\/+$/, "");
+  const base = withoutTrailingSlashes(options.baseUrl);
   return {
     url: `${base}/api/studio/v1/auth/link?token=${encodeURIComponent(token)}`,
     expiresAt: new Date(Date.now() + ttl),
@@ -263,7 +266,7 @@ export function editorAccessFromEnv(
       fix: "Set both from your GitHub OAuth app (Settings > Developer settings > OAuth Apps), or neither to use invite links only.",
     });
   }
-  const publicUrl = env.GRAFT_STUDIO_URL?.trim().replace(/\/+$/, "") || undefined;
+  const publicUrl = withoutTrailingSlashes(env.GRAFT_STUDIO_URL?.trim() ?? "") || undefined;
   return {
     secret,
     ...(publicUrl ? { publicUrl } : {}),

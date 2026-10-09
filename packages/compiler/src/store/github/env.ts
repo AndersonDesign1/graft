@@ -71,9 +71,10 @@ export function githubStoreFromEnv(options: GitHubStoreFromEnvOptions): GitHubSt
 
   const root = options.projectRoot ?? process.cwd();
   const inferred = relative(root, options.contentDir).split(sep).join("/");
+  // Inside the project, the content directory sits at the same place in the
+  // repository (the project root itself is ""). Outside it, guess `content`.
   const contentPath =
-    env.GRAFT_GITHUB_CONTENT_PATH?.trim() ??
-    (inferred.startsWith("..") || inferred === "" ? "content" : inferred);
+    env.GRAFT_GITHUB_CONTENT_PATH?.trim() ?? (inferred.startsWith("..") ? "content" : inferred);
 
   return new GitHubStore({
     repo,

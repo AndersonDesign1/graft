@@ -524,10 +524,11 @@ function EntryPicker({
   );
 }
 
-function ReferenceControl({ field, value, onChange, disabled }: InputProps) {
+function ReferenceControl(props: InputProps) {
+  const { field, value, onChange, disabled } = props;
   const slug = typeof value === "string" ? value : "";
   const title = useEntryTitle(field.to, slug);
-  if (!field.to) return <TextControl {...({ field, value, onChange, disabled } as InputProps)} />;
+  if (!field.to) return <TextControl {...props} />;
   return (
     <div className="fc-ref">
       <EntryPicker
@@ -1032,7 +1033,7 @@ function ListControl({ field, value, onChange, disabled, path, problems }: Input
                     problems={problems}
                     disabled={disabled}
                     inputId=""
-                    onChange={(next) => update(i, { ...(entry as object), ...(next as object) })}
+                    onChange={(next) => update(i, next)}
                   />
                 ) : (
                   <FieldRow
