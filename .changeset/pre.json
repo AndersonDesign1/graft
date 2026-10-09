@@ -38,6 +38,7 @@
     "content-api-cors",
     "content-api-rate-limit",
     "content-api-reads",
+    "content-change-refresh",
     "core-db-optional-peer",
     "db-out-of-the-browser",
     "dependency-floors",
