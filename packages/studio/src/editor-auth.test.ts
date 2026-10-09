@@ -280,7 +280,7 @@ describe("Sign in with GitHub", () => {
     expect(denied.headers.get("location")).toBe("/studio/?signin=not_allowed");
 
     // A failed check is not a "no": the screen says access couldn't be checked.
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
     const { stub: devStub } = githubStub({ login: "dev" });
     const broken = createStudioHandler({
       ...base,
@@ -295,6 +295,8 @@ describe("Sign in with GitHub", () => {
     });
     const unchecked = await flow(broken);
     expect(unchecked.headers.get("location")).toBe("/studio/?signin=access_unchecked");
+    expect(quiet).toHaveBeenCalledOnce();
+    quiet.mockRestore();
   });
 
   it("never redirects off-site after sign-in", async () => {

@@ -427,7 +427,22 @@ export class GitHubStore implements ContentStore {
     return `${this.prefix}/drafts/${actorKey(actor)}`;
   }
 
+  /**
+   * The production head. Lookups already in flight are shared, so reading
+   * several published files at once (a listing with many pending deletions)
+   * costs one ref request, not one each. Nothing is kept once it settles:
+   * the next call sees a branch that moved.
+   */
   private async requireMain(): Promise<string> {
+    this.mainLookup ??= this.lookupMain().finally(() => {
+      this.mainLookup = undefined;
+    });
+    return this.mainLookup;
+  }
+
+  private mainLookup: Promise<string> | undefined;
+
+  private async lookupMain(): Promise<string> {
     const main = await this.client.getRef(this.branch);
     if (main === null) {
       throw new GraftError({

@@ -93,6 +93,13 @@ async function deletionStaysListed(handler: Handler): Promise<void> {
   const deleted = await call<EntryDto>(handler, "GET", "/entry?collection=products&slug=wool-hat");
   expect(deleted.json).toMatchObject({ status: "deleted", version: null });
   expect(deleted.json.data).toMatchObject({ title: "Wool Hat" });
+  // Its slug stays taken while the deletion is pending.
+  const reused = await call<{ error: string }>(handler, "POST", "/entry", {
+    collection: "products",
+    slug: "wool-hat",
+    data: { title: "Another hat", price: 1, status: "draft" },
+  });
+  expect([reused.status, reused.json.error]).toEqual([409, "SLUG_NOT_UNIQUE"]);
 
   await call(handler, "POST", "/drafts/discard", { paths: [opened.json.path] });
   const restored = await call<EntryDto>(handler, "GET", "/entry?collection=products&slug=wool-hat");

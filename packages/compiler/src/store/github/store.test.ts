@@ -412,6 +412,21 @@ describe("GitHubStore: layout and listing", () => {
     expect(error.fix).toContain("Metadata: read");
   });
 
+  it("shares one production lookup between concurrent published reads", async () => {
+    const { fake, store } = setup();
+    const before = fake.requests.length;
+    const files = await Promise.all(
+      ["products/shirt.mdx", "products/hat.mdx", "products/none.mdx"].map((path) =>
+        store.drafts.readPublished(path),
+      ),
+    );
+    expect(files.map((file) => file?.raw ?? null)).toEqual([shirt, hat, null]);
+    const lookups = fake.requests
+      .slice(before)
+      .filter((request) => request.path.includes("/git/ref/heads/main"));
+    expect(lookups).toHaveLength(1);
+  });
+
   it("explains a missing production branch", async () => {
     const { store } = setup(undefined, { branch: "production" });
     const error = await caught(store.read("products/shirt.mdx"));

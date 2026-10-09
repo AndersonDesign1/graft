@@ -153,7 +153,7 @@ export class EditorService {
     );
     const restored = await Promise.all(
       deleted.map(async (change) => {
-        const published = await this.drafts.readPublished(change.path).catch(() => null);
+        const published = await this.drafts.readPublished(change.path);
         return published ? parseEntry(change.path, published.raw) : null;
       }),
     );
@@ -200,7 +200,7 @@ export class EditorService {
     // Deleted in this person's draft: show the published copy so they can
     // read it or restore it. Its draft version is "absent" (null).
     if (!file && change?.kind === "deleted") {
-      file = await this.drafts.readPublished(path).catch(() => null);
+      file = await this.drafts.readPublished(path);
       version = null;
     }
     if (!file) {
@@ -324,7 +324,13 @@ export class EditorService {
     actor: StoreActor,
   ): Promise<SaveEntryResult> {
     const collection = this.fileCollection(input.collection);
-    const taken = new Set((await this.entries(input.collection, actor)).map((entry) => entry.slug));
+    // Slugs of entries deleted in this draft stay taken: reusing one would
+    // put a new entry beside the pending deletion under the same address.
+    const taken = new Set(
+      (await this.listed(input.collection, actor, await this.changeMap(actor))).map(
+        (entry) => entry.slug,
+      ),
+    );
     let slug = input.slug?.trim();
     if (slug) {
       if (!SLUG_RE.test(slug)) throw invalidSlug(slug);
@@ -367,7 +373,13 @@ export class EditorService {
     actor: StoreActor,
   ): Promise<SaveEntryResult> {
     const source = await this.read(input.collection, input.slug, actor);
-    const taken = new Set((await this.entries(input.collection, actor)).map((entry) => entry.slug));
+    // Slugs of entries deleted in this draft stay taken: reusing one would
+    // put a new entry beside the pending deletion under the same address.
+    const taken = new Set(
+      (await this.listed(input.collection, actor, await this.changeMap(actor))).map(
+        (entry) => entry.slug,
+      ),
+    );
     const slug = uniqueSlug(`${input.slug}-copy`, taken);
     const data: Record<string, unknown> = { ...source.data };
     if (typeof data.slug === "string") data.slug = slug;

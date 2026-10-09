@@ -47,7 +47,12 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
 
   const [entry, setEntry] = useState<EntryDto | null>(null);
   // A deleted entry shows its published copy, to read or restore, not to edit.
-  const readOnly = !canWrite || entry?.status === "deleted";
+  // Judged from the drafts list, which every publish and discard refreshes,
+  // so restoring from the Publish sheet makes the page editable again.
+  const deletedInDraft = drafts.data
+    ? drafts.data.changes.some((change) => change.path === entry?.path && change.kind === "deleted")
+    : entry?.status === "deleted";
+  const readOnly = !canWrite || deletedInDraft;
   const [edits, setEdits] = useState<Record<string, unknown>>({});
   const [body, setBody] = useState("");
   const [raw, setRaw] = useState("");
@@ -210,6 +215,13 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collection, slug, load]);
+
+  // Restored somewhere else (the Publish sheet, another tab): what is loaded is
+  // the published copy with no draft version, so load the live one to edit.
+  const staleDeleted = entry?.status === "deleted" && !deletedInDraft;
+  useEffect(() => {
+    if (staleDeleted) void load();
+  }, [staleDeleted, load]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
