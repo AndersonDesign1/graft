@@ -9,6 +9,9 @@
 import {
   FilesystemStore,
   compile,
+  notifyContentChange,
+  type ContentChangeListener,
+  type ContentChangeNotice,
   composeDocument,
   parseDocument,
   requireCollection,
@@ -58,6 +61,8 @@ export interface EditorServiceOptions {
   branchId: string;
   mdxTrust?: MdxTrust;
   store?: ContentStore;
+  /** Told after a local write changed the index, so the app refreshes its cache. */
+  onContentChange?: ContentChangeListener;
 }
 
 export class EditorService {
@@ -185,15 +190,36 @@ export class EditorService {
 
   /* ---- writing --------------------------------------------------------- */
 
-  private async afterWrite(): Promise<void> {
-    if (this.remote) return;
-    await compile({
+  /**
+   * Locally a save is live at once: compile, then tell the app so it drops its
+   * cached copy. A remote draft is neither; the host rebuilds on publish.
+   */
+  private async afterWrite(): Promise<ContentChangeNotice | undefined> {
+    if (this.remote) return undefined;
+    const result = await compile({
       contentDir: this.options.contentDir,
       collections: this.options.collections,
       db: this.options.db,
       mdxTrust: this.options.mdxTrust,
       branchId: this.options.branchId,
     });
+    return notifyContentChange(this.options.onContentChange, {
+      branch: this.options.branchId,
+      gitSha: result.gitSha ?? null,
+      changes: result.changes,
+    });
+  }
+
+  private async written(
+    name: string,
+    slug: string,
+    path: string,
+    version: string | null,
+    actor: StoreActor,
+  ): Promise<SaveEntryResult> {
+    const refresh = await this.afterWrite();
+    const result = await this.result(name, slug, path, version, actor);
+    return refresh ? { ...result, refresh } : result;
   }
 
   private async result(
@@ -253,8 +279,7 @@ export class EditorService {
       actor,
       ...(input.baseVersion !== undefined ? { baseVersion: input.baseVersion } : {}),
     });
-    await this.afterWrite();
-    return this.result(input.collection, input.slug, path, version, actor);
+    return this.written(input.collection, input.slug, path, version, actor);
   }
 
   async create(
@@ -284,8 +309,7 @@ export class EditorService {
     assertSafeMdx(body, { label: path });
     parseDocument(raw, collection, path);
     const { version } = await this.store.write(path, raw, { actor, baseVersion: null });
-    await this.afterWrite();
-    return this.result(input.collection, slug, path, version, actor);
+    return this.written(input.collection, slug, path, version, actor);
   }
 
   async remove(
@@ -298,8 +322,7 @@ export class EditorService {
       actor,
       ...(input.baseVersion !== undefined ? { baseVersion: input.baseVersion } : {}),
     });
-    await this.afterWrite();
-    return this.result(input.collection, input.slug, path, null, actor);
+    return this.written(input.collection, input.slug, path, null, actor);
   }
 
   async duplicate(
@@ -419,9 +442,9 @@ export class EditorService {
     };
   }
 
-  async discard(paths: string[], actor: StoreActor): Promise<void> {
+  async discard(paths: string[], actor: StoreActor): Promise<ContentChangeNotice | undefined> {
     await this.drafts.discard(actor, paths);
-    await this.afterWrite();
+    return this.afterWrite();
   }
 }
 

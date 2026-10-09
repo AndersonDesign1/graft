@@ -1,6 +1,7 @@
 import type { FieldDescriptor } from "@usegraft/contracts";
 
 /** Serializable shapes matching packages/studio/openapi.yaml */
+import type { ContentChangeNotice } from "@usegraft/compiler";
 
 /**
  * Where a document exists relative to the compiled index.
@@ -102,6 +103,8 @@ export interface CompileResultDto {
   changed: number;
   removed: number;
   docCount: number;
+  /** Whether the app was told to refresh. Absent with no listener or no change. */
+  refresh?: ContentChangeNotice;
 }
 
 /** Whether reverting to a compilation is safe, and why not if it isn't. */
@@ -127,6 +130,8 @@ export interface RevertResultDto {
   changed: number;
   removed: number;
   docCount: number;
+  /** Whether the app was told to refresh. Absent with no listener or no change. */
+  refresh?: ContentChangeNotice;
 }
 
 /* ---- git: the Changes drawer --------------------------------------------

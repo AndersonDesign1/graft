@@ -4,7 +4,7 @@
  * sees it, a draft is an unpublished change, publishing is the act that makes
  * it live. Git, files and the index stay underneath.
  */
-import type { ReviewRequest } from "@usegraft/compiler";
+import type { ContentChangeNotice, ReviewRequest } from "@usegraft/compiler";
 
 /**
  * Where an entry stands, for this person.
@@ -73,6 +73,8 @@ export interface SaveEntryResult {
   /** The new version, to send as `baseVersion` on the next save. */
   version: string | null;
   status: EntryStatus;
+  /** Present when a local save changed the index: whether the app was told to refresh. */
+  refresh?: ContentChangeNotice;
 }
 
 /** What pressing Publish does for this person. */

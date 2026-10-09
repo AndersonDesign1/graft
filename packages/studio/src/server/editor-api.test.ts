@@ -247,6 +247,41 @@ describe("editor API on a local checkout", () => {
     expect(copy.status).toBe(201);
   });
 
+  it("tells the app after a local save, and says so when that fails", async () => {
+    const { compile } = await import("@usegraft/compiler");
+    vi.mocked(compile).mockResolvedValueOnce({
+      count: 3,
+      docs: [],
+      changes: { added: [], changed: ["products/wool-hat"], removed: [], unchanged: 2 },
+      gitSha: null,
+    } as never);
+    const told: string[] = [];
+    const refreshing = createStudioApiHandler({
+      db: {} as never,
+      collections,
+      contentDir,
+      onContentChange: (event) => {
+        told.push(...event.changes.changed);
+        throw new Error("revalidate route answered 500");
+      },
+    });
+    const opened = await call<EntryDto>(
+      refreshing,
+      "GET",
+      "/entry?collection=products&slug=wool-hat",
+    );
+    const saved = await call<SaveEntryResult>(refreshing, "PUT", "/entry", {
+      collection: "products",
+      slug: "wool-hat",
+      data: { ...opened.json.data, price: 2600 },
+      body: opened.json.body,
+      baseVersion: opened.json.version,
+    });
+    expect(saved.status).toBe(200);
+    expect(told).toEqual(["products/wool-hat"]);
+    expect(saved.json.refresh).toMatchObject({ ok: false });
+  });
+
   it("refuses a save made from a stale read, and keeps the newer bytes", async () => {
     const opened = await call<EntryDto>(handler, "GET", "/entry?collection=products&slug=wool-hat");
     expect(opened.json.data).toMatchObject({ title: "Wool Hat", price: 2500 });
@@ -398,6 +433,27 @@ describe("editor API on GitHub (hosted)", () => {
     });
     return { fake, handler, contentDir };
   }
+
+  it("restores a deleted entry only while it is still deleted", async () => {
+    const { handler } = hosted();
+    const opened = await call<EntryDto>(handler, "GET", "/entry?collection=products&slug=wool-hat");
+    await call(handler, "DELETE", "/entry", {
+      collection: "products",
+      slug: "wool-hat",
+      baseVersion: opened.json.version,
+    });
+    const restore = {
+      collection: "products",
+      slug: "wool-hat",
+      data: opened.json.data,
+      body: opened.json.body,
+      baseVersion: null,
+    };
+    expect((await call(handler, "PUT", "/entry", restore)).status).toBe(200);
+    // Restored now, so a second, stale undo is refused rather than applied.
+    const again = await call<{ error: string }>(handler, "PUT", "/entry", restore);
+    expect([again.status, again.json.error]).toEqual([409, "CONTENT_CONFLICT"]);
+  });
 
   it("refuses the routes that would write the deployed files", async () => {
     const { handler, contentDir } = hosted();

@@ -13,7 +13,7 @@
 import { unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { createStorage, storageConfigFromEnv, type Storage } from "@usegraft/assets";
-import { compile, compileStatic, resolveContained, type CompileResult } from "@usegraft/compiler";
+import { compile, compileStatic, notifyContentChange, resolveContained } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import {
   createFunctionsHandler,
@@ -26,7 +26,7 @@ import type { BranchScope, ContentSearchHit, Database } from "@usegraft/db";
 import { openStaticIndex, resolveBranchScope, searchContent } from "@usegraft/db";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { findDoc, requireCollection } from "./content-hints";
-import type { RegisterTools, ToolDeps } from "./tools/deps";
+import type { ProjectedContent, RegisterTools, ToolDeps } from "./tools/deps";
 import { registerApprovalTools } from "./tools/approvals";
 import { registerAssetTools } from "./tools/assets";
 import { registerBranchTools } from "./tools/branches";
@@ -164,21 +164,31 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
    * open is sub-millisecond, and holding no handle keeps the server as
    * stateless as the Postgres path.
    */
-  const projectContent = async (): Promise<CompileResult> =>
-    staticIndexPath === undefined
-      ? compile({
-          contentDir,
-          collections,
-          db: requireDb("compile", ""),
-          branchId,
-          mdxTrust: options.mdxTrust,
-        })
-      : compileStatic({
-          contentDir,
-          collections,
-          indexPath: staticIndexPath,
-          mdxTrust: options.mdxTrust,
-        });
+  const projectContent = async (): Promise<ProjectedContent> => {
+    const result =
+      staticIndexPath === undefined
+        ? await compile({
+            contentDir,
+            collections,
+            db: requireDb("compile", ""),
+            branchId,
+            mdxTrust: options.mdxTrust,
+          })
+        : await compileStatic({
+            contentDir,
+            collections,
+            indexPath: staticIndexPath,
+            mdxTrust: options.mdxTrust,
+          });
+    // Every caller of projectContent has just written to the tree, so this is
+    // the one place the app hears about it.
+    const refresh = await notifyContentChange(options.onContentChange, {
+      branch: branchId,
+      gitSha: result.gitSha,
+      changes: result.changes,
+    });
+    return { ...result, refresh };
+  };
 
   /** Search whichever index this server serves; the static artifact is opened per call. */
   const searchIndex = async (query: {
@@ -315,6 +325,7 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
         branch: branchId,
         gitSha: result.gitSha,
         changes: result.changes,
+        ...(result.refresh ? { refresh: result.refresh } : {}),
       };
     },
   });

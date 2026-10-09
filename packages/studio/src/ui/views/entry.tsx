@@ -355,11 +355,14 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
                 : snapshot.status === "changed"
                   ? api("/entry", {
                       method: "PUT",
+                      // Only while it is still deleted: a draft someone wrote
+                      // since is newer than this snapshot, and is refused.
                       body: JSON.stringify({
                         collection,
                         slug,
                         data: snapshot.data,
                         body: snapshot.body,
+                        baseVersion: null,
                       }),
                     })
                   : api("/drafts/discard", {

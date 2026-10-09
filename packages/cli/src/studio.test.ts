@@ -94,6 +94,9 @@ describe("graft studio invite", () => {
     if (saved !== undefined) process.env.GRAFT_STUDIO_URL = saved;
     await expect(
       studioInviteCommand({ cwd: process.cwd(), email: "a@b.c", url: "shop.test" }),
-    ).rejects.toThrow(/not a URL/);
+    ).rejects.toThrow(/not an http\(s\) URL/);
+    await expect(
+      studioInviteCommand({ cwd: process.cwd(), email: "a@b.c", url: "file:///srv/site" }),
+    ).rejects.toThrow(/not an http\(s\) URL/);
   });
 });

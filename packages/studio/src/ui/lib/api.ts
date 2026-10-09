@@ -3,6 +3,8 @@
  * the SPA is served both at `/` and under `/studio/`, but the API is always
  * mounted at `/api/studio/v1/*`.
  */
+import type { ContentChangeNotice } from "@usegraft/compiler";
+import { warnIfNotRefreshed } from "./refresh";
 
 const BASE = "/api/studio/v1";
 
@@ -51,6 +53,11 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       body?.fix,
       body?.details,
     );
+  }
+  // Any local write may answer with `refresh`. Warning here, once, covers
+  // every save, delete, discard and compile without each caller remembering.
+  if (body && typeof body === "object" && "refresh" in body) {
+    warnIfNotRefreshed((body as { refresh?: ContentChangeNotice }).refresh);
   }
   return body as T;
 }

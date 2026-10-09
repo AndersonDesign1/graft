@@ -4,10 +4,13 @@
  * polynomial ReDoS; this is linear whatever the input.
  */
 export function trimChar(value: string, char: string, ends: "end" | "both" = "end"): string {
+  if (char.length === 0) return value;
   let start = 0;
   let end = value.length;
-  if (ends === "both") while (start < end && value[start] === char) start += 1;
-  while (end > start && value[end - 1] === char) end -= 1;
+  if (ends === "both") {
+    while (end - start >= char.length && value.startsWith(char, start)) start += char.length;
+  }
+  while (end - start >= char.length && value.endsWith(char, end)) end -= char.length;
   return value.slice(start, end);
 }
 

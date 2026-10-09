@@ -44,7 +44,7 @@ export function localDrafts(contentDir: string): DraftWorkflow {
       const paths = await renameDestinations(contentDir, options.paths);
       const result = await commitChanges(contentDir, {
         paths,
-        message: options.message?.trim() || defaultMessage(options.paths),
+        message: options.message?.trim() || defaultMessage(paths),
       });
       return {
         mode: "direct",

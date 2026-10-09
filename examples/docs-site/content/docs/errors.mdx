@@ -3,7 +3,7 @@
 # Source: ERROR_KNOWLEDGE in packages/mcp/src/explain.ts
 # Regenerate: node scripts/gen-error-docs.mjs
 title: Error reference
-description: "Every Graft error code, what it means, and how to recover. 45 codes."
+description: "Every Graft error code, what it means, and how to recover. 46 codes."
 section: Reference
 order: 5
 ---
@@ -18,7 +18,7 @@ you can tell whether the fix applies or something else is wrong.
 Agents can read the same entries without leaving their tools: the
 `explain_error` MCP tool returns them for any code.
 
-There are 45 codes, listed alphabetically.
+There are 46 codes, listed alphabetically.
 
 ## Codes
 
@@ -522,7 +522,7 @@ The error's `details.available` lists every item you can add. Run `graft add <na
 
 ### REMOTE_STORE_FAILED
 
-The content store that writes to a remote repository (GitHub) refused or failed a request. Authored content lives in git, so when the remote cannot be written, the save did not happen.
+The content store that writes to a remote repository (GitHub) refused or failed a request. A failed save did not happen. A publish may have partly completed (the production branch moved, then tidying the draft failed), so check the repository before retrying a publish.
 
 **Usually because**
 
@@ -533,7 +533,21 @@ The content store that writes to a remote repository (GitHub) refused or failed 
 
 **How to recover**
 
-Read `details.status` and `details.message`, which carry GitHub's own answer. A 401 or 403 is credentials or permissions; a 404 is the repository or branch name; a protected branch needs `GRAFT_STUDIO_PUBLISH=pull-request`. Retry once the cause is fixed: drafts already saved stay on their branch.
+Read the error message and `details`. A GitHub refusal carries `details.status` and `details.message`, GitHub's own answer; a failure before GitHub answered (network, a malformed response) has the message only. A 401 or 403 is credentials or permissions; a 404 is the repository or branch name; a protected branch needs `GRAFT_STUDIO_PUBLISH=pull-request`. Retry once the cause is fixed: drafts already saved stay on their branch.
+
+### REVALIDATE_FAILED
+
+The content was written and the index is up to date, but telling the app to refresh its cache failed. The app may serve the old copy until its next refresh.
+
+**Usually because**
+
+- GRAFT_WEBHOOK_SECRET differs from the secret the app's revalidate route checks (the route answers 401)
+- GRAFT_REVALIDATE_URL is unreachable from the server, redirects, or points at the wrong path
+- An onContentChange listener passed to an in-app mount threw
+
+**How to recover**
+
+Do not retry the write: it succeeded. Fix the cause the error's `fix` names. Then POST the write's `{ branch, gitSha, changes }` to the revalidate route: an agent's result carries `changes`, and the server logs the whole body with the error. Do not recompile instead. The index already holds the change, so a later compile reports these documents as unchanged and refreshes none of them.
 
 ### ROUTE_NOT_FOUND
 

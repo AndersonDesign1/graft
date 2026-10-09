@@ -168,6 +168,7 @@ export function searchText(entry: CatalogEntry, fields: SchemaFieldDto[]): strin
   for (const field of fields) {
     const value = entry.data[field.name];
     if (typeof value === "string") parts.push(value);
+    else if (value instanceof Date) parts.push(value.toISOString());
   }
   return parts.join(" ");
 }

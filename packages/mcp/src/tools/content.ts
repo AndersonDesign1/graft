@@ -64,17 +64,23 @@ export const registerContentReadTools: RegisterTools = (server, deps) => {
    * deployed files with the caller's own draft on top, so an agent reads back
    * what it just wrote with write_content.
    */
-  async function currentDocs(name: string, collection: AnyCollection): Promise<ProjectedDoc[]> {
+  async function currentDocs(
+    name: string,
+    collection: AnyCollection,
+  ): Promise<{ docs: ProjectedDoc[]; deleted: Set<string> }> {
     const docs = readCollectionDocs(contentDir, name, collection);
+    const deleted = new Set<string>();
     const overlay = await deps.remoteStore?.overlay?.(deps.storeActor());
-    if (!overlay || overlay.size === 0) return docs;
+    if (!overlay || overlay.size === 0) return { docs, deleted };
     const byPath = new Map(docs.map((doc) => [doc.sourcePath, doc]));
     for (const [path, file] of overlay) {
       if (!path.startsWith(`${name}/`)) continue;
-      if (file === null) byPath.delete(path);
-      else byPath.set(path, parseDocument(file.raw, collection, path));
+      if (file === null) {
+        byPath.delete(path);
+        deleted.add(path);
+      } else byPath.set(path, parseDocument(file.raw, collection, path));
     }
-    return [...byPath.values()].sort((a, b) => a.slug.localeCompare(b.slug));
+    return { docs: [...byPath.values()].sort((a, b) => a.slug.localeCompare(b.slug)), deleted };
   }
 
   server.registerTool(
@@ -93,7 +99,7 @@ export const registerContentReadTools: RegisterTools = (server, deps) => {
       guarded(
         async () => {
           const collection = requireCollection(collections, name);
-          const docs = await currentDocs(name, collection);
+          const { docs } = await currentDocs(name, collection);
           return {
             collection: name,
             documents: docs.map((doc) => ({
@@ -124,10 +130,20 @@ export const registerContentReadTools: RegisterTools = (server, deps) => {
       guarded(
         async () => {
           const collection = requireCollection(collections, name);
-          const drafted = deps.remoteStore?.overlay
-            ? (await currentDocs(name, collection)).find((candidate) => candidate.slug === slug)
+          const current = deps.remoteStore?.overlay
+            ? await currentDocs(name, collection)
             : undefined;
+          const drafted = current?.docs.find((candidate) => candidate.slug === slug);
           const doc = drafted ?? findDoc(contentDir, name, collection, slug);
+          // Deleted in this caller's draft: gone for them, though still deployed.
+          if (!drafted && current?.deleted.has(doc.sourcePath)) {
+            throw new GraftError({
+              code: "DOCUMENT_NOT_FOUND",
+              message: `${name}/${slug} is deleted in your draft.`,
+              fix: "It stays live until publish_drafts; discard_drafts with its path brings it back.",
+              details: { collection: name, slug, sourcePath: doc.sourcePath },
+            });
+          }
           return {
             collection: name,
             slug: doc.slug,
@@ -216,7 +232,7 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
       outputSchema: writeContentOutput,
       annotations: WRITES,
       description:
-        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit. On a hosted server that writes to GitHub (list_drafts is registered), the write is instead an unpublished draft on your own branch, nothing is compiled (gitSha is null), and it goes live only through publish_drafts.",
+        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. When the server is set up to refresh the app and the write changed content, the result also carries `refresh`; `ok: false` means the write landed but the site may show the old copy, so tell the human and do not retry the write. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit. On a hosted server that writes to GitHub (list_drafts is registered), the write is instead an unpublished draft on your own branch, nothing is compiled (gitSha is null), and it goes live only through publish_drafts.",
       inputSchema: {
         collection: z.string().describe("Collection name"),
         slug: z
@@ -319,6 +335,7 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
             branch: branchId,
             gitSha: result.gitSha,
             changes: result.changes,
+            ...(result.refresh ? { refresh: result.refresh } : {}),
           };
         },
         // Where the thing it just wrote now lives.

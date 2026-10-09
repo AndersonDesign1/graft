@@ -10,7 +10,12 @@
  * This is that seam. The helpers below are the closure `createGraftMcp` built
  * anyway, named and handed over explicitly instead of captured implicitly.
  */
-import type { CompileResult, ContentStore, StoreActor } from "@usegraft/compiler";
+import type {
+  CompileResult,
+  ContentChangeNotice,
+  ContentStore,
+  StoreActor,
+} from "@usegraft/compiler";
 import type { AnyCollection, AnyGraftFunction, GraftFunctionsHandler } from "@usegraft/core";
 import type { BranchScope, ContentSearchHit, Database } from "@usegraft/db";
 import type { Storage } from "@usegraft/assets";
@@ -34,8 +39,8 @@ export interface ToolDeps {
   /** The verified identity a decision is attributed to, or a refusal. */
   requireDecider: () => { kind: string; id: string };
 
-  /** Project the content tree into whichever index this server serves. */
-  projectContent: () => Promise<CompileResult>;
+  /** Project the content tree into whichever index this server serves, then tell the app. */
+  projectContent: () => Promise<ProjectedContent>;
   /** Full-text search across the index, Postgres or static. */
   searchIndex: (query: {
     query: string;
@@ -65,6 +70,12 @@ export interface ToolDeps {
    */
   elicitApproval?: ApprovalElicitor;
 }
+
+/**
+ * A compile's result plus whether the app was told. `refresh` is undefined when
+ * no onContentChange listener is configured or nothing changed.
+ */
+export type ProjectedContent = CompileResult & { refresh?: ContentChangeNotice };
 
 /** Registers one cohesive group of tools onto a server. */
 export type RegisterTools = (server: McpServer, deps: ToolDeps) => void;

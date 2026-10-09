@@ -158,6 +158,11 @@ describe("GitHubStore: drafts", () => {
     const slashes = "/".repeat(100_000);
     const started = performance.now();
     expect(trimChar(`${slashes}a${slashes}x`, "/", "both")).toBe(`a${slashes}x`);
+    expect(trimChar(`x${slashes}a${slashes}`, "/")).toBe(`x${slashes}a`);
+    expect(withoutTrailingSlashes(`https://api.github.com${slashes}`)).toBe(
+      "https://api.github.com",
+    );
+    expect(trimChar("🚀🚀a🚀", "🚀", "both")).toBe("a");
     expect(performance.now() - started).toBeLessThan(200);
   });
 });

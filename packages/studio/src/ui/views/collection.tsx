@@ -129,9 +129,13 @@ export function CollectionView({ collection }: { collection: string }) {
   );
 
   const seq = useRef(0);
+  // The page the last request asked for, so Try again repeats that request:
+  // a failed first page must not be retried from the old list's cursor.
+  const lastCursor = useRef<string | undefined>(undefined);
   const fetchPage = useCallback(
     async (cursor?: string) => {
       const mine = ++seq.current;
+      lastCursor.current = cursor;
       setLoading(true);
       try {
         const page = await api<EntryList>(`/entries${qs({ ...params, cursor, limit: 100 })}`);
@@ -410,9 +414,7 @@ export function CollectionView({ collection }: { collection: string }) {
           <button
             type="button"
             className="btn notice-action"
-            onClick={() =>
-              void fetchPage(items.length > 0 ? (list?.nextCursor ?? undefined) : undefined)
-            }
+            onClick={() => void fetchPage(lastCursor.current)}
           >
             Try again
           </button>

@@ -99,6 +99,22 @@ describe("MCP writes through a GitHub store", () => {
     ]);
   });
 
+  it("reads a document deleted in its draft as gone", async () => {
+    const { fake, call } = await connect(["content:write"]);
+    const sameDraft = new GitHubStore({
+      repo: "acme/site",
+      auth: tokenAuth(fake.token),
+      apiUrl: fake.apiUrl,
+      fetch: fake.fetch,
+    });
+    await sameDraft.write("pages/home.mdx", null, { actor: { id: "writer-bot" } });
+    const one = await call("get_content", { collection: "pages", slug: "home" });
+    expect(one.isError).toBe(true);
+    expect(one.payload.error).toBe("DOCUMENT_NOT_FOUND");
+    const all = await call("list_content", { collection: "pages" });
+    expect(all.payload.documents).toEqual([]);
+  });
+
   it("reads back its own draft with get_content and list_content", async () => {
     const { call } = await connect(["content:write"]);
     await call("write_content", {

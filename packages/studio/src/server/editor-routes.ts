@@ -25,6 +25,7 @@ function service(ctx: RouteContext): EditorService {
       branchId: ctx.defaultBranch,
       mdxTrust: ctx.options.mdxTrust,
       ...(ctx.options.store ? { store: ctx.options.store } : {}),
+      ...(ctx.options.onContentChange ? { onContentChange: ctx.options.onContentChange } : {}),
     });
     services.set(ctx.options, found);
   }
@@ -309,8 +310,11 @@ export const EDITOR_ROUTES: readonly Route[] = [
     scope: "studio:write",
     handle: async (ctx) => {
       const payload = await body(ctx);
-      await service(ctx).discard(stringList(payload.paths), actorOf(ctx));
-      return Response.json({ discarded: stringList(payload.paths) });
+      const refresh = await service(ctx).discard(stringList(payload.paths), actorOf(ctx));
+      return Response.json({
+        discarded: stringList(payload.paths),
+        ...(refresh ? { refresh } : {}),
+      });
     },
   },
 ];
