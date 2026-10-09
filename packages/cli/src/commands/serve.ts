@@ -477,6 +477,13 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     );
   }
 
+  // One store for every writing surface, so a hosted agent's write_content
+  // and a hosted editor's save land the same way.
+  const repository = githubStoreFromEnv({
+    contentDir: config.contentDir,
+    projectRoot: options.cwd,
+  });
+
   let studioHandler: FetchHandler | undefined;
   if (studioMod) {
     // Resolve the caller and hand the Studio their scopes; the Studio decides
@@ -498,15 +505,15 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     // whoever can push to the content repository unless GRAFT_STUDIO_EDITORS
     // narrows it, so the store's credentials answer that question.
     const access = studioMod.editorAccessFromEnv();
-    const repository = access
-      ? githubStoreFromEnv({ contentDir: config.contentDir, projectRoot: options.cwd })
-      : undefined;
     studioHandler = studioMod.createStudioHandler({
       db: branch.db,
       collections: config.collections,
       contentDir: config.contentDir,
       mdxTrust: config.mdxTrust,
       defaultBranch: writeBranch,
+      // Saves land in git on GitHub when GRAFT_GITHUB_REPO is set: the only
+      // way a hosted Studio on a read-only filesystem can save at all.
+      ...(repository ? { store: repository } : {}),
       ...(access
         ? {
             editors: {

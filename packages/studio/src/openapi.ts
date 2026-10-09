@@ -129,5 +129,94 @@ export const STUDIO_OPENAPI = {
         responses: { "200": { description: "Decision recorded" } },
       },
     },
+    "/api/studio/v1/workspace": {
+      get: {
+        operationId: "getWorkspace",
+        summary: "Where saves land and what Publish does for the caller",
+        description:
+          "Storage (local or github), repository and branch, the publish action for this caller (commit, publish, or review), and who is signed in.",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/entries": {
+      get: {
+        operationId: "listEntries",
+        summary: "A page of a collection's entries, searched, filtered and sorted on the server",
+        description:
+          "Status per entry for the caller (published, changed, new, deleted), column values for scalar fields, facets for select, boolean and reference fields. Query: q, status (all | unpublished | <status>), where.<field>=<value>, sort (site | title | updated | <field>), dir, cursor, limit (max 500).",
+        parameters: [
+          { name: "collection", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/entry": {
+      get: {
+        operationId: "getEntry",
+        summary: "One entry: fields, body, source and version",
+        description: "Send `version` back as `baseVersion` when saving.",
+        parameters: [
+          { name: "collection", in: "query", required: true, schema: { type: "string" } },
+          { name: "slug", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: { "200": { description: "OK" } },
+      },
+      put: {
+        operationId: "saveEntry",
+        summary: "Save an entry through the content store",
+        description:
+          "Validated like MCP write_content. Refused with CONTENT_CONFLICT (409) when baseVersion is not the current version.",
+        responses: { "200": { description: "OK" } },
+      },
+      post: {
+        operationId: "createEntry",
+        summary: "Create an entry; the slug comes from the title when omitted",
+        responses: { "200": { description: "OK" } },
+      },
+      delete: {
+        operationId: "deleteEntry",
+        summary: "Delete an entry (a draft change until published)",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/entry/duplicate": {
+      post: {
+        operationId: "duplicateEntry",
+        summary: "Copy an entry under a new slug",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/drafts": {
+      get: {
+        operationId: "listDrafts",
+        summary: "The caller's unpublished changes and open review requests",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/drafts/diff": {
+      get: {
+        operationId: "diffDraft",
+        summary: "Line diff of a draft against the published version",
+        parameters: [{ name: "path", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/drafts/publish": {
+      post: {
+        operationId: "publishDrafts",
+        summary:
+          "Publish drafts: a commit locally, a commit on the production branch, or a pull request",
+        description:
+          "A caller without studio:publish always opens a pull request. Conflicts are refused with CONTENT_CONFLICT listing each path; resend with resolve: { path: mine | theirs }.",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/drafts/discard": {
+      post: {
+        operationId: "discardDrafts",
+        summary: "Throw drafts away; the published version stands",
+        responses: { "200": { description: "OK" } },
+      },
+    },
   },
 } as const;

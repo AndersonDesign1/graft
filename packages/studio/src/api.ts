@@ -3,7 +3,7 @@
  * Shared by `graft studio` and `graft serve --studio`.
  * Reads + mutations (edit content, decide approvals) — same ops as MCP/CLI.
  */
-import { compile } from "@usegraft/compiler";
+import { compile, type ContentStore } from "@usegraft/compiler";
 import type { AnyCollection } from "@usegraft/core";
 import type { MdxTrust } from "@usegraft/mdx-safety";
 import {
@@ -24,6 +24,7 @@ import { readCollectionDocs, readRawDocument, requireCollection, writeDocument }
 import { STUDIO_OPENAPI } from "./openapi";
 import { commitChanges, readChanges, readFileDiff } from "./git";
 import { preflightRevert, revertContentTo } from "./revert";
+import { EDITOR_ROUTES } from "./server/editor-routes";
 import type {
   ApprovalList,
   BranchList,
@@ -88,6 +89,11 @@ export interface StudioApiOptions {
    * loopback.
    */
   authenticate?: (request: Request) => StudioPrincipal | null | Promise<StudioPrincipal | null>;
+  /**
+   * Where saves land. Defaults to the files under `contentDir`; a GitHub
+   * store makes a hosted Studio writable on a read-only filesystem.
+   */
+  store?: ContentStore;
 }
 
 /** The identity a Studio request authenticated as. */
@@ -223,7 +229,11 @@ function statusFor(error: GraftError): number {
     // a state that cannot satisfy it, which is what 409 is for.
     case "GIT_UNAVAILABLE":
     case "COMMIT_FAILED":
+    case "CONTENT_CONFLICT":
+    case "SLUG_NOT_UNIQUE":
       return 409;
+    case "REMOTE_STORE_FAILED":
+      return 502;
     case "SCHEMA_VALIDATION_FAILED":
     case "INPUT_VALIDATION_FAILED":
     case "INVALID_SLUG":
@@ -402,21 +412,13 @@ async function buildTree(
   };
 }
 
-function toSchemaField(field: {
-  name: string;
-  type: string;
-  optional: boolean;
-  description?: string;
-  fields?: unknown;
-  items?: unknown;
-}): SchemaFieldDto {
-  const nested = field.fields as SchemaFieldDto[] | undefined;
-  const items = field.items as SchemaFieldDto | undefined;
+function toSchemaField(field: SchemaFieldDto): SchemaFieldDto {
+  // Every key the descriptor carries (label, options, constraints, the
+  // reference target) reaches the form; only empty ones are dropped.
+  const { fields: nested, items, description, ...rest } = field;
   return {
-    name: field.name,
-    type: field.type,
-    optional: field.optional,
-    ...(field.description ? { description: field.description } : {}),
+    ...rest,
+    ...(description ? { description } : {}),
     ...(nested ? { fields: nested.map(toSchemaField) } : {}),
     ...(items ? { items: toSchemaField(items) } : {}),
   };
@@ -503,7 +505,7 @@ function operator(options: StudioApiOptions, principal?: StudioPrincipal): Appro
 }
 
 /** Everything a route handler is given. */
-interface RouteContext {
+export interface RouteContext {
   request: Request;
   url: URL;
   options: StudioApiOptions;
@@ -522,8 +524,8 @@ interface RouteContext {
  * sixteen-branch if/else chain. That absence is what let
  * `actor.kind !== "anonymous"` stand in for authorization for as long as it did.
  */
-interface Route {
-  method: "GET" | "POST" | "PUT";
+export interface Route {
+  method: "GET" | "POST" | "PUT" | "DELETE";
   /** Exact pathname, or a pattern with exactly one capture group. */
   path: string | RegExp;
   scope: StudioScope;
@@ -552,6 +554,7 @@ async function requireCompilation(
   return row;
 }
 
+/** The editor API (entries, drafts, publishing) lives in server/editor-routes.ts. */
 const ROUTES: readonly Route[] = [
   {
     method: "GET",
@@ -909,6 +912,7 @@ const ROUTES: readonly Route[] = [
       return json(result);
     },
   },
+  ...EDITOR_ROUTES,
 ];
 
 /** The route this request targets, with any captured segment decoded. */
