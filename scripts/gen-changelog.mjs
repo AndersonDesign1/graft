@@ -8,8 +8,11 @@
  * change listed once with the packages it touched and a link to its commit.
  *
  * Release dates are the npm publish dates, kept in scripts/changelog-dates.json
- * so the check needs no git history or network. A version with no date yet (a
- * fresh `changeset version`) gets today's date, written back to that file.
+ * so the check needs no git history or network. Writing the page reads the
+ * publish times from the registry and corrects that file, so a release whose
+ * version PR sat unmerged for days gets its real date at the next run. A
+ * version not on npm yet (a fresh `changeset version`) gets today's date until
+ * then. Offline, the stored dates are used as they are.
  *
  *   node scripts/gen-changelog.mjs           # write the page (and any new date)
  *   node scripts/gen-changelog.mjs --check   # fail if the page is stale
@@ -136,23 +139,36 @@ function compareVersionsDesc(a, b) {
 function escapeMdx(text) {
   const lines = text.split("\n");
   let inFence = false;
+  // An inline span opened by a run of N backticks closes at the next run of
+  // exactly N, and may wrap onto the next line: changesets are hard-wrapped
+  // prose. A blank line ends the paragraph, and with it any unclosed span.
+  let openRun = 0;
   return lines
     .map((line) => {
       if (/^\s*```/.test(line)) {
         inFence = !inFence;
+        openRun = 0;
         return line;
       }
       if (inFence) return line;
+      if (line.trim() === "") {
+        openRun = 0;
+        return line;
+      }
       let out = "";
-      let inCode = false;
-      for (const ch of line) {
-        if (ch === "`") {
-          inCode = !inCode;
-          out += ch;
+      for (let i = 0; i < line.length; ) {
+        if (line[i] === "`") {
+          let run = 0;
+          while (line[i + run] === "`") run++;
+          if (openRun === 0) openRun = run;
+          else if (run === openRun) openRun = 0;
+          out += "`".repeat(run);
+          i += run;
           continue;
         }
-        if (!inCode && (ch === "<" || ch === "{")) out += `\\${ch}`;
-        else out += ch;
+        const ch = line[i];
+        out += openRun === 0 && (ch === "<" || ch === "{") ? `\\${ch}` : ch;
+        i++;
       }
       return out;
     })
@@ -193,16 +209,45 @@ for (const pkg of readChangelogs()) {
 
 const versions = [...releases.keys()].sort(compareVersionsDesc);
 
-// Dates: keep the recorded ones, add today for a version that has none yet.
-const dates = existsSync(DATES) ? JSON.parse(readFileSync(DATES, "utf8")) : {};
-const today = new Date().toISOString().slice(0, 10);
-const missing = versions.filter((v) => !dates[v]);
-if (missing.length > 0 && check) {
-  console.error(`No release date for ${missing.join(", ")} in scripts/changelog-dates.json.`);
-  console.error("Run: node scripts/gen-changelog.mjs");
-  process.exit(1);
+/**
+ * Publish dates from the registry, keyed by version, or null when it cannot be
+ * reached. One package is enough: the fixed group publishes every version of
+ * every package in the same run.
+ */
+async function publishDates() {
+  try {
+    const response = await fetch("https://registry.npmjs.org/@usegraft/cli", {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new Error(`registry answered ${response.status}`);
+    const { time } = await response.json();
+    return Object.fromEntries(
+      Object.entries(time ?? {}).map(([version, iso]) => [version, String(iso).slice(0, 10)]),
+    );
+  } catch (error) {
+    console.warn(
+      `Could not read publish dates from npm (${error.message}); keeping the stored ones.`,
+    );
+    return null;
+  }
 }
-for (const v of missing) dates[v] = today;
+
+// Dates: the stored ones, corrected from npm when writing, and today for a
+// version npm does not have yet.
+const dates = existsSync(DATES) ? JSON.parse(readFileSync(DATES, "utf8")) : {};
+const before = JSON.stringify(dates);
+const today = new Date().toISOString().slice(0, 10);
+if (check) {
+  const missing = versions.filter((v) => !dates[v]);
+  if (missing.length > 0) {
+    console.error(`No release date for ${missing.join(", ")} in scripts/changelog-dates.json.`);
+    console.error("Run: node scripts/gen-changelog.mjs");
+    process.exit(1);
+  }
+} else {
+  const published = await publishDates();
+  for (const v of versions) dates[v] = published?.[v] ?? dates[v] ?? today;
+}
 
 const formatDate = (iso) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
@@ -250,12 +295,12 @@ const page = `---
 # Source: packages/*/CHANGELOG.md (written by changesets) and scripts/changelog-dates.json
 # Regenerate: node scripts/gen-changelog.mjs
 title: Changelog
-description: "Every change in every Graft release, newest first, with the packages it touched."
+description: "Every change in every Graft release, newest first, with the packages it touched. Dependency-only updates are left out."
 section: Reference
 order: 8
 ---
 
-<p className="kicker">Every change in every release, newest first.</p>
+<p className="kicker">Every change in every release, newest first, except dependency-only updates.</p>
 
 All Graft packages release together under one version number, so each release
 below covers all of them. Each change names the packages it touched and links to
@@ -285,6 +330,8 @@ if (check) {
   console.log(`Changelog is current (${versions.length} releases, ${changeCount} changes).`);
 } else {
   writeFileSync(OUT, page, "utf8");
-  if (missing.length > 0) writeFileSync(DATES, `${JSON.stringify(dates, null, 2)}\n`, "utf8");
+  if (JSON.stringify(dates) !== before) {
+    writeFileSync(DATES, `${JSON.stringify(dates, null, 2)}\n`, "utf8");
+  }
   console.log(`Wrote ${OUT} (${versions.length} releases, ${changeCount} changes).`);
 }
