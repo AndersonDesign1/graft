@@ -3,7 +3,12 @@
  * Shared by `graft studio` and `graft serve --studio`.
  * Reads + mutations (edit content, decide approvals) — same ops as MCP/CLI.
  */
-import { compile } from "@usegraft/compiler";
+import {
+  compile,
+  notifyContentChange,
+  type CompileResult,
+  type ContentChangeListener,
+} from "@usegraft/compiler";
 import type { AnyCollection } from "@usegraft/core";
 import type { MdxTrust } from "@usegraft/mdx-safety";
 import {
@@ -62,6 +67,14 @@ export interface StudioApiOptions {
    * authored file including the ones that came from git.
    */
   mdxTrust?: MdxTrust;
+  /**
+   * Called after a save, compile or revert changed the index, with the branch
+   * and ChangeSet, so the app can refresh its cache. `graft studio` and
+   * `graft serve --studio` pass a webhook built from GRAFT_REVALIDATE_URL. A
+   * throw does not fail the request: the response carries
+   * `refresh: { ok: false, … }` instead.
+   */
+  onContentChange?: ContentChangeListener;
   /** Branch used for compile + tree default. */
   defaultBranch?: string;
   /**
@@ -615,6 +628,7 @@ const ROUTES: readonly Route[] = [
         mdxTrust: options.mdxTrust,
         branchId: branch,
       });
+      const refresh = await tellApp(options, branch, result);
       const body: CompileResultDto = {
         branch,
         gitSha: result.gitSha ?? null,
@@ -622,6 +636,7 @@ const ROUTES: readonly Route[] = [
         changed: result.changes.changed.length,
         removed: result.changes.removed.length,
         docCount: result.count,
+        ...(refresh ? { refresh } : {}),
       };
       return json(body);
     },
@@ -817,6 +832,7 @@ const ROUTES: readonly Route[] = [
         mdxTrust: options.mdxTrust,
         branchId: row.branchId,
       });
+      const refresh = await tellApp(options, row.branchId, result);
       const body: RevertResultDto = {
         compilationId: row.id,
         gitSha: row.gitSha,
@@ -826,6 +842,7 @@ const ROUTES: readonly Route[] = [
         changed: result.changes.changed.length,
         removed: result.changes.removed.length,
         docCount: result.count,
+        ...(refresh ? { refresh } : {}),
       };
       return json(body);
     },
@@ -903,10 +920,28 @@ const ROUTES: readonly Route[] = [
         data,
         body,
       });
-      return json(result);
+      const { changes, ...written } = result;
+      const refresh = await tellApp(options, written.branch, {
+        gitSha: written.gitSha,
+        changes,
+      });
+      return json({ ...written, ...(refresh ? { refresh } : {}) });
     },
   },
 ];
+
+/** Tell the app the index changed. Undefined when there is no listener or no change. */
+function tellApp(
+  options: StudioApiOptions,
+  branch: string,
+  result: Pick<CompileResult, "gitSha" | "changes">,
+) {
+  return notifyContentChange(options.onContentChange, {
+    branch,
+    gitSha: result.gitSha ?? null,
+    changes: result.changes,
+  });
+}
 
 /** The route this request targets, with any captured segment decoded. */
 function matchRoute(method: string, pathname: string): { route: Route; id: string } | undefined {

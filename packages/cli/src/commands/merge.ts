@@ -19,6 +19,7 @@
  * `--apply` is the operator's consent, same contract as `graft migrate`.
  */
 import { basename } from "node:path";
+import type { ContentChangeEvent } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import type { ChangeSet, MigrationAppliedRow } from "@usegraft/db";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
@@ -84,7 +85,7 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
   const url = requireDatabaseUrl();
 
   const [
-    { compile, resolveGitSha },
+    { compile, notifyContentChange, resolveGitSha, revalidateWebhookFromEnv },
     {
       createDb,
       getBranch,
@@ -103,6 +104,8 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
     import("@usegraft/db"),
     import("@usegraft/core"),
   ]);
+  // Before any connection opens, so a bad GRAFT_REVALIDATE_URL stops the merge.
+  const onContentChange = revalidateWebhookFromEnv();
   const control = createDb(url);
 
   // Merging requires both ends registered (no tolerant fallback here — a typo
@@ -124,6 +127,8 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
   const targetWrite = scopeWriteBranch(target.scope);
   const sameDb = src.scope.kind === "overlay" && target.scope.kind === "overlay";
 
+  // The target's recompile, sent to the app once both locks are released.
+  let mergedChange: ContentChangeEvent | undefined;
   const run = async (): Promise<MergeCommandResult> => {
     const [branchLedger, targetLedger] = await Promise.all([
       listAppliedMigrations(src.db, srcWrite),
@@ -232,6 +237,7 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
       console.log(
         `recompiled "${into}": +${compiled.added.length} ~${compiled.changed.length} -${compiled.removed.length} (${compiled.unchanged} unchanged)`,
       );
+      mergedChange = { branch: targetWrite, gitSha: result.gitSha, changes: compiled };
       console.log(
         `\nMerge complete. Drop the branch when you're done with it: graft branch drop ${options.branch}`,
       );
@@ -260,12 +266,19 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
     ].sort((a, b) => a.name.localeCompare(b.name));
     const waitFor = (name: string) => () =>
       console.log(`A migration or merge is running on "${name}"; waiting for it to finish…`);
-    return await withMigrationLock(
+    const result = await withMigrationLock(
       first.db,
       first.branch,
       () => withMigrationLock(second.db, second.branch, run, { onWait: waitFor(second.name) }),
       { onWait: waitFor(first.name) },
     );
+    // After the locks are released: a slow revalidate route must not hold up
+    // a migration or merge waiting on either branch.
+    if (mergedChange) {
+      const refresh = await notifyContentChange(onContentChange, mergedChange);
+      if (refresh?.ok) console.log(`told the app to refresh "${into}"`);
+    }
+    return result;
   } finally {
     await src.close();
     await target.close();

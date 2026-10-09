@@ -262,6 +262,18 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 15 and 16. Or upgrade the framework.",
   },
+  REVALIDATE_FAILED: {
+    code: "REVALIDATE_FAILED",
+    meaning:
+      "The content was written and the index is up to date, but telling the app to refresh its cache failed. The app may serve the old copy until its next refresh.",
+    typicalCauses: [
+      "GRAFT_WEBHOOK_SECRET differs from the secret the app's revalidate route checks (the route answers 401)",
+      "GRAFT_REVALIDATE_URL is unreachable from the server, redirects, or points at the wrong path",
+      "An onContentChange listener passed to an in-app mount threw",
+    ],
+    howToRecover:
+      "Do not retry the write: it succeeded. Fix the cause the error's `fix` names. To refresh now, run `graft compile --json` and POST its output to the revalidate route. The next write also refreshes once the route works.",
+  },
   SLUG_NOT_UNIQUE: {
     code: "SLUG_NOT_UNIQUE",
     meaning: "Two documents in the same collection resolve to the same slug.",

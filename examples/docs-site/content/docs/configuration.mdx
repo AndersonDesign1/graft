@@ -45,6 +45,8 @@ what operational data, typed functions, and copy-on-write branches need.
 | `GRAFT_HARDEN` | Container: create + harden the runtime role at boot, then serve under it. Default `1` in all-in-one, `0` in `GRAFT_MODE=serve` |
 | `GRAFT_RUNTIME_PASSWORD` | The hardened role's password; setting it also turns hardening on. Generated per boot when unset |
 | `GRAFT_MODE` | Container compose: `serve` against external db/storage |
+| `GRAFT_REVALIDATE_URL` | Your app's revalidate route. `graft serve`, `graft studio`, `graft mcp`, `graft merge` and `graft migrate` POST `{ branch, gitSha, changes }` to it after each write that changes content. https only, except `localhost`. See [Refresh pages when content changes](/docs/next#refresh-pages-when-content-changes) |
+| `GRAFT_WEBHOOK_SECRET` | Sent as `Authorization: Bearer …` to `GRAFT_REVALIDATE_URL`. Required when the URL is set. The app's route checks the same value |
 
 ## Assets (S3-compatible)
 

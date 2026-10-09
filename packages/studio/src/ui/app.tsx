@@ -26,6 +26,7 @@ import { ContentExplorer } from "./components/content-tree";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from "./components/ui/menu";
 import { api, qs } from "./lib/api";
 import { plural } from "./lib/format";
+import { warnIfNotRefreshed } from "./lib/refresh";
 import { currentBranch, setBranchInUrl, useRoute, type ViewId } from "./lib/route";
 import { useSidebarWidth } from "./lib/sidebar";
 import { useTheme, type Theme } from "./lib/theme";
@@ -104,6 +105,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
       toast.success(`Compiled ${plural(result.docCount, "document")}`, {
         description: `+${result.added} added · ~${result.changed} changed · −${result.removed} removed`,
       });
+      warnIfNotRefreshed(result.refresh);
       tree.refresh();
     } catch (err) {
       toast.error("Compile failed", {

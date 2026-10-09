@@ -466,13 +466,60 @@ export async function POST(request: Request) {
 
 </Step>
 
+<Step title="Point Graft at the route">
+
+Set two variables where `graft serve`, `graft studio` or `graft mcp` runs. The
+secret must match the one the route checks:
+
+```sh
+GRAFT_REVALIDATE_URL=https://example.com/api/revalidate
+GRAFT_WEBHOOK_SECRET=a-long-random-string
+```
+
+Graft now calls the route after every write that changes content: an agent's
+`write_content` or `delete_content`, a Studio save, compile or revert, and
+`graft merge --apply` or `graft migrate --apply`. The URL must use https, except
+for `localhost`.
+
+If the route fails, the write still succeeds. The server logs a
+`REVALIDATE_FAILED` error, and an agent's result carries
+`refresh: { ok: false, fix }`, so the agent knows not to retry the write.
+
+</Step>
+
 </Steps>
 
-Graft does not call this route for you. Call it after content changes, with
-the change list Graft gave you. An agent's `write_content` call returns it as
-`changes`. `graft compile --json` prints it too, along with the branch. In a
-deploy script, send it to the route. The script stops if the compile fails,
-and `--fail` makes a refused request fail the script too:
+If your app mounts the MCP endpoint itself, skip the webhook. Agent writes run
+in your app's process, so refresh there:
+
+<CodeBlock title="app/api/mcp/route.ts">
+
+```ts
+import { createGraftMcpHandler } from "@usegraft/mcp";
+import { revalidateContent } from "@usegraft/sdk-next";
+import { collections, functions } from "@/graft.config";
+import { actor } from "@/lib/actor";
+import { db } from "@/lib/graft";
+
+export const POST = createGraftMcpHandler({
+  contentDir: "./content",
+  db,
+  collections,
+  functions,
+  actor,
+  // An agent's write lands in this app's process, so refresh the cache here.
+  onContentChange: ({ branch, changes }) => {
+    revalidateContent(branch, changes);
+  },
+});
+```
+
+</CodeBlock>
+
+`graft compile` never calls the route: a deploy compiles before the new version
+is live. To refresh after a deploy, send the compile's output yourself. The
+script stops if the compile fails, and `--fail` makes a refused request fail
+the script too:
 
 ```sh
 graft compile --json > changes.json || exit 1
@@ -487,6 +534,7 @@ Either way, the route reads a body shaped like this:
 ```json
 {
   "branch": "main",
+  "gitSha": "b8eb719a468be404bae9adca4fbea4d90c642411",
   "changes": { "added": ["pages/pricing"], "changed": ["pages/home"], "removed": [], "unchanged": 12 }
 }
 ```

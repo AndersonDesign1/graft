@@ -5,6 +5,7 @@
 import { execFile } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { userInfo } from "node:os";
+import { revalidateWebhookFromEnv } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { allowedHostsFor, createNodeListener } from "./serve";
@@ -108,6 +109,9 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
   loadProjectEnv(options.cwd);
   const config = await loadConfig(findConfig(options.cwd));
   const url = requireDatabaseUrl();
+  // Built before any connection opens, so a bad GRAFT_REVALIDATE_URL stops the
+  // start instead of surfacing on the first write.
+  const onContentChange = revalidateWebhookFromEnv();
 
   const [{ createStudioHandler }, { createDb, resolveBranchHandle, scopeWriteBranch }] =
     await Promise.all([import("@usegraft/studio"), import("@usegraft/db")]);
@@ -167,6 +171,7 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
         defaultBranch: writeBranch,
         decider: operatorIdentity,
         authenticate,
+        onContentChange,
       });
 
       const listening = createServer(
