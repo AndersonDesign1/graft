@@ -19,7 +19,10 @@ const collections = {
   pages: defineCollection({ name: "pages", fields: { title: field.string() } }),
 };
 
-async function connect(scopes: string[]): Promise<{
+async function connect(
+  scopes: string[],
+  id: string | null = "writer-bot",
+): Promise<{
   fake: GitHubFake;
   dir: string;
   call: (
@@ -41,7 +44,7 @@ async function connect(scopes: string[]): Promise<{
     db: {} as never,
     audit: false,
     actor: () => ({ kind: "agent", id: "writer-bot" }),
-    connectionActor: { kind: "agent", id: "writer-bot", scopes },
+    ...(id ? { connectionActor: { kind: "agent" as const, id, scopes } } : {}),
     store: new GitHubStore({
       repo: "acme/site",
       auth: tokenAuth(fake.token),
@@ -97,6 +100,15 @@ describe("MCP writes through a GitHub store", () => {
     expect(listed.payload.changes).toEqual([
       expect.objectContaining({ path: "pages/about.mdx", kind: "added" }),
     ]);
+  });
+
+  it("lets an anonymous caller read deployed content, but not draft", async () => {
+    const { call } = await connect([], null);
+    const one = await call("get_content", { collection: "pages", slug: "home" });
+    expect(one.isError).toBe(false);
+    expect(one.payload.data.title).toBe("Home");
+    const drafts = await call("list_drafts");
+    expect(drafts.isError).toBe(true);
   });
 
   it("reads a document deleted in its draft as gone", async () => {

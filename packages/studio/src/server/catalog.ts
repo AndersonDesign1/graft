@@ -289,7 +289,8 @@ export function queryEntries(
     );
   const sorted = [...items].sort((a, b) => {
     if (sort === "updated")
-      return compareCells(b.updatedAt ?? null, a.updatedAt ?? null, direction);
+      // Newest first when ascending; entries without a date last either way.
+      return compareCells(a.updatedAt ?? null, b.updatedAt ?? null, direction === 1 ? -1 : 1);
     if (sort === "title" || (sort === "site" && !usesSiteOrder)) {
       return direction * a.title.localeCompare(b.title, undefined, { numeric: true });
     }

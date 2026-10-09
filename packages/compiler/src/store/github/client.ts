@@ -114,7 +114,13 @@ export class GitHubClient {
         fix: "Check that the server can reach GitHub (GRAFT_GITHUB_API_URL, if set, must be the API root) and retry.",
         details: { method, path: path.split("?")[0] },
       });
-    const token = await this.options.auth.token();
+    let token: string;
+    try {
+      token = await this.options.auth.token();
+    } catch (error) {
+      // An App's token exchange is itself a request to GitHub.
+      throw error instanceof GraftError ? error : unreachable(error);
+    }
     let response: Response;
     try {
       response = await this.doFetch(`${this.apiUrl}${path}`, {

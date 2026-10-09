@@ -380,6 +380,18 @@ describe("GitHubStore: layout and listing", () => {
     const error = await caught(store.read("a.mdx"));
     expect(error.code).toBe("REMOTE_STORE_FAILED");
     expect(error.message).toContain("fetch failed");
+
+    // A GitHub App fetches its token from GitHub too.
+    const app = new GitHubStore({
+      repo: "acme/shop",
+      auth: {
+        kind: "app",
+        token: async () => {
+          throw new TypeError("fetch failed");
+        },
+      },
+    });
+    expect((await caught(app.read("a.mdx"))).code).toBe("REMOTE_STORE_FAILED");
   });
 
   it("explains a missing production branch", async () => {

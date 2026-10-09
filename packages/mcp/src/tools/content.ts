@@ -70,7 +70,14 @@ export const registerContentReadTools: RegisterTools = (server, deps) => {
   ): Promise<{ docs: ProjectedDoc[]; deleted: Set<string> }> {
     const docs = readCollectionDocs(contentDir, name, collection);
     const deleted = new Set<string>();
-    const overlay = await deps.remoteStore?.overlay?.(deps.storeActor());
+    // Only an identified caller has a draft; anyone else reads what is deployed.
+    let actor: ReturnType<typeof deps.storeActor> | undefined;
+    try {
+      actor = deps.remoteStore?.overlay ? deps.storeActor() : undefined;
+    } catch {
+      actor = undefined;
+    }
+    const overlay = actor ? await deps.remoteStore?.overlay?.(actor) : undefined;
     if (!overlay || overlay.size === 0) return { docs, deleted };
     const byPath = new Map(docs.map((doc) => [doc.sourcePath, doc]));
     for (const [path, file] of overlay) {

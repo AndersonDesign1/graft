@@ -74,6 +74,10 @@ function columnsFor(fields: readonly SchemaFieldDto[]): SchemaFieldDto[] {
 
 type StatusFilter = "all" | "unpublished" | "published";
 
+/** Rows per request, and the most a refresh asks for at once (the API's cap). */
+const PAGE = 100;
+const MAX_PAGE = 500;
+
 export function CollectionView({ collection }: { collection: string }) {
   const { schema, workspace, drafts, navigate, openCreate } = useStudio();
   const meta = schema.data?.collections.find((c) => c.name === collection);
@@ -133,12 +137,12 @@ export function CollectionView({ collection }: { collection: string }) {
   // a failed first page must not be retried from the old list's cursor.
   const lastCursor = useRef<string | undefined>(undefined);
   const fetchPage = useCallback(
-    async (cursor?: string) => {
+    async (cursor?: string, size = PAGE) => {
       const mine = ++seq.current;
       lastCursor.current = cursor;
       setLoading(true);
       try {
-        const page = await api<EntryList>(`/entries${qs({ ...params, cursor, limit: 100 })}`);
+        const page = await api<EntryList>(`/entries${qs({ ...params, cursor, limit: size })}`);
         if (mine !== seq.current) return;
         setError(null);
         setList(page);
@@ -159,9 +163,13 @@ export function CollectionView({ collection }: { collection: string }) {
   // Refresh the visible page whenever drafts are refetched (a save, a publish,
   // a discard). Not keyed on the count: editing an entry that already has a
   // draft leaves the count alone but changes its row.
+  // Everything already scrolled into view is fetched again in one request, so
+  // a save doesn't drop the rows below the first page.
+  const loaded = useRef(0);
+  loaded.current = items.length;
   const draftsSeen = drafts.data;
   useEffect(() => {
-    if (draftsSeen) void fetchPage();
+    if (draftsSeen) void fetchPage(undefined, Math.min(MAX_PAGE, Math.max(PAGE, loaded.current)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftsSeen]);
 
