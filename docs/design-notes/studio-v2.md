@@ -2,8 +2,7 @@
 
 > Opened 2026-10-09. Pairs with `editor.md` (the L2 canvas) and
 > `p7-5-docs-and-gallery.md` (the opt-in Studio, P7.5.3).
-> Status: **in progress.** The unit list at the end is the source of truth for
-> what has shipped.
+> Status: **units 1 to 6 shipped**, 7 and 8 next. See "Progress" at the end.
 
 ## The brief
 
@@ -321,14 +320,17 @@ Each is code, tests and one conventional commit, shippable on its own.
    discard, workspace info. `graft serve --studio` mounts the GitHub store
    when configured. MCP `write_content` writes through the same store, and
    MCP gains `list_changes`, `publish_changes`, `discard_changes` when a
-   draft-capable store is mounted. (`studio`, `cli`, `mcp`)
+   draft-capable store is mounted. (`studio`, `cli`, `mcp`) Shipped as
+   `list_drafts`, `publish_drafts` and `discard_drafts`, named after what an
+   editor calls them.
 5. **The editor UI.** Editor-first shell, collection tables, document editor
    with labelled fields and structured editors (groups, repeatable groups,
    tags, galleries, reference picker), inline validation, publish sheet with
    per-document diff, undo for actions, discard, sign-in screen. Developer
    views kept under Developer. (`studio`)
 6. **Deploy story.** `examples/shop` (a product catalog seeded at scale),
-   a hosting page in the docs, `deploy/studio.md`, and an end-to-end check
+   a hosting page in the docs, a Studio section in `deploy/README.md`, and an
+   end-to-end check
    that a hosted save and publish produce commits on a repository.
 7. **Studio on the static tier.** Optional `db`; developer views degrade to
    "needs Postgres" panels; state comes from the SQLite artifact.
@@ -350,3 +352,67 @@ Each is code, tests and one conventional commit, shippable on its own.
   on the production branch with the editor as author. Against real GitHub
   this is a documented manual step, because the cloud session that built this
   has no GitHub credentials to give the Studio.
+
+## Progress
+
+| Unit                                           | State   | Commit                                                                     |
+| ---------------------------------------------- | ------- | -------------------------------------------------------------------------- |
+| 1. Editor field metadata                       | shipped | `feat(core): select and reference fields…`                                 |
+| 2. ContentStore                                | shipped | `feat(compiler): content store with GitHub drafts…`                        |
+| 3. Editor sessions                             | shipped | `feat(studio): sign in to a hosted Studio…`                                |
+| 4. Studio content API on the store, MCP parity | shipped | `feat(studio): editor API…`, `feat(mcp): write through the content store…` |
+| 5. The editor UI                               | shipped | `feat(studio): an editor for people…`                                      |
+| 6. Deploy story                                | shipped | `docs(studio): host Studio for a team…`                                    |
+| 7. Studio on the static tier                   | next    |                                                                            |
+| 8. Incremental projection and the rest         | next    |                                                                            |
+
+### What verification found
+
+- **A real bug outside Studio.** The Node adapter in `graft serve` folded
+  several `Set-Cookie` headers into one, so a hosted sign-in lost its session
+  cookie. Fixed with `Headers.getSetCookie()` and a test, in its own commit.
+- **End to end, hosted.** `examples/shop/scripts/e2e-hosted.mjs` boots
+  `graft serve --studio` with the content directory read-only, against the
+  in-memory GitHub served over HTTP. Every step holds: a signed-out request
+  is refused, an invite link sets a session, a save is a commit on
+  `graft-studio/drafts/<editor>` authored by the editor, the deployed files
+  and production are untouched, a stale save gets 409 `CONTENT_CONFLICT`,
+  publish lands one commit on main by the editor, the empty draft branch is
+  deleted, and the list shows the published price before any redeploy.
+- **In a browser.** Hosted as a contributor: sign-in screen, "Submit for
+  review", the publish sheet's field diff ("Name: Clay Cashmere Beanie →
+  Clay Cashmere Watch Cap"), and the done state linking the pull request.
+  Locally: edit, autosave, field diff, commit; create with validation;
+  dark mode.
+- **Against real GitHub** this remains a manual step: point `GRAFT_GITHUB_*`
+  at a test repository and walk "Check it works" in the hosting guide. The
+  session that built this had no credentials to give a Studio.
+
+### Scale, 2,000 products
+
+Measured on `node scripts/seed.mjs --count 2000`, local Studio:
+
+| Operation                    | Time        |
+| ---------------------------- | ----------- |
+| `graft compile`              | 2.3 s       |
+| `/entries`, first page, cold | 226 ms      |
+| `/entries`, first page, warm | about 46 ms |
+| Search                       | about 40 ms |
+| Filter and sort              | about 36 ms |
+| Local save                   | 1.3 s       |
+
+Lists are fast because `DiskCatalog` caches parsed entries by mtime and size
+and the query runs on the server. A local save is slow because it recompiles
+the whole tree. `projectBranchContent` in `@usegraft/db` diffs the full branch
+and soft-deletes rows it was not given, so projecting one document needs a
+new function rather than a smaller input. That is the first item of unit 8.
+Hosted saves do not compile at all.
+
+### Debt left on purpose
+
+- `/document` routes are superseded by `/entry`. They stay until
+  `feat/content-change-refresh` merges, since that branch edits the same
+  files, and then go in one removal.
+- Rules for the old shell remain in `studio.css` and `parts.css`.
+- The editor chunk (Milkdown and CodeMirror) is 2.7 MB and should load only
+  when an entry opens.
