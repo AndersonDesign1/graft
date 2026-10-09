@@ -361,7 +361,16 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     gitSha,
   });
 
+  // One store for every writing surface, so a hosted agent's write_content
+  // and a hosted editor's save land the same way: as drafts on GitHub when
+  // GRAFT_GITHUB_REPO is set, which is what lets a read-only deployment write.
+  const repository = githubStoreFromEnv({
+    contentDir: config.contentDir,
+    projectRoot: options.cwd,
+  });
+
   const mcpHandler = createGraftMcpHandler({
+    ...(repository ? { store: repository } : {}),
     name: "graft-serve",
     contentDir: config.contentDir,
     collections: config.collections,
@@ -476,13 +485,6 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
         "the policy is not part of the MCP surface.",
     );
   }
-
-  // One store for every writing surface, so a hosted agent's write_content
-  // and a hosted editor's save land the same way.
-  const repository = githubStoreFromEnv({
-    contentDir: config.contentDir,
-    projectRoot: options.cwd,
-  });
 
   let studioHandler: FetchHandler | undefined;
   if (studioMod) {

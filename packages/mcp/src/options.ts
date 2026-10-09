@@ -1,3 +1,4 @@
+import type { ContentStore } from "@usegraft/compiler";
 /**
  * How a Graft MCP server is configured.
  *
@@ -152,4 +153,13 @@ export interface GraftMcpOptions {
    * Tests inject a fake.
    */
   storage?: Storage | (() => Storage | Promise<Storage>);
+  /**
+   * Where authored content is written. Omitted: the files under `contentDir`.
+   * A remote store (GitHub) makes `write_content` and `delete_content` land as
+   * draft commits on the caller's own branch instead of files, which is what
+   * lets a hosted, read-only deployment accept writes, and registers
+   * `list_drafts`, `publish_drafts` and `discard_drafts`: the same draft model
+   * a hosted Studio uses.
+   */
+  store?: ContentStore;
 }

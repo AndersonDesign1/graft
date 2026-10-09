@@ -181,7 +181,9 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
     getDeleteHandler,
     options,
     projectContent,
+    remoteStore,
     requireScope,
+    storeActor,
   } = deps;
 
   server.registerTool(
@@ -247,6 +249,30 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
           // code: rendering evaluates `{…}` and `import` as JavaScript on the
           // server. Refuse it here, before it is stored.
           assertSafeMdx(body ?? "", { label: `${name}/${slug}` });
+
+          if (remoteStore) {
+            // Hosted: the write lands as a draft commit on this caller's own
+            // branch, the same draft a hosted Studio editor gets. Nothing is
+            // compiled, because a draft must not reach the live index; a human
+            // publishes it with publish_drafts or from Studio.
+            const actor = storeActor();
+            const existing = await remoteStore.read(sourcePath, actor);
+            const raw = composeDocument(existing?.raw, data as Record<string, unknown>, body ?? "");
+            parseDocument(raw, collection, sourcePath);
+            await remoteStore.write(sourcePath, raw, { actor });
+            const key = `${name}/${slug}`;
+            return {
+              written: sourcePath,
+              branch: branchId,
+              gitSha: null,
+              changes: {
+                added: existing ? [] : [key],
+                changed: existing ? [key] : [],
+                removed: [],
+                unchanged: 0,
+              },
+            };
+          }
 
           const existingRaw = existsSync(fullPath) ? readFileSync(fullPath, "utf8") : undefined;
           const raw = composeDocument(existingRaw, data as Record<string, unknown>, body ?? "");
