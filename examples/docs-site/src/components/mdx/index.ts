@@ -6,12 +6,15 @@
  * Everything here renders to static HTML in `renderMdx`, so none of it ships
  * client JavaScript. Tabs switch through a radio group rather than a handler,
  * and FieldTable reads the live schema at render time rather than at runtime.
+ * The copy button on every fence is markup too; one delegated listener in
+ * DocsRoot.astro answers all of them.
  */
 import { Callout } from "./Callout";
 import { CodeBlock } from "./CodeBlock";
 import { DocCard, DocCards } from "./DocCards";
 import { FieldTable } from "./FieldTable";
 import { InlineCode } from "./InlineCode";
+import { Pre } from "./Pre";
 import { Step, Steps } from "./Steps";
 import { Table } from "./Table";
 import { Tab, Tabs } from "./Tabs";
@@ -29,5 +32,6 @@ export const mdxComponents = {
   Tabs,
   TierBadge,
   code: InlineCode,
+  pre: Pre,
   table: Table,
 };

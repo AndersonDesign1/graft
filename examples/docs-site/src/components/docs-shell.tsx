@@ -9,6 +9,7 @@ import type { Root } from "fumadocs-core/page-tree";
 import type { TOCItemType } from "fumadocs-core/toc";
 import { DocsLayout } from "fumadocs-ui/layouts/notebook";
 import { DocsBody, DocsPage, DocsTitle } from "fumadocs-ui/layouts/notebook/page";
+import { TOCPopover, TOCProvider } from "fumadocs-ui/layouts/notebook/page/slots/toc";
 import { RootProvider } from "fumadocs-ui/provider/astro";
 import { Check, Copy, FileText, History, MessageSquareWarning, SquarePen } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -16,6 +17,7 @@ import { docSourcePath } from "../lib/doc-source";
 import { AnthropicMark, OpenAIMark } from "./brand-icons";
 import { PoweredByGraft } from "./powered-by-graft";
 import SearchDialog from "./search";
+import { TOCRail } from "./toc-rail";
 
 const REPO = "https://github.com/AndersonDesign1/graft";
 const SITE = "https://graft.page";
@@ -202,6 +204,9 @@ export function DocsShell({
       >
         <DocsPage
           toc={toc}
+          // Graft's own contents rail (toc-rail.tsx); the provider and the
+          // phone's contents bar stay fumadocs'.
+          slots={{ toc: { provider: TOCProvider, main: TOCRail, popover: TOCPopover } }}
           tableOfContent={{
             footer: (
               <PageMeta slug={slug} title={title} updated={updated} className="doc-meta-rail" />
