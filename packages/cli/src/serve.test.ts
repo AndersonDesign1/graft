@@ -130,6 +130,20 @@ describe("createNodeListener", () => {
     expect((await fetch(base)).status).toBe(200);
   });
 
+  it("passes every Set-Cookie through as its own header", async () => {
+    // Studio's sign-in sets the session and clears the OAuth state in one
+    // response. Copying headers through Headers#forEach kept only one of them,
+    // and the session was the one lost: a hosted Studio could not sign anyone in.
+    const base = await listen(async () => {
+      const headers = new Headers();
+      headers.append("set-cookie", "a=1; Path=/");
+      headers.append("set-cookie", "b=2; Path=/; HttpOnly");
+      return new Response(null, { status: 204, headers });
+    });
+    const response = await fetch(base);
+    expect(response.headers.getSetCookie()).toEqual(["a=1; Path=/", "b=2; Path=/; HttpOnly"]);
+  });
+
   it("registers the socket peer where no header can reach it", async () => {
     // The peer is recorded against the Request object in-process, not written
     // as a header. An earlier version DID use a header, which the adapter

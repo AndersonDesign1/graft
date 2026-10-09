@@ -185,10 +185,15 @@ export function createNodeListener(handler: FetchHandler, options: NodeListenerO
       if (peer) setRequestPeer(request, peer);
 
       const response = await handler(request);
-      const outHeaders: Record<string, string> = {};
+      const outHeaders: Record<string, string | string[]> = {};
       response.headers.forEach((value, key) => {
-        if (!HOP_BY_HOP.has(key)) outHeaders[key] = value;
+        if (!HOP_BY_HOP.has(key) && key !== "set-cookie") outHeaders[key] = value;
       });
+      // Each cookie is its own header line. Headers#forEach hands set-cookie
+      // over joined (or, per entry, as the last one only), which silently
+      // dropped Studio's session cookie when sign-in cleared a second one.
+      const cookies = response.headers.getSetCookie();
+      if (cookies.length > 0) outHeaders["set-cookie"] = cookies;
       res.writeHead(response.status, outHeaders);
       res.end(Buffer.from(await response.arrayBuffer()));
     } catch (error) {
