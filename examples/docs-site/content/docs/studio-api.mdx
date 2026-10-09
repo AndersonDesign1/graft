@@ -43,17 +43,47 @@ It describes every route and payload exactly. The tables below are a summary.
 | `GET` | `/approvals` | `studio:read` |
 | `POST` | `/approvals/:id/decide` | `approvals:decide` |
 
-All paths are prefixed with `/api/studio/v1`.
+The editor uses these, which work the same whether saves go to files or to
+GitHub:
+
+| Method | Path | Scope |
+| --- | --- | --- |
+| `GET` | `/workspace` | `studio:read` |
+| `GET` | `/entries?collection=…` | `studio:read` |
+| `GET` | `/entry?collection=…&slug=…` | `studio:read` |
+| `PUT` | `/entry` | `studio:write` |
+| `POST` | `/entry` | `studio:write` |
+| `DELETE` | `/entry` | `studio:write` |
+| `POST` | `/entry/duplicate` | `studio:write` |
+| `GET` | `/drafts` | `studio:read` |
+| `GET` | `/drafts/diff?path=…` | `studio:read` |
+| `POST` | `/drafts/publish` | `studio:write` |
+| `POST` | `/drafts/discard` | `studio:write` |
+
+All paths are prefixed with `/api/studio/v1`. Sign-in lives beside them at
+`/api/studio/v1/auth/*` and needs no scope, because it is how a session starts.
+
+`GET /entries` takes `q`, `status` (`all`, `unpublished`, `published`, `new`,
+`changed`), `where.<field>=<value>`, `sort` (`site`, `title`, `updated` or a
+field), `dir`, `cursor` and `limit` (at most 500), and returns a page with the
+facets to filter by.
+
+`PUT /entry` takes `{ collection, slug, data, body, baseVersion }`, where
+`baseVersion` is the `version` from `GET /entry`. A stale one is refused with
+`CONTENT_CONFLICT` (409) and nothing is written. `POST /drafts/publish` takes
+`{ paths, message?, resolve? }`; a caller without `studio:publish` always opens
+a pull request on a hosted Studio.
 
 Revert has two methods on one path. `GET` checks whether a revert is safe and
 needs only a read scope. `POST` performs it and needs a write scope.
 
-## The three scopes
+## The four scopes
 
 | Scope | Why it is separate |
 | --- | --- |
 | `studio:read` | Looking at the project |
-| `studio:write` | Changing it: saving, compiling, committing, reverting |
+| `studio:write` | Changing it: saving drafts, compiling, committing, reverting |
+| `studio:publish` | Putting drafts live on a hosted Studio without a review |
 | `approvals:decide` | The human gate. No agent runtime token should carry it |
 
 Being signed in grants nothing by itself. A caller needs the scope for each

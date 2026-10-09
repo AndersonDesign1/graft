@@ -1,0 +1,161 @@
+---
+title: Host Studio for your team
+description: "Run Studio on a server so editors can sign in, draft and publish from a browser, with every change landing in Git on GitHub."
+section: Deploy & operate
+order: 6
+---
+
+<p className="kicker">Give a content team a Studio URL. Their changes still end up as commits.</p>
+
+<TierBadge tier="postgres" />
+
+Locally, Studio saves to files and you commit. A hosted Studio has no files it
+can keep: a serverless function's filesystem is read-only, and a container's is
+thrown away on the next deploy. So a hosted Studio writes to GitHub instead.
+Every editor's saves go to a draft branch of their own, and publishing puts one
+commit on your production branch, or opens a pull request. Your host redeploys
+from that commit the way it would for a developer's push.
+
+Nothing is stored outside Git. An editor's draft is a branch you can open on
+GitHub, and an agent with repository access can read or finish it with plain
+Git.
+
+## How it works
+
+| Editor does | What happens in the repository |
+| --- | --- |
+| Saves | A commit on `graft-studio/drafts/<editor>`, authored by the editor |
+| Publishes | One commit on the production branch with the selected entries, authored by the editor |
+| Submits for review | A branch and a pull request; nothing changes on production until it is merged |
+| Discards | The draft branch goes back to the published version of those entries |
+
+Two things are guarded for you:
+
+- **A save from a stale page is refused.** If the entry changed since the
+  editor opened it (another tab, another editor, an agent over MCP), Studio
+  says so and lets them load the newer version or keep theirs.
+- **Publishing never silently overwrites someone else.** If an entry was
+  published by someone else after the editor started their draft, Studio asks
+  them to keep their version or take the published one.
+
+## 1. Give Studio access to the repository
+
+Pick one.
+
+**A GitHub App** (recommended for a team). Create an app under your
+organisation's Developer settings with these repository permissions:
+Contents read and write, Pull requests read and write. Install it on the
+repository. Then set:
+
+| Variable | Value |
+| --- | --- |
+| `GRAFT_GITHUB_APP_ID` | The app's ID |
+| `GRAFT_GITHUB_APP_PRIVATE_KEY` | The private key you generated, as PEM. Literal `\n` sequences are accepted |
+| `GRAFT_GITHUB_APP_INSTALLATION_ID` | Optional. Found automatically from the repository |
+
+Studio exchanges the app's key for tokens that last an hour, so nothing is tied
+to one person's account.
+
+**A fine-grained personal access token** (simplest). Give it access to the one
+repository, with Contents and Pull requests set to read and write, and set
+`GRAFT_GITHUB_TOKEN`.
+
+Then, either way:
+
+| Variable | Value |
+| --- | --- |
+| `GRAFT_GITHUB_REPO` | `owner/name` |
+| `GRAFT_GITHUB_BRANCH` | The branch your site deploys from. Default `main` |
+| `GRAFT_GITHUB_CONTENT_PATH` | Where your content directory is in the repository. Default: your content directory relative to the project, usually `content` |
+| `GRAFT_STUDIO_PUBLISH` | `commit` (publishing commits to the branch) or `pull-request`. Default `commit` |
+
+If the production branch is protected against direct pushes, use
+`pull-request`.
+
+## 2. Let people sign in
+
+Set `GRAFT_STUDIO_SECRET` to at least 32 random characters
+(`openssl rand -base64 48`). Studio signs its session cookies with it. Changing
+it signs everyone out and voids every unused invite link.
+
+**Sign in with GitHub.** Create an OAuth app (Developer settings, OAuth Apps)
+with the callback URL `https://<your-site>/api/studio/v1/auth/github/callback`,
+and set:
+
+| Variable | Value |
+| --- | --- |
+| `GRAFT_GITHUB_CLIENT_ID` | The OAuth app's client ID |
+| `GRAFT_GITHUB_CLIENT_SECRET` | Its client secret |
+| `GRAFT_STUDIO_URL` | The public origin, such as `https://shop.example.com` |
+
+Without a list, anyone with write access to the repository can sign in. To
+choose who can, and with which role, set `GRAFT_STUDIO_EDITORS`:
+
+```sh
+GRAFT_STUDIO_EDITORS="ana@shop.example.com=admin, octocat, ben@shop.example.com=contributor"
+```
+
+**Invite links**, for people without a GitHub account:
+
+```sh
+graft studio invite ana@shop.example.com --name "Ana Lima" --role editor
+```
+
+This prints a link that signs Ana in. It lasts seven days (`--days` sets 1 to
+30). Send it privately: anyone with the link can use it until it expires.
+Commits from an invited editor carry their name and email.
+
+### Roles
+
+| Role | Can |
+| --- | --- |
+| `viewer` | Read everything |
+| `contributor` | Draft changes. Publishing opens a pull request |
+| `editor` | Draft and publish |
+| `admin` | Everything an editor can, and approve or deny actions waiting for a person |
+
+## 3. Deploy
+
+Studio is served by `graft serve --studio`, the same server that answers
+`/api/fn`, `/api/mcp` and the content API. Run it wherever you run Node: the
+[container image](/docs/deploy), Fly, Railway or Render. The content directory
+can be read-only; nothing writes to it.
+
+```sh
+GRAFT_STUDIO=1 graft serve --host 0.0.0.0
+```
+
+Studio is then at `https://<your-site>/studio`. Set `GRAFT_DEPLOYED_SHA` to the
+commit the deployment was built from, if your host does not already provide
+one (Vercel, Render and Railway do). Studio uses it to show entries published
+since the build, before the redeploy lands.
+
+`examples/shop` in the repository is a product catalog set up this way.
+
+## 4. Publish without a developer
+
+When an editor publishes, the production branch moves and your host rebuilds
+the site from it, running `graft compile` as part of the build like any other
+deploy. There is no separate content pipeline to keep in sync.
+
+## Agents use the same drafts
+
+On a server writing to GitHub, MCP's `write_content` and `delete_content` save
+to the connection's own draft branch, and `list_drafts`, `publish_drafts` and
+`discard_drafts` do what Studio's Publish sheet does. An agent opens a pull
+request unless its token carries `content:publish`. See
+[MCP tools](/docs/mcp-tools).
+
+## Check it works
+
+1. Open `/studio`. You see the sign-in screen.
+2. Sign in, open an entry and change a field. The bar says
+   "Unpublished changes", and a branch called `graft-studio/drafts/<you>`
+   appears on GitHub with your commit.
+3. Press Publish. One commit appears on the production branch, authored by
+   you, and the draft branch is deleted.
+4. Your host redeploys, and the change is live.
+
+`examples/shop/scripts/e2e-hosted.mjs` runs the same steps against a stand-in
+for GitHub, with the content directory read-only, and fails loudly if any step
+does not hold.

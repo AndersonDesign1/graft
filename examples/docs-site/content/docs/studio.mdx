@@ -1,25 +1,22 @@
 ---
 title: Studio
-description: "An optional editing UI for people who would rather not edit files: browse content, edit documents, commit changes, and roll back."
+description: "An editor for people who would rather not edit files: find, create, edit and publish content in a browser, with every change ending up in Git."
 section: Content
 order: 5
 ---
 
-<p className="kicker">Give writers a visual editor, without giving up Git.</p>
+<p className="kicker">Give writers and merchandisers an editor, without giving up Git.</p>
 
 <TierBadge tier="postgres" />
 
 Not everyone on your team wants to edit Markdown files and run Git commands.
-Studio is a web UI for them: they browse the content, edit a document in a
-rich editor, review what they changed, and commit it. Everything still ends up
-as files in Git, exactly as if a developer had edited them.
+Studio is an editor for them. They find an entry, change it in a form built from
+your schema, and publish. Everything still ends up as files in Git, exactly as
+if a developer had edited them, and nothing an editor can do in Studio is
+unavailable to an agent or a developer.
 
-Studio is optional. Your content stays plain files in Git, so nothing is locked
-inside the UI: anything Studio does to content, you can also do by editing the
-files and using Git. Some actions also have CLI or MCP equivalents, such as
-`graft compile`, `graft approve`, and `write_content`. Committing and
-reverting a compilation are Studio's own. It needs the [Postgres engine](/docs/tiers),
-because it compares your files with the compiled index.
+Studio needs the [Postgres engine](/docs/tiers) for its developer views
+(history, approvals, branches). Content stays files in Git either way.
 
 ## Open Studio
 
@@ -28,142 +25,120 @@ graft studio
 ```
 
 This starts Studio on your machine, at port 4983, and opens your browser. Only
-your machine can reach it.
+your machine can reach it, and saves go to the files in your checkout.
 
-To serve it from a deployment instead, mount it in the Graft server:
-
-```sh
-graft serve --studio    # served at /studio
-```
-
-Setting `GRAFT_STUDIO=1` does the same without the flag. Either command accepts
-`--branch <name>` to edit a [preview branch](/docs/branching-previews) instead
-of `main`. The UI then stays on that branch, so it can never show `main` while
-the server is serving a preview.
+To give a team a Studio URL, with sign-in and saves that land on GitHub, see
+[Host Studio for your team](/docs/studio-hosting).
 
 ## Find your way around
 
-| View | Use it to |
+Content comes first.
+
+| Where | What it is for |
 | --- | --- |
-| Overview | See document counts, what changed recently, and anything out of date |
-| Collections | Browse the content and open a document to edit |
-| Schema | Look up every collection's fields (read-only) |
-| Approvals | Approve or deny actions waiting for a person |
-| Branches | See preview branches |
-| History | See past compiles, and roll back to one |
-| Settings | Appearance, project details, and package versions |
+| Home | What is waiting to publish, and every collection with its count |
+| A collection | A table of its entries: search, filter, sort, select many |
+| An entry | Its fields and its content, saved as you type |
+| Publish | Every unpublished change, what changed in it, and the button that puts it live |
+| Developer | Index health, schema, history, branches, approvals and settings |
 
-Each view has its own URL, so you can bookmark or share a link to it.
+Press <kbd>⌘K</kbd> anywhere to find an entry by name, create one, or jump to a
+collection. Search runs on the server, so it is as quick on five thousand
+products as on fifty.
 
-## Why a document is marked "drifted"
+## Find content
 
-Your files are the source of truth, and the index is a compiled copy of them.
-After you edit a file, and before you compile, the two disagree. Studio shows
-that instead of hiding it. Each document is in one of four states:
+A collection opens as a table. The columns are the first few short fields of
+its schema, so a product list shows price, status and category without any
+configuration.
 
-| State | Meaning | What to do |
-| --- | --- | --- |
-| `synced` | The file and the index match | Nothing |
-| `drifted` | The file was edited since the last compile | Compile |
-| `unindexed` | The file exists but has never been compiled | Compile |
-| `orphaned` | The index still has it, but the file is gone | Compile, which removes it |
+- **Search** matches names, URL names and text fields.
+- **Filter** by status (all, unpublished, published) and by any choice,
+  yes/no or reference field.
+- **Sort** by name, last edited or any column.
+- **Select** several entries to publish, discard or delete them together.
 
-The header counts every document that is not `synced`, and has a button to
-compile.
+The table loads a page at a time as you scroll.
 
-If one collection's files cannot be read, that collection shows its error and
-the rest of the tree still works. Operational data collections are marked as
-such, because their records live in Postgres and are only changed through
-[functions](/docs/functions-and-access).
+## Edit an entry
 
-## Edit a document
+An entry opens as a page: its title at the top, its fields below, and its
+content last.
 
-A document opens in one of two editors:
+Fields are built from your schema. Each has its label, says if it is optional,
+and shows its help text. Money is typed as money, choices are buttons or a
+list, references open a search over the other collection, lists of images are a
+gallery, and repeated groups such as product variants fold into one line each.
+See [Schema](/docs/schema) for how to declare them.
 
-- **Rich** works like a word processor, and saves back to Markdown.
-- **Raw MDX** shows the source text.
+Problems are shown on the field, in words, before anything is saved: "Keep the
+summary to 240 characters", "Price can't be less than $0.00". Studio does not
+save an entry until it is valid, which is the same rule every agent write
+follows.
 
-Rich is only offered when it can save the document without changing anything
-you did not touch. When a document opens, Studio converts it with the rich
-editor and compares the result with the original file. If the content would
-change, beyond harmless formatting such as list markers or table spacing, the
-document opens in Raw and Rich is disabled. This matters for MDX: a change as
-small as escaping `{` can break a page that looks identical.
+The content is edited in a rich editor that saves back to Markdown. Studio only
+offers it when it can save the content without changing anything you did not
+touch. When it can't, the content opens as Markdown beside the same form. This
+matters for MDX: a change as small as escaping `{` can break a page that looks
+identical. Use **Edit source** in the entry's menu to edit the whole file.
 
 ### Saving
 
-Studio saves automatically, and it never rewrites a file you only opened:
+Studio saves automatically, and never rewrites an entry you only opened. Every
+save carries the version you started from. If the entry changed somewhere else
+in the meantime (another tab, a teammate, an agent), Studio does not overwrite
+it. It shows you, and you choose to load the newer version or keep yours.
 
-- It ignores changes until you actually type or click in the editor.
-- It refuses to save a file whose contents would be identical to what it
-  loaded.
+## Publish
 
-A save is checked exactly like a CLI or agent edit. Studio validates the
-frontmatter against the schema, runs the [MDX safety](/docs/mdx-safety) check,
-writes the file, and recompiles. A document that fails gets the same
-`SCHEMA_VALIDATION_FAILED` error, with a message saying which field to fix.
+Saved changes are drafts until you publish them. The Publish button in the top
+bar shows how many are waiting, and opens a sheet that lists them as entries
+("Wool Hat, Edited") with the fields that changed ("Price: $25.00 → $29.00").
+Choose what to include and press the button. What it does depends on where
+Studio runs:
 
-## Review and commit your changes
+| Studio | Publish button | What happens |
+| --- | --- | --- |
+| On your machine | Commit | A Git commit of the selected files. Nothing is pushed |
+| Hosted, editor | Publish | One commit on your production branch; the site redeploys |
+| Hosted, contributor | Submit for review | A pull request for someone to merge |
 
-The **Changes** drawer shows what you have changed since the last Git commit,
-read straight from Git:
-
-- Each changed file is listed with what happened to it: added, modified,
-  deleted, or renamed.
-- Click a file to see its diff. Images and other binary files have no diff.
-
-Select the files to include, write a message, and commit. Studio commits only
-files it showed you, checks your Git identity before changing anything, and
-leaves any other work you had staged untouched.
-
-If the project is not a Git repository, the drawer says so. Content still
-compiles and serves without Git.
-
-## Revert from a compilation
-
-Every compile in a Git repository records the commit that was checked out when
-it ran. In History you can pick such a compile and restore your content to that
-commit. Studio restores the files and recompiles. A compile outside Git, or
-before the first commit, records no commit, so it cannot be restored this way.
-
-A compile can include uncommitted edits, and the recorded commit does not
-contain them. Restoring such a compile gives you the commit, not the exact
-content that compile served.
-
-It only offers this when it is safe. It first checks that the commit exists in
-this copy of the repository and that you have no uncommitted content changes
-the revert would overwrite. The restored files are staged, not committed, so you
-review and commit the revert yourself.
+**Discard** throws a draft away and leaves the published version as it is.
+Deleting an entry is a draft too: it stays live until you publish the deletion,
+and the toast that follows a delete has an Undo.
 
 ## Give people access
 
-Studio's actions are split into three permissions, so you can let someone, or
-an agent, read without letting them change content or approve actions:
+On your own machine Studio asks for no login. A hosted Studio has sign-in, with
+GitHub or an invite link, and four roles: viewer, contributor, editor and
+admin. See [Host Studio for your team](/docs/studio-hosting#roles).
+
+The roles name scopes, which is also what bearer tokens carry:
 
 | Scope | Allows |
 | --- | --- |
-| `studio:read` | Browsing content, the schema, branches, history, diffs, and pending approvals |
-| `studio:write` | Saving, compiling, committing, and reverting |
+| `studio:read` | Browsing content, the schema, history and pending approvals |
+| `studio:write` | Saving drafts, discarding, compiling. Publishing opens a pull request |
+| `studio:publish` | Publishing straight to the production branch |
 | `approvals:decide` | Approving and denying |
 
-`graft studio` on your own machine asks for no login, because only you can
-reach it. When Studio is reachable from other machines, it requires a token,
-and it warns at startup if you have not set `GRAFT_DEV_TOKEN`.
+## Developer views
 
-Studio records every approval decision against a verified identity, never a
-name the request supplies. Otherwise someone could approve their own request.
-On a [hardened](/docs/hardening) deployment, approvals can only be decided with
-the operator login, so the Approvals view there is read-only.
+Under **Developer**: index health (each document's state against the compiled
+index), the schema, the compile history with restore, branches, approvals, and
+settings. The index states are explained in [How Graft works](/docs/the-model).
 
 ## Do it without Studio
 
-| In Studio | From the CLI | Over MCP |
+| In Studio | From the CLI or Git | Over MCP |
 | --- | --- | --- |
-| Browse content | `graft content` | `list_content` |
-| Save a document | Edit the file, then `graft compile` | `write_content` |
+| Find content | `graft content` | `list_content`, `search_content` |
+| Save an entry | Edit the file, then `graft compile` | `write_content` |
+| Delete an entry | Delete the file | `delete_content` |
+| Publish, locally | `git commit` | |
+| Publish, hosted | Merge the draft branch | `publish_drafts` |
+| Discard a draft | `git restore` | `discard_drafts` |
 | See past compiles | `graft compilations` | `list_compilations` |
-| See branches | `graft branch list` | `list_branches` |
-| See pending approvals | `graft approvals` | `list_approvals` |
 | Approve or deny | `graft approve` / `graft deny` | `decide_approval` |
 
 The UI itself uses the [Studio API](/docs/studio-api), which you can call
@@ -171,6 +146,6 @@ directly.
 
 ## Next steps
 
-- [Studio API](/docs/studio-api) documents the endpoints the UI uses.
+- [Host Studio for your team](/docs/studio-hosting) puts Studio online with sign-in.
+- [Schema](/docs/schema) declares the fields Studio builds its forms from.
 - [MDX safety](/docs/mdx-safety) explains what a save refuses.
-- [Audit & approvals](/docs/audit-and-approvals) covers the approvals Studio shows.
