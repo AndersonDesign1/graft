@@ -220,12 +220,40 @@ Astro.response.headers.set("Cache-Tag", tagsFor("main", "pages", slug).join(",")
 Then, when content changes, purge those tags at your CDN.
 `tagsForChanges(branch, changes)` turns a change list into the tags to purge:
 each changed document, and the collection it is in. Graft does not purge your
-CDN for you. Do it from your own route, called with the change list.
+CDN itself. Add a route that reads `branch` and `changes` from a POST body,
+checks a bearer secret, and purges the tags `tagsForChanges` returns.
 
-The change list comes from two places. An agent's `write_content` call returns
-it as `changes`. `graft compile --json` prints it too, along with the branch.
-In a deploy script, send it to your route. The script stops if the compile
-fails, and `--fail` makes a refused request fail the script too:
+Then point Graft at the route. Add two variables to the `.env` Graft reads, or to the environment, wherever
+`graft serve`, `graft studio`, `graft mcp`, `graft merge` or `graft migrate`
+runs. The secret must match the one the route checks:
+
+<CodeBlock title=".env">
+
+```sh
+GRAFT_REVALIDATE_URL=https://example.com/api/revalidate
+GRAFT_WEBHOOK_SECRET=a-long-random-string
+```
+
+</CodeBlock>
+
+The app's route reads `GRAFT_WEBHOOK_SECRET` too, so set the same value in the
+app's runtime environment, such as your host's environment variables.
+Otherwise the route answers 401 and nothing refreshes.
+
+Graft now calls the route after every write that changes content: an agent's
+`write_content` or `delete_content`, a Studio save, compile or revert, and
+`graft merge --apply` or `graft migrate --apply`. If the route fails, the write
+still succeeds, and the server logs a `REVALIDATE_FAILED` error with the body to
+resend. Recompiling does not resend it: a new compile reports those documents
+as unchanged. If your app
+mounts the MCP endpoint itself, pass `onContentChange` to
+`createGraftMcpHandler` and purge there instead.
+
+`graft compile` never calls the route: a deploy compiles before the new version
+is live. To purge after a deploy, send the compile's output yourself. A shell does not read `.env`, so the deploy script needs `GRAFT_WEBHOOK_SECRET`
+exported in its environment, which is how most CI systems expose secrets.
+The script stops if the compile fails, and `--fail` makes a refused request
+fail the script too:
 
 ```sh
 graft compile --json > changes.json || exit 1
@@ -234,9 +262,6 @@ curl --fail -X POST https://example.com/api/revalidate \
   -H "content-type: application/json" \
   --data-binary @changes.json
 ```
-
-Your route reads `branch` and `changes` from the body and passes them to
-`tagsForChanges`.
 
 `Cache-Tag` is the header Cloudflare reads, with tags separated by commas.
 Fastly reads `Surrogate-Key`, with tags separated by spaces. Use the header

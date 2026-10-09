@@ -14,6 +14,7 @@
  * static dev tokens). See docs/design-notes/agent-mcp.md.
  */
 import { createActorResolver } from "@usegraft/auth";
+import { revalidateWebhookFromEnv } from "@usegraft/compiler";
 import type { FunctionActor } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { assertNoStaticBranch } from "./compile";
@@ -42,6 +43,9 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
   const isStatic = config.index.driver === "static";
   if (isStatic) assertNoStaticBranch(options.branchId);
   const url = isStatic ? undefined : requireDatabaseUrl();
+  // Built before any connection opens, so a bad GRAFT_REVALIDATE_URL stops the
+  // start instead of surfacing on the first write.
+  const onContentChange = revalidateWebhookFromEnv();
 
   const [{ createGraftMcp, serveStdio }, { createDb, resolveBranchHandle, scopeWriteBranch }] =
     await Promise.all([import("@usegraft/mcp"), import("@usegraft/db")]);
@@ -116,6 +120,7 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
       localUploadRoot: config.projectDir,
       defaultAuthorization: devToken,
       approvalElicitation,
+      onContentChange,
     });
 
     // Stdio MCP: never write noise to stdout (that's the protocol stream).

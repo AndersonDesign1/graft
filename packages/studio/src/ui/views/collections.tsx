@@ -17,6 +17,8 @@ import { Tabs, TabsIndicator, TabsList, TabsTrigger } from "../components/ui/tab
 import { api, qs } from "../lib/api";
 import { useAutosave } from "../lib/autosave";
 import { buildSavePayload } from "../lib/draft";
+import { warnIfNotRefreshed } from "../lib/refresh";
+import type { ContentChangeNotice } from "@usegraft/compiler";
 import { compareRoundTrip, describeFidelity, type FidelityResult } from "../lib/fidelity";
 import type { Route } from "../lib/route";
 import { buildForm, composeData } from "../lib/schema-form";
@@ -134,7 +136,11 @@ export function CollectionsView({
     );
     if (!payload) return;
 
-    await api<{ written: string; gitSha: string | null }>("/document", {
+    const saved = await api<{
+      written: string;
+      gitSha: string | null;
+      refresh?: ContentChangeNotice;
+    }>("/document", {
       method: "PUT",
       body: JSON.stringify(payload),
     });
@@ -148,6 +154,7 @@ export function CollectionsView({
       description: `${collection}/${slug}`,
       duration: 1600,
     });
+    warnIfNotRefreshed(saved.refresh);
     onSaved();
     // `route` is deliberately absent: this callback must not change identity
     // when the route does, or the bug above comes back.

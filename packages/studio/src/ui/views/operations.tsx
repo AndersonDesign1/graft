@@ -17,6 +17,7 @@ import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { api, qs } from "../lib/api";
 import { absoluteTime, relativeTime, shortSha, plural } from "../lib/format";
+import { warnIfNotRefreshed } from "../lib/refresh";
 import { useResource } from "../lib/use-resource";
 
 export function ApprovalsView({ onDecided }: { onDecided?: () => void }) {
@@ -248,6 +249,7 @@ function CompilationDetail({
       toast.success(`Reverted to ${shortSha(result.gitSha)}`, {
         description: `${plural(result.filesChanged.length, "file")} restored · index recompiled (+${result.added} ~${result.changed} −${result.removed})`,
       });
+      warnIfNotRefreshed(result.refresh);
       onReverted();
       onClose();
     } catch (err) {

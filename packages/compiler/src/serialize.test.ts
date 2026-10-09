@@ -199,6 +199,14 @@ Body.
     expect(composeDocument(raw, { title: "T" }, "New.")).toBe("---\ntitle: T\n---\n\nNew.\n");
   });
 
+  it("is byte-identical when a body-less document is saved again", () => {
+    // gray-matter writes an empty body as frontmatter plus one blank line. The
+    // second save used to append another newline, so it projected as a change
+    // and refreshed the app for nothing.
+    const fresh = composeDocument(undefined, { title: "T" }, "");
+    expect(composeDocument(fresh, { title: "T" }, "")).toBe(fresh);
+  });
+
   it("preserves CRLF files without mixing line endings", () => {
     const crlf = "---\r\ntitle: T\r\n---\r\n\r\nBody.\r\n";
     const out = composeDocument(crlf, { title: "T" }, "Body.");

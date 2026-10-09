@@ -51,7 +51,12 @@ export const STUDIO_OPENAPI = {
         operationId: "compileBranch",
         summary: "Recompile a branch's content index (same as graft compile)",
         parameters: [{ name: "branch", in: "query", schema: { type: "string" } }],
-        responses: { "200": { description: "Change counts + git SHA" } },
+        responses: {
+          "200": {
+            description:
+              "Change counts + git SHA, plus refresh ({ ok: true } or { ok: false, error, message, fix }) when the handler has onContentChange and content changed",
+          },
+        },
       },
     },
     "/api/studio/v1/document": {
@@ -67,7 +72,12 @@ export const STUDIO_OPENAPI = {
       put: {
         operationId: "putDocument",
         summary: "Write MDX document and recompile (same as MCP write_content)",
-        responses: { "200": { description: "Write + compile result" } },
+        responses: {
+          "200": {
+            description:
+              "Written path, branch, git SHA and ChangeSet, plus refresh ({ ok: true } or { ok: false, error, message, fix }) when the handler has onContentChange and content changed",
+          },
+        },
       },
     },
     "/api/studio/v1/changes": {
