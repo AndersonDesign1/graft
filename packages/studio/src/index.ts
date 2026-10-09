@@ -35,7 +35,6 @@ export type {
   ContentTreeDoc,
   DiffHunkDto,
   DiffLineDto,
-  DocumentDto,
   FileDiffDto,
   GitChangesDto,
   PendingApprovalDto,

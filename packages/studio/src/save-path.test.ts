@@ -63,9 +63,9 @@ afterEach(() => {
 
 const put = (payload: Record<string, unknown>) =>
   handler(
-    new Request("http://localhost/api/studio/v1/document", {
+    new Request("http://localhost/api/studio/v1/entry", {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", origin: "http://localhost" },
       body: JSON.stringify(payload),
     }),
   );
@@ -73,7 +73,7 @@ const put = (payload: Record<string, unknown>) =>
 const read = (slug: string) => readFileSync(join(contentDir, "docs", `${slug}.mdx`), "utf8");
 const docFiles = () => readdirSync(join(contentDir, "docs")).sort();
 
-describe("PUT /document, on disk", () => {
+describe("PUT /entry, on disk", () => {
   it("writes the named document and leaves every sibling byte-identical", async () => {
     const before = read("beta");
 
@@ -148,10 +148,10 @@ describe("PUT /document, on disk", () => {
   });
 });
 
-describe("GET /document", () => {
+describe("GET /entry", () => {
   it("returns what is actually on disk, byte for byte", async () => {
     const res = await handler(
-      new Request("http://localhost/api/studio/v1/document?collection=docs&slug=beta"),
+      new Request("http://localhost/api/studio/v1/entry?collection=docs&slug=beta"),
     );
 
     expect(res.status).toBe(200);
@@ -163,7 +163,7 @@ describe("GET /document", () => {
 
   it("reports a missing document rather than inventing one", async () => {
     const res = await handler(
-      new Request("http://localhost/api/studio/v1/document?collection=docs&slug=ghost"),
+      new Request("http://localhost/api/studio/v1/entry?collection=docs&slug=ghost"),
     );
     expect(res.status).toBe(404);
   });

@@ -410,9 +410,9 @@ Hosted saves do not compile at all.
 
 ### Debt left on purpose
 
-- `/document` routes are superseded by `/entry`. They stay until
-  `feat/content-change-refresh` merges, since that branch edits the same
-  files, and then go in one removal.
+- Done in this PR: the `/document` routes, superseded by `/entry`, were
+  removed once `feat/content-change-refresh` (#56) merged; their save-path,
+  fidelity and refresh tests now run against `/entry`.
 - Rules for the old shell remain in `studio.css` and `parts.css`.
 - The editor chunk (Milkdown and CodeMirror) is 2.7 MB and should load only
   when an entry opens.

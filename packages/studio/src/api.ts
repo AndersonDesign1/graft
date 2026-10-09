@@ -25,8 +25,7 @@ import {
 import { EditorComponentSpec, GraftError, type EditorComponentList } from "@usegraft/contracts";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import matter from "gray-matter";
-import { readCollectionDocs, readRawDocument, requireCollection, writeDocument } from "./content";
+import { readCollectionDocs } from "./content";
 import { STUDIO_OPENAPI } from "./openapi";
 import { commitChanges, readChanges, readFileDiff } from "./git";
 import { preflightRevert, revertContentTo } from "./revert";
@@ -40,7 +39,6 @@ import type {
   ContentTree,
   ContentTreeCollection,
   ContentTreeDoc,
-  DocumentDto,
   DocumentState,
   RevertPreviewDto,
   RevertResultDto,
@@ -866,84 +864,6 @@ const ROUTES: readonly Route[] = [
         ...(refresh ? { refresh } : {}),
       };
       return json(body);
-    },
-  },
-  {
-    method: "GET",
-    path: `${V1}/document`,
-    scope: "studio:read",
-    handle: ({ url, options }) => {
-      const collection = url.searchParams.get("collection")?.trim();
-      const slug = url.searchParams.get("slug")?.trim();
-      if (!collection || !slug) {
-        throw new GraftError({
-          code: "INPUT_VALIDATION_FAILED",
-          message: "collection and slug query params are required.",
-          fix: "GET /api/studio/v1/document?collection=docs&slug=getting-started",
-        });
-      }
-      const coll = requireCollection(options.collections, collection);
-      const doc = readRawDocument(options.contentDir, collection, coll, slug);
-      const body: DocumentDto = {
-        collection,
-        slug,
-        sourcePath: doc.sourcePath,
-        data: doc.data,
-        body: doc.body,
-        raw: doc.raw,
-      };
-      return json(body);
-    },
-  },
-  {
-    method: "PUT",
-    path: `${V1}/document`,
-    scope: "studio:write",
-    writesCheckout: true,
-    handle: async ({ request, options, defaultBranch }) => {
-      const payload = (await request.json()) as {
-        collection?: string;
-        slug?: string;
-        data?: Record<string, unknown>;
-        body?: string;
-        /** Full MDX source; when set, parsed with gray-matter (Studio editor). */
-        raw?: string;
-        branch?: string;
-      };
-      if (!payload.collection || !payload.slug) {
-        throw new GraftError({
-          code: "INPUT_VALIDATION_FAILED",
-          message: "collection and slug are required.",
-          fix: 'PUT { "collection", "slug", "raw" } or { "collection", "slug", "data", "body?" }.',
-        });
-      }
-      let data = payload.data;
-      let body = payload.body ?? "";
-      if (typeof payload.raw === "string") {
-        const parsed = matter(payload.raw);
-        data = parsed.data as Record<string, unknown>;
-        body = parsed.content.replace(/^\n/, "");
-      }
-      if (!data) {
-        throw new GraftError({
-          code: "INPUT_VALIDATION_FAILED",
-          message: "data or raw is required.",
-          fix: 'PUT { "collection", "slug", "raw" } from the Studio editor.',
-        });
-      }
-      const result = await writeDocument({
-        contentDir: options.contentDir,
-        collections: options.collections,
-        db: options.db,
-        mdxTrust: options.mdxTrust,
-        branchId: payload.branch?.trim() || defaultBranch,
-        collection: payload.collection,
-        slug: payload.slug,
-        data,
-        body,
-      });
-      const refresh = await tellApp(options, result.branch, result);
-      return json({ ...result, ...(refresh ? { refresh } : {}) });
     },
   },
   ...EDITOR_ROUTES,

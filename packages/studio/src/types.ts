@@ -68,15 +68,6 @@ export interface ContentTree {
   };
 }
 
-export interface DocumentDto {
-  collection: string;
-  slug: string;
-  sourcePath: string;
-  data: Record<string, unknown>;
-  body: string;
-  raw: string;
-}
-
 export interface CompilationDto {
   id: string;
   branchId: string;

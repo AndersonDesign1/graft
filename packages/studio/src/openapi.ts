@@ -59,27 +59,6 @@ export const STUDIO_OPENAPI = {
         },
       },
     },
-    "/api/studio/v1/document": {
-      get: {
-        operationId: "getDocument",
-        summary: "Read one MDX document (file truth)",
-        parameters: [
-          { name: "collection", in: "query", required: true, schema: { type: "string" } },
-          { name: "slug", in: "query", required: true, schema: { type: "string" } },
-        ],
-        responses: { "200": { description: "Document data + body + raw" } },
-      },
-      put: {
-        operationId: "putDocument",
-        summary: "Write MDX document and recompile (same as MCP write_content)",
-        responses: {
-          "200": {
-            description:
-              "Written path, branch, git SHA and ChangeSet, plus refresh ({ ok: true } or { ok: false, error, message, fix }) when the handler has onContentChange and content changed",
-          },
-        },
-      },
-    },
     "/api/studio/v1/changes": {
       get: {
         operationId: "getChanges",
