@@ -40,6 +40,15 @@ export type ContentChangeNotice =
   | { ok: false; error: GraftErrorJSON["error"]; message: string; fix?: string };
 
 /**
+ * How to recover from a failed refresh. Recompiling does not help: the index
+ * already holds the change, so a later compile reports these documents as
+ * unchanged and its ChangeSet names none of them. The only record of what to
+ * refresh is this event, so it is logged in full for the operator to resend.
+ */
+const RESEND =
+  "Then resend this change: POST the { branch, gitSha, changes } body logged with this error to the revalidate route (an agent's result carries the same changes). A later compile reports these documents as unchanged, so it will not refresh them.";
+
+/**
  * Run the listener for a change, if there is one and something changed.
  *
  * Never throws. The write already landed, so failing it now would tell the
@@ -61,9 +70,11 @@ export async function notifyContentChange(
         : new GraftError({
             code: "REVALIDATE_FAILED",
             message: `The content was written, but refreshing the app failed: ${error instanceof Error ? error.message : String(error)}`,
-            fix: "Check the onContentChange listener. The index is already up to date; once the listener works, the next write refreshes the app, or run `graft compile --json` and send it to the revalidate route.",
+            fix: `Fix the onContentChange listener. ${RESEND}`,
           });
-    console.error(`graft: ${graftError.message}\n  fix: ${graftError.fix ?? ""}`);
+    console.error(
+      `graft: ${graftError.message}\n  fix: ${graftError.fix ?? ""}\n  resend: ${JSON.stringify(event)}`,
+    );
     return {
       ok: false,
       error: graftError.code,
@@ -129,7 +140,7 @@ export function createRevalidateWebhook(options: RevalidateWebhookOptions): Cont
       throw new GraftError({
         code: "REVALIDATE_FAILED",
         message: `The content was written, but the revalidate request to ${url.origin} failed: ${error instanceof Error ? error.message : String(error)}`,
-        fix: `Check that GRAFT_REVALIDATE_URL (${url.href}) is reachable from this server and does not redirect. The index is already up to date; the next write refreshes the app once the route answers.`,
+        fix: `Check that GRAFT_REVALIDATE_URL (${url.href}) is reachable from this server and does not redirect. ${RESEND}`,
         details: { url: url.href },
       });
     }
@@ -140,8 +151,8 @@ export function createRevalidateWebhook(options: RevalidateWebhookOptions): Cont
         message: `The content was written, but the app's revalidate route answered ${response.status}.${detail ? ` ${detail}` : ""}`,
         fix:
           response.status === 401 || response.status === 403
-            ? "GRAFT_WEBHOOK_SECRET here must equal the secret the revalidate route checks. Set the same value on both."
-            : `Check the revalidate route at ${url.href}. It must accept POST { branch, gitSha, changes } with the bearer secret.`,
+            ? `GRAFT_WEBHOOK_SECRET here must equal the secret the revalidate route checks. Set the same value on both. ${RESEND}`
+            : `Check the revalidate route at ${url.href}. It must accept POST { branch, gitSha, changes } with the bearer secret. ${RESEND}`,
         details: { url: url.href, status: response.status },
       });
     }

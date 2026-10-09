@@ -266,19 +266,23 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
     ].sort((a, b) => a.name.localeCompare(b.name));
     const waitFor = (name: string) => () =>
       console.log(`A migration or merge is running on "${name}"; waiting for it to finish…`);
-    const result = await withMigrationLock(
-      first.db,
-      first.branch,
-      () => withMigrationLock(second.db, second.branch, run, { onWait: waitFor(second.name) }),
-      { onWait: waitFor(first.name) },
-    );
-    // After the locks are released: a slow revalidate route must not hold up
-    // a migration or merge waiting on either branch.
-    if (mergedChange) {
-      const refresh = await notifyContentChange(onContentChange, mergedChange);
-      if (refresh?.ok) console.log(`told the app to refresh "${into}"`);
+    try {
+      return await withMigrationLock(
+        first.db,
+        first.branch,
+        () => withMigrationLock(second.db, second.branch, run, { onWait: waitFor(second.name) }),
+        { onWait: waitFor(first.name) },
+      );
+    } finally {
+      // After the locks are released: a slow revalidate route must not hold up
+      // a migration or merge waiting on either branch. In `finally` so a
+      // recompile that landed is announced even if something after it threw.
+      // notifyContentChange never throws, so that error still propagates.
+      if (mergedChange) {
+        const refresh = await notifyContentChange(onContentChange, mergedChange);
+        if (refresh?.ok) console.log(`told the app to refresh "${into}"`);
+      }
     }
-    return result;
   } finally {
     await src.close();
     await target.close();

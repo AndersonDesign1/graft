@@ -272,7 +272,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "An onContentChange listener passed to an in-app mount threw",
     ],
     howToRecover:
-      "Do not retry the write: it succeeded. Fix the cause the error's `fix` names. To refresh now, run `graft compile --json` and POST its output to the revalidate route. The next write also refreshes once the route works.",
+      "Do not retry the write: it succeeded. Fix the cause the error's `fix` names. Then POST the write's `{ branch, gitSha, changes }` to the revalidate route: an agent's result carries `changes`, and the server logs the whole body with the error. Do not recompile instead. The index already holds the change, so a later compile reports these documents as unchanged and refreshes none of them.",
   },
   SLUG_NOT_UNIQUE: {
     code: "SLUG_NOT_UNIQUE",

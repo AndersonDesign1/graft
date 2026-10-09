@@ -236,15 +236,23 @@ export async function migrateCommand(
     // A dry run reads the ledger without the lock. --apply reads it only once
     // the lock is held, so a run that had to wait skips what the other applied.
     if (!options.apply) return await run();
-    const result = await withMigrationLock(branch.db, writeBranch, run, {
-      onWait: () =>
-        // A merge into this branch holds the same lock, so name both.
-        console.log(`A migration or merge is running on "${branchId}"; waiting for it to finish…`),
-    });
-    // After the lock is released: a slow revalidate route must not hold up
-    // the next migration or merge on this branch.
-    for (const change of contentChanges) await notifyContentChange(onContentChange, change);
-    return result;
+    try {
+      return await withMigrationLock(branch.db, writeBranch, run, {
+        onWait: () =>
+          // A merge into this branch holds the same lock, so name both.
+          console.log(
+            `A migration or merge is running on "${branchId}"; waiting for it to finish…`,
+          ),
+      });
+    } finally {
+      // After the lock is released: a slow revalidate route must not hold up
+      // the next migration or merge on this branch. In `finally` because each
+      // applied migration commits its compile and ledger row as it goes, so a
+      // later one throwing leaves the earlier ones live, and a rerun skips
+      // them. notifyContentChange never throws, so the migration's own error
+      // is the one that propagates.
+      for (const change of contentChanges) await notifyContentChange(onContentChange, change);
+    }
   } finally {
     await branch.close();
     await control.close();

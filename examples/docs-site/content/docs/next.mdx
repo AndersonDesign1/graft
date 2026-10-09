@@ -483,7 +483,10 @@ for `localhost`.
 
 If the route fails, the write still succeeds. The server logs a
 `REVALIDATE_FAILED` error, and an agent's result carries
-`refresh: { ok: false, fix }`, so the agent knows not to retry the write.
+`refresh: { ok: false, fix }`, so the agent knows not to retry the write. To
+refresh those pages, POST the body the server logged with the error to the
+route. Recompiling does not help: the index already has the change, so a new
+compile reports those documents as unchanged.
 
 </Step>
 

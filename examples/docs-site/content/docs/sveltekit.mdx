@@ -223,7 +223,9 @@ GRAFT_WEBHOOK_SECRET=a-long-random-string
 Graft now calls the route after every write that changes content: an agent's
 `write_content` or `delete_content`, a Studio save, compile or revert, and
 `graft merge --apply` or `graft migrate --apply`. If the route fails, the write
-still succeeds, and the server logs a `REVALIDATE_FAILED` error. If your app
+still succeeds, and the server logs a `REVALIDATE_FAILED` error with the body to
+resend. Recompiling does not resend it: a new compile reports those documents
+as unchanged. If your app
 mounts the MCP endpoint itself, pass `onContentChange` to
 `createGraftMcpHandler` and purge there instead.
 

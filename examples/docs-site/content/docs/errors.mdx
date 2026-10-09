@@ -518,7 +518,7 @@ The content was written and the index is up to date, but telling the app to refr
 
 **How to recover**
 
-Do not retry the write: it succeeded. Fix the cause the error's `fix` names. To refresh now, run `graft compile --json` and POST its output to the revalidate route. The next write also refreshes once the route works.
+Do not retry the write: it succeeded. Fix the cause the error's `fix` names. Then POST the write's `{ branch, gitSha, changes }` to the revalidate route: an agent's result carries `changes`, and the server logs the whole body with the error. Do not recompile instead. The index already holds the change, so a later compile reports these documents as unchanged and refreshes none of them.
 
 ### ROUTE_NOT_FOUND
 

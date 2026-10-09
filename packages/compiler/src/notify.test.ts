@@ -65,6 +65,10 @@ describe("notifyContentChange", () => {
     expect(notice && !notice.ok && notice.message).toContain("boom");
     expect(notice && !notice.ok && notice.fix).toBeTruthy();
     expect(log).toHaveBeenCalledOnce();
+    // A later compile reports these documents unchanged, so the logged event
+    // is the only record of what to resend.
+    expect(String(log.mock.calls[0]?.[0])).toContain(`resend: ${JSON.stringify(event)}`);
+    expect(notice && !notice.ok && notice.fix).toContain("will not refresh them");
   });
 
   it("keeps a GraftError's own code and fix", async () => {
