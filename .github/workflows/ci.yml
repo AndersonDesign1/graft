@@ -75,6 +75,10 @@ jobs:
       # build, so a second hand-written copy would drift invisibly. Needs the
       # build above: it imports the built package.
       - run: pnpm check:error-docs
+      # The changelog page is merged from every package's CHANGELOG.md, which
+      # only a version PR changes. `pnpm version-packages` regenerates it, so
+      # this fails only when a CHANGELOG was edited by hand without it.
+      - run: pnpm check:changelog
       - run: pnpm test
       # P6.1 — cold-agent path must stay green: MCP-only introspection → write → read.
       # Runs again explicitly so the gate is visible in CI logs (also covered by pnpm test).
