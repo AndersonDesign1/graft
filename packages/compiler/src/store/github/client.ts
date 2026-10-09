@@ -104,21 +104,42 @@ export class GitHubClient {
     body?: unknown,
     expect: readonly number[] = [],
   ): Promise<T> {
+    const route = `${method} ${path.split("?")[0]}`;
+    // No answer, or one that isn't JSON, is the same failure to the caller as
+    // a refusal: the remote could not be written, with the cause in the message.
+    const unreachable = (cause: unknown): GraftError =>
+      new GraftError({
+        code: "REMOTE_STORE_FAILED",
+        message: `GitHub did not answer ${route}: ${cause instanceof Error ? cause.message : String(cause)}`,
+        fix: "Check that the server can reach GitHub (GRAFT_GITHUB_API_URL, if set, must be the API root) and retry.",
+        details: { method, path: path.split("?")[0] },
+      });
     const token = await this.options.auth.token();
-    const response = await this.doFetch(`${this.apiUrl}${path}`, {
-      method,
-      headers: {
-        accept: "application/vnd.github+json",
-        authorization: `Bearer ${token}`,
-        "x-github-api-version": "2022-11-28",
-        "user-agent": "graft-studio",
-        ...(body === undefined ? {} : { "content-type": "application/json" }),
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
+    let response: Response;
+    try {
+      response = await this.doFetch(`${this.apiUrl}${path}`, {
+        method,
+        headers: {
+          accept: "application/vnd.github+json",
+          authorization: `Bearer ${token}`,
+          "x-github-api-version": "2022-11-28",
+          "user-agent": "graft-studio",
+          ...(body === undefined ? {} : { "content-type": "application/json" }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    } catch (error) {
+      throw unreachable(error);
+    }
     if (response.status === 204) return undefined as T;
-    const text = await response.text();
-    const parsed = text ? (JSON.parse(text) as unknown) : undefined;
+    let parsed: unknown;
+    try {
+      const text = await response.text();
+      parsed = text ? (JSON.parse(text) as unknown) : undefined;
+    } catch (error) {
+      if (response.ok) throw unreachable(error);
+      parsed = undefined; // an error page instead of JSON: statusText below
+    }
     if (response.ok) return parsed as T;
 
     const message =
@@ -126,7 +147,7 @@ export class GitHubClient {
     if (expect.includes(response.status)) throw new GitHubStatus(response.status, message);
     throw new GraftError({
       code: "REMOTE_STORE_FAILED",
-      message: `GitHub refused ${method} ${path.split("?")[0]} (${response.status}): ${message}`,
+      message: `GitHub refused ${route} (${response.status}): ${message}`,
       fix: hintFor(response.status, this.repo),
       details: { status: response.status, message, method, path: path.split("?")[0] },
     });

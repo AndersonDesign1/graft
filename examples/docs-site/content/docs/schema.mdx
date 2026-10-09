@@ -107,7 +107,7 @@ Every builder accepts `optional: true` and a `description`.
 | `min`, `max` | `number` | The allowed range |
 | `int: true` | `number` | Whole numbers only |
 | `maxItems` | `array` | The most entries allowed |
-| `format: "money"` | `number` | An amount in the smallest currency unit (cents). Implies `int`. Studio shows and edits it as money |
+| `format: "money"` | `number` | An amount in the currency's minor unit (cents for USD, whole yen for JPY). Implies `int`. Studio shows and edits it as money |
 | `currency` | `number` with `format: "money"` | The ISO currency code Studio shows. Defaults to `USD` |
 | `label` | every field | What Studio calls the field, such as `"Price"`. The key stays the same |
 

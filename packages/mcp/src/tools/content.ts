@@ -216,7 +216,7 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
       outputSchema: writeContentOutput,
       annotations: WRITES,
       description:
-        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.",
+        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit. On a hosted server that writes to GitHub (list_drafts is registered), the write is instead an unpublished draft on your own branch, nothing is compiled (gitSha is null), and it goes live only through publish_drafts.",
       inputSchema: {
         collection: z.string().describe("Collection name"),
         slug: z
@@ -290,15 +290,16 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
               baseVersion: existing?.version ?? null,
             });
             const key = `${name}/${slug}`;
+            const same = existing?.raw === raw;
             return {
               written: sourcePath,
               branch: branchId,
               gitSha: null,
               changes: {
                 added: existing ? [] : [key],
-                changed: existing ? [key] : [],
+                changed: existing && !same ? [key] : [],
                 removed: [],
-                unchanged: 0,
+                unchanged: same ? 1 : 0,
               },
             };
           }

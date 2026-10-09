@@ -76,6 +76,8 @@ export function HomeView() {
         <p className="masthead-lede">
           {drafts.loading && !drafts.data ? (
             " "
+          ) : drafts.error && !drafts.data ? (
+            `Unpublished changes can't be loaded right now: ${drafts.error}`
           ) : changes.length === 0 ? (
             "Everything is published."
           ) : (

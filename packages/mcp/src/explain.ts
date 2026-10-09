@@ -255,7 +255,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "GitHub rate limiting or an outage",
     ],
     howToRecover:
-      "Read `details.status` and `details.message`, which carry GitHub's own answer. A 401 or 403 is credentials or permissions; a 404 is the repository or branch name; a protected branch needs `GRAFT_STUDIO_PUBLISH=pull-request`. Retry once the cause is fixed: drafts already saved stay on their branch.",
+      "Read the error message and `details`. A GitHub refusal carries `details.status` and `details.message`, GitHub's own answer; a failure before GitHub answered (network, a malformed response) has the message only. A 401 or 403 is credentials or permissions; a 404 is the repository or branch name; a protected branch needs `GRAFT_STUDIO_PUBLISH=pull-request`. Retry once the cause is fixed: drafts already saved stay on their branch.",
   },
   STATIC_INDEX_NOT_FOUND: {
     code: "STATIC_INDEX_NOT_FOUND",

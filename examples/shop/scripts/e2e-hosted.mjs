@@ -28,9 +28,10 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createGitHubFake } from "@usegraft/compiler/testing";
 
-const here = new URL("..", import.meta.url).pathname;
+const here = fileURLToPath(new URL("..", import.meta.url));
 const cli = join(here, "../../packages/cli/dist/index.js");
 if (!process.env.DATABASE_URL) {
   console.error("Set DATABASE_URL to a Postgres database this script may compile into.");

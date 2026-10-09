@@ -154,7 +154,8 @@ export interface GraftMcpOptions {
    */
   storage?: Storage | (() => Storage | Promise<Storage>);
   /**
-   * Where authored content is written. Omitted: the files under `contentDir`.
+   * Where authored content is written. Omitted, or a filesystem store: the
+   * files under `contentDir`, which the tools already write directly.
    * A remote store (GitHub) makes `write_content` and `delete_content` land as
    * draft commits on the caller's own branch instead of files, which is what
    * lets a hosted, read-only deployment accept writes, and registers

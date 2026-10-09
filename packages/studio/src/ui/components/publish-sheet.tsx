@@ -136,13 +136,24 @@ export function PublishSheet({
           <Done result={done} onClose={() => onOpenChange(false)} />
         ) : changes.length === 0 ? (
           <div className="sheet-empty">
-            <p className="sheet-empty-title">Everything is published.</p>
-            <p className="sheet-empty-body">
-              Edits you make are saved as drafts and gather here until you publish them.
-            </p>
             {(drafts.data?.reviews ?? []).length > 0 ? (
-              <Reviews reviews={drafts.data?.reviews ?? []} />
-            ) : null}
+              <>
+                <p className="sheet-empty-title">
+                  Nothing new to {action === "review" ? "submit" : action}.
+                </p>
+                <p className="sheet-empty-body">
+                  These are waiting for someone to review and merge them.
+                </p>
+                <Reviews reviews={drafts.data?.reviews ?? []} />
+              </>
+            ) : (
+              <>
+                <p className="sheet-empty-title">Everything is published.</p>
+                <p className="sheet-empty-body">
+                  Edits you make are saved as drafts and gather here until you publish them.
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <>

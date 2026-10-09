@@ -79,8 +79,18 @@ export interface GitHubFake {
   ): string;
   /** Merge an open pull request by squashing it onto its base. */
   mergePull(number: number): string;
-  /** Answer the next N calls to a path prefix with a status, to test failures. */
-  failNext(method: string, pathPrefix: string, status: number, times?: number): void;
+  /**
+   * Answer the next N calls to a path prefix with a status, to test failures.
+   * `before` runs as each one is refused, to stage what caused it (another
+   * push landing, say).
+   */
+  failNext(
+    method: string,
+    pathPrefix: string,
+    status: number,
+    times?: number,
+    before?: () => void,
+  ): void;
   /** Serve over real HTTP, for an end-to-end run. */
   listen(port?: number): Promise<{ url: string; close: () => Promise<void> }>;
 }
@@ -100,7 +110,13 @@ export function createGitHubFake(options: GitHubFakeOptions = {}): GitHubFake {
   const refs = new Map<string, string>();
   const pulls: Pull[] = [];
   const requests: { method: string; path: string }[] = [];
-  const failures: { method: string; prefix: string; status: number; times: number }[] = [];
+  const failures: {
+    method: string;
+    prefix: string;
+    status: number;
+    times: number;
+    before?: () => void;
+  }[] = [];
   let clock = Date.parse("2026-10-01T00:00:00Z");
 
   function putBlob(content: string): string {
@@ -226,6 +242,7 @@ export function createGitHubFake(options: GitHubFakeOptions = {}): GitHubFake {
     if (failure) {
       failure.times -= 1;
       if (failure.times <= 0) failures.splice(failures.indexOf(failure), 1);
+      failure.before?.();
       return json(failure.status, { message: `Injected ${failure.status}` });
     }
 
@@ -434,13 +451,22 @@ export function createGitHubFake(options: GitHubFakeOptions = {}): GitHubFake {
       for (const [path, sha] of to)
         if (from.get(path) !== sha) changes[path] = blobs.get(sha) ?? "";
       for (const path of from.keys()) if (!to.has(path)) changes[path] = null;
+      // Like GitHub, refuse a merge where the base changed the same file
+      // differently since the pull request branched.
+      const base = flatMap((commits.get(baseHead) as Commit).tree);
+      const conflicted = Object.keys(changes).filter(
+        (path) => base.get(path) !== from.get(path) && base.get(path) !== to.get(path),
+      );
+      if (conflicted.length > 0) {
+        throw new Error(`pull ${number} conflicts with ${pull.base}: ${conflicted.join(", ")}`);
+      }
       const sha = applyToBranch(pull.base, changes, `${pull.title} (#${pull.number})`);
       pull.state = "closed";
       pull.merged = true;
       return sha;
     },
-    failNext(method, pathPrefix, status, times = 1) {
-      failures.push({ method, prefix: pathPrefix, status, times });
+    failNext(method, pathPrefix, status, times = 1, before) {
+      failures.push({ method, prefix: pathPrefix, status, times, before });
     },
     async listen(port = 0) {
       const server = createServer(async (req, res) => {

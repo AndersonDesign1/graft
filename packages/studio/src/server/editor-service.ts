@@ -149,6 +149,9 @@ export class EditorService {
 
   /** The path for a slug: the file that declares it, or the conventional one. */
   private async pathFor(name: string, slug: string, actor: StoreActor): Promise<string> {
+    // A slug names a file: "shirts/blue" would save a nested file listed
+    // under a different slug. Every entry's own slug already has this shape.
+    if (!SLUG_RE.test(slug)) throw invalidSlug(slug);
     const match = (await this.entries(name, actor)).find((entry) => entry.slug === slug);
     return match?.path ?? `${name}/${slug}.mdx`;
   }

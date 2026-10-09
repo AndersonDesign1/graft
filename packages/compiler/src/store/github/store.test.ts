@@ -264,11 +264,23 @@ describe("GitHubStore: publishing", () => {
   it("retries when production moves during the publish", async () => {
     const { fake, store } = setup();
     await store.write("products/shirt.mdx", `${shirt}mine\n`, { actor: ana });
-    // The first fast-forward of main is refused, as if a push landed between
-    // reading main and moving it.
-    fake.failNext("PATCH", "/repos/acme/shop/git/refs/heads/main", 422);
+    // A push lands between reading main and moving it, so the first
+    // fast-forward is refused. The retry must build on that push, not over it.
+    fake.failNext("PATCH", "/repos/acme/shop/git/refs/heads/main", 422, 1, () => {
+      fake.push("main", { "README.md": "# shop, renamed\n" });
+    });
     await store.drafts.publish({ actor: ana, paths: ["products/shirt.mdx"] });
     expect(fake.files()["content/products/shirt.mdx"]).toBe(`${shirt}mine\n`);
+    expect(fake.files()["README.md"]).toBe("# shop, renamed\n");
+  });
+
+  it("has the stand-in GitHub refuse a review that conflicts with production", async () => {
+    const { fake, store } = setup(undefined, { publishMode: "review" });
+    await store.write("products/hat.mdx", `${hat}reviewed\n`, { actor: ana });
+    await store.drafts.publish({ actor: ana, paths: ["products/hat.mdx"] });
+    fake.push("main", { "content/products/hat.mdx": `${hat}hotfix\n` });
+    expect(() => fake.mergePull(1)).toThrow(/conflicts/);
+    expect(fake.files()["content/products/hat.mdx"]).toBe(`${hat}hotfix\n`);
   });
 
   it("opens a pull request in review mode and keeps production untouched", async () => {
@@ -350,6 +362,19 @@ describe("GitHubStore: layout and listing", () => {
     expect(error.code).toBe("REMOTE_STORE_FAILED");
     expect(error.details).toMatchObject({ status: 401 });
     expect(error.fix).toContain("GRAFT_GITHUB_TOKEN");
+  });
+
+  it("reports an unreachable GitHub as a store failure, not a crash", async () => {
+    const store = new GitHubStore({
+      repo: "acme/shop",
+      auth: tokenAuth("t"),
+      fetch: async () => {
+        throw new TypeError("fetch failed");
+      },
+    });
+    const error = await caught(store.read("a.mdx"));
+    expect(error.code).toBe("REMOTE_STORE_FAILED");
+    expect(error.message).toContain("fetch failed");
   });
 
   it("explains a missing production branch", async () => {

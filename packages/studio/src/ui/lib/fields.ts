@@ -250,9 +250,11 @@ export function problemsWith(
       }
       break;
     case "asset": {
-      const key = (value as { key?: unknown }).key;
+      const { key, alt } = value as { key?: unknown; alt?: unknown };
       if (typeof key !== "string" || !ASSET_KEY.test(key)) {
         out.set(path, `${label} needs a file name like "products/hat.jpg" (lowercase, no spaces).`);
+      } else if (alt !== undefined && typeof alt !== "string") {
+        out.set(path, `${label}'s description should be text.`);
       }
       break;
     }

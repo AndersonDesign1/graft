@@ -9,8 +9,9 @@
  */
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("../content/", import.meta.url).pathname;
+const root = fileURLToPath(new URL("../content/", import.meta.url));
 const countArg = process.argv.indexOf("--count");
 const count = countArg === -1 ? 48 : Number(process.argv[countArg + 1]);
 if (!Number.isInteger(count) || count < 1) throw new Error("--count needs a whole number");

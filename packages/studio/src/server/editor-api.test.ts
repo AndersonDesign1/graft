@@ -3,7 +3,14 @@
  * real git repository (local Studio) and on the in-memory GitHub (hosted).
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GitHubStore, tokenAuth } from "@usegraft/compiler";
@@ -160,6 +167,27 @@ describe("editor API on a local checkout", () => {
       { value: "active", count: 2 },
       { value: "archived", count: 1 },
     ]);
+
+    // Empty values sort last in either direction.
+    writeFileSync(
+      join(contentDir, "products", "loose-thread.mdx"),
+      "---\ntitle: Loose Thread\nprice: 100\nstatus: draft\n---\n",
+    );
+    for (const dir of ["asc", "desc"]) {
+      const sorted = await call<EntryList>(
+        handler,
+        "GET",
+        `/entries?collection=products&sort=category&dir=${dir}`,
+      );
+      expect(sorted.json.items.at(-1)?.slug).toBe("loose-thread");
+    }
+    const nested = await call<{ error: string }>(handler, "PUT", "/entry", {
+      collection: "products",
+      slug: "shirts/blue",
+      data: { title: "Blue", price: 1, status: "draft" },
+    });
+    expect([nested.status, nested.json.error]).toEqual([400, "INVALID_SLUG"]);
+    unlinkSync(join(contentDir, "products", "loose-thread.mdx"));
 
     // Search reads whole fields, not the table's shortened cells.
     writeFileSync(

@@ -253,9 +253,20 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
   // filesystem store is today's behaviour and needs no indirection.
   const remoteStore =
     options.store && options.store.kind !== "filesystem" ? options.store : undefined;
+  // Each caller drafts on a branch named for its identity, so a remote write
+  // without one is refused: a shared fallback would let anonymous callers read,
+  // overwrite and publish each other's drafts.
   const storeActor = () => {
-    const actor = options.connectionActor;
-    return { id: actor?.id ?? "agent", name: actor?.id ?? "Agent" };
+    const id = options.connectionActor?.id;
+    if (!id) {
+      throw new GraftError({
+        code: "UNAUTHORIZED",
+        message:
+          "Drafts on a hosted server belong to an identified caller, and this connection has none.",
+        fix: "Connect with a bearer token (its subject names your draft branch), or give the MCP handler a connectionActor with an id.",
+      });
+    }
+    return { id, name: id };
   };
 
   const deleteContentFn = defineFunction({

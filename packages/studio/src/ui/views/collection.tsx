@@ -152,12 +152,14 @@ export function CollectionView({ collection }: { collection: string }) {
     void fetchPage();
   }, [fetchPage]);
 
-  // Refresh the visible page when drafts change (a save elsewhere, a publish).
-  const draftStamp = drafts.data?.changes.length;
+  // Refresh the visible page whenever drafts are refetched (a save, a publish,
+  // a discard). Not keyed on the count: editing an entry that already has a
+  // draft leaves the count alone but changes its row.
+  const draftsSeen = drafts.data;
   useEffect(() => {
-    if (draftStamp !== undefined) void fetchPage();
+    if (draftsSeen) void fetchPage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftStamp]);
+  }, [draftsSeen]);
 
   // A selection only means something for the rows it was made on.
   useEffect(() => setSelected(new Set()), [params]);

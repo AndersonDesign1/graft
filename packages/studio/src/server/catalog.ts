@@ -234,13 +234,14 @@ function siteOrder(sections: readonly string[] | undefined) {
   };
 }
 
-function compareCells(a: CellValue, b: CellValue): number {
+function compareCells(a: CellValue, b: CellValue, direction: 1 | -1 = 1): number {
   if (a === b) return 0;
-  // Empty values sort last whichever way the list is ordered.
+  // Empty values sort last whichever way the list is ordered, so the
+  // direction applies only once both sides have a value.
   if (a === null) return 1;
   if (b === null) return -1;
-  if (typeof a === "number" && typeof b === "number") return a - b;
-  return String(a).localeCompare(String(b), undefined, { numeric: true });
+  if (typeof a === "number" && typeof b === "number") return direction * (a - b);
+  return direction * String(a).localeCompare(String(b), undefined, { numeric: true });
 }
 
 export function queryEntries(
@@ -287,13 +288,13 @@ export function queryEntries(
     );
   const sorted = [...items].sort((a, b) => {
     if (sort === "updated")
-      return direction * compareCells(b.updatedAt ?? null, a.updatedAt ?? null);
+      return compareCells(b.updatedAt ?? null, a.updatedAt ?? null, direction);
     if (sort === "title" || (sort === "site" && !usesSiteOrder)) {
       return direction * a.title.localeCompare(b.title, undefined, { numeric: true });
     }
     if (sort === "site") return direction * siteOrder(sections)(a, b);
     return (
-      direction * compareCells(a.fields[sort] ?? null, b.fields[sort] ?? null) ||
+      compareCells(a.fields[sort] ?? null, b.fields[sort] ?? null, direction) ||
       a.title.localeCompare(b.title)
     );
   });

@@ -964,7 +964,7 @@ function ListControl({ field, value, onChange, disabled, path, problems }: Input
       return out;
     });
   const hasProblem = (i: number) =>
-    [...problems.keys()].some((key) => key.startsWith(`${path}.${i}`));
+    [...problems.keys()].some((key) => key === `${path}.${i}` || key.startsWith(`${path}.${i}.`));
 
   return (
     <div className="fc-list">
