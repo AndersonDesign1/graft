@@ -11,7 +11,12 @@
  * Nested structure (object / array) is first-class so SEO groups, FAQ lists, and
  * commerce line items stay typed — not opaque field.json blobs.
  */
-import type { FieldDescriptor } from "@usegraft/contracts";
+import type {
+  FieldConstraints,
+  FieldDescriptor,
+  FieldFormat,
+  SelectOption,
+} from "@usegraft/contracts";
 import { z } from "zod";
 
 export type ScalarFieldType =
@@ -23,7 +28,13 @@ export type ScalarFieldType =
   | "json"
   | "asset";
 
-export type FieldType = ScalarFieldType | "object" | "array";
+export type FieldType = ScalarFieldType | "select" | "reference" | "object" | "array";
+
+/**
+ * A document slug: what a `reference` field holds. Kept in step with the
+ * compiler's SLUG_RE, which names files; a reference names one of them.
+ */
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
  * Lowercase slash-separated path, each segment starting alphanumeric —
@@ -71,6 +82,19 @@ export interface FieldOptions {
   optional?: boolean;
   description?: string;
   /**
+   * What an editor calls this field ("Price", "Meta description"). Shown in
+   * the Studio's form instead of the key; the key stays the contract.
+   */
+  label?: string;
+  /**
+   * How a `number` is presented. `money` declares the value is an integer in
+   * the smallest currency unit (cents), so the Studio shows "$12.50" and
+   * writes 1250. Implies `int`.
+   */
+  format?: FieldFormat;
+  /** ISO 4217 code for a `money` number. Presentation only; defaults to USD. */
+  currency?: string;
+  /**
    * Maximum length for `string` / `text`.
    *
    * There was no way to bound a field at all, so every authored string and
@@ -108,6 +132,14 @@ export interface FieldDefinition<TZod extends z.ZodType = z.ZodType> {
   zod: TZod;
   optional: boolean;
   description?: string;
+  label?: string;
+  /** The limits `zod` enforces, restated as data for introspection. */
+  constraints?: FieldConstraints;
+  format?: FieldFormat;
+  /** Allowed values, for `select`. */
+  options?: SelectOption[];
+  /** Target collection, for `reference`. */
+  to?: string;
   /** Nested fields when type is `object`. */
   fields?: Record<string, FieldDefinition>;
   /** Item field when type is `array`. */
@@ -153,12 +185,41 @@ function constrain(type: ScalarFieldType, base: z.ZodType, options?: FieldOption
   }
   if (type === "number") {
     let n = out as z.ZodNumber;
-    if (options.int === true) n = n.int();
+    if (options.int === true || options.format === "money") n = n.int();
     if (options.min !== undefined) n = n.min(options.min);
     if (options.max !== undefined) n = n.max(options.max);
     out = n;
   }
   return out;
+}
+
+/** The options that limit a value, as introspectable data. Undefined when none. */
+function constraintsOf(
+  options: FieldOptions & { maxItems?: number },
+): FieldConstraints | undefined {
+  const out: FieldConstraints = {};
+  if (options.min !== undefined) out.min = options.min;
+  if (options.max !== undefined) out.max = options.max;
+  if (options.int === true || options.format === "money") out.int = true;
+  if (options.maxLength !== undefined) out.maxLength = options.maxLength;
+  if (options.pattern !== undefined) out.pattern = options.pattern.source;
+  if (options.maxItems !== undefined) out.maxItems = options.maxItems;
+  if (options.format === "money") out.currency = (options.currency ?? "USD").toUpperCase();
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** Presentation metadata every builder carries the same way. */
+function presentation(
+  options: (FieldOptions & { maxItems?: number }) | undefined,
+): Pick<FieldDefinition, "description" | "label" | "constraints" | "format"> {
+  if (options === undefined) return {};
+  const constraints = constraintsOf(options);
+  return {
+    ...(options.description !== undefined ? { description: options.description } : {}),
+    ...(options.label !== undefined ? { label: options.label } : {}),
+    ...(constraints ? { constraints } : {}),
+    ...(options.format !== undefined ? { format: options.format } : {}),
+  };
 }
 
 export function defineField<
@@ -172,6 +233,84 @@ export function defineField<
     zod: (optional ? base.optional() : base) as MaybeOptional<ScalarZodMap[TType], TOptions>,
     optional,
     description: options?.description,
+    ...presentation(options),
+  };
+}
+
+/** One allowed value: a bare string, or a value with the label people see. */
+export type SelectChoice = string | { value: string; label?: string };
+
+type ChoiceValue<T> = T extends string ? T : T extends { value: infer V } ? V : never;
+
+export interface SelectFieldOptions<TChoices extends readonly SelectChoice[]> extends Pick<
+  FieldOptions,
+  "optional" | "description" | "label"
+> {
+  /** The allowed values, in the order an editor sees them. At least one. */
+  options: TChoices;
+}
+
+/**
+ * One value from a fixed list: a product's status, a doc's section.
+ *
+ * A `string` with a description listing the allowed values only teaches the
+ * reader; this one is enforced, and the Studio renders it as a choice instead
+ * of a box someone can misspell into.
+ */
+export function defineSelectField<
+  const TChoices extends readonly [SelectChoice, ...SelectChoice[]],
+  const TOptions extends SelectFieldOptions<TChoices>,
+>(
+  options: TOptions & { options: TChoices },
+): FieldDefinition<
+  MaybeOptional<z.ZodEnum<{ [K in ChoiceValue<TChoices[number]>]: K }>, TOptions>
+> {
+  const optional = options.optional ?? false;
+  const choices: SelectOption[] = options.options.map((choice) =>
+    typeof choice === "string"
+      ? { value: choice }
+      : { value: choice.value, ...(choice.label !== undefined ? { label: choice.label } : {}) },
+  );
+  const values = choices.map((choice) => choice.value) as [string, ...string[]];
+  const base = z.enum(values);
+  return {
+    type: "select",
+    zod: (optional ? base.optional() : base) as never,
+    optional,
+    description: options.description,
+    ...presentation(options),
+    options: choices,
+  };
+}
+
+export interface ReferenceFieldOptions extends Pick<
+  FieldOptions,
+  "optional" | "description" | "label"
+> {
+  /** The collection the referenced document lives in. */
+  to: string;
+}
+
+/**
+ * The slug of a document in another collection: a product's category, a
+ * post's author. Stored as the bare slug so the file stays readable, and
+ * declared as a reference so the Studio offers a picker and an agent knows
+ * where to look the value up.
+ */
+export function defineReferenceField<const TOptions extends ReferenceFieldOptions>(
+  options: TOptions,
+): FieldDefinition<MaybeOptional<z.ZodString, TOptions>> {
+  const optional = options.optional ?? false;
+  const base = z
+    .string()
+    .regex(SLUG_RE, `must be the slug of a document in "${options.to}", e.g. "summer-sale"`);
+  return {
+    type: "reference",
+    zod: (optional ? base.optional() : base) as MaybeOptional<z.ZodString, TOptions>,
+    optional,
+    description: options.description,
+    ...presentation(options),
+    to: options.to,
   };
 }
 
@@ -198,7 +337,10 @@ type FieldsToZodShape<TFields extends Record<string, FieldDefinition>> = {
 /** Nested object field — builds a Zod object from child field defs. */
 export function defineObjectField<
   const TFields extends Record<string, FieldDefinition>,
-  const TOptions extends { optional?: boolean; description?: string } = Record<never, never>,
+  const TOptions extends { optional?: boolean; description?: string; label?: string } = Record<
+    never,
+    never
+  >,
 >(
   options: { fields: TFields } & TOptions,
 ): FieldDefinition<MaybeOptional<z.ZodObject<FieldsToZodShape<TFields>>, TOptions>> {
@@ -215,6 +357,7 @@ export function defineObjectField<
     >,
     optional,
     description: options.description,
+    ...presentation(options),
     fields: options.fields,
   };
 }
@@ -225,6 +368,7 @@ export function defineArrayField<
   const TOptions extends {
     optional?: boolean;
     description?: string;
+    label?: string;
     maxItems?: number;
   } = Record<never, never>,
 >(
@@ -240,6 +384,7 @@ export function defineArrayField<
     zod: (optional ? base.optional() : base) as MaybeOptional<z.ZodArray<TItemZod>, TOptions>,
     optional,
     description: options.description,
+    ...presentation(options),
     items: options.of,
   };
 }
@@ -254,6 +399,13 @@ export function toFieldDescriptor(name: string, def: FieldDefinition): FieldDesc
     type: def.type,
     optional: def.optional,
     description: def.description,
+    // Only present keys: describe_schema output stays as small as it was for
+    // a field that declares none of these.
+    ...(def.label !== undefined ? { label: def.label } : {}),
+    ...(def.constraints !== undefined ? { constraints: def.constraints } : {}),
+    ...(def.options !== undefined ? { options: def.options } : {}),
+    ...(def.to !== undefined ? { to: def.to } : {}),
+    ...(def.format !== undefined ? { format: def.format } : {}),
     fields: def.fields
       ? Object.entries(def.fields).map(([n, d]) => toFieldDescriptor(n, d))
       : undefined,
@@ -272,6 +424,8 @@ export const field = {
     defineField("datetime", o),
   json: <const O extends FieldOptions = Record<never, never>>(o?: O) => defineField("json", o),
   asset: <const O extends FieldOptions = Record<never, never>>(o?: O) => defineField("asset", o),
+  select: defineSelectField,
+  reference: defineReferenceField,
   // Keep the same generic signatures as defineObjectField / defineArrayField —
   // wrapping through ObjectFieldOptions/ArrayFieldOptions erases element types
   // to ZodType<unknown> in the emitted .d.ts.
