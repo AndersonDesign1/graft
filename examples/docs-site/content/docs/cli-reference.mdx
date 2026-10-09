@@ -49,7 +49,8 @@ nothing to refresh. On the Postgres engine, writes from agents, Studio,
 `graft merge` and `graft migrate` call your app's revalidate route when
 `GRAFT_REVALIDATE_URL` is set. `graft compile` does not, because a deploy
 compiles before the new version is live. Send its output to the route yourself
-so the app refreshes only the pages that changed:
+so the app refreshes only the pages that changed. A shell does not read `.env`,
+so export `GRAFT_WEBHOOK_SECRET` in the script's environment first:
 
 ```sh
 graft compile --json > changes.json || exit 1
