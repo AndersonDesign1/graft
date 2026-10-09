@@ -237,7 +237,9 @@ export function composeDocument(
   // would be the same class of churn this function exists to stop (a file
   // ending in a blank line would silently lose it on every save). The only
   // addition is a final newline when the body lacks one and the file had one.
+  // An empty body adds nothing: the separator is already the file's last
+  // newline, so adding one made every save of a body-less document a change.
   const separator = /^\r?\n/.exec(rest)?.[0] ?? "";
-  const needsNewline = !body.endsWith("\n") && existingRaw.endsWith("\n");
+  const needsNewline = body !== "" && !body.endsWith("\n") && existingRaw.endsWith("\n");
   return frontmatter + separator + body + (needsNewline ? newline : "");
 }

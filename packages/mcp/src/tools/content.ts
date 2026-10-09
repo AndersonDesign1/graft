@@ -191,7 +191,7 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
       outputSchema: writeContentOutput,
       annotations: WRITES,
       description:
-        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.",
+        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. When the server is set up to refresh the app and the write changed content, the result also carries `refresh`; `ok: false` means the write landed but the site may show the old copy, so tell the human and do not retry the write. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.",
       inputSchema: {
         collection: z.string().describe("Collection name"),
         slug: z
@@ -263,6 +263,7 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
             branch: branchId,
             gitSha: result.gitSha,
             changes: result.changes,
+            ...(result.refresh ? { refresh: result.refresh } : {}),
           };
         },
         // Where the thing it just wrote now lives.

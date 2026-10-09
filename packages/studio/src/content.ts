@@ -15,7 +15,7 @@ import {
   writeDocumentFile,
   type ProjectedDoc,
 } from "@usegraft/compiler";
-import { GraftError } from "@usegraft/contracts";
+import { GraftError, type ChangeSet } from "@usegraft/contracts";
 import { assertSafeMdx, type MdxTrust } from "@usegraft/mdx-safety";
 import type { AnyCollection } from "@usegraft/core";
 import type { Database } from "@usegraft/db";
@@ -76,7 +76,7 @@ export async function writeDocument(options: {
   slug: string;
   data: Record<string, unknown>;
   body: string;
-}): Promise<{ written: string; branch: string; gitSha: string | null }> {
+}): Promise<{ written: string; branch: string; gitSha: string | null; changes: ChangeSet }> {
   const collection = requireCollection(options.collections, options.collection);
   if (collection.authority === "db-authoritative") {
     throw new GraftError({
@@ -127,5 +127,6 @@ export async function writeDocument(options: {
     written: sourcePath,
     branch: options.branchId,
     gitSha: result.gitSha ?? null,
+    changes: result.changes,
   };
 }

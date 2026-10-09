@@ -35,6 +35,17 @@ const ChangeSet = z.object({
   unchanged: z.number(),
 });
 
+/** ContentChangeNotice from @usegraft/compiler. */
+const ContentRefresh = z.union([
+  z.object({ ok: z.literal(true) }),
+  z.object({
+    ok: z.literal(false),
+    error: z.string(),
+    message: z.string(),
+    fix: z.string().optional(),
+  }),
+]);
+
 export const listCollectionsOutput = {
   branch: z.string(),
   collections: z.array(
@@ -133,6 +144,12 @@ export const writeContentOutput = {
   /** Null when the content tree is not in a git checkout. */
   gitSha: z.string().nullable(),
   changes: ChangeSet,
+  /**
+   * Whether the app was told to refresh its cache. Absent when the server has
+   * no onContentChange listener or nothing changed. `ok: false` means the
+   * write landed but the app may serve the old copy: do not retry the write.
+   */
+  refresh: ContentRefresh.optional(),
 };
 
 export const listBranchesOutput = {
