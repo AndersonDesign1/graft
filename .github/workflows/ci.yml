@@ -139,7 +139,10 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17
+        # Docker Hub's official image, through Google's public pull-through
+        # mirror. GitHub runners share IPs, so anonymous Docker Hub pulls hit
+        # its rate limit (429) and failed this job repeatedly on 2026-10-09.
+        image: mirror.gcr.io/library/postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -209,8 +212,10 @@ jobs:
       # Plain `docker build`, not docker/build-push-action: every other action
       # here is SHA-pinned, and adding one more supply-chain dependency to prove
       # a Dockerfile still parses is a poor trade. The runner ships buildx.
+      # Base images through mirror.gcr.io, not Docker Hub: see DOCKER_HUB in
+      # the Dockerfile.
       - name: Build the self-host image
-        run: docker build -f deploy/docker/Dockerfile -t graft:ci .
+        run: docker build -f deploy/docker/Dockerfile --build-arg DOCKER_HUB=mirror.gcr.io -t graft:ci .
 
   # .github/rulesets/*.json is a record of branch protection, not a mechanism
   # that applies it — a change made in the GitHub UI leaves no diff anywhere.
