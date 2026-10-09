@@ -27,7 +27,7 @@ import { DocumentSkeleton } from "../components/skeletons";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "../components/ui/menu";
 import { ApiError, api, plainError, qs } from "../lib/api";
 import { useAutosave } from "../lib/autosave";
-import { problemsFromServer, problemsIn, titleField } from "../lib/fields";
+import { labelOf, problemsFromServer, problemsIn, titleField } from "../lib/fields";
 import { compareRoundTrip, describeFidelity, type FidelityResult } from "../lib/fidelity";
 import { buildForm, composeData, sameValue } from "../lib/schema-form";
 import { collectionLabel, publishVerb, singular, useStudio } from "../lib/studio";
@@ -524,6 +524,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
             <>
               {headline ? (
                 <TitleInput
+                  label={labelOf(headline)}
                   value={String(data[headline.name] ?? "")}
                   placeholder={`Untitled ${singular(collection)}`}
                   readOnly={readOnly}
@@ -617,12 +618,14 @@ function saveText(
 
 /** The headline, in the face the site publishes with, growing with its text. */
 function TitleInput({
+  label,
   value,
   placeholder,
   readOnly,
   problem,
   onChange,
 }: {
+  label: string;
   value: string;
   placeholder: string;
   readOnly: boolean;
@@ -645,7 +648,7 @@ function TitleInput({
         value={value}
         placeholder={placeholder}
         readOnly={readOnly}
-        aria-label="Title"
+        aria-label={label}
         aria-invalid={problem ? true : undefined}
         onChange={(e) => onChange(e.target.value.replace(/\n/g, " "))}
       />
