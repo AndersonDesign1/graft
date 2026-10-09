@@ -10,5 +10,6 @@ Durable design decisions and spike findings live here, one file per topic.
 | [`agent-mcp.md`](./agent-mcp.md)                   | Project MCP: install UX, function tools, safety defaults, non-goals              |
 | [`approval-hardening.md`](./approval-hardening.md) | Approval gate vs autonomous agents: Postgres role separation, self-decision      |
 | [`packaging.md`](./packaging.md)                   | Phase 7 packaging: `graft serve` (headless runtime), container + deploy topology |
+| [`studio-v2.md`](./studio-v2.md)                   | Studio for editors: audit, hosted writes through GitHub, e-commerce gaps         |
 
 These notes hand off throwaway spikes and research into real package APIs.
