@@ -72,8 +72,9 @@ export async function notifyContentChange(
             message: `The content was written, but refreshing the app failed: ${error instanceof Error ? error.message : String(error)}`,
             fix: `Fix the onContentChange listener. ${RESEND}`,
           });
+    // The code leads the line so `REVALIDATE_FAILED` is searchable in logs.
     console.error(
-      `graft: ${graftError.message}\n  fix: ${graftError.fix ?? ""}\n  resend: ${JSON.stringify(event)}`,
+      `graft: ${graftError.code}: ${graftError.message}\n  fix: ${graftError.fix ?? ""}\n  resend: ${JSON.stringify(event)}`,
     );
     return {
       ok: false,
@@ -117,6 +118,9 @@ export function createRevalidateWebhook(options: RevalidateWebhookOptions): Cont
   }
   const timeoutMs = options.timeoutMs ?? 10_000;
   const send = options.fetch ?? fetch;
+  // What errors name. A URL can carry a token in its query or userinfo, and
+  // errors reach logs, agents and Studio toasts, so they get origin + path only.
+  const where = `${url.origin}${url.pathname}`;
 
   return async (event) => {
     let response: Response;
@@ -140,23 +144,47 @@ export function createRevalidateWebhook(options: RevalidateWebhookOptions): Cont
       throw new GraftError({
         code: "REVALIDATE_FAILED",
         message: `The content was written, but the revalidate request to ${url.origin} failed: ${error instanceof Error ? error.message : String(error)}`,
-        fix: `Check that GRAFT_REVALIDATE_URL (${url.href}) is reachable from this server and does not redirect. ${RESEND}`,
-        details: { url: url.href },
+        fix: `Check that GRAFT_REVALIDATE_URL (${where}) is reachable from this server and does not redirect. ${RESEND}`,
+        details: { url: where },
       });
     }
     if (!response.ok) {
-      const detail = (await response.text().catch(() => "")).slice(0, 300);
+      const detail = await readStart(response, 300);
       throw new GraftError({
         code: "REVALIDATE_FAILED",
         message: `The content was written, but the app's revalidate route answered ${response.status}.${detail ? ` ${detail}` : ""}`,
         fix:
           response.status === 401 || response.status === 403
             ? `GRAFT_WEBHOOK_SECRET here must equal the secret the revalidate route checks. Set the same value on both. ${RESEND}`
-            : `Check the revalidate route at ${url.href}. It must accept POST { branch, gitSha, changes } with the bearer secret. ${RESEND}`,
-        details: { url: url.href, status: response.status },
+            : `Check the revalidate route at ${where}. It must accept POST { branch, gitSha, changes } with the bearer secret. ${RESEND}`,
+        details: { url: where, status: response.status },
       });
     }
   };
+}
+
+/**
+ * The first `limit` characters of an error body, read without buffering the
+ * rest: a misconfigured route can answer with an arbitrarily large page, and
+ * only the start of it goes into the message. Never throws.
+ */
+async function readStart(response: Response, limit: number): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+  const decoder = new TextDecoder();
+  let text = "";
+  try {
+    while (text.length < limit) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+  } catch {
+    // A body that fails mid-read still leaves whatever arrived.
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+  return text.slice(0, limit);
 }
 
 function parseWebhookUrl(raw: string): URL {
@@ -166,7 +194,7 @@ function parseWebhookUrl(raw: string): URL {
   } catch {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
-      message: `GRAFT_REVALIDATE_URL is not a URL: ${JSON.stringify(raw)}.`,
+      message: "GRAFT_REVALIDATE_URL is not a URL.",
       fix: "Set it to the app's revalidate route, e.g. https://example.com/api/revalidate.",
       details: { variable: "GRAFT_REVALIDATE_URL" },
     });
@@ -175,7 +203,7 @@ function parseWebhookUrl(raw: string): URL {
   if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
-      message: `GRAFT_REVALIDATE_URL must use https (plain http is allowed only for localhost): ${url.href}.`,
+      message: `GRAFT_REVALIDATE_URL must use https (plain http is allowed only for loopback: localhost, 127.0.0.1, [::1]): ${url.origin}${url.pathname}.`,
       fix: "Use the https address of the app's revalidate route. The webhook secret travels in a header, so it must not cross the network in the clear.",
       details: { variable: "GRAFT_REVALIDATE_URL", protocol: url.protocol },
     });

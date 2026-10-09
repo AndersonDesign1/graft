@@ -468,18 +468,23 @@ export async function POST(request: Request) {
 
 <Step title="Point Graft at the route">
 
-Set two variables where `graft serve`, `graft studio` or `graft mcp` runs. The
-secret must match the one the route checks:
+Add two variables to the `.env` Graft reads, or to the environment, wherever
+`graft serve`, `graft studio`, `graft mcp`, `graft merge` or `graft migrate`
+runs. The secret must match the one the route checks:
+
+<CodeBlock title=".env">
 
 ```sh
 GRAFT_REVALIDATE_URL=https://example.com/api/revalidate
 GRAFT_WEBHOOK_SECRET=a-long-random-string
 ```
 
+</CodeBlock>
+
 Graft now calls the route after every write that changes content: an agent's
 `write_content` or `delete_content`, a Studio save, compile or revert, and
 `graft merge --apply` or `graft migrate --apply`. The URL must use https, except
-for `localhost`.
+on loopback (`localhost`, `127.0.0.1`, `[::1]`).
 
 If the route fails, the write still succeeds. The server logs a
 `REVALIDATE_FAILED` error, and an agent's result carries

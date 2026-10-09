@@ -18,7 +18,7 @@ until someone called its revalidate route by hand.
 runs. After each write that changes content, Graft POSTs
 `{ branch, gitSha, changes }` with `Authorization: Bearer <secret>`, the body
 the documented revalidate route already reads. The URL must use https, except
-for `localhost`, and redirects are refused. A URL without a secret stops the
+on loopback (`localhost`, `127.0.0.1`, `[::1]`), and redirects are refused. A URL without a secret stops the
 command before it connects to anything. `graft compile` does not call the
 route, because a deploy compiles before the new version is live.
 

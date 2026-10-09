@@ -76,7 +76,11 @@ describe("Studio onContentChange", () => {
     const res = await handlerWith(listener)(save());
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ written: "pages/about.mdx", refresh: { ok: true } });
+    expect(await res.json()).toMatchObject({
+      written: "pages/about.mdx",
+      changes: compiled.changes,
+      refresh: { ok: true },
+    });
     expect(listener).toHaveBeenCalledWith({
       branch: "main",
       gitSha: "abc123",

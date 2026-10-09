@@ -65,6 +65,7 @@ describe("notifyContentChange", () => {
     expect(notice && !notice.ok && notice.message).toContain("boom");
     expect(notice && !notice.ok && notice.fix).toBeTruthy();
     expect(log).toHaveBeenCalledOnce();
+    expect(String(log.mock.calls[0]?.[0])).toMatch(/^graft: REVALIDATE_FAILED: /);
     // A later compile reports these documents unchanged, so the logged event
     // is the only record of what to resend.
     expect(String(log.mock.calls[0]?.[0])).toContain(`resend: ${JSON.stringify(event)}`);
@@ -86,7 +87,8 @@ describe("notifyContentChange", () => {
 });
 
 describe("createRevalidateWebhook", () => {
-  it("POSTs { branch, gitSha, changes } with the bearer secret and no redirects", async () => {
+  it("POSTs { branch, gitSha, changes } with the bearer secret, no redirects and a timeout", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
     const { fn, calls } = fakeFetch(new Response(null, { status: 200 }));
     const hook = createRevalidateWebhook({
       url: "https://example.com/api/revalidate",
@@ -100,6 +102,9 @@ describe("createRevalidateWebhook", () => {
     expect(call?.url).toBe("https://example.com/api/revalidate");
     expect(call?.init.method).toBe("POST");
     expect(call?.init.redirect).toBe("error");
+    // A hung route must not hold the write's response open: 10 seconds by default.
+    expect(timeout).toHaveBeenCalledWith(10_000);
+    expect(call?.init.signal).toBe(timeout.mock.results[0]?.value);
     expect(call?.init.headers).toMatchObject({
       authorization: "Bearer s3cret",
       "content-type": "application/json",
@@ -125,6 +130,42 @@ describe("createRevalidateWebhook", () => {
     const error = await Promise.resolve(hook(event)).catch((e: unknown) => e);
     expect(error).toMatchObject({ code: "REVALIDATE_FAILED", details: { status: 500 } });
     expect((error as GraftError).message).toContain("nope");
+  });
+
+  it("names the route without the query or userinfo, which can carry a token", async () => {
+    const { fn } = fakeFetch(new Response("nope", { status: 500 }));
+    const hook = createRevalidateWebhook({
+      url: "https://user:pass@example.com/r?token=t0k3n",
+      secret: "x",
+      fetch: fn,
+    });
+    const error = (await Promise.resolve(hook(event)).catch((e: unknown) => e)) as GraftError;
+    const reported = JSON.stringify({
+      message: error.message,
+      fix: error.fix,
+      details: error.details,
+    });
+    expect(reported).toContain("https://example.com/r");
+    expect(reported).not.toContain("t0k3n");
+    expect(reported).not.toContain("pass");
+  });
+
+  it("reads only the start of a large error body", async () => {
+    let pulled = 0;
+    const chunk = new TextEncoder().encode("x".repeat(1024));
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        // An endless body: the read must stop on its own.
+        pulled++;
+        controller.enqueue(chunk);
+      },
+    });
+    const { fn } = fakeFetch(new Response(body, { status: 502 }));
+    const hook = createRevalidateWebhook({ url: "https://example.com/r", secret: "x", fetch: fn });
+    const error = (await Promise.resolve(hook(event)).catch((e: unknown) => e)) as GraftError;
+    expect(error.message).toContain("x".repeat(300));
+    expect(error.message).not.toContain("x".repeat(301));
+    expect(pulled).toBeLessThan(5);
   });
 
   it("turns a network failure into REVALIDATE_FAILED", async () => {

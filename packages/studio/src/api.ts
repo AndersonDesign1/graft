@@ -832,7 +832,12 @@ const ROUTES: readonly Route[] = [
         mdxTrust: options.mdxTrust,
         branchId: row.branchId,
       });
-      const refresh = await tellApp(options, row.branchId, result);
+      // The files now match the compilation's commit, not HEAD (which compile
+      // records), so the app is told the SHA the content was restored to.
+      const refresh = await tellApp(options, row.branchId, {
+        gitSha: row.gitSha,
+        changes: result.changes,
+      });
       const body: RevertResultDto = {
         compilationId: row.id,
         gitSha: row.gitSha,
@@ -920,12 +925,8 @@ const ROUTES: readonly Route[] = [
         data,
         body,
       });
-      const { changes, ...written } = result;
-      const refresh = await tellApp(options, written.branch, {
-        gitSha: written.gitSha,
-        changes,
-      });
-      return json({ ...written, ...(refresh ? { refresh } : {}) });
+      const refresh = await tellApp(options, result.branch, result);
+      return json({ ...result, ...(refresh ? { refresh } : {}) });
     },
   },
 ];

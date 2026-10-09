@@ -546,6 +546,16 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   };
 }
 
+/**
+ * The revalidate URL as the banner prints it: origin and path only, because a
+ * query string or userinfo can carry a token. startServe already refused a URL
+ * that does not parse.
+ */
+function revalidateTarget(raw: string): string {
+  const url = new URL(raw.trim());
+  return `${url.origin}${url.pathname}`;
+}
+
 /** `graft serve` — start and block until SIGINT/SIGTERM, then shut down cleanly. */
 export async function serveCommand(options: ServeCommandOptions): Promise<void> {
   const running = await startServe(options);
@@ -566,7 +576,9 @@ export async function serveCommand(options: ServeCommandOptions): Promise<void> 
           ]
         : []),
       ...(process.env.GRAFT_REVALIDATE_URL?.trim()
-        ? [`  refresh    POST ${process.env.GRAFT_REVALIDATE_URL.trim()} after each write`]
+        ? [
+            `  refresh    POST ${revalidateTarget(process.env.GRAFT_REVALIDATE_URL)} after each write`,
+          ]
         : []),
     ].join("\n"),
   );
