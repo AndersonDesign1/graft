@@ -6,37 +6,17 @@
  * brings its own tokens, and tsup (which builds the lib) can't process
  * stylesheets. The standalone SPA pulls the styles in via `ui/main.tsx`.
  */
-import { useEffect } from "react";
-import { CollectionsView } from "./ui/views/collections";
+import { StudioApp } from "./ui/app";
 import { ApprovalsView, BranchesView, HistoryView } from "./ui/views/operations";
-import { qs } from "./ui/lib/api";
-import { parseHash, toHash, useRoute } from "./ui/lib/route";
-import { useResource } from "./ui/lib/use-resource";
-import type { ContentTree } from "./types";
 
 export { StudioApp } from "./ui/app";
 
-/** Full content workspace, standalone. */
+/**
+ * The content workspace, standalone: the full editor (lists, entries,
+ * publishing) without the host providing a shell. It owns its own hash route.
+ */
 export function ContentTreePanel({ branch = "main" }: { branch?: string }) {
-  const [route, navigate] = useRoute();
-  const tree = useResource<ContentTree>(`/tree${qs({ branch })}`);
-
-  // Embedded, the panel owns no shell, so seed the route if the host hasn't.
-  useEffect(() => {
-    if (parseHash(window.location.hash).view !== "collections") {
-      window.location.hash = toHash({ view: "collections" });
-    }
-  }, []);
-
-  return (
-    <CollectionsView
-      branch={branch}
-      route={route}
-      navigate={navigate}
-      tree={tree}
-      onSaved={tree.refresh}
-    />
-  );
+  return <StudioApp branch={branch} />;
 }
 
 export function ApprovalQueuePanel() {

@@ -227,8 +227,10 @@ h3 {
    Menu (Base UI)
    ========================================================================== */
 
+/* Above dialogs (61): a picker or menu opened inside the publish sheet or
+   the new-entry dialog must not open behind it. */
 .menu-positioner {
-  z-index: 40;
+  z-index: 70;
 }
 
 .menu {

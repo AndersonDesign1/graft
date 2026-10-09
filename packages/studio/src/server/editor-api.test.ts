@@ -233,12 +233,16 @@ describe("editor API on a local checkout", () => {
       { path: "products/wool-hat.mdx", kind: "modified", title: "Wool Hat" },
     ]);
 
-    const diff = await call<{ added: number; removed: number }>(
-      handler,
-      "GET",
-      "/drafts/diff?path=products/wool-hat.mdx",
-    );
-    expect(diff.json).toMatchObject({ added: 1, removed: 1 });
+    const diff = await call<{
+      fields: { field: string; before: unknown; after: unknown }[];
+      bodyChanged: boolean;
+      file: { added: number; removed: number };
+    }>(handler, "GET", "/drafts/diff?path=products/wool-hat.mdx");
+    // In the editor's terms first (which field, from what to what), then the
+    // exact lines for anyone who wants them.
+    expect(diff.json.fields).toEqual([{ field: "price", before: 2500, after: 2900 }]);
+    expect(diff.json.bodyChanged).toBe(false);
+    expect(diff.json.file).toMatchObject({ added: 1, removed: 1 });
 
     await call(handler, "POST", "/drafts/publish", {
       paths: ["products/wool-hat.mdx"],

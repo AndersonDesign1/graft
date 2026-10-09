@@ -24,6 +24,7 @@ import type { Database } from "@usegraft/db";
 import { assertSafeMdx, type MdxTrust } from "@usegraft/mdx-safety";
 import matter from "gray-matter";
 import type {
+  DraftDiffDto,
   DraftChangeDto,
   DraftsDto,
   EntryDto,
@@ -32,7 +33,7 @@ import type {
   PublishResultDto,
   SaveEntryResult,
 } from "../editor-types";
-import type { FileDiffDto, SchemaFieldDto } from "../types";
+import type { SchemaFieldDto } from "../types";
 import { readChanges } from "../git";
 import {
   DiskCatalog,
@@ -344,12 +345,27 @@ export class EditorService {
     return { publish: this.publishAction(canPublishDirectly), changes: described, reviews };
   }
 
-  async diff(path: string, actor: StoreActor): Promise<FileDiffDto> {
+  async diff(path: string, actor: StoreActor): Promise<DraftDiffDto> {
     const [before, after] = await Promise.all([
       this.drafts.readPublished(path),
       this.store.read(path, actor),
     ]);
-    return lineDiff(path, before?.raw ?? null, after?.raw ?? null);
+    const old = before ? parseEntry(path, before.raw) : null;
+    const next = after ? parseEntry(path, after.raw) : null;
+    const keys = new Set([...Object.keys(old?.data ?? {}), ...Object.keys(next?.data ?? {})]);
+    const fields = [...keys]
+      .filter((key) => !sameValue(old?.data[key], next?.data[key]))
+      .map((field) => ({
+        field,
+        before: old?.data[field] ?? null,
+        after: next?.data[field] ?? null,
+      }));
+    return {
+      path,
+      fields,
+      bodyChanged: (old?.body ?? "").trim() !== (next?.body ?? "").trim(),
+      file: lineDiff(path, before?.raw ?? null, after?.raw ?? null),
+    };
   }
 
   async publish(
@@ -395,6 +411,26 @@ export class EditorService {
     await this.drafts.discard(actor, paths);
     await this.afterWrite();
   }
+}
+
+/** Structural equality over parsed YAML values (plain data, Dates by time). */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, i) => sameValue(item, b[i]));
+  }
+  if (a && b && typeof a === "object" && typeof b === "object") {
+    const ak = Object.keys(a as object);
+    const bk = Object.keys(b as object);
+    return (
+      ak.length === bk.length &&
+      ak.every((key) =>
+        sameValue((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+      )
+    );
+  }
+  return false;
 }
 
 /** "Blue Linen Shirt!" -> "blue-linen-shirt". */

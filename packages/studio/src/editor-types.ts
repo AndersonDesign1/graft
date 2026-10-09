@@ -116,6 +116,25 @@ export interface DraftsDto {
   reviews: ReviewRequest[];
 }
 
+/** One top-level field that differs between the published version and the draft. */
+export interface FieldChangeDto {
+  field: string;
+  before: unknown;
+  after: unknown;
+}
+
+/**
+ * A draft compared with what is published: the fields that changed, in
+ * values an editor recognises, plus the line diff of the file for anyone who
+ * wants the exact bytes.
+ */
+export interface DraftDiffDto {
+  path: string;
+  fields: FieldChangeDto[];
+  bodyChanged: boolean;
+  file: import("./types").FileDiffDto;
+}
+
 export interface PublishResultDto {
   action: PublishAction;
   published: string[];
