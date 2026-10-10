@@ -1,84 +1,94 @@
 import { Command } from "cmdk";
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 import type { EditorComponentSpec } from "@usegraft/contracts";
-import type { BranchList, ContentTree } from "../../types";
+import type { EntryList, EntrySummary } from "../../editor-types";
+import { api, qs } from "../lib/api";
+import { canInsert, insertBlock } from "../lib/editor-insert";
+import type { DevView } from "../lib/route";
 import {
+  collectionLabel,
+  editableCollections,
+  publishVerb,
+  singular,
+  useStudio,
+} from "../lib/studio";
+import {
+  IconApprovals,
   IconBranches,
   IconChanges,
-  IconCompile,
   IconComponentBlock,
   IconFile,
+  IconHistory,
   IconOverview,
   IconSchema,
   IconSettings,
-  IconApprovals,
-  IconHistory,
   type IconComponent,
 } from "./icons";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
-import { canInsert, insertBlock } from "../lib/editor-insert";
-import type { Route, ViewId } from "../lib/route";
 
-const NAV: Array<[ViewId, string, IconComponent]> = [
-  ["overview", "Overview", IconOverview],
-  ["collections", "Collections", IconFile],
+const DEVELOPER: Array<[DevView, string, IconComponent]> = [
+  ["overview", "Health", IconOverview],
   ["schema", "Schema", IconSchema],
-  ["approvals", "Approvals", IconApprovals],
-  ["branches", "Branches", IconBranches],
   ["history", "History", IconHistory],
+  ["branches", "Branches", IconBranches],
+  ["approvals", "Approvals", IconApprovals],
   ["settings", "Settings", IconSettings],
 ];
 
 /**
- * ⌘K palette on cmdk, inside a Base UI dialog.
+ * ⌘K: find any entry by name, jump anywhere, create, publish.
  *
- * cmdk owns the list semantics — filtering, scoring, roving selection, the
- * combobox ARIA contract — which is a surprising amount of behaviour to get
- * right by hand and the part users notice when it is wrong.
- *
- * Deliberately unanimated: it is opened by keyboard many times a session, and
- * an entrance transition on a keyboard action reads as lag however short.
+ * Entry search goes to the server (each collection's `/entries?q=`), so it
+ * works the same on a catalog of fifty or five thousand. Deliberately
+ * unanimated: it is opened by keyboard many times a session, and an entrance
+ * transition on a keyboard action reads as lag however short.
  */
 export function CommandPalette({
   open,
   onOpenChange,
-  tree,
-  branches,
   components,
-  navigate,
-  onSelectBranch,
-  onCompile,
-  onReviewChanges,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tree: ContentTree | null;
-  branches: BranchList | null;
   /** The project's component declarations, for the insert group. */
   components: readonly EditorComponentSpec[];
-  navigate: (route: Route) => void;
-  onSelectBranch: (name: string) => void;
-  onCompile: () => void;
-  onReviewChanges: () => void;
 }) {
-  // Recomputed on open rather than memoised on `components`: whether an editor
-  // is mounted changes as the operator moves around, and `canInsert()` is not
-  // React state the memo could depend on.
-  const insertable = open ? components.filter((spec) => spec.snippet && canInsert()) : [];
+  const { schema, drafts, navigate, openPublish, openCreate } = useStudio();
+  const collections = editableCollections(schema.data);
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<EntrySummary[]>([]);
 
-  const documents = useMemo(
-    () =>
-      (tree?.collections ?? []).flatMap((collection) =>
-        collection.documents.map((doc) => ({ collection: collection.name, doc })),
-      ),
-    [tree],
-  );
-
-  // Escape is handled by the dialog; cmdk only needs to not fight it.
   useEffect(() => {
-    if (!open) return;
-    return () => undefined;
+    if (!open) setQuery("");
   }, [open]);
+
+  useEffect(() => {
+    const term = query.trim();
+    // Drop the last search's hits at once: each item's value carries the
+    // current query, so a stale hit would look like a match for this one.
+    setHits([]);
+    if (!open || term.length < 2) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void Promise.all(
+        collections.map((collection) =>
+          api<EntryList>(`/entries${qs({ collection: collection.name, q: term, limit: 6 })}`)
+            .then((list) => list.items)
+            .catch(() => [] as EntrySummary[]),
+        ),
+      ).then((groups) => !cancelled && setHits(groups.flat()));
+    }, 120);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, open, schema.data]);
+
+  // Recomputed on open: whether an editor is mounted changes as the person
+  // moves around, and `canInsert()` is not React state.
+  const insertable = open ? components.filter((spec) => spec.snippet && canInsert()) : [];
+  const unpublished = drafts.data?.changes.length ?? 0;
 
   const go = (fn: () => void): void => {
     fn();
@@ -88,34 +98,44 @@ export function CommandPalette({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="palette">
-        <DialogTitle className="sr-only">Command palette</DialogTitle>
-        <Command label="Command palette" loop>
+        <DialogTitle className="sr-only">Search and commands</DialogTitle>
+        <Command label="Search and commands" loop shouldFilter={true}>
           <div className="palette-input">
-            <Command.Input placeholder="Jump to a document, switch branch, run a command…" />
+            <Command.Input
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Find an entry, or type a command…"
+            />
             <kbd>Esc</kbd>
           </div>
           <Command.List className="palette-list">
-            <Command.Empty className="palette-empty">No matches.</Command.Empty>
+            <Command.Empty className="palette-empty">
+              {query.trim().length < 2 ? "Type to search." : "Nothing matches."}
+            </Command.Empty>
 
-            <Command.Group heading="Go to" className="palette-group">
-              {NAV.map(([view, label, Icon]) => (
-                <Command.Item
-                  key={view}
-                  value={`go ${label}`}
-                  className="palette-item"
-                  onSelect={() => go(() => navigate({ view }))}
-                >
-                  <Icon size={14} />
-                  <span className="palette-item-label">{label}</span>
-                </Command.Item>
-              ))}
-            </Command.Group>
+            {hits.length > 0 ? (
+              <Command.Group heading="Entries" className="palette-group">
+                {hits.map((hit) => (
+                  <Command.Item
+                    key={hit.path}
+                    value={`${hit.title} ${hit.slug} ${hit.collection} ${query}`}
+                    className="palette-item"
+                    onSelect={() =>
+                      go(() =>
+                        navigate({ view: "entry", collection: hit.collection, slug: hit.slug }),
+                      )
+                    }
+                  >
+                    <IconFile size={14} />
+                    <span className="palette-item-label">{hit.title}</span>
+                    <span className="palette-item-hint">{collectionLabel(hit.collection)}</span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            ) : null}
 
-            {/* Only when a rich editor is mounted and the component declared a
-                snippet. Crepe's own `/` menu covers markdown structure; what it
-                cannot know is this project's components, which is the gap. */}
             {insertable.length > 0 ? (
-              <Command.Group heading="Insert into document" className="palette-group">
+              <Command.Group heading="Insert into content" className="palette-group">
                 {insertable.map((spec) => (
                   <Command.Item
                     key={spec.component}
@@ -125,70 +145,78 @@ export function CommandPalette({
                   >
                     <IconComponentBlock size={14} />
                     <span className="palette-item-label">{spec.label ?? spec.component}</span>
-                    <span className="palette-item-hint">{`<${spec.component}>`}</span>
                   </Command.Item>
                 ))}
               </Command.Group>
             ) : null}
 
-            <Command.Group heading="Actions" className="palette-group">
+            <Command.Group heading="Go to" className="palette-group">
               <Command.Item
-                value="changes commit git review diff"
+                value="go home"
                 className="palette-item"
-                onSelect={() => go(onReviewChanges)}
+                onSelect={() => go(() => navigate({ view: "home" }))}
+              >
+                <IconOverview size={14} />
+                <span className="palette-item-label">Home</span>
+              </Command.Item>
+              {collections.map((collection) => (
+                <Command.Item
+                  key={collection.name}
+                  value={`go ${collection.name}`}
+                  className="palette-item"
+                  onSelect={() =>
+                    go(() => navigate({ view: "collection", collection: collection.name }))
+                  }
+                >
+                  <IconFile size={14} />
+                  <span className="palette-item-label">{collectionLabel(collection.name)}</span>
+                </Command.Item>
+              ))}
+            </Command.Group>
+
+            <Command.Group heading="Create" className="palette-group">
+              {collections.map((collection) => (
+                <Command.Item
+                  key={collection.name}
+                  value={`new create ${singular(collection.name)}`}
+                  className="palette-item"
+                  onSelect={() => go(() => openCreate(collection.name))}
+                >
+                  <span className="palette-plus" aria-hidden="true">
+                    +
+                  </span>
+                  <span className="palette-item-label">New {singular(collection.name)}</span>
+                </Command.Item>
+              ))}
+            </Command.Group>
+
+            <Command.Group heading="Publish" className="palette-group">
+              <Command.Item
+                value="publish review changes commit"
+                className="palette-item"
+                onSelect={() => go(openPublish)}
               >
                 <IconChanges size={14} />
-                <span className="palette-item-label">Review changes</span>
-                <span className="palette-item-hint">Diff and commit your edits</span>
-              </Command.Item>
-              <Command.Item
-                value="compile branch index"
-                className="palette-item"
-                onSelect={() => go(onCompile)}
-              >
-                <IconCompile size={14} />
-                <span className="palette-item-label">Compile this branch</span>
-                <span className="palette-item-hint">Refresh the index from disk</span>
+                <span className="palette-item-label">{publishVerb(drafts.data?.publish)}…</span>
+                <span className="palette-item-hint">
+                  {unpublished === 0 ? "nothing waiting" : `${unpublished} waiting`}
+                </span>
               </Command.Item>
             </Command.Group>
 
-            {documents.length > 0 ? (
-              <Command.Group heading="Documents" className="palette-group">
-                {documents.map(({ collection, doc }) => (
-                  <Command.Item
-                    key={`${collection}/${doc.slug}`}
-                    value={`${collection} ${doc.title ?? doc.slug} ${doc.sourcePath}`}
-                    className="palette-item"
-                    onSelect={() =>
-                      go(() => navigate({ view: "collections", collection, slug: doc.slug }))
-                    }
-                  >
-                    <span className="dot" data-state={doc.state} />
-                    <span className="palette-item-label">{doc.title ?? doc.slug}</span>
-                    <span className="palette-item-hint">{doc.sourcePath}</span>
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            ) : null}
-
-            {(branches?.branches.length ?? 0) > 0 ? (
-              <Command.Group heading="Switch branch" className="palette-group">
-                {branches?.branches.map((row) => (
-                  <Command.Item
-                    key={row.name}
-                    value={`branch ${row.name}`}
-                    className="palette-item"
-                    onSelect={() => go(() => onSelectBranch(row.name))}
-                  >
-                    <IconBranches size={14} />
-                    <span className="palette-item-label">{row.name}</span>
-                    <span className="palette-item-hint">
-                      {row.parent ? `← ${row.parent}` : "root"}
-                    </span>
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            ) : null}
+            <Command.Group heading="Developer" className="palette-group">
+              {DEVELOPER.map(([view, label, Icon]) => (
+                <Command.Item
+                  key={view}
+                  value={`developer ${label} ${view}`}
+                  className="palette-item"
+                  onSelect={() => go(() => navigate({ view }))}
+                >
+                  <Icon size={14} />
+                  <span className="palette-item-label">{label}</span>
+                </Command.Item>
+              ))}
+            </Command.Group>
           </Command.List>
         </Command>
       </DialogContent>

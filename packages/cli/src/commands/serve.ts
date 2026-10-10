@@ -33,7 +33,7 @@
 import { execFileSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createActorResolver, type TrustedIssuer } from "@usegraft/auth";
-import { revalidateWebhookFromEnv } from "@usegraft/compiler";
+import { githubStoreFromEnv, revalidateWebhookFromEnv } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { setRequestPeer } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
@@ -185,10 +185,15 @@ export function createNodeListener(handler: FetchHandler, options: NodeListenerO
       if (peer) setRequestPeer(request, peer);
 
       const response = await handler(request);
-      const outHeaders: Record<string, string> = {};
+      const outHeaders: Record<string, string | string[]> = {};
       response.headers.forEach((value, key) => {
-        if (!HOP_BY_HOP.has(key)) outHeaders[key] = value;
+        if (!HOP_BY_HOP.has(key) && key !== "set-cookie") outHeaders[key] = value;
       });
+      // Each cookie is its own header line. Headers#forEach hands set-cookie
+      // over joined (or, per entry, as the last one only), which silently
+      // dropped Studio's session cookie when sign-in cleared a second one.
+      const cookies = response.headers.getSetCookie();
+      if (cookies.length > 0) outHeaders["set-cookie"] = cookies;
       res.writeHead(response.status, outHeaders);
       res.end(Buffer.from(await response.arrayBuffer()));
     } catch (error) {
@@ -364,7 +369,16 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     gitSha,
   });
 
+  // One store for every writing surface, so a hosted agent's write_content
+  // and a hosted editor's save land the same way: as drafts on GitHub when
+  // GRAFT_GITHUB_REPO is set, which is what lets a read-only deployment write.
+  const repository = githubStoreFromEnv({
+    contentDir: config.contentDir,
+    projectRoot: config.projectDir,
+  });
+
   const mcpHandler = createGraftMcpHandler({
+    ...(repository ? { store: repository } : {}),
     name: "graft-serve",
     contentDir: config.contentDir,
     collections: config.collections,
@@ -498,12 +512,29 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
         : !loopback
           ? () => null
           : undefined;
+    // People sign in when GRAFT_STUDIO_SECRET is set. GitHub sign-in admits
+    // whoever can push to the content repository unless GRAFT_STUDIO_EDITORS
+    // narrows it, so the store's credentials answer that question.
+    const access = studioMod.editorAccessFromEnv();
     studioHandler = studioMod.createStudioHandler({
       db: branch.db,
       collections: config.collections,
       contentDir: config.contentDir,
       mdxTrust: config.mdxTrust,
       defaultBranch: writeBranch,
+      // Saves land in git on GitHub when GRAFT_GITHUB_REPO is set: the only
+      // way a hosted Studio on a read-only filesystem can save at all.
+      ...(repository ? { store: repository } : {}),
+      ...(access
+        ? {
+            editors: {
+              ...access,
+              ...(repository
+                ? { permissionOf: (login: string) => repository.permissionOf(login) }
+                : {}),
+            },
+          }
+        : {}),
       // Only reached on a loopback mount, where there is no caller identity to
       // attribute to. Off loopback the authenticated principal is used instead.
       decider: { kind: "agent", id: "studio-serve" },

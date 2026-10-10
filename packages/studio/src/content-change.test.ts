@@ -58,15 +58,16 @@ function handlerWith(onContentChange?: (event: unknown) => void | Promise<void>)
 function mutate(method: "PUT" | "POST", path: string, body: unknown): Request {
   return new Request(`http://localhost/api/studio/v1/${path}`, {
     method,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", origin: "http://localhost" },
     body: JSON.stringify(body),
   });
 }
 
-const save = mutate.bind(null, "PUT", "document", {
+const save = mutate.bind(null, "POST", "entry", {
   collection: "pages",
   slug: "about",
-  raw: "---\ntitle: About\n---\n\nHello.\n",
+  data: { title: "About" },
+  body: "Hello.",
 });
 
 describe("Studio onContentChange", () => {
@@ -75,10 +76,9 @@ describe("Studio onContentChange", () => {
     const listener = vi.fn();
     const res = await handlerWith(listener)(save());
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(await res.json()).toMatchObject({
-      written: "pages/about.mdx",
-      changes: compiled.changes,
+      path: "pages/about.mdx",
       refresh: { ok: true },
     });
     expect(listener).toHaveBeenCalledWith({
@@ -118,9 +118,9 @@ describe("Studio onContentChange", () => {
       throw new Error("route down");
     })(save());
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(await res.json()).toMatchObject({
-      written: "pages/about.mdx",
+      path: "pages/about.mdx",
       refresh: { ok: false, error: "REVALIDATE_FAILED" },
     });
   });

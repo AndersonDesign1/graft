@@ -48,3 +48,55 @@ describe("studioPreviewUrl", () => {
     }
   });
 });
+
+describe("graft studio invite", () => {
+  const secret = "k".repeat(40);
+
+  it("prints a link the hosted Studio accepts", async () => {
+    const { studioInviteCommand } = await import("./commands/studio");
+    const { createStudioHandler } = await import("@usegraft/studio");
+    const previous = process.env.GRAFT_STUDIO_SECRET;
+    process.env.GRAFT_STUDIO_SECRET = secret;
+    try {
+      const invite = await studioInviteCommand({
+        cwd: process.cwd(),
+        email: "ana@shop.test",
+        role: "contributor",
+        url: "https://shop.test/studio/",
+      });
+      expect(invite.url).toMatch(/^https:\/\/shop\.test\/api\/studio\/v1\/auth\/link\?token=/);
+      const handler = createStudioHandler({
+        db: {} as never,
+        collections: {},
+        contentDir: "/tmp/none",
+        uiBasePath: "/studio",
+        editors: { secret },
+      });
+      const response = await handler(new Request(invite.url, { redirect: "manual" }));
+      expect(response.headers.get("location")).toBe("/studio/");
+      expect(response.headers.getSetCookie().join()).toContain("graft_studio=");
+    } finally {
+      if (previous === undefined) delete process.env.GRAFT_STUDIO_SECRET;
+      else process.env.GRAFT_STUDIO_SECRET = previous;
+    }
+  });
+
+  it("refuses an unknown role and a missing URL", async () => {
+    const { studioInviteCommand } = await import("./commands/studio");
+    await expect(
+      studioInviteCommand({ cwd: process.cwd(), email: "a@b.c", role: "owner", url: "https://x" }),
+    ).rejects.toThrow(/not a Studio role/);
+    const saved = process.env.GRAFT_STUDIO_URL;
+    delete process.env.GRAFT_STUDIO_URL;
+    await expect(studioInviteCommand({ cwd: process.cwd(), email: "a@b.c" })).rejects.toThrow(
+      /public URL/,
+    );
+    if (saved !== undefined) process.env.GRAFT_STUDIO_URL = saved;
+    await expect(
+      studioInviteCommand({ cwd: process.cwd(), email: "a@b.c", url: "shop.test" }),
+    ).rejects.toThrow(/not an http\(s\) URL/);
+    await expect(
+      studioInviteCommand({ cwd: process.cwd(), email: "a@b.c", url: "file:///srv/site" }),
+    ).rejects.toThrow(/not an http\(s\) URL/);
+  });
+});

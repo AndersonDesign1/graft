@@ -8,4 +8,5 @@ export * from "./content-files";
 export * from "./paths";
 export * from "./compile";
 export * from "./serialize";
+export * from "./store";
 export * from "./notify";

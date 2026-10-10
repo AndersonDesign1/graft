@@ -64,6 +64,16 @@
   --c-purple-text: light-dark(oklch(0.45 0.204 300), oklch(0.8 0.107 300));
   --c-purple-text-loud: light-dark(oklch(0.42 0.191 300), oklch(0.82 0.09 300));
 
+  /* ---- vermilion — hue 35, the grafting-wax mark from the brand. Same
+     lightness slots as the scales above; chroma held a little under the
+     red's so the two never read as one colour side by side. ---- */
+  --c-vermilion-bg: light-dark(oklch(0.945 0.025 35), oklch(0.245 0.05 35));
+  --c-vermilion-bg-hover: light-dark(oklch(0.91 0.045 35), oklch(0.295 0.066 35));
+  --c-vermilion-border: light-dark(oklch(0.8 0.08 35), oklch(0.4 0.09 35));
+  --c-vermilion-solid: light-dark(oklch(0.6 0.19 35), oklch(0.72 0.16 35));
+  --c-vermilion-text: light-dark(oklch(0.47 0.15 35), oklch(0.8 0.11 35));
+  --c-vermilion-text-loud: light-dark(oklch(0.44 0.14 35), oklch(0.82 0.1 35));
+
   /* ---- neutral — not a hue. Aliases into the tokens.css ramp so the
      colorless states share one source of truth with the chrome. ---- */
   --c-neutral-bg: var(--paper-sunken);

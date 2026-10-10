@@ -1,120 +1,118 @@
 import { IconContext } from "@phosphor-icons/react";
-import { Toaster, toast } from "sonner";
+import { Toaster } from "sonner";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { EditorComponentList } from "@usegraft/contracts";
-import type { BranchList, CompileResultDto, ContentTree, GitChangesDto } from "../types";
-import { setEditorComponentSpecs } from "./components/mdx-card";
-import { CommandPalette } from "./components/palette";
+import type { ContentTree } from "../types";
+import { CollectionMark } from "./components/collection-icon";
+import { CreateDialog } from "./components/create-dialog";
 import {
   IconApprovals,
   IconBranches,
-  IconCaretUpDown,
-  IconChanges,
-  IconSidebar,
+  IconCaretDown,
   IconHistory,
   IconMoon,
   IconOverview,
   IconSchema,
+  IconSearch,
   IconSettings,
   IconSun,
   IconSystem,
-  IconWarning,
   type IconComponent,
 } from "./components/icons";
-import { ChangesDrawer } from "./components/changes-drawer";
-import { ContentExplorer } from "./components/content-tree";
-import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from "./components/ui/menu";
-import { api, qs } from "./lib/api";
-import { plural } from "./lib/format";
-import { warnIfNotRefreshed } from "./lib/refresh";
-import { currentBranch, setBranchInUrl, useRoute, type ViewId } from "./lib/route";
-import { useSidebarWidth } from "./lib/sidebar";
+import { setEditorComponentSpecs } from "./components/mdx-card";
+import { CommandPalette } from "./components/palette";
+import { PublishSheet } from "./components/publish-sheet";
+import { SignIn } from "./components/sign-in";
+import {
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuLabel,
+  MenuSeparator,
+  MenuTrigger,
+} from "./components/ui/menu";
+import { SIGNED_OUT_EVENT, qs } from "./lib/api";
+import { DEV_VIEWS, currentBranch, setBranchInUrl, useRoute, type DevView } from "./lib/route";
+import {
+  StudioProvider,
+  collectionLabel,
+  editableCollections,
+  publishVerb,
+  useStudioResources,
+  type StudioState,
+} from "./lib/studio";
 import { useTheme, type Theme } from "./lib/theme";
 import { useResource } from "./lib/use-resource";
-import { CollectionsView } from "./views/collections";
+import { CollectionView } from "./views/collection";
+import { EntryView } from "./views/entry";
+import { HomeView } from "./views/home";
 import { ApprovalsView, BranchesView, HistoryView } from "./views/operations";
 import { OverviewView } from "./views/overview";
 import { SchemaView } from "./views/schema";
 import { SettingsView } from "./views/settings";
 
-type NavItem = { id: ViewId; label: string; Icon: IconComponent };
-
-const TOP: NavItem[] = [{ id: "overview", label: "Overview", Icon: IconOverview }];
-const OPERATIONS: NavItem[] = [
-  { id: "approvals", label: "Approvals", Icon: IconApprovals },
-  { id: "branches", label: "Branches", Icon: IconBranches },
-  { id: "history", label: "History", Icon: IconHistory },
-];
-const BOTTOM: NavItem[] = [
-  { id: "schema", label: "Schema", Icon: IconSchema },
-  { id: "settings", label: "Settings", Icon: IconSettings },
+const DEV_NAV: Array<{ view: DevView; label: string; Icon: IconComponent }> = [
+  { view: "overview", label: "Health", Icon: IconOverview },
+  { view: "schema", label: "Schema", Icon: IconSchema },
+  { view: "history", label: "History", Icon: IconHistory },
+  { view: "branches", label: "Branches", Icon: IconBranches },
+  { view: "approvals", label: "Approvals", Icon: IconApprovals },
+  { view: "settings", label: "Settings", Icon: IconSettings },
 ];
 
-const THEME_ORDER: Theme[] = ["system", "light", "dark"];
-const THEME_META: Record<Theme, { label: string; Icon: IconComponent }> = {
-  system: { label: "Theme: following the system", Icon: IconSystem },
-  light: { label: "Theme: light", Icon: IconSun },
-  dark: { label: "Theme: dark", Icon: IconMoon },
+const THEME: Record<Theme, { label: string; Icon: IconComponent }> = {
+  system: { label: "Match system", Icon: IconSystem },
+  light: { label: "Light", Icon: IconSun },
+  dark: { label: "Dark", Icon: IconMoon },
 };
 
 export function StudioApp({ branch: initialBranch = "main" }: { branch?: string }) {
+  const [signedOut, setSignedOut] = useState(false);
+  useEffect(() => {
+    const onSignedOut = (): void => setSignedOut(true);
+    window.addEventListener(SIGNED_OUT_EVENT, onSignedOut);
+    return () => window.removeEventListener(SIGNED_OUT_EVENT, onSignedOut);
+  }, []);
+
+  return (
+    // One place decides icon weight and size, so glyphs stay optically
+    // consistent with the 1px hairlines they sit beside.
+    <IconContext.Provider value={{ size: 16, weight: "regular" }}>
+      {signedOut ? <SignIn /> : <Shell initialBranch={initialBranch} />}
+      <Toaster position="bottom-right" closeButton toastOptions={{ className: "sonner-toast" }} />
+    </IconContext.Provider>
+  );
+}
+
+function Shell({ initialBranch }: { initialBranch: string }) {
   const [branch, setBranch] = useState(() => currentBranch(initialBranch));
   const [route, navigate] = useRoute();
   const [theme, setTheme] = useTheme();
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [changesOpen, setChangesOpen] = useState(false);
-  const [compiling, setCompiling] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
-  const sidebar = useSidebarWidth();
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [creating, setCreating] = useState<string | null>(null);
+  const resources = useStudioResources();
+  const { workspace, drafts, schema } = resources;
+  const developer = (DEV_VIEWS as readonly string[]).includes(route.view);
+  const [devOpen, setDevOpen] = useState(developer);
+  useEffect(() => {
+    if (developer) setDevOpen(true);
+  }, [developer]);
 
-  const tree = useResource<ContentTree>(`/tree${qs({ branch })}`);
-  const branches = useResource<BranchList>("/branches");
+  // The developer views read the content tree; only they pay for it.
+  const tree = useResource<ContentTree>(developer ? `/tree${qs({ branch })}` : null);
   const approvals = useResource<{ approvals: unknown[] }>("/approvals");
-  // Uncommitted work. Read at the top level because the count belongs in the
-  // top bar whether or not the drawer has ever been opened — "Changes (3)" is
-  // the reminder; the drawer is only where you act on it.
-  const changes = useResource<GitChangesDto>("/changes");
 
-  // How this project's components present in the canvas. Loaded once and handed
-  // to the node view rather than passed down: ProseMirror constructs node views
-  // itself, so there is no prop to thread them through.
+  // How this project's components present in the canvas.
   const editorComponents = useResource<EditorComponentList>("/editor-components");
   useEffect(() => {
     setEditorComponentSpecs(editorComponents.data?.components ?? []);
   }, [editorComponents.data]);
 
-  const openChanges = useCallback(() => {
-    changes.refresh();
-    setChangesOpen(true);
-  }, [changes]);
-
-  const onDocumentSaved = useCallback(() => {
-    tree.refresh();
-    changes.refresh();
-  }, [changes, tree]);
-
   const selectBranch = useCallback((name: string) => {
     setBranch(name);
     setBranchInUrl(name);
   }, []);
-
-  const compile = useCallback(async () => {
-    setCompiling(true);
-    try {
-      const result = await api<CompileResultDto>(`/compile${qs({ branch })}`, { method: "POST" });
-      toast.success(`Compiled ${plural(result.docCount, "document")}`, {
-        description: `+${result.added} added · ~${result.changed} changed · −${result.removed} removed`,
-      });
-      warnIfNotRefreshed(result.refresh);
-      tree.refresh();
-    } catch (err) {
-      toast.error("Compile failed", {
-        description: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setCompiling(false);
-    }
-  }, [branch, tree]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -127,239 +125,272 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const drift = tree.data?.summary.drift ?? 0;
-  const uncommitted = changes.data?.files.length ?? 0;
+  const state: StudioState = useMemo(
+    () => ({
+      ...resources,
+      navigate,
+      openPublish: () => setPublishOpen(true),
+      openCreate: (collection: string) => setCreating(collection),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [resources.workspace, resources.drafts, resources.schema, navigate],
+  );
+
+  const collections = editableCollections(schema.data);
+  const unpublished = drafts.data?.changes.length ?? 0;
   const pending = approvals.data?.approvals.length ?? 0;
-  const collections = useMemo(() => tree.data?.collections ?? [], [tree.data]);
-  const themeMeta = THEME_META[theme];
+  const user = workspace.data?.user;
 
   let main: React.ReactNode;
-  if (route.view === "collections") {
+  if (route.view === "entry" && route.collection && route.slug) {
     main = (
-      <CollectionsView
-        branch={branch}
-        route={route}
-        navigate={navigate}
-        tree={tree}
-        onSaved={onDocumentSaved}
+      <EntryView
+        key={`${route.collection}/${route.slug}`}
+        collection={route.collection}
+        slug={route.slug}
       />
     );
+  } else if (route.view === "collection" && route.collection) {
+    main = <CollectionView collection={route.collection} />;
+  } else if (route.view === "overview") {
+    main = <OverviewView branch={branch} tree={tree} navigate={navigate} />;
   } else if (route.view === "schema") main = <SchemaView />;
   else if (route.view === "approvals") main = <ApprovalsView onDecided={approvals.refresh} />;
-  else if (route.view === "branches") {
+  else if (route.view === "branches")
     main = <BranchesView branch={branch} onSelectBranch={selectBranch} />;
-  } else if (route.view === "history") main = <HistoryView branch={branch} />;
+  else if (route.view === "history") main = <HistoryView branch={branch} />;
   else if (route.view === "settings") {
     main = <SettingsView branch={branch} theme={theme} setTheme={setTheme} tree={tree.data} />;
-  } else {
-    main = <OverviewView branch={branch} tree={tree} navigate={navigate} />;
-  }
+  } else main = <HomeView />;
 
-  const railItem = ({ id, label, Icon }: NavItem, badge?: React.ReactNode) => (
-    <button
-      key={id}
-      type="button"
-      className="rail-item"
-      data-active={route.view === id}
-      aria-current={route.view === id ? "page" : undefined}
-      onClick={() => navigate({ view: id })}
-    >
-      <Icon />
-      <span>{label}</span>
-      {badge}
-    </button>
+  const crumbs = (
+    <nav className="crumbs" aria-label="Breadcrumb">
+      <a href="#/" className="crumb">
+        Home
+      </a>
+      {route.collection ? (
+        <>
+          <span className="crumb-sep" aria-hidden="true">
+            /
+          </span>
+          <a
+            href={`#/c/${encodeURIComponent(route.collection)}`}
+            className="crumb"
+            aria-current={route.view === "collection" ? "page" : undefined}
+          >
+            {collectionLabel(route.collection)}
+          </a>
+        </>
+      ) : null}
+      {developer ? (
+        <>
+          <span className="crumb-sep" aria-hidden="true">
+            /
+          </span>
+          <span className="crumb" aria-current="page">
+            {DEV_NAV.find((item) => item.view === route.view)?.label}
+          </span>
+        </>
+      ) : null}
+    </nav>
   );
 
   return (
-    // One place decides icon weight and size, so glyphs stay optically
-    // consistent with the 1px hairlines they sit beside.
-    <IconContext.Provider value={{ size: 16, weight: "regular" }}>
-      <div className="studio">
-        <header className="topbar">
-          <div className="topbar-left">
+    <StudioProvider value={state}>
+      <div className="shell">
+        <aside className="side" aria-label="Studio">
+          <div className="side-head">
+            <a href="#/" className="wordmark" aria-label="Studio home">
+              graft<b>.</b>
+            </a>
+            <span className="side-site" title={workspace.data?.repository ?? undefined}>
+              {workspace.data?.repository?.split("/")[1] ?? "studio"}
+            </span>
+          </div>
+
+          <button type="button" className="side-search" onClick={() => setPaletteOpen(true)}>
+            <IconSearch size={14} />
+            <span>Search</span>
+            <kbd>⌘K</kbd>
+          </button>
+
+          <nav className="side-nav" aria-label="Content">
+            <a
+              href="#/"
+              className="side-item"
+              data-active={route.view === "home" || undefined}
+              aria-current={route.view === "home" ? "page" : undefined}
+            >
+              <IconOverview size={15} />
+              <span className="side-text">Home</span>
+            </a>
+            <p className="side-label">Content</p>
+            {collections.map((collection) => {
+              const active = route.collection === collection.name && !developer;
+              const changed = (drafts.data?.changes ?? []).filter(
+                (c) => c.collection === collection.name,
+              ).length;
+              return (
+                <a
+                  key={collection.name}
+                  href={`#/c/${encodeURIComponent(collection.name)}`}
+                  className="side-item"
+                  data-active={active || undefined}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <CollectionMark name={collection.name} authority="file" size="sm" />
+                  <span className="side-text">{collectionLabel(collection.name)}</span>
+                  {changed > 0 ? (
+                    <span
+                      className="side-dot"
+                      title={`${changed} unpublished`}
+                      aria-label={`${changed} unpublished`}
+                    />
+                  ) : null}
+                </a>
+              );
+            })}
+          </nav>
+
+          <div className="side-foot">
             <button
               type="button"
-              className="icon-btn"
-              aria-label={collapsed ? "Show sidebar" : "Hide sidebar"}
-              aria-expanded={!collapsed}
-              title={`${collapsed ? "Show" : "Hide"} sidebar`}
-              onClick={() => setCollapsed((v) => !v)}
+              className="side-label side-toggle"
+              aria-expanded={devOpen}
+              onClick={() => setDevOpen((v) => !v)}
             >
-              <IconSidebar size={16} />
+              Developer
+              <IconCaretDown size={11} />
             </button>
-            <span className="brand">
-              graft<b>.</b>
-            </span>
-            <span className="crumb-sep">/</span>
-            <span className="scope">studio</span>
-            <span className="crumb-sep">/</span>
+            {devOpen ? (
+              <nav className="side-nav" aria-label="Developer">
+                {DEV_NAV.map(({ view, label, Icon }) => (
+                  <a
+                    key={view}
+                    href={`#/dev/${view}`}
+                    className="side-item"
+                    data-active={route.view === view || undefined}
+                    aria-current={route.view === view ? "page" : undefined}
+                  >
+                    <Icon size={15} />
+                    <span className="side-text">{label}</span>
+                    {view === "approvals" && pending > 0 ? (
+                      <span className="side-count" data-numeric="">
+                        {pending}
+                      </span>
+                    ) : null}
+                  </a>
+                ))}
+              </nav>
+            ) : null}
 
             <Menu>
-              <MenuTrigger className="branch-trigger">
-                <span className="dot" data-state="synced" />
-                {branch}
-                <IconCaretUpDown size={12} className="branch-caret" />
+              <MenuTrigger className="side-user">
+                <span className="avatar" aria-hidden="true">
+                  {(user?.name ?? user?.id ?? "You").slice(0, 1).toUpperCase()}
+                </span>
+                <span className="side-user-text">
+                  <span className="side-user-name">{user?.name ?? user?.id ?? "Local editor"}</span>
+                  <span className="side-user-role">
+                    {workspace.data?.storage === "github"
+                      ? `Saving to ${workspace.data.branch ? "GitHub" : "GitHub"}`
+                      : "Saving on this computer"}
+                  </span>
+                </span>
               </MenuTrigger>
-              <MenuContent>
-                <MenuLabel>Switch branch</MenuLabel>
-                {(branches.data?.branches ?? []).length === 0 ? (
-                  <p className="menu-empty">No other branches registered.</p>
-                ) : (
-                  branches.data?.branches.map((row) => (
+              <MenuContent align="start" side="top">
+                <MenuLabel>Appearance</MenuLabel>
+                {(Object.keys(THEME) as Theme[]).map((key) => {
+                  const { label, Icon } = THEME[key];
+                  return (
                     <MenuItem
-                      key={row.name}
-                      data-active={row.name === branch}
-                      onClick={() => selectBranch(row.name)}
+                      key={key}
+                      data-active={theme === key || undefined}
+                      onClick={() => setTheme(key)}
                     >
-                      <span className="menu-item-label">{row.name}</span>
-                      <span className="menu-item-hint">
-                        {row.backend}
-                        {row.parent ? ` ← ${row.parent}` : " · root"}
-                      </span>
+                      <Icon size={14} />
+                      <span className="menu-item-label">{label}</span>
                     </MenuItem>
-                  ))
-                )}
+                  );
+                })}
+                {workspace.data?.sessions ? (
+                  <>
+                    <MenuSeparator />
+                    <MenuItem
+                      onClick={() => {
+                        void fetch("/api/studio/v1/auth/sign-out", {
+                          method: "POST",
+                          credentials: "same-origin",
+                        }).then(() => window.location.reload());
+                      }}
+                    >
+                      <span className="menu-item-label">Sign out</span>
+                    </MenuItem>
+                  </>
+                ) : null}
               </MenuContent>
             </Menu>
           </div>
+        </aside>
 
-          <div className="topbar-right">
-            {/* Always present, unlike the drift alarm: "have I saved my work?"
-                is a question worth being able to ask at any time, and a control
-                that only exists once something is wrong cannot be learned. */}
-            <button
-              type="button"
-              className="changes-trigger"
-              onClick={openChanges}
-              title="Review and commit your content changes"
-            >
-              <IconChanges size={14} />
-              Changes
-              {uncommitted > 0 ? (
-                <span className="count" data-numeric="">
-                  {uncommitted}
-                </span>
-              ) : null}
-            </button>
-            {drift > 0 ? (
-              <button
-                type="button"
-                className="drift"
-                onClick={() => void compile()}
-                disabled={compiling}
-                title="Recompile so the index matches disk"
+        <div className="stage">
+          <header className="bar">
+            {crumbs}
+            <span className="bar-spacer" />
+            {workspace.data?.storage === "github" && workspace.data.repositoryUrl ? (
+              <a
+                className="bar-repo"
+                href={workspace.data.repositoryUrl}
+                target="_blank"
+                rel="noreferrer"
+                title="The repository your content lives in"
               >
-                <IconWarning size={13} />
-                {compiling ? "Compiling…" : `${plural(drift, "change")} to compile`}
-              </button>
+                {workspace.data.repository}
+                {workspace.data.branch ? (
+                  <span className="muted"> · {workspace.data.branch}</span>
+                ) : null}
+              </a>
             ) : null}
             <button
               type="button"
-              className="icon-btn"
-              onClick={() => setPaletteOpen(true)}
-              title="Command palette"
-              aria-label="Open command palette"
+              className="publish"
+              data-pending={unpublished > 0 || undefined}
+              onClick={() => setPublishOpen(true)}
+              disabled={workspace.data ? !workspace.data.canWrite : false}
             >
-              <kbd>⌘K</kbd>
+              {publishVerb(drafts.data?.publish)}
+              {unpublished > 0 ? (
+                <span
+                  className="publish-count"
+                  data-numeric=""
+                  aria-label={`${unpublished} unpublished`}
+                >
+                  {unpublished}
+                </span>
+              ) : null}
             </button>
-            <button
-              type="button"
-              className="icon-btn"
-              title={themeMeta.label}
-              aria-label={themeMeta.label}
-              onClick={() => setTheme(THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % 3] as Theme)}
-            >
-              <themeMeta.Icon size={15} />
-            </button>
-          </div>
-        </header>
-
-        <div className="body">
-          {/* The sidebar is the content explorer, not just a section list:
-              browsing content IS navigation, so a separate list pane was a
-              redundant column. Width is a real preference here — document
-              titles vary — so it drags. */}
-          <nav
-            className="rail"
-            aria-label="Studio sections"
-            data-collapsed={collapsed}
-            // The collapse animates; a width drag must not, or it lags the pointer.
-            data-dragging={sidebar.dragging}
-            style={collapsed ? undefined : { width: `${sidebar.width}px` }}
-          >
-            <div className="rail-group">{TOP.map((item) => railItem(item))}</div>
-
-            <ContentExplorer
-              collections={collections}
-              loading={tree.loading}
-              activeCollection={route.view === "collections" ? route.collection : undefined}
-              activeSlug={route.view === "collections" ? route.slug : undefined}
-              onSelectCollection={(name, firstSlug) =>
-                navigate({ view: "collections", collection: name, slug: firstSlug })
-              }
-              onSelectDocument={(collection, slug) =>
-                navigate({ view: "collections", collection, slug })
-              }
-              onSearch={() => setPaletteOpen(true)}
-            />
-
-            <div className="rail-group">
-              <p className="rail-label">Operations</p>
-              {OPERATIONS.map((item) =>
-                railItem(
-                  item,
-                  item.id === "approvals" && pending > 0 ? (
-                    <span className="count" data-tone="pending" data-numeric="">
-                      {pending}
-                    </span>
-                  ) : undefined,
-                ),
-              )}
-            </div>
-
-            <div className="rail-group rail-group-end">{BOTTOM.map((item) => railItem(item))}</div>
-          </nav>
-
-          <div
-            className="rail-resize"
-            hidden={collapsed}
-            data-dragging={sidebar.dragging}
-            role="separator"
-            aria-label="Resize sidebar"
-            aria-orientation="vertical"
-            onPointerDown={sidebar.onPointerDown}
-            onDoubleClick={sidebar.reset}
-            title="Drag to resize · double-click to reset"
-          />
-
+          </header>
           <main className="main">{main}</main>
         </div>
 
-        {/* Sonner: bottom-right, and it inherits our surface tokens rather
-            than shipping its own palette. */}
-        <Toaster position="bottom-right" closeButton toastOptions={{ className: "sonner-toast" }} />
-
-        <ChangesDrawer
-          open={changesOpen}
-          onOpenChange={setChangesOpen}
-          changes={changes}
-          tree={tree.data}
-          navigate={navigate}
-          onCommitted={tree.refresh}
+        <PublishSheet
+          open={publishOpen}
+          onOpenChange={setPublishOpen}
+          onDone={() => {
+            drafts.refresh();
+          }}
         />
-
+        <CreateDialog
+          collection={creating}
+          onOpenChange={(open) => !open && setCreating(null)}
+          onCreated={drafts.refresh}
+        />
         <CommandPalette
           open={paletteOpen}
           onOpenChange={setPaletteOpen}
-          tree={tree.data}
-          branches={branches.data}
           components={editorComponents.data?.components ?? []}
-          navigate={navigate}
-          onSelectBranch={selectBranch}
-          onCompile={() => void compile()}
-          onReviewChanges={openChanges}
         />
       </div>
-    </IconContext.Provider>
+    </StudioProvider>
   );
 }

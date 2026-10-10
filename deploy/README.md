@@ -14,6 +14,18 @@ where your compute runs:
 Both topologies serve identical bytes: `graft serve` and an app route mount the
 same stateless `Request → Response` handlers.
 
+## Studio for a content team
+
+A hosted Studio saves through GitHub, not to the container's files, so it works
+on the container adapters above with the content directory read-only. (On
+Vercel, Studio is not mounted: `graft serve` serves it, and Vercel runs your
+app's route handlers instead.) Set
+`GRAFT_STUDIO=1`, the `GRAFT_GITHUB_*` repository settings and
+`GRAFT_STUDIO_SECRET`, and editors sign in at `/studio`. The full list, the
+roles and a checklist are in
+[Host Studio for your team](../examples/docs-site/content/docs/studio-hosting.mdx);
+`examples/shop` is a catalog set up this way.
+
 ## The credential recipe (every adapter repeats this)
 
 Give the deployment a runtime credential that can execute everything mounted

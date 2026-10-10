@@ -9,11 +9,13 @@ import {
   composeDocument,
   parseDocument,
   readCollectionDocs,
+  type ProjectedDoc,
   resolveContained,
   SLUG_RE,
   writeDocumentFile,
 } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
+import type { AnyCollection } from "@usegraft/core";
 import { assertSafeMdx } from "@usegraft/mdx-safety";
 import { assertSearchQuery, scopeChain } from "@usegraft/db";
 import { z } from "zod";
@@ -57,6 +59,37 @@ function assertSlugShape(slug: string, collection: string): void {
 export const registerContentReadTools: RegisterTools = (server, deps) => {
   const { branchId, collections, contentDir, getScope, searchIndex, staticIndexPath } = deps;
 
+  /**
+   * A collection's documents as this caller sees them. Hosted, that is the
+   * deployed files with the caller's own draft on top, so an agent reads back
+   * what it just wrote with write_content.
+   */
+  async function currentDocs(
+    name: string,
+    collection: AnyCollection,
+  ): Promise<{ docs: ProjectedDoc[]; deleted: Set<string> }> {
+    const docs = readCollectionDocs(contentDir, name, collection);
+    const deleted = new Set<string>();
+    // Only an identified caller has a draft; anyone else reads what is deployed.
+    let actor: ReturnType<typeof deps.storeActor> | undefined;
+    try {
+      actor = deps.remoteStore?.overlay ? deps.storeActor() : undefined;
+    } catch {
+      actor = undefined;
+    }
+    const overlay = actor ? await deps.remoteStore?.overlay?.(actor) : undefined;
+    if (!overlay || overlay.size === 0) return { docs, deleted };
+    const byPath = new Map(docs.map((doc) => [doc.sourcePath, doc]));
+    for (const [path, file] of overlay) {
+      if (!path.startsWith(`${name}/`)) continue;
+      if (file === null) {
+        byPath.delete(path);
+        deleted.add(path);
+      } else byPath.set(path, parseDocument(file.raw, collection, path));
+    }
+    return { docs: [...byPath.values()].sort((a, b) => a.slug.localeCompare(b.slug)), deleted };
+  }
+
   server.registerTool(
     "list_content",
     {
@@ -71,9 +104,9 @@ export const registerContentReadTools: RegisterTools = (server, deps) => {
     },
     ({ collection: name }) =>
       guarded(
-        () => {
+        async () => {
           const collection = requireCollection(collections, name);
-          const docs = readCollectionDocs(contentDir, name, collection);
+          const { docs } = await currentDocs(name, collection);
           return {
             collection: name,
             documents: docs.map((doc) => ({
@@ -102,9 +135,22 @@ export const registerContentReadTools: RegisterTools = (server, deps) => {
     },
     ({ collection: name, slug }) =>
       guarded(
-        () => {
+        async () => {
           const collection = requireCollection(collections, name);
-          const doc = findDoc(contentDir, name, collection, slug);
+          const current = deps.remoteStore?.overlay
+            ? await currentDocs(name, collection)
+            : undefined;
+          const drafted = current?.docs.find((candidate) => candidate.slug === slug);
+          const doc = drafted ?? findDoc(contentDir, name, collection, slug);
+          // Deleted in this caller's draft: gone for them, though still deployed.
+          if (!drafted && current?.deleted.has(doc.sourcePath)) {
+            throw new GraftError({
+              code: "DOCUMENT_NOT_FOUND",
+              message: `${name}/${slug} is deleted in your draft.`,
+              fix: "It stays live until publish_drafts; discard_drafts with its path brings it back.",
+              details: { collection: name, slug, sourcePath: doc.sourcePath },
+            });
+          }
           return {
             collection: name,
             slug: doc.slug,
@@ -181,7 +227,9 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
     getDeleteHandler,
     options,
     projectContent,
+    remoteStore,
     requireScope,
+    storeActor,
   } = deps;
 
   server.registerTool(
@@ -191,7 +239,7 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
       outputSchema: writeContentOutput,
       annotations: WRITES,
       description:
-        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. When the server is set up to refresh the app and the write changed content, the result also carries `refresh`; `ok: false` means the write landed but the site may show the old copy, so tell the human and do not retry the write. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.",
+        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. When the server is set up to refresh the app and the write changed content, the result also carries `refresh`; `ok: false` means the write landed but the site may show the old copy, so tell the human and do not retry the write. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit. On a hosted server that writes to GitHub (list_drafts is registered), the write is instead an unpublished draft on your own branch, nothing is compiled (gitSha is null), and it goes live only through publish_drafts.",
       inputSchema: {
         collection: z.string().describe("Collection name"),
         slug: z
@@ -247,6 +295,37 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
           // code: rendering evaluates `{…}` and `import` as JavaScript on the
           // server. Refuse it here, before it is stored.
           assertSafeMdx(body ?? "", { label: `${name}/${slug}` });
+
+          if (remoteStore) {
+            // Hosted: the write lands as a draft commit on this caller's own
+            // branch, the same draft a hosted Studio editor gets. Nothing is
+            // compiled, because a draft must not reach the live index; a human
+            // publishes it with publish_drafts or from Studio.
+            const actor = storeActor();
+            const existing = await remoteStore.read(sourcePath, actor);
+            const raw = composeDocument(existing?.raw, data as Record<string, unknown>, body ?? "");
+            parseDocument(raw, collection, sourcePath);
+            assertSlugFree(contentDir, name, collection, slug, sourcePath);
+            // The version just read: a Studio save or another agent landing
+            // in between is refused with CONTENT_CONFLICT, not overwritten.
+            await remoteStore.write(sourcePath, raw, {
+              actor,
+              baseVersion: existing?.version ?? null,
+            });
+            const key = `${name}/${slug}`;
+            const same = existing?.raw === raw;
+            return {
+              written: sourcePath,
+              branch: branchId,
+              gitSha: null,
+              changes: {
+                added: existing ? [] : [key],
+                changed: existing && !same ? [key] : [],
+                removed: [],
+                unchanged: same ? 1 : 0,
+              },
+            };
+          }
 
           const existingRaw = existsSync(fullPath) ? readFileSync(fullPath, "utf8") : undefined;
           const raw = composeDocument(existingRaw, data as Record<string, unknown>, body ?? "");

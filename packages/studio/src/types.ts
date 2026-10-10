@@ -1,3 +1,5 @@
+import type { FieldDescriptor } from "@usegraft/contracts";
+
 /** Serializable shapes matching packages/studio/openapi.yaml */
 import type { ContentChangeNotice } from "@usegraft/compiler";
 
@@ -64,15 +66,6 @@ export interface ContentTree {
     /** drifted + unindexed + orphaned — the "compile would change something" count. */
     drift: number;
   };
-}
-
-export interface DocumentDto {
-  collection: string;
-  slug: string;
-  sourcePath: string;
-  data: Record<string, unknown>;
-  body: string;
-  raw: string;
 }
 
 export interface CompilationDto {
@@ -234,18 +227,11 @@ export interface ApprovalList {
 }
 
 /**
- * One field of a collection schema, for the read-only Schema view.
- * Recursive: object fields carry `fields`, array fields carry `items` — the
- * same shape MCP's describe_schema returns, so the two never drift.
+ * One field of a collection schema: the descriptor MCP's describe_schema
+ * returns, so the Studio form, the Schema view and agents read one shape
+ * (labels, limits, select options and reference targets included).
  */
-export interface SchemaFieldDto {
-  name: string;
-  type: string;
-  optional: boolean;
-  description?: string;
-  fields?: SchemaFieldDto[];
-  items?: SchemaFieldDto;
-}
+export type SchemaFieldDto = FieldDescriptor;
 
 export interface SchemaCollectionDto {
   name: string;

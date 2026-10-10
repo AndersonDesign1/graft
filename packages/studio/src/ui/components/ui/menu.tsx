@@ -21,15 +21,22 @@ export function MenuTrigger({ className, ...props }: MenuPrimitive.Trigger.Props
 export function MenuContent({
   className,
   align = "start",
+  side,
   sideOffset = 6,
   ...props
 }: MenuPrimitive.Popup.Props & {
   align?: MenuPrimitive.Positioner.Props["align"];
+  side?: MenuPrimitive.Positioner.Props["side"];
   sideOffset?: number;
 }) {
   return (
     <MenuPrimitive.Portal>
-      <MenuPrimitive.Positioner align={align} sideOffset={sideOffset} className="menu-positioner">
+      <MenuPrimitive.Positioner
+        align={align}
+        {...(side ? { side } : {})}
+        sideOffset={sideOffset}
+        className="menu-positioner"
+      >
         {/* Base UI hands us the trigger's position as --transform-origin, so
             the popup scales out of the control rather than its own centre. */}
         <MenuPrimitive.Popup

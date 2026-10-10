@@ -59,27 +59,6 @@ export const STUDIO_OPENAPI = {
         },
       },
     },
-    "/api/studio/v1/document": {
-      get: {
-        operationId: "getDocument",
-        summary: "Read one MDX document (file truth)",
-        parameters: [
-          { name: "collection", in: "query", required: true, schema: { type: "string" } },
-          { name: "slug", in: "query", required: true, schema: { type: "string" } },
-        ],
-        responses: { "200": { description: "Document data + body + raw" } },
-      },
-      put: {
-        operationId: "putDocument",
-        summary: "Write MDX document and recompile (same as MCP write_content)",
-        responses: {
-          "200": {
-            description:
-              "Written path, branch, git SHA and ChangeSet, plus refresh ({ ok: true } or { ok: false, error, message, fix }) when the handler has onContentChange and content changed",
-          },
-        },
-      },
-    },
     "/api/studio/v1/changes": {
       get: {
         operationId: "getChanges",
@@ -137,6 +116,95 @@ export const STUDIO_OPENAPI = {
         summary: "Approve or deny (same as graft approve/deny)",
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
         responses: { "200": { description: "Decision recorded" } },
+      },
+    },
+    "/api/studio/v1/workspace": {
+      get: {
+        operationId: "getWorkspace",
+        summary: "Where saves land and what Publish does for the caller",
+        description:
+          "Storage (local or github), repository and branch, the publish action for this caller (commit, publish, or review), and who is signed in.",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/entries": {
+      get: {
+        operationId: "listEntries",
+        summary: "A page of a collection's entries, searched, filtered and sorted on the server",
+        description:
+          "Status per entry for the caller (published, changed, new, deleted), column values for scalar fields, facets for select, boolean and reference fields. Query: q, status (all | unpublished | <status>), where.<field>=<value>, sort (site | title | updated | <field>), dir, cursor, limit (max 500).",
+        parameters: [
+          { name: "collection", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/entry": {
+      get: {
+        operationId: "getEntry",
+        summary: "One entry: fields, body, source and version",
+        description: "Send `version` back as `baseVersion` when saving.",
+        parameters: [
+          { name: "collection", in: "query", required: true, schema: { type: "string" } },
+          { name: "slug", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: { "200": { description: "OK" } },
+      },
+      put: {
+        operationId: "saveEntry",
+        summary: "Save an entry through the content store",
+        description:
+          "Validated like MCP write_content. Send the version you read as baseVersion: it is refused with CONTENT_CONFLICT (409) when that is no longer the current version. A save without baseVersion is unconditional.",
+        responses: { "200": { description: "OK" } },
+      },
+      post: {
+        operationId: "createEntry",
+        summary: "Create an entry; the slug comes from the title when omitted",
+        responses: { "201": { description: "Created" } },
+      },
+      delete: {
+        operationId: "deleteEntry",
+        summary: "Delete an entry (a draft change until published)",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/entry/duplicate": {
+      post: {
+        operationId: "duplicateEntry",
+        summary: "Copy an entry under a new slug",
+        responses: { "201": { description: "Created" } },
+      },
+    },
+    "/api/studio/v1/drafts": {
+      get: {
+        operationId: "listDrafts",
+        summary: "The caller's unpublished changes and open review requests",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/drafts/diff": {
+      get: {
+        operationId: "diffDraft",
+        summary: "Line diff of a draft against the published version",
+        parameters: [{ name: "path", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/drafts/publish": {
+      post: {
+        operationId: "publishDrafts",
+        summary:
+          "Publish drafts: a commit locally, a commit on the production branch, or a pull request",
+        description:
+          "On GitHub storage, a caller without studio:publish, or any caller when GRAFT_STUDIO_PUBLISH=pull-request, opens a pull request; local storage commits. Conflicts are refused with CONTENT_CONFLICT listing each path; resend with resolve: { path: mine | theirs }.",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/drafts/discard": {
+      post: {
+        operationId: "discardDrafts",
+        summary: "Throw drafts away; the published version stands",
+        responses: { "200": { description: "OK" } },
       },
     },
   },

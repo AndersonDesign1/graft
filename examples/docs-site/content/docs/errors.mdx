@@ -3,7 +3,7 @@
 # Source: ERROR_KNOWLEDGE in packages/mcp/src/explain.ts
 # Regenerate: node scripts/gen-error-docs.mjs
 title: Error reference
-description: "Every Graft error code, what it means, and how to recover. 44 codes."
+description: "Every Graft error code, what it means, and how to recover. 46 codes."
 section: Reference
 order: 5
 ---
@@ -18,7 +18,7 @@ you can tell whether the fix applies or something else is wrong.
 Agents can read the same entries without leaving their tools: the
 `explain_error` MCP tool returns them for any code.
 
-There are 44 codes, listed alphabetically.
+There are 46 codes, listed alphabetically.
 
 ## Codes
 
@@ -214,6 +214,20 @@ No graft.config.\{ts,js} was found in the working directory or any parent.
 **How to recover**
 
 cd into the project root (the directory holding graft.config.ts) and retry, or scaffold a new project with `graft init`.
+
+### CONTENT_CONFLICT
+
+A write or a publish was refused because the document changed underneath it: someone (a person in Studio, an agent over MCP, a developer's push) saved a newer version after this one was read. Nothing was written.
+
+**Usually because**
+
+- Two people, or two browser tabs, editing the same document
+- An agent called write_content on a document a person had open in Studio
+- A publish where the production branch changed the same document since the draft began
+
+**How to recover**
+
+Read the document again (`details.path`) and reapply the change on the current version. For a publish, `details.conflicts` lists each document; publish again choosing, per document, to keep the draft version or take the published one.
 
 ### CONTENT_DIR_NOT_FOUND
 
@@ -505,6 +519,21 @@ The error names what failed (a manifest field or the version mismatch). For a ve
 **How to recover**
 
 The error's `details.available` lists every item you can add. Run `graft add <name>` with one of those, or build the primitive by hand as owned code under graft/.
+
+### REMOTE_STORE_FAILED
+
+The content store that writes to a remote repository (GitHub) refused or failed a request. A failed save did not happen. A publish may have partly completed (the production branch moved, then tidying the draft failed), so check the repository before retrying a publish.
+
+**Usually because**
+
+- The token or GitHub App lacks Contents or Pull requests write access to the repository
+- GRAFT_GITHUB_REPO or GRAFT_GITHUB_BRANCH names a repository or branch that does not exist
+- A branch protection rule forbids direct pushes to the production branch
+- GitHub rate limiting or an outage
+
+**How to recover**
+
+Read the error message and `details`. A GitHub refusal carries `details.status` and `details.message`, GitHub's own answer; a failure before GitHub answered (network, a malformed response) has the message only. A 401 or 403 is credentials or permissions; a 404 is the repository or branch name; a protected branch needs `GRAFT_STUDIO_PUBLISH=pull-request`. Retry once the cause is fixed: drafts already saved stay on their branch.
 
 ### REVALIDATE_FAILED
 

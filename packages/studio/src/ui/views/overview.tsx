@@ -79,11 +79,7 @@ export function OverviewView({
             <section className="card">
               <div className="card-head">
                 <h2>Collections</h2>
-                <button
-                  type="button"
-                  className="link"
-                  onClick={() => navigate({ view: "collections" })}
-                >
+                <button type="button" className="link" onClick={() => navigate({ view: "home" })}>
                   Browse
                 </button>
               </div>
@@ -93,7 +89,7 @@ export function OverviewView({
                     <button
                       type="button"
                       className="mini-row"
-                      onClick={() => navigate({ view: "collections", collection: collection.name })}
+                      onClick={() => navigate({ view: "collection", collection: collection.name })}
                     >
                       <IdentityMark name={collection.name} />
                       <span className="mini-row-main">

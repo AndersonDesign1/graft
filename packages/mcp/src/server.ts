@@ -31,6 +31,7 @@ import { registerApprovalTools } from "./tools/approvals";
 import { registerAssetTools } from "./tools/assets";
 import { registerBranchTools } from "./tools/branches";
 import { registerContentReadTools, registerContentWriteTools } from "./tools/content";
+import { registerDraftTools } from "./tools/drafts";
 import { registerErrorTools } from "./tools/errors";
 import { registerPackageTools } from "./tools/packages";
 import { registerFunctionTools } from "./tools/functions";
@@ -258,6 +259,26 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
    * the gate: requiring a bearer as well would brick anonymous local stdio
    * servers without making the delete any less human-controlled.
    */
+  // A remote store (GitHub) is where writes land on a hosted mount; the
+  // filesystem store is today's behaviour and needs no indirection.
+  const remoteStore =
+    options.store && options.store.kind !== "filesystem" ? options.store : undefined;
+  // Each caller drafts on a branch named for its identity, so a remote write
+  // without one is refused: a shared fallback would let anonymous callers read,
+  // overwrite and publish each other's drafts.
+  const storeActor = () => {
+    const id = options.connectionActor?.id;
+    if (!id) {
+      throw new GraftError({
+        code: "UNAUTHORIZED",
+        message:
+          "Drafts on a hosted server belong to an identified caller, and this connection has none.",
+        fix: "Connect with a bearer token (its subject names your draft branch), or give the MCP handler a connectionActor with an id.",
+      });
+    }
+    return { id, name: id };
+  };
+
   const deleteContentFn = defineFunction({
     name: "delete_content",
     kind: "mutation",
@@ -273,6 +294,26 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
       // Re-resolve at execution time — the tree may have changed since the
       // approval was filed; the file named by the approval must still exist.
       const collection = requireCollection(collections, input.collection);
+      if (remoteStore) {
+        // A draft deletion on the caller's branch: the live site keeps the
+        // document until a human publishes the change.
+        const path = `${input.collection}/${input.slug}.mdx`;
+        if (!(await remoteStore.read(path, storeActor()))) {
+          findDoc(contentDir, input.collection, collection, input.slug);
+        }
+        await remoteStore.write(path, null, { actor: storeActor() });
+        return {
+          deleted: path,
+          branch: branchId,
+          gitSha: null,
+          changes: {
+            added: [],
+            changed: [],
+            removed: [`${input.collection}/${input.slug}`],
+            unchanged: 0,
+          },
+        };
+      }
       const doc = findDoc(contentDir, input.collection, collection, input.slug);
       // Same containment as the read and the write: sourcePath comes from a
       // directory scan, and a symlink in the content tree would point this
@@ -355,6 +396,8 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
     getFunctionsHandler,
     getDeleteHandler,
     getStorage,
+    ...(remoteStore ? { remoteStore } : {}),
+    storeActor,
     // Absent unless the mount opted in. The default stays the out-of-band
     // flow, which is the one a remote agent with no human attached must get.
     elicitApproval: options.approvalElicitation
@@ -385,6 +428,7 @@ const FULL_SURFACE: RegisterTools = (server, deps) => {
   registerRegistryTools(server, deps);
   registerContentReadTools(server, deps);
   registerContentWriteTools(server, deps);
+  registerDraftTools(server, deps);
   registerAssetTools(server, deps);
   registerBranchTools(server, deps);
   registerApprovalTools(server, deps);

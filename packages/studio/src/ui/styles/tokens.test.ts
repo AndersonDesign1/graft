@@ -14,7 +14,7 @@ const here = join(process.cwd(), "src", "ui", "styles");
 const read = (name: string): string => readFileSync(join(here, name), "utf8");
 
 /** Every layer-3 stylesheet. Both must obey the same rules. */
-const COMPONENT_SHEETS = ["studio.css", "parts.css"];
+const COMPONENT_SHEETS = ["studio.css", "parts.css", "editor.css"];
 const components = (): string => COMPONENT_SHEETS.map(read).join("\n");
 
 /** Drop comments so prose about colours doesn't trip the literal checks. */

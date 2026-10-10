@@ -10,7 +10,12 @@
  * This is that seam. The helpers below are the closure `createGraftMcp` built
  * anyway, named and handed over explicitly instead of captured implicitly.
  */
-import type { CompileResult, ContentChangeNotice } from "@usegraft/compiler";
+import type {
+  CompileResult,
+  ContentChangeNotice,
+  ContentStore,
+  StoreActor,
+} from "@usegraft/compiler";
 import type { AnyCollection, AnyGraftFunction, GraftFunctionsHandler } from "@usegraft/core";
 import type { BranchScope, ContentSearchHit, Database } from "@usegraft/db";
 import type { Storage } from "@usegraft/assets";
@@ -54,6 +59,10 @@ export interface ToolDeps {
   getDeleteHandler: () => GraftFunctionsHandler;
   /** The asset store, constructed on first use. */
   getStorage: () => Promise<Storage>;
+  /** A remote content store, when writes land in git rather than files. */
+  remoteStore?: ContentStore;
+  /** Who a store write is attributed to: this connection's identity. */
+  storeActor: () => StoreActor;
   /**
    * Ask the connected human to decide a filed approval, when the mount is
    * configured for it and the client can ask. Undefined is the default and
