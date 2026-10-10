@@ -100,10 +100,13 @@ a draft branch of the connection's own, `graft-studio/drafts/<identity>`, and
 return `gitSha: null`, because nothing was compiled: a draft must not reach the
 live site's index.
 
-`list_drafts` shows those changes, and `publish_drafts` puts them live. It opens
-a pull request unless the credential carries `content:publish` and the server
-publishes directly (`GRAFT_STUDIO_PUBLISH=commit`, the default), in which case
-it commits to the production branch and the host redeploys. A document the
+`list_drafts` shows those changes, and `publish_drafts` sends them toward
+production. It opens a pull request unless the credential carries
+`content:publish` and the server publishes directly
+(`GRAFT_STUDIO_PUBLISH=commit`, the default), in which case it commits to the
+production branch. Either way the site changes when the change reaches that
+branch and the host redeploys: at once for a commit, after the merge for a pull
+request. A document the
 production branch also changed since the draft began is refused with
 `CONTENT_CONFLICT`; send `resolve: { "<path>": "mine" }` or `"theirs"` to
 decide. This is the same draft model a Studio editor uses, so an agent and a

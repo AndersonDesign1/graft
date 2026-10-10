@@ -155,8 +155,10 @@ it on your machine with `graft studio`, or host it for a team with
 Git, the CLI or MCP. See [Studio](/docs/studio).
 
 **Draft.** Saved changes that are not live yet. In a local Studio they are the
-edited files. On a server that writes to GitHub, each editor and each agent
-connection drafts on its own branch, `graft-studio/drafts/<editor>`.
+edited files. On a server that writes to GitHub, each identity drafts on its own
+branch, `graft-studio/drafts/<identity>`: a person signed in to Studio, or the
+identity an agent's token resolves to. Two connections with the same identity
+share one draft.
 
 **Publish.** Making drafts live. In a local Studio it is a commit in your
 checkout, which you push yourself. On GitHub it is one commit on the

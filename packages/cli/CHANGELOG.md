@@ -4,9 +4,10 @@
 
 ### Minor Changes
 
+- ab7cca3: **Breaking:** `graft serve --studio` no longer serves `GET` and `PUT /api/studio/v1/document`. Use `GET` and `PUT /api/studio/v1/entry`, which read and save the same files and carry a version for conflict detection. See Upgrading.
 - ab7cca3: MCP writes through the content store. On a `graft serve` that writes to GitHub (`GRAFT_GITHUB_REPO` set), `write_content` and `delete_content` commit to the connection's own draft branch instead of the read-only files, and three tools appear: `list_drafts`, `publish_drafts` (a pull request, or a commit to the production branch with the new `content:publish` scope) and `discard_drafts`. Agents and Studio editors share one draft model.
-- ab7cca3: Studio has an editor API on top of the content store. `GET /api/studio/v1/entries` returns a page of a collection searched, filtered, sorted and faceted on the server, from a listing that re-parses only files whose size or mtime changed, so a catalog of thousands stays fast. `GET/PUT/POST/DELETE /api/studio/v1/entry` and `POST /api/studio/v1/entry/duplicate` read, save, create (slug from the title), delete and copy entries; a save that sends the version it read as `baseVersion` is refused with `CONTENT_CONFLICT` when that version is stale (a save without one is unconditional). `/api/studio/v1/drafts`, `/drafts/diff`, `/drafts/publish` and `/drafts/discard` list unpublished changes, diff them, publish them and throw them away: a commit locally, a commit on the production branch or a pull request on GitHub. `GET /api/studio/v1/workspace` says where saves land and what Publish does for the caller. `graft serve --studio` writes through GitHub when `GRAFT_GITHUB_REPO` is set along with a credential (`GRAFT_GITHUB_TOKEN`, or a GitHub App). Locally, every save, create, delete and discard compiles and then calls `onContentChange`, so the app refreshes the way it does for the old routes; a failed refresh comes back as `refresh: { ok: false }` and Studio warns.
-- ab7cca3: A hosted Studio now has sign-in. Set `GRAFT_STUDIO_SECRET` and people sign in with GitHub (`GRAFT_GITHUB_CLIENT_ID` and `GRAFT_GITHUB_CLIENT_SECRET`) or with an invite link from `graft studio invite <email> --role editor`, into a signed, HTTP-only session cookie. `GRAFT_STUDIO_EDITORS` lists who may sign in and with which role; without it, anyone with write access to the content repository can. Roles map to scopes: `viewer`, `contributor` (drafts, publishing opens a pull request), `editor` (adds the new `studio:publish` scope) and `admin` (adds `approvals:decide`). Bearer tokens keep working beside sessions.
+- ab7cca3: Studio has an editor API on top of the content store. `GET /api/studio/v1/entries` returns a page of a collection searched, filtered, sorted and faceted on the server, from a listing that re-parses only files whose size or mtime changed, so a catalog of thousands stays fast. `GET/PUT/POST/DELETE /api/studio/v1/entry` and `POST /api/studio/v1/entry/duplicate` read, save, create (slug from the title), delete and copy entries; a save that sends the version it read as `baseVersion` is refused with `CONTENT_CONFLICT` when that version is stale (a save without one is unconditional). `/api/studio/v1/drafts`, `/drafts/diff`, `/drafts/publish` and `/drafts/discard` list unpublished changes, diff them, publish them and throw them away: a commit locally, a commit on the production branch or a pull request on GitHub. `GET /api/studio/v1/workspace` says where saves land and what Publish does for the caller. `graft serve --studio` writes through GitHub when `GRAFT_GITHUB_REPO` is set along with a credential (`GRAFT_GITHUB_TOKEN`, or a GitHub App). Locally, every save, create, delete and discard compiles, then calls `onContentChange` when one is configured and the content changed, so the app refreshes the way it does for the old routes; a failed refresh comes back as `refresh: { ok: false }` and Studio warns.
+- ab7cca3: A hosted Studio now has sign-in. Set `GRAFT_STUDIO_SECRET` and people sign in with GitHub (`GRAFT_GITHUB_CLIENT_ID` and `GRAFT_GITHUB_CLIENT_SECRET`) or with an invite link from `graft studio invite <email> --role editor`, into a signed, HTTP-only session cookie. `GRAFT_STUDIO_EDITORS` lists who may sign in with GitHub and with which role; without it, anyone with write access to the content repository can. An invite link signs its holder in with the role it was made with, whether or not they are on that list. Roles map to scopes: `viewer`, `contributor` (drafts, publishing opens a pull request), `editor` (adds the new `studio:publish` scope) and `admin` (adds `approvals:decide`). Bearer tokens keep working beside sessions.
 
 ### Patch Changes
 
@@ -46,12 +47,14 @@
 
   **Webhook.** Set `GRAFT_REVALIDATE_URL` and `GRAFT_WEBHOOK_SECRET` where
   `graft serve`, `graft studio`, `graft mcp`, `graft merge` or `graft migrate`
-  runs. After each write that changes content, Graft POSTs
+  runs. After each local write that changes the index, Graft POSTs
   `{ branch, gitSha, changes }` with `Authorization: Bearer <secret>`, the body
   the documented revalidate route already reads. The URL must use https, except
   on loopback (`localhost`, `127.0.0.1`, `[::1]`), and redirects are refused. A URL without a secret stops the
   command before it connects to anything. `graft compile` does not call the
-  route, because a deploy compiles before the new version is live.
+  route, because a deploy compiles before the new version is live. A write to a
+  GitHub-backed store is a draft and calls nothing: the app refreshes when a
+  publish reaches the production branch and the host rebuilds.
 
   **Hook.** `createGraftMcp`, `createGraftMcpHandler`, `createStudioApiHandler`
   and `createStudioHandler` take `onContentChange(event)`. An app that mounts the
