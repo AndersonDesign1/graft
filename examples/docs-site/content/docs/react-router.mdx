@@ -208,7 +208,9 @@ export default [
 
 On the static engine, content changes ship with a new deploy, so there is
 nothing to refresh. On Postgres, content can change while your app is running,
-from Studio or from an agent. React Router has no tag-based data cache, so let your
+from a local Studio or from an agent. A server that writes to GitHub
+([Host Studio for your team](/docs/studio-hosting)) is different: saves are
+drafts, and publishing is a commit your host rebuilds from like any deploy. React Router has no tag-based data cache, so let your
 CDN cache pages and purge only the ones whose content changed.
 
 First, send each page with a header that lists the content it read. `tagsFor`
@@ -247,7 +249,8 @@ app's runtime environment, such as your host's environment variables.
 Otherwise the route answers 401 and nothing refreshes.
 
 Graft now calls the route after every write that changes content: an agent's
-`write_content` or `delete_content`, a Studio save, compile or revert, and
+`write_content` or `delete_content`, a local Studio save, create, delete,
+discard, compile or revert, and
 `graft merge --apply` or `graft migrate --apply`. If the route fails, the write
 still succeeds, and the server logs a `REVALIDATE_FAILED` error with the body to
 resend. Recompiling does not resend it: a new compile reports those documents

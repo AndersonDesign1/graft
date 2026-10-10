@@ -149,5 +149,16 @@ into your project as code you own. See [Owned primitives](/docs/owned-primitives
 **Barrel.** `graft/index.ts`, a file that re-exports everything in `graft/`, so
 your config picks up added primitives automatically.
 
-**Studio.** The optional editing UI. Everything it does is also available on
-the CLI and over MCP. See [Studio](/docs/studio).
+**Studio.** The optional editing UI, built for people who do not use Git. Run
+it on your machine with `graft studio`, or host it for a team with
+`graft serve --studio`. Every content change it makes is also available from
+Git, the CLI or MCP. See [Studio](/docs/studio).
+
+**Draft.** Saved changes that are not live yet. In a local Studio they are the
+edited files. On a server that writes to GitHub, each editor and each agent
+connection drafts on its own branch, `graft-studio/drafts/<editor>`.
+
+**Publish.** Making drafts live. Locally it is a commit. On GitHub it is one
+commit on the production branch, or a pull request when the person or token
+lacks `studio:publish` (`content:publish` for agents). See
+[Host Studio for your team](/docs/studio-hosting).
