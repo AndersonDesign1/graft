@@ -158,7 +158,9 @@ Git, the CLI or MCP. See [Studio](/docs/studio).
 edited files. On a server that writes to GitHub, each editor and each agent
 connection drafts on its own branch, `graft-studio/drafts/<editor>`.
 
-**Publish.** Making drafts live. Locally it is a commit. On GitHub it is one
-commit on the production branch, or a pull request when the person or token
-lacks `studio:publish` (`content:publish` for agents). See
+**Publish.** Making drafts live. In a local Studio it is a commit in your
+checkout, which you push yourself. On GitHub it is one commit on the
+production branch, or a pull request when `GRAFT_STUDIO_PUBLISH` is
+`pull-request` or the person or token lacks `studio:publish`
+(`content:publish` for agents). See
 [Host Studio for your team](/docs/studio-hosting).
