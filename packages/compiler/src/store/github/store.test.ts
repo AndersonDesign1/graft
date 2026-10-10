@@ -125,7 +125,7 @@ describe("GitHubStore: drafts", () => {
     expect(draft["content/products/hat.mdx"]).toBe(`${hat}tab two\n`);
   });
 
-  it("discards back to the published version and removes an empty draft", async () => {
+  it("discards back to the published version and empties the draft", async () => {
     const { fake, store } = setup();
     await store.write("products/shirt.mdx", `${shirt}x\n`, { actor: ana });
     await store.write("products/hat.mdx", `${hat}x\n`, { actor: ana });
@@ -134,7 +134,48 @@ describe("GitHubStore: drafts", () => {
     expect((await store.read("products/shirt.mdx", ana))?.raw).toBe(shirt);
     await store.drafts.discard(ana, ["products/hat.mdx"]);
     expect(await store.drafts.changes(ana)).toEqual([]);
-    expect(fake.branches()).toEqual(["main"]);
+    // Emptied, not deleted: a delete cannot be made conditional on GitHub.
+    expect(fake.files("graft-studio/drafts/ana")).toEqual(fake.files());
+  });
+
+  it("never loses a save that lands while the draft is being emptied", async () => {
+    // Emptying used to read the head, then delete the branch. A save that
+    // landed between the two was deleted with it, after reporting success.
+    const fake = createGitHubFake({
+      repo: "acme/shop",
+      files: { "content/products/shirt.mdx": shirt, "content/products/hat.mdx": hat },
+    });
+    const options = { repo: "acme/shop", auth: tokenAuth(fake.token), apiUrl: fake.apiUrl };
+    const otherTab = new GitHubStore({ ...options, fetch: fake.fetch });
+    let armed = false;
+    const store = new GitHubStore({
+      ...options,
+      fetch: async (input, init) => {
+        const method = init?.method ?? "GET";
+        const url = input instanceof Request ? input.url : String(input);
+        if (armed && (method === "PATCH" || method === "DELETE") && url.includes("drafts")) {
+          armed = false;
+          await otherTab.write(
+            "products/shirt.mdx",
+            `${shirt}late
+`,
+            { actor: ana },
+          );
+        }
+        return fake.fetch(input, init);
+      },
+    });
+    await store.write(
+      "products/hat.mdx",
+      `${hat}x
+`,
+      { actor: ana },
+    );
+    armed = true;
+    await store.drafts.discard(ana, ["products/hat.mdx"]);
+    expect((await store.drafts.changes(ana)).map((c) => c.path)).toEqual(["products/shirt.mdx"]);
+    expect((await store.read("products/shirt.mdx", ana))?.raw).toBe(`${shirt}late
+`);
   });
 
   it("rejects paths that leave the content directory", () => {
@@ -146,10 +187,20 @@ describe("GitHubStore: drafts", () => {
   it("gives every actor its own branch key", () => {
     expect(actorKey({ id: "ana" })).toBe("ana");
     expect(actorKey({ id: "writer-bot" })).toBe("writer-bot");
-    expect(actorKey({ id: "Ana.Lima@Shop.test" })).toMatch(/^ana-lima-shop-test-[0-9a-f]{10}$/);
+    expect(actorKey({ id: "Ana.Lima@Shop.test" })).toMatch(/^ana-lima-shop-test--[0-9a-f]{10}$/);
     expect(actorKey({ id: "a+b@x.com" })).not.toBe(actorKey({ id: "a-b@x.com" }));
-    expect(actorKey({ id: "x".repeat(200) })).toMatch(/^x{37}-[0-9a-f]{10}$/);
-    expect(actorKey({ id: "@@@" })).toMatch(/^editor-[0-9a-f]{10}$/);
+    expect(actorKey({ id: "x".repeat(200) })).toMatch(/^x{36}--[0-9a-f]{10}$/);
+    expect(actorKey({ id: "@@@" })).toMatch(/^editor--[0-9a-f]{10}$/);
+  });
+
+  it("keeps clean keys and hashed keys apart", () => {
+    // A login is used as is. Before, one shaped like a hashed key equalled an
+    // invite email's key, and both people wrote to one draft branch.
+    const email = actorKey({ id: "Ana.Lima@Shop.test" });
+    const lookalike = email.replace("--", "-");
+    expect(actorKey({ id: lookalike })).toBe(lookalike);
+    expect(actorKey({ id: lookalike })).not.toBe(email);
+    expect(actorKey({ id: "editor-0123456789" })).not.toBe(actorKey({ id: "@@@" }));
   });
 
   it("trims configured paths and URLs in linear time", () => {
@@ -194,12 +245,13 @@ describe("GitHubStore: publishing", () => {
     expect((await store.drafts.changes(ana)).map((c) => c.path)).toEqual(["products/hat.mdx"]);
   });
 
-  it("deletes the draft branch once everything is published", async () => {
+  it("empties the draft once everything is published", async () => {
     const { fake, store } = setup();
     await store.write("products/sock.mdx", "---\ntitle: Sock\n---\n", { actor: ana });
     await store.write("products/hat.mdx", null, { actor: ana });
     await store.drafts.publish({ actor: ana, paths: ["products/sock.mdx", "products/hat.mdx"] });
-    expect(fake.branches()).toEqual(["main"]);
+    expect(await store.drafts.changes(ana)).toEqual([]);
+    expect(fake.files("graft-studio/drafts/ana")).toEqual(fake.files());
     expect(Object.keys(fake.files()).sort()).toEqual([
       "README.md",
       "content/products/shirt.mdx",

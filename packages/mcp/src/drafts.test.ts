@@ -181,7 +181,8 @@ describe("MCP writes through a GitHub store", () => {
     await call("write_content", { collection: "pages", slug: "about", data: { title: "About" } });
     await call("discard_drafts", { paths: ["pages/about.mdx"] });
     expect((await call("list_drafts")).payload.changes).toEqual([]);
-    expect(fake.branches()).toEqual(["main"]);
+    const draft = fake.branches().find((branch) => branch.startsWith("graft-studio/drafts/"));
+    expect(draft && fake.files(draft)).toEqual(fake.files());
   });
 
   it("refuses draft tools without content:write", async () => {

@@ -214,19 +214,6 @@ export class GitHubClient {
     }
   }
 
-  async deleteRef(branch: string): Promise<void> {
-    try {
-      await this.request(
-        "DELETE",
-        this.repoPath(`/git/refs/heads/${encodeRef(branch)}`),
-        undefined,
-        [404, 422],
-      );
-    } catch (error) {
-      if (!(error instanceof GitHubStatus)) throw error;
-    }
-  }
-
   getCommit(sha: string): Promise<GitCommit> {
     return this.request("GET", this.repoPath(`/git/commits/${sha}`));
   }

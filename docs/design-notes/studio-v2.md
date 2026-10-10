@@ -377,8 +377,10 @@ Each is code, tests and one conventional commit, shippable on its own.
   is refused, an invite link sets a session, a save is a commit on
   `graft-studio/drafts/<editor>` authored by the editor, the deployed files
   and production are untouched, a stale save gets 409 `CONTENT_CONFLICT`,
-  publish lands one commit on main by the editor, the empty draft branch is
-  deleted, and the list shows the published price before any redeploy.
+  publish lands one commit on main by the editor, the draft branch holds no
+  changes afterwards (it is emptied by a fast-forward, not deleted, because a
+  delete cannot be made conditional), and the list shows the published price
+  before any redeploy.
 - **In a browser.** Hosted as a contributor: sign-in screen, "Submit for
   review", the publish sheet's field diff ("Name: Clay Cashmere Beanie →
   Clay Cashmere Watch Cap"), and the done state linking the pull request.

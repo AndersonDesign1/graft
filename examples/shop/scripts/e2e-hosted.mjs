@@ -228,7 +228,10 @@ try {
     github.files()[`content/${productPath}`].includes(`price: ${newPrice}`),
     "main has the new price",
   );
-  check(!github.branches().includes(draftBranch), "the empty draft branch is gone");
+  check(
+    JSON.stringify(github.files(draftBranch)) === JSON.stringify(github.files()),
+    "the draft branch holds no changes",
+  );
   const after = await api(
     `/entries?collection=products&q=${encodeURIComponent(entry.body.data.title)}`,
   );
