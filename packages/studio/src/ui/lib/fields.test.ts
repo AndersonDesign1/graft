@@ -120,6 +120,14 @@ describe("validation in words", () => {
     });
     expect(problemsIn([code], { code: "ABC" }).get("code")).toBeUndefined();
     expect(problemsIn([code], { code: "AB1" }).get("code")).toBeDefined();
+    // Sticky anchors at the start, as on the server.
+    const sticky = f({
+      name: "slug",
+      type: "string",
+      constraints: { pattern: "foo", patternFlags: "y" },
+    });
+    expect(problemsIn([sticky], { slug: "foo-bar" }).get("slug")).toBeUndefined();
+    expect(problemsIn([sticky], { slug: "xfoo" }).get("slug")).toBeDefined();
   });
 
   it("passes a valid entry", () => {

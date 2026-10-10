@@ -305,6 +305,23 @@ describe("Sign in with GitHub", () => {
     quiet.mockRestore();
   });
 
+  it("keeps the return path when GitHub cannot be reached", async () => {
+    // The fetch throws, so the error leaves githubCallback; the outer catch
+    // used to send the person to Studio's front page.
+    const unreachable = (async () => {
+      throw new TypeError("fetch failed");
+    }) as typeof fetch;
+    const handler = createStudioHandler({
+      ...base,
+      uiBasePath: "/studio",
+      editors: { secret, github: { clientId: "id", clientSecret: "cs", fetch: unreachable } },
+    });
+    const response = await flow(handler, "/studio/?branch=preview#/collections/products");
+    expect(response.headers.get("location")).toBe(
+      "/studio/?branch=preview&signin=github_refused#/collections/products",
+    );
+  });
+
   it("never redirects off-site after sign-in", async () => {
     const { stub } = githubStub({ login: "octocat" });
     const handler = createStudioHandler({

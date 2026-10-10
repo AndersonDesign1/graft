@@ -276,6 +276,17 @@ describe("writeDocumentFile", () => {
     },
   );
 
+  it("deletes a file that is already gone without failing", () => {
+    // Removed between the caller's existence check and the unlink: the
+    // delete's goal is met, so a raw ENOENT is the wrong answer.
+    const dir = mkdtempSync(join(tmpdir(), "graft-rm-gone-"));
+    try {
+      expect(() => removeDocumentFile(dir, "missing.mdx")).not.toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("lets an unrelated filesystem error through untranslated", () => {
     stub.errno = "ENOSPC";
     expect(() => writeDocumentFile(tmpdir(), "graft-full/p.mdx", "x")).toThrow(/ENOSPC/);

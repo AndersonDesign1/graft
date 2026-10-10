@@ -522,7 +522,7 @@ The error's `details.available` lists every item you can add. Run `graft add <na
 
 ### REMOTE_STORE_FAILED
 
-The content store that writes to a remote repository (GitHub) refused or failed a request. When GitHub refused (`details.status` is set), nothing was written. When the request failed before an answer arrived (a network error), GitHub may still have applied it, so a save or a publish can have landed. Check the draft or production branch before retrying.
+The content store that writes to a remote repository (GitHub) refused or failed a request. When GitHub refused (`details.status` is set), that request was not applied, but an operation made of several requests may have finished earlier steps: a publish can move the production branch and then be refused while tidying the draft. When a request failed before an answer arrived (a network error), GitHub may still have applied it. Either way, check the draft and the production branch before retrying.
 
 **Usually because**
 

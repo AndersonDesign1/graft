@@ -222,6 +222,18 @@ describe("editor metadata", () => {
     });
   });
 
+  it("validates a g or y pattern the same on every parse", () => {
+    // Zod resets lastIndex before each test, so a flagged pattern is not
+    // stateful: `g` is inert and `y` anchors at index 0, which is what a
+    // fresh `new RegExp(pattern, patternFlags)` in Studio does too.
+    const global = field.string({ pattern: /foo/g });
+    expect([1, 2, 3].map(() => global.zod.safeParse("foo").success)).toEqual([true, true, true]);
+    const sticky = field.string({ pattern: /foo/y });
+    expect(sticky.zod.safeParse("foo-bar").success).toBe(true);
+    expect(sticky.zod.safeParse("xfoo").success).toBe(false);
+    expect(toFieldDescriptor("s", sticky).constraints).toMatchObject({ patternFlags: "y" });
+  });
+
   it("advertises only the constraints the field type enforces", () => {
     // field.string ignores min and max, so describing them promised a rule
     // nothing checks.

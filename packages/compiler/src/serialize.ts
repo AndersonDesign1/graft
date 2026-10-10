@@ -60,6 +60,8 @@ export function removeDocumentFile(root: string, sourcePath: string): void {
   try {
     unlinkSync(fullPath);
   } catch (error) {
+    // Already gone, which is what a delete asks for.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
     throw readOnlyError(error, "delete", fullPath) ?? error;
   }
 }

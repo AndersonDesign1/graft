@@ -9,7 +9,7 @@
  *
  * `resolveContained` therefore checks the bytes AND the filesystem.
  */
-import { lstatSync } from "node:fs";
+import { lstatSync, type Stats } from "node:fs";
 import { isAbsolute, normalize, resolve, sep } from "node:path";
 import { GraftError } from "@usegraft/contracts";
 
@@ -40,6 +40,19 @@ function refuse(label: string, path: string, why: string, fix: string): never {
     fix,
     details: { path },
   });
+}
+
+/**
+ * lstat, or undefined when the path does not exist. ENOTDIR (an ancestor is a
+ * regular file) is "does not exist" too: `throwIfNoEntry` covers ENOENT only.
+ */
+function lstatOrAbsent(path: string): Stats | undefined {
+  try {
+    return lstatSync(path, { throwIfNoEntry: false });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOTDIR") return undefined;
+    throw error;
+  }
 }
 
 /**
@@ -83,7 +96,11 @@ export function resolveContained(root: string, path: string, options: ContainOpt
       cursor = resolve(cursor, segment);
       // lstat, never existsSync: existsSync follows the link, so a dangling
       // symlink reads as absent and a write would then create its target.
-      if (lstatSync(cursor, { throwIfNoEntry: false })?.isSymbolicLink() === true) {
+      const stat = lstatOrAbsent(cursor);
+      // Nothing below a missing path or a regular file can exist, so no link
+      // can either: stop, and let the caller see an absent file.
+      if (stat === undefined) break;
+      if (stat.isSymbolicLink()) {
         refuse(
           label,
           path,

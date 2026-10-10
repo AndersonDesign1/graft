@@ -123,14 +123,19 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     return raw;
   }
 
-  async function githubCallback(request: Request, url: URL): Promise<Response> {
-    const github = options.github;
-    if (!github) return failed(request, "github_off");
-    const pending = verify<{ state: string; return: string }>(
+  /** The signed OAuth state cookie set when sign-in started, if it is valid. */
+  function pendingSignIn(request: Request): { state: string; return: string } | null {
+    return verify<{ state: string; return: string }>(
       options.secret,
       "oauth",
       readCookie(request, OAUTH_COOKIE),
     );
+  }
+
+  async function githubCallback(request: Request, url: URL): Promise<Response> {
+    const github = options.github;
+    if (!github) return failed(request, "github_off");
+    const pending = pendingSignIn(request);
     const state = url.searchParams.get("state");
     const code = url.searchParams.get("code");
     if (!pending || !state || pending.state !== state || !code) {
@@ -280,7 +285,9 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
           try {
             return await githubCallback(request, url);
           } catch {
-            return failed(request, "github_refused");
+            // A network failure talking to GitHub: still go back where the
+            // person started, if the sign-in got far enough to record it.
+            return failed(request, "github_refused", pendingSignIn(request)?.return);
           }
 
         case "GET /link": {

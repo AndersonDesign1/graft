@@ -62,11 +62,18 @@ describe("lineDiff", () => {
     // step, two 10,000-line files with nothing in common needed gigabytes.
     const before = Array.from({ length: 10_000 }, (_, i) => `old ${i}`).join("\n");
     const after = Array.from({ length: 10_000 }, (_, i) => `new ${i}`).join("\n");
-    const heapBefore = process.memoryUsage().heapUsed;
+    // Typed-array storage lives outside the JS heap, so count both.
+    const used = () => {
+      const { heapUsed, arrayBuffers } = process.memoryUsage();
+      return heapUsed + arrayBuffers;
+    };
+    const memoryBefore = used();
     const started = performance.now();
     const diff = lineDiff("x", before, after);
     expect(diff).toMatchObject({ added: 10_000, removed: 10_000, truncated: true });
-    expect(process.memoryUsage().heapUsed - heapBefore).toBeLessThan(200 * 1024 * 1024);
+    expect(used() - memoryBefore).toBeLessThan(200 * 1024 * 1024);
+    // The dependable guard: the old trace copied 40,003 entries per edit for
+    // 20,000 edits, which takes far longer than this before memory runs out.
     expect(performance.now() - started).toBeLessThan(5000);
   });
 

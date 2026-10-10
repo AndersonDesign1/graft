@@ -159,6 +159,16 @@ describe("createRevalidateWebhook", () => {
     expect(error.message).not.toContain("t0k3n");
   });
 
+  it("keeps the URL's token out of an error page that echoes the request", async () => {
+    // Framework and CDN error pages often print the URL they were asked for.
+    const url = "https://example.com/r?token=t0k3n";
+    const { fn } = fakeFetch(new Response(`Not found: ${url}`, { status: 404 }));
+    const hook = createRevalidateWebhook({ url, secret: "x", fetch: fn });
+    const error = (await Promise.resolve(hook(event)).catch((e: unknown) => e)) as GraftError;
+    expect(error.message).toContain("Not found: https://example.com/r");
+    expect(error.message).not.toContain("t0k3n");
+  });
+
   it("refuses a URL with a username or password, without repeating them", () => {
     // fetch would refuse it on every send, quoting the credentials each time.
     const error = (() => {

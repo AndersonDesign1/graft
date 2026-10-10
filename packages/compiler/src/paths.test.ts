@@ -79,6 +79,15 @@ describe("resolveContained", () => {
     expect(() => resolveContained(root, "docs/dangling.mdx")).toThrowError(/symbolic link/);
   });
 
+  it("treats a path under a regular file as absent, not as an error", () => {
+    // lstat throws ENOTDIR here, which `throwIfNoEntry` does not cover. Thrown
+    // raw, a read of "docs/page.mdx/x" failed instead of finding nothing.
+    writeFileSync(join(root, "docs", "page.mdx"), "x");
+    expect(resolveContained(root, "docs/page.mdx/child.mdx")).toBe(
+      join(root, "docs", "page.mdx", "child.mdx"),
+    );
+  });
+
   it.skipIf(!canSymlink)("follows symlinks only when explicitly allowed", () => {
     symlinkSync(join(outside, "secret.txt"), join(root, "docs", "ok.mdx"));
     expect(() => resolveContained(root, "docs/ok.mdx", { allowSymlinks: true })).not.toThrow();

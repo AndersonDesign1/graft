@@ -5,13 +5,10 @@
 import { execFile } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { userInfo } from "node:os";
-import { revalidateWebhookFromEnv } from "@usegraft/compiler";
+import { isLoopbackHost, revalidateWebhookFromEnv } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { allowedHostsFor, createNodeListener } from "./serve";
-
-/** Hosts where plain http is acceptable: nothing leaves the machine. */
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 export interface StudioCommandOptions {
   cwd: string;
@@ -277,7 +274,7 @@ export async function studioInviteCommand(
   }
   // The link carries a sign-in token, and the session cookie is Secure off
   // loopback, so plain http would leak the token and still fail to sign in.
-  if (parsed.protocol === "http:" && !LOOPBACK_HOSTS.has(parsed.hostname)) {
+  if (parsed.protocol === "http:" && !isLoopbackHost(parsed.hostname)) {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
       message: `"${baseUrl}" uses plain http, which would send the sign-in token unencrypted.`,

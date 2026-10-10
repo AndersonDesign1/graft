@@ -76,8 +76,12 @@ function myers(a: string[], b: string[]): Op[] | null {
   const n = a.length;
   const m = b.length;
   const max = n + m;
-  const offset = max + 1;
-  const v = new Int32Array(2 * max + 3);
+  // Every read is within offset ± (d + 1), and d never passes MAX_EDITS, so
+  // the frontier needs the band, not the whole input: a 1M-line rewrite would
+  // otherwise allocate 8 MB before giving up.
+  const band = Math.min(max, MAX_EDITS);
+  const offset = band + 1;
+  const v = new Int32Array(2 * band + 3);
   const trace: Int32Array[] = [];
   outer: for (let d = 0; d <= max; d += 1) {
     if (d > MAX_EDITS) return null;

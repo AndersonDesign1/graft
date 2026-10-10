@@ -313,9 +313,10 @@ export function problemsIn(
 
 function safeTest(pattern: string, flags: string | undefined, value: string): boolean {
   try {
-    // The validator's flags, minus the stateful ones: `g` and `y` make test()
-    // depend on the previous call through lastIndex.
-    return new RegExp(pattern, (flags ?? "").replace(/[gy]/g, "")).test(value);
+    // Every flag the validator has. A fresh RegExp starts at lastIndex 0,
+    // which is what Zod resets to before each test, so `g` changes nothing
+    // and `y` anchors at the start, the same on both sides.
+    return new RegExp(pattern, flags ?? "").test(value);
   } catch {
     return true;
   }

@@ -96,7 +96,18 @@ export interface RevalidateWebhookOptions {
   fetch?: typeof fetch;
 }
 
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+/**
+ * Hostnames where plain http never leaves the machine. One list for every
+ * "https unless loopback" decision: the revalidate webhook, Studio's Secure
+ * cookie, and `graft studio invite`. If they drifted, the CLI could hand out
+ * an http link for a host where the cookie is Secure and sign-in fails.
+ */
+export const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/** Whether `hostname` (as `URL.hostname` spells it, IPv6 in brackets) is loopback. */
+export function isLoopbackHost(hostname: string): boolean {
+  return LOOPBACK_HOSTS.has(hostname);
+}
 
 /**
  * A listener that POSTs `{ branch, gitSha, changes }` to the app's revalidate
@@ -121,6 +132,14 @@ export function createRevalidateWebhook(options: RevalidateWebhookOptions): Cont
   // What errors name. A URL can carry a token in its query or userinfo, and
   // errors reach logs, agents and Studio toasts, so they get origin + path only.
   const where = `${url.origin}${url.pathname}`;
+  // Anything quoted back to us (a fetch error, the route's error page) can
+  // repeat the URL, query included. Swap the full URL for `where`, then drop
+  // any leftover copy of the query string.
+  const redact = (text: string): string => {
+    let out = text.split(url.href).join(where).split(options.url).join(where);
+    if (url.search) out = out.split(url.search).join("");
+    return out;
+  };
 
   return async (event) => {
     let response: Response;
@@ -141,10 +160,7 @@ export function createRevalidateWebhook(options: RevalidateWebhookOptions): Cont
         redirect: "error",
       });
     } catch (error) {
-      // fetch errors can quote the whole URL, query token included.
-      const reason = (error instanceof Error ? error.message : String(error))
-        .split(url.href)
-        .join(where);
+      const reason = redact(error instanceof Error ? error.message : String(error));
       throw new GraftError({
         code: "REVALIDATE_FAILED",
         message: `The content was written, but the revalidate request to ${url.origin} failed: ${reason}`,
@@ -153,7 +169,7 @@ export function createRevalidateWebhook(options: RevalidateWebhookOptions): Cont
       });
     }
     if (!response.ok) {
-      const detail = await readStart(response, 300);
+      const detail = redact(await readStart(response, 300));
       throw new GraftError({
         code: "REVALIDATE_FAILED",
         message: `The content was written, but the app's revalidate route answered ${response.status}.${detail ? ` ${detail}` : ""}`,
@@ -213,7 +229,7 @@ function parseWebhookUrl(raw: string): URL {
       details: { variable: "GRAFT_REVALIDATE_URL" },
     });
   }
-  const loopback = LOOPBACK_HOSTS.has(url.hostname);
+  const loopback = isLoopbackHost(url.hostname);
   if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
