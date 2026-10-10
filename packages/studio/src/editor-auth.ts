@@ -102,9 +102,17 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     ]);
   }
 
-  /** Back to the UI with a reason it can put into words. */
-  function failed(request: Request, reason: string): Response {
-    return redirect(`${ui}?signin=${encodeURIComponent(reason)}`, [
+  /**
+   * Back to the UI with a reason it can put into words, at the page the person
+   * started from (its branch and hash kept) when the attempt got that far.
+   */
+  function failed(request: Request, reason: string, returnTo?: string): Response {
+    const target = safeReturn(returnTo ?? null);
+    const hashAt = target.indexOf("#");
+    const path = hashAt === -1 ? target : target.slice(0, hashAt);
+    const hash = hashAt === -1 ? "" : target.slice(hashAt);
+    const joiner = path.includes("?") ? "&" : "?";
+    return redirect(`${path}${joiner}signin=${encodeURIComponent(reason)}${hash}`, [
       cookieHeader(request, OAUTH_COOKIE, "", 0),
     ]);
   }
@@ -126,8 +134,9 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     const state = url.searchParams.get("state");
     const code = url.searchParams.get("code");
     if (!pending || !state || pending.state !== state || !code) {
-      return failed(request, "expired");
+      return failed(request, "expired", pending?.return);
     }
+    const back = pending.return;
 
     const doFetch = github.fetch ?? fetch;
     const webUrl = withoutTrailingSlashes(github.webUrl ?? "https://github.com");
@@ -145,7 +154,7 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     });
     const token = ((await exchange.json().catch(() => ({}))) as { access_token?: string })
       .access_token;
-    if (!exchange.ok || !token) return failed(request, "github_refused");
+    if (!exchange.ok || !token) return failed(request, "github_refused", back);
 
     const headers = {
       accept: "application/vnd.github+json",
@@ -157,7 +166,7 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
       name?: string | null;
       email?: string | null;
     };
-    if (!user.login) return failed(request, "github_refused");
+    if (!user.login) return failed(request, "github_refused", back);
     let email = user.email ?? undefined;
     if (!email) {
       const emails = (await (
@@ -180,9 +189,9 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
         `graft studio: could not check ${user.login}'s access:`,
         error instanceof Error ? error.message : error,
       );
-      return failed(request, "access_unchecked");
+      return failed(request, "access_unchecked", back);
     }
-    if (!role) return failed(request, "not_allowed");
+    if (!role) return failed(request, "not_allowed", back);
     return signedIn(
       request,
       {

@@ -99,7 +99,10 @@ export interface WorkspaceDto {
     email: string | null;
     scopes: readonly string[];
   } | null;
-  /** Sign-in is configured, so a Sign out control makes sense. */
+  /**
+   * Whether this request carried a Studio session cookie, so a Sign out
+   * control makes sense. It does not say whether sign-in is configured.
+   */
   sessions: boolean;
 }
 
