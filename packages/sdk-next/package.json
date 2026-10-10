@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/sdk-next",
-  "version": "1.0.0-beta.4",
+  "version": "1.0.0-beta.5",
   "description": "Next.js App Router adapter: typed content reads in Server Components, cache-tag invalidation, and real MDX rendering.",
   "keywords": [
     "agent",

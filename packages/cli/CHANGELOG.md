@@ -1,5 +1,38 @@
 # @usegraft/cli
 
+## 1.0.0-beta.5
+
+### Minor Changes
+
+- ab7cca3: MCP writes through the content store. On a `graft serve` that writes to GitHub (`GRAFT_GITHUB_REPO` set), `write_content` and `delete_content` commit to the connection's own draft branch instead of the read-only files, and three tools appear: `list_drafts`, `publish_drafts` (a pull request, or a commit to the production branch with the new `content:publish` scope) and `discard_drafts`. Agents and Studio editors share one draft model.
+- ab7cca3: Studio has an editor API on top of the content store. `GET /api/studio/v1/entries` returns a page of a collection searched, filtered, sorted and faceted on the server, from a listing that re-parses only files whose size or mtime changed, so a catalog of thousands stays fast. `GET/PUT/POST/DELETE /api/studio/v1/entry` and `POST /api/studio/v1/entry/duplicate` read, save, create (slug from the title), delete and copy entries; a save that sends the version it read as `baseVersion` is refused with `CONTENT_CONFLICT` when that version is stale (a save without one is unconditional). `/api/studio/v1/drafts`, `/drafts/diff`, `/drafts/publish` and `/drafts/discard` list unpublished changes, diff them, publish them and throw them away: a commit locally, a commit on the production branch or a pull request on GitHub. `GET /api/studio/v1/workspace` says where saves land and what Publish does for the caller. `graft serve --studio` writes through GitHub when `GRAFT_GITHUB_REPO` is set along with a credential (`GRAFT_GITHUB_TOKEN`, or a GitHub App). Locally, every save, create, delete and discard compiles and then calls `onContentChange`, so the app refreshes the way it does for the old routes; a failed refresh comes back as `refresh: { ok: false }` and Studio warns.
+- ab7cca3: A hosted Studio now has sign-in. Set `GRAFT_STUDIO_SECRET` and people sign in with GitHub (`GRAFT_GITHUB_CLIENT_ID` and `GRAFT_GITHUB_CLIENT_SECRET`) or with an invite link from `graft studio invite <email> --role editor`, into a signed, HTTP-only session cookie. `GRAFT_STUDIO_EDITORS` lists who may sign in and with which role; without it, anyone with write access to the content repository can. Roles map to scopes: `viewer`, `contributor` (drafts, publishing opens a pull request), `editor` (adds the new `studio:publish` scope) and `admin` (adds `approvals:decide`). Bearer tokens keep working beside sessions.
+
+### Patch Changes
+
+- ab7cca3: `graft serve` passes every `Set-Cookie` header through. Its Node adapter copied response headers one value per name, so a response setting two cookies arrived with one, and a hosted Studio's sign-in lost the session cookie.
+- Updated dependencies [ab7cca3]
+- Updated dependencies [ab7cca3]
+- Updated dependencies [ab7cca3]
+- Updated dependencies [ab7cca3]
+- Updated dependencies [ab7cca3]
+- Updated dependencies [ab7cca3]
+- Updated dependencies [3b396c0]
+- Updated dependencies [ab7cca3]
+- Updated dependencies [ab7cca3]
+  - @usegraft/compiler@1.0.0-beta.5
+  - @usegraft/contracts@1.0.0-beta.5
+  - @usegraft/mcp@1.0.0-beta.5
+  - @usegraft/core@1.0.0-beta.5
+  - @usegraft/studio@1.0.0-beta.5
+  - @usegraft/auth@1.0.0-beta.5
+  - @usegraft/content-api@1.0.0-beta.5
+  - @usegraft/content-migrations@1.0.0-beta.5
+  - @usegraft/db@1.0.0-beta.5
+  - @usegraft/mdx-safety@1.0.0-beta.5
+  - @usegraft/registry@1.0.0-beta.5
+  - @usegraft/assets@1.0.0-beta.5
+
 ## 1.0.0-beta.4
 
 ### Minor Changes
