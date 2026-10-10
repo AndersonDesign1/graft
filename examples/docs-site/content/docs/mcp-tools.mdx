@@ -57,6 +57,9 @@ without another call.
 | `write_content` | `content:write` | Validates, writes `<contentDir>/<collection>/<slug>.mdx`, compiles |
 | `delete_content` | `content:write` | Destructive and human-gated |
 | `put_asset` | `content:write` | Uploads a binary for `field.asset` |
+| `list_drafts` | none | Hosted on GitHub only. This connection's unpublished changes |
+| `publish_drafts` | `content:write` | Hosted on GitHub only. A pull request, or a commit with `content:publish` |
+| `discard_drafts` | `content:write` | Hosted on GitHub only. Throws unpublished changes away |
 
 ### write_content
 
@@ -87,6 +90,24 @@ request for a file that was never there.
 On a server that opted into elicited approvals, and a client that supports
 elicitation, the confirmation happens in-band and the call completes in one
 step. The gate is the same either way.
+
+### Drafts on a hosted server
+
+When `graft serve` writes through GitHub (`GRAFT_GITHUB_REPO` is set, see
+[Studio hosting](/docs/studio-hosting)), a deployment's files are read-only and
+nothing is written to them. `write_content` and `delete_content` then commit to
+a draft branch of the connection's own, `graft-studio/drafts/<identity>`, and
+return `gitSha: null`, because nothing was compiled: a draft must not reach the
+live site's index.
+
+`list_drafts` shows those changes, and `publish_drafts` puts them live. It opens
+a pull request unless the credential carries `content:publish` and the server
+publishes directly (`GRAFT_STUDIO_PUBLISH=commit`, the default), in which case
+it commits to the production branch and the host redeploys. A document the
+production branch also changed since the draft began is refused with
+`CONTENT_CONFLICT`; send `resolve: { "<path>": "mine" }` or `"theirs"` to
+decide. This is the same draft model a Studio editor uses, so an agent and a
+person never take different routes to the live site.
 
 ### put_asset
 
@@ -163,8 +184,8 @@ without parsing prose.
 | Annotation set | Tools |
 | --- | --- |
 | Read-only | The four discovery tools, the three content reads, `list_branches`, `list_compilations`, `list_approvals`, `list_packages`, `list_registry`, `describe_item`, `explain_error` |
-| Write, not destructive | `write_content` |
-| Destructive | `delete_content`, `put_asset`, `decide_approval`, `run_function` |
+| Write, not destructive | `write_content`, `publish_drafts` |
+| Destructive | `delete_content`, `discard_drafts`, `put_asset`, `decide_approval`, `run_function` |
 
 `write_content` is marked non-destructive, because Git can undo a content
 change once the earlier version is committed. Uncommitted edits it overwrites,
@@ -187,7 +208,7 @@ service, so it sets `openWorldHint: true`.
 
 ## Output schemas
 
-Sixteen of the eighteen declare an `outputSchema`. The SDK validates every
+Every tool except two declares an `outputSchema`. The SDK validates every
 result against it before the answer leaves the server, so a tool that quietly
 changes shape fails there rather than inside whatever the agent did next.
 Results also carry `structuredContent` alongside the text block.
@@ -199,11 +220,11 @@ describe them.
 
 ## Scopes
 
-Three tools check a scope at the MCP layer.
+These tools check a scope at the MCP layer. `publish_drafts` also reads `content:publish` to decide between a pull request and a commit.
 
 | Scope | Tools |
 | --- | --- |
-| `content:write` | `write_content`, `delete_content`, `put_asset` |
+| `content:write` | `write_content`, `delete_content`, `put_asset`, `publish_drafts`, `discard_drafts` |
 | `approvals:decide` | `decide_approval` |
 
 Everything else is ungated at this layer, and `run_function` defers to the

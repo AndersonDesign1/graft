@@ -14,7 +14,8 @@ export interface Resource<T> {
  * refresh so a poll or a post-mutation refetch doesn't blank the pane the
  * operator is reading.
  */
-export function useResource<T>(path: string, deps: unknown[] = []): Resource<T> {
+/** `path: null` skips the request, for a resource only some views need. */
+export function useResource<T>(path: string | null, deps: unknown[] = []): Resource<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,6 +24,10 @@ export function useResource<T>(path: string, deps: unknown[] = []): Resource<T> 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
+    if (path === null) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setError(null);

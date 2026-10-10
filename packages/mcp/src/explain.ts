@@ -232,6 +232,31 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       'The error\'s `details.stderr` carries git\'s own words. For an unset identity, run `git config user.name "…"` and `git config user.email "…"`. Selected files may already be staged; `git status` shows the current state, and committing from a terminal always remains available.',
   },
+  CONTENT_CONFLICT: {
+    code: "CONTENT_CONFLICT",
+    meaning:
+      "A write or a publish was refused because the document changed underneath it: someone (a person in Studio, an agent over MCP, a developer's push) saved a newer version after this one was read. Nothing was written.",
+    typicalCauses: [
+      "Two people, or two browser tabs, editing the same document",
+      "An agent called write_content on a document a person had open in Studio",
+      "A publish where the production branch changed the same document since the draft began",
+    ],
+    howToRecover:
+      "Read the document again (`details.path`) and reapply the change on the current version. For a publish, `details.conflicts` lists each document; publish again choosing, per document, to keep the draft version or take the published one.",
+  },
+  REMOTE_STORE_FAILED: {
+    code: "REMOTE_STORE_FAILED",
+    meaning:
+      "The content store that writes to a remote repository (GitHub) refused or failed a request. A failed save did not happen. A publish may have partly completed (the production branch moved, then tidying the draft failed), so check the repository before retrying a publish.",
+    typicalCauses: [
+      "The token or GitHub App lacks Contents or Pull requests write access to the repository",
+      "GRAFT_GITHUB_REPO or GRAFT_GITHUB_BRANCH names a repository or branch that does not exist",
+      "A branch protection rule forbids direct pushes to the production branch",
+      "GitHub rate limiting or an outage",
+    ],
+    howToRecover:
+      "Read the error message and `details`. A GitHub refusal carries `details.status` and `details.message`, GitHub's own answer; a failure before GitHub answered (network, a malformed response) has the message only. A 401 or 403 is credentials or permissions; a 404 is the repository or branch name; a protected branch needs `GRAFT_STUDIO_PUBLISH=pull-request`. Retry once the cause is fixed: drafts already saved stay on their branch.",
+  },
   STATIC_INDEX_NOT_FOUND: {
     code: "STATIC_INDEX_NOT_FOUND",
     meaning:
@@ -261,6 +286,18 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     ],
     howToRecover:
       "Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 15 and 16. Or upgrade the framework.",
+  },
+  REVALIDATE_FAILED: {
+    code: "REVALIDATE_FAILED",
+    meaning:
+      "The content was written and the index is up to date, but telling the app to refresh its cache failed. The app may serve the old copy until its next refresh.",
+    typicalCauses: [
+      "GRAFT_WEBHOOK_SECRET differs from the secret the app's revalidate route checks (the route answers 401)",
+      "GRAFT_REVALIDATE_URL is unreachable from the server, redirects, or points at the wrong path",
+      "An onContentChange listener passed to an in-app mount threw",
+    ],
+    howToRecover:
+      "Do not retry the write: it succeeded. Fix the cause the error's `fix` names. Then POST the write's `{ branch, gitSha, changes }` to the revalidate route: an agent's result carries `changes`, and the server logs the whole body with the error. Do not recompile instead. The index already holds the change, so a later compile reports these documents as unchanged and refreshes none of them.",
   },
   SLUG_NOT_UNIQUE: {
     code: "SLUG_NOT_UNIQUE",

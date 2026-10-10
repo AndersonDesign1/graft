@@ -1,5 +1,82 @@
 # @usegraft/mcp
 
+## 1.0.0-beta.5
+
+### Minor Changes
+
+- ab7cca3: Add the content store: where authored content is read from and written to, behind one interface. `FilesystemStore` is today's behaviour. `GitHubStore` writes through the GitHub REST API, so a hosted surface on a read-only filesystem can save: each editor drafts on their own branch, and publishing lands one commit on the production branch authored by the editor, or opens a pull request. Every write can carry the version it was read at and is refused with the new `CONTENT_CONFLICT` code when the document changed underneath it, which covers a second tab or an agent writing under the same identity. Editors draft apart, so between two editors the guard is at publish: it refuses to overwrite a document production changed since the draft began until someone chooses to keep the draft or take the published version. Credentials are a fine-grained token (`GRAFT_GITHUB_TOKEN`) or a GitHub App (`GRAFT_GITHUB_APP_ID`, `GRAFT_GITHUB_APP_PRIVATE_KEY`); `githubStoreFromEnv` reads the configuration. GitHub failures surface as `REMOTE_STORE_FAILED`: a refusal carries GitHub's own message and status, and an unreachable GitHub says so. `@usegraft/compiler/testing` exports an in-memory GitHub for tests.
+- ab7cca3: MCP writes through the content store. On a `graft serve` that writes to GitHub (`GRAFT_GITHUB_REPO` set), `write_content` and `delete_content` commit to the connection's own draft branch instead of the read-only files, and three tools appear: `list_drafts`, `publish_drafts` (a pull request, or a commit to the production branch with the new `content:publish` scope) and `discard_drafts`. Agents and Studio editors share one draft model.
+
+### Patch Changes
+
+- Updated dependencies [ab7cca3]
+- Updated dependencies [ab7cca3]
+  - @usegraft/compiler@1.0.0-beta.5
+  - @usegraft/contracts@1.0.0-beta.5
+  - @usegraft/core@1.0.0-beta.5
+  - @usegraft/db@1.0.0-beta.5
+  - @usegraft/mdx-safety@1.0.0-beta.5
+  - @usegraft/registry@1.0.0-beta.5
+  - @usegraft/assets@1.0.0-beta.5
+
+## 1.0.0-beta.4
+
+### Minor Changes
+
+- 4831a77: Graft now tells your app when content changes, so its cache refreshes without
+  a manual call.
+
+  Before this, an agent's `write_content` or a Studio save updated the index and
+  returned the ChangeSet to the caller. The app kept serving its cached pages
+  until someone called its revalidate route by hand.
+
+  **Webhook.** Set `GRAFT_REVALIDATE_URL` and `GRAFT_WEBHOOK_SECRET` where
+  `graft serve`, `graft studio`, `graft mcp`, `graft merge` or `graft migrate`
+  runs. After each write that changes content, Graft POSTs
+  `{ branch, gitSha, changes }` with `Authorization: Bearer <secret>`, the body
+  the documented revalidate route already reads. The URL must use https, except
+  on loopback (`localhost`, `127.0.0.1`, `[::1]`), and redirects are refused. A URL without a secret stops the
+  command before it connects to anything. `graft compile` does not call the
+  route, because a deploy compiles before the new version is live.
+
+  **Hook.** `createGraftMcp`, `createGraftMcpHandler`, `createStudioApiHandler`
+  and `createStudioHandler` take `onContentChange(event)`. An app that mounts the
+  MCP endpoint itself refreshes in-process:
+
+  ```ts
+  createGraftMcpHandler({
+    // …
+    onContentChange: ({ branch, changes }) => {
+      revalidateContent(branch, changes);
+    },
+  });
+  ```
+
+  `@usegraft/compiler` exports the pieces: `notifyContentChange`,
+  `createRevalidateWebhook`, `revalidateWebhookFromEnv` and the
+  `ContentChangeEvent` / `ContentChangeListener` types.
+
+  **A failed refresh never fails the write.** The write already landed. The
+  server logs the new `REVALIDATE_FAILED` error, `write_content` and
+  `delete_content` return `refresh: { ok: false, error, message, fix }`, and
+  Studio shows a warning toast. Writes that change nothing do not call the
+  listener.
+
+  Also fixed: saving a document with an empty body a second time appended a
+  newline to the file, so it projected as a change. `composeDocument` now leaves
+  a body-less document byte-identical.
+
+### Patch Changes
+
+- Updated dependencies [4831a77]
+  - @usegraft/compiler@1.0.0-beta.4
+  - @usegraft/contracts@1.0.0-beta.4
+  - @usegraft/core@1.0.0-beta.4
+  - @usegraft/db@1.0.0-beta.4
+  - @usegraft/mdx-safety@1.0.0-beta.4
+  - @usegraft/registry@1.0.0-beta.4
+  - @usegraft/assets@1.0.0-beta.4
+
 ## 1.0.0-beta.3
 
 ### Patch Changes

@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { defineField, field } from "./field";
+import { FieldDescriptor } from "@usegraft/contracts";
+import { defineField, field, toFieldDescriptor } from "./field";
 import type { z } from "zod";
 
 describe("defineField", () => {
@@ -142,5 +143,79 @@ describe("bounds", () => {
 
   it("leaves fields unbounded when no bound is given", () => {
     expect(field.string().zod.safeParse("x".repeat(10_000)).success).toBe(true);
+  });
+});
+
+describe("editor metadata", () => {
+  it("select accepts only declared values and infers their union", () => {
+    const status = field.select({
+      options: ["draft", { value: "active", label: "On sale" }, "archived"],
+      label: "Status",
+    });
+    expect(status.type).toBe("select");
+    expect(status.zod.safeParse("active").success).toBe(true);
+    expect(status.zod.safeParse("Active").success).toBe(false);
+    expect(status.options).toEqual([
+      { value: "draft" },
+      { value: "active", label: "On sale" },
+      { value: "archived" },
+    ]);
+    expectTypeOf(status.zod.parse("draft")).toEqualTypeOf<"draft" | "active" | "archived">();
+  });
+
+  it("optional select allows absence", () => {
+    const f = field.select({ options: ["a", "b"], optional: true });
+    expect(f.zod.safeParse(undefined).success).toBe(true);
+    expectTypeOf(f.zod.parse(undefined)).toEqualTypeOf<"a" | "b" | undefined>();
+  });
+
+  it("reference holds a slug and names its collection", () => {
+    const category = field.reference({ to: "categories", label: "Category" });
+    expect(category.type).toBe("reference");
+    expect(category.to).toBe("categories");
+    expect(category.zod.safeParse("summer-sale").success).toBe(true);
+    expect(category.zod.safeParse("../etc/passwd").success).toBe(false);
+    expect(category.zod.safeParse("Summer Sale").success).toBe(false);
+  });
+
+  it("money numbers are integers and say so", () => {
+    const price = field.number({ format: "money", currency: "eur", min: 0 });
+    expect(price.zod.safeParse(1250).success).toBe(true);
+    expect(price.zod.safeParse(12.5).success).toBe(false);
+    expect(price.constraints).toEqual({ min: 0, int: true, currency: "EUR" });
+    expect(price.format).toBe("money");
+  });
+
+  it("describes label, constraints, options and target, and nothing for a bare field", () => {
+    const described = toFieldDescriptor(
+      "title",
+      field.string({ label: "Title", maxLength: 80, pattern: /^[A-Z]/ }),
+    );
+    expect(described).toMatchObject({
+      label: "Title",
+      constraints: { maxLength: 80, pattern: "^[A-Z]" },
+    });
+    expect(Object.keys(toFieldDescriptor("plain", field.string()))).toEqual([
+      "name",
+      "type",
+      "optional",
+      "description",
+      "fields",
+      "items",
+    ]);
+    const gallery = toFieldDescriptor(
+      "images",
+      field.array({ of: field.asset(), maxItems: 8, label: "Gallery" }),
+    );
+    expect(gallery).toMatchObject({ label: "Gallery", constraints: { maxItems: 8 } });
+    expect(toFieldDescriptor("c", field.reference({ to: "categories" })).to).toBe("categories");
+  });
+
+  it("round-trips through the contract schema", () => {
+    const parsed = FieldDescriptor.parse(
+      toFieldDescriptor("s", field.select({ options: ["x"], label: "S" })),
+    );
+    expect(parsed.options).toEqual([{ value: "x" }]);
+    expect(parsed.label).toBe("S");
   });
 });

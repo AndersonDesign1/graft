@@ -1,4 +1,7 @@
+import type { FieldDescriptor } from "@usegraft/contracts";
+
 /** Serializable shapes matching packages/studio/openapi.yaml */
+import type { ContentChangeNotice } from "@usegraft/compiler";
 
 /**
  * Where a document exists relative to the compiled index.
@@ -65,15 +68,6 @@ export interface ContentTree {
   };
 }
 
-export interface DocumentDto {
-  collection: string;
-  slug: string;
-  sourcePath: string;
-  data: Record<string, unknown>;
-  body: string;
-  raw: string;
-}
-
 export interface CompilationDto {
   id: string;
   branchId: string;
@@ -100,6 +94,8 @@ export interface CompileResultDto {
   changed: number;
   removed: number;
   docCount: number;
+  /** Whether the app was told to refresh. Absent with no listener or no change. */
+  refresh?: ContentChangeNotice;
 }
 
 /** Whether reverting to a compilation is safe, and why not if it isn't. */
@@ -125,6 +121,8 @@ export interface RevertResultDto {
   changed: number;
   removed: number;
   docCount: number;
+  /** Whether the app was told to refresh. Absent with no listener or no change. */
+  refresh?: ContentChangeNotice;
 }
 
 /* ---- git: the Changes drawer --------------------------------------------
@@ -229,18 +227,11 @@ export interface ApprovalList {
 }
 
 /**
- * One field of a collection schema, for the read-only Schema view.
- * Recursive: object fields carry `fields`, array fields carry `items` — the
- * same shape MCP's describe_schema returns, so the two never drift.
+ * One field of a collection schema: the descriptor MCP's describe_schema
+ * returns, so the Studio form, the Schema view and agents read one shape
+ * (labels, limits, select options and reference targets included).
  */
-export interface SchemaFieldDto {
-  name: string;
-  type: string;
-  optional: boolean;
-  description?: string;
-  fields?: SchemaFieldDto[];
-  items?: SchemaFieldDto;
-}
+export type SchemaFieldDto = FieldDescriptor;
 
 export interface SchemaCollectionDto {
   name: string;

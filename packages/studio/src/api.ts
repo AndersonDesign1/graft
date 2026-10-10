@@ -3,7 +3,13 @@
  * Shared by `graft studio` and `graft serve --studio`.
  * Reads + mutations (edit content, decide approvals) — same ops as MCP/CLI.
  */
-import { compile } from "@usegraft/compiler";
+import {
+  compile,
+  notifyContentChange,
+  type CompileResult,
+  type ContentChangeListener,
+  type ContentStore,
+} from "@usegraft/compiler";
 import type { AnyCollection } from "@usegraft/core";
 import type { MdxTrust } from "@usegraft/mdx-safety";
 import {
@@ -19,11 +25,11 @@ import {
 import { EditorComponentSpec, GraftError, type EditorComponentList } from "@usegraft/contracts";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import matter from "gray-matter";
-import { readCollectionDocs, readRawDocument, requireCollection, writeDocument } from "./content";
+import { readCollectionDocs } from "./content";
 import { STUDIO_OPENAPI } from "./openapi";
 import { commitChanges, readChanges, readFileDiff } from "./git";
 import { preflightRevert, revertContentTo } from "./revert";
+import { EDITOR_ROUTES } from "./server/editor-routes";
 import type {
   ApprovalList,
   BranchList,
@@ -33,7 +39,6 @@ import type {
   ContentTree,
   ContentTreeCollection,
   ContentTreeDoc,
-  DocumentDto,
   DocumentState,
   RevertPreviewDto,
   RevertResultDto,
@@ -62,6 +67,14 @@ export interface StudioApiOptions {
    * authored file including the ones that came from git.
    */
   mdxTrust?: MdxTrust;
+  /**
+   * Called after a save, compile or revert changed the index, with the branch
+   * and ChangeSet, so the app can refresh its cache. `graft studio` and
+   * `graft serve --studio` pass a webhook built from GRAFT_REVALIDATE_URL. A
+   * throw does not fail the request: the response carries
+   * `refresh: { ok: false, … }` instead.
+   */
+  onContentChange?: ContentChangeListener;
   /** Branch used for compile + tree default. */
   defaultBranch?: string;
   /**
@@ -88,12 +101,20 @@ export interface StudioApiOptions {
    * loopback.
    */
   authenticate?: (request: Request) => StudioPrincipal | null | Promise<StudioPrincipal | null>;
+  /**
+   * Where saves land. Defaults to the files under `contentDir`; a GitHub
+   * store makes a hosted Studio writable on a read-only filesystem.
+   */
+  store?: ContentStore;
 }
 
 /** The identity a Studio request authenticated as. */
 export interface StudioPrincipal {
   kind: string;
   id: string;
+  /** For commit attribution when a save lands in git on this person's behalf. */
+  name?: string;
+  email?: string;
   /** Scopes the credential carries. Absent means none — not "all". */
   scopes?: readonly string[];
 }
@@ -186,7 +207,7 @@ function assertSameOrigin(request: Request, url: URL): void {
  * tree has no business committing it, and deciding approvals is separated from
  * both: it is the human gate, and no agent runtime token should carry it.
  */
-export type StudioScope = "studio:read" | "studio:write" | "approvals:decide";
+export type StudioScope = "studio:read" | "studio:write" | "studio:publish" | "approvals:decide";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -220,7 +241,12 @@ function statusFor(error: GraftError): number {
     // a state that cannot satisfy it, which is what 409 is for.
     case "GIT_UNAVAILABLE":
     case "COMMIT_FAILED":
+    case "CONTENT_CONFLICT":
+    case "SLUG_NOT_UNIQUE":
+    case "CONTENT_TREE_READ_ONLY":
       return 409;
+    case "REMOTE_STORE_FAILED":
+      return 502;
     case "SCHEMA_VALIDATION_FAILED":
     case "INPUT_VALIDATION_FAILED":
     case "INVALID_SLUG":
@@ -399,21 +425,13 @@ async function buildTree(
   };
 }
 
-function toSchemaField(field: {
-  name: string;
-  type: string;
-  optional: boolean;
-  description?: string;
-  fields?: unknown;
-  items?: unknown;
-}): SchemaFieldDto {
-  const nested = field.fields as SchemaFieldDto[] | undefined;
-  const items = field.items as SchemaFieldDto | undefined;
+function toSchemaField(field: SchemaFieldDto): SchemaFieldDto {
+  // Every key the descriptor carries (label, options, constraints, the
+  // reference target) reaches the form; only empty ones are dropped.
+  const { fields: nested, items, description, ...rest } = field;
   return {
-    name: field.name,
-    type: field.type,
-    optional: field.optional,
-    ...(field.description ? { description: field.description } : {}),
+    ...rest,
+    ...(description ? { description } : {}),
     ...(nested ? { fields: nested.map(toSchemaField) } : {}),
     ...(items ? { items: toSchemaField(items) } : {}),
   };
@@ -500,7 +518,7 @@ function operator(options: StudioApiOptions, principal?: StudioPrincipal): Appro
 }
 
 /** Everything a route handler is given. */
-interface RouteContext {
+export interface RouteContext {
   request: Request;
   url: URL;
   options: StudioApiOptions;
@@ -519,11 +537,16 @@ interface RouteContext {
  * sixteen-branch if/else chain. That absence is what let
  * `actor.kind !== "anonymous"` stand in for authorization for as long as it did.
  */
-interface Route {
-  method: "GET" | "POST" | "PUT";
+export interface Route {
+  method: "GET" | "POST" | "PUT" | "DELETE";
   /** Exact pathname, or a pattern with exactly one capture group. */
   path: string | RegExp;
   scope: StudioScope;
+  /**
+   * Writes the files under `contentDir` directly. Refused when saves go to a
+   * remote store, where the checkout is the deployment and not the draft.
+   */
+  writesCheckout?: true;
   handle: (ctx: RouteContext) => Promise<Response> | Response;
 }
 
@@ -549,6 +572,7 @@ async function requireCompilation(
   return row;
 }
 
+/** The editor API (entries, drafts, publishing) lives in server/editor-routes.ts. */
 const ROUTES: readonly Route[] = [
   {
     method: "GET",
@@ -604,6 +628,7 @@ const ROUTES: readonly Route[] = [
     method: "POST",
     path: `${V1}/compile`,
     scope: "studio:write",
+    writesCheckout: true,
     handle: async ({ request, url, options, defaultBranch }) => {
       const payload = (await request.json().catch(() => ({}))) as { branch?: string };
       const branch =
@@ -615,6 +640,7 @@ const ROUTES: readonly Route[] = [
         mdxTrust: options.mdxTrust,
         branchId: branch,
       });
+      const refresh = await tellApp(options, branch, result);
       const body: CompileResultDto = {
         branch,
         gitSha: result.gitSha ?? null,
@@ -622,6 +648,7 @@ const ROUTES: readonly Route[] = [
         changed: result.changes.changed.length,
         removed: result.changes.removed.length,
         docCount: result.count,
+        ...(refresh ? { refresh } : {}),
       };
       return json(body);
     },
@@ -658,6 +685,7 @@ const ROUTES: readonly Route[] = [
     method: "POST",
     path: `${V1}/changes/commit`,
     scope: "studio:write",
+    writesCheckout: true,
     handle: async ({ request, options }) => {
       const payload = (await request.json().catch(() => ({}))) as {
         paths?: unknown;
@@ -805,6 +833,7 @@ const ROUTES: readonly Route[] = [
     method: "POST",
     path: COMPILATION_REVERT_PATH,
     scope: "studio:write",
+    writesCheckout: true,
     handle: async ({ options, id }) => {
       const row = await requireCompilation(options, id);
       const changed = await revertContentTo(options.contentDir, row.gitSha as string);
@@ -817,6 +846,12 @@ const ROUTES: readonly Route[] = [
         mdxTrust: options.mdxTrust,
         branchId: row.branchId,
       });
+      // The files now match the compilation's commit, not HEAD (which compile
+      // records), so the app is told the SHA the content was restored to.
+      const refresh = await tellApp(options, row.branchId, {
+        gitSha: row.gitSha,
+        changes: result.changes,
+      });
       const body: RevertResultDto = {
         compilationId: row.id,
         gitSha: row.gitSha,
@@ -826,87 +861,26 @@ const ROUTES: readonly Route[] = [
         changed: result.changes.changed.length,
         removed: result.changes.removed.length,
         docCount: result.count,
+        ...(refresh ? { refresh } : {}),
       };
       return json(body);
     },
   },
-  {
-    method: "GET",
-    path: `${V1}/document`,
-    scope: "studio:read",
-    handle: ({ url, options }) => {
-      const collection = url.searchParams.get("collection")?.trim();
-      const slug = url.searchParams.get("slug")?.trim();
-      if (!collection || !slug) {
-        throw new GraftError({
-          code: "INPUT_VALIDATION_FAILED",
-          message: "collection and slug query params are required.",
-          fix: "GET /api/studio/v1/document?collection=docs&slug=getting-started",
-        });
-      }
-      const coll = requireCollection(options.collections, collection);
-      const doc = readRawDocument(options.contentDir, collection, coll, slug);
-      const body: DocumentDto = {
-        collection,
-        slug,
-        sourcePath: doc.sourcePath,
-        data: doc.data,
-        body: doc.body,
-        raw: doc.raw,
-      };
-      return json(body);
-    },
-  },
-  {
-    method: "PUT",
-    path: `${V1}/document`,
-    scope: "studio:write",
-    handle: async ({ request, options, defaultBranch }) => {
-      const payload = (await request.json()) as {
-        collection?: string;
-        slug?: string;
-        data?: Record<string, unknown>;
-        body?: string;
-        /** Full MDX source; when set, parsed with gray-matter (Studio editor). */
-        raw?: string;
-        branch?: string;
-      };
-      if (!payload.collection || !payload.slug) {
-        throw new GraftError({
-          code: "INPUT_VALIDATION_FAILED",
-          message: "collection and slug are required.",
-          fix: 'PUT { "collection", "slug", "raw" } or { "collection", "slug", "data", "body?" }.',
-        });
-      }
-      let data = payload.data;
-      let body = payload.body ?? "";
-      if (typeof payload.raw === "string") {
-        const parsed = matter(payload.raw);
-        data = parsed.data as Record<string, unknown>;
-        body = parsed.content.replace(/^\n/, "");
-      }
-      if (!data) {
-        throw new GraftError({
-          code: "INPUT_VALIDATION_FAILED",
-          message: "data or raw is required.",
-          fix: 'PUT { "collection", "slug", "raw" } from the Studio editor.',
-        });
-      }
-      const result = await writeDocument({
-        contentDir: options.contentDir,
-        collections: options.collections,
-        db: options.db,
-        mdxTrust: options.mdxTrust,
-        branchId: payload.branch?.trim() || defaultBranch,
-        collection: payload.collection,
-        slug: payload.slug,
-        data,
-        body,
-      });
-      return json(result);
-    },
-  },
+  ...EDITOR_ROUTES,
 ];
+
+/** Tell the app the index changed. Undefined when there is no listener or no change. */
+function tellApp(
+  options: StudioApiOptions,
+  branch: string,
+  result: Pick<CompileResult, "gitSha" | "changes">,
+) {
+  return notifyContentChange(options.onContentChange, {
+    branch,
+    gitSha: result.gitSha ?? null,
+    changes: result.changes,
+  });
+}
 
 /** The route this request targets, with any captured segment decoded. */
 function matchRoute(method: string, pathname: string): { route: Route; id: string } | undefined {
@@ -969,6 +943,15 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
             },
           });
         }
+      }
+
+      if (matched.route.writesCheckout && options.store && options.store.kind !== "filesystem") {
+        throw new GraftError({
+          code: "CONTENT_TREE_READ_ONLY",
+          message: `${method} ${pathname} writes the deployed files, and this Studio saves to ${options.store.kind} instead.`,
+          fix: "Save with PUT /api/studio/v1/entry and publish with POST /api/studio/v1/drafts/publish; the host compiles when it redeploys.",
+          details: { pathname, method, storage: options.store.kind },
+        });
       }
 
       return await matched.route.handle({

@@ -5,6 +5,7 @@
  * server that hosts them.
  */
 import type { Storage } from "@usegraft/assets";
+import type { ContentChangeListener, ContentStore } from "@usegraft/compiler";
 import type { AnyCollection, AnyGraftFunction, FunctionActor, RateLimit } from "@usegraft/core";
 import type { ApprovalStore, AuditStore, BranchScope, Database } from "@usegraft/db";
 import type { MdxTrust } from "@usegraft/mdx-safety";
@@ -152,4 +153,23 @@ export interface GraftMcpOptions {
    * Tests inject a fake.
    */
   storage?: Storage | (() => Storage | Promise<Storage>);
+  /**
+   * Where authored content is written. Omitted, or a filesystem store: the
+   * files under `contentDir`, which the tools already write directly.
+   * A remote store (GitHub) makes `write_content` and `delete_content` land as
+   * draft commits on the caller's own branch instead of files, which is what
+   * lets a hosted, read-only deployment accept writes, and registers
+   * `list_drafts`, `publish_drafts` and `discard_drafts`: the same draft model
+   * a hosted Studio uses.
+   */
+  store?: ContentStore;
+  /**
+   * Called after write_content or delete_content changed the index, with the
+   * branch and ChangeSet, so the app can refresh its cache. An in-app mount
+   * refreshes in-process (sdk-next: `revalidateContent(branch, changes)`);
+   * `graft serve` and `graft mcp` pass a webhook built from
+   * GRAFT_REVALIDATE_URL. A throw does not fail the write: the tool result
+   * carries `refresh: { ok: false, … }` instead.
+   */
+  onContentChange?: ContentChangeListener;
 }

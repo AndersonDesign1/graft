@@ -23,7 +23,7 @@ vi.mock("@usegraft/compiler", async (importOriginal) => {
   };
 });
 
-const { writeDocument } = await import("./content");
+const { createStudioApiHandler } = await import("./api");
 
 const collections = {
   docs: defineCollection({
@@ -57,21 +57,24 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+const send = async (method: "PUT" | "POST", payload: Record<string, unknown>) => {
+  const handler = createStudioApiHandler({ db: {} as never, collections, contentDir });
+  const res = await handler(
+    new Request("http://localhost/api/studio/v1/entry", {
+      method,
+      headers: { "content-type": "application/json", origin: "http://localhost" },
+      body: JSON.stringify(payload),
+    }),
+  );
+  expect(res.status).toBeLessThan(300);
+};
+
 const save = (data: Record<string, unknown>, body: string) =>
-  writeDocument({
-    contentDir,
-    collections,
-    db: {} as never,
-    branchId: "main",
-    collection: "docs",
-    slug: "what-is-graft",
-    data,
-    body,
-  });
+  send("PUT", { collection: "docs", slug: "what-is-graft", data, body });
 
 const onDisk = () => readFileSync(join(contentDir, "docs", "what-is-graft.mdx"), "utf8");
 
-describe("writeDocument frontmatter fidelity", () => {
+describe("Studio save frontmatter fidelity", () => {
   it("a body-only save leaves every frontmatter byte alone", async () => {
     await save(
       {
@@ -100,11 +103,7 @@ A rewritten body.
   });
 
   it("creating a new document still works", async () => {
-    await writeDocument({
-      contentDir,
-      collections,
-      db: {} as never,
-      branchId: "main",
+    await send("POST", {
       collection: "docs",
       slug: "brand-new",
       data: { title: "Brand New" },

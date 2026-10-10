@@ -9,6 +9,18 @@
 export { createStudioApiHandler, type StudioApiOptions, type StudioFetchHandler } from "./api";
 export { createStudioHandler, type StudioHandlerOptions } from "./handler";
 export { STUDIO_OPENAPI } from "./openapi";
+export {
+  EDITOR_AUTH_ENV,
+  ROLE_SCOPES,
+  STUDIO_ROLES,
+  createInviteLink,
+  editorAccessFromEnv,
+  isStudioRole,
+  parseEditorList,
+  type EditorAccessConfig,
+  type StudioRole,
+} from "./session";
+export type { EditorAuthOptions, GitHubSignInOptions } from "./editor-auth";
 export type {
   ApprovalList,
   BranchDto,
@@ -23,10 +35,25 @@ export type {
   ContentTreeDoc,
   DiffHunkDto,
   DiffLineDto,
-  DocumentDto,
   FileDiffDto,
   GitChangesDto,
   PendingApprovalDto,
 } from "./types";
+export type {
+  CellValue,
+  DraftChangeDto,
+  DraftDiffDto,
+  DraftsDto,
+  EntryDto,
+  EntryList,
+  EntryStatus,
+  EntrySummary,
+  Facet,
+  FieldChangeDto,
+  PublishAction,
+  PublishResultDto,
+  SaveEntryResult,
+  WorkspaceDto,
+} from "./editor-types";
 
 export const PACKAGE = "@usegraft/studio" as const;

@@ -1,5 +1,19 @@
 # @usegraft/sdk-astro
 
+## 1.0.0-beta.5
+
+### Patch Changes
+
+- @usegraft/sdk-core@1.0.0-beta.5
+- @usegraft/db@1.0.0-beta.5
+
+## 1.0.0-beta.4
+
+### Patch Changes
+
+- @usegraft/sdk-core@1.0.0-beta.4
+- @usegraft/db@1.0.0-beta.4
+
 ## 1.0.0-beta.3
 
 ### Patch Changes

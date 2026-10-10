@@ -45,6 +45,32 @@ what operational data, typed functions, and copy-on-write branches need.
 | `GRAFT_HARDEN` | Container: create + harden the runtime role at boot, then serve under it. Default `1` in all-in-one, `0` in `GRAFT_MODE=serve` |
 | `GRAFT_RUNTIME_PASSWORD` | The hardened role's password; setting it also turns hardening on. Generated per boot when unset |
 | `GRAFT_MODE` | Container compose: `serve` against external db/storage |
+| `GRAFT_REVALIDATE_URL` | Your app's revalidate route. `graft serve`, `graft studio`, `graft mcp`, `graft merge` and `graft migrate` POST `{ branch, gitSha, changes }` to it after each write that changes content. https only, except on loopback (`localhost`, `127.0.0.1`, `[::1]`). See [Refresh pages when content changes](/docs/next#refresh-pages-when-content-changes) |
+| `GRAFT_WEBHOOK_SECRET` | Sent as `Authorization: Bearer …` to `GRAFT_REVALIDATE_URL`. Required when the URL is set. The app's route checks the same value |
+
+## Studio
+
+`graft serve --studio` reads these. Set `GRAFT_GITHUB_REPO` to make saves land
+on GitHub instead of the content directory. See
+[Host Studio for your team](/docs/studio-hosting) for the full setup.
+
+| Variable | Purpose |
+| --- | --- |
+| `GRAFT_STUDIO` | `1` mounts Studio at `/studio` on `graft serve`, like `--studio` |
+| `GRAFT_STUDIO_PORT` | Port for `graft studio`. Default `4983` |
+| `GRAFT_STUDIO_SECRET` | Turns on sign-in. At least 32 random characters. Signs session cookies and invite links, so changing it signs everyone out |
+| `GRAFT_STUDIO_URL` | Public origin people reach Studio on. GitHub sign-in and `graft studio invite` need it |
+| `GRAFT_STUDIO_EDITORS` | Who may sign in, as comma-separated logins or emails, each with an optional `=role` (default `editor`). Unset lets anyone with write access to the repository sign in |
+| `GRAFT_GITHUB_CLIENT_ID` / `GRAFT_GITHUB_CLIENT_SECRET` | A GitHub OAuth app, for "Sign in with GitHub". Set both or neither |
+| `GRAFT_GITHUB_REPO` | `owner/name`. Studio and MCP writes go to draft branches in this repository |
+| `GRAFT_GITHUB_TOKEN` | A fine-grained token with Contents and Pull requests read and write |
+| `GRAFT_GITHUB_APP_ID` / `GRAFT_GITHUB_APP_PRIVATE_KEY` | A GitHub App instead of a token. The key is PEM, literal `\n` accepted |
+| `GRAFT_GITHUB_APP_INSTALLATION_ID` | Optional. Found from the repository when unset |
+| `GRAFT_GITHUB_BRANCH` | The production branch publishing writes to. Default `main` |
+| `GRAFT_GITHUB_CONTENT_PATH` | The content directory's path in the repository. Default: its path relative to the project, or `content` when the directory is outside the project |
+| `GRAFT_GITHUB_API_URL` | GitHub Enterprise API base. Default `https://api.github.com` |
+| `GRAFT_STUDIO_PUBLISH` | `commit` (default) or `pull-request`. Use `pull-request` when the production branch is protected |
+| `GRAFT_DEPLOYED_SHA` | The commit this deployment was built from. Vercel, Render and Railway set their own, which Studio reads |
 
 ## Assets (S3-compatible)
 

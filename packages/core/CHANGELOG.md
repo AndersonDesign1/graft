@@ -1,5 +1,26 @@
 # @usegraft/core
 
+## 1.0.0-beta.5
+
+### Minor Changes
+
+- ab7cca3: Fields can say how an editor should see them. `field.select({ options })` holds one value from a fixed list, `field.reference({ to })` holds the slug of a document in another collection, every field takes a `label`, and `field.number({ format: "money" })` declares an amount in the smallest currency unit. `describe_schema` now includes each field's label, limits (`min`, `max`, `int`, `maxLength`, `pattern`, `maxItems`), options and reference target, so Studio and agents see the rules the validator applies.
+
+### Patch Changes
+
+- Updated dependencies [ab7cca3]
+- Updated dependencies [ab7cca3]
+  - @usegraft/contracts@1.0.0-beta.5
+  - @usegraft/db@1.0.0-beta.5
+
+## 1.0.0-beta.4
+
+### Patch Changes
+
+- Updated dependencies [4831a77]
+  - @usegraft/contracts@1.0.0-beta.4
+  - @usegraft/db@1.0.0-beta.4
+
 ## 1.0.0-beta.3
 
 ### Patch Changes

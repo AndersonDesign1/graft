@@ -22,11 +22,52 @@ export type FieldDescriptor = {
   type: string;
   optional: boolean;
   description?: string;
+  /**
+   * What a person calls this field ("Price", "Meta description"). Absent means
+   * the editor humanises the key. Presentation only: the key stays the
+   * contract with the content and the code.
+   */
+  label?: string;
+  /**
+   * The limits the field's validator enforces, so an editor can say "at most
+   * 160 characters" before a save fails and an agent can stay inside them on
+   * the first try. Mirrors the field options exactly; nothing here is a hint
+   * the validator does not also apply.
+   */
+  constraints?: FieldConstraints;
+  /** The allowed values when type is `select`, in declared order. */
+  options?: SelectOption[];
+  /** The collection a `reference` field points into. */
+  to?: string;
+  /**
+   * How a value should be presented. `money`: an integer in the currency's
+   * smallest unit (cents), shown as an amount.
+   */
+  format?: FieldFormat;
   /** Nested fields when type is `object`. */
   fields?: FieldDescriptor[];
   /** Item shape when type is `array` (name is conventionally `"item"`). */
   items?: FieldDescriptor;
 };
+
+export const FieldFormat = z.enum(["money"]);
+export type FieldFormat = z.infer<typeof FieldFormat>;
+
+export const FieldConstraints = z.object({
+  min: z.number().optional(),
+  max: z.number().optional(),
+  int: z.boolean().optional(),
+  maxLength: z.number().optional(),
+  /** A `RegExp` source, flags dropped (fields declare none). */
+  pattern: z.string().optional(),
+  maxItems: z.number().optional(),
+  /** ISO 4217 code for a `money` number. */
+  currency: z.string().optional(),
+});
+export type FieldConstraints = z.infer<typeof FieldConstraints>;
+
+export const SelectOption = z.object({ value: z.string(), label: z.string().optional() });
+export type SelectOption = z.infer<typeof SelectOption>;
 
 export const FieldDescriptor: z.ZodType<FieldDescriptor> = z.lazy(() =>
   z.object({
@@ -34,6 +75,11 @@ export const FieldDescriptor: z.ZodType<FieldDescriptor> = z.lazy(() =>
     type: z.string(),
     optional: z.boolean().default(false),
     description: z.string().optional(),
+    label: z.string().optional(),
+    constraints: FieldConstraints.optional(),
+    options: z.array(SelectOption).optional(),
+    to: z.string().optional(),
+    format: FieldFormat.optional(),
     fields: z.array(FieldDescriptor).optional(),
     items: FieldDescriptor.optional(),
   }),

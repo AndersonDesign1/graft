@@ -5,6 +5,7 @@
 import { execFile } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { userInfo } from "node:os";
+import { revalidateWebhookFromEnv } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { allowedHostsFor, createNodeListener } from "./serve";
@@ -108,6 +109,9 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
   loadProjectEnv(options.cwd);
   const config = await loadConfig(findConfig(options.cwd));
   const url = requireDatabaseUrl();
+  // Built before any connection opens, so a bad GRAFT_REVALIDATE_URL stops the
+  // start instead of surfacing on the first write.
+  const onContentChange = revalidateWebhookFromEnv();
 
   const [{ createStudioHandler }, { createDb, resolveBranchHandle, scopeWriteBranch }] =
     await Promise.all([import("@usegraft/studio"), import("@usegraft/db")]);
@@ -167,6 +171,7 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
         defaultBranch: writeBranch,
         decider: operatorIdentity,
         authenticate,
+        onContentChange,
       });
 
       const listening = createServer(
@@ -209,4 +214,76 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
   } finally {
     await control.close();
   }
+}
+
+export interface StudioInviteOptions {
+  cwd: string;
+  email: string;
+  name?: string;
+  role?: string;
+  days?: number;
+  /** Public base URL of the hosted Studio; GRAFT_STUDIO_URL otherwise. */
+  url?: string;
+}
+
+/**
+ * `graft studio invite <email>`: a sign-in link for someone with no GitHub
+ * account. Signed with GRAFT_STUDIO_SECRET, so it is only valid on a Studio
+ * that shares the secret, and it expires. Nothing is sent; the person running
+ * the command passes the link on.
+ */
+export async function studioInviteCommand(
+  options: StudioInviteOptions,
+): Promise<{ url: string; expiresAt: Date; role: string }> {
+  loadProjectEnv(options.cwd);
+  const { createInviteLink, isStudioRole, STUDIO_ROLES } = await import("@usegraft/studio");
+  const role = options.role ?? "editor";
+  if (!isStudioRole(role)) {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `"${role}" is not a Studio role.`,
+      fix: `Use --role with one of: ${STUDIO_ROLES.join(", ")}.`,
+    });
+  }
+  const baseUrl = options.url ?? process.env.GRAFT_STUDIO_URL;
+  if (!baseUrl) {
+    throw new GraftError({
+      code: "ENV_VAR_MISSING",
+      message: "No public URL to build the link from.",
+      fix: "Pass --url https://your-site.com (where Studio is served), or set GRAFT_STUDIO_URL.",
+    });
+  }
+  const days = options.days ?? 7;
+  if (!Number.isInteger(days) || days < 1 || days > 30) {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `--days ${days} is out of range.`,
+      fix: "Invite links last 1 to 30 days.",
+    });
+  }
+  // The sign-in route is at the site's root (/api/studio/v1/auth/link), so a
+  // URL pasted with a path, like https://shop.example.com/studio, is cut back
+  // to its origin.
+  let origin: string;
+  try {
+    const parsed = new URL(baseUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+      throw new Error(parsed.protocol);
+    origin = parsed.origin;
+  } catch {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `"${baseUrl}" is not an http(s) URL.`,
+      fix: "Pass --url with the site's address, such as https://shop.example.com.",
+    });
+  }
+  const link = createInviteLink({
+    secret: process.env.GRAFT_STUDIO_SECRET ?? "",
+    baseUrl: origin,
+    email: options.email,
+    name: options.name,
+    role,
+    ttlMs: days * 24 * 60 * 60 * 1000,
+  });
+  return { ...link, role };
 }
