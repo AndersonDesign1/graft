@@ -39,5 +39,21 @@ export type {
   GitChangesDto,
   PendingApprovalDto,
 } from "./types";
+export type {
+  CellValue,
+  DraftChangeDto,
+  DraftDiffDto,
+  DraftsDto,
+  EntryDto,
+  EntryList,
+  EntryStatus,
+  EntrySummary,
+  Facet,
+  FieldChangeDto,
+  PublishAction,
+  PublishResultDto,
+  SaveEntryResult,
+  WorkspaceDto,
+} from "./editor-types";
 
 export const PACKAGE = "@usegraft/studio" as const;

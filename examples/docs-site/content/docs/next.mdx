@@ -310,7 +310,10 @@ read-only docs, use the [docs MCP](/docs/docs-mcp) instead.
 
 On the static engine, content changes ship with a new deploy, so there is
 nothing to refresh. On Postgres, content can change while your app is running,
-from Studio or from an agent. This section makes Next.js refresh only the pages
+from a local Studio or from an agent. A server that writes to GitHub
+([Host Studio for your team](/docs/studio-hosting)) is different: saves are
+drafts. Publishing either commits to your production branch or opens a pull
+request, and your host rebuilds when the change reaches that branch. This section makes Next.js refresh only the pages
 whose content changed.
 
 It takes two steps. How you cache reads depends on your version. Next.js 16
@@ -486,7 +489,8 @@ app's runtime environment, such as your host's environment variables.
 Otherwise the route answers 401 and nothing refreshes.
 
 Graft now calls the route after every write that changes content: an agent's
-`write_content` or `delete_content`, a Studio save, compile or revert, and
+`write_content` or `delete_content`, a local Studio save, create, delete,
+discard, compile or revert, and
 `graft merge --apply` or `graft migrate --apply`. The URL must use https, except
 on loopback (`localhost`, `127.0.0.1`, `[::1]`).
 
