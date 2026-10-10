@@ -19,10 +19,16 @@ vi.mock("node:fs", async (importOriginal) => {
       }
       return actual.writeFileSync(...args);
     },
+    unlinkSync: (...args: Parameters<typeof actual.unlinkSync>) => {
+      if (stub.errno !== undefined) {
+        throw Object.assign(new Error(`${stub.errno}: refused`), { code: stub.errno });
+      }
+      return actual.unlinkSync(...args);
+    },
   };
 });
 
-const { composeDocument, writeDocumentFile } = await import("./serialize");
+const { composeDocument, removeDocumentFile, writeDocumentFile } = await import("./serialize");
 
 afterEach(() => {
   stub.errno = undefined;
@@ -248,6 +254,25 @@ describe("writeDocumentFile", () => {
       expect((error as GraftError).code).toBe("CONTENT_TREE_READ_ONLY");
       expect((error as GraftError).fix).toContain("writable checkout");
       expect((error as GraftError).details).toMatchObject({ errno: code });
+    },
+  );
+
+  it.each(["EROFS", "EACCES", "EPERM"])(
+    "turns a %s refusal on delete into the same error",
+    (code) => {
+      // A delete on a serverless filesystem fails like a save does. Before, it
+      // surfaced as a raw errno while the save beside it explained itself.
+      const dir = mkdtempSync(join(tmpdir(), "graft-rm-"));
+      try {
+        writeDocumentFile(dir, "page.mdx", "x");
+        stub.errno = code;
+        expect(() => removeDocumentFile(dir, "page.mdx")).toThrow(
+          expect.objectContaining({ code: "CONTENT_TREE_READ_ONLY" }),
+        );
+      } finally {
+        stub.errno = undefined;
+        rmSync(dir, { recursive: true, force: true });
+      }
     },
   );
 

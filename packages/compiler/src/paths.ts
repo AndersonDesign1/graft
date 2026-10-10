@@ -9,7 +9,7 @@
  *
  * `resolveContained` therefore checks the bytes AND the filesystem.
  */
-import { existsSync, lstatSync } from "node:fs";
+import { lstatSync } from "node:fs";
 import { isAbsolute, normalize, resolve, sep } from "node:path";
 import { GraftError } from "@usegraft/contracts";
 
@@ -81,7 +81,9 @@ export function resolveContained(root: string, path: string, options: ContainOpt
     let cursor = rootAbs;
     for (const segment of candidate.slice(rootAbs.length).split(sep).filter(Boolean)) {
       cursor = resolve(cursor, segment);
-      if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) {
+      // lstat, never existsSync: existsSync follows the link, so a dangling
+      // symlink reads as absent and a write would then create its target.
+      if (lstatSync(cursor, { throwIfNoEntry: false })?.isSymbolicLink() === true) {
         refuse(
           label,
           path,
