@@ -99,4 +99,24 @@ describe("graft studio invite", () => {
       studioInviteCommand({ cwd: process.cwd(), email: "a@b.c", url: "file:///srv/site" }),
     ).rejects.toThrow(/not an http\(s\) URL/);
   });
+
+  it("refuses plain http off loopback, where the token would travel unencrypted", async () => {
+    const { studioInviteCommand } = await import("./commands/studio");
+    const previous = process.env.GRAFT_STUDIO_SECRET;
+    process.env.GRAFT_STUDIO_SECRET = secret;
+    try {
+      await expect(
+        studioInviteCommand({ cwd: process.cwd(), email: "a@b.c", url: "http://shop.test" }),
+      ).rejects.toThrow(/plain http/);
+      const local = await studioInviteCommand({
+        cwd: process.cwd(),
+        email: "a@b.c",
+        url: "http://localhost:3903",
+      });
+      expect(local.url).toMatch(/^http:\/\/localhost:3903\/api\/studio\/v1\/auth\/link/);
+    } finally {
+      if (previous === undefined) delete process.env.GRAFT_STUDIO_SECRET;
+      else process.env.GRAFT_STUDIO_SECRET = previous;
+    }
+  });
 });
