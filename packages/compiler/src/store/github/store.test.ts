@@ -3,7 +3,7 @@ import { GraftError } from "@usegraft/contracts";
 import { describe, expect, it } from "vitest";
 import { gitBlobSha } from "../blob";
 import { appAuth, appJwt, tokenAuth } from "./auth";
-import { deployedShaFrom, githubStoreFromEnv } from "./env";
+import { DEPLOYED_SHA_ENV, GITHUB_STORE_ENV, deployedShaFrom, githubStoreFromEnv } from "./env";
 import { createGitHubFake, type GitHubFake } from "./fake";
 import { actorKey, GitHubStore, normalisePath, type GitHubStoreOptions } from "./store";
 import { trimChar, withoutTrailingSlashes } from "../trim";
@@ -599,5 +599,15 @@ describe("githubStoreFromEnv", () => {
     const sha = "a".repeat(40);
     expect(deployedShaFrom({ VERCEL_GIT_COMMIT_SHA: sha })).toBe(sha);
     expect(deployedShaFrom({ GITHUB_SHA: "short" })).toBeUndefined();
+  });
+
+  it("lists every variable it reads, host commit variables included", () => {
+    // Consumers allowlist a server's environment from GITHUB_STORE_ENV. A host
+    // variable missing from it was dropped, and the deployed commit unknown.
+    const sha = "b".repeat(40);
+    for (const name of DEPLOYED_SHA_ENV) {
+      expect(GITHUB_STORE_ENV).toContain(name);
+      expect(deployedShaFrom({ [name]: sha })).toBe(sha);
+    }
   });
 });
