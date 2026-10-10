@@ -205,7 +205,7 @@ export function problemsWith(
           path,
           `Keep ${label.toLowerCase()} to ${c.maxLength} characters (it has ${value.length}).`,
         );
-      } else if (c.pattern !== undefined && !safeTest(c.pattern, value)) {
+      } else if (c.pattern !== undefined && !safeTest(c.pattern, c.patternFlags, value)) {
         out.set(path, `${label} isn't in the expected format.`);
       }
       break;
@@ -311,9 +311,12 @@ export function problemsIn(
   return out;
 }
 
-function safeTest(pattern: string, value: string): boolean {
+function safeTest(pattern: string, flags: string | undefined, value: string): boolean {
   try {
-    return new RegExp(pattern).test(value);
+    // Every flag the validator has. A fresh RegExp starts at lastIndex 0,
+    // which is what Zod resets to before each test, so `g` changes nothing
+    // and `y` anchors at the start, the same on both sides.
+    return new RegExp(pattern, flags ?? "").test(value);
   } catch {
     return true;
   }

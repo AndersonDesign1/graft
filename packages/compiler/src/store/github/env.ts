@@ -9,7 +9,20 @@ import type { PublishMode } from "../types";
 import { appAuth, tokenAuth, type GitHubAuth } from "./auth";
 import { GitHubStore } from "./store";
 
-/** Every variable the store reads, for docs and for turbo's env lists. */
+/**
+ * Where a host says which commit a deployment was built from, in the order
+ * `deployedShaFrom` tries them.
+ */
+export const DEPLOYED_SHA_ENV = [
+  "GRAFT_DEPLOYED_SHA",
+  "VERCEL_GIT_COMMIT_SHA",
+  "RENDER_GIT_COMMIT",
+  "RAILWAY_GIT_COMMIT_SHA",
+  "COMMIT_REF",
+  "GITHUB_SHA",
+] as const;
+
+/** Every variable the store reads, for docs and for allowlisting a server's environment. */
 export const GITHUB_STORE_ENV = [
   "GRAFT_GITHUB_REPO",
   "GRAFT_GITHUB_BRANCH",
@@ -20,7 +33,7 @@ export const GITHUB_STORE_ENV = [
   "GRAFT_GITHUB_APP_INSTALLATION_ID",
   "GRAFT_GITHUB_API_URL",
   "GRAFT_STUDIO_PUBLISH",
-  "GRAFT_DEPLOYED_SHA",
+  ...DEPLOYED_SHA_ENV,
 ] as const;
 
 export interface GitHubStoreFromEnvOptions {
@@ -90,14 +103,7 @@ export function githubStoreFromEnv(options: GitHubStoreFromEnvOptions): GitHubSt
 
 /** The commit the running deployment was built from, from the host's own variable. */
 export function deployedShaFrom(env: Record<string, string | undefined>): string | undefined {
-  for (const name of [
-    "GRAFT_DEPLOYED_SHA",
-    "VERCEL_GIT_COMMIT_SHA",
-    "RENDER_GIT_COMMIT",
-    "RAILWAY_GIT_COMMIT_SHA",
-    "COMMIT_REF",
-    "GITHUB_SHA",
-  ]) {
+  for (const name of DEPLOYED_SHA_ENV) {
     const value = env[name]?.trim();
     if (value && /^[0-9a-f]{40}$/.test(value)) return value;
   }

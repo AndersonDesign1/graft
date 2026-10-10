@@ -276,8 +276,12 @@ describe("Sign in with GitHub", () => {
         permissionOf: async (login) => permissions[login] ?? "none",
       },
     });
-    const denied = await flow(refused);
-    expect(denied.headers.get("location")).toBe("/studio/?signin=not_allowed");
+    // The failure lands on the page the person started from, branch and hash
+    // kept, so trying again resumes where they were.
+    const denied = await flow(refused, "/studio/?branch=preview#/collections/products");
+    expect(denied.headers.get("location")).toBe(
+      "/studio/?branch=preview&signin=not_allowed#/collections/products",
+    );
 
     // A failed check is not a "no": the screen says access couldn't be checked.
     const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -294,9 +298,28 @@ describe("Sign in with GitHub", () => {
       },
     });
     const unchecked = await flow(broken);
-    expect(unchecked.headers.get("location")).toBe("/studio/?signin=access_unchecked");
+    expect(unchecked.headers.get("location")).toBe(
+      "/studio/?signin=access_unchecked#/collections/products",
+    );
     expect(quiet).toHaveBeenCalledOnce();
     quiet.mockRestore();
+  });
+
+  it("keeps the return path when GitHub cannot be reached", async () => {
+    // The fetch throws, so the error leaves githubCallback; the outer catch
+    // used to send the person to Studio's front page.
+    const unreachable = (async () => {
+      throw new TypeError("fetch failed");
+    }) as typeof fetch;
+    const handler = createStudioHandler({
+      ...base,
+      uiBasePath: "/studio",
+      editors: { secret, github: { clientId: "id", clientSecret: "cs", fetch: unreachable } },
+    });
+    const response = await flow(handler, "/studio/?branch=preview#/collections/products");
+    expect(response.headers.get("location")).toBe(
+      "/studio/?branch=preview&signin=github_refused#/collections/products",
+    );
   });
 
   it("never redirects off-site after sign-in", async () => {

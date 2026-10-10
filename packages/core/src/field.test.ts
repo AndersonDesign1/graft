@@ -211,6 +211,38 @@ describe("editor metadata", () => {
     expect(toFieldDescriptor("c", field.reference({ to: "categories" })).to).toBe("categories");
   });
 
+  it("keeps a pattern's flags, which the validator applies", () => {
+    // Dropped, Studio rebuilt /^[a-z]+$/i without `i` and flagged "ABC" as
+    // invalid while the server accepted it.
+    const code = field.string({ pattern: /^[a-z]+$/i });
+    expect(code.zod.safeParse("ABC").success).toBe(true);
+    expect(toFieldDescriptor("code", code).constraints).toEqual({
+      pattern: "^[a-z]+$",
+      patternFlags: "i",
+    });
+  });
+
+  it("validates a g or y pattern the same on every parse", () => {
+    // Zod resets lastIndex before each test, so a flagged pattern is not
+    // stateful: `g` is inert and `y` anchors at index 0, which is what a
+    // fresh `new RegExp(pattern, patternFlags)` in Studio does too.
+    const global = field.string({ pattern: /foo/g });
+    expect([1, 2, 3].map(() => global.zod.safeParse("foo").success)).toEqual([true, true, true]);
+    const sticky = field.string({ pattern: /foo/y });
+    expect(sticky.zod.safeParse("foo-bar").success).toBe(true);
+    expect(sticky.zod.safeParse("xfoo").success).toBe(false);
+    expect(toFieldDescriptor("s", sticky).constraints).toMatchObject({ patternFlags: "y" });
+  });
+
+  it("advertises only the constraints the field type enforces", () => {
+    // field.string ignores min and max, so describing them promised a rule
+    // nothing checks.
+    const loose = field.string({ min: 10, max: 20 });
+    expect(loose.zod.safeParse("short").success).toBe(true);
+    expect(toFieldDescriptor("s", loose).constraints).toBeUndefined();
+    expect(toFieldDescriptor("n", field.number({ maxLength: 4 })).constraints).toBeUndefined();
+  });
+
   it("round-trips through the contract schema", () => {
     const parsed = FieldDescriptor.parse(
       toFieldDescriptor("s", field.select({ options: ["x"], label: "S" })),

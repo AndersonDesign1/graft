@@ -6,7 +6,9 @@
  * the same interface the GitHub store implements. Nothing new is invented;
  * the git calls are the ones git.ts already makes and tests.
  */
-import { existsSync, unlinkSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { createReadStream, existsSync, unlinkSync } from "node:fs";
+import { stat } from "node:fs/promises";
 import type { DraftChange, DraftWorkflow, PublishResult, StoredFile } from "@usegraft/compiler";
 import { gitBlobSha } from "@usegraft/compiler";
 import { commitChanges, git, gitRaw, readChanges, safeContentPath } from "../git";
@@ -15,15 +17,24 @@ export function localDrafts(contentDir: string): DraftWorkflow {
   return {
     async changes(): Promise<DraftChange[]> {
       const status = await readChanges(contentDir);
+      // A draft's version is its bytes on disk; null is reserved for a deletion.
+      const versionOf = (path: string): Promise<string | null> =>
+        fileBlobSha(safeContentPath(contentDir, path));
       const out: DraftChange[] = [];
       for (const file of status.files) {
         if (file.status === "renamed") {
-          out.push({ path: file.path, kind: "added", version: null, conflict: false });
+          out.push({
+            path: file.path,
+            kind: "added",
+            version: await versionOf(file.path),
+            conflict: false,
+          });
           if (file.from)
             out.push({ path: file.from, kind: "deleted", version: null, conflict: false });
           continue;
         }
-        out.push({ path: file.path, kind: file.status, version: null, conflict: false });
+        const version = file.status === "deleted" ? null : await versionOf(file.path);
+        out.push({ path: file.path, kind: file.status, version, conflict: false });
       }
       return out.sort((a, b) => a.path.localeCompare(b.path));
     },
@@ -62,7 +73,13 @@ export function localDrafts(contentDir: string): DraftWorkflow {
         const full = safeContentPath(contentDir, path);
         const file = byPath.get(path);
         if (!file) continue;
-        if (file.status === "added") {
+        // A file staged as new and then deleted reads as "deleted", but it
+        // has no published version either: restoring it from HEAD fails, and
+        // in a repository with no commits there is no HEAD at all.
+        const neverPublished =
+          file.status === "added" ||
+          (file.status === "deleted" && !(await inHead(contentDir, path)));
+        if (neverPublished) {
           // Never committed, so there is no published version to go back to:
           // discarding it removes it. Unstage first if it was staged.
           await git(contentDir, [
@@ -95,6 +112,29 @@ export function localDrafts(contentDir: string): DraftWorkflow {
       return [];
     },
   };
+}
+
+/**
+ * The git blob SHA of a file, read as a stream: the drawer lists every
+ * changed file, and a large one buffered whole would stall the server.
+ * Equal to `gitBlobSha` of the same bytes. Null when the file is gone.
+ */
+async function fileBlobSha(full: string): Promise<string | null> {
+  const info = await stat(full).catch(() => null);
+  if (!info?.isFile()) return null;
+  const hash = createHash("sha1").update(`blob ${info.size}\0`);
+  for await (const chunk of createReadStream(full)) hash.update(chunk as Buffer);
+  return hash.digest("hex");
+}
+
+/** Whether HEAD holds `path`. False with no commits yet, since there is no HEAD. */
+async function inHead(contentDir: string, path: string): Promise<boolean> {
+  try {
+    await git(contentDir, ["cat-file", "-e", `HEAD:./${path}`]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -681,7 +681,7 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
           const email = args.positionals[1];
           if (!email) {
             throw new UsageError(
-              "usage: graft studio invite <email> [--role editor] [--url <url>]",
+              "usage: graft studio invite <email> [--name <name>] [--role <role>] [--days <n>] [--url <url>]",
             );
           }
           const { studioInviteCommand } = await import("./commands/studio");

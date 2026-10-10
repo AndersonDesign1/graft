@@ -34,25 +34,12 @@
         // and by Studio's GitHub store to know what the checkout holds.
         "VERCEL_GIT_COMMIT_SHA",
         "GITHUB_SHA",
-        // A hosted Studio: sign-in and the GitHub content store. Runtime only,
-        // read when a server or route starts, never inlined into a build; listed
-        // so a framework mount that builds under turbo still receives them.
-        "GRAFT_STUDIO",
-        "GRAFT_STUDIO_SECRET",
-        "GRAFT_STUDIO_URL",
-        "GRAFT_STUDIO_EDITORS",
-        "GRAFT_STUDIO_PUBLISH",
-        "GRAFT_GITHUB_REPO",
-        "GRAFT_GITHUB_BRANCH",
-        "GRAFT_GITHUB_CONTENT_PATH",
-        "GRAFT_GITHUB_TOKEN",
-        "GRAFT_GITHUB_APP_ID",
-        "GRAFT_GITHUB_APP_PRIVATE_KEY",
-        "GRAFT_GITHUB_APP_INSTALLATION_ID",
-        "GRAFT_GITHUB_API_URL",
-        "GRAFT_GITHUB_CLIENT_ID",
-        "GRAFT_GITHUB_CLIENT_SECRET",
         "GRAFT_DEPLOYED_SHA"
+        // Deliberately absent: GRAFT_STUDIO_* and GRAFT_GITHUB_*. A hosted
+        // Studio reads them when its server starts, never during a build, and
+        // they include write credentials (a token, a GitHub App private key,
+        // an OAuth secret). Passing them to every package build hands them to
+        // every build script and plugin in the graph for nothing.
       ],
       // `.vercel/output` is the docs site's real build product — the artifact
       // Vercel uploads, and the one `pnpm check:site` reads. Undeclared, turbo

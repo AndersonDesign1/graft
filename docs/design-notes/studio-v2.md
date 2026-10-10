@@ -119,17 +119,19 @@ tree and is the one both Studio and MCP depend on. No new package (a new
 interface ContentStore {
   kind: "filesystem" | "github";
   read(path, actor): Promise<{ raw: string; version: string } | null>;
-  write(path, raw, { actor, baseVersion }): Promise<{ version: string }>;
-  remove(path, { actor, baseVersion }): Promise<void>;
+  // raw: null deletes. There is no separate remove().
+  write(path, raw: string | null, { actor, baseVersion? }): Promise<{ version: string | null }>;
   drafts?: DraftWorkflow; // changes, diff, publish, discard
 }
 ```
 
 Paths are relative to the content directory. `version` is an opaque content
-version: a git blob SHA on GitHub, a hash of the bytes on disk. Every write
-carries the version the editor loaded, and the store refuses the write with
-`CONTENT_CONFLICT` when the current version differs. That one rule covers a
-second browser tab, a second editor, and an agent editing the same file over
+version: a git blob SHA on GitHub, a hash of the bytes on disk. A write that
+carries the version the editor loaded is refused with `CONTENT_CONFLICT` when
+the current version differs. `baseVersion` is optional: a write without it is
+unconditional, last writer wins. Studio's editor sends it on every save, and
+leaves it out only when the person chooses to keep their version over a newer
+one. That one rule covers a second browser tab, a second editor, and an agent editing the same file over
 MCP while a person has it open, which is a real case for an agent-native CMS.
 
 **FilesystemStore** is today's behaviour: write the file, then the caller
@@ -144,7 +146,7 @@ filesystem, so it works on a read-only serverless filesystem by construction.
 
 ### Drafts are a branch per editor
 
-Each editor gets one draft branch, `graft-studio/<editor>`, created from the
+Each editor gets one draft branch, `graft-studio/drafts/<editor>`, created from the
 production branch on their first save.
 
 - **Save** appends a commit to the editor's draft branch: tree from the draft
@@ -377,8 +379,10 @@ Each is code, tests and one conventional commit, shippable on its own.
   is refused, an invite link sets a session, a save is a commit on
   `graft-studio/drafts/<editor>` authored by the editor, the deployed files
   and production are untouched, a stale save gets 409 `CONTENT_CONFLICT`,
-  publish lands one commit on main by the editor, the empty draft branch is
-  deleted, and the list shows the published price before any redeploy.
+  publish lands one commit on main by the editor, the draft branch holds no
+  changes afterwards (it is emptied by a fast-forward, not deleted, because a
+  delete cannot be made conditional), and the list shows the published price
+  before any redeploy.
 - **In a browser.** Hosted as a contributor: sign-in screen, "Submit for
   review", the publish sheet's field diff ("Name: Clay Cashmere Beanie →
   Clay Cashmere Watch Cap"), and the done state linking the pull request.
