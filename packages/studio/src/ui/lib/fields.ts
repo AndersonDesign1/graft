@@ -205,7 +205,7 @@ export function problemsWith(
           path,
           `Keep ${label.toLowerCase()} to ${c.maxLength} characters (it has ${value.length}).`,
         );
-      } else if (c.pattern !== undefined && !safeTest(c.pattern, value)) {
+      } else if (c.pattern !== undefined && !safeTest(c.pattern, c.patternFlags, value)) {
         out.set(path, `${label} isn't in the expected format.`);
       }
       break;
@@ -311,9 +311,11 @@ export function problemsIn(
   return out;
 }
 
-function safeTest(pattern: string, value: string): boolean {
+function safeTest(pattern: string, flags: string | undefined, value: string): boolean {
   try {
-    return new RegExp(pattern).test(value);
+    // The validator's flags, minus the stateful ones: `g` and `y` make test()
+    // depend on the previous call through lastIndex.
+    return new RegExp(pattern, (flags ?? "").replace(/[gy]/g, "")).test(value);
   } catch {
     return true;
   }
