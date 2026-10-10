@@ -33,7 +33,8 @@ afterEach(() => {
   if (repo) rmSync(repo, { recursive: true, force: true });
 });
 
-describe("localDrafts", () => {
+// Real git repositories: slow on Windows under a full parallel run.
+describe("localDrafts", { timeout: 30_000 }, () => {
   it("gives modified and added drafts their version, and deletions null", async () => {
     const content = init(true);
     writeFileSync(join(content, "docs", "kept.mdx"), "# Kept, edited\n");
