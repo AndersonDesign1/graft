@@ -3,6 +3,7 @@ import { GraftError } from "@usegraft/contracts";
 import { describe, expect, it } from "vitest";
 import { gitBlobSha } from "../blob";
 import { appAuth, appJwt, tokenAuth } from "./auth";
+import { GitHubClient } from "./client";
 import { DEPLOYED_SHA_ENV, GITHUB_STORE_ENV, deployedShaFrom, githubStoreFromEnv } from "./env";
 import { createGitHubFake, type GitHubFake } from "./fake";
 import { actorKey, GitHubStore, normalisePath, type GitHubStoreOptions } from "./store";
@@ -484,6 +485,30 @@ describe("GitHubStore: layout and listing", () => {
     const error = await caught(store.read("products/shirt.mdx"));
     expect(error.code).toBe("REMOTE_STORE_FAILED");
     expect(error.fix).toContain("GRAFT_GITHUB_BRANCH");
+  });
+});
+
+describe("GitHubClient", () => {
+  const answering = (status: number, message: string) =>
+    new GitHubClient({
+      repo: "acme/shop",
+      auth: tokenAuth("t"),
+      fetch: (async () =>
+        new Response(JSON.stringify({ message }), {
+          status,
+          headers: { "content-type": "application/json" },
+        })) as typeof fetch,
+    });
+
+  it("reads only a duplicate-ref 422 as 'the branch exists'", async () => {
+    expect(await answering(422, "Reference already exists").createRef("x", "a".repeat(40))).toBe(
+      false,
+    );
+    // Any other 422 is a real refusal. Read as "exists", the save loop retried
+    // it to exhaustion and reported "busy" instead of GitHub's reason.
+    await expect(
+      answering(422, "Object does not exist").createRef("x", "a".repeat(40)),
+    ).rejects.toMatchObject({ code: "REMOTE_STORE_FAILED" });
   });
 });
 

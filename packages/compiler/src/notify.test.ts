@@ -132,10 +132,10 @@ describe("createRevalidateWebhook", () => {
     expect((error as GraftError).message).toContain("nope");
   });
 
-  it("names the route without the query or userinfo, which can carry a token", async () => {
+  it("names the route without the query, which can carry a token", async () => {
     const { fn } = fakeFetch(new Response("nope", { status: 500 }));
     const hook = createRevalidateWebhook({
-      url: "https://user:pass@example.com/r?token=t0k3n",
+      url: "https://example.com/r?token=t0k3n",
       secret: "x",
       fetch: fn,
     });
@@ -147,7 +147,30 @@ describe("createRevalidateWebhook", () => {
     });
     expect(reported).toContain("https://example.com/r");
     expect(reported).not.toContain("t0k3n");
-    expect(reported).not.toContain("pass");
+  });
+
+  it("keeps the URL's token out of a network error that quotes the URL", async () => {
+    // Node's fetch puts the full URL in some error messages.
+    const url = "https://example.com/r?token=t0k3n";
+    const { fn } = fakeFetch(new TypeError(`fetch failed for ${new URL(url).href}`));
+    const hook = createRevalidateWebhook({ url, secret: "x", fetch: fn });
+    const error = (await Promise.resolve(hook(event)).catch((e: unknown) => e)) as GraftError;
+    expect(error.message).toContain("https://example.com/r");
+    expect(error.message).not.toContain("t0k3n");
+  });
+
+  it("refuses a URL with a username or password, without repeating them", () => {
+    // fetch would refuse it on every send, quoting the credentials each time.
+    const error = (() => {
+      try {
+        createRevalidateWebhook({ url: "https://user:s3cret@example.com/r", secret: "x" });
+      } catch (e) {
+        return e as GraftError;
+      }
+      return undefined;
+    })();
+    expect(error).toMatchObject({ code: "INPUT_VALIDATION_FAILED" });
+    expect(JSON.stringify({ m: error?.message, f: error?.fix })).not.toContain("s3cret");
   });
 
   it("reads only the start of a large error body", async () => {

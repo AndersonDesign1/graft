@@ -141,9 +141,13 @@ export function createRevalidateWebhook(options: RevalidateWebhookOptions): Cont
         redirect: "error",
       });
     } catch (error) {
+      // fetch errors can quote the whole URL, query token included.
+      const reason = (error instanceof Error ? error.message : String(error))
+        .split(url.href)
+        .join(where);
       throw new GraftError({
         code: "REVALIDATE_FAILED",
-        message: `The content was written, but the revalidate request to ${url.origin} failed: ${error instanceof Error ? error.message : String(error)}`,
+        message: `The content was written, but the revalidate request to ${url.origin} failed: ${reason}`,
         fix: `Check that GRAFT_REVALIDATE_URL (${where}) is reachable from this server and does not redirect. ${RESEND}`,
         details: { url: where },
       });
@@ -196,6 +200,16 @@ function parseWebhookUrl(raw: string): URL {
       code: "INPUT_VALIDATION_FAILED",
       message: "GRAFT_REVALIDATE_URL is not a URL.",
       fix: "Set it to the app's revalidate route, e.g. https://example.com/api/revalidate.",
+      details: { variable: "GRAFT_REVALIDATE_URL" },
+    });
+  }
+  // fetch refuses a URL with credentials in it, and quotes the URL when it
+  // does. Refuse it here, without echoing what was in it.
+  if (url.username || url.password) {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `GRAFT_REVALIDATE_URL carries a username or password: ${url.origin}${url.pathname}.`,
+      fix: "Remove the user:password@ part. The webhook authenticates with GRAFT_WEBHOOK_SECRET, sent as a bearer header.",
       details: { variable: "GRAFT_REVALIDATE_URL" },
     });
   }

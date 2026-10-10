@@ -178,7 +178,11 @@ export class GitHubClient {
     }
   }
 
-  /** Create a branch; false when it already exists. */
+  /**
+   * Create a branch; false when it already exists. GitHub answers 422 for
+   * other refusals too (a bad name, a missing commit), and those are errors:
+   * read as "exists", the save loop retried them and reported "busy".
+   */
   async createRef(branch: string, sha: string): Promise<boolean> {
     try {
       await this.request(
@@ -189,8 +193,14 @@ export class GitHubClient {
       );
       return true;
     } catch (error) {
-      if (error instanceof GitHubStatus) return false;
-      throw error;
+      if (!(error instanceof GitHubStatus)) throw error;
+      if (/already exists/i.test(error.message)) return false;
+      throw new GraftError({
+        code: "REMOTE_STORE_FAILED",
+        message: `GitHub refused to create the branch ${branch} (${error.status}): ${error.message}`,
+        fix: hintFor(error.status, this.repo),
+        details: { status: error.status, message: error.message, branch },
+      });
     }
   }
 
