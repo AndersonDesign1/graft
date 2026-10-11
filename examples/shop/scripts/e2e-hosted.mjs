@@ -41,10 +41,11 @@ if (!process.env.DATABASE_URL) {
 function step(message) {
   console.log(`\n▸ ${message}`);
 }
+/** Throws rather than exiting, so `finally` still stops both servers. */
 function check(condition, message) {
   if (!condition) {
     console.error(`  ✗ ${message}`);
-    process.exit(1);
+    throw new Error(`check failed: ${message}`);
   }
   console.log(`  ✓ ${message}`);
 }
@@ -70,57 +71,62 @@ const productPath = "products/" + readdirSync(join(site, "content", "products"))
 const before = readFileSync(join(site, "content", productPath), "utf8");
 check(true, `content is read-only; editing ${productPath}`);
 
-/* ---- GitHub ------------------------------------------------------------ */
-
-step("Start a GitHub-compatible server seeded with the same content");
-const files = {};
-const walk = (dir, prefix) => {
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name);
-    if (statSync(full).isDirectory()) walk(full, `${prefix}${name}/`);
-    else files[`${prefix}${name}`] = readFileSync(full, "utf8");
-  }
-};
-walk(join(here, "content"), "content/");
-const github = createGitHubFake({ repo: "acme/shop", files, token: "ghs_test" });
-const { url: apiUrl, close: closeGitHub } = await github.listen();
-const deployed = github.head();
-check(Boolean(deployed), `GitHub at ${apiUrl}, main at ${deployed.slice(0, 7)}`);
-
-/* ---- the hosted Studio ------------------------------------------------- */
-
-step("Boot graft serve --studio, writing through GitHub");
-const port = 3900 + Math.floor(Math.random() * 90);
-const origin = `http://127.0.0.1:${port}`;
-const env = {
-  ...process.env,
-  PORT: String(port),
-  GRAFT_STUDIO: "1",
-  GRAFT_STUDIO_SECRET: "e2e-secret-that-is-long-enough-to-sign-with",
-  GRAFT_STUDIO_URL: origin,
-  GRAFT_GITHUB_REPO: "acme/shop",
-  GRAFT_GITHUB_TOKEN: "ghs_test",
-  GRAFT_GITHUB_API_URL: apiUrl,
-  GRAFT_GITHUB_CONTENT_PATH: "content",
-  GRAFT_STUDIO_PUBLISH: "commit",
-  GRAFT_DEPLOYED_SHA: deployed,
-};
-execFileSync("node", [cli, "db", "migrate"], { cwd: site, env, stdio: "ignore" });
-execFileSync("node", [cli, "compile"], { cwd: site, env, stdio: "ignore" });
-const server = spawn("node", [cli, "serve", "--studio"], { cwd: site, env, stdio: "pipe" });
+// Both servers are stopped in `finally`, however the run ends.
+let server;
+let closeGitHub = async () => {};
 let log = "";
-server.stdout.on("data", (chunk) => (log += chunk));
-server.stderr.on("data", (chunk) => (log += chunk));
-for (let i = 0; i < 50 && !log.includes("studio"); i += 1)
-  await new Promise((r) => setTimeout(r, 200));
-check(log.includes("/studio"), "serving /studio");
-
 const cleanup = async () => {
-  server.kill();
+  server?.kill();
   await closeGitHub();
 };
 
 try {
+  /* ---- GitHub ------------------------------------------------------------ */
+
+  step("Start a GitHub-compatible server seeded with the same content");
+  const files = {};
+  const walk = (dir, prefix) => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) walk(full, `${prefix}${name}/`);
+      else files[`${prefix}${name}`] = readFileSync(full, "utf8");
+    }
+  };
+  walk(join(here, "content"), "content/");
+  const github = createGitHubFake({ repo: "acme/shop", files, token: "ghs_test" });
+  const listening = await github.listen();
+  const apiUrl = listening.url;
+  closeGitHub = listening.close;
+  const deployed = github.head();
+  check(Boolean(deployed), `GitHub at ${apiUrl}, main at ${deployed.slice(0, 7)}`);
+
+  /* ---- the hosted Studio ------------------------------------------------- */
+
+  step("Boot graft serve --studio, writing through GitHub");
+  const port = 3900 + Math.floor(Math.random() * 90);
+  const origin = `http://127.0.0.1:${port}`;
+  const env = {
+    ...process.env,
+    PORT: String(port),
+    GRAFT_STUDIO: "1",
+    GRAFT_STUDIO_SECRET: "e2e-secret-that-is-long-enough-to-sign-with",
+    GRAFT_STUDIO_URL: origin,
+    GRAFT_GITHUB_REPO: "acme/shop",
+    GRAFT_GITHUB_TOKEN: "ghs_test",
+    GRAFT_GITHUB_API_URL: apiUrl,
+    GRAFT_GITHUB_CONTENT_PATH: "content",
+    GRAFT_STUDIO_PUBLISH: "commit",
+    GRAFT_DEPLOYED_SHA: deployed,
+  };
+  execFileSync("node", [cli, "db", "migrate"], { cwd: site, env, stdio: "ignore" });
+  execFileSync("node", [cli, "compile"], { cwd: site, env, stdio: "ignore" });
+  server = spawn("node", [cli, "serve", "--studio"], { cwd: site, env, stdio: "pipe" });
+  server.stdout.on("data", (chunk) => (log += chunk));
+  server.stderr.on("data", (chunk) => (log += chunk));
+  for (let i = 0; i < 50 && !log.includes("studio"); i += 1)
+    await new Promise((r) => setTimeout(r, 200));
+  check(log.includes("/studio"), "serving /studio");
+
   /* ---- sign in ---------------------------------------------------------- */
 
   step("Sign in with an invite link");
@@ -228,7 +234,10 @@ try {
     github.files()[`content/${productPath}`].includes(`price: ${newPrice}`),
     "main has the new price",
   );
-  check(!github.branches().includes(draftBranch), "the empty draft branch is gone");
+  check(
+    JSON.stringify(github.files(draftBranch)) === JSON.stringify(github.files()),
+    "the draft branch holds no changes",
+  );
   const after = await api(
     `/entries?collection=products&q=${encodeURIComponent(entry.body.data.title)}`,
   );
@@ -263,7 +272,7 @@ try {
     await new Promise((resolve) => process.once("SIGINT", resolve));
   }
 } catch (error) {
-  console.error(error);
+  if (!String(error?.message).startsWith("check failed:")) console.error(error);
   console.error(log);
   process.exitCode = 1;
 } finally {

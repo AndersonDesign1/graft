@@ -3,8 +3,9 @@
  *
  * Local Studio asks git for its diff. A hosted Studio has no git binary and
  * no checkout, only the two versions the store returns, so it diffs them
- * itself. Myers' O(ND) algorithm over lines: documents are small, edits are
- * few, and D (the number of changed lines) is what the cost scales with.
+ * itself. Myers' O(ND) algorithm over lines, after trimming the common ends:
+ * documents are small, edits are few, and D (the number of changed lines) is
+ * what the cost scales with. Past MAX_EDITS it falls back to a plain replace.
  */
 import type { DiffHunkDto, DiffLineDto, FileDiffDto } from "../types";
 
@@ -21,16 +22,71 @@ function lines(text: string | null): string[] {
 
 type Op = { kind: DiffLineDto["kind"]; text: string; a: number; b: number };
 
-/** Edit script from a to b: Myers with a trace, then backtrack. */
+/**
+ * Past this many changed lines the minimal diff stops being worth its cost:
+ * Myers keeps one frontier per edit, so memory grows with the square of the
+ * edit count. The fallback (every old line removed, every new line added) is
+ * still a correct diff, just not the shortest.
+ */
+const MAX_EDITS = 2000;
+
+/** Edit script from a to b. Common ends are cheap, so only the middle pays for Myers. */
 function editScript(a: string[], b: string[]): Op[] {
+  let head = 0;
+  while (head < a.length && head < b.length && a[head] === b[head]) head += 1;
+  let tail = 0;
+  while (
+    tail < a.length - head &&
+    tail < b.length - head &&
+    a[a.length - 1 - tail] === b[b.length - 1 - tail]
+  ) {
+    tail += 1;
+  }
+
+  const ops: Op[] = [];
+  for (let i = 0; i < head; i += 1) ops.push({ kind: "context", text: a[i] as string, a: i, b: i });
+  const midA = a.slice(head, a.length - tail);
+  const midB = b.slice(head, b.length - tail);
+  const middle = myers(midA, midB) ?? replaceAll(midA, midB);
+  for (const op of middle) ops.push({ ...op, a: op.a + head, b: op.b + head });
+  for (let i = tail; i > 0; i -= 1) {
+    ops.push({
+      kind: "context",
+      text: a[a.length - i] as string,
+      a: a.length - i,
+      b: b.length - i,
+    });
+  }
+  return ops;
+}
+
+function replaceAll(a: string[], b: string[]): Op[] {
+  return [
+    ...a.map((text, i): Op => ({ kind: "remove", text, a: i, b: 0 })),
+    ...b.map((text, j): Op => ({ kind: "add", text, a: a.length, b: j })),
+  ];
+}
+
+/**
+ * Myers with a trace, then backtrack. Each step keeps only the band of the
+ * frontier that step can touch (2d + 3 entries), not the whole array, and
+ * the search gives up past MAX_EDITS: null means "use the fallback".
+ */
+function myers(a: string[], b: string[]): Op[] | null {
   const n = a.length;
   const m = b.length;
   const max = n + m;
-  const offset = max + 1;
-  const v = new Int32Array(2 * max + 3);
+  // Every read is within offset ± (d + 1), and d never passes MAX_EDITS, so
+  // the frontier needs the band, not the whole input: a 1M-line rewrite would
+  // otherwise allocate 8 MB before giving up.
+  const band = Math.min(max, MAX_EDITS);
+  const offset = band + 1;
+  const v = new Int32Array(2 * band + 3);
   const trace: Int32Array[] = [];
   outer: for (let d = 0; d <= max; d += 1) {
-    trace.push(v.slice());
+    if (d > MAX_EDITS) return null;
+    // Step d reads k - 1 and k + 1 for k in [-d, d]: keep [-d - 1, d + 1].
+    trace.push(v.slice(offset - d - 1, offset + d + 2));
     for (let k = -d; k <= d; k += 2) {
       let x =
         k === -d || (k !== d && (v[offset + k - 1] as number) < (v[offset + k + 1] as number))
@@ -51,12 +107,13 @@ function editScript(a: string[], b: string[]): Op[] {
   let y = m;
   for (let d = trace.length - 1; d >= 0; d -= 1) {
     const vd = trace[d] as Int32Array;
+    const band = d + 1; // index of k = 0 in this step's slice
     const k = x - y;
     const prevK =
-      k === -d || (k !== d && (vd[offset + k - 1] as number) < (vd[offset + k + 1] as number))
+      k === -d || (k !== d && (vd[band + k - 1] as number) < (vd[band + k + 1] as number))
         ? k + 1
         : k - 1;
-    const prevX = vd[offset + prevK] as number;
+    const prevX = vd[band + prevK] as number;
     const prevY = prevX - prevK;
     while (x > prevX && y > prevY) {
       x -= 1;
@@ -97,12 +154,15 @@ export function lineDiff(path: string, before: string | null, after: string | nu
 
     const slice = ops.slice(start, end + 1);
     const first = slice[0] as Op;
+    const oldLines = slice.filter((op) => op.kind !== "add").length;
+    const newLines = slice.filter((op) => op.kind !== "remove").length;
     const hunk: DiffHunkDto = {
       heading: "",
-      oldStart: first.a + 1,
-      newStart: first.b + 1,
-      oldLines: slice.filter((op) => op.kind !== "add").length,
-      newLines: slice.filter((op) => op.kind !== "remove").length,
+      // An empty side starts at the line before it, as in git (`-0,0` for a new file).
+      oldStart: oldLines === 0 ? first.a : first.a + 1,
+      newStart: newLines === 0 ? first.b : first.b + 1,
+      oldLines,
+      newLines,
       lines: [],
     };
     for (const op of slice) {

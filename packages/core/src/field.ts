@@ -193,27 +193,40 @@ function constrain(type: ScalarFieldType, base: z.ZodType, options?: FieldOption
   return out;
 }
 
-/** The options that limit a value, as introspectable data. Undefined when none. */
+/**
+ * The options that limit a value, as introspectable data. Undefined when none.
+ * Only the options `constrain` (or the array builder) enforces for this type:
+ * `field.string({ min: 10 })` validates nothing, so it advertises nothing.
+ */
 function constraintsOf(
+  type: string,
   options: FieldOptions & { maxItems?: number },
 ): FieldConstraints | undefined {
   const out: FieldConstraints = {};
-  if (options.min !== undefined) out.min = options.min;
-  if (options.max !== undefined) out.max = options.max;
-  if (options.int === true || options.format === "money") out.int = true;
-  if (options.maxLength !== undefined) out.maxLength = options.maxLength;
-  if (options.pattern !== undefined) out.pattern = options.pattern.source;
-  if (options.maxItems !== undefined) out.maxItems = options.maxItems;
-  if (options.format === "money") out.currency = (options.currency ?? "USD").toUpperCase();
+  if (type === "string" || type === "text") {
+    if (options.maxLength !== undefined) out.maxLength = options.maxLength;
+    if (options.pattern !== undefined) {
+      out.pattern = options.pattern.source;
+      if (options.pattern.flags) out.patternFlags = options.pattern.flags;
+    }
+  }
+  if (type === "number") {
+    if (options.min !== undefined) out.min = options.min;
+    if (options.max !== undefined) out.max = options.max;
+    if (options.int === true || options.format === "money") out.int = true;
+    if (options.format === "money") out.currency = (options.currency ?? "USD").toUpperCase();
+  }
+  if (type === "array" && options.maxItems !== undefined) out.maxItems = options.maxItems;
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /** Presentation metadata every builder carries the same way. */
 function presentation(
+  type: string,
   options: (FieldOptions & { maxItems?: number }) | undefined,
 ): Pick<FieldDefinition, "description" | "label" | "constraints" | "format"> {
   if (options === undefined) return {};
-  const constraints = constraintsOf(options);
+  const constraints = constraintsOf(type, options);
   return {
     ...(options.description !== undefined ? { description: options.description } : {}),
     ...(options.label !== undefined ? { label: options.label } : {}),
@@ -233,7 +246,7 @@ export function defineField<
     zod: (optional ? base.optional() : base) as MaybeOptional<ScalarZodMap[TType], TOptions>,
     optional,
     description: options?.description,
-    ...presentation(options),
+    ...presentation(type, options),
   };
 }
 
@@ -278,7 +291,7 @@ export function defineSelectField<
     zod: (optional ? base.optional() : base) as never,
     optional,
     description: options.description,
-    ...presentation(options),
+    ...presentation("select", options),
     options: choices,
   };
 }
@@ -309,7 +322,7 @@ export function defineReferenceField<const TOptions extends ReferenceFieldOption
     zod: (optional ? base.optional() : base) as MaybeOptional<z.ZodString, TOptions>,
     optional,
     description: options.description,
-    ...presentation(options),
+    ...presentation("reference", options),
     to: options.to,
   };
 }
@@ -357,7 +370,7 @@ export function defineObjectField<
     >,
     optional,
     description: options.description,
-    ...presentation(options),
+    ...presentation("object", options),
     fields: options.fields,
   };
 }
@@ -384,7 +397,7 @@ export function defineArrayField<
     zod: (optional ? base.optional() : base) as MaybeOptional<z.ZodArray<TItemZod>, TOptions>,
     optional,
     description: options.description,
-    ...presentation(options),
+    ...presentation("array", options),
     items: options.of,
   };
 }

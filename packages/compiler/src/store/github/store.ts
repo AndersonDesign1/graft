@@ -346,11 +346,8 @@ export class GitHubStore implements ContentStore {
       const dropping = requested.filter((path) => state.mine.has(path));
       if (dropping.length === 0 || state.draft === null) return;
       if (dropping.length === state.mine.size) {
-        // Nothing left: the branch goes, so a stale one never lingers.
-        if ((await this.client.getRef(this.draftBranch(actor))) === state.draft) {
-          await this.client.deleteRef(this.draftBranch(actor));
-          return;
-        }
+        // Nothing left: clear the draft rather than delete it (see clearDraft).
+        if (await this.clearDraft(actor, state.draft)) return;
         continue;
       }
       // Back to the base bytes, so the path stops differing from base. Not to
@@ -404,7 +401,7 @@ export class GitHubStore implements ContentStore {
 
     const settled = new Set([...plan.submitted, ...plan.adopt, ...plan.published]);
     if ([...before.mine.keys()].every((path) => settled.has(path))) {
-      await this.client.deleteRef(branch);
+      await this.clearDraft(actor, draft);
       return;
     }
 
@@ -419,6 +416,25 @@ export class GitHubStore implements ContentStore {
       author: authorOf(actor),
     });
     await this.client.fastForward(branch, commit);
+  }
+
+  /**
+   * Empty a draft without deleting its branch. GitHub's REST API has no
+   * conditional delete, so "check the head, then delete" loses a save that
+   * lands in between. A fast-forward is conditional: the branch moves to a
+   * commit holding production's tree, with the old head and production as
+   * parents, only if nobody moved it first. The branch then has no changes,
+   * and the editor's next save reuses it.
+   */
+  private async clearDraft(actor: StoreActor, head: string): Promise<boolean> {
+    // Production as it is now: a publish has just moved it.
+    const main = await this.requireMain();
+    const commit = await this.commitOnto(main, await this.contentFiles(main), [], {
+      parents: [head, main],
+      message: "Draft: clear after publish or discard",
+      author: authorOf(actor),
+    });
+    return this.client.fastForward(this.draftBranch(actor), commit);
   }
 
   /* ---- state ----------------------------------------------------------- */
@@ -669,13 +685,18 @@ export function normalisePath(path: string): string {
  * key per id. An id that is already a clean key (`ana`, `writer-bot`) is used
  * as is. Any other id (`ana@shop.test`) keeps a readable prefix and gains a
  * hash of the whole id, so `a+b@x.com` and `a-b@x.com` never share a draft.
+ *
+ * The hash is joined with `--`, which a clean key cannot contain (runs of
+ * other characters collapse to one `-`). Without that, a GitHub login such as
+ * `ana-lima-shop-test-0123456789` could equal an invite email's hashed key,
+ * and two people would share one draft branch.
  */
 export function actorKey(actor: StoreActor): string {
   const readable = trimChar(actor.id.toLowerCase().replace(/[^a-z0-9]+/g, "-"), "-", "both");
   if (readable === actor.id && readable.length <= 48) return readable;
   const hash = createHash("sha256").update(actor.id).digest("hex").slice(0, 10);
-  const prefix = trimChar(readable.slice(0, 37), "-");
-  return prefix ? `${prefix}-${hash}` : `editor-${hash}`;
+  const prefix = trimChar(readable.slice(0, 36), "-");
+  return prefix ? `${prefix}--${hash}` : `editor--${hash}`;
 }
 
 function authorOf(actor: StoreActor): CommitAuthor {

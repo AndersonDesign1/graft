@@ -13,7 +13,7 @@
  * frontmatter bytes. Only a real data change earns a re-serialisation, because
  * then the author asked for one.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { GraftError } from "@usegraft/contracts";
 import { resolveContained } from "./paths";
@@ -46,15 +46,36 @@ export function writeDocumentFile(root: string, sourcePath: string, raw: string)
     writeFileSync(fullPath, raw);
     return fullPath;
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code ?? "";
-    if (!READ_ONLY_CODES.has(code)) throw error;
-    throw new GraftError({
-      code: "CONTENT_TREE_READ_ONLY",
-      message: `Cannot write ${fullPath}: the filesystem refused it (${code}).`,
-      fix: "Authored content lives in files, so writing needs a writable checkout. Run this surface locally (`graft studio` / `graft mcp`) or in a container with the project mounted read-write; a serverless deployment's filesystem is read-only and should serve reads only.",
-      details: { path: fullPath, errno: code },
-    });
+    throw readOnlyError(error, "write", fullPath) ?? error;
   }
+}
+
+/**
+ * Delete a document's file, with the same containment and the same read-only
+ * translation as a write. A delete on a serverless filesystem fails the same
+ * way a save does and deserves the same explanation.
+ */
+export function removeDocumentFile(root: string, sourcePath: string): void {
+  const fullPath = resolveContained(root, sourcePath, { label: "document" });
+  try {
+    unlinkSync(fullPath);
+  } catch (error) {
+    // Already gone, which is what a delete asks for.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw readOnlyError(error, "delete", fullPath) ?? error;
+  }
+}
+
+/** The explaining error for a read-only refusal, or undefined for any other failure. */
+function readOnlyError(error: unknown, verb: string, fullPath: string): GraftError | undefined {
+  const code = (error as NodeJS.ErrnoException).code ?? "";
+  if (!READ_ONLY_CODES.has(code)) return undefined;
+  return new GraftError({
+    code: "CONTENT_TREE_READ_ONLY",
+    message: `Cannot ${verb} ${fullPath}: the filesystem refused it (${code}).`,
+    fix: "Authored content lives in files, so writing needs a writable checkout. Run this surface locally (`graft studio` / `graft mcp`) or in a container with the project mounted read-write; a serverless deployment's filesystem is read-only and should serve reads only.",
+    details: { path: fullPath, errno: code },
+  });
 }
 
 /**

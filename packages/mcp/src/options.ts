@@ -158,9 +158,11 @@ export interface GraftMcpOptions {
    * files under `contentDir`, which the tools already write directly.
    * A remote store (GitHub) makes `write_content` and `delete_content` land as
    * draft commits on the caller's own branch instead of files, which is what
-   * lets a hosted, read-only deployment accept writes, and registers
-   * `list_drafts`, `publish_drafts` and `discard_drafts`: the same draft model
-   * a hosted Studio uses.
+   * lets a hosted, read-only deployment accept writes. When the store also has
+   * a draft workflow (`store.drafts`, which `GitHubStore` provides), the
+   * server registers `list_drafts`, `publish_drafts` and `discard_drafts`: the
+   * same draft model a hosted Studio uses. A remote store without one gets the
+   * writes but none of those three tools.
    */
   store?: ContentStore;
   /**

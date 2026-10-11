@@ -58,8 +58,14 @@ export const FieldConstraints = z.object({
   max: z.number().optional(),
   int: z.boolean().optional(),
   maxLength: z.number().optional(),
-  /** A `RegExp` source, flags dropped (fields declare none). */
+  /** A `RegExp` source. Its flags, if any, are in `patternFlags`. */
   pattern: z.string().optional(),
+  /**
+   * The `RegExp` flags of `pattern` (`i`, `u`, ...). Absent when there are none.
+   * Rebuild with `new RegExp(pattern, patternFlags)` per test: the validator
+   * resets `lastIndex` to 0 each time, so `g` is inert and `y` anchors at 0.
+   */
+  patternFlags: z.string().optional(),
   maxItems: z.number().optional(),
   /** ISO 4217 code for a `money` number. */
   currency: z.string().optional(),

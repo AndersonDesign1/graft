@@ -192,7 +192,10 @@ nothing to refresh. On Postgres, content can change while your app is running,
 from a local Studio or from an agent. A server that writes to GitHub
 ([Host Studio for your team](/docs/studio-hosting)) is different: saves are
 drafts. Publishing either commits to your production branch or opens a pull
-request, and your host rebuilds when the change reaches that branch. SvelteKit has no tag-based data cache, so let your
+request, and your host rebuilds when the change reaches that branch. A local
+Studio refreshes the app after a save that changes content, once the webhook
+below (or an `onContentChange` hook) is set up, and its Publish only commits in
+your checkout, which you push yourself. SvelteKit has no tag-based data cache, so let your
 CDN cache pages and purge only the ones whose content changed.
 
 First, send each page with a header that lists the content it read. `tagsFor`

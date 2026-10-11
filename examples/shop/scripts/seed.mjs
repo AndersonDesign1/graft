@@ -60,6 +60,8 @@ const slugify = (text) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+/** "A" or "An", by the sound of the next word: every colour here starts as it is spelled. */
+const article = (word) => (/^[aeiou]/i.test(word) ? "An" : "A");
 const yamlString = (text) =>
   /^[\w .,'&-]+$/.test(text) && !/^\d/.test(text) ? text : JSON.stringify(text);
 
@@ -103,7 +105,7 @@ products.forEach((product, i) => {
     `price: ${price}`,
     ...(onSale ? [`compareAtPrice: ${price + 2000}`] : []),
     `category: ${product.category}`,
-    `summary: ${yamlString(`A ${product.title.toLowerCase()} made to last, in a cut that works on its own or layered.`)}`,
+    `summary: ${yamlString(`${article(product.title)} ${product.title.toLowerCase()} made to last, in a cut that works on its own or layered.`)}`,
     "images:",
     `  - key: products/${product.slug}/front.jpg`,
     `    alt: ${yamlString(`${product.title}, front`)}`,
@@ -122,9 +124,14 @@ products.forEach((product, i) => {
     });
   }
   if (i % 7 === 0) lines.push("featured: true");
-  const related = [products[(i + 1) % products.length], products[(i + 5) % products.length]]
-    .filter((other) => other && other.slug !== product.slug)
-    .map((other) => other.slug);
+  // A Set: with --count 2 or 4 both offsets land on the same product.
+  const related = [
+    ...new Set(
+      [products[(i + 1) % products.length], products[(i + 5) % products.length]]
+        .filter((other) => other && other.slug !== product.slug)
+        .map((other) => other.slug),
+    ),
+  ];
   if (related.length > 0) {
     lines.push("related:", ...related.map((slug) => `  - ${slug}`));
   }

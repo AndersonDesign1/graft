@@ -5,7 +5,7 @@
 import { execFile } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { userInfo } from "node:os";
-import { revalidateWebhookFromEnv } from "@usegraft/compiler";
+import { isLoopbackHost, revalidateWebhookFromEnv } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { allowedHostsFor, createNodeListener } from "./serve";
@@ -264,19 +264,24 @@ export async function studioInviteCommand(
   // The sign-in route is at the site's root (/api/studio/v1/auth/link), so a
   // URL pasted with a path, like https://shop.example.com/studio, is cut back
   // to its origin.
-  let origin: string;
-  try {
-    const parsed = new URL(baseUrl);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
-      throw new Error(parsed.protocol);
-    origin = parsed.origin;
-  } catch {
+  const parsed = URL.canParse(baseUrl) ? new URL(baseUrl) : undefined;
+  if (!parsed || (parsed.protocol !== "http:" && parsed.protocol !== "https:")) {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
       message: `"${baseUrl}" is not an http(s) URL.`,
       fix: "Pass --url with the site's address, such as https://shop.example.com.",
     });
   }
+  // The link carries a sign-in token, and the session cookie is Secure off
+  // loopback, so plain http would leak the token and still fail to sign in.
+  if (parsed.protocol === "http:" && !isLoopbackHost(parsed.hostname)) {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: `"${baseUrl}" uses plain http, which would send the sign-in token unencrypted.`,
+      fix: "Pass the https address, such as https://shop.example.com. Plain http is accepted only for localhost, 127.0.0.1 and [::1].",
+    });
+  }
+  const origin = parsed.origin;
   const link = createInviteLink({
     secret: process.env.GRAFT_STUDIO_SECRET ?? "",
     baseUrl: origin,

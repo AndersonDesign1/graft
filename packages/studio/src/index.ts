@@ -55,5 +55,8 @@ export type {
   SaveEntryResult,
   WorkspaceDto,
 } from "./editor-types";
+// Referenced by the editor DTOs above, so a caller typing responses needs them
+// from the same import.
+export type { ContentChangeNotice, ReviewRequest } from "@usegraft/compiler";
 
 export const PACKAGE = "@usegraft/studio" as const;

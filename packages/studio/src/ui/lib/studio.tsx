@@ -52,8 +52,12 @@ export function collectionLabel(name: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+/** Words whose plural is the singular: "New news" otherwise. Matched on the last word. */
+const SAME_IN_SINGULAR = new Set(["news", "series", "species", "media", "data"]);
+
 export function singular(name: string): string {
   const label = name.replace(/[-_]+/g, " ").toLowerCase();
+  if (SAME_IN_SINGULAR.has(label.split(" ").pop() ?? "")) return label;
   if (/ies$/.test(label)) return label.replace(/ies$/, "y");
   if (/(ss|us)$/.test(label)) return label;
   if (/(ches|shes|xes|ses)$/.test(label)) return label.replace(/es$/, "");

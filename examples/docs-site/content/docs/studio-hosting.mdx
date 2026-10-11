@@ -92,7 +92,8 @@ Without a list, anyone with write access to the repository can sign in. Studio
 asks GitHub with its own credential, which needs Metadata read on the
 repository; every fine-grained token and GitHub App has it. If GitHub refuses,
 the sign-in screen says access couldn't be checked and the server log says why.
-To choose who can sign in, and with which role, set `GRAFT_STUDIO_EDITORS`:
+To choose who can sign in with GitHub, and with which role, set
+`GRAFT_STUDIO_EDITORS`:
 
 ```sh
 GRAFT_STUDIO_EDITORS="ana@shop.example.com=admin, octocat, ben@shop.example.com=contributor"
@@ -106,7 +107,9 @@ graft studio invite ana@shop.example.com --name "Ana Lima" --role editor
 
 This prints a link that signs Ana in. It lasts seven days (`--days` sets 1 to
 30). Send it privately: anyone with the link can use it until it expires.
-Commits from an invited editor carry their name and email.
+Commits from an invited editor carry their name and email. An invite link
+grants the role it was made with on its own: `GRAFT_STUDIO_EDITORS` applies to
+GitHub sign-in only, so an invited person does not need to be on that list.
 
 ### Roles
 
@@ -156,7 +159,7 @@ request unless its token carries `content:publish`. See
    "Unpublished changes", and a branch called `graft-studio/drafts/<you>`
    appears on GitHub with your commit.
 3. Press Publish. One commit appears on the production branch, authored by
-   you, and the draft branch is deleted.
+   you, and your draft branch no longer holds changes.
 4. Your host redeploys, and the change is live.
 
 `examples/shop/scripts/e2e-hosted.mjs` runs the same steps against a stand-in

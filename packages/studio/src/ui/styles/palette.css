@@ -70,9 +70,9 @@
   --c-vermilion-bg: light-dark(oklch(0.945 0.025 35), oklch(0.245 0.05 35));
   --c-vermilion-bg-hover: light-dark(oklch(0.91 0.045 35), oklch(0.295 0.066 35));
   --c-vermilion-border: light-dark(oklch(0.8 0.08 35), oklch(0.4 0.09 35));
-  --c-vermilion-solid: light-dark(oklch(0.6 0.19 35), oklch(0.72 0.16 35));
-  --c-vermilion-text: light-dark(oklch(0.47 0.15 35), oklch(0.8 0.11 35));
-  --c-vermilion-text-loud: light-dark(oklch(0.44 0.14 35), oklch(0.82 0.1 35));
+  --c-vermilion-solid: light-dark(oklch(0.58 0.19 35), oklch(0.74 0.16 35));
+  --c-vermilion-text: light-dark(oklch(0.45 0.15 35), oklch(0.8 0.11 35));
+  --c-vermilion-text-loud: light-dark(oklch(0.42 0.14 35), oklch(0.82 0.1 35));
 
   /* ---- neutral — not a hue. Aliases into the tokens.css ramp so the
      colorless states share one source of truth with the chrome. ---- */

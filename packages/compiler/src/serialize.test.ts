@@ -19,10 +19,16 @@ vi.mock("node:fs", async (importOriginal) => {
       }
       return actual.writeFileSync(...args);
     },
+    unlinkSync: (...args: Parameters<typeof actual.unlinkSync>) => {
+      if (stub.errno !== undefined) {
+        throw Object.assign(new Error(`${stub.errno}: refused`), { code: stub.errno });
+      }
+      return actual.unlinkSync(...args);
+    },
   };
 });
 
-const { composeDocument, writeDocumentFile } = await import("./serialize");
+const { composeDocument, removeDocumentFile, writeDocumentFile } = await import("./serialize");
 
 afterEach(() => {
   stub.errno = undefined;
@@ -250,6 +256,36 @@ describe("writeDocumentFile", () => {
       expect((error as GraftError).details).toMatchObject({ errno: code });
     },
   );
+
+  it.each(["EROFS", "EACCES", "EPERM"])(
+    "turns a %s refusal on delete into the same error",
+    (code) => {
+      // A delete on a serverless filesystem fails like a save does. Before, it
+      // surfaced as a raw errno while the save beside it explained itself.
+      const dir = mkdtempSync(join(tmpdir(), "graft-rm-"));
+      try {
+        writeDocumentFile(dir, "page.mdx", "x");
+        stub.errno = code;
+        expect(() => removeDocumentFile(dir, "page.mdx")).toThrow(
+          expect.objectContaining({ code: "CONTENT_TREE_READ_ONLY" }),
+        );
+      } finally {
+        stub.errno = undefined;
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("deletes a file that is already gone without failing", () => {
+    // Removed between the caller's existence check and the unlink: the
+    // delete's goal is met, so a raw ENOENT is the wrong answer.
+    const dir = mkdtempSync(join(tmpdir(), "graft-rm-gone-"));
+    try {
+      expect(() => removeDocumentFile(dir, "missing.mdx")).not.toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 
   it("lets an unrelated filesystem error through untranslated", () => {
     stub.errno = "ENOSPC";

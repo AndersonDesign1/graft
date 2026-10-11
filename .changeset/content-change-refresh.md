@@ -15,12 +15,14 @@ until someone called its revalidate route by hand.
 
 **Webhook.** Set `GRAFT_REVALIDATE_URL` and `GRAFT_WEBHOOK_SECRET` where
 `graft serve`, `graft studio`, `graft mcp`, `graft merge` or `graft migrate`
-runs. After each write that changes content, Graft POSTs
+runs. After each local write that changes the index, Graft POSTs
 `{ branch, gitSha, changes }` with `Authorization: Bearer <secret>`, the body
 the documented revalidate route already reads. The URL must use https, except
 on loopback (`localhost`, `127.0.0.1`, `[::1]`), and redirects are refused. A URL without a secret stops the
 command before it connects to anything. `graft compile` does not call the
-route, because a deploy compiles before the new version is live.
+route, because a deploy compiles before the new version is live. A write to a
+GitHub-backed store is a draft and calls nothing: the app refreshes when a
+publish reaches the production branch and the host rebuilds.
 
 **Hook.** `createGraftMcp`, `createGraftMcpHandler`, `createStudioApiHandler`
 and `createStudioHandler` take `onContentChange(event)`. An app that mounts the

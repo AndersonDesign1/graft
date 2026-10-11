@@ -62,7 +62,7 @@ All paths are prefixed with `/api/studio/v1`. Sign-in lives beside them at
 `/api/studio/v1/auth/*` and needs no scope, because it is how a session starts.
 
 `GET /entries` takes `q`, `status` (`all`, `unpublished`, `published`, `new`,
-`changed`), `where.<field>=<value>`, `sort` (`site`, `title`, `updated` or a
+`changed`, `deleted`), `where.<field>=<value>`, `sort` (`site`, `title`, `updated` or a
 field), `dir`, `cursor` and `limit` (at most 500), and returns a page with the
 facets to filter by.
 

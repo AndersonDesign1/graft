@@ -7,10 +7,7 @@
 
 /** "Blue Linen Shirt!" -> "blue-linen-shirt". Empty when nothing is left. */
 export function slugify(text: string, max = 80): string {
-  const plain = text
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
+  const plain = text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
   let out = "";
   for (const char of plain) {
     if (out.length >= max) break;

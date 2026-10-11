@@ -20,6 +20,15 @@ export function useResource<T>(path: string | null, deps: unknown[] = []): Resou
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [nonce, setNonce] = useState(0);
+  const [activePath, setActivePath] = useState(path);
+
+  // A path that just became non-null is loading from this render on. Set in
+  // the effect instead, the first render after the change showed neither a
+  // skeleton nor data: loading was still false from the skipped request.
+  if (path !== activePath) {
+    setActivePath(path);
+    if (path !== null) setLoading(true);
+  }
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 

@@ -13,7 +13,7 @@
  * GRAFT_STUDIO_SECRET signs everyone out and voids every unused invite.
  */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { withoutTrailingSlashes } from "@usegraft/compiler";
+import { isLoopbackHost, withoutTrailingSlashes } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 
 /** What a person may do in Studio. Ordered from least to most. */
@@ -186,7 +186,7 @@ export function cookieHeader(
   maxAgeMs: number,
 ): string {
   const url = new URL(request.url);
-  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  const loopback = isLoopbackHost(url.hostname);
   const secure = url.protocol === "https:" || !loopback;
   return [
     `${name}=${encodeURIComponent(value)}`,

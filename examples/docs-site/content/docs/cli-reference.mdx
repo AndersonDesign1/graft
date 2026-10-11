@@ -47,7 +47,8 @@ The real output is one line. `added`, `changed`, and `removed` are lists of
 On the static engine, a content change ships with a new deploy, so there is
 nothing to refresh. On the Postgres engine, writes from agents, Studio,
 `graft merge` and `graft migrate` call your app's revalidate route when
-`GRAFT_REVALIDATE_URL` is set. `graft compile` does not, because a deploy
+`GRAFT_REVALIDATE_URL` and `GRAFT_WEBHOOK_SECRET` are both set. With the URL
+alone, these commands refuse to start. `graft compile` does not, because a deploy
 compiles before the new version is live. Send its output to the route yourself
 so the app refreshes only the pages that changed. A shell does not read `.env`,
 so export `GRAFT_WEBHOOK_SECRET` in the script's environment first:
@@ -70,7 +71,7 @@ for the route.
 | `graft mcp` | Serve your project to an agent on this machine, over stdio |
 | `graft serve [--port 3903]` | Run Graft's HTTP endpoints: functions, MCP, the Content API, and `/healthz`. Add `--studio` to include Studio. |
 | `graft studio` | Open Studio on this machine, at port 4983 |
-| `graft studio invite <email>` | Print a sign-in link for a hosted Studio. `--role` (viewer, contributor, editor, admin), `--name`, `--days`, `--url`. Needs `GRAFT_STUDIO_SECRET` |
+| `graft studio invite <email>` | Print a sign-in link for a hosted Studio. `--role` (viewer, contributor, editor, admin), `--name`, `--days`, `--url`. Needs `GRAFT_STUDIO_SECRET`, and Studio's public address from `--url` or `GRAFT_STUDIO_URL`: https, or plain http on `localhost`, `127.0.0.1` or `[::1]` |
 
 ## Manage the database (Postgres engine)
 

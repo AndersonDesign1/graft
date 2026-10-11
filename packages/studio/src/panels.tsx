@@ -16,7 +16,9 @@ export { StudioApp } from "./ui/app";
  * publishing) without the host providing a shell. It owns its own hash route.
  */
 export function ContentTreePanel({ branch = "main" }: { branch?: string }) {
-  return <StudioApp branch={branch} />;
+  // StudioApp reads `branch` once, into state. Keyed on it, a host that
+  // switches branch gets a fresh app on the new one instead of a stale view.
+  return <StudioApp key={branch} branch={branch} />;
 }
 
 export function ApprovalQueuePanel() {

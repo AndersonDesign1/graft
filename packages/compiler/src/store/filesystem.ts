@@ -7,9 +7,9 @@
  * draft and a commit is the publish; Studio supplies that over the working
  * tree with git, where it already lived.
  */
-import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolveContained } from "../paths";
-import { writeDocumentFile } from "../serialize";
+import { removeDocumentFile, writeDocumentFile } from "../serialize";
 import { gitBlobSha } from "./blob";
 import { assertBaseVersion } from "./conflict";
 import type { ContentStore, StoredFile, StoreInfo, WriteOptions } from "./types";
@@ -39,7 +39,7 @@ export class FilesystemStore implements ContentStore {
     const current = existsSync(full) ? gitBlobSha(readFileSync(full)) : null;
     assertBaseVersion(path, options.baseVersion, current);
     if (raw === null) {
-      if (current !== null) unlinkSync(full);
+      if (current !== null) removeDocumentFile(this.contentDir, path);
       return { version: null };
     }
     writeDocumentFile(this.contentDir, path, raw);
