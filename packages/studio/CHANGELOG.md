@@ -1,5 +1,42 @@
 # @usegraft/studio
 
+## 1.0.0-beta.6
+
+### Patch Changes
+
+- 2386e74: Field descriptors now match what the validator checks. A pattern's flags are kept in the new `constraints.patternFlags`, so Studio checks `/^[a-z]+$/i` case-insensitively like the server does instead of flagging valid values. Constraints are listed only for the field types that enforce them: `field.string({ min: 10 })` validates nothing, so `describe_schema` no longer advertises a minimum for it.
+- 2386e74: A save to a GitHub draft can no longer be lost while the draft is being emptied. Publishing everything or discarding the last change used to read the draft branch and then delete it, and a save that landed in between was deleted with it after reporting success. The draft is now emptied with a fast-forward that fails if the branch moved, so the branch stays, holding no changes, and the next save reuses it.
+
+  Invite-link editors get new draft branch names. Their key joins the hash with `--`, which a GitHub login cannot produce, so a login shaped like an email's key (`ana-lima-shop-test-0123456789`) no longer shares that person's draft. A draft saved under the old name before upgrading stays on GitHub as a branch: publish or discard it first, or merge it by hand.
+
+- 2386e74: One loopback list decides every "https unless loopback" question: `@usegraft/compiler` exports `LOOPBACK_HOSTS` and `isLoopbackHost`, and the revalidate webhook, Studio's `Secure` session cookie and `graft studio invite` all use them, so the invite check and the cookie can never disagree about a host. Paths under a regular file now read as absent instead of failing with `ENOTDIR`, and deleting a document that is already gone succeeds.
+- 2386e74: A hosted Studio's change diff keeps its memory bounded. It kept a copy of the whole search frontier for every changed line, so a large rewrite (two 10,000-line versions with nothing in common) needed gigabytes and could take the server down. It now skips the unchanged start and end, keeps only the part of the frontier each step uses, and past 2,000 changed lines falls back to every old line removed and every new line added. As before, the drawer renders at most 600 lines and marks a longer diff as truncated. A hunk whose old or new side is empty now starts at the line before it, as git does (`-0,0` for a new file).
+- 2386e74: `@usegraft/studio` also exports `ContentChangeNotice` and `ReviewRequest`, the two types its editor DTOs refer to, so typing a response needs one import instead of a second one from `@usegraft/compiler`.
+- 2386e74: Studio fixes from review:
+
+  - Discarding a local file that was staged as new and then deleted works, including in a repository with no commits yet. It used to try to restore it from HEAD, where it never was.
+  - Local drafts report each changed file's version, as GitHub drafts do. Only a deletion has none.
+  - A failed GitHub sign-in returns to the page the person started from, branch and hash kept, instead of Studio's front page. That needs the sign-in's own state cookie: a callback without a valid one still lands on the front page.
+  - Slugs drop every combining mark, not only those in U+0300 to U+036F, so a title with one no longer gains a hyphen mid-word.
+  - "News", "series", "species", "media" and "data" keep their form in the singular ("New news" became "New new").
+  - `ContentTreePanel` follows a change to its `branch` prop. It kept showing the first branch.
+  - The first render after a view starts loading shows the loading state, not an empty page.
+  - The vermilion scale uses the same lightness steps as the other hues, so unpublished-state colour reads at the same brightness.
+  - `WorkspaceDto.sessions` is documented as what it is: whether the request carried a session cookie.
+
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+  - @usegraft/compiler@1.0.0-beta.6
+  - @usegraft/core@1.0.0-beta.6
+  - @usegraft/contracts@1.0.0-beta.6
+  - @usegraft/db@1.0.0-beta.6
+  - @usegraft/mdx-safety@1.0.0-beta.6
+  - @usegraft/assets@1.0.0-beta.6
+
 ## 1.0.0-beta.5
 
 ### Minor Changes

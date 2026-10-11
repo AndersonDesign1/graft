@@ -1,5 +1,34 @@
 # @usegraft/cli
 
+## 1.0.0-beta.6
+
+### Patch Changes
+
+- 2386e74: One loopback list decides every "https unless loopback" question: `@usegraft/compiler` exports `LOOPBACK_HOSTS` and `isLoopbackHost`, and the revalidate webhook, Studio's `Secure` session cookie and `graft studio invite` all use them, so the invite check and the cookie can never disagree about a host. Paths under a regular file now read as absent instead of failing with `ENOTDIR`, and deleting a document that is already gone succeeds.
+- 2386e74: `graft studio invite` refuses a plain `http://` address unless it is `localhost`, `127.0.0.1` or `[::1]`. The link carries a sign-in token, so plain http sent it unencrypted, and the session cookie is `Secure` off loopback, so the sign-in failed anyway. The usage message for a missing email now lists `--name` and `--days` too.
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+  - @usegraft/compiler@1.0.0-beta.6
+  - @usegraft/core@1.0.0-beta.6
+  - @usegraft/contracts@1.0.0-beta.6
+  - @usegraft/studio@1.0.0-beta.6
+  - @usegraft/mcp@1.0.0-beta.6
+  - @usegraft/auth@1.0.0-beta.6
+  - @usegraft/content-migrations@1.0.0-beta.6
+  - @usegraft/content-api@1.0.0-beta.6
+  - @usegraft/db@1.0.0-beta.6
+  - @usegraft/mdx-safety@1.0.0-beta.6
+  - @usegraft/registry@1.0.0-beta.6
+  - @usegraft/assets@1.0.0-beta.6
+
 ## 1.0.0-beta.5
 
 ### Minor Changes
