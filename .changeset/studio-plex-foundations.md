@@ -12,6 +12,9 @@ are a mark and a word on the neutral ramp, amber is kept for something waiting
 on a person, red for errors and deletes, and diffs keep their code colors.
 Collections are marked by an icon in the text color, not a tinted tile.
 
-Icons are Lucide, at 16px and a 1.75 stroke, as in the docs. If you embed
-`@usegraft/studio/panels`, install `lucide-react` in place of
-`@phosphor-icons/react`; it is the optional peer the panels now import.
+Icons are Lucide, at 16px and a 1.75 stroke, as in the docs.
+
+**BREAKING (panels embed only):** if you embed `@usegraft/studio/panels`,
+install `lucide-react` in place of `@phosphor-icons/react`. It is the optional
+peer the panels now import. `graft studio` and `graft serve --studio` need
+nothing.

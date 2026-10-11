@@ -27,7 +27,7 @@ const stripComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, 
  */
 const LITERAL = /(oklch|rgba?|hsla?|lab|lch)\(|#[0-9a-fA-F]{3,8}\b/;
 /** Palette names and syntax tokens: components reach them only through a role. */
-const RAW_SCALE = /var\(--(?:c|gh|code|n|paper|ink)-\d|var\(--(?:c|gh|code)-/;
+const RAW_SCALE = /var\(--(?:c|gh|code|n|paper|ink|note|warning|danger)-\d|var\(--(?:c|gh|code)-/;
 
 describe("token layering", () => {
   it("keeps colour literals out of roles.css", () => {
