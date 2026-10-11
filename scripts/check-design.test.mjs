@@ -101,6 +101,7 @@ test("named colors are literals; names inside variables and fonts are not", () =
   assert.equal(checkCss(".a { border: 1px solid rebeccapurple; }").length, 1);
   assert.deepEqual(checkCss(".a { color: var(--red-500); background: currentColor; }"), []);
   assert.deepEqual(checkCss('.a { font-family: "Gold Sans", var(--font-sans); }'), []);
+  assert.deepEqual(checkCss(".a { background: url('/assets/red-logo.svg'); }"), []);
 });
 
 test("a commented-out definition does not count", () => {

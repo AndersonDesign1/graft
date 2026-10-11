@@ -10,7 +10,8 @@ and recovers from an error using its `fix`.
 - `mcp.read`: `get_content`, `list_content`, `search_content`.
 - `mcp.write`: in a local project, `write_content` validates, writes the
   file, and compiles. On a `graft serve` that writes to GitHub, it commits to
-  the connection's draft branch instead and does not compile;
+  the caller's draft branch (one per identity, shared by that identity's
+  connections) instead and does not compile;
   `publish_drafts` publishes.
 - `mcp.write-error`: a bad write returns `SCHEMA_VALIDATION_FAILED` with
   `fix`, `details.issues` and `howToRecover`, and writes nothing.

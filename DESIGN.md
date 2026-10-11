@@ -318,6 +318,9 @@ What ships today and breaks a rule above. Fix these when you touch the
 component; do not copy them.
 
 - Fence and prompt copy buttons are 32px, under the 40px hit area.
+- The Copy page pill changes its own label to "Copied" or "Copy failed",
+  which changes its accessible name. It should keep "Copy page" and announce
+  the result in a live region, as the fence and prompt buttons do.
 - `InlineCode` also colors file paths (`graft.config.ts`, `src/`), and leaves
   `npx` and `npm` commands plain.
 - Markdown tables have no `scope` on header cells, do not right-align

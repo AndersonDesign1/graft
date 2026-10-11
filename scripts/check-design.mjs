@@ -67,8 +67,9 @@ const NOT_A_COLOR =
 /** Whether a declaration's value spells a color instead of reading a token. */
 function hasLiteralColor(property, value) {
   if (NOT_A_COLOR.test(property)) return false;
-  // Variable names (`--red-500`) are references, not color words.
-  const bare = value.replace(/--[\w-]+/g, "");
+  // Variable names (`--red-500`) are references and a url() is a path, not
+  // color words.
+  const bare = value.replace(/url\((?:"[^"]*"|'[^']*'|[^)]*)\)|--[\w-]+/gi, "");
   if (LITERAL_COLOR.test(bare)) return true;
   return bare
     .toLowerCase()

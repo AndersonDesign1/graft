@@ -9,6 +9,10 @@
 # one for a real database; verification must not touch it.
 set -euo pipefail
 
+if [[ $# -gt 1 ]]; then
+  echo "usage: sandbox.sh [--postgres]" >&2
+  exit 2
+fi
 case "${1:-}" in
   "" | --postgres) ;;
   *)

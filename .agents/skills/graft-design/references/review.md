@@ -11,7 +11,8 @@ Render it. Code reading is not a visual review.
 # docs site
 # build what the site imports first (graft-verify, features/docs-site.md)
 cd examples/docs-site && npx astro dev --background --port 4321 --host 127.0.0.1
-until curl -sf -o /dev/null http://127.0.0.1:4321/docs/getting-started; do sleep 1; done
+for i in $(seq 60); do curl -sf -o /dev/null http://127.0.0.1:4321/docs/getting-started && break; sleep 1; done
+curl -sf -o /dev/null http://127.0.0.1:4321/docs/getting-started || { npx astro dev logs; exit 1; }
 agent-browser --color-scheme dark open http://127.0.0.1:4321/docs/getting-started
 agent-browser set viewport 1440 900 && agent-browser screenshot desktop-dark.png
 agent-browser set viewport 390 844 && agent-browser screenshot phone-dark.png

@@ -40,7 +40,8 @@ Where anything here disagrees with DESIGN.md, DESIGN.md wins.
   Announce "Copied" through a live region (`role="status"` or `aria-live`);
   the button's own label names what it copies ("Copy code", "Copy prompt",
   "Copy page") and does not change. Catch clipboard errors and say "Copy
-  failed".
+  failed". (The Copy page pill still changes its label; see Known gaps in
+  DESIGN.md.)
 
 ## Icons
 

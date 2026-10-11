@@ -29,7 +29,8 @@ case "$cmd" in
     data="$(mktemp -d /tmp/graft-pg.XXXXXX)"
     chmod 755 "$data"
     password="$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')"
-    printf '%s\n' "$password" > "$data/pwfile"
+    (umask 077 && printf '%s\n' "$password" > "$data/pwfile")
+    trap 'rm -f "$data/pwfile"' EXIT
     if [[ "$(id -u)" == 0 ]]; then chown -R postgres "$data"; fi
     echo "$data" > "$dir/datadir"
     port=54330

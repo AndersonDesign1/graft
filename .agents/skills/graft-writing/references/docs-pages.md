@@ -74,8 +74,10 @@ Use `<Steps>` only for an order the reader must follow.
 
 ## Callouts
 
-`<Callout label="..." type="warning">`, where `type` is one of `note`
-(the default), `warning` or `danger`. At most two per page.
+`<Callout label="..." type="warning">`, where `type` is one of `note`,
+`warning` or `danger`. Without `type`, the component guesses from the label
+(words like "beta" or "irreversible"), so set it whenever the tone matters.
+At most two per page.
 
 - The label is the point, as a sentence: "Deletes cannot be undone",
   "Keep the client on the server", "The rule". Not "Note" or "Warning".
