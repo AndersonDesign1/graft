@@ -377,8 +377,8 @@
 
   .top-branch,
   .top-repo,
-  .wordmark-sep,
-  .wordmark-surface {
+  .top .wordmark-sep,
+  .top .wordmark-surface {
     display: none;
   }
 

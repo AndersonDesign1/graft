@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { SchemaFieldDto, SchemaList } from "../../types";
 import { IconDatabase, IconFile, IconSearch } from "../components/icons";
-import { EmptyState, Pill, Status, TypeBadge } from "../components/primitives";
+import { EmptyState, Status, TypeBadge } from "../components/primitives";
 import { CollectionMark } from "../components/collection-icon";
 import { CardsSkeleton } from "../components/skeletons";
 import { useResource } from "../lib/use-resource";
@@ -25,15 +25,15 @@ function FieldRow({ field, depth = 0 }: { field: SchemaFieldDto; depth?: number 
         <td>
           {field.optional ? (
             <span className="req" data-required="false">
-              optional
+              Optional
             </span>
           ) : (
             <span className="req" data-required="true">
-              required
+              Required
             </span>
           )}
         </td>
-        <td className="desc">{field.description ?? <span className="muted">—</span>}</td>
+        <td className="desc">{field.description ?? ""}</td>
       </tr>
       {children.map((child, i) => (
         <FieldRow key={`${field.name}-${child.name}-${i}`} field={child} depth={depth + 1} />
@@ -69,7 +69,7 @@ export function SchemaView() {
         <div>
           <h1 className="view-title">Schema</h1>
           <p className="view-sub">
-            What <code>graft.config.ts</code> declares — the same shape agents get from{" "}
+            What <code>graft.config.ts</code> declares: the same shape agents get from{" "}
             <code>describe_schema</code>.
           </p>
         </div>
@@ -118,17 +118,14 @@ export function SchemaView() {
                     </p>
                   </div>
                 </div>
-                <Pill
-                  tone={collection.authority === "db" ? "db" : "file"}
-                  title={collection.authorityRaw}
-                >
+                <span className="card-meta" title={collection.authorityRaw}>
                   {collection.authority === "db" ? (
-                    <IconDatabase size={14} />
+                    <IconDatabase size={14} aria-hidden="true" />
                   ) : (
-                    <IconFile size={14} />
+                    <IconFile size={14} aria-hidden="true" />
                   )}
-                  {collection.authority === "db" ? "db rows" : "mdx files"}
-                </Pill>
+                  {collection.authority === "db" ? "Database rows" : "MDX files"}
+                </span>
               </div>
 
               {collection.fields.length === 0 ? (
@@ -137,10 +134,12 @@ export function SchemaView() {
                 <table className="table table-tight table-schema">
                   <thead>
                     <tr>
-                      <th>Field</th>
-                      <th>Type</th>
-                      <th />
-                      <th>Description</th>
+                      <th scope="col">Field</th>
+                      <th scope="col">Type</th>
+                      <th scope="col">
+                        <span className="sr-only">Required</span>
+                      </th>
+                      <th scope="col">Description</th>
                     </tr>
                   </thead>
                   <tbody>

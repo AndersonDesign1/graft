@@ -18,15 +18,15 @@ import { IconCheck, IconWarning } from "./icons";
 
 export const STATE_LABEL: Record<DocumentState, string> = {
   synced: "In sync",
-  drifted: "Drifted",
+  drifted: "Out of date",
   unindexed: "Not indexed",
-  orphaned: "Orphaned",
+  orphaned: "File missing",
 };
 
 export const STATE_HELP: Record<DocumentState, string> = {
-  synced: "On disk and in the index — hashes match.",
+  synced: "On disk and in the index, and the two match.",
   drifted: "Edited on disk since the last compile.",
-  unindexed: "On disk but never compiled into the index.",
+  unindexed: "On disk, with no row in the index.",
   orphaned: "In the index but the file is gone.",
 };
 
@@ -135,77 +135,6 @@ export function EmptyState({
 }
 
 /* ---- overview widgets ---------------------------------------------------- */
-
-export function StatTile({
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  label: string;
-  value: number | string;
-  hint?: string;
-  tone?: "synced" | "drifted" | "unindexed" | "orphaned" | "db";
-}) {
-  return (
-    <div className="tile" {...(tone ? { "data-tone": tone } : {})}>
-      <span className="tile-label">{label}</span>
-      <span className="tile-value" data-numeric="">
-        {value}
-      </span>
-      {hint ? <span className="tile-hint">{hint}</span> : null}
-    </div>
-  );
-}
-
-export function DeltaChart({
-  points,
-}: {
-  points: Array<{ added: number; changed: number; removed: number; label: string }>;
-}) {
-  if (points.length === 0) return null;
-  const max = Math.max(1, ...points.map((p) => p.added + p.changed + p.removed));
-  const w = 4;
-  const gap = 2;
-  const height = 40;
-
-  return (
-    <svg
-      className="chart"
-      viewBox={`0 0 ${points.length * (w + gap)} ${height}`}
-      preserveAspectRatio="none"
-      role="img"
-      aria-label="Compilation deltas, newest last"
-    >
-      {points.map((p, i) => {
-        const total = p.added + p.changed + p.removed;
-        const scale = (n: number) => (n / max) * height;
-        const x = i * (w + gap);
-        let y = height - scale(total);
-        const segs: Array<[string, number]> = [
-          ["add", scale(p.added)],
-          ["change", scale(p.changed)],
-          ["remove", scale(p.removed)],
-        ];
-        return (
-          <g key={i}>
-            <title>{`${p.label} · +${p.added} ~${p.changed} −${p.removed}`}</title>
-            {total === 0 ? (
-              <rect x={x} y={height - 1} width={w} height={1} data-seg="empty" />
-            ) : (
-              segs.map(([seg, h]) => {
-                if (h <= 0) return null;
-                const rect = <rect key={seg} x={x} y={y} width={w} height={h} data-seg={seg} />;
-                y += h;
-                return rect;
-              })
-            )}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
 
 export function Delta({
   added,

@@ -244,78 +244,34 @@ h3 {
   background: var(--state-orphaned-solid);
 }
 
+/* Labels for state and facts: a word (and the dot beside it, when there is
+   one), never a pill. Hue only for waiting (amber) and broken (red). */
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: var(--space-2);
   flex-shrink: 0;
-  padding: 0.14rem 0.45rem;
-  border: 1px solid var(--chip-border);
-  border-radius: 999px;
-  background: var(--chip-bg);
   color: var(--chip-text);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 
-.pill[data-state="synced"] {
-  border-color: var(--state-synced-border);
-  background: var(--state-synced-bg);
-  color: var(--state-synced-text);
-}
-.pill[data-state="drifted"] {
-  border-color: var(--state-drifted-border);
-  background: var(--state-drifted-bg);
-  color: var(--state-drifted-text);
-}
-.pill[data-state="unindexed"] {
-  border-color: var(--state-unindexed-border);
-  background: var(--state-unindexed-bg);
-  color: var(--state-unindexed-text);
-}
 .pill[data-state="orphaned"] {
-  border-color: var(--state-orphaned-border);
-  background: var(--state-orphaned-bg);
   color: var(--state-orphaned-text);
 }
+
 .pill[data-tone="pending"] {
-  border-color: var(--state-pending-border);
-  background: var(--state-pending-bg);
   color: var(--state-pending-text);
-}
-.pill[data-tone="ready"] {
-  border-color: var(--state-ready-border);
-  background: var(--state-ready-bg);
-  color: var(--state-ready-text);
-}
-.pill[data-tone="denied"] {
-  border-color: var(--state-denied-border);
-  background: var(--state-denied-bg);
-  color: var(--state-denied-text);
-}
-.pill[data-tone="db"] {
-  border-color: var(--state-db-border);
-  background: var(--state-db-bg);
-  color: var(--state-db-text);
 }
 
 .count {
   flex-shrink: 0;
-  min-width: 1.2rem;
-  padding: 0.05rem 0.28rem;
-  border-radius: 999px;
-  background: var(--chip-bg);
-  color: var(--chip-text);
-  font-size: var(--text-2xs);
-  text-align: center;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  text-align: end;
 }
 
-.count[data-tone="drifted"] {
-  background: var(--state-drifted-bg);
-  color: var(--state-drifted-text);
-}
 .count[data-tone="pending"] {
-  background: var(--state-pending-bg);
   color: var(--state-pending-text);
 }
 
@@ -328,70 +284,92 @@ h3 {
 }
 
 .tag {
-  margin-left: 0.4rem;
-  padding: 0.05rem 0.28rem;
-  border-radius: var(--radius-inner);
-  background: var(--chip-bg);
+  margin-left: var(--space-2);
   color: var(--ink-faint);
   font-size: var(--text-xs);
 }
 
-/* ---- schema types: an identity axis, not a severity one ---- */
-
+/* A schema type is an identifier: mono, plain. */
 .type {
-  padding: 0.05rem 0.35rem;
-  border-radius: var(--radius-inner);
-  background: color-mix(in oklch, currentcolor 10%, transparent);
-  font-size: var(--text-2xs);
-  color: var(--type-unknown);
-}
-
-.type[data-type="string"] {
-  color: var(--type-string);
-}
-.type[data-type="text"] {
-  color: var(--type-text);
-}
-.type[data-type="number"] {
-  color: var(--type-number);
-}
-.type[data-type="boolean"] {
-  color: var(--type-boolean);
-}
-.type[data-type="date"],
-.type[data-type="datetime"] {
-  color: var(--type-date);
-}
-.type[data-type="array"] {
-  color: var(--type-array);
-}
-.type[data-type="object"] {
-  color: var(--type-object);
-}
-.type[data-type="asset"],
-.type[data-type="image"] {
-  color: var(--type-asset);
-}
-.type[data-type="reference"] {
-  color: var(--type-reference);
-}
-.type[data-type="json"] {
-  color: var(--type-json);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
 }
 
 .req {
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
 }
 
 .req[data-required="true"] {
-  padding: 0.05rem 0.35rem;
-  border-radius: 999px;
-  background: var(--field-required-bg);
-  color: var(--field-required);
+  color: var(--ink);
+  font-weight: var(--weight-medium);
 }
 
 .req[data-required="false"] {
   color: var(--field-optional);
+}
+
+/* A fact about a card, beside its title: an icon and a word. */
+.card-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+/* ---- Health: numbers without boxes ---- */
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-12);
+  margin: 0;
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* Label first in the DOM, so a screen reader says "On disk, 7"; the number
+   sits above it on screen. */
+.stat {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--space-1);
+}
+
+.stat dt {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.stat dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--display-tracking);
+  line-height: 1.25;
+}
+
+.stat[data-tone="danger"] dd {
+  color: var(--danger);
+}
+
+.stat[data-tone="waiting"] dd {
+  color: var(--state-pending-text);
+}
+
+.health-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
 /* ==========================================================================

@@ -314,8 +314,8 @@ function CompilationDetail({
           </div>
         </dl>
         <p className="dialog-note">
-          The trail records counts, not which documents changed — the projection is a hash diff, so
-          per-document history lives in git.
+          The trail records counts, not which documents changed. The projection is a hash diff, so
+          per-document history lives in Git.
         </p>
 
         {/* Revert */}
@@ -334,7 +334,7 @@ function CompilationDetail({
             <IconWarning size={14} />
             <span>
               {plural(pre.dirty.length, "uncommitted change")} in the content directory would be
-              destroyed. Commit or stash first — reverting cannot bring them back.
+              destroyed. Commit or stash first: reverting cannot bring them back.
             </span>
           </p>
         ) : confirming ? (
@@ -345,7 +345,7 @@ function CompilationDetail({
                 Restore every content file to <code>{pre.shortSha}</code>?
               </p>
               <p className="confirm-body">
-                Files are rewritten and staged in git — not committed, so you can review the diff.
+                Files are rewritten and staged in Git, not committed, so you can review the diff.
                 The index recompiles to match.
               </p>
               <div className="card-actions">
@@ -387,8 +387,8 @@ export function HistoryView({ branch }: { branch: string }) {
         <div>
           <h1 className="view-title">History</h1>
           <p className="view-sub">
-            Every projection of <code>{branch}</code> into the index — newest first. Select a run
-            for detail.
+            Every projection of <code>{branch}</code> into the index, newest first. Select a run for
+            detail.
           </p>
         </div>
       </header>

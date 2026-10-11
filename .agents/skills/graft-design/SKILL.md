@@ -43,13 +43,13 @@ have to.
 
 - Use tokens and the existing components of the surface you are on. A
   literal color, size or radius in component CSS is a bug. `pnpm
-  check:design` catches colors in the docs stylesheet only; check sizes,
-  radii and other surfaces by reading.
-- DESIGN.md's full rules apply to the docs. The landing page and Studio keep
-  their current look until they are rebuilt: on those, use their tokens and
-  components and apply the rules only to what you add.
+  check:design` catches colors in the docs and Studio stylesheets; check
+  sizes, radii and the landing page by reading.
+- DESIGN.md's full rules apply to the docs and to Studio (with its Studio
+  section). The landing page keeps its current look until it is rebuilt: use
+  its tokens and components and apply the rules only to what you add.
 - Express the change in the project's styling system (plain CSS in the docs
-  site, the existing approach in Studio). Never add a second one.
+  site and in Studio's `src/ui/styles`). Never add a second one.
 - Before inventing a component, check DESIGN.md's primitive list and
   `examples/docs-site/src/components/mdx/`.
 - Facts on the page come from source: run the command, read the package,

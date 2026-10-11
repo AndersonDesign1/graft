@@ -47,7 +47,7 @@ const SECTIONS = [
   {
     id: "appearance",
     title: "Appearance",
-    sub: "Both schemes are first-class — the tokens are built on light-dark(). Stored in this browser.",
+    sub: "Light and dark are both first-class. Your choice is stored in this browser.",
   },
   {
     id: "workspace",
@@ -67,7 +67,7 @@ const SECTIONS = [
   {
     id: "about",
     title: "About",
-    sub: "Studio is opt-in — nothing here runs unless you asked for it.",
+    sub: "Studio is opt-in: nothing here runs unless you asked for it.",
   },
 ] as const satisfies ReadonlyArray<{ id: string; title: string; sub: string }>;
 
@@ -291,7 +291,7 @@ export function SettingsView({
                 hint={
                   loopback
                     ? "Loopback binds are trusted; no bearer token is required."
-                    : "Bound beyond loopback — every request must carry a bearer token."
+                    : "Bound beyond loopback: every request must carry a bearer token."
                 }
               >
                 <Pill tone={loopback ? "ready" : "pending"}>
@@ -380,7 +380,7 @@ export function SettingsView({
               </Row>
               <Row
                 label="Parity"
-                hint="Every action here is also available through MCP and the CLI — the UI is a client of the same HTTP surface, never a privileged path."
+                hint="Every action here is also available through MCP and the CLI. The UI is a client of the same HTTP surface, never a privileged path."
               />
               <Row
                 label="Source of truth"

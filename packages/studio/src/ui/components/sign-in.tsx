@@ -39,10 +39,14 @@ export function SignIn() {
   return (
     <main className="signin">
       <div className="signin-card">
-        <p className="signin-brand">
-          graft<b>.</b> <span>studio</span>
+        <p className="signin-brand wordmark">
+          graft.
+          <span className="wordmark-sep" aria-hidden="true">
+            /
+          </span>
+          <span className="wordmark-surface">Studio</span>
         </p>
-        <h1 className="signin-title">Sign in to edit.</h1>
+        <h1 className="signin-title">Sign in to edit</h1>
         <p className="signin-lede">Drafts you save here are yours until you publish them.</p>
         {reason && REASONS[reason] ? (
           <p className="notice" data-tone="error" role="alert">
