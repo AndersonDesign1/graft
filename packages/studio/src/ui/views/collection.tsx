@@ -13,6 +13,7 @@ import type { EntryList, EntryStatus, EntrySummary } from "../../editor-types";
 import type { SchemaFieldDto } from "../../types";
 import { AssetThumb, formatCell } from "../components/fields";
 import { IconCaretDown, IconClose, IconSearch, IconSort, IconWarning } from "../components/icons";
+import { useConfirm } from "../components/ui/confirm";
 import { Menu, MenuContent, MenuItem, MenuSection, MenuTrigger } from "../components/ui/menu";
 import { api, plainError, qs } from "../lib/api";
 import { humanise, labelOf, titleField } from "../lib/fields";
@@ -80,6 +81,7 @@ const MAX_PAGE = 500;
 
 export function CollectionView({ collection }: { collection: string }) {
   const { schema, workspace, drafts, navigate, openCreate } = useStudio();
+  const confirm = useConfirm();
   const meta = schema.data?.collections.find((c) => c.name === collection);
   const fields = useMemo(() => meta?.fields ?? [], [meta]);
   const columns = useMemo(() => columnsFor(fields), [fields]);
@@ -200,12 +202,25 @@ export function CollectionView({ collection }: { collection: string }) {
     if (chosen.length === 0) return;
     const noun =
       chosen.length === 1 ? (chosen[0]?.title ?? "1 entry") : `${chosen.length} ${collection}`;
-    if (
-      kind === "delete" &&
-      !window.confirm(`Delete ${noun}? Published entries stay live until you publish the deletion.`)
-    )
-      return;
-    if (kind === "discard" && !window.confirm(`Discard unpublished changes to ${noun}?`)) return;
+    const what = chosen.length === 1 ? singular(collection) : `${chosen.length} entries`;
+    if (kind === "delete") {
+      const ok = await confirm({
+        kind: "delete",
+        title: `Delete ${chosen.length === 1 ? `“${noun}”` : noun}?`,
+        body: "Published entries stay live until you publish the deletion.",
+        action: `Delete ${what}`,
+      });
+      if (!ok) return;
+    }
+    if (kind === "discard") {
+      const ok = await confirm({
+        kind: "discard",
+        title: `Discard your changes to ${chosen.length === 1 ? `“${noun}”` : noun}?`,
+        body: "Your edits are thrown away. The published versions stay as they are.",
+        action: "Discard changes",
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     try {
       if (kind === "publish") {

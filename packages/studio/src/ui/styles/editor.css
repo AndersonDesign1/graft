@@ -8,362 +8,10 @@
  * Motion budget (emil-design-eng, make-interfaces-feel-better):
  *   - none on lists, rows, navigation or anything keyboard-driven
  *   - presses scale to --press-scale over --duration-press
- *   - the publish sheet slides from the edge it lives on, 240ms in, 180ms out
+ *   - popups open in under 200ms and close faster (shell.css)
  *   - the bulk bar rises 8px with a fade when a selection starts
- *   - the publish seal is the one decorative moment, a few times a day
  *   - under reduced motion every transform goes; opacity stays
  */
-
-/* ==========================================================================
-   Shell
-   ========================================================================== */
-
-.shell {
-  display: grid;
-  grid-template-columns: 15.5rem minmax(0, 1fr);
-  height: 100%;
-  overflow: hidden;
-  background: var(--paper);
-}
-
-.side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-height: 0;
-  padding: var(--space-3) var(--space-2);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background: var(--paper-sunken);
-  border-right: 1px solid var(--hairline);
-}
-
-.side-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-2) var(--space-3);
-}
-
-.wordmark {
-  font-family: var(--font-editorial);
-  font-weight: var(--weight-semibold);
-  font-size: var(--type-wordmark);
-  line-height: 1;
-  letter-spacing: var(--tracking-wordmark);
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.wordmark b,
-.signin-brand b {
-  color: var(--brand-mark);
-  font-weight: inherit;
-}
-
-.side-site {
-  overflow: hidden;
-  font-size: var(--text-2xs);
-  color: var(--ink-faint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.side-search {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-2);
-  padding: 0 var(--space-2);
-  height: var(--control-height);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-inner);
-  background: var(--paper);
-  color: var(--ink-faint);
-  text-align: start;
-  cursor: pointer;
-  transition: border-color var(--duration-fast) var(--ease-out);
-}
-
-.side-search span {
-  flex: 1;
-}
-
-.side-search kbd {
-  font-size: var(--text-2xs);
-  color: var(--ink-faint);
-  background: none;
-  border: 0;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .side-search:hover {
-    border-color: var(--hairline-strong);
-  }
-}
-
-.side-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.side-label {
-  margin: var(--space-4) 0 var(--space-1);
-  padding: 0 var(--space-2);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-medium);
-  color: var(--ink-faint);
-}
-
-.side-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--row-height);
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-inner);
-  color: var(--nav-text);
-  text-decoration: none;
-  transition:
-    background var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
-}
-
-.side-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.side-item[data-active] {
-  background: var(--nav-active-bg);
-  color: var(--nav-active-text);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .side-item:not([data-active]):hover {
-    background: var(--nav-hover-bg);
-    color: var(--ink);
-  }
-}
-
-/* Drafts in this collection: one ink dot, no number. The
-   number lives on the Publish button; the dot only says where. */
-.side-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--state-unpublished-solid);
-}
-
-.side-count {
-  min-width: 1.25rem;
-  padding: 0 0.3rem;
-  border-radius: 999px;
-  background: var(--state-pending-bg);
-  color: var(--state-pending-text);
-  font-size: var(--text-2xs);
-  text-align: center;
-}
-
-.side-foot {
-  margin-top: auto;
-  padding-top: var(--space-3);
-}
-
-.side-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  width: 100%;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  text-align: start;
-}
-
-.side-toggle svg {
-  transition: rotate var(--duration-fast) var(--ease-out);
-}
-
-.side-toggle[aria-expanded="false"] svg {
-  rotate: -90deg;
-}
-
-.side-user {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  margin-top: var(--space-3);
-  padding: var(--space-2);
-  border: 0;
-  border-top: 1px solid var(--hairline);
-  background: none;
-  text-align: start;
-  cursor: pointer;
-}
-
-.avatar {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  background: var(--ink);
-  color: var(--paper);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-}
-
-.side-user-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.side-user-name,
-.side-user-role {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.side-user-name {
-  font-size: var(--text-sm);
-  color: var(--ink);
-}
-
-.side-user-role {
-  font-size: var(--text-2xs);
-  color: var(--ink-faint);
-}
-
-.stage {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
-
-.bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-shrink: 0;
-  height: 3rem;
-  padding: 0 var(--space-4);
-  border-bottom: 1px solid var(--hairline);
-  background: var(--paper);
-}
-
-.bar-spacer,
-.toolbar-spacer,
-.entry-bar-spacer {
-  flex: 1;
-}
-
-.bar .crumbs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  letter-spacing: normal;
-  text-transform: none;
-}
-
-.crumb {
-  overflow: hidden;
-  color: var(--ink-muted);
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.crumb[aria-current="page"] {
-  color: var(--ink);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  a.crumb:hover {
-    color: var(--ink);
-  }
-}
-
-.crumb-sep {
-  color: var(--ink-faint);
-}
-
-.bar-repo {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--ink-muted);
-  text-decoration: none;
-}
-
-/* The one control that is always there. Bright (the mark), not coloured;
-   pending work adds a count. */
-.publish {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  height: var(--control-height);
-  padding: 0 0.85rem;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius-inner);
-  background: var(--paper-raised);
-  color: var(--ink);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  transition:
-    background var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out),
-    transform var(--duration-press) var(--ease-out);
-}
-
-.publish[data-pending] {
-  background: var(--mark);
-  border-color: var(--mark);
-  color: var(--primary-foreground);
-}
-
-.publish:active:not(:disabled) {
-  transform: scale(var(--press-scale));
-}
-
-.publish:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.publish-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 1.25rem;
-  height: 1.25rem;
-  padding: 0 0.3rem;
-  border-radius: 999px;
-  /* Sits on the primary fill, so it is a step of that fill, not a colour. */
-  background: color-mix(in oklch, var(--primary-foreground) 22%, transparent);
-  color: var(--primary-foreground);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
-}
-
-.main {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
 
 .link {
   padding: 0;
@@ -388,30 +36,6 @@
   font-size: var(--text-2xs);
   font-weight: var(--weight-regular);
   color: var(--ink-faint);
-}
-
-.menu-item-danger {
-  color: var(--field-problem-text);
-}
-
-.popover {
-  min-width: 18rem;
-  max-width: min(26rem, calc(100vw - 2rem));
-  padding: var(--space-1);
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius);
-  background: var(--elevated);
-  box-shadow: var(--shadow-floating);
-  transform-origin: var(--transform-origin);
-  transition:
-    opacity var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-.popover[data-starting-style],
-.popover[data-ending-style] {
-  opacity: 0;
-  transform: scale(0.96);
 }
 
 /* ==========================================================================
@@ -980,7 +604,7 @@
   align-items: center;
   gap: var(--space-3);
   flex-shrink: 0;
-  min-height: 2.75rem;
+  min-height: 3rem;
   padding: 0 var(--space-4);
   border-bottom: 1px solid var(--hairline);
   background: var(--paper);
@@ -1796,20 +1420,20 @@
    ========================================================================== */
 
 .create {
-  width: min(36rem, calc(100vw - 2rem));
-  padding: var(--space-6);
+  width: min(32rem, calc(100vw - 2rem));
 }
 
 .create-title {
   margin: 0;
-  font-family: var(--font-editorial);
-  font-size: var(--text-md);
+  padding-right: var(--space-8);
+  font-size: var(--text-base);
   font-weight: var(--weight-semibold);
-  line-height: 1.1;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
 }
 
 .create-lede {
-  margin: var(--space-2) 0 var(--space-6);
+  margin: var(--space-1) 0 var(--space-5);
   color: var(--ink-muted);
 }
 
@@ -1833,59 +1457,6 @@
 /* ==========================================================================
    Publish sheet
    ========================================================================== */
-
-/* Slides from the edge it lives on and leaves the same way: spatial
-   consistency. In 240ms on the drawer curve, out faster at 180ms. */
-.dialog.sheet {
-  top: 0;
-  right: 0;
-  left: auto;
-  translate: none;
-  width: min(32rem, 100vw);
-  height: 100dvh;
-  max-height: none;
-  padding: 0;
-  gap: 0;
-  border: 0;
-  border-left: 1px solid var(--hairline-strong);
-  border-radius: 0;
-  background: var(--paper-raised);
-  transition:
-    transform var(--duration-base) cubic-bezier(0.32, 0.72, 0, 1),
-    opacity var(--duration-base) var(--ease-out);
-}
-
-.dialog.sheet[data-starting-style] {
-  opacity: 1;
-  scale: 1;
-  transform: translateX(100%);
-}
-
-.dialog.sheet[data-ending-style] {
-  opacity: 1;
-  scale: 1;
-  transform: translateX(100%);
-  transition-duration: var(--duration-fast);
-}
-
-.sheet-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-5) var(--space-6) var(--space-3);
-}
-
-.sheet-title {
-  margin: 0;
-  font-family: var(--font-editorial);
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-}
-
-.sheet-close {
-  font-size: var(--text-md);
-  line-height: 1;
-}
 
 .sheet-lede {
   margin: 0;
@@ -2129,44 +1700,6 @@
   margin-top: var(--space-4);
 }
 
-/* The wax seal: presses in, then the tick draws. Rare by design: it marks
-   the end of a piece of work, not a routine save. */
-.seal {
-  display: block;
-  width: 64px;
-  height: 64px;
-  margin-bottom: var(--space-4);
-  animation: seal-press 360ms var(--ease-out) both;
-}
-
-.seal-wax {
-  fill: var(--brand-mark);
-}
-
-.seal-mark {
-  fill: none;
-  stroke: var(--paper-raised);
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 40;
-  stroke-dashoffset: 40;
-  animation: seal-tick 280ms var(--ease-out) 220ms forwards;
-}
-
-@keyframes seal-press {
-  from {
-    opacity: 0;
-    transform: scale(0.9) rotate(-8deg);
-  }
-}
-
-@keyframes seal-tick {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
 /* ==========================================================================
    Sign-in
    ========================================================================== */
@@ -2231,15 +1764,8 @@
    Small screens and reduced motion
    ========================================================================== */
 
+/* The shell's own breakpoint (the sidebar becomes a drawer) is in shell.css. */
 @media (max-width: 860px) {
-  .shell {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .side {
-    display: none;
-  }
-
   .home-columns,
   .form-grid,
   .fc-group,
@@ -2267,7 +1793,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .publish:active,
+  .publish:active:not(:disabled),
+  .btn:active:not(:disabled),
+  .icon-btn:active,
   .toc-new:active,
   .fc-segment:active,
   .fc-add:active {
@@ -2282,31 +1810,10 @@
     }
   }
 
-  .dialog.sheet[data-starting-style],
-  .dialog.sheet[data-ending-style] {
-    opacity: 0;
-    transform: none;
-  }
-
-  .seal {
-    animation-name: fade-only;
-  }
-
-  .seal-mark {
-    stroke-dashoffset: 0;
-    animation: none;
-  }
-
   .side-toggle svg,
   .fc-item-caret,
   .sheet-row-caret {
     transition: none;
-  }
-}
-
-@keyframes fade-only {
-  from {
-    opacity: 0;
   }
 }
 

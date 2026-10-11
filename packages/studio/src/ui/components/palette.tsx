@@ -22,6 +22,7 @@ import {
   IconHome,
   IconOverview,
   IconPlus,
+  IconSearch,
   IconSchema,
   IconSettings,
   type IconComponent,
@@ -99,16 +100,16 @@ export function CommandPalette({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="palette">
+      <DialogContent className="palette" close={false}>
         <DialogTitle className="sr-only">Search and commands</DialogTitle>
         <Command label="Search and commands" loop shouldFilter={true}>
           <div className="palette-input">
+            <IconSearch />
             <Command.Input
               value={query}
               onValueChange={setQuery}
-              placeholder="Find an entry, or type a command…"
+              placeholder="Find an entry, or type a command"
             />
-            <kbd>Esc</kbd>
           </div>
           <Command.List className="palette-list">
             <Command.Empty className="palette-empty">
@@ -128,7 +129,7 @@ export function CommandPalette({
                       )
                     }
                   >
-                    <IconFile size={14} />
+                    <IconFile />
                     <span className="palette-item-label">{hit.title}</span>
                     <span className="palette-item-hint">{collectionLabel(hit.collection)}</span>
                   </Command.Item>
@@ -145,7 +146,7 @@ export function CommandPalette({
                     className="palette-item"
                     onSelect={() => go(() => insertBlock(spec.snippet ?? ""))}
                   >
-                    <IconComponentBlock size={14} />
+                    <IconComponentBlock />
                     <span className="palette-item-label">{spec.label ?? spec.component}</span>
                   </Command.Item>
                 ))}
@@ -170,7 +171,7 @@ export function CommandPalette({
                     go(() => navigate({ view: "collection", collection: collection.name }))
                   }
                 >
-                  <IconFile size={14} />
+                  <IconFile />
                   <span className="palette-item-label">{collectionLabel(collection.name)}</span>
                 </Command.Item>
               ))}
@@ -190,16 +191,18 @@ export function CommandPalette({
               ))}
             </Command.Group>
 
-            <Command.Group heading="Publish" className="palette-group">
+            <Command.Group heading="Drafts" className="palette-group">
               <Command.Item
                 value="publish review changes commit"
                 className="palette-item"
                 onSelect={() => go(openPublish)}
               >
-                <IconChanges size={14} />
+                <IconChanges />
                 <span className="palette-item-label">{publishVerb(drafts.data?.publish)}…</span>
                 <span className="palette-item-hint">
-                  {unpublished === 0 ? "nothing waiting" : `${unpublished} waiting`}
+                  {unpublished === 0
+                    ? "No drafts"
+                    : `${unpublished} ${unpublished === 1 ? "draft" : "drafts"}`}
                 </span>
               </Command.Item>
             </Command.Group>
@@ -212,12 +215,27 @@ export function CommandPalette({
                   className="palette-item"
                   onSelect={() => go(() => navigate({ view }))}
                 >
-                  <Icon size={14} />
+                  <Icon />
                   <span className="palette-item-label">{label}</span>
                 </Command.Item>
               ))}
             </Command.Group>
           </Command.List>
+          <div className="palette-foot">
+            <span>
+              <kbd>↑</kbd>
+              <kbd>↓</kbd>
+              Move
+            </span>
+            <span>
+              <kbd>↵</kbd>
+              Open
+            </span>
+            <span>
+              <kbd>Esc</kbd>
+              Close
+            </span>
+          </div>
         </Command>
       </DialogContent>
     </Dialog>
