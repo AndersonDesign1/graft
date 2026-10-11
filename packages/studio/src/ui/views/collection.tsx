@@ -9,31 +9,60 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { EntryList, EntryStatus, EntrySummary } from "../../editor-types";
+import type { DraftsDto, EntryList, EntryStatus, EntrySummary } from "../../editor-types";
 import type { SchemaFieldDto } from "../../types";
 import { AssetThumb, formatCell } from "../components/fields";
-import { IconCaretDown, IconClose, IconSearch, IconSort, IconWarning } from "../components/icons";
+import {
+  IconCaretDown,
+  IconClose,
+  IconPlus,
+  IconSearch,
+  IconSort,
+  IconWarning,
+} from "../components/icons";
 import { useConfirm } from "../components/ui/confirm";
 import { Menu, MenuContent, MenuItem, MenuSection, MenuTrigger } from "../components/ui/menu";
 import { api, plainError, qs } from "../lib/api";
 import { humanise, labelOf, titleField } from "../lib/fields";
 import { relativeTime } from "../lib/format";
-import { collectionLabel, publishVerb, singular, useStudio } from "../lib/studio";
+import {
+  actionWord,
+  collectionLabel,
+  doneWord,
+  publishVerb,
+  singular,
+  useStudio,
+} from "../lib/studio";
 
+/** How a row names its state. A published entry is the resting state: nothing. */
 const STATUS_TEXT: Record<EntryStatus, string> = {
-  published: "Published",
-  changed: "Changed",
-  new: "New",
+  published: "",
+  changed: "Draft",
+  new: "New draft",
   deleted: "Deleted",
 };
 
-export function StatusLabel({ status, conflict }: { status: EntryStatus; conflict?: boolean }) {
+/**
+ * The entry's state, as a mark and a word. The word follows what the
+ * workspace's action is called: "Committed" on a laptop, "Published" when
+ * Studio publishes.
+ */
+export function StatusLabel({
+  status,
+  conflict,
+  action,
+}: {
+  status: EntryStatus;
+  conflict?: boolean;
+  action?: DraftsDto["publish"];
+}) {
+  const done = doneWord(action);
   if (conflict) {
     return (
       <span
         className="status"
         data-status="conflict"
-        title="Published again by someone else since you started editing"
+        title={`Someone else ${done} this entry after you started editing`}
       >
         <span className="status-dot" />
         Needs a decision
@@ -44,12 +73,12 @@ export function StatusLabel({ status, conflict }: { status: EntryStatus; conflic
     <span className="status" data-status={status}>
       <span className="status-dot" />
       {status === "published"
-        ? "Published"
+        ? done.charAt(0).toUpperCase() + done.slice(1)
         : status === "new"
-          ? "Not published yet"
+          ? "New draft"
           : status === "changed"
-            ? "Unpublished changes"
-            : "Deletion not published"}
+            ? "Draft"
+            : `Deleted, not ${done} yet`}
     </span>
   );
 }
@@ -207,7 +236,7 @@ export function CollectionView({ collection }: { collection: string }) {
       const ok = await confirm({
         kind: "delete",
         title: `Delete ${chosen.length === 1 ? `“${noun}”` : noun}?`,
-        body: "Published entries stay live until you publish the deletion.",
+        body: `They stay live until you ${actionWord(drafts.data?.publish)} the deletion.`,
         action: `Delete ${what}`,
       });
       if (!ok) return;
@@ -216,7 +245,7 @@ export function CollectionView({ collection }: { collection: string }) {
       const ok = await confirm({
         kind: "discard",
         title: `Discard your changes to ${chosen.length === 1 ? `“${noun}”` : noun}?`,
-        body: "Your edits are thrown away. The published versions stay as they are.",
+        body: `Your edits are thrown away. The ${doneWord(drafts.data?.publish)} versions stay as they are.`,
         action: "Discard changes",
       });
       if (!ok) return;
@@ -226,8 +255,8 @@ export function CollectionView({ collection }: { collection: string }) {
       if (kind === "publish") {
         const paths = chosen.filter((item) => item.status !== "published").map((item) => item.path);
         if (paths.length === 0) {
-          toast("Nothing to publish", {
-            description: "The selected entries have no unpublished changes.",
+          toast(`Nothing to ${actionWord(drafts.data?.publish)}`, {
+            description: "The selected entries have no drafts.",
           });
         } else {
           await api("/drafts/publish", { method: "POST", body: JSON.stringify({ paths }) });
@@ -247,7 +276,10 @@ export function CollectionView({ collection }: { collection: string }) {
           });
         }
         toast.success(`Deleted ${noun}`, {
-          description: "Publish the deletion to remove it from the site.",
+          description:
+            drafts.data?.publish === "commit"
+              ? "Commit the deletion to record it in Git."
+              : "Publish the deletion to remove it from the site.",
         });
       }
       setSelected(new Set());
@@ -275,12 +307,8 @@ export function CollectionView({ collection }: { collection: string }) {
           </p>
         </div>
         {canWrite ? (
-          <button
-            type="button"
-            className="btn"
-            data-variant="primary"
-            onClick={() => openCreate(collection)}
-          >
+          <button type="button" className="btn" onClick={() => openCreate(collection)}>
+            <IconPlus aria-hidden="true" />
             New {singular(collection)}
           </button>
         ) : null}
@@ -318,7 +346,13 @@ export function CollectionView({ collection }: { collection: string }) {
               data-active={status === value || undefined}
               onClick={() => setStatus(value)}
             >
-              {value === "all" ? "All" : value === "unpublished" ? "Unpublished" : "Published"}
+              {value === "all"
+                ? "All"
+                : value === "unpublished"
+                  ? "Drafts"
+                  : drafts.data?.publish === "commit"
+                    ? "Committed"
+                    : "Published"}
               {value === "unpublished" && list?.counts.unpublished ? (
                 <span className="segment-count" data-numeric="">
                   {list.counts.unpublished}
@@ -460,7 +494,7 @@ export function CollectionView({ collection }: { collection: string }) {
                   }
                 />
               </th>
-              <th className="col-title">Name</th>
+              <th className="col-title">Title</th>
               {columns.map((field) => (
                 <th key={field.name} data-align={field.type === "number" ? "end" : undefined}>
                   {labelOf(field)}
@@ -506,13 +540,8 @@ export function CollectionView({ collection }: { collection: string }) {
                       <span
                         className="row-state"
                         data-status={item.conflict ? "conflict" : item.status}
-                        title={
-                          item.conflict
-                            ? "Needs a decision before publishing"
-                            : STATUS_TEXT[item.status]
-                        }
                       >
-                        {item.conflict ? "Conflict" : STATUS_TEXT[item.status]}
+                        {item.conflict ? "Needs a decision" : STATUS_TEXT[item.status]}
                       </span>
                     ) : null}
                     {item.problem ? (

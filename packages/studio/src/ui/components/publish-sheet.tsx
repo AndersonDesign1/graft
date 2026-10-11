@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { DraftChangeDto, DraftsDto, PublishResultDto, WorkspaceDto } from "../../editor-types";
 import { ApiError, api, plainError } from "../lib/api";
-import { publishVerb, collectionLabel, useStudio } from "../lib/studio";
+import { collectionLabel, doneWord, publishVerb, useStudio } from "../lib/studio";
 import { DiffView } from "./diff-view";
 import { IconCaretDown, IconCheck, IconExternal, IconWarning } from "./icons";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
@@ -98,7 +98,7 @@ export function PublishSheet({
     const ok = await confirm({
       kind: "discard",
       title: `Discard your changes to ${names}?`,
-      body: "Your edits are thrown away. The published versions stay as they are.",
+      body: `Your edits are thrown away. The ${doneWord(action)} versions stay as they are.`,
       action: chosen.length === 1 ? "Discard changes" : `Discard ${chosen.length} changes`,
     });
     if (!ok) return;
@@ -150,7 +150,7 @@ export function PublishSheet({
               </>
             ) : (
               <>
-                <p className="sheet-empty-title">Everything is published.</p>
+                <p className="sheet-empty-title">Everything is {doneWord(action)}.</p>
                 <p className="sheet-empty-body">
                   Edits you make are saved as drafts and gather here until you publish them.
                 </p>

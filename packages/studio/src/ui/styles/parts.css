@@ -189,7 +189,7 @@
 }
 
 /* Crepe ships `padding: 60px 120px` on the editor for its own standalone
-   layout. The sheet owns padding now, and leaving both in place inset the text
+   layout. The page owns padding now, and leaving both in place inset the text
    168px from the page edge — a ~40-character measure inside an 832px page,
    which is most of why the canvas read as a narrow grey column. */
 .rich .milkdown .ProseMirror {
@@ -215,9 +215,10 @@
    to render 16px body and a 24px h1, so the canvas was both flat and a lie
    about what the page would look like. The measure itself is the sheet's
    width minus its padding — see .doc-sheet. */
+/* The docs' reading size: an entry looks like the page it becomes. */
 .rich .ProseMirror {
-  font-size: var(--text-md);
-  line-height: var(--leading-body);
+  font-size: 1.0625rem;
+  line-height: 1.75;
   color: var(--ink);
   text-wrap: pretty;
 }
@@ -248,15 +249,17 @@
 
 .rich .ProseMirror h1 {
   font-size: var(--text-xl);
-  line-height: var(--leading-tight);
+  line-height: 1.2;
 }
 
 .rich .ProseMirror h2 {
-  font-size: var(--text-lg);
+  font-size: 1.625rem;
+  line-height: 1.2;
 }
 
 .rich .ProseMirror h3 {
-  font-size: var(--text-md);
+  font-size: var(--text-h3);
+  line-height: 1.3;
 }
 
 .rich .ProseMirror h4 {
