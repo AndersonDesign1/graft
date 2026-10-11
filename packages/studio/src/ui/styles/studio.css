@@ -474,20 +474,26 @@ h3 {
   color: var(--ink-faint);
 }
 
+/* Inputs sit on the page with a strong hairline, as in the docs' search; focus
+   is the ink border plus a soft ring. */
 .input {
   width: 100%;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--hairline);
+  min-height: var(--control-height);
+  padding: 0.4375rem var(--space-3);
+  border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-inner);
-  background: var(--paper-sunken);
+  background: var(--paper);
   color: var(--ink);
   font-size: var(--text-sm);
   outline: none;
-  transition: border-color var(--duration-fast) var(--ease-out);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .input:focus {
-  border-color: var(--focus-ring);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--wash-strong);
 }
 
 .input:disabled {
@@ -643,10 +649,10 @@ h3 {
 }
 
 .view-sub {
-  margin: 0.2rem 0 0;
+  margin: var(--space-1) 0 0;
   max-width: 62ch;
   color: var(--ink-muted);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   line-height: var(--leading-body);
   text-wrap: pretty;
 }

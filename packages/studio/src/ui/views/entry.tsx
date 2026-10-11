@@ -41,7 +41,14 @@ import { useAutosave } from "../lib/autosave";
 import { labelOf, problemsFromServer, problemsIn, titleField } from "../lib/fields";
 import { compareRoundTrip, describeFidelity, type FidelityResult } from "../lib/fidelity";
 import { buildForm, composeData, sameValue } from "../lib/schema-form";
-import { collectionLabel, publishVerb, singular, useStudio } from "../lib/studio";
+import {
+  actionWord,
+  collectionLabel,
+  doneWord,
+  publishVerb,
+  singular,
+  useStudio,
+} from "../lib/studio";
 import { StatusLabel } from "./collection";
 
 type Mode = "form" | "source";
@@ -321,7 +328,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
     const ok = await confirm({
       kind: "discard",
       title: `Discard your changes to this ${singular(collection)}?`,
-      body: "Your edits are thrown away. The published version stays as it is.",
+      body: `Your edits are thrown away. The ${doneWord(drafts.data?.publish)} version stays as it is.`,
       action: "Discard changes",
     });
     if (!ok) return;
@@ -335,7 +342,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
         toast.success("Draft discarded");
         navigate({ view: "collection", collection });
       } else {
-        toast.success("Back to the published version");
+        toast.success(`Back to the ${doneWord(drafts.data?.publish)} version`);
         await load();
       }
     } catch (error) {
@@ -366,8 +373,8 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
       title: `Delete “${name}”?`,
       body:
         entry.status === "new"
-          ? "It was never published, so it goes for good."
-          : "It stays live until you publish the deletion. Undo is offered for a few seconds after.",
+          ? `It was never ${doneWord(drafts.data?.publish)}, so it goes for good.`
+          : `It stays live until you ${actionWord(drafts.data?.publish)} the deletion. Undo is offered for a few seconds after.`,
       action: `Delete ${singular(collection)}`,
     });
     if (!ok) return;
@@ -499,7 +506,11 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
             {String(entry.data[headline?.name ?? "title"] ?? slug) || slug}
           </span>
         </nav>
-        <StatusLabel status={status} conflict={draft?.conflict ?? entry.conflict} />
+        <StatusLabel
+          status={status}
+          conflict={draft?.conflict ?? entry.conflict}
+          action={drafts.data?.publish}
+        />
         <span
           className="save"
           data-state={conflict ? "conflict" : autosave.state}
@@ -560,7 +571,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
           data-size="sm"
           disabled={!canWrite || status === "published" || autosave.state === "saving"}
           onClick={() => void publishThis()}
-          title={status === "published" ? "No unpublished changes" : undefined}
+          title={status === "published" ? `No draft to ${actionWord(action)}` : undefined}
         >
           {action === "review" ? "Submit" : publishVerb(action)}
         </button>

@@ -64,6 +64,18 @@ export function singular(name: string): string {
   return label.replace(/s$/, "");
 }
 
+/** The verb inside a sentence: "until you commit the deletion". */
+export function actionWord(action: DraftsDto["publish"] | undefined): string {
+  if (action === "review") return "submit";
+  if (action === "commit") return "commit";
+  return "publish";
+}
+
+/** What finished work is called here: "committed" on a laptop, else "published". */
+export function doneWord(action: DraftsDto["publish"] | undefined): string {
+  return action === "commit" ? "committed" : "published";
+}
+
 /** What the Publish button says, for this person, in this workspace. */
 export function publishVerb(action: DraftsDto["publish"] | undefined): string {
   if (action === "review") return "Submit for review";
