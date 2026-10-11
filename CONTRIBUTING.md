@@ -118,8 +118,11 @@ default. Name them `*.integration.test.ts` and gate them behind
 RUN_INTEGRATION=1 DATABASE_URL=postgres://... pnpm test
 ```
 
-Point `DATABASE_URL` at a database you can throw away. Some suites also call
-live services when their keys are in the environment, so in a shell that has
+Suites that write to a real, billed service (the Neon branch backend, the
+S3/R2 asset store) also need `RUN_LIVE=1` and that service's keys, so
+`RUN_INTEGRATION=1` on its own reaches only the database in `DATABASE_URL`.
+
+Point `DATABASE_URL` at a database you can throw away. In a shell that has
 production credentials, run tests through `offline.sh`, which removes them
 and takes the throwaway database's URL with `--db`. It refuses to run while
 a repo-root `.env` exists, because the tests load that file themselves; move
@@ -134,7 +137,7 @@ $S/offline.sh --db "$URL" env RUN_INTEGRATION=1 pnpm test
 $S/pg.sh down /tmp/graft-pg
 ```
 
-`RUN_INTEGRATION` is declared in `turbo.json`. A variable that is not declared
+`RUN_INTEGRATION` and `RUN_LIVE` are declared in `turbo.json`. A variable that is not declared
 there is deleted before the task runs rather than merely uncached, so an
 undeclared flag silently does nothing.
 
