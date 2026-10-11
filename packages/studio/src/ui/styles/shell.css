@@ -1,0 +1,1164 @@
+/**
+ * The frame and the things that float over it: the top bar, the sidebar,
+ * buttons, and every popup (menu, popover, dialog, confirm, sheet, command
+ * palette, tooltip, toast). Role names only, like the other sheets.
+ *
+ * The frame is the docs' frame: a 56px bar across the full width with the
+ * wordmark left, search centred and actions right; a 268px sidebar under it
+ * on the page colour; one canvas, no grey rail.
+ *
+ * Popups share one material: the elevated surface, a 1px hairline ring and
+ * the floating shadow, a 10px radius, and a scrim that dims and never blurs.
+ * They open in under 200ms from where they were asked for and close faster.
+ */
+
+:root {
+  --top-height: 3.5rem;
+  --side-width: 16.75rem;
+  /* Opening is quick, closing quicker: the person already decided. */
+  --duration-open: 160ms;
+  --duration-close: 100ms;
+}
+
+/* ==========================================================================
+   Frame
+   ========================================================================== */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--side-width) minmax(0, 1fr);
+  grid-template-rows: var(--top-height) minmax(0, 1fr);
+  height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.top {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 24rem) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  padding-inline: var(--space-4) var(--space-4);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--paper);
+}
+
+.top-start,
+.top-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.top-end {
+  justify-content: flex-end;
+}
+
+.icon-btn.top-menu {
+  display: none;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  flex-shrink: 0;
+  color: var(--ink);
+  font-size: var(--type-wordmark);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wordmark);
+  line-height: 1;
+  text-decoration: none;
+}
+
+.wordmark-sep {
+  margin-inline: 0.4rem;
+  color: var(--ink-faint);
+  font-weight: var(--weight-regular);
+  letter-spacing: 0;
+}
+
+.wordmark-surface {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0;
+}
+
+/* The branch everything is scoped to. An identifier, so mono. */
+.top-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  height: 2rem;
+  padding-inline: var(--space-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  color: var(--ink-muted);
+  text-decoration: none;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.top-branch span {
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-repo {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Search, centred as in the docs header. */
+.top-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: var(--control-height);
+  padding-inline: var(--space-3) var(--space-1);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-outer);
+  background: var(--paper);
+  color: var(--ink-faint);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.top-search > span:first-of-type {
+  flex: 1;
+}
+
+.top-search-keys {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.top-account {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-right: calc(var(--space-1) * -1);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--wash-strong);
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .top-search:hover,
+  .top-branch:hover {
+    border-color: var(--hairline-strong);
+    color: var(--ink);
+  }
+
+  .top-account:hover .avatar {
+    background: var(--wash-strong);
+    box-shadow: 0 0 0 1px var(--hairline-strong);
+  }
+}
+
+/* The Commit (or Publish) button: the brightest thing in the bar when there
+   is work to commit, an outline when there is none. */
+.publish {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-height);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-inner);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+.publish[data-pending] {
+  border-color: var(--mark);
+  background: var(--mark);
+  color: var(--primary-foreground);
+}
+
+.publish:active:not(:disabled) {
+  transform: scale(var(--press-scale));
+}
+
+.publish:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.publish-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.375rem;
+  border-radius: 999px;
+  /* Sits on the primary fill, so it is a step of that fill, not a colour. */
+  background: color-mix(in oklch, var(--primary-foreground) 22%, transparent);
+  color: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+/* ---- sidebar ---- */
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 0;
+  padding: var(--space-4) var(--space-3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-right: 1px solid var(--hairline);
+  background: var(--paper);
+}
+
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.side-label {
+  margin: var(--space-4) 0 var(--space-1);
+  padding-inline: var(--space-3);
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.side-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 2rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  cursor: pointer;
+  text-align: start;
+}
+
+.side-toggle svg {
+  transition: rotate var(--duration-fast) var(--ease-out);
+}
+
+.side-toggle[aria-expanded="false"] svg {
+  rotate: -90deg;
+}
+
+.side-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--row-height);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius);
+  color: var(--nav-text);
+  text-decoration: none;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.side-item[data-active] {
+  background: var(--nav-active-bg);
+  color: var(--nav-active-text);
+  font-weight: var(--weight-medium);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .side-item:not([data-active]):hover {
+    background: var(--nav-hover-bg);
+    color: var(--ink);
+  }
+}
+
+.side-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Drafts in this collection: one ink dot. The number is on the Commit
+   button; the dot only says where. */
+.side-dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  background: var(--state-unpublished-solid);
+}
+
+/* Approvals waiting: the one amber in the chrome, beside a word. */
+.side-count {
+  color: var(--state-pending-text);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.side-foot {
+  margin-top: auto;
+  padding-top: var(--space-3);
+}
+
+.toolbar-spacer,
+.entry-bar-spacer {
+  flex: 1;
+}
+
+.main {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* ---- narrow screens: the sidebar becomes a drawer behind a menu button ---- */
+
+@media (width < 48rem) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shell > .side {
+    display: none;
+  }
+
+  .top {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--space-2);
+    padding-inline: var(--space-2) var(--space-3);
+  }
+
+  .icon-btn.top-menu {
+    display: inline-grid;
+  }
+
+  .top-branch,
+  .top-repo,
+  .wordmark-sep,
+  .wordmark-surface {
+    display: none;
+  }
+
+  /* Search becomes an icon; the palette it opens is the same. */
+  .top-search {
+    justify-self: end;
+    width: 2.5rem;
+    padding: 0;
+    justify-content: center;
+    border-color: transparent;
+  }
+
+  .top-search > span {
+    display: none;
+  }
+}
+
+.dialog.drawer {
+  top: 0;
+  left: 0;
+  translate: none;
+  width: min(20rem, calc(100vw - 3rem));
+  height: 100dvh;
+  max-height: none;
+  padding: var(--space-3);
+  gap: var(--space-1);
+  border-radius: 0;
+  box-shadow: var(--shadow-floating);
+  transition:
+    transform var(--duration-open) var(--ease-out),
+    opacity var(--duration-open) var(--ease-out);
+}
+
+.dialog.drawer[data-starting-style],
+.dialog.drawer[data-ending-style] {
+  opacity: 1;
+  scale: 1;
+  transform: translateX(-100%);
+}
+
+.dialog.drawer[data-ending-style] {
+  transition-duration: var(--duration-close);
+}
+
+.drawer .side-item {
+  min-height: 2.75rem;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding-inline: var(--space-3) 3rem;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-height);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-inner);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+.btn[data-size="sm"] {
+  height: 2rem;
+  padding-inline: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.btn[data-size="xs"] {
+  height: 1.75rem;
+  padding-inline: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.btn[data-size="icon"],
+.btn[data-size="icon-sm"] {
+  width: var(--control-height);
+  padding: 0;
+}
+
+/* A control smaller than 40px still answers to a 40px target. */
+.btn[data-size="sm"]::after,
+.btn[data-size="xs"]::after,
+.btn[data-size="icon-sm"]::after,
+.icon-btn::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: max(100%, 2.5rem);
+  height: max(100%, 2.5rem);
+  translate: -50% -50%;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(var(--press-scale));
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled) {
+    background: var(--wash);
+  }
+}
+
+/* Primary is bright, not coloured. */
+.btn[data-variant="primary"] {
+  border-color: var(--mark);
+  background: var(--mark);
+  color: var(--primary-foreground);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn[data-variant="primary"]:hover:not(:disabled) {
+    border-color: var(--mark-strong);
+    background: var(--mark-strong);
+  }
+}
+
+/* Deletes and discards: the danger fill, always with an icon and a verb. */
+.btn[data-variant="danger"] {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--primary-foreground);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn[data-variant="danger"]:hover:not(:disabled) {
+    border-color: var(--danger);
+    background: color-mix(in oklch, var(--danger) 88%, var(--ink));
+  }
+}
+
+/* A destructive action that is not the confirming one: danger text only. */
+.btn[data-variant="destructive"] {
+  color: var(--danger);
+}
+
+.btn[data-variant="outline"] {
+  background: transparent;
+}
+
+.btn[data-variant="ghost"] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn[data-variant="ghost"]:hover:not(:disabled) {
+    color: var(--ink);
+  }
+}
+
+.btn[data-variant="link"] {
+  height: auto;
+  padding: 0;
+  border-color: transparent;
+  background: none;
+  color: var(--ink-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* An icon-only button: 32px, with the 40px target from above. Always has an
+   aria-label, and a tooltip where the icon is not self-evident. */
+.icon-btn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .icon-btn:hover {
+    background: var(--wash);
+    color: var(--ink);
+  }
+}
+
+.icon-btn:active {
+  transform: scale(var(--press-scale));
+}
+
+/* A small copy control beside an identifier (a SHA, a URL). */
+.copy {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 1.75rem;
+  padding-inline: var(--space-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-inner);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.copy::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: max(100%, 2.5rem);
+  height: 2.5rem;
+  translate: -50% -50%;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .copy:hover {
+    border-color: var(--hairline-strong);
+    color: var(--ink);
+  }
+}
+
+kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.375rem;
+  height: 1.375rem;
+  padding-inline: 0.3rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-inner);
+  background: var(--paper);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1;
+}
+
+/* ==========================================================================
+   Menus and popovers
+   ========================================================================== */
+
+.menu-positioner {
+  z-index: 70;
+}
+
+.menu,
+.popover {
+  padding: var(--space-1);
+  border-radius: var(--radius-outer);
+  background: var(--elevated);
+  box-shadow: var(--shadow-floating);
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity var(--duration-open) var(--ease-out),
+    transform var(--duration-open) var(--ease-out);
+}
+
+.menu {
+  min-width: 13rem;
+  max-height: min(24rem, var(--available-height, 24rem));
+  overflow-y: auto;
+}
+
+.popover {
+  min-width: 18rem;
+  max-width: min(26rem, calc(100vw - 2rem));
+}
+
+.menu[data-starting-style],
+.menu[data-ending-style],
+.popover[data-starting-style],
+.popover[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+.menu[data-ending-style],
+.popover[data-ending-style] {
+  transition-duration: var(--duration-close);
+}
+
+.menu-head {
+  display: grid;
+  padding: var(--space-2) var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--hairline);
+  margin: 0 calc(var(--space-1) * -1) var(--space-1);
+  padding-inline: var(--space-3);
+}
+
+.menu-head b {
+  font-weight: var(--weight-medium);
+}
+
+.menu-head span {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.menu-label {
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+/* One row: icon, label, then a count, hint or check at the end. */
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 2rem;
+  padding-inline: var(--space-2);
+  border-radius: var(--radius);
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+
+.menu-item > svg {
+  flex-shrink: 0;
+  color: var(--ink-muted);
+}
+
+.menu-item[data-highlighted] {
+  background: var(--wash-strong);
+}
+
+.menu-item[data-active="true"] {
+  font-weight: var(--weight-medium);
+}
+
+.menu-item-label {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+
+.menu-item-hint {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.menu-item-danger,
+.menu-item-danger > svg {
+  color: var(--danger);
+}
+
+.menu-separator {
+  height: 1px;
+  margin: var(--space-1) calc(var(--space-1) * -1);
+  background: var(--hairline);
+}
+
+/* ==========================================================================
+   Dialogs, confirm, sheet
+   ========================================================================== */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--scrim);
+  transition: opacity var(--duration-open) var(--ease-out);
+}
+
+.dialog-backdrop[data-starting-style],
+.dialog-backdrop[data-ending-style] {
+  opacity: 0;
+}
+
+.dialog-backdrop[data-ending-style] {
+  transition-duration: var(--duration-close);
+}
+
+.dialog {
+  position: fixed;
+  z-index: 61;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: min(85vh, 48rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-outer);
+  background: var(--elevated);
+  box-shadow: var(--shadow-floating);
+  overflow-y: auto;
+  transition:
+    opacity var(--duration-open) var(--ease-out),
+    scale var(--duration-open) var(--ease-out);
+}
+
+.dialog[data-starting-style],
+.dialog[data-ending-style] {
+  opacity: 0;
+  scale: 0.98;
+}
+
+.dialog[data-ending-style] {
+  transition-duration: var(--duration-close);
+}
+
+.dialog-close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+}
+
+.dialog-title {
+  margin: 0;
+  padding-right: var(--space-8);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+  text-wrap: balance;
+}
+
+.dialog-description {
+  margin: 0;
+  color: var(--ink-muted);
+  line-height: var(--leading-body);
+  text-wrap: pretty;
+}
+
+.dialog-body {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin: 0 calc(var(--space-5) * -1) calc(var(--space-5) * -1);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--hairline);
+}
+
+.dialog-note {
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--hairline);
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+}
+
+.dialog.confirm {
+  width: min(28rem, calc(100vw - 2rem));
+}
+
+/* The commit sheet: slides from the right edge and leaves the same way. */
+.dialog.sheet {
+  top: 0;
+  right: 0;
+  left: auto;
+  translate: none;
+  width: min(30rem, 100vw);
+  height: 100dvh;
+  max-height: none;
+  padding: 0;
+  gap: 0;
+  border-radius: 0;
+  transition:
+    transform 180ms var(--ease-out),
+    opacity 180ms var(--ease-out);
+}
+
+.dialog.sheet[data-starting-style],
+.dialog.sheet[data-ending-style] {
+  opacity: 1;
+  scale: 1;
+  transform: translateX(100%);
+}
+
+.dialog.sheet[data-ending-style] {
+  transition-duration: 140ms;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  padding: var(--space-5) var(--space-6) var(--space-2);
+}
+
+.sheet-title {
+  margin: 0;
+  padding-right: var(--space-8);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+.sheet-done-mark {
+  margin-bottom: var(--space-2);
+  color: var(--ink);
+}
+
+/* ==========================================================================
+   Command palette
+   ========================================================================== */
+
+/* Opened by keyboard, dozens of times a session: no entrance, as docs search. */
+.dialog.palette {
+  top: 15vh;
+  translate: -50% 0;
+  width: min(38rem, calc(100vw - 2rem));
+  max-height: min(70vh, 34rem);
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  transition: none;
+}
+
+.dialog.palette[data-starting-style],
+.dialog.palette[data-ending-style] {
+  opacity: 1;
+  scale: 1;
+}
+
+.palette [cmdk-root] {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.palette-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+  height: 3.25rem;
+  padding-inline: var(--space-4);
+  border-bottom: 1px solid var(--hairline);
+  color: var(--ink-faint);
+}
+
+.palette-input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+
+.palette-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-1) var(--space-1) var(--space-2);
+  list-style: none;
+}
+
+.palette [cmdk-group-heading] {
+  padding: var(--space-3) var(--space-3) var(--space-1);
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 2.5rem;
+  padding-inline: var(--space-3);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.palette-item > svg {
+  flex-shrink: 0;
+  color: var(--ink-muted);
+}
+
+.palette-item[data-selected="true"],
+.palette-item[data-active="true"] {
+  background: var(--wash-strong);
+}
+
+.palette-item-label {
+  flex-shrink: 0;
+}
+
+.palette-item-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-empty {
+  padding: var(--space-6) var(--space-4);
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.palette-foot {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--hairline);
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.palette-foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* ==========================================================================
+   Tooltip
+   ========================================================================== */
+
+.tooltip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.3125rem var(--space-2);
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  transition: opacity var(--duration-open) var(--ease-out);
+}
+
+.tooltip[data-starting-style],
+.tooltip[data-ending-style] {
+  opacity: 0;
+}
+
+.tooltip kbd {
+  min-width: 1.125rem;
+  height: 1.125rem;
+  border-color: color-mix(in oklch, var(--paper) 30%, transparent);
+  background: transparent;
+  color: color-mix(in oklch, var(--paper) 75%, transparent);
+}
+
+/* ==========================================================================
+   Toasts (sonner), on the popup material
+   ========================================================================== */
+
+[data-sonner-toaster] {
+  --normal-bg: var(--elevated);
+  --normal-text: var(--ink);
+  --normal-border: transparent;
+  --border-radius: var(--radius-outer);
+  font-family: var(--font-sans);
+}
+
+[data-sonner-toast][data-styled="true"] {
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-floating);
+  font-size: var(--text-sm);
+}
+
+[data-sonner-toast] [data-description] {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+[data-sonner-toast][data-type="error"] [data-icon] {
+  color: var(--danger);
+}
+
+[data-sonner-toast] [data-button] {
+  height: 1.75rem;
+  border-radius: var(--radius-inner);
+  background: var(--mark);
+  color: var(--primary-foreground);
+  font-weight: var(--weight-medium);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog.sheet[data-starting-style],
+  .dialog.sheet[data-ending-style],
+  .dialog.drawer[data-starting-style],
+  .dialog.drawer[data-ending-style] {
+    opacity: 0;
+    transform: none;
+  }
+
+  .menu[data-starting-style],
+  .menu[data-ending-style],
+  .popover[data-starting-style],
+  .popover[data-ending-style] {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   Breadcrumb (the entry bar's way back)
+   ========================================================================== */
+
+.entry-crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-muted);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crumb[aria-current="page"] {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  a.crumb:hover {
+    color: var(--ink);
+  }
+}
+
+.crumb-sep {
+  color: var(--ink-faint);
+}

@@ -48,6 +48,7 @@ export {
   GitCommitHorizontalIcon as IconCommit,
   CopyPlusIcon as IconDuplicate,
   LinkIcon as IconLink,
+  LogOutIcon as IconSignOut,
 } from "lucide-react";
 
 // status / meaning

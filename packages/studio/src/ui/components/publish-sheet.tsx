@@ -13,8 +13,9 @@ import type { DraftChangeDto, DraftsDto, PublishResultDto, WorkspaceDto } from "
 import { ApiError, api, plainError } from "../lib/api";
 import { publishVerb, collectionLabel, useStudio } from "../lib/studio";
 import { DiffView } from "./diff-view";
-import { IconCaretDown, IconExternal, IconWarning } from "./icons";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
+import { IconCaretDown, IconCheck, IconExternal, IconWarning } from "./icons";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
+import { useConfirm } from "./ui/confirm";
 
 const KIND_LABEL: Record<DraftChangeDto["kind"], string> = {
   added: "New",
@@ -44,6 +45,7 @@ export function PublishSheet({
   onDone: () => void;
 }) {
   const { drafts, workspace, schema, navigate } = useStudio();
+  const confirm = useConfirm();
   const changes = drafts.data?.changes ?? [];
   const action = drafts.data?.publish ?? "publish";
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -93,10 +95,13 @@ export function PublishSheet({
 
   async function discard(): Promise<void> {
     const names = chosen.map((change) => change.title).join(", ");
-    if (
-      !window.confirm(`Discard your changes to ${names}? The published versions stay as they are.`)
-    )
-      return;
+    const ok = await confirm({
+      kind: "discard",
+      title: `Discard your changes to ${names}?`,
+      body: "Your edits are thrown away. The published versions stay as they are.",
+      action: chosen.length === 1 ? "Discard changes" : `Discard ${chosen.length} changes`,
+    });
+    if (!ok) return;
     setBusy("discard");
     try {
       await api("/drafts/discard", {
@@ -127,9 +132,6 @@ export function PublishSheet({
                 ? "Commit changes"
                 : "Publish changes"}
           </DialogTitle>
-          <DialogClose className="icon-btn sheet-close" aria-label="Close">
-            ×
-          </DialogClose>
         </header>
 
         {done ? (
@@ -357,8 +359,8 @@ function Reviews({ reviews }: { reviews: DraftsDto["reviews"] }) {
 }
 
 /**
- * The one celebratory moment in the Studio: it happens a few times a day at
- * most, and it is the point of everything else. A wax seal presses in.
+ * The result, in words: what went where, and what to do next. A success is
+ * bright, not an animation.
  */
 function Done({ result, onClose }: { result: PublishResultDto; onClose: () => void }) {
   const count = result.published.length;
@@ -369,15 +371,7 @@ function Done({ result, onClose }: { result: PublishResultDto; onClose: () => vo
   const onlyKept = count === 0 && kept > 0;
   return (
     <div className="sheet-done">
-      <span className="seal" aria-hidden="true">
-        <svg viewBox="0 0 64 64" width="64" height="64">
-          <path
-            className="seal-wax"
-            d="M32 3c4 0 6 3 9 4s7 0 9 3 1 6 3 9 4 5 4 9-3 6-4 9 0 7-3 9-6 1-9 3-5 4-9 4-6-3-9-4-7 0-9-3-1-6-3-9-4-5-4-9 3-6 4-9 0-7 3-9 6-1 9-3 5-4 9-4z"
-          />
-          <path className="seal-mark" d="M22 33l7 7 14-15" />
-        </svg>
-      </span>
+      <IconCheck className="sheet-done-mark" size={20} aria-hidden="true" />
       <p className="sheet-done-title">
         {onlyKept
           ? `Kept the published ${kept === 1 ? "version" : "versions"}.`

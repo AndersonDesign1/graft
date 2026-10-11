@@ -243,6 +243,9 @@
   --shadow-floating:
     0 0 0 1px var(--border), 0 2px 6px light-dark(rgb(27 26 22 / 0.07), rgb(0 0 0 / 0.65)),
     0 12px 32px light-dark(rgb(27 26 22 / 0.1), rgb(0 0 0 / 0.7));
+  /* Behind a dialog, a sheet or the command palette: dims the page, never
+     blurs it. Black in both schemes, stronger on the black stage. */
+  --scrim: light-dark(rgb(27 26 22 / 0.18), rgb(0 0 0 / 0.6));
   /* Image outlines: pure black/white — tinted neutrals read as dirt. */
   --outline-image: light-dark(rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.1));
 

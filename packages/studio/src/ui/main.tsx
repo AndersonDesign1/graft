@@ -16,6 +16,7 @@ import "@usegraft/tokens/tokens.css";
 import "./styles/roles.css";
 import "./styles/type.css";
 import "./styles/studio.css";
+import "./styles/shell.css";
 import "./styles/parts.css";
 import "./styles/editor.css";
 

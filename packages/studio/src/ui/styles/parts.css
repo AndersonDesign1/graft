@@ -402,28 +402,6 @@
 }
 
 /* ==========================================================================
-   Sonner — pointed at our surfaces rather than its own palette
-   ========================================================================== */
-
-[data-sonner-toaster] {
-  --normal-bg: var(--elevated);
-  --normal-text: var(--ink);
-  --normal-border: var(--hairline-strong);
-  --success-bg: var(--state-synced-bg);
-  --success-text: var(--state-synced-text);
-  --success-border: var(--state-synced-border);
-  --error-bg: var(--state-orphaned-bg);
-  --error-text: var(--state-orphaned-text);
-  --error-border: var(--state-orphaned-border);
-  font-family: var(--font-sans);
-}
-
-.sonner-toast {
-  border-radius: var(--radius) !important;
-  font-size: var(--text-xs) !important;
-}
-
-/* ==========================================================================
    Misc: warn notices, revert confirmation, file pill, tree search
    ========================================================================== */
 

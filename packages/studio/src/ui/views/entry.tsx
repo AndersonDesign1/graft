@@ -19,8 +19,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { EntryDto, EntryStatus, PublishResultDto, SaveEntryResult } from "../../editor-types";
 import type { SchemaFieldDto } from "../../types";
+import { useConfirm } from "../components/ui/confirm";
+import { Tooltip } from "../components/ui/tooltip";
 import { FieldRow } from "../components/fields";
-import { IconWarning } from "../components/icons";
+import {
+  IconBack,
+  IconCode,
+  IconDuplicate,
+  IconLink,
+  IconMore,
+  IconRevert,
+  IconTrash,
+  IconWarning,
+} from "../components/icons";
 import { MdxEditor } from "../components/editor";
 import { RichEditor } from "../components/rich-editor";
 import { DocumentSkeleton } from "../components/skeletons";
@@ -37,6 +48,7 @@ type Mode = "form" | "source";
 
 export function EntryView({ collection, slug }: { collection: string; slug: string }) {
   const { schema, workspace, drafts, navigate, openPublish } = useStudio();
+  const confirm = useConfirm();
   const fields = useMemo<SchemaFieldDto[]>(
     () => schema.data?.collections.find((c) => c.name === collection)?.fields ?? [],
     [schema.data, collection],
@@ -306,10 +318,13 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
   async function discardThis(): Promise<void> {
     if (status === "deleted") return restoreThis();
     if (!entry) return;
-    if (
-      !window.confirm("Discard your changes to this entry? The published version stays as it is.")
-    )
-      return;
+    const ok = await confirm({
+      kind: "discard",
+      title: `Discard your changes to this ${singular(collection)}?`,
+      body: "Your edits are thrown away. The published version stays as it is.",
+      action: "Discard changes",
+    });
+    if (!ok) return;
     try {
       await api("/drafts/discard", {
         method: "POST",
@@ -346,12 +361,16 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
   async function remove(): Promise<void> {
     if (!entry) return;
     const name = String(entry.data[headline?.name ?? "title"] ?? slug);
-    if (
-      !window.confirm(
-        `Delete ${name}? ${entry.status === "new" ? "It was never published." : "It stays live until you publish the deletion."}`,
-      )
-    )
-      return;
+    const ok = await confirm({
+      kind: "delete",
+      title: `Delete “${name}”?`,
+      body:
+        entry.status === "new"
+          ? "It was never published, so it goes for good."
+          : "It stays live until you publish the deletion. Undo is offered for a few seconds after.",
+      action: `Delete ${singular(collection)}`,
+    });
+    if (!ok) return;
     try {
       // Land any pending save first, so the delete sends the latest version
       // and the undo below brings back the latest draft.
@@ -468,6 +487,18 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
   return (
     <div className="entry">
       <div className="entry-bar">
+        <nav className="entry-crumbs" aria-label="Breadcrumb">
+          <a href={`#/c/${encodeURIComponent(collection)}`} className="crumb">
+            <IconBack size={14} aria-hidden="true" />
+            {collectionLabel(collection)}
+          </a>
+          <span className="crumb-sep" aria-hidden="true">
+            /
+          </span>
+          <span className="crumb" aria-current="page">
+            {String(entry.data[headline?.name ?? "title"] ?? slug) || slug}
+          </span>
+        </nav>
         <StatusLabel status={status} conflict={draft?.conflict ?? entry.conflict} />
         <span
           className="save"
@@ -478,20 +509,21 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
         </span>
         <span className="entry-bar-spacer" />
         <Menu>
-          <MenuTrigger
-            className="btn"
-            data-variant="ghost"
-            data-size="sm"
-            aria-label="More actions"
-          >
-            •••
-          </MenuTrigger>
+          <Tooltip label="More actions">
+            <MenuTrigger className="icon-btn" aria-label="More actions">
+              <IconMore />
+            </MenuTrigger>
+          </Tooltip>
           <MenuContent align="end">
             <MenuItem onClick={() => void switchMode(mode === "form" ? "source" : "form")}>
-              {mode === "form" ? "Edit source" : "Edit as form"}
+              <IconCode />
+              <span className="menu-item-label">
+                {mode === "form" ? "Edit source" : "Edit as form"}
+              </span>
             </MenuItem>
             <MenuItem disabled={readOnly} onClick={() => void duplicate()}>
-              Duplicate
+              <IconDuplicate />
+              <span className="menu-item-label">Duplicate</span>
             </MenuItem>
             <MenuItem
               onClick={() => {
@@ -499,11 +531,15 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
                 toast.success("Link copied");
               }}
             >
-              Copy link
+              <IconLink />
+              <span className="menu-item-label">Copy link</span>
             </MenuItem>
             {status !== "published" ? (
               <MenuItem disabled={!canWrite} onClick={() => void discardThis()}>
-                {status === "deleted" ? "Restore" : "Discard changes"}
+                <IconRevert />
+                <span className="menu-item-label">
+                  {status === "deleted" ? "Restore" : "Discard changes"}
+                </span>
               </MenuItem>
             ) : null}
             <MenuSeparator />
@@ -512,7 +548,8 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
               className="menu-item-danger"
               onClick={() => void remove()}
             >
-              Delete {singular(collection)}
+              <IconTrash />
+              <span className="menu-item-label">Delete {singular(collection)}</span>
             </MenuItem>
           </MenuContent>
         </Menu>

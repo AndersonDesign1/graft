@@ -265,7 +265,7 @@ function CompilationDetail({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="dialog-detail">
-        <DialogTitle>Compilation</DialogTitle>
+        <DialogTitle className="dialog-title">Compilation</DialogTitle>
         <dl className="facts">
           <div>
             <dt>When</dt>
