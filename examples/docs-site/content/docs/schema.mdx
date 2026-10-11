@@ -90,6 +90,8 @@ the index until every file passes.
 | `field.boolean()` | `true` or `false` | Flags such as `featured` |
 | `field.datetime()` | An ISO date and time | Publish dates |
 | `field.asset()` | `{ key, alt? }` | Images and files. See [Assets](/docs/assets) |
+| `field.select({ options })` | One value from a fixed list | A status, a section, a size |
+| `field.reference({ to })` | The slug of a document in another collection | A product's category, a post's author |
 | `field.object({ fields })` | A nested group of fields | An author with a name and a URL |
 | `field.array({ of })` | A list of another field | Tags, FAQ entries |
 | `field.json()` | Any JSON value | A last resort. Prefer an object or array, which are checked and typed |
@@ -105,11 +107,38 @@ Every builder accepts `optional: true` and a `description`.
 | `min`, `max` | `number` | The allowed range |
 | `int: true` | `number` | Whole numbers only |
 | `maxItems` | `array` | The most entries allowed |
+| `format: "money"` | `number` | An amount in the currency's minor unit (cents for USD, whole yen for JPY). Implies `int`. Studio shows and edits it as money |
+| `currency` | `number` with `format: "money"` | The ISO currency code Studio shows. Defaults to `USD` |
+| `label` | every field | What Studio calls the field, such as `"Price"`. The key stays the same |
 
 Set `maxLength` on any string or text field a public form writes to, and
 `maxItems` on any array, so one request cannot store megabytes. Set `max` on
 numbers that get multiplied, such as a quantity times a price. `field.json()`
 has no size limit, so keep it out of public forms.
+
+## Choices and references
+
+`field.select` limits a value to a list. Each option is a string, or a value
+with the label people see:
+
+```ts
+status: field.select({
+  options: ["draft", { value: "active", label: "On sale" }, "archived"],
+}),
+```
+
+`field.reference` stores the slug of a document in another collection. The
+file stays readable (`category: summer-sale`), Studio offers a picker over the
+target collection, and `describe_schema` tells an agent where to look the
+value up:
+
+```ts
+category: field.reference({ to: "categories" }),
+```
+
+Both appear in `describe_schema` with their options and target, alongside each
+field's `label` and limits, so an agent and Studio see the same rules the
+validator applies.
 
 ## Nest fields
 

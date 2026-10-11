@@ -1,5 +1,20 @@
 # @usegraft/content-api
 
+## 1.0.0-beta.5
+
+### Patch Changes
+
+- Updated dependencies [ab7cca3]
+- Updated dependencies [ab7cca3]
+  - @usegraft/contracts@1.0.0-beta.5
+
+## 1.0.0-beta.4
+
+### Patch Changes
+
+- Updated dependencies [4831a77]
+  - @usegraft/contracts@1.0.0-beta.4
+
 ## 1.0.0-beta.3
 
 ### Patch Changes

@@ -33,6 +33,7 @@
 import { execFileSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createActorResolver, type TrustedIssuer } from "@usegraft/auth";
+import { githubStoreFromEnv, revalidateWebhookFromEnv } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { setRequestPeer } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
@@ -184,10 +185,15 @@ export function createNodeListener(handler: FetchHandler, options: NodeListenerO
       if (peer) setRequestPeer(request, peer);
 
       const response = await handler(request);
-      const outHeaders: Record<string, string> = {};
+      const outHeaders: Record<string, string | string[]> = {};
       response.headers.forEach((value, key) => {
-        if (!HOP_BY_HOP.has(key)) outHeaders[key] = value;
+        if (!HOP_BY_HOP.has(key) && key !== "set-cookie") outHeaders[key] = value;
       });
+      // Each cookie is its own header line. Headers#forEach hands set-cookie
+      // over joined (or, per entry, as the last one only), which silently
+      // dropped Studio's session cookie when sign-in cleared a second one.
+      const cookies = response.headers.getSetCookie();
+      if (cookies.length > 0) outHeaders["set-cookie"] = cookies;
       res.writeHead(response.status, outHeaders);
       res.end(Buffer.from(await response.arrayBuffer()));
     } catch (error) {
@@ -284,6 +290,9 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   loadProjectEnv(options.cwd);
   const config = await loadConfig(findConfig(options.cwd));
   const url = requireDatabaseUrl();
+  // Built before any connection opens, so a bad GRAFT_REVALIDATE_URL stops the
+  // start instead of surfacing on the first write.
+  const onContentChange = revalidateWebhookFromEnv();
 
   const enableStudio = options.studio === true || process.env.GRAFT_STUDIO === "1";
 
@@ -360,7 +369,16 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     gitSha,
   });
 
+  // One store for every writing surface, so a hosted agent's write_content
+  // and a hosted editor's save land the same way: as drafts on GitHub when
+  // GRAFT_GITHUB_REPO is set, which is what lets a read-only deployment write.
+  const repository = githubStoreFromEnv({
+    contentDir: config.contentDir,
+    projectRoot: config.projectDir,
+  });
+
   const mcpHandler = createGraftMcpHandler({
+    ...(repository ? { store: repository } : {}),
     name: "graft-serve",
     contentDir: config.contentDir,
     collections: config.collections,
@@ -376,6 +394,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     // run_function, so the transport decided the limit — and tools/functions.ts
     // claims the two surfaces apply rate limits identically.
     rateLimit: { limit: 60, windowSeconds: 60 },
+    onContentChange,
   });
 
   // Same-origin unless the operator names origins. A browser client on another
@@ -493,17 +512,35 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
         : !loopback
           ? () => null
           : undefined;
+    // People sign in when GRAFT_STUDIO_SECRET is set. GitHub sign-in admits
+    // whoever can push to the content repository unless GRAFT_STUDIO_EDITORS
+    // narrows it, so the store's credentials answer that question.
+    const access = studioMod.editorAccessFromEnv();
     studioHandler = studioMod.createStudioHandler({
       db: branch.db,
       collections: config.collections,
       contentDir: config.contentDir,
       mdxTrust: config.mdxTrust,
       defaultBranch: writeBranch,
+      // Saves land in git on GitHub when GRAFT_GITHUB_REPO is set: the only
+      // way a hosted Studio on a read-only filesystem can save at all.
+      ...(repository ? { store: repository } : {}),
+      ...(access
+        ? {
+            editors: {
+              ...access,
+              ...(repository
+                ? { permissionOf: (login: string) => repository.permissionOf(login) }
+                : {}),
+            },
+          }
+        : {}),
       // Only reached on a loopback mount, where there is no caller identity to
       // attribute to. Off loopback the authenticated principal is used instead.
       decider: { kind: "agent", id: "studio-serve" },
       uiBasePath: "/studio",
       authenticate,
+      onContentChange,
     });
   }
 
@@ -540,6 +577,16 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   };
 }
 
+/**
+ * The revalidate URL as the banner prints it: origin and path only, because a
+ * query string or userinfo can carry a token. startServe already refused a URL
+ * that does not parse.
+ */
+function revalidateTarget(raw: string): string {
+  const url = new URL(raw.trim());
+  return `${url.origin}${url.pathname}`;
+}
+
 /** `graft serve` — start and block until SIGINT/SIGTERM, then shut down cleanly. */
 export async function serveCommand(options: ServeCommandOptions): Promise<void> {
   const running = await startServe(options);
@@ -557,6 +604,11 @@ export async function serveCommand(options: ServeCommandOptions): Promise<void> 
         ? [
             `  studio     GET  ${base}/studio`,
             `  openapi    GET  ${base}/api/studio/v1/openapi.json`,
+          ]
+        : []),
+      ...(process.env.GRAFT_REVALIDATE_URL?.trim()
+        ? [
+            `  refresh    POST ${revalidateTarget(process.env.GRAFT_REVALIDATE_URL)} after each write`,
           ]
         : []),
     ].join("\n"),

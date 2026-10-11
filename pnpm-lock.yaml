@@ -415,6 +415,22 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  examples/shop:
+    dependencies:
+      '@usegraft/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@usegraft/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      '@usegraft/compiler':
+        specifier: workspace:*
+        version: link:../../packages/compiler
+
   packages/assets:
     dependencies:
       aws4fetch:

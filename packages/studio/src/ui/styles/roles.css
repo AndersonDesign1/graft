@@ -52,6 +52,33 @@
   --state-orphaned-text: var(--c-red-text);
   --state-orphaned-text-loud: var(--c-red-text-loud);
 
+  /* ---- editorial state: what is live and what is not ----------------------
+     The editor's status axis. Unpublished work wears the brand's vermilion,
+     the one place it appears in the chrome: it is the state an editor most
+     needs to see at a glance, and "not live yet" is not an error. Published
+     carries no hue at all, because it is the resting state. */
+  --state-unpublished-bg: var(--c-vermilion-bg);
+  --state-unpublished-border: var(--c-vermilion-border);
+  --state-unpublished-solid: var(--c-vermilion-solid);
+  --state-unpublished-text: var(--c-vermilion-text);
+  --state-unpublished-text-loud: var(--c-vermilion-text-loud);
+
+  --state-published-solid: var(--c-neutral-solid);
+  --state-published-text: var(--c-neutral-text);
+
+  --state-conflict-bg: var(--c-amber-bg);
+  --state-conflict-border: var(--c-amber-border);
+  --state-conflict-solid: var(--c-amber-solid);
+  --state-conflict-text: var(--c-amber-text);
+
+  /* Field problems: the red the system already spends on errors. */
+  --field-problem-text: var(--c-red-text-loud);
+  --field-problem-border: var(--c-red-solid);
+  --field-problem-bg: var(--c-red-bg);
+
+  /* The brand mark itself, for the wordmark's dot and the publish seal. */
+  --brand-mark: var(--c-vermilion-solid);
+
   /* ---- operational state: approvals, branches ---- */
   --state-pending-bg: var(--c-amber-bg);
   --state-pending-border: var(--c-amber-border);

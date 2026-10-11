@@ -83,6 +83,10 @@ export function RichEditor({
         [Crepe.Feature.Toolbar]: true,
         [Crepe.Feature.CodeMirror]: true,
       },
+      featureConfigs: {
+        // Crepe's default ("Please enter...") reads like a form error.
+        [Crepe.Feature.Placeholder]: { text: "Start writing, or type / for blocks", mode: "doc" },
+      },
     });
 
     // Match the serialiser to how these files are actually written. remark

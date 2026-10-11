@@ -11,6 +11,7 @@
  */
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
+import type { ContentChangeEvent } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import {
   runContentMigration,
@@ -112,7 +113,7 @@ export async function migrateCommand(
 
   const url = requireDatabaseUrl();
   const [
-    { compile, resolveGitSha },
+    { compile, notifyContentChange, resolveGitSha, revalidateWebhookFromEnv },
     {
       createDb,
       listAppliedMigrations,
@@ -122,12 +123,16 @@ export async function migrateCommand(
       withMigrationLock,
     },
   ] = await Promise.all([import("@usegraft/compiler"), import("@usegraft/db")]);
+  // Before any connection opens, so a bad GRAFT_REVALIDATE_URL stops the run.
+  const onContentChange = revalidateWebhookFromEnv();
   const control = createDb(url);
   // Overlay branches (and unregistered ids) run against the shared DB under
   // their branch_id; a neon branch runs against its own database.
   const branch = await resolveBranchHandle(control.db, branchId, { databaseUrl: url });
   const writeBranch = scopeWriteBranch(branch.scope);
 
+  // Each applied content migration's compile, sent to the app once the lock is released.
+  const contentChanges: ContentChangeEvent[] = [];
   const run = async (): Promise<MigrateCommandResult> => {
     const appliedRows = await listAppliedMigrations(branch.db, writeBranch);
     const appliedIds = new Set(appliedRows.map((row) => row.migrationId));
@@ -164,6 +169,11 @@ export async function migrateCommand(
             mdxTrust: config.mdxTrust,
             branchId: writeBranch,
             gitSha,
+          });
+          contentChanges.push({
+            branch: writeBranch,
+            gitSha: compiled.gitSha,
+            changes: compiled.changes,
           });
           await recordAppliedMigration(branch.db, {
             branchId: writeBranch,
@@ -226,11 +236,23 @@ export async function migrateCommand(
     // A dry run reads the ledger without the lock. --apply reads it only once
     // the lock is held, so a run that had to wait skips what the other applied.
     if (!options.apply) return await run();
-    return await withMigrationLock(branch.db, writeBranch, run, {
-      onWait: () =>
-        // A merge into this branch holds the same lock, so name both.
-        console.log(`A migration or merge is running on "${branchId}"; waiting for it to finish…`),
-    });
+    try {
+      return await withMigrationLock(branch.db, writeBranch, run, {
+        onWait: () =>
+          // A merge into this branch holds the same lock, so name both.
+          console.log(
+            `A migration or merge is running on "${branchId}"; waiting for it to finish…`,
+          ),
+      });
+    } finally {
+      // After the lock is released: a slow revalidate route must not hold up
+      // the next migration or merge on this branch. In `finally` because each
+      // applied migration commits its compile and ledger row as it goes, so a
+      // later one throwing leaves the earlier ones live, and a rerun skips
+      // them. notifyContentChange never throws, so the migration's own error
+      // is the one that propagates.
+      for (const change of contentChanges) await notifyContentChange(onContentChange, change);
+    }
   } finally {
     await branch.close();
     await control.close();

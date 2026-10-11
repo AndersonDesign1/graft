@@ -30,9 +30,16 @@
         "GRAFT_MCP_ALLOW_ANONYMOUS",
         // Which accounts the landing-page example grants operator scopes to.
         "GRAFT_OPERATOR_EMAILS",
-        // Deployment provenance, read per-request by the functions handler.
+        // Deployment provenance, read per-request by the functions handler,
+        // and by Studio's GitHub store to know what the checkout holds.
         "VERCEL_GIT_COMMIT_SHA",
-        "GITHUB_SHA"
+        "GITHUB_SHA",
+        "GRAFT_DEPLOYED_SHA"
+        // Deliberately absent: GRAFT_STUDIO_* and GRAFT_GITHUB_*. A hosted
+        // Studio reads them when its server starts, never during a build, and
+        // they include write credentials (a token, a GitHub App private key,
+        // an OAuth secret). Passing them to every package build hands them to
+        // every build script and plugin in the graph for nothing.
       ],
       // `.vercel/output` is the docs site's real build product — the artifact
       // Vercel uploads, and the one `pnpm check:site` reads. Undeclared, turbo

@@ -92,7 +92,10 @@ function targets() {
   }
 
   const site = join(root, "examples", "docs-site");
-  files.push(...walk(join(site, "content"), [".mdx", ".md"]));
+  // The changelog page is the CHANGELOGs merged (scripts/gen-changelog.mjs), so
+  // it is the same record of the past and is exempt for the same reason.
+  const changelogPage = join(site, "content", "docs", "changelog.mdx");
+  files.push(...walk(join(site, "content"), [".mdx", ".md"]).filter((f) => f !== changelogPage));
   files.push(...walk(join(site, "src"), [".ts", ".tsx", ".astro"]));
 
   return files;
