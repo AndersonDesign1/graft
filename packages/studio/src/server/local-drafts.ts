@@ -123,7 +123,14 @@ async function fileBlobSha(full: string): Promise<string | null> {
   const info = await stat(full).catch(() => null);
   if (!info?.isFile()) return null;
   const hash = createHash("sha1").update(`blob ${info.size}\0`);
-  for await (const chunk of createReadStream(full)) hash.update(chunk as Buffer);
+  try {
+    for await (const chunk of createReadStream(full)) hash.update(chunk as Buffer);
+  } catch (error) {
+    // Deleted between the stat and the read: a missing file, not a failed
+    // listing. Thrown, it emptied the whole Changes list.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
   return hash.digest("hex");
 }
 
