@@ -52,6 +52,7 @@ file is a candidate to move up into a check.
 | Rule                                                                                                   | Enforced by                                      |
 | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
 | Formatting matches the repo                                                                            | `pnpm format:check`, pre-commit hook             |
+| PR titles are Conventional Commits, lowercase after the colon, no period                               | `Conventional title` check on every PR           |
 | No slop patterns in TypeScript                                                                         | `pnpm lint` (anti-slop plugin)                   |
 | Registry copies stay in sync                                                                           | `pnpm check:registry-drift`                      |
 | The error reference matches the code                                                                   | `pnpm check:error-docs`                          |
