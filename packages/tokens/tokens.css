@@ -207,6 +207,9 @@
   --leading-lede: 1.6;
   --type-meta: 0.8125rem; /* 13, captions, group labels, dates */
   --leading-meta: 1.45;
+  /* The wordmark: "graft." in every top bar, the same on every surface. */
+  --type-wordmark: 1.1875rem; /* 19 */
+  --tracking-wordmark: -0.035em;
 
   --leading-tight: 1.08;
   --leading-snug: 1.3;

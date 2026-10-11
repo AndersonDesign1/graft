@@ -1564,9 +1564,9 @@ html[data-theme="dark"] .powered-by-graft-on-ink {
 
 .doc-wordmark {
   font-family: var(--font-sans);
-  font-size: 1.1875rem;
+  font-size: var(--type-wordmark);
   font-weight: var(--weight-semibold);
-  letter-spacing: -0.035em;
+  letter-spacing: var(--tracking-wordmark);
   line-height: 1;
   color: var(--ink);
 }
