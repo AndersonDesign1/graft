@@ -221,7 +221,7 @@ export function CommandPalette({
               ))}
             </Command.Group>
           </Command.List>
-          <div className="palette-foot" aria-hidden="true">
+          <div className="palette-foot">
             <span>
               <kbd>↑</kbd>
               <kbd>↓</kbd>

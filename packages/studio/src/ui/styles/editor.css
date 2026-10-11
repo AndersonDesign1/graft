@@ -1793,8 +1793,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .publish:active,
-  .btn:active,
+  .publish:active:not(:disabled),
+  .btn:active:not(:disabled),
   .icon-btn:active,
   .toc-new:active,
   .fc-segment:active,

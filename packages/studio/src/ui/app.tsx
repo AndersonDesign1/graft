@@ -253,7 +253,13 @@ function Shell({ initialBranch }: { initialBranch: string }) {
                 )}
               </div>
 
-              <button type="button" className="top-search" onClick={() => setPaletteOpen(true)}>
+              <button
+                type="button"
+                className="top-search"
+                aria-label="Search"
+                aria-keyshortcuts="Meta+K Control+K"
+                onClick={() => setPaletteOpen(true)}
+              >
                 <IconSearch />
                 <span>Search</span>
                 <span className="top-search-keys" aria-hidden="true">

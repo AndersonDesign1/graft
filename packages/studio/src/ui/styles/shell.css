@@ -1080,6 +1080,14 @@ kbd {
   --normal-bg: var(--elevated);
   --normal-text: var(--ink);
   --normal-border: transparent;
+  /* Success and failure share the popup surface: the icon carries the
+     meaning (an error's icon is red), never a tinted card. */
+  --success-bg: var(--elevated);
+  --success-text: var(--ink);
+  --success-border: transparent;
+  --error-bg: var(--elevated);
+  --error-text: var(--ink);
+  --error-border: transparent;
   --border-radius: var(--radius-outer);
   font-family: var(--font-sans);
 }
