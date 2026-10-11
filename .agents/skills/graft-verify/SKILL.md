@@ -84,8 +84,10 @@ $O --db "$URL" env RUN_INTEGRATION=1 pnpm --filter @usegraft/db exec vitest run
 $V/pg.sh down "$P/itest"
 ```
 
-Suites that need Neon or S3 skip themselves once `offline.sh` removes the
-keys. That is correct. Report them as skipped, never as passed.
+Suites that need Neon or S3 skip themselves unless `RUN_LIVE=1` is set, and
+`offline.sh` removes their keys as well. That is correct. Report them as
+skipped, never as passed, and never set `RUN_LIVE=1` without the user's
+say-so: those suites create and delete things in a real, billed account.
 
 Helpers:
 

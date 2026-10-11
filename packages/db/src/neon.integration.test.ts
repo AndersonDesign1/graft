@@ -1,8 +1,13 @@
 /**
- * Integration: the neon branch backend against the real Neon API + database
- * (opt-in, and additionally gated on the neon env). Run with:
- * RUN_INTEGRATION=1, DATABASE_URL, NEON_API_KEY, GRAFT_NEON_PROJECT_ID
- * (repo-root .env is auto-loaded).
+ * Integration: the neon branch backend against the real Neon API + database.
+ * It creates and deletes a branch in a real, billed Neon project, so it needs
+ * its own opt-in on top of the integration flag. Run with:
+ * RUN_INTEGRATION=1, RUN_LIVE=1, DATABASE_URL, NEON_API_KEY,
+ * GRAFT_NEON_PROJECT_ID (repo-root .env is auto-loaded).
+ *
+ * RUN_INTEGRATION=1 alone points the suites at a throwaway Postgres. A shell
+ * that also happens to hold Neon keys must not turn that into a write to a
+ * real project.
  *
  * One lifecycle test on purpose — every step is a real API call with seconds
  * of latency, and later steps need the earlier ones' state anyway.
@@ -25,6 +30,7 @@ try {
 
 const runIntegration =
   process.env.RUN_INTEGRATION === "1" &&
+  process.env.RUN_LIVE === "1" &&
   Boolean(process.env.DATABASE_URL) &&
   Boolean(process.env.NEON_API_KEY) &&
   Boolean(process.env.GRAFT_NEON_PROJECT_ID);
