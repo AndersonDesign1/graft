@@ -1196,6 +1196,7 @@
 
 .fc-tile .input {
   height: 1.8rem;
+  min-height: 1.8rem;
   font-size: var(--text-xs);
 }
 

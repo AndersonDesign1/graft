@@ -571,7 +571,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
           data-size="sm"
           disabled={!canWrite || status === "published" || autosave.state === "saving"}
           onClick={() => void publishThis()}
-          title={status === "published" ? "No draft to commit or publish" : undefined}
+          title={status === "published" ? `No draft to ${actionWord(action)}` : undefined}
         >
           {action === "review" ? "Submit" : publishVerb(action)}
         </button>

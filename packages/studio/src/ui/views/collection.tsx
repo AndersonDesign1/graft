@@ -279,7 +279,9 @@ export function CollectionView({ collection }: { collection: string }) {
           description:
             drafts.data?.publish === "commit"
               ? "Commit the deletion to record it in Git."
-              : "Publish the deletion to remove it from the site.",
+              : drafts.data?.publish === "review"
+                ? "Submit the deletion for review."
+                : "Publish the deletion to remove it from the site.",
         });
       }
       setSelected(new Set());

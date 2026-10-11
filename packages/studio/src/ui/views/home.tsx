@@ -61,9 +61,11 @@ export function HomeView() {
       <header className="view-head">
         <h1 className="view-title">{title}</h1>
         <p className="view-sub">
-          {collections.length === 0
-            ? "No collections yet. Add one to graft.config.ts."
-            : `${plural(total, "entry", "entries")} in ${plural(collections.length, "collection")}`}
+          {!schema.data
+            ? "\u00a0"
+            : collections.length === 0
+              ? "No collections stored as MDX files yet. Add one to graft.config.ts."
+              : `${plural(total, "entry", "entries")} in ${plural(collections.length, "collection")}`}
         </p>
       </header>
 
@@ -127,7 +129,11 @@ export function HomeView() {
               </a>
             </li>
           ))}
-          {drafts.data && changes.length === 0 && pending === 0 && reviews.length === 0 ? (
+          {drafts.data &&
+          !approvals.loading &&
+          changes.length === 0 &&
+          pending === 0 &&
+          reviews.length === 0 ? (
             <li>
               <IconCheck className="waiting-icon" aria-hidden="true" />
               <span className="waiting-main">

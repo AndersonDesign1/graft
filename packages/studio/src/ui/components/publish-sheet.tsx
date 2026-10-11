@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { DraftChangeDto, DraftsDto, PublishResultDto, WorkspaceDto } from "../../editor-types";
 import { ApiError, api, plainError } from "../lib/api";
-import { collectionLabel, doneWord, publishVerb, useStudio } from "../lib/studio";
+import { actionWord, collectionLabel, doneWord, publishVerb, useStudio } from "../lib/studio";
 import { DiffView } from "./diff-view";
 import { IconCaretDown, IconCheck, IconExternal, IconWarning } from "./icons";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
@@ -152,7 +152,8 @@ export function PublishSheet({
               <>
                 <p className="sheet-empty-title">Everything is {doneWord(action)}.</p>
                 <p className="sheet-empty-body">
-                  Edits you make are saved as drafts and gather here until you publish them.
+                  Edits you make are saved as drafts and gather here until you {actionWord(action)}{" "}
+                  them.
                 </p>
               </>
             )}
