@@ -6,12 +6,13 @@
  * design system with two sources of truth — the exact thing tokens exist to
  * prevent. Import it as `@usegraft/tokens/tokens.css`.
  *
- * Thesis: editorial print, monochrome. A black stage, off-white type, and
- * elevation carried entirely by *lightness* — surfaces step up from the stage
- * rather than being drawn in with borders. There is no brand accent. Emphasis
- * is "bright": the mark, the union, the active state and the primary button are
- * simply the lightest thing on screen. The only chromatic color in the system
- * is the error red, and it is function, not identity.
+ * Thesis: monochrome chrome, colorful content. A black stage and off-white
+ * type in dark, chalk paper and near-black ink in light, and elevation carried
+ * by *lightness*: surfaces step up from the stage rather than being drawn in
+ * with borders. There is no brand accent. Emphasis is "bright": the mark, the
+ * active state and the primary button are simply the lightest (dark) or
+ * darkest (light) thing on screen. Color comes from content: syntax, CLI
+ * chips, framework marks, callout tones, and the error red.
  *
  * Why no accent (this is measured, not vibes):
  *   A colored accent on a black stage is a trap. Solving for the lightness a
@@ -57,10 +58,12 @@
   --n-9: oklch(0.96 0.003 95); /* #f2f2ef — dark-scheme text/bright — Lc -99 */
   --n-10: #ffffff; /* the top of the ramp — dark-scheme hover on a bright fill */
 
-  /* light scheme neutrals — warm ivory paper, warm near-black ink */
-  --paper-0: #f7f5f0; /* the page */
+  /* light scheme neutrals: chalk paper (a warm near-white on the ink's hue,
+     almost no chroma, so it reads white without going cold) and warm
+     near-black ink. It replaced ivory, #f7f5f0. */
+  --paper-0: oklch(0.992 0.002 95); /* #fdfcfb — the page */
   --paper-1: #ffffff; /* raised */
-  --paper-2: #eeebe3; /* sunken */
+  --paper-2: oklch(0.966 0.003 95); /* #f4f4f1 — sunken */
   --ink-0: oklch(0.2 0.006 95); /* #1b1a16 — text, and the light-scheme "bright" */
   --ink-0-hover: oklch(0.32 0.006 95); /* one step off the fill, not a gray jump */
   --ink-1: oklch(0.44 0.006 95); /* #5c5a52 — muted */
@@ -105,8 +108,10 @@
   --muted-foreground: light-dark(var(--ink-1), var(--n-8)); /* passes body 75 */
   --faint-foreground: light-dark(var(--ink-2), var(--n-7)); /* passes non-body 60 */
 
-  --border: light-dark(rgb(27 26 22 / 0.14), rgb(242 242 239 / 0.11));
-  --border-strong: light-dark(rgb(27 26 22 / 0.34), rgb(242 242 239 / 0.26));
+  /* Light borders are lighter than on ivory: on chalk, 0.14 read as a rule
+     rather than a hairline. */
+  --border: light-dark(rgb(27 26 22 / 0.11), rgb(242 242 239 / 0.11));
+  --border-strong: light-dark(rgb(27 26 22 / 0.24), rgb(242 242 239 / 0.26));
 
   /* "Primary" is not a hue — it is BRIGHT. Marks, unions, the active state,
      the filled button. In dark it is the lightest neutral; in light it is the
@@ -183,6 +188,25 @@
   --text-xl: 2.25rem; /* 36 — doc h1 */
   --text-2xl: 3.5rem; /* 56 — page display */
   --text-3xl: clamp(3.5rem, 9vw, 6.5rem); /* hero display */
+
+  /* Type roles. Size, leading and tracking travel together; components set
+     a role, never one of the three alone. Weights are 400, 500, 600 only. */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --type-title: clamp(2rem, 1.6rem + 1.4vw, 2.5rem); /* 32 → 40, a page h1 */
+  --leading-title: 1.15;
+  --tracking-title: -0.032em;
+  --type-section: 1.5rem; /* 24, h2 */
+  --leading-section: 1.3;
+  --tracking-section: -0.022em;
+  --type-subsection: 1.1875rem; /* 19, h3 */
+  --leading-subsection: 1.4;
+  --tracking-subsection: -0.014em;
+  --type-lede: var(--text-md); /* 18, the sentence under a title */
+  --leading-lede: 1.6;
+  --type-meta: 0.8125rem; /* 13, captions, group labels, dates */
+  --leading-meta: 1.45;
 
   --leading-tight: 1.08;
   --leading-snug: 1.3;

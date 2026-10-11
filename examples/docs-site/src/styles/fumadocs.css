@@ -71,16 +71,15 @@ header#nd-subnav::before {
   border-block-end: 1px solid var(--hairline);
 }
 
-/* Sidebar section group labels: sentence-case mono. Short operational labels
-   keep the mono voice; all-caps tracking is banned (it slows scanning and
-   turns every group into emphasis, so nothing is). Source text in lib/nav.ts
-   is already sentence-case ("Get Started"); this just stops uppercasing it. */
+/* Sidebar section group labels: sentence-case sans in the faint ink. Mono is
+   for literals (code, commands, paths), never for labels; all-caps tracking
+   is banned too (it slows scanning and turns every group into emphasis). */
 #nd-sidebar p.inline-flex,
 aside p.inline-flex {
-  font-family: var(--font-mono) !important;
-  font-size: var(--text-xs) !important;
-  font-weight: 500 !important;
-  letter-spacing: 0.02em !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--type-meta) !important;
+  font-weight: var(--weight-medium) !important;
+  letter-spacing: 0 !important;
   text-transform: none !important;
   color: var(--ink-faint) !important;
   margin-top: var(--space-6) !important;
@@ -168,8 +167,8 @@ kbd {
   --doc-gutter: 0px;
   --doc-column: 50rem; /* 800 — the article column's widest */
   --doc-body: 1.0625rem; /* 17 — reading size for long-form docs */
-  --doc-title: clamp(2.25rem, 1.75rem + 1.4vw, 2.875rem); /* 36 → 46 */
-  --doc-lede: 1.25rem; /* 20 */
+  --doc-title: var(--type-title); /* 32 → 40 */
+  --doc-lede: var(--type-lede); /* 18 */
 }
 
 /* Once the sidebar shows, the sidebar and contents rail sit a gutter in from
@@ -184,43 +183,53 @@ kbd {
 }
 
 /* ---- Page header ----------------------------------------------------------
-   Where you are, how long it takes, what the page is, what it gives you. The
-   hairline closes the header so the body starts on a clean line. */
+   What the page is, what it gives you, what you can do with it, then where it
+   sits and how long it takes. Space, not a rule, separates it from the body. */
 .doc-header {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding-block-end: var(--space-8);
-  margin-block-end: var(--space-4);
-  border-block-end: 1px solid var(--hairline);
+  padding-block-end: var(--space-6);
 }
 
-.doc-eyebrow {
+/* Section and reading time: the reader's least urgent question, so it comes
+   last and in the faint ink. Sans, like every label. */
+.doc-page-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.02em;
+  font-size: var(--type-meta);
+  line-height: var(--leading-meta);
   color: var(--ink-faint);
 }
 
-.font-serif,
+.doc-page-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.doc-page-meta svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
 #nd-page h1,
 .prose h1 {
   font-family: var(--font-display);
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-title);
 }
 
-/* The title steps 46 → 26 → 20 down to h3, each level also set apart by
+/* The title steps 40 → 26 → 20 down to h3, each level also set apart by
    weight or tracking, so the page title is unmistakably the top of the page. */
 #nd-page .doc-header h1 {
   margin: 0;
   font-size: var(--doc-title);
-  line-height: 1.06;
-  letter-spacing: -0.03em;
+  line-height: var(--leading-title);
+  letter-spacing: var(--tracking-title);
   text-wrap: balance;
 }
 
@@ -228,7 +237,7 @@ kbd {
   margin: 0;
   max-width: 60ch;
   font-size: var(--doc-lede);
-  line-height: 1.5;
+  line-height: var(--leading-lede);
   color: var(--ink-muted);
   text-wrap: pretty;
 }
@@ -1430,10 +1439,10 @@ html[data-theme="dark"] .powered-by-graft-on-ink {
    rail bent its line in at every h3, so its shape changed from page to page. */
 #nd-toc #toc-title {
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.02em;
-  color: var(--ink-faint);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
 }
 
 #nd-toc a {
@@ -1543,9 +1552,36 @@ html[data-theme="dark"] .powered-by-graft-on-ink {
   transition: none;
 }
 
-/* The "beta" mark beside the wordmark in the top bar. */
-.wordmark-badge {
-  color: var(--mark);
-  border: 1px solid color-mix(in oklch, var(--mark) 35%, transparent);
-  background: color-mix(in oklch, var(--mark) 10%, transparent);
+/* The wordmark in the top bar: "graft." the same size and weight on every
+   surface, then the surface name after a faint slash, then the stage as
+   plain faint text. */
+.doc-brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.doc-wordmark {
+  font-family: var(--font-sans);
+  font-size: 1.1875rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.035em;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.doc-brand-sep {
+  color: var(--ink-faint);
+}
+
+.doc-brand-surface {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+
+.doc-brand-stage {
+  font-size: var(--type-meta);
+  color: var(--ink-faint);
 }
