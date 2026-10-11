@@ -31,6 +31,7 @@
     "check:dist-tags": "node scripts/check-dist-tags.mjs",
     "sync:dist-tags": "node scripts/sync-dist-tags.mjs",
     "check:site": "node scripts/check-site-build.mjs",
+    "check:design": "node scripts/check-design.mjs",
     "install-tag": "node scripts/install-tag.mjs",
     "check:error-docs": "node scripts/gen-error-docs.mjs --check",
     "docs:errors": "node scripts/gen-error-docs.mjs",

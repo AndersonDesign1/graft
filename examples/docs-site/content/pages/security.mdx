@@ -9,7 +9,7 @@ description: >-
 faqs:
   - question: Can an agent delete my content?
     answer: >-
-      Deletes are destructive functions, so the first call never executes — it
+      Deletes are destructive functions, so the first call never executes. It
       files a one-shot, input-bound approval and returns 403 with its id. Only
       after you run graft approve does the retry succeed, and the deletion is
       still a commit in your history.
@@ -24,7 +24,7 @@ faqs:
       Tokens are verified against your OIDC issuer, carry only the scopes you
       granted, and expire on the issuer's schedule. Everything the token did is
       in the audit log. Revocation is at your issuer. A stolen runtime
-      credential can still rewrite or hide content_index rows — the approval
+      credential can still rewrite or hide content_index rows. The approval
       gate is the exception, not a general database lock.
 
 ---

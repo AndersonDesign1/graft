@@ -95,7 +95,7 @@ aside a {
 }
 
 aside a:hover:not([data-active="true"]) {
-  background: light-dark(rgba(0, 0, 0, 0.04), rgba(255, 255, 255, 0.05)) !important;
+  background: color-mix(in oklch, var(--ink) 5%, transparent) !important;
   color: var(--ink) !important;
 }
 
@@ -104,7 +104,7 @@ aside a[data-active="true"] {
   color: var(--ink) !important;
   font-weight: 600 !important;
   border-inline-start: none !important;
-  background: light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08)) !important;
+  background: color-mix(in oklch, var(--ink) 7%, transparent) !important;
   box-shadow: none !important;
 }
 
@@ -589,7 +589,7 @@ kbd {
 
 .stat-strip .stat-label {
   display: block;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--text-xs);
   font-weight: 500;
   color: var(--ink-faint);

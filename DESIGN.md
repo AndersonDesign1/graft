@@ -1,0 +1,329 @@
+# Graft design language
+
+This file is how Graft looks, and why. Read it before you design, build or
+review anything a person sees: the docs site, Studio, an example app, a social
+card. It is written for people and agents alike. If you follow it you should
+not need anyone's taste but this file's.
+
+The judgment lives here. The mechanics live in two places:
+
+- **Tokens and components:** `@usegraft/tokens` (`tokens.css`) holds every
+  value, and the docs site's MDX components
+  (`examples/docs-site/src/components/mdx`) hold the structure. Use them; do
+  not read them into context to reverse-engineer them. The components are
+  listed in this file.
+- **Copy:** the `graft-writing` skill. Design and words are one pass; a page
+  is not done until its copy follows that skill too.
+
+Every rule below is something you can check by looking. If a rule here is
+vague, that is a bug in this file: fix the rule, do not guess.
+
+## Scope right now
+
+- **Docs** (`examples/docs-site`, `/docs/*`) follow this file in full.
+- **The landing page** (`/`, `/why`, `/security`) keeps its current design.
+  Do not restyle it as a side effect of other work. It gets its own pass.
+- **Studio** keeps its current design until its own pass, after the docs.
+
+## Who opens a Graft page, and what they need
+
+| Reader                          | Arrives from                             | Needs within one screen                        |
+| ------------------------------- | ---------------------------------------- | ---------------------------------------------- |
+| A developer evaluating Graft    | GitHub, search, a link                   | What Graft is, the one command, proof it works |
+| A developer building with Graft | The docs sidebar, search                 | The exact code and the exact next step         |
+| An agent operating a project    | `llms.txt`, Markdown twins, the docs MCP | Plain text with the same facts as the page     |
+| An editor in Studio             | A teammate's invite                      | What changed, what is waiting for them         |
+
+Design for the first two, never at the expense of the third: every docs page
+has a Markdown twin, and nothing important may exist only as a visual.
+
+## Priority order
+
+When rules compete, protect them in this order:
+
+1. Facts. Version floors, commands, error codes and APIs are copied from the
+   source, never paraphrased into something untrue.
+2. The reader's next action is unmistakable.
+3. The invariants are visible where they matter: Git is the source, one
+   schema checks everything, destructive work waits for a person.
+4. Graft is recognizable: the wordmark, the warm stage, the type, the pills,
+   the colored marks.
+5. The page has a composition specific to its material.
+6. Polish: motion, hover states, optical alignment.
+
+## The thesis
+
+**Monochrome chrome, colorful content.** Surfaces, text and controls use one
+warm neutral ramp (hue 95): warm ivory paper and near-black ink in light, a
+black stage and off-white type in dark. There is no brand accent color. The
+primary button, the active nav item and the selected tab are simply the
+brightest (dark) or darkest (light) thing on screen.
+
+The color on a Graft page comes from what the page is about:
+
+- **Syntax** in code blocks, and the terminal's hues in inline CLI chips
+  (`graft compile`): the binary, the command, flags and arguments each have
+  their color.
+- **Framework and tool marks** in their own colors: Next.js, TypeScript,
+  Astro, React, Svelte and the rest, in tabs, tables and next-step links.
+  Package-manager marks (npm, pnpm, bun) take the text color so they read in
+  both themes.
+- **Callouts:** the tone's hue (note blue, warning amber, danger red) on the
+  icon and the label. Never on the fill, never as a side rail.
+- **Danger** for errors and destructive actions, always with an icon or a
+  word.
+
+Success is not green. A compile that worked is bright, not a traffic light.
+
+What only Graft has is the material: MCP transcripts, `fix` lines, compile
+output, approval gates. Show it.
+
+## Identity
+
+- **Wordmark:** `graft.` lowercase, with the period, IBM Plex Sans 600,
+  tracking -0.035em, 19px in headers. The same on every surface. A surface
+  name follows after a faint slash: `graft. / Docs`. The stage (`beta`)
+  follows as plain faint text.
+- **Docs header:** wordmark and surface name left, at most three section
+  links, GitHub icon right. 56px tall, translucent background, hairline
+  bottom border.
+- **Footer:** wordmark left, one line right (license and source link). Quiet.
+
+## Type
+
+IBM Plex Sans for everything a person reads: prose, headings, labels,
+buttons, tables, numbers. IBM Plex Mono only for code, commands, file paths,
+error codes, tool names and other literal identifiers, and only for the
+identifier itself, not its sentence or its table.
+
+**Never use mono for labels, eyebrows, navigation or section names.**
+
+Use roles, never raw sizes. Weights are 400, 500 and 600 only.
+
+| Role       | Token               | Size / leading / tracking | Use                                       |
+| ---------- | ------------------- | ------------------------- | ----------------------------------------- |
+| Title      | `--type-title`      | 32-40px / 1.15 / -0.032em | A page's h1                               |
+| Section    | (in `fumadocs.css`) | 26px / 1.2 / -0.02em      | h2                                        |
+| Subsection | `--text-h3`         | 20px / 1.3 / -0.01em      | h3; step titles at 16px                   |
+| Lede       | `--type-lede`       | 18px / 1.6                | The one sentence under a title            |
+| Body       | `--doc-body`        | 17px / 1.75               | Reading                                   |
+| Compact    | `--text-sm`         | 14px / 1.5                | Sidebar, buttons, pills, tables, callouts |
+| Meta       | `--type-meta`       | 13px / 1.45               | Captions, group labels, dates             |
+| Code       | `--text-sm`         | 14px / 1.7                | Code blocks                               |
+
+`--type-section` (24px) and `--type-subsection` (19px) are the sizes h2 and
+h3 move to next; until then the table above is what ships. `--text-2xl` and
+`--text-3xl` are the landing page's display sizes and are not used in docs.
+
+Rules you can check:
+
+- Prose is at most 68 characters a line (`--measure`). Tables, code and
+  diagrams may use the full column.
+- Headings use `text-wrap: balance`, paragraphs `text-wrap: pretty`.
+- Headings are sentence case and state the claim or the task ("Add your own
+  content", not "Content" and not "CONTENT").
+- No all-caps text anywhere except inside code.
+- Numbers that line up use `font-variant-numeric: tabular-nums`.
+- No text below 13px. Rewrite before shrinking.
+- No em dashes in copy. The writing skill has the details.
+
+## Color tokens
+
+Components read the semantic layer only. Literal colors appear in
+`tokens.css` and in brand marks, nowhere else. A hover wash is
+`color-mix(in oklch, var(--ink) 5%, transparent)`, so it follows the scheme.
+
+| Token                                                     | Means                                                                       |
+| --------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `--background`                                            | The page                                                                    |
+| `--muted`                                                 | Sunken: code blocks, callouts, table heads, the active nav item, pill hover |
+| `--card`                                                  | Raised: the agent prompt, menus                                             |
+| `--elevated`                                              | Floating: menus, popovers                                                   |
+| `--foreground`                                            | Text                                                                        |
+| `--muted-foreground`                                      | Secondary text, safe for body copy                                          |
+| `--faint-foreground`                                      | Metadata only, 13px and up                                                  |
+| `--border`, `--border-strong`                             | Hairlines; strong for controls and hover                                    |
+| `--primary`, `--primary-hover`, `--primary-foreground`    | The bright fill and its label                                               |
+| `--danger`                                                | Errors and destructive actions                                              |
+| `--callout-note`, `--callout-warning`, `--callout-danger` | Callout icons and labels                                                    |
+| `--code-*`                                                | Syntax and CLI chips                                                        |
+
+Every pairing is checked with APCA against its real background: body text
+Lc 75 or more, metadata Lc 60 or more. Light and dark are both first-class and
+follow the operating system.
+
+## Space, shape, elevation
+
+- **Space** is a 4px grid: `--space-1` (4px) to `--space-24` (96px). Inside a
+  group 8-16px. Between groups 24-32px. Section turns in docs 64px.
+- **Every gap has one owner.** A flow, stack or grid sets it; children reset
+  their own margins. Never fix a bad gap with a one-off margin.
+- **Radius** is concentric (outer = inner + padding): 4px inline code and
+  kbd, 6px buttons and inputs, 10px code blocks, tables, menus and the agent
+  prompt. Pills are fully round; so are step numbers.
+- **Elevation is lightness.** In dark, a raised surface is lighter, not
+  shadowed. Shadows exist only on floating things (menus, popovers).
+- **The page is one canvas.** A surface or border must mean something: code,
+  a table, an interactive object, a callout. Never wrap a section, a
+  paragraph or a metric in a card. Never nest a card in a card.
+
+## Docs layout
+
+A sticky header; a 248px sidebar; an article column up to 752px; a 216px
+contents rail from 1280px wide. The sidebar hides below 1024px behind a menu
+button and the rail hides below 1280px.
+
+The page head, in order: the title, the lede, the page-action pills, then a
+meta line (section, reading time, last updated) in `--faint-foreground`.
+
+Rules you can check:
+
+- Nothing scrolls the page sideways at 390px. Wide code and tables scroll
+  inside their own frame.
+- Grid and flex children that hold text, code or tables have `min-width: 0`.
+- Peers share edges, baselines, type roles and inner padding.
+
+## Components
+
+Compose pages from these. If none fits, write CSS in
+`examples/docs-site/src/styles/fumadocs.css` that reads tokens, scoped to a
+class of its own; never restyle an existing component from a page.
+
+**Shell** (`docs-shell.tsx`): the top bar with the `graft.` wordmark, `/`,
+the surface name and the stage badge; the sidebar; the page head with its
+action pills and meta line; the contents rail (`toc-rail.tsx`); search.
+
+**MDX components** (`src/components/mdx`), the only ones an author writes:
+
+| Component                     | For                                          |
+| ----------------------------- | -------------------------------------------- |
+| `<AgentPrompt>`               | The prompt that makes an agent do the page   |
+| `<CodeBlock title>`           | A titled code frame around one fence         |
+| `<Tabs labels>` with `<Tab>`  | Alternatives the reader picks once           |
+| `<Steps>` with `<Step>`       | An order the reader must follow              |
+| `<Callout label>`             | A point the reader must not miss             |
+| `<DocCards>` with `<DocCard>` | Next steps at the end of a page              |
+| `<FieldTable>`                | A schema's fields, read from the live schema |
+| `<TierBadge>`                 | Which engine a page needs                    |
+
+Markdown tables, fences and inline code render through `Table`, `Pre` and
+`InlineCode`, so an author never writes a class name.
+
+### When to use which
+
+- **Page actions.** A row of pills under the lede: Copy page, View as
+  Markdown, Open in ChatGPT, Open in Claude. Icon and label, 40px tall, 44px
+  on touch. The copy pill swaps its icon to a check on success. On narrow
+  screens the row wraps; it never collapses into a menu.
+- **Agent prompt.** Every guide that ends in a working result opens with one,
+  right after the page head: the exact prompt that makes an agent do the
+  page, in a card titled "Let your agent do it" with a copy button.
+- **Tabs.** For alternatives the reader picks once (framework, package
+  manager). Each framework tab leads with its mark. Switching is instant.
+- **Code block.** Always titled with its file path and a file icon, or
+  "Terminal" with a terminal icon for a shell. A path is mono; "Terminal" is
+  sans. Package-manager tabs (`<Tabs labels="npm, pnpm, yarn, bun">`) render
+  as one code block led by a terminal icon, each tab with its mark, not as a
+  second frame.
+- **CLI chips.** An inline command in prose (`graft compile`, `npx next
+--version`) takes the terminal's hues automatically when it starts with a
+  known program. Other inline code (a path, a field, a value) stays
+  monochrome.
+- **Steps.** Only for an order the reader must follow. Each title is an
+  action ("Compile your content"). Never number things that are not a
+  sequence.
+- **Callout.** At most two per page. The label is a sentence that states the
+  point ("Deletes cannot be undone"), not a category ("Note"), and carries
+  the tone's hue with the icon.
+- **Table.** For lookup and comparison. Full column width, a quiet header,
+  hairline rows, numbers right-aligned. Error tables are code, meaning, fix.
+  A table of frameworks leads each row with the framework's mark.
+- **Next steps.** `<DocCards>`: a title and one line per link.
+
+## Motion
+
+Default to stillness. The page is complete without any motion, and motion
+never gates reading.
+
+| Allowed                                                  | Duration, easing                  |
+| -------------------------------------------------------- | --------------------------------- |
+| Button and pill press: `scale: 0.97`                     | 120ms `--ease-out`                |
+| Hover color, border and background                       | 150ms `ease`                      |
+| Menu open from its trigger, scale 0.97 to 1 plus opacity | 150ms in, 100ms out, `--ease-out` |
+| Copy icon swap: opacity, scale 0.25 to 1, blur 4px to 0  | 200ms                             |
+| Link-list arrow nudge on hover, 3px                      | 200ms `--ease-out`                |
+| Disclosure (show more, accordion)                        | 200ms `--ease-out`                |
+
+Never in docs: scroll-triggered reveals, typing animations, blinking
+cursors, marquees, parallax, bounce, page-load sequences, animated keyboard
+actions (search opens instantly), `transition: all`, `ease-in` on UI,
+anything over 300ms in UI. Respect `prefers-reduced-motion` everywhere.
+
+## Icons
+
+Two kinds, never mixed up:
+
+- **Interface icons** are Lucide, one set, 15-16px, stroke 1.5 beside regular
+  text, `currentColor`, states through color and opacity.
+- **Marks** are the real logos of frameworks and tools (Next.js, TypeScript,
+  Astro, React, Svelte, TanStack, Node.js, Docker, Postgres, SQLite, npm,
+  pnpm, bun, ChatGPT, Claude). They sit beside the name they stand for, at the
+  text's height. They keep their own colors, except where a brand color would
+  vanish on one theme (package managers use `currentColor`).
+
+An icon always sits beside a word or has an `aria-label`. Never put an icon
+in a colored tile, never use one as section decoration, never use emoji.
+
+## Accessibility
+
+One `h1`, ordered headings, a skip link, landmarks, visible focus (2px ring in
+`--focus-ring`), native controls, real `<table>` with `scope`, a label on every
+icon button, 40px hit areas on desktop and 44px on touch. A table that can
+scroll is focusable. Meet WCAG AA and APCA as above, and never encode meaning
+in color alone: a callout's hue always comes with its icon and label.
+
+## Reject list
+
+Do not ship any of these in docs:
+
+- Mono uppercase eyebrows or kickers above headings.
+- Gradients, glows, glass, grain, hand-drawn decoration.
+- Content that fades in on scroll; typing or replay animations that run on
+  load.
+- A box or pill around metadata (`BETA`, `New`, reading time). Pills are for
+  actions.
+- Colored side rails or colored fills on callouts or cards.
+- Syntax colors on inline code that is not a command.
+- Cards for every section, cards in cards, borders that fix weak hierarchy.
+- Text under 13px, weights other than 400/500/600, ad-hoc font sizes.
+- Brand marks redrawn, recolored or used as decoration away from their name.
+- Em dashes, "truly", "seamless", "powerful", "blazing".
+
+Restraint is not emptiness. Every page still has one strong focal object.
+
+## Verify before you hand off
+
+1. Render it. Never claim a visual result from code alone.
+2. Look at 1440px and 390px, in light and dark.
+3. Check the first screen: is the next action obvious?
+4. Run the reject list against what you see.
+5. Check overflow (`scrollWidth` equals `clientWidth` at 390px), focus order,
+   and contrast.
+6. Does the Markdown twin carry the same facts?
+
+`graft-verify` has the commands.
+
+## Where corrections go
+
+When a review finds a problem, fix it in the narrowest place that can enforce
+it:
+
+- A judgment call goes into this file, as a rule you can check.
+- A repeated mechanic goes into `tokens.css` as a token, or into
+  `src/components/mdx` as a component.
+- Anything a machine can catch goes into a check (`check:design`, a lint rule,
+  a test in `examples/docs-site`).
+- Words go into the `graft-writing` skill.
+- A one-off that appears once stays out of the rules until it repeats.
+
+Changes to this file are reviewed like code.
