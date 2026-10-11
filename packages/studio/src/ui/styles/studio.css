@@ -258,18 +258,17 @@ h3 {
 }
 
 .menu-label {
-  padding: 0.35rem 0.55rem 0.25rem;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
   color: var(--ink-faint);
 }
 
+/* One row: icon, label, then a count or hint pushed to the end. */
 .menu-item {
   display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
+  align-items: center;
+  gap: var(--space-2);
   width: 100%;
   padding: 0.38rem 0.55rem;
   border-radius: var(--radius-inner);
@@ -287,8 +286,9 @@ h3 {
 }
 
 .menu-item-label {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
 }
 
 .menu-item-hint,
@@ -3217,4 +3217,47 @@ kbd {
   .mdx-card-edit:active {
     transform: none;
   }
+}
+
+/* A view or the whole Studio threw while rendering (error-boundary.tsx). */
+.crash {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  max-width: 36rem;
+  margin: var(--space-12) auto;
+  padding-inline: var(--space-6);
+  color: var(--ink);
+}
+
+.crash[data-scope="page"] {
+  min-height: 100dvh;
+  align-content: center;
+  margin-block: 0;
+}
+
+.crash > svg {
+  color: var(--danger);
+}
+
+.crash h2 {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.crash p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.crash code {
+  max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-inner);
+  background: var(--paper-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
 }

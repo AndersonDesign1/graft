@@ -10,7 +10,6 @@ import { Menu as MenuPrimitive } from "@base-ui-components/react/menu";
 import { cx } from "../../lib/cn";
 
 export const Menu = MenuPrimitive.Root;
-export const MenuGroup = MenuPrimitive.Group;
 
 export function MenuTrigger({ className, ...props }: MenuPrimitive.Trigger.Props) {
   // No base class: the trigger is styled by whatever the caller is (a chip, an
@@ -55,13 +54,26 @@ export function MenuItem({ className, ...props }: MenuPrimitive.Item.Props) {
   );
 }
 
-export function MenuLabel({ className, ...props }: MenuPrimitive.GroupLabel.Props) {
+/**
+ * A labelled run of items. The label and its items travel together because
+ * Base UI only renders a group label inside a `Menu.Group`; a bare label
+ * throws (error #31) and, with nothing above it to catch the error, unmounts
+ * the whole Studio. There is no standalone label export, so that cannot be
+ * written by accident.
+ */
+export function MenuSection({
+  label,
+  children,
+  className,
+  ...props
+}: MenuPrimitive.Group.Props & { label: React.ReactNode }) {
   return (
-    <MenuPrimitive.GroupLabel
-      data-slot="menu-label"
-      className={cx("menu-label", className)}
-      {...props}
-    />
+    <MenuPrimitive.Group data-slot="menu-group" className={className} {...props}>
+      <MenuPrimitive.GroupLabel data-slot="menu-label" className="menu-label">
+        {label}
+      </MenuPrimitive.GroupLabel>
+      {children}
+    </MenuPrimitive.Group>
   );
 }
 

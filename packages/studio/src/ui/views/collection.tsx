@@ -13,7 +13,7 @@ import type { EntryList, EntryStatus, EntrySummary } from "../../editor-types";
 import type { SchemaFieldDto } from "../../types";
 import { AssetThumb, formatCell } from "../components/fields";
 import { IconCaretDown, IconClose, IconSearch, IconSort, IconWarning } from "../components/icons";
-import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from "../components/ui/menu";
+import { Menu, MenuContent, MenuItem, MenuSection, MenuTrigger } from "../components/ui/menu";
 import { api, plainError, qs } from "../lib/api";
 import { humanise, labelOf, titleField } from "../lib/fields";
 import { relativeTime } from "../lib/format";
@@ -332,39 +332,40 @@ export function CollectionView({ collection }: { collection: string }) {
                 <IconCaretDown size={11} />
               </MenuTrigger>
               <MenuContent>
-                <MenuLabel>{field ? labelOf(field) : humanise(facet.field)}</MenuLabel>
-                <MenuItem
-                  onClick={() =>
-                    setWhere((prev) => {
-                      const next = { ...prev };
-                      delete next[facet.field];
-                      return next;
-                    })
-                  }
-                >
-                  <span className="menu-item-label">Any</span>
-                </MenuItem>
-                {facet.values.map((value) => (
+                <MenuSection label={field ? labelOf(field) : humanise(facet.field)}>
                   <MenuItem
-                    key={value.value}
-                    data-active={active === value.value || undefined}
-                    onClick={() => setWhere((prev) => ({ ...prev, [facet.field]: value.value }))}
+                    onClick={() =>
+                      setWhere((prev) => {
+                        const next = { ...prev };
+                        delete next[facet.field];
+                        return next;
+                      })
+                    }
                   >
-                    <span className="menu-item-label">
-                      {formatCell(
-                        field,
-                        value.value === "true"
-                          ? true
-                          : value.value === "false"
-                            ? false
-                            : value.value,
-                      )}
-                    </span>
-                    <span className="menu-item-hint" data-numeric="">
-                      {value.count}
-                    </span>
+                    <span className="menu-item-label">Any</span>
                   </MenuItem>
-                ))}
+                  {facet.values.map((value) => (
+                    <MenuItem
+                      key={value.value}
+                      data-active={active === value.value || undefined}
+                      onClick={() => setWhere((prev) => ({ ...prev, [facet.field]: value.value }))}
+                    >
+                      <span className="menu-item-label">
+                        {formatCell(
+                          field,
+                          value.value === "true"
+                            ? true
+                            : value.value === "false"
+                              ? false
+                              : value.value,
+                        )}
+                      </span>
+                      <span className="menu-item-hint" data-numeric="">
+                        {value.count}
+                      </span>
+                    </MenuItem>
+                  ))}
+                </MenuSection>
               </MenuContent>
             </Menu>
           );
@@ -385,32 +386,33 @@ export function CollectionView({ collection }: { collection: string }) {
             {sort.key !== "site" ? (sort.dir === "asc" ? " ↑" : " ↓") : null}
           </MenuTrigger>
           <MenuContent align="end">
-            <MenuLabel>Sort by</MenuLabel>
-            {[
-              { key: "site", label: "Default order" },
-              { key: "title", label: "Name" },
-              ...(local ? [{ key: "updated", label: "Last edited" }] : []),
-              ...columns.map((field) => ({ key: field.name, label: labelOf(field) })),
-            ].map((option) => (
-              <MenuItem
-                key={option.key}
-                data-active={sort.key === option.key || undefined}
-                onClick={() =>
-                  setSort((prev) => ({
-                    key: option.key,
-                    dir:
-                      prev.key === option.key && prev.dir === "asc" && option.key !== "site"
-                        ? "desc"
-                        : "asc",
-                  }))
-                }
-              >
-                <span className="menu-item-label">{option.label}</span>
-                {sort.key === option.key && option.key !== "site" ? (
-                  <span className="menu-item-hint">{sort.dir === "asc" ? "↑" : "↓"}</span>
-                ) : null}
-              </MenuItem>
-            ))}
+            <MenuSection label="Sort by">
+              {[
+                { key: "site", label: "Default order" },
+                { key: "title", label: "Name" },
+                ...(local ? [{ key: "updated", label: "Last edited" }] : []),
+                ...columns.map((field) => ({ key: field.name, label: labelOf(field) })),
+              ].map((option) => (
+                <MenuItem
+                  key={option.key}
+                  data-active={sort.key === option.key || undefined}
+                  onClick={() =>
+                    setSort((prev) => ({
+                      key: option.key,
+                      dir:
+                        prev.key === option.key && prev.dir === "asc" && option.key !== "site"
+                          ? "desc"
+                          : "asc",
+                    }))
+                  }
+                >
+                  <span className="menu-item-label">{option.label}</span>
+                  {sort.key === option.key && option.key !== "site" ? (
+                    <span className="menu-item-hint">{sort.dir === "asc" ? "↑" : "↓"}</span>
+                  ) : null}
+                </MenuItem>
+              ))}
+            </MenuSection>
           </MenuContent>
         </Menu>
       </div>

@@ -5,6 +5,7 @@ import type { EditorComponentList } from "@usegraft/contracts";
 import type { ContentTree } from "../types";
 import { CollectionMark } from "./components/collection-icon";
 import { CreateDialog } from "./components/create-dialog";
+import { ErrorBoundary } from "./components/error-boundary";
 import {
   IconApprovals,
   IconBranches,
@@ -27,12 +28,19 @@ import {
   Menu,
   MenuContent,
   MenuItem,
-  MenuLabel,
+  MenuSection,
   MenuSeparator,
   MenuTrigger,
 } from "./components/ui/menu";
 import { SIGNED_OUT_EVENT, qs } from "./lib/api";
-import { DEV_VIEWS, currentBranch, setBranchInUrl, useRoute, type DevView } from "./lib/route";
+import {
+  DEV_VIEWS,
+  currentBranch,
+  setBranchInUrl,
+  toHash,
+  useRoute,
+  type DevView,
+} from "./lib/route";
 import {
   StudioProvider,
   collectionLabel,
@@ -78,7 +86,13 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
     // One place decides icon weight and size, so glyphs stay optically
     // consistent with the 1px hairlines they sit beside.
     <IconContext.Provider value={{ size: 16, weight: "regular" }}>
-      {signedOut ? <SignIn /> : <Shell initialBranch={initialBranch} />}
+      {signedOut ? (
+        <SignIn />
+      ) : (
+        <ErrorBoundary scope="page">
+          <Shell initialBranch={initialBranch} />
+        </ErrorBoundary>
+      )}
       <Toaster position="bottom-right" closeButton toastOptions={{ className: "sonner-toast" }} />
     </IconContext.Provider>
   );
@@ -293,26 +307,27 @@ function Shell({ initialBranch }: { initialBranch: string }) {
                   <span className="side-user-name">{user?.name ?? user?.id ?? "Local editor"}</span>
                   <span className="side-user-role">
                     {workspace.data?.storage === "github"
-                      ? `Saving to ${workspace.data.branch ? "GitHub" : "GitHub"}`
+                      ? "Saving to GitHub"
                       : "Saving on this computer"}
                   </span>
                 </span>
               </MenuTrigger>
               <MenuContent align="start" side="top">
-                <MenuLabel>Appearance</MenuLabel>
-                {(Object.keys(THEME) as Theme[]).map((key) => {
-                  const { label, Icon } = THEME[key];
-                  return (
-                    <MenuItem
-                      key={key}
-                      data-active={theme === key || undefined}
-                      onClick={() => setTheme(key)}
-                    >
-                      <Icon size={14} />
-                      <span className="menu-item-label">{label}</span>
-                    </MenuItem>
-                  );
-                })}
+                <MenuSection label="Appearance">
+                  {(Object.keys(THEME) as Theme[]).map((key) => {
+                    const { label, Icon } = THEME[key];
+                    return (
+                      <MenuItem
+                        key={key}
+                        data-active={theme === key || undefined}
+                        onClick={() => setTheme(key)}
+                      >
+                        <Icon size={14} />
+                        <span className="menu-item-label">{label}</span>
+                      </MenuItem>
+                    );
+                  })}
+                </MenuSection>
                 {workspace.data?.sessions ? (
                   <>
                     <MenuSeparator />
@@ -370,7 +385,12 @@ function Shell({ initialBranch }: { initialBranch: string }) {
               ) : null}
             </button>
           </header>
-          <main className="main">{main}</main>
+          <main className="main">
+            {/* Keyed by route, so leaving a view that crashed brings the panel back. */}
+            <ErrorBoundary key={toHash(route)} scope="view">
+              {main}
+            </ErrorBoundary>
+          </main>
         </div>
 
         <PublishSheet
