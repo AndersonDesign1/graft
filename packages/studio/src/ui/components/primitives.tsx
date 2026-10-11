@@ -19,14 +19,14 @@ import { IconCheck, IconWarning } from "./icons";
 export const STATE_LABEL: Record<DocumentState, string> = {
   synced: "In sync",
   drifted: "Out of date",
-  unindexed: "Never compiled",
+  unindexed: "Not indexed",
   orphaned: "File missing",
 };
 
 export const STATE_HELP: Record<DocumentState, string> = {
   synced: "On disk and in the index, and the two match.",
   drifted: "Edited on disk since the last compile.",
-  unindexed: "On disk but never compiled into the index.",
+  unindexed: "On disk, with no row in the index.",
   orphaned: "In the index but the file is gone.",
 };
 

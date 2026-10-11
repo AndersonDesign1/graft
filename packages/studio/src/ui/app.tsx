@@ -182,7 +182,14 @@ function Shell({ initialBranch }: { initialBranch: string }) {
   } else if (route.view === "collection" && route.collection) {
     main = <CollectionView collection={route.collection} />;
   } else if (route.view === "overview") {
-    main = <OverviewView branch={branch} tree={tree} navigate={navigate} />;
+    main = (
+      <OverviewView
+        branch={branch}
+        tree={tree}
+        navigate={navigate}
+        canWrite={workspace.data?.canWrite ?? false}
+      />
+    );
   } else if (route.view === "schema") main = <SchemaView />;
   else if (route.view === "approvals") main = <ApprovalsView onDecided={approvals.refresh} />;
   else if (route.view === "branches")

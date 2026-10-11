@@ -285,9 +285,10 @@ else in Studio's chrome takes a hue. Diffs keep the code colors.
 
 **One word per state, and the workspace's verb.** An edit not yet committed or
 published is a Draft everywhere. The action is Commit on a laptop, Publish when
-hosted, Submit for review without publish rights, and every sentence uses the
-same verb (`actionWord`, `doneWord` in `lib/studio.tsx`). A laptop never says
-"publish".
+hosted, Submit for review without publish rights. A sentence about what to do
+next uses `actionWord` (commit, publish, submit) and a sentence about what is
+done uses `doneWord` (committed, published), both in `lib/studio.tsx`, so a
+laptop never says "publish".
 
 **The editing canvas** is the page it becomes: the docs' column, title size,
 17/1.75 body and h2/h3 sizes, on the page colour with no card around it.

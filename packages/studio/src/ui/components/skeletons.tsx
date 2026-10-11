@@ -132,8 +132,8 @@ export function OverviewSkeleton() {
     <div className="stats" aria-hidden="true">
       {Array.from({ length: 6 }, (_, i) => (
         <div key={i} className="stat">
-          <Bar w="5rem" h="0.8rem" />
-          <Bar w="2.5rem" h="2.25rem" />
+          <Bar w="5rem" h="calc(var(--text-xs) * var(--leading-snug))" />
+          <Bar w="2.5rem" h="calc(var(--text-xl) * 1.25)" />
         </div>
       ))}
     </div>

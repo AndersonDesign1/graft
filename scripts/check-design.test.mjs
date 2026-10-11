@@ -134,3 +134,8 @@ test("variables Base UI and Studio set at runtime are not undefined", () => {
     ".menu { transform-origin: var(--transform-origin); max-height: var(--available-height); }";
   assert.deepEqual(checkCss(css, definedVariables(css)), []);
 });
+
+test("a misspelled runtime variable is still undefined", () => {
+  const css = ".tabs { width: var(--active-tab-wdith); }";
+  assert.equal(checkCss(css, definedVariables(css)).length, 1);
+});

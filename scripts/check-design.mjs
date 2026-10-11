@@ -101,9 +101,18 @@ const EASE_IN = /(^|[^\w-])ease-in(?![\w-])/;
 /**
  * Set at runtime rather than in a stylesheet: Shiki writes its colors inline,
  * Base UI hands popups their origin and room, and Studio's tabs set where the
- * active tab sits.
+ * active tab sits. Exact names, not prefixes, so a typo is still undefined.
  */
-const RUNTIME_VARIABLE = /^--(shiki-|transform-origin$|available-|anchor-|active-tab-)/;
+const RUNTIME_VARIABLES = new Set([
+  "--shiki-light",
+  "--shiki-dark",
+  "--transform-origin",
+  "--available-height",
+  "--available-width",
+  "--anchor-width",
+  "--active-tab-left",
+  "--active-tab-width",
+]);
 
 /** Every custom property a stylesheet defines, ignoring commented-out ones. */
 export function definedVariables(css) {
@@ -163,7 +172,7 @@ export function checkCss(css, defined) {
   for (const { selector, property, value, line } of declarations(css)) {
     if (defined) {
       for (const [, name] of value.matchAll(/var\(\s*(--[\w-]+)\s*\)/g)) {
-        if (defined.has(name) || RUNTIME_VARIABLE.test(name)) continue;
+        if (defined.has(name) || RUNTIME_VARIABLES.has(name)) continue;
         problems.push({
           line,
           message: `${name} is not defined`,

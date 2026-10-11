@@ -30,8 +30,11 @@ export function OverviewView({
   branch,
   tree,
   navigate,
+  canWrite,
 }: {
   branch: string;
+  /** A viewer can read Health but not compile: POST /compile needs studio:write. */
+  canWrite: boolean;
   tree: { data: ContentTree | null; error: string | null; loading: boolean; refresh: () => void };
   navigate: (route: Route) => void;
 }) {
@@ -75,8 +78,9 @@ export function OverviewView({
         <button
           type="button"
           className="btn"
-          disabled={compiling}
+          disabled={compiling || !canWrite}
           onClick={() => void compileNow()}
+          title={canWrite ? undefined : "Compiling needs write access"}
         >
           <IconCompile aria-hidden="true" />
           {compiling ? "Compiling…" : "Compile"}
@@ -105,17 +109,19 @@ export function OverviewView({
               <dd data-numeric="">{summary?.drifted ?? 0}</dd>
             </div>
             <div className="stat">
-              <dt>Never compiled</dt>
+              <dt>Not indexed</dt>
               <dd data-numeric="">{summary?.unindexed ?? 0}</dd>
             </div>
             <div className="stat" data-tone={(summary?.orphaned ?? 0) > 0 ? "danger" : undefined}>
               <dt>File missing</dt>
               <dd data-numeric="">{summary?.orphaned ?? 0}</dd>
             </div>
-            <div className="stat" data-tone={pending > 0 ? "waiting" : undefined}>
-              <dt>Waiting for approval</dt>
-              <dd data-numeric="">{pending}</dd>
-            </div>
+            {approvals.data ? (
+              <div className="stat" data-tone={pending > 0 ? "waiting" : undefined}>
+                <dt>Waiting for approval</dt>
+                <dd data-numeric="">{pending}</dd>
+              </div>
+            ) : null}
           </dl>
 
           <section className="health-section" aria-labelledby="health-collections">
@@ -141,13 +147,17 @@ export function OverviewView({
                     onClick={() => navigate({ view: "collection", collection: collection.name })}
                   >
                     <td>
-                      <span className="list-name">
+                      <a
+                        className="list-name"
+                        href={`#/c/${encodeURIComponent(collection.name)}`}
+                        onClick={(event) => event.stopPropagation()}
+                      >
                         <CollectionMark
                           name={collection.name}
                           authority={collection.authority === "db" ? "db" : "file"}
                         />
                         <code>{collection.name}</code>
-                      </span>
+                      </a>
                     </td>
                     <td className="muted">
                       {collection.authority === "db" ? "Database rows" : "MDX files"}
@@ -225,7 +235,14 @@ export function OverviewView({
             ) : null}
           </section>
 
-          {pending > 0 ? (
+          {approvals.error ? (
+            <section className="health-section" aria-labelledby="health-approvals">
+              <h2 className="section-title" id="health-approvals">
+                Waiting for approval
+              </h2>
+              <Status loading={false} error={approvals.error} />
+            </section>
+          ) : pending > 0 ? (
             <section className="health-section" aria-labelledby="health-approvals">
               <div className="section-head">
                 <h2 className="section-title" id="health-approvals">
@@ -244,7 +261,13 @@ export function OverviewView({
                       onClick={() => navigate({ view: "approvals" })}
                     >
                       <td>
-                        <code>{row.functionName}</code>
+                        <a
+                          className="list-name"
+                          href="#/dev/approvals"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <code>{row.functionName}</code>
+                        </a>
                       </td>
                       <td className="muted">
                         {row.requestedByKind}
