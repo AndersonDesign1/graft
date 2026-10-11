@@ -83,6 +83,14 @@ describe("Tabs", () => {
     expect(html.match(/class="tab-panel"/g)).toHaveLength(1);
     expect(html.match(/class="tab-label"/g)).toHaveLength(1);
   });
+
+  it("frames package-manager tabs as code and anything else as sections", async () => {
+    expect(await render(body)).toContain('data-variant="code"');
+
+    // `constructor` is on every object's prototype; it is not a package manager.
+    const html = await render('<Tabs labels="constructor">\n\n<Tab>\n\na\n\n</Tab>\n\n</Tabs>');
+    expect(html).toContain('data-variant="section"');
+  });
 });
 
 describe("CodeBlock", () => {

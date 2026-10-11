@@ -145,7 +145,7 @@ function getTabIcon(rawLabel: string): ReactNode {
 
 /** Every label names a package manager: the tabs are one code block. */
 function isPackageManagerSet(labels: string[]): boolean {
-  return labels.every((label) => label.toLowerCase().trim() in PM_ICONS);
+  return labels.every((label) => Object.hasOwn(PM_ICONS, label.toLowerCase().trim()));
 }
 
 export interface TabsProps {
