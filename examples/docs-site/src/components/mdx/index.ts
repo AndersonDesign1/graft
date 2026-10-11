@@ -9,6 +9,7 @@
  * The copy button on every fence is markup too; one delegated listener in
  * DocsRoot.astro answers all of them.
  */
+import { AgentPrompt } from "./AgentPrompt";
 import { Callout } from "./Callout";
 import { CodeBlock } from "./CodeBlock";
 import { DocCard, DocCards } from "./DocCards";
@@ -21,6 +22,7 @@ import { Tab, Tabs } from "./Tabs";
 import { TierBadge } from "./TierBadge";
 
 export const mdxComponents = {
+  AgentPrompt,
   Callout,
   CodeBlock,
   DocCard,

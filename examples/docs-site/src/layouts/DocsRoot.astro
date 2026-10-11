@@ -61,17 +61,25 @@ const ogImageUrl = ogImage ? new URL(ogImage, Astro.site ?? "https://graft.page"
     <a href="#nd-page" class="skip-link">Skip to content</a>
     <slot />
     <script>
-      // Copy buttons on code fences (components/mdx/Pre.tsx). The body is
-      // static HTML, so one listener on the document answers every button,
-      // including any rendered after it was attached.
+      // Copy buttons on code fences (components/mdx/Pre.tsx) and agent
+      // prompts (components/mdx/AgentPrompt.tsx). The body is static HTML, so
+      // one listener on the document answers every button, including any
+      // rendered after it was attached. A fence copies its <code> exactly; a
+      // prompt copies its text with the line breaks of the source collapsed.
       const timers = new WeakMap<HTMLElement, number>();
       document.addEventListener("click", async (event) => {
         if (!(event.target instanceof Element)) return;
         const button = event.target.closest<HTMLElement>("[data-copy-code]");
-        const pre = button?.closest("pre");
-        const code = pre?.querySelector("code");
-        const status = pre?.querySelector("[data-copy-status]");
-        if (!button || !code) return;
+        const root = button?.closest("pre, [data-copy-root]");
+        const fence = root instanceof HTMLPreElement;
+        const source = fence
+          ? root.querySelector("code")
+          : root?.querySelector("[data-copy-text]");
+        const status = root?.querySelector("[data-copy-status]");
+        if (!button || !source) return;
+        const text = fence
+          ? (source.textContent ?? "")
+          : (source.textContent ?? "").replace(/\s+/g, " ").trim();
         clearTimeout(timers.get(button));
         const report = (state: "done" | "failed" | null, message: string) => {
           if (state) button.dataset.state = state;
@@ -80,7 +88,7 @@ const ogImageUrl = ogImage ? new URL(ogImage, Astro.site ?? "https://graft.page"
           if (status) status.textContent = message;
         };
         try {
-          await navigator.clipboard.writeText(code.textContent ?? "");
+          await navigator.clipboard.writeText(text);
           report("done", "Copied");
           timers.set(
             button,

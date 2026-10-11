@@ -85,8 +85,12 @@ export function componentsToMarkdown(body: string): string {
       const label = attr(trimmed, "label");
       out.push(label ? `> **${/[.?!]$/.test(label) ? label : `${label}.`}**` : ">");
       inCallout = true;
-    } else if (trimmed === "</Callout>") {
+    } else if (trimmed === "</Callout>" || trimmed === "</AgentPrompt>") {
       inCallout = false;
+    } else if (trimmed === "<AgentPrompt>") {
+      // The prompt reads as a quote an agent can lift whole.
+      out.push("> **Prompt for a coding agent:**");
+      inCallout = true;
     } else if (trimmed.startsWith("<TierBadge")) {
       const note = ENGINE_NOTE.get(attr(trimmed, "tier") ?? "");
       if (note) out.push(note);
