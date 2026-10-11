@@ -731,7 +731,7 @@ function TitleInput({
       />
       {problem ? (
         <p className="fr-problem" role="alert">
-          <IconWarning size={13} />
+          <IconWarning size={14} />
           <span>{problem}</span>
         </p>
       ) : null}

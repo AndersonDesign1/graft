@@ -19,7 +19,9 @@ import {
   IconComponentBlock,
   IconFile,
   IconHistory,
+  IconHome,
   IconOverview,
+  IconPlus,
   IconSchema,
   IconSettings,
   type IconComponent,
@@ -156,7 +158,7 @@ export function CommandPalette({
                 className="palette-item"
                 onSelect={() => go(() => navigate({ view: "home" }))}
               >
-                <IconOverview size={14} />
+                <IconHome />
                 <span className="palette-item-label">Home</span>
               </Command.Item>
               {collections.map((collection) => (
@@ -182,9 +184,7 @@ export function CommandPalette({
                   className="palette-item"
                   onSelect={() => go(() => openCreate(collection.name))}
                 >
-                  <span className="palette-plus" aria-hidden="true">
-                    +
-                  </span>
+                  <IconPlus />
                   <span className="palette-item-label">New {singular(collection.name)}</span>
                 </Command.Item>
               ))}

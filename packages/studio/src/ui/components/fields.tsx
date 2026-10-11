@@ -79,7 +79,7 @@ export function FieldRow(props: ControlProps) {
       ) : null}
       {problem ? (
         <p className="fr-problem" id={`${id}-problem`} role="alert">
-          <IconWarning size={13} />
+          <IconWarning size={14} />
           <span>{problem}</span>
         </p>
       ) : null}
@@ -400,7 +400,7 @@ function SelectControl({ field, value, onChange, disabled, inputId, describedBy 
           </option>
         ))}
       </select>
-      <IconCaretDown size={12} className="fc-select-caret" aria-hidden="true" />
+      <IconCaretDown size={14} className="fc-select-caret" aria-hidden="true" />
     </div>
   );
 }
@@ -539,19 +539,19 @@ function ReferenceControl(props: InputProps) {
           slug ? (
             <span className="fc-ref-chosen">
               <span className="fc-ref-title">{title ?? humanise(slug)}</span>
-              <IconCaretDown size={12} />
+              <IconCaretDown size={14} />
             </span>
           ) : (
             <span className="fc-ref-placeholder">
               Choose a {singular(field.to)}…
-              <IconCaretDown size={12} />
+              <IconCaretDown size={14} />
             </span>
           )
         }
       />
       {slug && field.optional ? (
         <button type="button" className="fc-clear" aria-label="Clear" onClick={() => onChange("")}>
-          <IconClose size={12} />
+          <IconClose size={14} />
         </button>
       ) : null}
     </div>
@@ -608,7 +608,7 @@ function RefChip({
         disabled={disabled}
         aria-label={`Remove ${title ?? slug}`}
       >
-        <IconClose size={11} />
+        <IconClose size={14} />
       </button>
     </span>
   );
@@ -639,7 +639,7 @@ function TagsControl({ field, value, onChange, disabled, inputId }: InputProps) 
                 onChange(on ? list.filter((v) => v !== option.value) : [...list, option.value])
               }
             >
-              {on ? <IconCheck size={11} /> : null}
+              {on ? <IconCheck size={14} /> : null}
               {optionText(option)}
             </button>
           );
@@ -668,7 +668,7 @@ function TagsControl({ field, value, onChange, disabled, inputId }: InputProps) 
             aria-label={`Remove ${tag}`}
             onClick={() => onChange(list.filter((_, j) => j !== i))}
           >
-            <IconClose size={11} />
+            <IconClose size={14} />
           </button>
         </span>
       ))}
@@ -863,7 +863,7 @@ function GalleryControl({ value, onChange, disabled, path, problems }: InputProp
                 onClick={() => onChange(list.filter((_, j) => j !== i))}
                 aria-label={`Remove image ${i + 1}`}
               >
-                <IconClose size={11} />
+                <IconClose size={14} />
               </button>
             </div>
           </figure>
@@ -986,12 +986,12 @@ function ListControl({ field, value, onChange, disabled, path, problems }: Input
                 aria-expanded={open.has(i)}
                 onClick={() => toggle(i)}
               >
-                <IconCaretDown size={12} className="fc-item-caret" />
+                <IconCaretDown size={14} className="fc-item-caret" />
                 <span className="fc-item-index" data-numeric="">
                   {i + 1}
                 </span>
                 <span className="fc-item-summary">{itemSummary(entry, childFields, i)}</span>
-                {hasProblem(i) ? <IconWarning size={13} className="fc-item-warn" /> : null}
+                {hasProblem(i) ? <IconWarning size={14} className="fc-item-warn" /> : null}
               </button>
               <div className="fc-item-actions">
                 <button
@@ -1019,7 +1019,7 @@ function ListControl({ field, value, onChange, disabled, path, problems }: Input
                   onClick={() => onChange(list.filter((_, j) => j !== i))}
                   aria-label={`Remove ${noun} ${i + 1}`}
                 >
-                  <IconClose size={11} />
+                  <IconClose size={14} />
                 </button>
               </div>
             </div>

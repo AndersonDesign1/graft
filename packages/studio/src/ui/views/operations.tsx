@@ -208,7 +208,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
         window.setTimeout(() => setCopied(false), 1600);
       }}
     >
-      {copied ? <IconCheck size={12} /> : <IconCopy size={12} />}
+      {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
       {copied ? "Copied" : "Copy"}
     </button>
   );
