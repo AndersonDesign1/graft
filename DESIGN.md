@@ -23,7 +23,8 @@ vague, that is a bug in this file: fix the rule, do not guess.
 - **Docs** (`examples/docs-site`, `/docs/*`) follow this file in full.
 - **The landing page** (`/`, `/why`, `/security`) keeps its current design.
   Do not restyle it as a side effect of other work. It gets its own pass.
-- **Studio** keeps its current design until its own pass, after the docs.
+- **Studio** (`packages/studio`) follows this file in full, plus the
+  [Studio](#studio) section for what an app needs that a page does not.
 
 ## Who opens a Graft page, and what they need
 
@@ -83,8 +84,8 @@ output, approval gates. Show it.
 - **Wordmark:** `graft.` lowercase, with the period, IBM Plex Sans 600,
   tracking -0.035em, 19px (`--type-wordmark`, `--tracking-wordmark`). A
   surface name follows after a faint slash: `graft. / Docs`. The stage
-  (`beta`) follows as plain faint text. The landing page and Studio still
-  draw their own and move to this one when they are rebuilt.
+  (`beta`) follows as plain faint text: `graft. / Studio` in Studio. The
+  landing page still draws its own and moves to this one when it is rebuilt.
 - **Docs header:** wordmark and surface name left, at most three section
   links, GitHub icon right. 56px tall, translucent background, hairline
   bottom border.
@@ -153,6 +154,7 @@ Components read the semantic tokens below or their aliases (`--paper`,
 | `--danger`                                                | Errors and destructive actions                         |
 | `--callout-note`, `--callout-warning`, `--callout-danger` | Callout icons and labels                               |
 | `--code-*`                                                | Syntax and CLI chips                                   |
+| `--scrim`                                                 | Behind a dialog or sheet: dims the page, never blurs   |
 
 Every pairing is checked with APCA against its real background: body text
 at |Lc| 75 or more, metadata at |Lc| 60 or more (Lc is negative for light
@@ -248,6 +250,65 @@ Markdown tables, fences and inline code render through `Table`, `Pre` and
   A table of frameworks leads each row with the framework's mark.
 - **Next steps.** `<DocCards>`: a title and one line per link.
 
+## Studio
+
+Studio is an app: it is scanned and operated, not read top to bottom. Every
+rule above holds; this section adds what an app needs.
+
+**Frame.** The docs' frame. A 56px top bar across the full width: the
+wordmark and the branch left, search centred (24rem, with its shortcut), the
+Commit or Publish button and the account menu right. A 268px sidebar under it
+on the page colour holds navigation only. Below 48rem the sidebar opens as a
+drawer from a menu button and search becomes an icon.
+
+**Density.** 14px is the body size, 13px the floor. Controls are 36px; a
+smaller control (32px in a toolbar, an icon button) pads its hit area to 40px.
+Table rows are 44px, menu items 32px. Views open with a title (24px, 600), a
+one-line description, then their content; sections inside a view use 16px 600
+titles.
+
+**State is a mark and a word.** Never a colored pill. The resting state shows
+nothing, so the exceptions are what the eye finds.
+
+| State                | Mark                  | Color               |
+| -------------------- | --------------------- | ------------------- |
+| Draft                | Filled dot            | Ink                 |
+| New draft            | Ring                  | Ink                 |
+| Deleted              | Dot, or trash icon    | `--danger`          |
+| Needs a decision     | Dot                   | `--callout-warning` |
+| Waiting for approval | Count, or shield icon | `--callout-warning` |
+| Out of date          | Refresh icon          | Ink                 |
+| File missing         | Dot                   | `--danger`          |
+
+Amber means a person is needed and red means broken or destructive; nothing
+else in Studio's chrome takes a hue. Diffs keep the code colors.
+
+**One word per state, and the workspace's verb.** An edit not yet committed or
+published is a Draft everywhere. The action is Commit on a laptop, Publish when
+hosted, Submit for review without publish rights, and every sentence uses the
+same verb (`actionWord`, `doneWord` in `lib/studio.tsx`). A laptop never says
+"publish".
+
+**The editing canvas** is the page it becomes: the docs' column, title size,
+17/1.75 body and h2/h3 sizes, on the page colour with no card around it.
+
+**Popups.** One material: the elevated surface, a 10px radius, the floating
+shadow, `--scrim` behind modal ones. Open in 160ms, close in 100ms, from where
+they were asked for.
+
+| Kind    | For                                                   | Rules                                                               |
+| ------- | ----------------------------------------------------- | ------------------------------------------------------------------- |
+| Menu    | Actions or a choice on one thing                      | Items are icon and label; group labels sentence case                |
+| Dialog  | A short task that blocks                              | A visible close button, always; 480px wide by default               |
+| Confirm | Before a delete or a discard                          | Focus starts on Cancel; the button names the action ("Delete post") |
+| Sheet   | Reviewing a set before acting (commit)                | Slides from the right edge; a close button                          |
+| Palette | Go anywhere, run anything                             | Opens instantly; shows its keys                                     |
+| Tooltip | Naming an icon-only button                            | Never the only place a word lives                                   |
+| Toast   | Undo after a delete, or work that finished off-screen | One at a time; errors stay next to their cause instead              |
+
+Never `window.confirm`, never a blurred backdrop, never an animation on
+success: a commit that worked ends in a still check.
+
 ## Motion
 
 Default to stillness. The page is complete without any motion, and motion
@@ -333,6 +394,10 @@ component; do not copy them.
 - `<TierBadge>` is a pill around metadata.
 - Most fences are not wrapped in a titled `<CodeBlock>`. `check:design` only
   checks the ones that are.
+- Studio: Approvals are still bordered cards, Settings keeps its own section
+  layout, and Branches and History use the older table styles.
+- Studio: the editor chunk (Milkdown and CodeMirror, about 2.7 MB) loads with
+  the app instead of when an entry opens.
 
 ## Verify before you hand off
 

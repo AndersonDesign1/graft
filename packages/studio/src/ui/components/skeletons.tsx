@@ -65,25 +65,6 @@ export function DocumentSkeleton() {
   );
 }
 
-/**
- * Overview stat tiles. Bar heights are the label/value/hint line boxes, so
- * the strip is its final height before the numbers arrive — the grid gives
- * every tile the tallest row, and only the outer two carry a hint.
- */
-export function TilesSkeleton({ count = 6 }: { count?: number }) {
-  return (
-    <div className="tiles" aria-hidden="true">
-      {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="tile">
-          <Bar w="60%" h="1.05rem" />
-          <Bar w="35%" h="2.3rem" />
-          {i === 0 || i === count - 1 ? <Bar w="70%" h="1.05rem" /> : null}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /** A card's inner list — Overview panels, Settings blocks. */
 export function ListSkeleton({ rows = 4, avatar = false }: { rows?: number; avatar?: boolean }) {
   return (
@@ -145,28 +126,18 @@ export function MiniListSkeleton({ rows = 4 }: { rows?: number }) {
   );
 }
 
-/** The Compilations panel: delta chart above its mini-list. */
-export function ChartSkeleton({ rows = 4 }: { rows?: number }) {
-  return (
-    <>
-      <div className="sk-chart" aria-hidden="true">
-        {[38, 62, 45, 80, 55, 70, 48, 90, 60, 42].map((h, i) => (
-          <span key={i} className="sk-bar sk-chart-bar" style={{ height: `${h}%` }} />
-        ))}
-      </div>
-      <MiniListSkeleton rows={rows} />
-    </>
-  );
-}
-
-/**
- * The Overview above the fold — now just the stat strip. The sync banner it
- * used to reserve space for is gone (the top bar owns that job), and a
- * skeleton for a block that never arrives is a guaranteed layout jump rather
- * than protection from one.
- */
+/** Health's stat row, at its final height before the numbers arrive. */
 export function OverviewSkeleton() {
-  return <TilesSkeleton />;
+  return (
+    <div className="stats" aria-hidden="true">
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className="stat">
+          <Bar w="5rem" h="0.8rem" />
+          <Bar w="2.5rem" h="2.25rem" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /** Stacked cards — Approvals, Schema, Branches. */

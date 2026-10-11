@@ -116,3 +116,21 @@ test("a CodeBlock's title may be on a later line of its tag", () => {
     [3],
   );
 });
+
+test("Studio identifiers may be mono; Studio labels may not", () => {
+  const css = [
+    ".page-slug { font-family: var(--font-mono); }",
+    ".top-branch span { font-family: var(--font-mono); }",
+    ".type { font-family: var(--font-mono); }",
+  ].join("\n");
+  assert.deepEqual(checkCss(css), []);
+  assert.deepEqual(messages(checkCss(".menu-label { font-family: var(--font-mono); }")), [
+    'mono on ".menu-label"',
+  ]);
+});
+
+test("variables Base UI and Studio set at runtime are not undefined", () => {
+  const css =
+    ".menu { transform-origin: var(--transform-origin); max-height: var(--available-height); }";
+  assert.deepEqual(checkCss(css, definedVariables(css)), []);
+});

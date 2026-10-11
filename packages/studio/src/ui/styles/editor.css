@@ -916,7 +916,6 @@
 }
 
 .fc-zone {
-  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   color: var(--ink-faint);
 }
@@ -1685,23 +1684,14 @@
 
 .signin-brand {
   margin: 0;
-  font-family: var(--font-editorial);
-  font-weight: var(--weight-semibold);
-  font-size: var(--type-wordmark);
-}
-
-.signin-brand span {
-  font-size: var(--text-2xs);
-  color: var(--ink-faint);
 }
 
 .signin-title {
   margin: var(--space-6) 0 0;
-  font-family: var(--font-editorial);
   font-size: var(--type-title);
   font-weight: var(--weight-semibold);
-  line-height: 1.02;
-  letter-spacing: -0.02em;
+  line-height: var(--leading-title);
+  letter-spacing: var(--tracking-title);
 }
 
 .signin-lede,
@@ -1720,7 +1710,7 @@
 .signin-github {
   justify-content: center;
   height: 2.75rem;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   text-decoration: none;
 }
 

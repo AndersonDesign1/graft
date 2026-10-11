@@ -1,40 +1,86 @@
+/**
+ * Health: content on disk against what the index knows, for one branch.
+ *
+ * A developer's page. The numbers are the point, so they lead, without boxes
+ * around them; a number takes a hue only when it needs someone (amber) or
+ * something is broken (red). Below them, plain lists: collections, recent
+ * compiles, approvals and branches. Out-of-date content is fixed from here
+ * with Compile, rather than by sending someone to a terminal.
+ */
+import { useState } from "react";
+import { toast } from "sonner";
 import type { ApprovalList, BranchList, CompilationList, ContentTree } from "../../types";
 import { CollectionMark } from "../components/collection-icon";
-import { Delta, DeltaChart, EmptyState, StatTile, Status } from "../components/primitives";
-import { ChartSkeleton, MiniListSkeleton, OverviewSkeleton } from "../components/skeletons";
-import { qs } from "../lib/api";
+import { IconCompile } from "../components/icons";
+import { Delta, EmptyState, Status } from "../components/primitives";
+import { MiniListSkeleton, OverviewSkeleton } from "../components/skeletons";
+import { api, plainError, qs } from "../lib/api";
 import { relativeTime, shortSha, plural } from "../lib/format";
 import type { Route } from "../lib/route";
 import { useResource } from "../lib/use-resource";
 
-// Compiling is not this view's job any more — the top bar owns that control, so
-// the props that drove the removed banner are gone with it.
+interface CompileResult {
+  added: number;
+  changed: number;
+  removed: number;
+  docCount: number;
+}
+
 export function OverviewView({
   branch,
   tree,
   navigate,
 }: {
   branch: string;
-  tree: { data: ContentTree | null; error: string | null; loading: boolean };
+  tree: { data: ContentTree | null; error: string | null; loading: boolean; refresh: () => void };
   navigate: (route: Route) => void;
 }) {
-  const compilations = useResource<CompilationList>(`/compilations${qs({ branch, limit: 30 })}`);
+  const compilations = useResource<CompilationList>(`/compilations${qs({ branch, limit: 10 })}`);
   const approvals = useResource<ApprovalList>("/approvals");
   const branches = useResource<BranchList>("/branches");
+  const [compiling, setCompiling] = useState(false);
 
   const summary = tree.data?.summary;
-  const neverCompiled = (compilations.data?.compilations.length ?? 0) === 0;
   const pending = approvals.data?.approvals.length ?? 0;
+  const runs = compilations.data?.compilations ?? [];
+
+  async function compileNow(): Promise<void> {
+    setCompiling(true);
+    try {
+      const result = await api<CompileResult>("/compile", {
+        method: "POST",
+        body: JSON.stringify({ branch }),
+      });
+      toast.success(`Compiled ${plural(result.docCount, "entry", "entries")}`, {
+        description: `${result.added} added, ${result.changed} changed, ${result.removed} removed`,
+      });
+      tree.refresh();
+      compilations.refresh();
+    } catch (error) {
+      toast.error(plainError(error));
+    } finally {
+      setCompiling(false);
+    }
+  }
 
   return (
     <div className="view">
       <header className="view-head">
         <div>
-          <h1 className="view-title">Overview</h1>
+          <h1 className="view-title">Health</h1>
           <p className="view-sub">
-            Branch <code>{branch}</code> — content on disk, and what the index knows about it.
+            Content on disk on <code>{branch}</code>, and what the index knows about it.
           </p>
         </div>
+        <button
+          type="button"
+          className="btn"
+          disabled={compiling}
+          onClick={() => void compileNow()}
+        >
+          <IconCompile aria-hidden="true" />
+          {compiling ? "Compiling…" : "Compile"}
+        </button>
       </header>
 
       <Status
@@ -45,210 +91,214 @@ export function OverviewView({
 
       {tree.data ? (
         <>
-          {/* No sync banner here. It said the same thing as the "N changes to
-              compile" control in the top bar — which is always on screen, on
-              every view, and runs the same compile — and then repeated the
-              breakdown that the stat tiles directly below already give as
-              numbers. Three copies of one fact pushed the actual dashboard
-              below the fold. The tiles are the breakdown; the top bar is the
-              call to action. */}
-          <section className="tiles">
-            <StatTile
-              label="On disk"
-              value={summary?.documents ?? 0}
-              hint={plural(tree.data.collections.length, "collection")}
-            />
-            <StatTile label="In sync" value={summary?.synced ?? 0} tone="synced" />
-            <StatTile label="Drifted" value={summary?.drifted ?? 0} tone="drifted" />
-            <StatTile label="Not indexed" value={summary?.unindexed ?? 0} tone="unindexed" />
-            <StatTile label="Orphaned" value={summary?.orphaned ?? 0} tone="orphaned" />
-            <StatTile
-              label="Approvals"
-              value={pending}
-              hint={pending > 0 ? "waiting on you" : "queue clear"}
-            />
+          <dl className="stats">
+            <div className="stat">
+              <dt>On disk</dt>
+              <dd data-numeric="">{summary?.documents ?? 0}</dd>
+            </div>
+            <div className="stat">
+              <dt>In the index</dt>
+              <dd data-numeric="">{summary?.synced ?? 0}</dd>
+            </div>
+            <div className="stat">
+              <dt>Out of date</dt>
+              <dd data-numeric="">{summary?.drifted ?? 0}</dd>
+            </div>
+            <div className="stat">
+              <dt>Never compiled</dt>
+              <dd data-numeric="">{summary?.unindexed ?? 0}</dd>
+            </div>
+            <div className="stat" data-tone={(summary?.orphaned ?? 0) > 0 ? "danger" : undefined}>
+              <dt>File missing</dt>
+              <dd data-numeric="">{summary?.orphaned ?? 0}</dd>
+            </div>
+            <div className="stat" data-tone={pending > 0 ? "waiting" : undefined}>
+              <dt>Waiting for approval</dt>
+              <dd data-numeric="">{pending}</dd>
+            </div>
+          </dl>
+
+          <section className="health-section" aria-labelledby="health-collections">
+            <h2 className="section-title" id="health-collections">
+              Collections
+            </h2>
+            <table className="list">
+              <thead>
+                <tr>
+                  <th scope="col">Collection</th>
+                  <th scope="col">Stored as</th>
+                  <th scope="col">State</th>
+                  <th scope="col" data-align="end">
+                    Entries
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {tree.data.collections.map((collection) => (
+                  <tr
+                    key={collection.name}
+                    className="list-row"
+                    onClick={() => navigate({ view: "collection", collection: collection.name })}
+                  >
+                    <td>
+                      <span className="list-name">
+                        <CollectionMark
+                          name={collection.name}
+                          authority={collection.authority === "db" ? "db" : "file"}
+                        />
+                        <code>{collection.name}</code>
+                      </span>
+                    </td>
+                    <td className="muted">
+                      {collection.authority === "db" ? "Database rows" : "MDX files"}
+                    </td>
+                    <td>
+                      {collection.error ? (
+                        <span className="row-state" data-status="deleted">
+                          {collection.error}
+                        </span>
+                      ) : collection.authority === "file" && collection.driftCount > 0 ? (
+                        <span className="row-state" data-status="changed">
+                          {collection.driftCount} out of date
+                        </span>
+                      ) : (
+                        <span className="muted">In sync</span>
+                      )}
+                    </td>
+                    <td data-align="end" data-numeric="">
+                      {collection.documents.length}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </section>
 
-          <div className="cards">
-            <section className="card">
-              <div className="card-head">
-                <h2>Collections</h2>
-                <button type="button" className="link" onClick={() => navigate({ view: "home" })}>
-                  Browse
-                </button>
-              </div>
-              <ul className="mini-list">
-                {tree.data.collections.map((collection) => (
-                  <li key={collection.name}>
-                    <button
-                      type="button"
-                      className="mini-row"
-                      onClick={() => navigate({ view: "collection", collection: collection.name })}
-                    >
-                      <CollectionMark
-                        name={collection.name}
-                        authority={collection.authority === "db" ? "db" : "file"}
-                      />
-                      <span className="mini-row-main">
-                        <span className="mini-row-title">{collection.name}</span>
-                        <span className="mini-row-sub">
-                          {collection.authority === "db"
-                            ? "db-authoritative — rows, not files"
-                            : collection.error
-                              ? collection.error
-                              : `${plural(collection.documents.length, "document")}${
-                                  collection.driftCount > 0
-                                    ? ` · ${collection.driftCount} out of sync`
-                                    : ""
-                                }`}
-                        </span>
-                      </span>
-                      {collection.authority === "file" && collection.driftCount > 0 ? (
-                        <span className="dot" data-state="drifted" />
-                      ) : collection.authority === "file" && collection.documents.length > 0 ? (
-                        <span className="dot" data-state="synced" />
-                      ) : null}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-
-            <section className="card">
-              <div className="card-head">
-                <h2>Compilations</h2>
-                <button
-                  type="button"
-                  className="link"
-                  onClick={() => navigate({ view: "history" })}
-                >
-                  History
-                </button>
-              </div>
-              <Status
-                loading={compilations.loading && !compilations.data}
-                error={compilations.error}
-                empty={neverCompiled}
-                skeleton={<ChartSkeleton />}
-              >
-                <p className="muted">Nothing compiled on this branch yet.</p>
-              </Status>
-              {!neverCompiled && compilations.data ? (
-                <>
-                  <DeltaChart
-                    points={[...compilations.data.compilations].reverse().map((row) => ({
-                      added: row.added,
-                      changed: row.changed,
-                      removed: row.removed,
-                      label: relativeTime(row.createdAt),
-                    }))}
-                  />
-                  <ul className="mini-list">
-                    {compilations.data.compilations.slice(0, 5).map((row) => (
-                      <li key={row.id}>
-                        <div className="mini-row" data-static="">
-                          <span className="mini-row-main">
-                            <span className="mini-row-title">
-                              {row.gitSha ? <code>{shortSha(row.gitSha)}</code> : "no git sha"}
-                            </span>
-                            <span className="mini-row-sub">{plural(row.docCount, "document")}</span>
-                          </span>
-                          <Delta added={row.added} changed={row.changed} removed={row.removed} />
-                          <time className="mini-row-time" dateTime={row.createdAt}>
-                            {relativeTime(row.createdAt)}
-                          </time>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : null}
-            </section>
-
-            <section className="card">
-              <div className="card-head">
-                <h2>Approvals</h2>
-                <button
-                  type="button"
-                  className="link"
-                  onClick={() => navigate({ view: "approvals" })}
-                >
-                  Queue
-                </button>
-              </div>
-              <Status
-                loading={approvals.loading && !approvals.data}
-                error={approvals.error}
-                empty={pending === 0}
-                skeleton={<MiniListSkeleton rows={3} />}
-              >
-                <p className="muted">No agent is waiting on a decision.</p>
-              </Status>
-              {pending > 0 ? (
-                <ul className="mini-list">
-                  {approvals.data?.approvals.slice(0, 4).map((row) => (
-                    <li key={row.id}>
-                      <button
-                        type="button"
-                        className="mini-row"
-                        onClick={() => navigate({ view: "approvals" })}
-                      >
-                        <span className="mini-row-main">
-                          <span className="mini-row-title">{row.functionName}</span>
-                          <span className="mini-row-sub">
-                            {row.requestedByKind}
-                            {row.requestedById ? `:${row.requestedById}` : ""}
-                          </span>
-                        </span>
-                        <time className="mini-row-time" dateTime={row.createdAt}>
-                          {relativeTime(row.createdAt)}
-                        </time>
-                      </button>
-                    </li>
+          <section className="health-section" aria-labelledby="health-compiles">
+            <div className="section-head">
+              <h2 className="section-title" id="health-compiles">
+                Recent compiles
+              </h2>
+              <a className="link" href="#/dev/history">
+                History
+              </a>
+            </div>
+            <Status
+              loading={compilations.loading && !compilations.data}
+              error={compilations.error}
+              empty={runs.length === 0}
+              skeleton={<MiniListSkeleton rows={3} />}
+            >
+              <p className="muted">Nothing compiled on this branch yet.</p>
+            </Status>
+            {runs.length > 0 ? (
+              <table className="list">
+                <thead>
+                  <tr>
+                    <th scope="col">Commit</th>
+                    <th scope="col">Changes</th>
+                    <th scope="col" data-align="end">
+                      Entries
+                    </th>
+                    <th scope="col" data-align="end">
+                      When
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {runs.slice(0, 5).map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.gitSha ? <code>{shortSha(row.gitSha)}</code> : "Not in Git"}</td>
+                      <td>
+                        <Delta added={row.added} changed={row.changed} removed={row.removed} />
+                      </td>
+                      <td data-align="end" data-numeric="">
+                        {row.docCount}
+                      </td>
+                      <td data-align="end">
+                        <time dateTime={row.createdAt}>{relativeTime(row.createdAt)}</time>
+                      </td>
+                    </tr>
                   ))}
-                </ul>
-              ) : null}
-            </section>
+                </tbody>
+              </table>
+            ) : null}
+          </section>
 
-            <section className="card">
-              <div className="card-head">
-                <h2>Branches</h2>
-                <button
-                  type="button"
-                  className="link"
-                  onClick={() => navigate({ view: "branches" })}
-                >
-                  All
-                </button>
+          {pending > 0 ? (
+            <section className="health-section" aria-labelledby="health-approvals">
+              <div className="section-head">
+                <h2 className="section-title" id="health-approvals">
+                  Waiting for approval
+                </h2>
+                <a className="link" href="#/dev/approvals">
+                  Review
+                </a>
               </div>
-              <Status
-                loading={branches.loading && !branches.data}
-                error={branches.error}
-                empty={(branches.data?.branches.length ?? 0) === 0}
-                skeleton={<MiniListSkeleton rows={3} />}
-              >
-                <p className="muted">No branches registered — only the default.</p>
-              </Status>
-              <ul className="mini-list">
-                {branches.data?.branches.slice(0, 5).map((row) => (
-                  <li key={row.name}>
-                    <div className="mini-row" data-static="" data-current={row.name === branch}>
-                      <span className="mini-row-main">
-                        <span className="mini-row-title">{row.name}</span>
-                        <span className="mini-row-sub">
-                          {row.backend}
-                          {row.parent ? ` ← ${row.parent}` : " · root"}
-                        </span>
-                      </span>
-                      <span className="pill" data-tone="ready">
-                        {row.status}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <table className="list">
+                <tbody>
+                  {approvals.data?.approvals.slice(0, 4).map((row) => (
+                    <tr
+                      key={row.id}
+                      className="list-row"
+                      onClick={() => navigate({ view: "approvals" })}
+                    >
+                      <td>
+                        <code>{row.functionName}</code>
+                      </td>
+                      <td className="muted">
+                        {row.requestedByKind}
+                        {row.requestedById ? `: ${row.requestedById}` : ""}
+                      </td>
+                      <td data-align="end">
+                        <time dateTime={row.createdAt}>{relativeTime(row.createdAt)}</time>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </section>
-          </div>
+          ) : null}
+
+          <section className="health-section" aria-labelledby="health-branches">
+            <div className="section-head">
+              <h2 className="section-title" id="health-branches">
+                Branches
+              </h2>
+              <a className="link" href="#/dev/branches">
+                All branches
+              </a>
+            </div>
+            <Status
+              loading={branches.loading && !branches.data}
+              error={branches.error}
+              empty={(branches.data?.branches.length ?? 0) === 0}
+              skeleton={<MiniListSkeleton rows={3} />}
+            >
+              <p className="muted">No branches registered, only the default.</p>
+            </Status>
+            {(branches.data?.branches.length ?? 0) > 0 ? (
+              <table className="list">
+                <tbody>
+                  {branches.data?.branches.slice(0, 5).map((row) => (
+                    <tr key={row.name}>
+                      <td>
+                        <code>{row.name}</code>
+                        {row.name === branch ? <span className="muted"> (current)</span> : null}
+                      </td>
+                      <td className="muted">
+                        {row.backend}
+                        {row.parent ? `, from ${row.parent}` : ", root"}
+                      </td>
+                      <td data-align="end" className="muted">
+                        {row.status}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : null}
+          </section>
         </>
       ) : null}
 
