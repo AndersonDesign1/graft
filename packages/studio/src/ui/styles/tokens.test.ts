@@ -1,10 +1,10 @@
 /**
- * Enforces the three-layer token contract, so "swap a colour without touching
+ * Enforces the two-layer token contract, so "swap a colour without touching
  * a component" stays true rather than becoming folklore.
  *
- *   palette.css  raw scales — the only file allowed a colour literal
- *   roles.css    meaning -> scale — var() indirection only
- *   studio.css   components — role names only
+ *   @usegraft/tokens  every colour value, in both schemes
+ *   roles.css         meaning -> token, var() indirection only
+ *   studio.css        components, role names only
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -26,8 +26,8 @@ const stripComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, 
  * per-declaration assertion below checks.
  */
 const LITERAL = /(oklch|rgba?|hsla?|lab|lch)\(|#[0-9a-fA-F]{3,8}\b/;
-/** Layer-1 scale names, plus the syntax tokens studio.css used to improvise with. */
-const RAW_SCALE = /var\(--(?:c|gh|code)-/;
+/** Palette names and syntax tokens: components reach them only through a role. */
+const RAW_SCALE = /var\(--(?:c|gh|code|n|paper|ink)-\d|var\(--(?:c|gh|code)-/;
 
 describe("token layering", () => {
   it("keeps colour literals out of roles.css", () => {
@@ -56,11 +56,10 @@ describe("token layering", () => {
   it("resolves every role to a var(), never to a literal", () => {
     const declarations = stripComments(read("roles.css")).matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm);
     for (const [, name, raw] of declarations) {
-      if (name === "--identity-count") continue; // a number, not a colour
       const value = raw?.trim() ?? "";
-      // A bare token, or a color-mix over tokens — mixing is still
-      // indirection as long as every colour in it came from layer 1.
-      const isToken = value.startsWith("var(--");
+      // A bare token, or a color-mix over tokens: mixing is still
+      // indirection as long as every colour in it came from a token.
+      const isToken = value.startsWith("var(--") || value === "transparent";
       const isMixOfTokens =
         value.startsWith("color-mix(") &&
         !/#[0-9a-fA-F]{3,8}\b|oklch\(|rgba?\(|hsla?\(/.test(value);
@@ -75,13 +74,5 @@ describe("token layering", () => {
         expect(roles, `--state-${state}-${slot} is missing`).toContain(`--state-${state}-${slot}:`);
       }
     }
-  });
-
-  it("keeps the identity cycle and its declared count in step", () => {
-    const roles = read("roles.css");
-    const count = Number(/--identity-count:\s*(\d+)/.exec(roles)?.[1]);
-    const defined = [...roles.matchAll(/--identity-(\d+):/g)].length;
-    // format.ts hashes into this range; a mismatch silently drops a hue.
-    expect(defined).toBe(count);
   });
 });

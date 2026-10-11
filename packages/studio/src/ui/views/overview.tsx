@@ -1,12 +1,6 @@
 import type { ApprovalList, BranchList, CompilationList, ContentTree } from "../../types";
-import {
-  Delta,
-  DeltaChart,
-  EmptyState,
-  IdentityMark,
-  StatTile,
-  Status,
-} from "../components/primitives";
+import { CollectionMark } from "../components/collection-icon";
+import { Delta, DeltaChart, EmptyState, StatTile, Status } from "../components/primitives";
 import { ChartSkeleton, MiniListSkeleton, OverviewSkeleton } from "../components/skeletons";
 import { qs } from "../lib/api";
 import { relativeTime, shortSha, plural } from "../lib/format";
@@ -91,7 +85,10 @@ export function OverviewView({
                       className="mini-row"
                       onClick={() => navigate({ view: "collection", collection: collection.name })}
                     >
-                      <IdentityMark name={collection.name} />
+                      <CollectionMark
+                        name={collection.name}
+                        authority={collection.authority === "db" ? "db" : "file"}
+                      />
                       <span className="mini-row-main">
                         <span className="mini-row-title">{collection.name}</span>
                         <span className="mini-row-sub">

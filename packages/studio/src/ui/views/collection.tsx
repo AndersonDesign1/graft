@@ -287,7 +287,7 @@ export function CollectionView({ collection }: { collection: string }) {
               aria-label="Clear search"
               onClick={() => setQ("")}
             >
-              <IconClose size={12} />
+              <IconClose size={14} />
             </button>
           ) : null}
         </label>
@@ -329,7 +329,7 @@ export function CollectionView({ collection }: { collection: string }) {
                     )}
                   </b>
                 ) : null}
-                <IconCaretDown size={11} />
+                <IconCaretDown size={14} />
               </MenuTrigger>
               <MenuContent>
                 <MenuSection label={field ? labelOf(field) : humanise(facet.field)}>
@@ -375,7 +375,7 @@ export function CollectionView({ collection }: { collection: string }) {
 
         <Menu>
           <MenuTrigger className="filter">
-            <IconSort size={13} />
+            <IconSort size={14} />
             {sort.key === "site"
               ? "Default order"
               : sort.key === "title"
@@ -502,7 +502,7 @@ export function CollectionView({ collection }: { collection: string }) {
                     ) : null}
                     {item.problem ? (
                       <span className="row-problem" title={item.problem}>
-                        <IconWarning size={12} /> Can't be read
+                        <IconWarning size={14} /> Can't be read
                       </span>
                     ) : null}
                   </a>

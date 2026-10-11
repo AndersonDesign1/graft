@@ -11,7 +11,6 @@
  */
 import type { ReactNode } from "react";
 import type { DocumentState } from "../../types";
-import { identityIndex } from "../lib/format";
 import { cn } from "../lib/cn";
 import { IconCheck, IconWarning } from "./icons";
 
@@ -68,29 +67,6 @@ export function TypeBadge({ type }: { type: string }) {
     <code className="type" data-type={type}>
       {type}
     </code>
-  );
-}
-
-/* ---- collection identity ------------------------------------------------- */
-
-export function IdentityMark({
-  name,
-  count,
-  size = "md",
-}: {
-  name: string;
-  count?: number;
-  size?: "sm" | "md";
-}) {
-  return (
-    <span
-      className="identity"
-      data-size={size}
-      style={{ "--identity": `var(--identity-${identityIndex(name)})` } as React.CSSProperties}
-      aria-hidden="true"
-    >
-      {count === undefined ? name.slice(0, 1).toUpperCase() : count}
-    </span>
   );
 }
 

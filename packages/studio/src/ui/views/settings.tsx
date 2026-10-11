@@ -23,7 +23,8 @@ import {
   IconSystem,
   type IconComponent,
 } from "../components/icons";
-import { IdentityMark, Pill } from "../components/primitives";
+import { CollectionMark } from "../components/collection-icon";
+import { Pill } from "../components/primitives";
 import { ListSkeleton } from "../components/skeletons";
 import type { Theme } from "../lib/theme";
 import { plural } from "../lib/format";
@@ -172,7 +173,7 @@ function CopyButton({ value }: { value: string }) {
         timer.current = window.setTimeout(() => setCopied(false), 1600);
       }}
     >
-      {copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
+      {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
     </button>
   );
 }
@@ -254,7 +255,7 @@ export function SettingsView({
                         <option.Icon size={14} />
                         <span className="theme-choice-label">{option.label}</span>
                         {theme === option.id ? (
-                          <IconCheck size={13} className="theme-choice-check" />
+                          <IconCheck size={14} className="theme-choice-check" />
                         ) : null}
                       </span>
                     </button>
@@ -305,7 +306,7 @@ export function SettingsView({
                   rel="noreferrer"
                 >
                   openapi.json
-                  <IconExternal size={12} />
+                  <IconExternal size={14} />
                 </a>
               </Row>
             </div>
@@ -324,10 +325,10 @@ export function SettingsView({
                   <ul className="set-collections">
                     {fileCollections.map((collection) => (
                       <li key={collection.name}>
-                        <IdentityMark name={collection.name} size="sm" />
+                        <CollectionMark name={collection.name} authority="file" size="sm" />
                         <span className="set-collection-name">{collection.name}</span>
                         <span className="set-collection-where">
-                          <IconFile size={12} />
+                          <IconFile size={14} />
                           content/{collection.name}/
                         </span>
                         <span className="set-collection-count" data-numeric="">
@@ -337,10 +338,10 @@ export function SettingsView({
                     ))}
                     {dbCollections.map((collection) => (
                       <li key={collection.name}>
-                        <IdentityMark name={collection.name} size="sm" />
+                        <CollectionMark name={collection.name} authority="db" size="sm" />
                         <span className="set-collection-name">{collection.name}</span>
                         <span className="set-collection-where">
-                          <IconDatabase size={12} />
+                          <IconDatabase size={14} />
                           data_records
                         </span>
                         <span className="set-collection-count">

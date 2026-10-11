@@ -1,10 +1,9 @@
 /**
  * The editor — LAYER 3 of 3, beside studio.css and parts.css. Role names only.
  *
- * Chrome stays monochrome: ivory and ink in light, ink and ivory in dark.
- * Colour is spent on state and identity alone, and the brand's vermilion on
- * exactly one state, "not published yet", because that is what an editor
- * most needs to see at a glance.
+ * Chrome stays monochrome: chalk paper and ink in light, a black stage and
+ * off-white type in dark. A draft, the state an editor most needs to see, is
+ * the brightest mark on screen, not a colour (see roles.css).
  *
  * Motion budget (emil-design-eng, make-interfaces-feel-better):
  *   - none on lists, rows, navigation or anything keyboard-driven
@@ -48,9 +47,10 @@
 
 .wordmark {
   font-family: var(--font-editorial);
-  font-size: 1.375rem;
+  font-weight: var(--weight-semibold);
+  font-size: var(--type-wordmark);
   line-height: 1;
-  letter-spacing: var(--editorial-tracking);
+  letter-spacing: var(--tracking-wordmark);
   color: var(--ink);
   text-decoration: none;
 }
@@ -63,7 +63,6 @@
 
 .side-site {
   overflow: hidden;
-  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   color: var(--ink-faint);
   text-overflow: ellipsis;
@@ -143,7 +142,6 @@
 .side-item[data-active] {
   background: var(--nav-active-bg);
   color: var(--nav-active-text);
-  box-shadow: var(--shadow-raised);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -153,7 +151,7 @@
   }
 }
 
-/* Unpublished work in this collection: one wax-red dot, no number. The
+/* Drafts in this collection: one ink dot, no number. The
    number lives on the Publish button; the dot only says where. */
 .side-dot {
   width: 6px;
@@ -311,7 +309,7 @@
 }
 
 /* The one control that is always there. Bright (the mark), not coloured;
-   pending work adds a wax-red count. */
+   pending work adds a count. */
 .publish {
   display: inline-flex;
   align-items: center;
@@ -354,7 +352,8 @@
   height: 1.25rem;
   padding: 0 0.3rem;
   border-radius: 999px;
-  background: var(--state-unpublished-solid);
+  /* Sits on the primary fill, so it is a step of that fill, not a colour. */
+  background: color-mix(in oklch, var(--primary-foreground) 22%, transparent);
   color: var(--primary-foreground);
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
@@ -386,11 +385,8 @@
 
 .section-label {
   margin: 0 0 var(--space-3);
-  font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  font-weight: var(--weight-normal);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
+  font-weight: var(--weight-regular);
   color: var(--ink-faint);
 }
 
@@ -436,18 +432,15 @@
 
 .masthead-dateline {
   margin: 0 0 var(--space-4);
-  font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
   color: var(--ink-muted);
 }
 
 .masthead-title {
   margin: 0;
   font-family: var(--font-editorial);
-  font-size: clamp(2.5rem, 5vw, 3.75rem);
-  font-weight: 400;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
   line-height: 1.02;
   letter-spacing: -0.02em;
   text-wrap: balance;
@@ -500,14 +493,14 @@
 }
 
 .toc-num {
-  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   color: var(--ink-faint);
 }
 
 .toc-name {
   font-family: var(--font-editorial);
-  font-size: 1.75rem;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-base);
   line-height: 1.1;
   letter-spacing: var(--editorial-tracking);
 }
@@ -519,7 +512,6 @@
 }
 
 .toc-count {
-  font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--ink-muted);
 }
@@ -640,8 +632,8 @@
 .listing-title {
   margin: 0;
   font-family: var(--font-editorial);
-  font-size: 2.5rem;
-  font-weight: 400;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
   line-height: 1.05;
   letter-spacing: -0.015em;
 }
@@ -732,7 +724,7 @@
 .fc-segment[data-active] {
   background: var(--paper-raised);
   color: var(--ink);
-  box-shadow: var(--shadow-raised);
+  box-shadow: 0 0 0 1px var(--hairline-strong);
 }
 
 .segment-count {
@@ -893,7 +885,8 @@
 .listing-empty-title {
   margin: 0;
   font-family: var(--font-editorial);
-  font-size: 1.75rem;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-base);
 }
 
 .listing-sentinel {
@@ -1089,7 +1082,8 @@
 .page-empty-title {
   margin: 0;
   font-family: var(--font-editorial);
-  font-size: 1.75rem;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-base);
 }
 
 .page-title-wrap {
@@ -1107,8 +1101,8 @@
   overflow: hidden;
   color: var(--ink);
   font-family: var(--font-editorial);
-  font-size: var(--text-xl);
-  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: var(--weight-semibold);
+  font-size: var(--type-title);
   line-height: 1.08;
   letter-spacing: -0.015em;
   text-wrap: balance;
@@ -1142,7 +1136,8 @@
 .page-kicker {
   margin: 0;
   font-family: var(--font-editorial);
-  font-size: 2rem;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-lg);
 }
 
 .page-note {
@@ -1175,7 +1170,6 @@
 }
 
 .page-body-mode {
-  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   color: var(--ink-faint);
 }
@@ -1742,7 +1736,6 @@
 }
 
 .fc-item-index {
-  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   color: var(--ink-faint);
 }
@@ -1810,8 +1803,8 @@
 .create-title {
   margin: 0;
   font-family: var(--font-editorial);
-  font-size: 2rem;
-  font-weight: 400;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
   line-height: 1.1;
 }
 
@@ -1885,12 +1878,12 @@
 .sheet-title {
   margin: 0;
   font-family: var(--font-editorial);
-  font-size: 1.875rem;
-  font-weight: 400;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
 }
 
 .sheet-close {
-  font-size: 1.25rem;
+  font-size: var(--text-md);
   line-height: 1;
 }
 
@@ -2119,7 +2112,8 @@
 .sheet-done-title {
   margin: 0;
   font-family: var(--font-editorial);
-  font-size: 1.75rem;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-lg);
   line-height: 1.15;
 }
 
@@ -2195,22 +2189,20 @@
 .signin-brand {
   margin: 0;
   font-family: var(--font-editorial);
-  font-size: 1.5rem;
+  font-weight: var(--weight-semibold);
+  font-size: var(--type-wordmark);
 }
 
 .signin-brand span {
-  font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
   color: var(--ink-faint);
 }
 
 .signin-title {
   margin: var(--space-6) 0 0;
   font-family: var(--font-editorial);
-  font-size: 3rem;
-  font-weight: 400;
+  font-size: var(--type-title);
+  font-weight: var(--weight-semibold);
   line-height: 1.02;
   letter-spacing: -0.02em;
 }

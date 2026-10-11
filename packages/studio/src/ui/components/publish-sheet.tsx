@@ -211,7 +211,7 @@ export function PublishSheet({
                         {collectionLabel(change.collection)} ·{" "}
                         <span data-kind={change.kind}>{KIND_LABEL[change.kind]}</span>
                       </span>
-                      <IconCaretDown size={12} className="sheet-row-caret" />
+                      <IconCaretDown size={14} className="sheet-row-caret" />
                     </button>
                     {change.kind !== "deleted" ? (
                       <button
@@ -237,7 +237,7 @@ export function PublishSheet({
                       aria-label={`Resolve ${change.title}`}
                     >
                       <p>
-                        <IconWarning size={13} />
+                        <IconWarning size={14} />
                         Someone published a newer version of this since you started editing.
                       </p>
                       <div className="sheet-conflict-choices">
@@ -346,7 +346,7 @@ function Reviews({ reviews }: { reviews: DraftsDto["reviews"] }) {
           <li key={review.number}>
             <a href={review.url} target="_blank" rel="noreferrer" className="link">
               {review.title}
-              <IconExternal size={12} />
+              <IconExternal size={14} />
             </a>
             <span className="muted"> #{review.number}</span>
           </li>

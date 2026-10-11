@@ -123,9 +123,9 @@ export function SchemaView() {
                   title={collection.authorityRaw}
                 >
                   {collection.authority === "db" ? (
-                    <IconDatabase size={11} />
+                    <IconDatabase size={14} />
                   ) : (
-                    <IconFile size={11} />
+                    <IconFile size={14} />
                   )}
                   {collection.authority === "db" ? "db rows" : "mdx files"}
                 </Pill>

@@ -1,4 +1,4 @@
-import { IconContext } from "@phosphor-icons/react";
+import { LucideProvider } from "lucide-react";
 import { Toaster } from "sonner";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { EditorComponentList } from "@usegraft/contracts";
@@ -11,6 +11,7 @@ import {
   IconBranches,
   IconCaretDown,
   IconHistory,
+  IconHome,
   IconMoon,
   IconOverview,
   IconSchema,
@@ -83,9 +84,9 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
   }, []);
 
   return (
-    // One place decides icon weight and size, so glyphs stay optically
-    // consistent with the 1px hairlines they sit beside.
-    <IconContext.Provider value={{ size: 16, weight: "regular" }}>
+    // One place decides icon size and stroke: Lucide at 16px and 1.75, as in
+    // the docs.
+    <LucideProvider size={16} strokeWidth={1.75}>
       {signedOut ? (
         <SignIn />
       ) : (
@@ -94,7 +95,7 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
         </ErrorBoundary>
       )}
       <Toaster position="bottom-right" closeButton toastOptions={{ className: "sonner-toast" }} />
-    </IconContext.Provider>
+    </LucideProvider>
   );
 }
 
@@ -235,7 +236,7 @@ function Shell({ initialBranch }: { initialBranch: string }) {
               data-active={route.view === "home" || undefined}
               aria-current={route.view === "home" ? "page" : undefined}
             >
-              <IconOverview size={15} />
+              <IconHome />
               <span className="side-text">Home</span>
             </a>
             <p className="side-label">Content</p>
@@ -274,7 +275,7 @@ function Shell({ initialBranch }: { initialBranch: string }) {
               onClick={() => setDevOpen((v) => !v)}
             >
               Developer
-              <IconCaretDown size={11} />
+              <IconCaretDown size={14} />
             </button>
             {devOpen ? (
               <nav className="side-nav" aria-label="Developer">
@@ -286,7 +287,7 @@ function Shell({ initialBranch }: { initialBranch: string }) {
                     data-active={route.view === view || undefined}
                     aria-current={route.view === view ? "page" : undefined}
                   >
-                    <Icon size={15} />
+                    <Icon />
                     <span className="side-text">{label}</span>
                     {view === "approvals" && pending > 0 ? (
                       <span className="side-count" data-numeric="">
