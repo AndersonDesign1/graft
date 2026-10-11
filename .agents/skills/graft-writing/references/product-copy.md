@@ -50,8 +50,8 @@ guessing.
   (`satisfy the "pages" schema — tagline: ...`); new and edited messages use
   a period or a colon before the field list.
 - If a fix might not have happened (a network error after a write), say
-  what is known: "The save may have reached GitHub. Reload the draft before
-  saving again."
+  what is known: "The save may have reached GitHub. Reload the draft and
+  check the production branch before saving again."
 
 ## Empty states and confirmation
 

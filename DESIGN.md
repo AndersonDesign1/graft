@@ -125,7 +125,8 @@ Rules you can check:
 - Headings use `text-wrap: balance`, paragraphs `text-wrap: pretty`.
 - Headings are sentence case and state the claim or the task ("Add your own
   content", not "Content" and not "CONTENT").
-- No all-caps text anywhere except inside code.
+- No all-caps labels or emphasis. Acronyms and names (APCA, MCP, MDX) and
+  code keep their own case.
 - Numbers that line up use `font-variant-numeric: tabular-nums`.
 - No text below 13px, except a mono identifier inside a frame (a code
   block's path, a field's type) at 12px. Rewrite before shrinking.
@@ -133,7 +134,8 @@ Rules you can check:
 
 ## Color tokens
 
-Components read the semantic layer only. Literal colors appear in
+Components read the semantic tokens below or their aliases (`--paper`,
+`--ink`, `--hairline`, `--mark`), never the palette. Literal colors appear in
 `tokens.css` and in brand marks, nowhere else. A hover wash is
 `color-mix(in oklch, var(--ink) 5%, transparent)`, so it follows the scheme.
 
@@ -153,7 +155,8 @@ Components read the semantic layer only. Literal colors appear in
 | `--code-*`                                                | Syntax and CLI chips                                   |
 
 Every pairing is checked with APCA against its real background: body text
-Lc 75 or more, metadata Lc 60 or more. Light and dark are both first-class and
+at |Lc| 75 or more, metadata at |Lc| 60 or more (Lc is negative for light
+text on dark). Light and dark are both first-class and
 follow the operating system.
 
 ## Space, shape, elevation
@@ -195,7 +198,7 @@ Compose pages from these. If none fits, write CSS in
 class of its own; never restyle an existing component from a page.
 
 **Shell** (`docs-shell.tsx`): the top bar with the `graft.` wordmark, `/`,
-the surface name and the stage badge; the sidebar; the page head with its
+the surface name and the stage label; the sidebar; the page head with its
 action pills and meta line; the contents rail (`toc-rail.tsx`); search.
 
 **MDX components** (`src/components/mdx`), the only ones an author writes:

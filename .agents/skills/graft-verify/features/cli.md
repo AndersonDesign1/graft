@@ -15,7 +15,7 @@ a fix when a file is wrong.
 ## How to get to it (user POV)
 
 - A terminal in a project folder: `npx @usegraft/cli@latest init`, then
-  `npx graft compile`.
+  `npx @usegraft/cli@latest compile`.
 - The getting-started guide and its agent prompt.
 
 ## Driving it with the CLI

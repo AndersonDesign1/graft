@@ -35,8 +35,8 @@ REPO=$(git rev-parse --show-toplevel)
 O=$REPO/.agents/skills/graft-verify/scripts/offline.sh
 pnpm -r --filter @usegraft/cli... run build      # or the package you touched, plus its dependents
 V=$REPO/.agents/skills/graft-verify/scripts
-P=$($V/sandbox.sh | tail -1)             # static project
-P=$($V/sandbox.sh --postgres | tail -1)  # Postgres project
+P=$($O $V/sandbox.sh | tail -1)             # static project
+P=$($O $V/sandbox.sh --postgres | tail -1)  # Postgres project
 ```
 
 `sandbox.sh` runs `graft init`, links the workspace's `node_modules`, compiles
@@ -73,7 +73,9 @@ recipe. Prefix every command with `$O` unless the recipe says otherwise. Cover e
 
 ### Integration tests
 
-The `*.integration.test.ts` suites run against a throwaway Postgres:
+The `*.integration.test.ts` suites run against a throwaway Postgres. This
+runs one package's; repeat the `--filter` for each package you touched, and
+report which ones ran:
 
 ```sh
 cd "$REPO"
@@ -113,7 +115,7 @@ the PR's Verification section:
 ## Cleanup
 
 ```sh
-$V/pg.sh down "$P/pg"                                # Postgres sandboxes
+for d in "$P/pg" "$P/itest"; do if [ -f "$d/datadir" ]; then $V/pg.sh down "$d"; fi; done  # Postgres
 kill "$STUDIO_PID" 2>/dev/null                       # Studio, if you started it
 (cd "$REPO/examples/docs-site" && npx astro dev stop) # the docs site, if you started it
 ```

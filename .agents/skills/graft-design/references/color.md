@@ -18,12 +18,14 @@ chips, brand marks and callouts. Both are easy to get wrong.
 
 - Both themes follow the OS by default. A toggle sets `data-theme` on `html`
   and must win in both directions.
-- `tokens.css` defines every semantic token once with
-  `light-dark(<light>, <dark>)`, and the theme switches `color-scheme`
+- `tokens.css` defines each theme-dependent token once with
+  `light-dark(<light>, <dark>)`; derived tokens (`--primary-tint`, the
+  aliases) mix or point at those. The theme switches `color-scheme`
   (`data-theme`, `.light` or `.dark` on the root, else the OS). Write new
   tokens the same way; never add a second dark-mode block.
-- Do not just invert. Dark surfaces step up in lightness (0, 0.17, 0.22,
-  0.27, 0.32); light surfaces step down from chalk paper.
+- Do not just invert. In dark, surfaces step up in lightness (0, 0.17, 0.22,
+  0.27, 0.32). In light, the page is chalk, raised surfaces (`--card`) are
+  white, and sunken ones (`--muted`) are darker than the page.
 
 ## Contrast
 
@@ -60,7 +62,9 @@ the binary, `--code-key` for the command, `--code-string` for flags,
 
 ## Brand marks
 
-Framework and tool marks keep their own colors. Check each in both themes:
+Package-manager marks (npm, pnpm, bun) use `currentColor`, as DESIGN.md
+says. Framework and tool marks keep their own colors. Check each in both
+themes:
 a mark whose brand color disappears on one background (bun's cream, a black
 Next.js circle) either uses `light-dark()` inside the SVG or switches to
 `currentColor`.

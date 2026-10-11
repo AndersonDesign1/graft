@@ -7,10 +7,11 @@ Every playbook ends here.
 2. **Checks**, all of them, before pushing:
    `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, the tests of every
    package you touched, and the `check:*` scripts that cover what you
-   changed (`check:registry-drift`, `check:error-docs`, `check:site`,
-   `check:changelog`). Run tests through `graft-verify`'s `offline.sh`.
+   changed (`check:registry-drift`, `check:error-docs`, `check:design`,
+   `check:site` after a docs build, `check:changelog`). Run tests through `graft-verify`'s `offline.sh`.
 3. **Commits.** Small and ordered so each could land alone, in the
-   `graft-writing` commit style. A failing test lands before its fix.
+   `graft-writing` commit style. A regression test lands with its fix, and
+   the PR shows it failing without the fix.
 4. **Changeset** for every published package you changed (`pnpm changeset`).
    None for docs, tests or CI only.
 5. **Self-review the diff** as a reviewer would: dead code, debug output,

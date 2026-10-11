@@ -9,8 +9,9 @@ The reader follows the page and it works. Every command on it has been run.
    sandbox. Paste the real output where the page shows output. Fix the page,
    or the product, when they disagree.
 5. Check the facts against source: versions, flags, error codes, tool names.
-6. Run `pnpm --filter docs-site test`, `pnpm check:site`, and
-   `pnpm check:error-docs`.
+6. Run `pnpm --filter docs-site test`, `pnpm check:design`,
+   `pnpm check:error-docs`, then `pnpm --filter docs-site build` and
+   `pnpm check:site` (it reads the build's output).
 7. Render the page with `graft-verify` (docs-site feature) at 1440px and
    390px, and read its `.md` twin.
 8. No changeset for a docs-only change.

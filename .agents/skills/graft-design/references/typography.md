@@ -14,8 +14,9 @@ The roles and sizes are in DESIGN.md; this file covers how to set them well.
 
 - Use a role token for size, leading and tracking together. Never set one
   without the other two.
-- Tighter tracking as size grows: about -0.045em at display, -0.03em at title,
-  -0.02em at section, 0 at body. Never positive tracking, since nothing is
+- Tighter tracking as size grows, from the tokens: `--tracking-display`
+  (-0.03em), `--tracking-title` (-0.032em), `--tracking-section` (-0.022em),
+  0 at body. Never positive tracking, since nothing is
   uppercase.
 - Body leading 1.75 for docs reading, 1.5 for compact UI text, 1.15 for a
   title.
@@ -32,8 +33,10 @@ The roles and sizes are in DESIGN.md; this file covers how to set them well.
 - `font-variant-numeric: tabular-nums` for tables, counters, versions in
   columns, and anything that updates.
 - Inline code: mono at 0.85em, sunken background, hairline border. A
-  command (one that starts with `graft` or `pnpm`, or with a flag) takes the
-  terminal's hues; any other inline code stays monochrome.
+  command (one that starts with a program such as `graft`, `pnpm`, `npm` or
+  `npx`, or with a flag) takes the terminal's hues; any other inline code
+  stays monochrome. `InlineCode` covers only `graft` and `pnpm` today (Known
+  gaps in DESIGN.md).
 - Code blocks: 14px (`--text-sm`), leading 1.7, `tab-size: 2`, horizontal scroll inside
   the block, never wrap code.
 - Mono only for the literal: in "Run `graft compile` again", only

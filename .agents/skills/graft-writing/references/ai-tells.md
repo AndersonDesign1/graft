@@ -19,7 +19,7 @@ most of them.
 
 ## Sentences
 
-- **"Not just X, but Y"** and **"not X, it's Y"** reveals. State Y.
+- **"Not just X, but Y"** and **"not X, it's Y"** reveals: state Y.
 - **Forced threes.** Use the number of items there really are.
 - **Synonym cycling.** Pick one name for a thing and repeat it.
 - **Trailing -ing clauses:** "..., ensuring consistency", "..., highlighting

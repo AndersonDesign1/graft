@@ -38,8 +38,9 @@ Where anything here disagrees with DESIGN.md, DESIGN.md wins.
   radio group, so they work without JavaScript and are one tab stop.
 - **Copy buttons** keep both icons in the DOM and show the check on success.
   Announce "Copied" through a live region (`role="status"` or `aria-live`);
-  the button's own label stays "Copy code". Catch clipboard errors and say
-  "Copy failed".
+  the button's own label names what it copies ("Copy code", "Copy prompt",
+  "Copy page") and does not change. Catch clipboard errors and say "Copy
+  failed".
 
 ## Icons
 

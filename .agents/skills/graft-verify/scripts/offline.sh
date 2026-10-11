@@ -28,14 +28,18 @@ fi
 unset_args=()
 while IFS='=' read -r name _; do
   case "$name" in
-    DATABASE_URL | *NEON* | S3_* | AWS_ACCESS_KEY_ID | AWS_SECRET_ACCESS_KEY | AWS_SESSION_TOKEN | R2_* | \
+    DATABASE_URL | *NEON* | S3_* | AWS_* | R2_* | \
       GITHUB_TOKEN | GH_TOKEN | GRAFT_GITHUB_* | GRAFT_STUDIO_* | GRAFT_DEV_TOKEN)
       unset_args+=(-u "$name")
       ;;
   esac
 done < <(env)
 
+# Unsetting the keys is not enough for AWS: the SDKs also read a profile from
+# ~/.aws and ask the instance metadata service. Point both at nothing.
+no_aws=(AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_EC2_METADATA_DISABLED=true)
+
 if [[ -n "$db" ]]; then
-  exec env "${unset_args[@]}" DATABASE_URL="$db" "$@"
+  exec env "${unset_args[@]}" "${no_aws[@]}" DATABASE_URL="$db" "$@"
 fi
-exec env "${unset_args[@]}" "$@"
+exec env "${unset_args[@]}" "${no_aws[@]}" "$@"

@@ -32,10 +32,12 @@ what happens, not how impressive it is. Never sell.
    what they will have at the end.
 2. **One idea per sentence.** Most sentences are under 25 words. Split
    anything with two "and"s and a comma.
-3. **Second person, present tense, active voice.** "You compile the
-   content", "Graft stops the compile", not "the content is compiled".
+3. **Second person, present tense, active voice** in explanations. "You
+   compile the content", "Graft stops the compile", not "the content is
+   compiled". Confirmations ("Copied") and commit bodies follow their own
+   formats in the references.
 4. **Define a term once, at first use, then use it the same way every time.**
-   "An **index**: a copy of your content organized for fast queries." The
+   "The **index**: the derived, queryable projection of your content." The
    names come from `CONTEXT.md`. One name per thing.
 5. **Be concrete.** Real commands, real file paths, real error codes, real
    numbers ("Node.js 22.16 or newer", "about 10 minutes"). Never a placeholder

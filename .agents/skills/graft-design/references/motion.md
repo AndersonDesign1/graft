@@ -28,13 +28,23 @@ nice" is not an answer.
 ## Patterns
 
 ```css
-/* Press */
-button { transition: scale var(--duration-press) var(--ease-out); }
-button:active { scale: var(--press-scale); }
+@media (prefers-reduced-motion: no-preference) {
+  /* Press */
+  button { transition: scale var(--duration-press) var(--ease-out); }
+  button:active { scale: var(--press-scale); }
 
-/* Menu: from its trigger, never from scale(0) */
-[role="menu"] { transform-origin: top right; transition: opacity 150ms var(--ease-out), scale 150ms var(--ease-out); }
-[role="menu"][hidden] { display: block; opacity: 0; scale: 0.97; visibility: hidden; transition-duration: 100ms; }
+  /* Menu: from its trigger, never from scale(0). `visibility` is in the
+     transition so the 100ms exit plays before the menu goes away. */
+  [role="menu"] {
+    transform-origin: top right;
+    transition: opacity 150ms var(--ease-out), scale 150ms var(--ease-out),
+      visibility 150ms;
+  }
+  [role="menu"][hidden] {
+    display: block; opacity: 0; scale: 0.97; visibility: hidden;
+    transition-duration: 100ms;
+  }
+}
 
 ```
 

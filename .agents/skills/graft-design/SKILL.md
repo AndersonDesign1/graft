@@ -41,8 +41,13 @@ have to.
 
 ## 3. Rules that override everything else
 
-- Use tokens and the existing components. A literal color, size or radius
-  in component CSS is a bug (`pnpm check:design` catches colors).
+- Use tokens and the existing components of the surface you are on. A
+  literal color, size or radius in component CSS is a bug. `pnpm
+  check:design` catches colors in the docs stylesheet only; check sizes,
+  radii and other surfaces by reading.
+- DESIGN.md's full rules apply to the docs. The landing page and Studio keep
+  their current look until they are rebuilt: on those, use their tokens and
+  components and apply the rules only to what you add.
 - Express the change in the project's styling system (plain CSS in the docs
   site, the existing approach in Studio). Never add a second one.
 - Before inventing a component, check DESIGN.md's primitive list and
@@ -63,13 +68,14 @@ have to.
 4. **Implement** the smallest coherent change.
 5. **Verify** with [references/review.md](references/review.md): render it,
    1440px and 390px, light and dark. Use `agent-browser` (or Playwright) for
-   screenshots; for the docs site run `astro dev --background` in
+   screenshots; for the docs site run `npx astro dev --background` in
    `examples/docs-site`.
 6. **Report** what you changed and what you saw. Never claim a visual result
    you did not render.
 
 ## 5. When DESIGN.md is silent
 
-Pick the quieter option, implement it, and say in your summary that DESIGN.md
-has no rule for it, with the rule you would propose. Do not edit DESIGN.md
+Pick the quieter option (in Build or Polish, implement it; in Shape or
+Review, recommend it) and say in your summary that DESIGN.md has no rule for
+it, with the rule you would propose. Do not edit DESIGN.md
 unless the user asked you to; propose the change instead.

@@ -8,8 +8,10 @@ when idle, so anything not pushed is lost.
 2. **Keep a decision log** at `.agents/run-log.md` on your working branch:
    one line per decision with the time, what you chose, the alternative, and
    the evidence. The user reads this when they return.
-3. **Work in verified units** and push after each one, so a reclaimed
-   container loses at most one unit.
+3. **Work in verified units.** Run the checks that cover the unit (lint,
+   typecheck, the tests of what it touched), commit it, and push, so a
+   reclaimed container loses at most one unit. The full checklist in
+   `opening-a-pr.md` is for the push that opens or updates the PR.
 4. **Decide reversible forks yourself** and log them. Stop only for the
    Always-ask list in `SKILL.md`.
 5. **Hand off cleanly** before you stop or when context is nearly full:

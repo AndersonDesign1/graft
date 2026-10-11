@@ -3,8 +3,10 @@
 You own the design. Decide it before you write it.
 
 1. **Check the invariants.** Read `CONTRIBUTING.md` "What gets turned down".
-   If the feature would break one (git is authoritative, one Zod layer,
-   destructive work is human-gated, errors carry a `fix`), stop and raise it.
+   If the feature would break one (git is authoritative, operational data
+   lives in Postgres behind typed functions, one Zod layer, destructive work
+   is human-gated, errors that cross a package boundary carry a `fix`), stop
+   and raise it.
 2. **Map the area.** Trace the subsystem the feature touches, and find the
    nearest existing feature built the same way. Copy its shape.
 3. **Name the data shape** and the structure that holds it, and write down
@@ -15,8 +17,9 @@ You own the design. Decide it before you write it.
 5. **Build it in small units**, verifying and committing each one. Every
    surface gets the same behavior: if it is a content operation, CLI, MCP and
    Studio must agree.
-6. **Errors.** Any new failure is a `GraftError` with a code and a `fix`. Run
-   `pnpm docs:errors` and commit the result.
+6. **Errors.** A new failure that crosses a package boundary is a
+   `GraftError` with a code and a `fix`. Run `pnpm docs:errors` and commit
+   the result.
 7. **Docs.** A user-visible change updates its docs page in the same PR
    (`graft-writing`). A new surface gets a `graft-verify` feature file.
 8. **Verify** with `graft-verify` on every surface you touched, plus

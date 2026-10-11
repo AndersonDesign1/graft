@@ -17,7 +17,8 @@ hypothesis, and hypotheses do not ship.
    disproved hypothesis motivated.
 5. **Verify on the same surface.** The original reproduction now passes. A
    passing unit test alone does not prove the bug is gone.
-6. **Commit the test before the fix**, so history shows it failing first.
+6. **Show the test failing** on the old code (in the PR body), then commit
+   the test and the fix together, so every commit passes.
 7. Add a changeset if a published package changed. If the bug was an error
    message, check its `fix` line too.
 8. Run [opening-a-pr](opening-a-pr.md).

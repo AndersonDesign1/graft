@@ -35,8 +35,46 @@ const DOCS_CONTENT = join(site, "content");
 /** Selectors that show code, a path or a type name, where mono is the point. */
 const MONO_SELECTOR = /(^|[\s>+~(])(code|pre|kbd|samp)\b|\.codeblock-title\b|\.field-type\b/;
 
-const LITERAL_COLOR =
-  /#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(|(^|[\s,(])(white|black)\b/i;
+const LITERAL_COLOR = /#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i;
+
+/** The CSS named colors. `transparent` and `currentColor` are not literals. */
+const NAMED_COLORS = new Set(
+  (
+    "aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue " +
+    "blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk " +
+    "crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki " +
+    "darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen " +
+    "darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue " +
+    "dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite " +
+    "gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki " +
+    "lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan " +
+    "lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen " +
+    "lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen " +
+    "magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen " +
+    "mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream " +
+    "mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid " +
+    "palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum " +
+    "powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown " +
+    "seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen " +
+    "steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen"
+  ).split(" "),
+);
+
+/** Properties whose values are names, not colors (`font-family: Courier`). */
+const NOT_A_COLOR =
+  /^(font|animation-name|grid|content|counter|quotes|list-style-type|will-change)/;
+
+/** Whether a declaration's value spells a color instead of reading a token. */
+function hasLiteralColor(property, value) {
+  if (NOT_A_COLOR.test(property)) return false;
+  // Variable names (`--red-500`) are references, not color words.
+  const bare = value.replace(/--[\w-]+/g, "");
+  if (LITERAL_COLOR.test(bare)) return true;
+  return bare
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .some((word) => NAMED_COLORS.has(word));
+}
 
 const ALLOWED_WEIGHT = /^(400|500|600|inherit|var\(--weight-(regular|medium|semibold)\))$/;
 
@@ -45,9 +83,10 @@ const EASE_IN = /(^|[^\w-])ease-in(?![\w-])/;
 /** Set at runtime rather than in a stylesheet: Shiki writes these inline. */
 const RUNTIME_VARIABLE = /^--shiki-/;
 
-/** Every custom property a stylesheet defines. */
+/** Every custom property a stylesheet defines, ignoring commented-out ones. */
 export function definedVariables(css) {
-  return new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1]));
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  return new Set([...text.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1]));
 }
 
 /**
@@ -110,6 +149,14 @@ export function checkCss(css, defined) {
         });
       }
     }
+    if (hasLiteralColor(property, value)) {
+      problems.push({
+        line,
+        message: `literal color in ${property}: ${value}`,
+        fix: "Use a token from @usegraft/tokens, or color-mix() over one, so both schemes follow.",
+      });
+    }
+
     if (property.startsWith("--")) continue;
 
     if (property === "font-family" && value.includes("--font-mono")) {
@@ -121,14 +168,6 @@ export function checkCss(css, defined) {
           fix: "Labels, captions and badges use var(--font-sans). Mono is for code, paths and type names.",
         });
       }
-    }
-
-    if (LITERAL_COLOR.test(value) && !property.startsWith("font")) {
-      problems.push({
-        line,
-        message: `literal color in ${property}: ${value}`,
-        fix: "Use a token from @usegraft/tokens, or color-mix() over one, so both schemes follow.",
-      });
     }
 
     if (property === "font-weight" && !ALLOWED_WEIGHT.test(value)) {
@@ -164,10 +203,16 @@ export function checkCss(css, defined) {
 export function checkMdx(mdx) {
   if (/^---[\s\S]*?GENERATED FILE[\s\S]*?^---/m.test(mdx)) return [];
   const problems = [];
+  const lines = mdx.split("\n");
+  const fencedLines = new Set();
   let fenced = false;
-  mdx.split("\n").forEach((text, index) => {
-    if (/^\s*(```|~~~)/.test(text)) fenced = !fenced;
-    if (fenced) return;
+  lines.forEach((text, index) => {
+    const fence = /^\s*(```|~~~)/.test(text);
+    if (fence) fenced = !fenced;
+    if (fenced || fence) {
+      fencedLines.add(index + 1);
+      return;
+    }
     const prose = text.replace(/`[^`]*`/g, "");
     if (prose.includes("—")) {
       problems.push({
@@ -176,15 +221,18 @@ export function checkMdx(mdx) {
         fix: "Split the sentence, or use a colon, comma or parentheses.",
       });
     }
-    if (/<CodeBlock\b/.test(text) && !/<CodeBlock\b[^>]*\btitle=/.test(text)) {
-      problems.push({
-        line: index + 1,
-        message: "CodeBlock without a title",
-        fix: 'Give it the file path, or title="Terminal" for a shell block.',
-      });
-    }
   });
-  return problems;
+  // The whole opening tag, which may span lines: `title` can be on any of them.
+  for (const match of mdx.matchAll(/<CodeBlock\b[^>]*>/g)) {
+    const line = mdx.slice(0, match.index).split("\n").length;
+    if (fencedLines.has(line) || /\btitle=/.test(match[0])) continue;
+    problems.push({
+      line,
+      message: "CodeBlock without a title",
+      fix: 'Give it the file path, or title="Terminal" for a shell block.',
+    });
+  }
+  return problems.sort((a, b) => a.line - b.line);
 }
 
 function mdxFiles(dir) {

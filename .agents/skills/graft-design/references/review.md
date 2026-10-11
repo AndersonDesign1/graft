@@ -9,14 +9,17 @@ Render it. Code reading is not a visual review.
 
 ```sh
 # docs site
-cd examples/docs-site && npx astro dev --background
-agent-browser --color-scheme dark open http://localhost:4321/docs/getting-started
+# build what the site imports first (graft-verify, features/docs-site.md)
+cd examples/docs-site && npx astro dev --background --port 4321 --host 127.0.0.1
+until curl -sf -o /dev/null http://127.0.0.1:4321/docs/getting-started; do sleep 1; done
+agent-browser --color-scheme dark open http://127.0.0.1:4321/docs/getting-started
 agent-browser set viewport 1440 900 && agent-browser screenshot desktop-dark.png
 agent-browser set viewport 390 844 && agent-browser screenshot phone-dark.png
 agent-browser eval "document.documentElement.scrollWidth === document.documentElement.clientWidth"
 ```
 
-Repeat with `--color-scheme light`. Check keyboard focus with Tab.
+Then `agent-browser close` and repeat with `--color-scheme light` (the
+scheme is fixed when the browser starts). Check keyboard focus with Tab.
 
 ## Checklist, in order
 
@@ -24,7 +27,8 @@ Repeat with `--color-scheme light`. Check keyboard focus with Tab.
    task visible without scrolling?
 2. **Reject list.** Go through DESIGN.md's reject list item by item.
 3. **Type.** Roles only, weights 400/500/600, no mono labels, no all caps,
-   prose at most 68ch, no text under 13px, headings balanced.
+   standalone lines at most 68ch, headings balanced; no text under 13px
+   except 12px mono identifiers inside code frames.
 4. **Space.** Every gap has one owner, the 4px grid holds, no accidental
    empty rectangles.
 5. **Surfaces.** Each border or fill means something. No cards in cards.

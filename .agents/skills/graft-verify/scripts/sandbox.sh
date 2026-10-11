@@ -9,10 +9,20 @@
 # one for a real database; verification must not touch it.
 set -euo pipefail
 
+case "${1:-}" in
+  "" | --postgres) ;;
+  *)
+    echo "usage: sandbox.sh [--postgres]" >&2
+    exit 2
+    ;;
+esac
+
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../../.." && pwd)"
 cli="$repo/packages/cli/dist/index.js"
 base="${GRAFT_VERIFY_DIR:-${TMPDIR:-/tmp}/graft-verify}"
+mkdir -p "$base"
+base="$(cd "$base" && pwd)"
 run="$base/run-$(date +%s)-$$"
 mkdir -p "$run"
 
@@ -21,6 +31,12 @@ if [[ ! -f "$cli" ]]; then
   exit 1
 fi
 
+# A failed step must not leave a server running with no path printed to stop it.
+stop_pg() {
+  if [[ -f "$run/pg/datadir" ]]; then "$here/pg.sh" down "$run/pg" || true; fi
+}
+trap stop_pg ERR
+
 cd "$run"
 env -u DATABASE_URL node "$cli" init . >/dev/null
 # The scaffold imports @usegraft/core; borrow the workspace's installed copy.
@@ -28,8 +44,10 @@ ln -s "$repo/examples/docs-site/node_modules" node_modules
 
 if [[ "${1:-}" == "--postgres" ]]; then
   "$here/pg.sh" up "$run/pg" >/dev/null
-  echo "DATABASE_URL=$(cat "$run/pg/url")" > .env
-  sed -i 's/export const index = "static"/export const index = "postgres"/' graft.config.ts
+  (umask 077 && echo "DATABASE_URL=$(cat "$run/pg/url")" > .env)
+  # A temporary file rather than `sed -i`, whose flags differ between GNU and BSD.
+  sed 's/export const index = "static"/export const index = "postgres"/' graft.config.ts > graft.config.ts.tmp
+  mv graft.config.ts.tmp graft.config.ts
   DATABASE_URL="$(cat "$run/pg/url")" node "$cli" db migrate >/dev/null
 fi
 

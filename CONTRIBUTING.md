@@ -121,7 +121,9 @@ RUN_INTEGRATION=1 DATABASE_URL=postgres://... pnpm test
 Point `DATABASE_URL` at a database you can throw away. Some suites also call
 live services when their keys are in the environment, so in a shell that has
 production credentials, run tests through `offline.sh`, which removes them
-and takes the throwaway database's URL with `--db`. `pg.sh` starts one
+and takes the throwaway database's URL with `--db`. It refuses to run while
+a repo-root `.env` exists, because the tests load that file themselves; move
+it aside first. `pg.sh` starts one
 (set `PG_BIN` to your Postgres `bin` directory if it is not under
 `/usr/lib/postgresql`):
 

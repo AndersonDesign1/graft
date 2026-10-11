@@ -9,7 +9,7 @@ as Markdown.
   actions.
 - `docs.markdown`: `/docs/<slug>.md` and `Accept: text/markdown` return the
   Markdown twin.
-- `docs.llms`: `/llms.txt` and `/llms-full.txt` list every page.
+- `docs.llms`: `/llms.txt` and `/llms-full.txt` list every docs page.
 - `docs.search`: the search dialog answers as you type.
 - `docs.landing`: `/` renders the landing page.
 

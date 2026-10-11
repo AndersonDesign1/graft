@@ -61,10 +61,6 @@ test("no transition: all, no ease-in", () => {
   ]);
 });
 
-test("custom properties are the tokens' business, not this check's", () => {
-  assert.deepEqual(checkCss(":root { --x: #fff; }"), []);
-});
-
 test("em dashes are caught in prose, not in code", () => {
   const mdx = ["One — two.", "Run `a — b`.", "```text", "output — as printed", "```"].join("\n");
   assert.deepEqual(
@@ -83,7 +79,8 @@ test("generated pages are skipped", () => {
 });
 
 test("a variable nothing defines is a problem", () => {
-  const css = ":root { --ink: black; }\n.a { color: var(--ink); background: var(--paper-hover); }";
+  const css =
+    ":root { --ink: currentColor; }\n.a { color: var(--ink); background: var(--paper-hover); }";
   assert.deepEqual(messages(checkCss(css, definedVariables(css))), [
     "--paper-hover is not defined",
   ]);
@@ -92,4 +89,29 @@ test("a variable nothing defines is a problem", () => {
 test("a fallback or a runtime variable is fine", () => {
   const css = ".a { color: var(--shiki-light); background: var(--missing, transparent); }";
   assert.deepEqual(checkCss(css, definedVariables(css)), []);
+});
+
+test("a custom property is checked for literal colors too", () => {
+  assert.equal(checkCss(".a { --brand: #fff; }").length, 1);
+  assert.deepEqual(checkCss(".a { --gap: var(--space-2); }"), []);
+});
+
+test("named colors are literals; names inside variables and fonts are not", () => {
+  assert.equal(checkCss(".a { color: red; }").length, 1);
+  assert.equal(checkCss(".a { border: 1px solid rebeccapurple; }").length, 1);
+  assert.deepEqual(checkCss(".a { color: var(--red-500); background: currentColor; }"), []);
+  assert.deepEqual(checkCss('.a { font-family: "Gold Sans", var(--font-sans); }'), []);
+});
+
+test("a commented-out definition does not count", () => {
+  const css = "/* :root { --brand: x; } */ .a { color: var(--brand); }";
+  assert.deepEqual(messages(checkCss(css, definedVariables(css))), ["--brand is not defined"]);
+});
+
+test("a CodeBlock's title may be on a later line of its tag", () => {
+  assert.deepEqual(checkMdx('<CodeBlock\n  note="x"\n  title="graft.config.ts"\n>'), []);
+  assert.deepEqual(
+    checkMdx('Text.\n\n<CodeBlock\n  note="x"\n>').map((problem) => problem.line),
+    [3],
+  );
 });

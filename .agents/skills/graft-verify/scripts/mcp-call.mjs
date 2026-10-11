@@ -45,19 +45,28 @@ child.stdout.on("data", (chunk) => {
     buf = buf.slice(nl + 1);
     if (!line) continue;
     const msg = JSON.parse(line);
-    const resolve = pending.get(msg.id);
-    if (resolve) {
+    const waiting = pending.get(msg.id);
+    if (waiting) {
       pending.delete(msg.id);
-      resolve(msg);
+      waiting.resolve(msg);
     }
   }
 });
 
 const request = (id, method, params) =>
-  new Promise((resolve) => {
-    pending.set(id, resolve);
+  new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
     send({ id, method, params });
   });
+
+// A server that dies before answering (a bad config, a startup error) fails
+// every waiting call now, not at the 30s timeout.
+child.on("exit", (code, signal) => {
+  for (const { reject } of pending.values()) {
+    reject(new Error(`graft mcp exited (${signal ?? `code ${code}`}) before replying`));
+  }
+  pending.clear();
+});
 
 const timer = setTimeout(() => {
   console.error("mcp-call: timed out after 30s");
@@ -65,15 +74,27 @@ const timer = setTimeout(() => {
   process.exit(1);
 }, 30_000);
 
-await request(0, "initialize", {
-  protocolVersion: "2025-06-18",
-  capabilities: {},
-  clientInfo: { name: "graft-verify", version: "0" },
-});
+try {
+  await request(0, "initialize", {
+    protocolVersion: "2025-06-18",
+    capabilities: {},
+    clientInfo: { name: "graft-verify", version: "0" },
+  });
+} catch (error) {
+  console.error(`mcp-call: ${error.message}`);
+  process.exit(1);
+}
 send({ method: "notifications/initialized" });
 
 for (const [i, call] of calls.entries()) {
-  const res = await request(i + 1, call.method, call.params);
+  let res;
+  try {
+    res = await request(i + 1, call.method, call.params);
+  } catch (error) {
+    console.error(`mcp-call: ${error.message}`);
+    failed = true;
+    break;
+  }
   if (res.error || res.result?.isError) failed = true;
   const label = call.method === "tools/call" ? call.params.name : call.method;
   console.log(`--- ${label}`);
@@ -89,4 +110,6 @@ for (const [i, call] of calls.entries()) {
 clearTimeout(timer);
 child.stdin.end();
 child.kill();
-process.exit(failed ? 1 : 0);
+// exitCode rather than exit(), so a large result piped to another program is
+// written in full before the process ends.
+process.exitCode = failed ? 1 : 0;

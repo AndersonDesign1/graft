@@ -2,7 +2,8 @@
 
 Find what would break. Do not edit unless asked.
 
-1. **Scope.** The diff: `git diff origin/feat/core...HEAD`, or the PR's files.
+1. **Scope.** The diff against the PR's own base (`git diff
+   origin/<base>...HEAD`, usually `feat/core`), or the PR's files.
 2. **Intent.** One paragraph on what the change is meant to do, from the PR
    body, commits and code. If you cannot tell, ask before reviewing.
 3. **Spawn two reviewers in parallel**, read-only, each on a different model

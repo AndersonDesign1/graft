@@ -22,12 +22,14 @@ fails with CONTENT_TREE_READ_ONLY like a write does.
 - The subject is lowercase after the colon, says the outcome, no period,
   under about 72 characters. Several outcomes are joined by commas.
 - The body explains what was wrong and why, in the past tense, then what
-  changed, in the present. Name the function, the file, the error code.
+  changed, in the present. Name the function, file or error code involved,
+  where there is one.
 - Breaking changes say `!` after the scope and explain who must change what.
 
 ## Changesets
 
-Every package change has one in `.changeset/`, named for the change
+Every change to a published package (`@usegraft/*`) has one in
+`.changeset/`; private packages and the docs site do not. Name it for the change
 (`approval-policy-to-config.md`).
 
 - Start with the change in bold if it is breaking: `**BREAKING:** approval

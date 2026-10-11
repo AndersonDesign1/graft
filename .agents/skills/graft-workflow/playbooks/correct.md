@@ -15,6 +15,8 @@ impossible, not just discouraged.
    5. Words last: a line in `AGENTS.md`, `DESIGN.md` or a skill, only for
       judgment calls a machine cannot check.
 3. **Prove the check fails** on a real past instance before you rely on it.
+   For a words-only rule (step 5 above), quote the past instance it would
+   have caught instead.
 4. **Record it** in the rules table in `AGENTS.md`: the rule, what enforces
    it, and the evidence. If the rule was already there with nothing
    enforcing it, move it up a level in the same change.

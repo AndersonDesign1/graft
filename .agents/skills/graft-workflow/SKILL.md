@@ -30,7 +30,7 @@ plausible one.
 | Review a diff or PR | [review](playbooks/review.md) |
 | "Run until done", "I'm stepping away", resuming a session | [long-run](playbooks/long-run.md) |
 | The same correction a second time | [correct](playbooks/correct.md) |
-| Every playbook ends here | [opening-a-pr](playbooks/opening-a-pr.md) |
+| Every playbook that changes the repo ends here | [opening-a-pr](playbooks/opening-a-pr.md) |
 
 Related skills: `graft-verify` (prove it works), `graft-design` (anything
 visual), `graft-writing` (any words, including commits and PRs).
