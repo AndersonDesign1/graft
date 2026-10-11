@@ -1,5 +1,23 @@
 # @usegraft/compiler
 
+## 1.0.0-beta.6
+
+### Patch Changes
+
+- 2386e74: Two error-handling fixes. `GRAFT_REVALIDATE_URL` with a `user:password@` part is refused at startup without repeating the credentials, and a network error that quotes the webhook URL has its query stripped, so a token in the URL no longer reaches logs, agents or Studio toasts. Creating a GitHub draft branch now reads only GitHub's "already exists" answer as a race: any other 422, such as a missing commit, fails with `REMOTE_STORE_FAILED` and GitHub's reason, where it used to retry to exhaustion and report the document busy.
+- 2386e74: Paths inside the content directory now refuse a dangling symbolic link. The check followed the link, so a link whose target did not exist read as absent, and a Studio or MCP write then created the target outside the content directory. A delete on a read-only filesystem now fails with `CONTENT_TREE_READ_ONLY`, the same error a save gives, instead of a raw `EROFS`.
+- 2386e74: A save to a GitHub draft can no longer be lost while the draft is being emptied. Publishing everything or discarding the last change used to read the draft branch and then delete it, and a save that landed in between was deleted with it after reporting success. The draft is now emptied with a fast-forward that fails if the branch moved, so the branch stays, holding no changes, and the next save reuses it.
+
+  Invite-link editors get new draft branch names. Their key joins the hash with `--`, which a GitHub login cannot produce, so a login shaped like an email's key (`ana-lima-shop-test-0123456789`) no longer shares that person's draft. A draft saved under the old name before upgrading stays on GitHub as a branch: publish or discard it first, or merge it by hand.
+
+- 2386e74: `GITHUB_STORE_ENV` now lists the host commit variables the store reads (`VERCEL_GIT_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `RAILWAY_GIT_COMMIT_SHA`, `COMMIT_REF`, `GITHUB_SHA`), exported on their own as `DEPLOYED_SHA_ENV`. A server that allowlisted its environment from the old list dropped them, so Studio could not tell which commit was deployed.
+- 2386e74: One loopback list decides every "https unless loopback" question: `@usegraft/compiler` exports `LOOPBACK_HOSTS` and `isLoopbackHost`, and the revalidate webhook, Studio's `Secure` session cookie and `graft studio invite` all use them, so the invite check and the cookie can never disagree about a host. Paths under a regular file now read as absent instead of failing with `ENOTDIR`, and deleting a document that is already gone succeeds.
+- Updated dependencies [2386e74]
+  - @usegraft/core@1.0.0-beta.6
+  - @usegraft/contracts@1.0.0-beta.6
+  - @usegraft/db@1.0.0-beta.6
+  - @usegraft/mdx-safety@1.0.0-beta.6
+
 ## 1.0.0-beta.5
 
 ### Minor Changes

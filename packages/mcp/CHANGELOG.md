@@ -1,5 +1,28 @@
 # @usegraft/mcp
 
+## 1.0.0-beta.6
+
+### Patch Changes
+
+- 2386e74: A save to a GitHub draft can no longer be lost while the draft is being emptied. Publishing everything or discarding the last change used to read the draft branch and then delete it, and a save that landed in between was deleted with it after reporting success. The draft is now emptied with a fast-forward that fails if the branch moved, so the branch stays, holding no changes, and the next save reuses it.
+
+  Invite-link editors get new draft branch names. Their key joins the hash with `--`, which a GitHub login cannot produce, so a login shaped like an email's key (`ana-lima-shop-test-0123456789`) no longer shares that person's draft. A draft saved under the old name before upgrading stays on GitHub as a branch: publish or discard it first, or merge it by hand.
+
+- 2386e74: `explain_error` for `REMOTE_STORE_FAILED` no longer promises that a failed save did not happen. A refusal means that one request was not applied, but a publish can move production before a later step is refused, and a network error can arrive after GitHub applied the request, so agents are told to check the branches before retrying. A 404 now also names its other cause: a private repository the token or GitHub App cannot see.
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+  - @usegraft/compiler@1.0.0-beta.6
+  - @usegraft/core@1.0.0-beta.6
+  - @usegraft/contracts@1.0.0-beta.6
+  - @usegraft/db@1.0.0-beta.6
+  - @usegraft/mdx-safety@1.0.0-beta.6
+  - @usegraft/registry@1.0.0-beta.6
+  - @usegraft/assets@1.0.0-beta.6
+
 ## 1.0.0-beta.5
 
 ### Minor Changes
