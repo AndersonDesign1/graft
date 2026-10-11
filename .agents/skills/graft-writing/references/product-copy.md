@@ -5,6 +5,9 @@ lines.
 
 ## Landing and marketing
 
+The landing page predates these rules and gets rebuilt against them, so do
+not copy its current wording.
+
 - The h1 names what Graft is in the fewest words: "The agent-native CMS."
 - The lede under it states three facts, each one checkable:
   "Content stays as MDX in your repository. One Zod schema checks every file.
@@ -28,7 +31,7 @@ lines.
 - State changes are confirmed in the past tense: "Copied", "Saved",
   "Written and compiled".
 - Labels are nouns in sentence case: "On this page", "Last updated",
-  "Search docs".
+  "Search the docs".
 
 ## Errors and fix lines
 

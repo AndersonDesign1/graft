@@ -22,8 +22,9 @@ Where anything here disagrees with DESIGN.md, DESIGN.md wins.
 - **Hit areas.** At least 40x40px on desktop, 44x44px on touch. Extend a
   small control with a `::before` inset instead of growing its visual size.
   Hit areas never overlap.
-- **Press feedback.** `scale: var(--press-scale)` (0.97) on `:active`, with a
-  120ms ease-out transition. Never below 0.95.
+- **Press feedback.** A small scale on `:active` over `--duration-press`
+  (140ms) with `--ease-out`: 0.96 on pills, 0.98 on larger targets such as
+  previous and next. Never below 0.95.
 - **Primary is unmistakable.** One primary button per view. Everything else
   is the outline or ghost variant.
 - **Page actions are pills.** Copy page, View as Markdown, Open in ChatGPT,
@@ -33,15 +34,18 @@ Where anything here disagrees with DESIGN.md, DESIGN.md wins.
   or "Confirm", and use `--danger` with an icon.
 - **Menus** open from their trigger (`transform-origin` at the trigger),
   close on Escape and outside click, return focus to the trigger.
-- **Tabs** switch instantly, support arrow keys, and use `role="tablist"`.
-- **Copy buttons** keep both icons in the DOM and cross-fade them (see
-  motion.md). Announce "Copied" through `aria-label`. Catch clipboard errors.
+- **Tabs** switch instantly and support arrow keys. The docs build them as a
+  radio group, so they work without JavaScript and are one tab stop.
+- **Copy buttons** keep both icons in the DOM and show the check on success.
+  Announce "Copied" through a live region (`role="status"` or `aria-live`);
+  the button's own label stays "Copy code". Catch clipboard errors and say
+  "Copy failed".
 
 ## Icons
 
-- Interface icons are Lucide, one stroke width per surface: 1.5px beside 400-weight text,
-  2px beside 600.
-- 16px in UI, 14px in metadata rows.
+- Interface icons are Lucide. Stroke 1.75 in the docs chrome, 2 in callouts
+  and steps.
+- 16px in UI, 14px in the page-action pills and metadata rows.
 - `currentColor`, states through color and opacity, outline by default and
   fill only for an active state.
 - Every icon-only button has an `aria-label`.

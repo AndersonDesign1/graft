@@ -12,8 +12,8 @@ else to launch, drive, capture evidence and clean up.
 
 - **Never reach a real service.** A cloud session's environment can hold
   live credentials (`DATABASE_URL`, `NEON_API_KEY`, `S3_*`, `GITHUB_TOKEN`).
-  Run every CLI call, test and script through `scripts/offline.sh`, which
-  removes them, and give it a throwaway database with `--db` when you need
+  Run every CLI call, test and script through `scripts/offline.sh` (`$O`
+  below), which removes them, and give it a throwaway database with `--db` when you need
   one. An integration run without it has created a real Neon branch
   before.
 - **Never drive an instance you did not start.** Kill what you started, by
@@ -34,8 +34,9 @@ Build what you changed, then make a sandbox:
 REPO=$(git rev-parse --show-toplevel)
 O=$REPO/.agents/skills/graft-verify/scripts/offline.sh
 pnpm -r --filter @usegraft/cli... run build      # or the package you touched, plus its dependents
-P=$(.agents/skills/graft-verify/scripts/sandbox.sh | tail -1)             # static project
-P=$(.agents/skills/graft-verify/scripts/sandbox.sh --postgres | tail -1)  # Postgres project
+V=$REPO/.agents/skills/graft-verify/scripts
+P=$($V/sandbox.sh | tail -1)             # static project
+P=$($V/sandbox.sh --postgres | tail -1)  # Postgres project
 ```
 
 `sandbox.sh` runs `graft init`, links the workspace's `node_modules`, compiles
@@ -75,10 +76,10 @@ recipe. Prefix every command with `$O` unless the recipe says otherwise. Cover e
 The `*.integration.test.ts` suites run against a throwaway Postgres:
 
 ```sh
-mkdir -p "$P/itest" && URL=$(.agents/skills/graft-verify/scripts/pg.sh up "$P/itest")
-.agents/skills/graft-verify/scripts/offline.sh --db "$URL" \
-  env RUN_INTEGRATION=1 pnpm --filter @usegraft/db exec vitest run
-.agents/skills/graft-verify/scripts/pg.sh down "$P/itest"
+cd "$REPO"
+mkdir -p "$P/itest" && URL=$($V/pg.sh up "$P/itest")
+$O --db "$URL" env RUN_INTEGRATION=1 pnpm --filter @usegraft/db exec vitest run
+$V/pg.sh down "$P/itest"
 ```
 
 Suites that need Neon or S3 skip themselves once `offline.sh` removes the
@@ -86,8 +87,8 @@ keys. That is correct. Report them as skipped, never as passed.
 
 Helpers:
 
-- `scripts/offline.sh [--db <url>] <command>` runs a command with every cloud
-  credential removed. Refuses to run if a repo-root `.env` exists, because
+- `scripts/offline.sh [--db <url>] <command>` runs a command with the
+  database, Neon, S3, AWS, R2 and GitHub credentials removed. Refuses to run if a repo-root `.env` exists, because
   tests load it directly.
 - `scripts/mcp-call.mjs <tool> '<json args>' [...]` runs `graft mcp` in the
   current directory, sends each call, prints the results, and exits 1 if any
@@ -112,8 +113,9 @@ the PR's Verification section:
 ## Cleanup
 
 ```sh
-.agents/skills/graft-verify/scripts/pg.sh down "$P/pg"   # Postgres sandboxes
-kill "$STUDIO_PID" "$ASTRO_PID" 2>/dev/null               # what you started
+$V/pg.sh down "$P/pg"                                # Postgres sandboxes
+kill "$STUDIO_PID" 2>/dev/null                       # Studio, if you started it
+(cd "$REPO/examples/docs-site" && npx astro dev stop) # the docs site, if you started it
 ```
 
 Leave `$P/evidence/` in place. Delete sandboxes only once the evidence is in

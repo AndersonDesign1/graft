@@ -9,8 +9,8 @@ file carries the notices the licenses require. Agents do not need to read it.
 | `graft-workflow/` (playbooks, principles, review, correct) | pstack, Copyright (c) 2026 Lauren Tan | MIT |
 | `graft-writing/references/ai-tells.md` | pstack `unslop`, Copyright (c) 2026 Lauren Tan | MIT |
 | `graft-verify/` (structure of the feature map) | pstack `create-verification-skill`, Copyright (c) 2026 Lauren Tan | MIT |
-| `graft-design/references/interface.md`, `motion.md` | make-interfaces-feel-better, Copyright (c) 2026 Jakub Krehel; emil-design-eng, Copyright (c) 2026 Emil Kowalski | MIT |
-| `graft-design/references/typography.md`, `color.md` | better-typography, better-colors (previously vendored in `.agents/skills/`), Copyright (c) 2026 Jakub Krehel | MIT |
+| `graft-design/references/interface.md`, `motion.md` | make-interfaces-feel-better and better-ui (jakubkrehel/skills), Copyright (c) 2026 Jakub Krehel; emil-design-eng, Copyright (c) 2026 Emil Kowalski | MIT |
+| `graft-design/references/typography.md`, `color.md` | better-typography and better-colors (jakubkrehel/skills, previously vendored in `.agents/skills/`), Copyright (c) 2026 Jakub Krehel | MIT |
 
 ## MIT License
 

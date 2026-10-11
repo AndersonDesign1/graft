@@ -18,8 +18,9 @@ edits a page.
 ## Driving it with agent-browser and curl
 
 Preconditions: a Postgres sandbox (`sandbox.sh --postgres`), `cd "$P"`, then
-`node $REPO/packages/cli/dist/index.js studio --port 4999 &` and
-`STUDIO_PID=$!`. Ready when the log prints `graft studio — branch "main"`.
+`$O node $REPO/packages/cli/dist/index.js studio --port 4999 &` and
+`STUDIO_PID=$!` (`offline.sh` execs, so this is Studio's own PID). Without
+`$O`, Studio connects to the environment's `DATABASE_URL`, not the sandbox's. Ready when the log prints `graft studio — branch "main"`.
 
 - **The tree is served.** `curl -s http://127.0.0.1:4999/api/studio/v1/tree`
   contains `"slug":"home"` and `"state":"synced"`.

@@ -41,12 +41,12 @@ Every page opens the same way:
 
 ## Headings
 
-- Guide headings name a task the reader does (86% did after the rewrite; aim higher): "Create a branch
-  and preview it", "Add your own content", "Connect your identity provider".
+- Guide headings name a task the reader does: "Create a branch and preview
+  it", "Add your own content", "Connect your identity provider".
 - Concept headings state the idea as a sentence: "Your files are the source
   of truth", "Content and user data are kept apart".
-- Fixed closing headings: "If something goes wrong" (an error table) and
-  "Next steps" (two to four links).
+- A guide ends with "Next steps" (two to four links). A troubleshooting
+  section, when a page has one, is an error table: code, meaning, fix.
 - No headings like "Overview", "Introduction", "Details" or "Note".
 
 ## Steps
@@ -74,7 +74,7 @@ Use `<Steps>` only for an order the reader must follow.
 
 ## Callouts
 
-`<Callout label="..." type="note|warning">`. At most two per page.
+`<Callout label="..." type="note|warning|danger">`. At most two per page.
 
 - The label is the point, as a sentence: "Deletes cannot be undone",
   "Keep the client on the server", "The rule". Not "Note" or "Warning".

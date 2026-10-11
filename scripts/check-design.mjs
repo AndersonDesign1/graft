@@ -12,6 +12,8 @@
  *   - font weights 400, 500 and 600 only
  *   - no `transition: all`, no `ease-in` (things that respond to a person
  *     start fast and settle)
+ *   - no `var(--name)` that nothing defines: the declaration is silently
+ *     dropped, so the bug only shows as a missing color
  *
  * Content (docs MDX, generated pages skipped):
  *   - no em dashes in prose
@@ -27,6 +29,7 @@ const root = resolve(import.meta.dirname, "..");
 const site = join(root, "examples", "docs-site");
 
 const DOCS_CSS = [join(site, "src", "styles", "fumadocs.css")];
+const TOKENS_CSS = join(root, "packages", "tokens", "tokens.css");
 const DOCS_CONTENT = join(site, "content");
 
 /** Selectors that show code, a path or a type name, where mono is the point. */
@@ -38,6 +41,14 @@ const LITERAL_COLOR =
 const ALLOWED_WEIGHT = /^(400|500|600|inherit|var\(--weight-(regular|medium|semibold)\))$/;
 
 const EASE_IN = /(^|[^\w-])ease-in(?![\w-])/;
+
+/** Set at runtime rather than in a stylesheet: Shiki writes these inline. */
+const RUNTIME_VARIABLE = /^--shiki-/;
+
+/** Every custom property a stylesheet defines. */
+export function definedVariables(css) {
+  return new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1]));
+}
 
 /**
  * Every declaration in a stylesheet with the selector it sits under and its
@@ -81,10 +92,24 @@ export function declarations(css) {
   return found;
 }
 
-/** Design problems in one stylesheet, each with the fix. */
-export function checkCss(css) {
+/**
+ * Design problems in one stylesheet, each with the fix. `defined` is every
+ * custom property in scope (the tokens plus this stylesheet); without it,
+ * undefined variables are not checked.
+ */
+export function checkCss(css, defined) {
   const problems = [];
   for (const { selector, property, value, line } of declarations(css)) {
+    if (defined) {
+      for (const [, name] of value.matchAll(/var\(\s*(--[\w-]+)\s*\)/g)) {
+        if (defined.has(name) || RUNTIME_VARIABLE.test(name)) continue;
+        problems.push({
+          line,
+          message: `${name} is not defined`,
+          fix: "Use a token that exists in @usegraft/tokens, or define it in this stylesheet.",
+        });
+      }
+    }
     if (property.startsWith("--")) continue;
 
     if (property === "font-family" && value.includes("--font-mono")) {
@@ -172,8 +197,11 @@ function mdxFiles(dir) {
 
 function main() {
   const report = [];
+  const tokens = readFileSync(TOKENS_CSS, "utf8");
   for (const file of DOCS_CSS) {
-    for (const problem of checkCss(readFileSync(file, "utf8"))) report.push({ file, ...problem });
+    const css = readFileSync(file, "utf8");
+    const defined = definedVariables(tokens + css);
+    for (const problem of checkCss(css, defined)) report.push({ file, ...problem });
   }
   const pages = mdxFiles(DOCS_CONTENT);
   for (const file of pages) {

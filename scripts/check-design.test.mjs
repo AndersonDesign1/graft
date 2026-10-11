@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkCss, checkMdx, declarations } from "./check-design.mjs";
+import { checkCss, checkMdx, declarations, definedVariables } from "./check-design.mjs";
 
 const messages = (problems) => problems.map((problem) => problem.message);
 
@@ -80,4 +80,16 @@ test("every CodeBlock has a title", () => {
 
 test("generated pages are skipped", () => {
   assert.deepEqual(checkMdx("---\n# GENERATED FILE. Do not edit.\ntitle: x\n---\n\nA — b."), []);
+});
+
+test("a variable nothing defines is a problem", () => {
+  const css = ":root { --ink: black; }\n.a { color: var(--ink); background: var(--paper-hover); }";
+  assert.deepEqual(messages(checkCss(css, definedVariables(css))), [
+    "--paper-hover is not defined",
+  ]);
+});
+
+test("a fallback or a runtime variable is fine", () => {
+  const css = ".a { color: var(--shiki-light); background: var(--missing, transparent); }";
+  assert.deepEqual(checkCss(css, definedVariables(css)), []);
 });

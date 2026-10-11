@@ -54,7 +54,7 @@ When rules compete, protect them in this order:
 ## The thesis
 
 **Monochrome chrome, colorful content.** Surfaces, text and controls use one
-warm neutral ramp (hue 95): warm ivory paper and near-black ink in light, a
+warm neutral ramp (hue 95): chalk paper and near-black ink in light, a
 black stage and off-white type in dark. There is no brand accent color. The
 primary button, the active nav item and the selected tab are simply the
 brightest (dark) or darkest (light) thing on screen.
@@ -81,13 +81,15 @@ output, approval gates. Show it.
 ## Identity
 
 - **Wordmark:** `graft.` lowercase, with the period, IBM Plex Sans 600,
-  tracking -0.035em, 19px in headers. The same on every surface. A surface
-  name follows after a faint slash: `graft. / Docs`. The stage (`beta`)
-  follows as plain faint text.
+  tracking -0.035em, 19px (`--type-wordmark`, `--tracking-wordmark`). A
+  surface name follows after a faint slash: `graft. / Docs`. The stage
+  (`beta`) follows as plain faint text. The landing page and Studio still
+  draw their own and move to this one when they are rebuilt.
 - **Docs header:** wordmark and surface name left, at most three section
   links, GitHub icon right. 56px tall, translucent background, hairline
   bottom border.
-- **Footer:** wordmark left, one line right (license and source link). Quiet.
+- **End of page:** last updated and the edit and report links
+  (`PageMeta`), then the "Powered by Graft" badge. Nothing else.
 
 ## Type
 
@@ -100,16 +102,16 @@ identifier itself, not its sentence or its table.
 
 Use roles, never raw sizes. Weights are 400, 500 and 600 only.
 
-| Role       | Token               | Size / leading / tracking | Use                                       |
-| ---------- | ------------------- | ------------------------- | ----------------------------------------- |
-| Title      | `--type-title`      | 32-40px / 1.15 / -0.032em | A page's h1                               |
-| Section    | (in `fumadocs.css`) | 26px / 1.2 / -0.02em      | h2                                        |
-| Subsection | `--text-h3`         | 20px / 1.3 / -0.01em      | h3; step titles at 16px                   |
-| Lede       | `--type-lede`       | 18px / 1.6                | The one sentence under a title            |
-| Body       | `--doc-body`        | 17px / 1.75               | Reading                                   |
-| Compact    | `--text-sm`         | 14px / 1.5                | Sidebar, buttons, pills, tables, callouts |
-| Meta       | `--type-meta`       | 13px / 1.45               | Captions, group labels, dates             |
-| Code       | `--text-sm`         | 14px / 1.7                | Code blocks                               |
+| Role       | Token               | Size / leading / tracking | Use                                     |
+| ---------- | ------------------- | ------------------------- | --------------------------------------- |
+| Title      | `--type-title`      | 32-40px / 1.15 / -0.032em | A page's h1                             |
+| Section    | (in `fumadocs.css`) | 26px / 1.2 / -0.02em      | h2                                      |
+| Subsection | `--text-h3`         | 20px / 1.3 / -0.01em      | h3 and step titles                      |
+| Lede       | `--type-lede`       | 18px / 1.6                | The one sentence under a title          |
+| Body       | `--doc-body`        | 17px / 1.75               | Reading; callout bodies at 16px         |
+| Compact    | `--text-sm`         | 14px / 1.5                | Sidebar, buttons, pills, tables, labels |
+| Meta       | `--type-meta`       | 13px / 1.45               | Captions, group labels, dates           |
+| Code       | `--text-sm`         | 14px / 1.7                | Code blocks                             |
 
 `--type-section` (24px) and `--type-subsection` (19px) are the sizes h2 and
 h3 move to next; until then the table above is what ships. `--text-2xl` and
@@ -117,14 +119,16 @@ h3 move to next; until then the table above is what ships. `--text-2xl` and
 
 Rules you can check:
 
-- Prose is at most 68 characters a line (`--measure`). Tables, code and
-  diagrams may use the full column.
+- Prose, code and tables share one column (`--doc-column`, 800px) and one
+  left edge. `--measure` (68 characters) is for a standalone line such as a
+  kicker.
 - Headings use `text-wrap: balance`, paragraphs `text-wrap: pretty`.
 - Headings are sentence case and state the claim or the task ("Add your own
   content", not "Content" and not "CONTENT").
 - No all-caps text anywhere except inside code.
 - Numbers that line up use `font-variant-numeric: tabular-nums`.
-- No text below 13px. Rewrite before shrinking.
+- No text below 13px, except a mono identifier inside a frame (a code
+  block's path, a field's type) at 12px. Rewrite before shrinking.
 - No em dashes in copy. The writing skill has the details.
 
 ## Color tokens
@@ -133,20 +137,20 @@ Components read the semantic layer only. Literal colors appear in
 `tokens.css` and in brand marks, nowhere else. A hover wash is
 `color-mix(in oklch, var(--ink) 5%, transparent)`, so it follows the scheme.
 
-| Token                                                     | Means                                                                       |
-| --------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `--background`                                            | The page                                                                    |
-| `--muted`                                                 | Sunken: code blocks, callouts, table heads, the active nav item, pill hover |
-| `--card`                                                  | Raised: the agent prompt, menus                                             |
-| `--elevated`                                              | Floating: menus, popovers                                                   |
-| `--foreground`                                            | Text                                                                        |
-| `--muted-foreground`                                      | Secondary text, safe for body copy                                          |
-| `--faint-foreground`                                      | Metadata only, 13px and up                                                  |
-| `--border`, `--border-strong`                             | Hairlines; strong for controls and hover                                    |
-| `--primary`, `--primary-hover`, `--primary-foreground`    | The bright fill and its label                                               |
-| `--danger`                                                | Errors and destructive actions                                              |
-| `--callout-note`, `--callout-warning`, `--callout-danger` | Callout icons and labels                                                    |
-| `--code-*`                                                | Syntax and CLI chips                                                        |
+| Token                                                     | Means                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------ |
+| `--background`                                            | The page                                               |
+| `--muted`                                                 | Sunken: code blocks, callouts, table heads, pill hover |
+| `--card`                                                  | Raised: the agent prompt, menus                        |
+| `--elevated`                                              | Floating: menus, popovers                              |
+| `--foreground`                                            | Text                                                   |
+| `--muted-foreground`                                      | Secondary text, safe for body copy                     |
+| `--faint-foreground`                                      | Metadata only, 13px and up                             |
+| `--border`, `--border-strong`                             | Hairlines; strong for controls and hover               |
+| `--primary`, `--primary-hover`, `--primary-foreground`    | The bright fill and its label                          |
+| `--danger`                                                | Errors and destructive actions                         |
+| `--callout-note`, `--callout-warning`, `--callout-danger` | Callout icons and labels                               |
+| `--code-*`                                                | Syntax and CLI chips                                   |
 
 Every pairing is checked with APCA against its real background: body text
 Lc 75 or more, metadata Lc 60 or more. Light and dark are both first-class and
@@ -158,8 +162,9 @@ follow the operating system.
   group 8-16px. Between groups 24-32px. Section turns in docs 64px.
 - **Every gap has one owner.** A flow, stack or grid sets it; children reset
   their own margins. Never fix a bad gap with a one-off margin.
-- **Radius** is concentric (outer = inner + padding): 4px inline code and
-  kbd, 6px buttons and inputs, 10px code blocks, tables, menus and the agent
+- **Radius** is concentric (outer = inner + padding): 3px
+  (`--radius-inner`) for buttons, inputs and code spans, 6px (`--radius`) for
+  cards, 10px (`--radius-outer`) for code blocks, tables, menus and the agent
   prompt. Pills are fully round; so are step numbers.
 - **Elevation is lightness.** In dark, a raised surface is lighter, not
   shadowed. Shadows exist only on floating things (menus, popovers).
@@ -169,12 +174,12 @@ follow the operating system.
 
 ## Docs layout
 
-A sticky header; a 248px sidebar; an article column up to 752px; a 216px
-contents rail from 1280px wide. The sidebar hides below 1024px behind a menu
-button and the rail hides below 1280px.
+A sticky header; a 268px sidebar from 768px wide, behind a menu button
+below that; an article column up to 800px (`--doc-column`); a 268px contents
+rail from 1280px wide, with last updated and the edit links under it.
 
 The page head, in order: the title, the lede, the page-action pills, then a
-meta line (section, reading time, last updated) in `--faint-foreground`.
+meta line (section and reading time) in `--faint-foreground`.
 
 Rules you can check:
 
@@ -225,10 +230,10 @@ Markdown tables, fences and inline code render through `Table`, `Pre` and
   sans. Package-manager tabs (`<Tabs labels="npm, pnpm, yarn, bun">`) render
   as one code block led by a terminal icon, each tab with its mark, not as a
   second frame.
-- **CLI chips.** An inline command in prose (`graft compile`, `npx next
---version`) takes the terminal's hues automatically when it starts with a
-  known program. Other inline code (a path, a field, a value) stays
-  monochrome.
+- **CLI chips.** An inline command in prose (`graft compile`,
+  `pnpm add @usegraft/cli`) takes the terminal's hues: `InlineCode` colors a
+  span that starts with `graft` or `pnpm`, or with a flag. Other inline code
+  (a field, a value) stays monochrome.
 - **Steps.** Only for an order the reader must follow. Each title is an
   action ("Compile your content"). Never number things that are not a
   sequence.
@@ -245,14 +250,15 @@ Markdown tables, fences and inline code render through `Table`, `Pre` and
 Default to stillness. The page is complete without any motion, and motion
 never gates reading.
 
-| Allowed                                                  | Duration, easing                  |
-| -------------------------------------------------------- | --------------------------------- |
-| Button and pill press: `scale: 0.97`                     | 120ms `--ease-out`                |
-| Hover color, border and background                       | 150ms `ease`                      |
-| Menu open from its trigger, scale 0.97 to 1 plus opacity | 150ms in, 100ms out, `--ease-out` |
-| Copy icon swap: opacity, scale 0.25 to 1, blur 4px to 0  | 200ms                             |
-| Link-list arrow nudge on hover, 3px                      | 200ms `--ease-out`                |
-| Disclosure (show more, accordion)                        | 200ms `--ease-out`                |
+| Allowed                                                       | Duration, easing                         |
+| ------------------------------------------------------------- | ---------------------------------------- |
+| Press: `scale(0.96)` on pills, `scale(0.98)` on previous/next | `--duration-press` (140ms), `--ease-out` |
+| Hover color, border and background                            | `--duration-fast` (180ms), `--ease-out`  |
+| A DocCard lifts 1px on hover                                  | 160ms                                    |
+| Anything new that opens (a menu, a popover), from its trigger | Under 200ms in, faster out, `--ease-out` |
+
+The copy buttons swap their icon to a check with no animation, and say
+"Copied" through a live region.
 
 Never in docs: scroll-triggered reveals, typing animations, blinking
 cursors, marquees, parallax, bounce, page-load sequences, animated keyboard
@@ -263,8 +269,9 @@ anything over 300ms in UI. Respect `prefers-reduced-motion` everywhere.
 
 Two kinds, never mixed up:
 
-- **Interface icons** are Lucide, one set, 15-16px, stroke 1.5 beside regular
-  text, `currentColor`, states through color and opacity.
+- **Interface icons** are Lucide, one set, `currentColor`, states through
+  color and opacity. 16px, or 14px in the pills and the meta line. Stroke
+  1.75 in the chrome, 2 in callouts and steps.
 - **Marks** are the real logos of frameworks and tools (Next.js, TypeScript,
   Astro, React, Svelte, TanStack, Node.js, Docker, Postgres, SQLite, npm,
   pnpm, bun, ChatGPT, Claude). They sit beside the name they stand for, at the
@@ -295,11 +302,31 @@ Do not ship any of these in docs:
 - Colored side rails or colored fills on callouts or cards.
 - Syntax colors on inline code that is not a command.
 - Cards for every section, cards in cards, borders that fix weak hierarchy.
-- Text under 13px, weights other than 400/500/600, ad-hoc font sizes.
+- Text under 13px outside a code frame, weights other than 400/500/600,
+  ad-hoc font sizes.
 - Brand marks redrawn, recolored or used as decoration away from their name.
 - Em dashes, "truly", "seamless", "powerful", "blazing".
 
 Restraint is not emptiness. Every page still has one strong focal object.
+
+## Known gaps
+
+What ships today and breaks a rule above. Fix these when you touch the
+component; do not copy them.
+
+- Fence and prompt copy buttons are 32px, under the 40px hit area.
+- `InlineCode` also colors file paths (`graft.config.ts`, `src/`), and leaves
+  `npx` and `npm` commands plain.
+- Markdown tables have no `scope` on header cells, do not right-align
+  numbers, and cannot show a framework's mark. Only `FieldTable` sets
+  `scope`.
+- Bold text in prose renders at 700, the browser's default, because
+  `DocsRoot.astro` loads Plex Sans 700 and nothing sets `strong` to 600.
+- `<DocCard>` puts its icon in a bordered tile and sizes its title at
+  1.15rem.
+- `<TierBadge>` is a pill around metadata.
+- Most fences are not wrapped in a titled `<CodeBlock>`. `check:design` only
+  checks the ones that are.
 
 ## Verify before you hand off
 

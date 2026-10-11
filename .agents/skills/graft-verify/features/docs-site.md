@@ -21,8 +21,8 @@ as Markdown.
 ## Driving it with agent-browser
 
 Preconditions: built packages (`pnpm -r --filter 'docs-site^...' run build`),
-then in `examples/docs-site` run `npx astro dev --port 4321 --host 127.0.0.1 &`
-and record `ASTRO_PID=$!`. Ready when
+then in `examples/docs-site` run
+`npx astro dev --background --port 4321 --host 127.0.0.1`. Ready when
 `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4321/docs/getting-started`
 prints `200`.
 
@@ -40,15 +40,21 @@ prints `200`.
   output, not in `astro dev`. After `pnpm --filter docs-site build`, check
   that `.vercel/output/config.json` has a route with
   `"value": ".*text/markdown.*"` and `"dest": "/docs/$1.md"`.
-- **The site checks pass.** From the repo root: `pnpm check:site`,
-  `pnpm check:error-docs`, and `pnpm --filter docs-site test`.
+- **The site checks pass.** From the repo root: `pnpm --filter docs-site build`
+  first (`check:site` reads its output), then `pnpm check:site`,
+  `pnpm check:design`, `pnpm check:error-docs`, and
+  `pnpm --filter docs-site test`.
 
 ## Gotchas
 
-- `pkill -f "astro dev"` inside a shell whose own command line contains that
-  text kills the shell. Kill `$ASTRO_PID` instead.
+- Stop the server with `npx astro dev stop`. In an agent session Astro
+  detaches the server from the command that started it, so `$!` is not the
+  server's PID, and `pkill -f "astro dev"` can match and kill your own shell.
 - `astro dev --background` may report "already running" from an earlier
-  session. Check with `astro dev status`.
+  session. Check with `npx astro dev status`.
+- `agent-browser --color-scheme` applies when the browser starts. Run
+  `agent-browser close` before switching schemes, or the second screenshot
+  is in the first scheme.
 - The site compiles `examples/docs-site/content` into `.graft/index.db`, which
   is tracked. Do not commit an index change you did not mean to make.
 - A running `astro dev` keeps the index it opened at start. After

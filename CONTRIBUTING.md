@@ -120,9 +120,17 @@ RUN_INTEGRATION=1 DATABASE_URL=postgres://... pnpm test
 
 Point `DATABASE_URL` at a database you can throw away. Some suites also call
 live services when their keys are in the environment, so in a shell that has
-production credentials, run tests through
-`.agents/skills/graft-verify/scripts/offline.sh`, which removes them.
-`scripts/pg.sh` in the same folder starts a local Postgres to point it at.
+production credentials, run tests through `offline.sh`, which removes them
+and takes the throwaway database's URL with `--db`. `pg.sh` starts one
+(set `PG_BIN` to your Postgres `bin` directory if it is not under
+`/usr/lib/postgresql`):
+
+```bash
+S=.agents/skills/graft-verify/scripts
+URL=$($S/pg.sh up /tmp/graft-pg)
+$S/offline.sh --db "$URL" env RUN_INTEGRATION=1 pnpm test
+$S/pg.sh down /tmp/graft-pg
+```
 
 `RUN_INTEGRATION` is declared in `turbo.json`. A variable that is not declared
 there is deleted before the task runs rather than merely uncached, so an

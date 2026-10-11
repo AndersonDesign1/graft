@@ -35,7 +35,8 @@ Skills live in `.agents/skills/` (`.claude/skills` links to it).
 
 ## Never
 
-- Commit, push to `main` or `feat/core`, publish, or deploy unless asked.
+- Push to `main` or `feat/core`, publish, or deploy unless asked. Commits and
+  pushes to your own working branch are fine.
 - Delete or change anything on a real external service without the user's
   say-so.
 - Silence a lint rule, skip a test, or weaken a `check:*` script to get green.
@@ -48,17 +49,17 @@ When the user corrects an agent, fix the mistake and add or update a row
 (see `graft-workflow/playbooks/correct.md`). A rule enforced only by this
 file is a candidate to move up into a check.
 
-| Rule                                                                              | Enforced by                                      |
-| --------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Formatting matches the repo                                                       | `pnpm format:check`, pre-commit hook             |
-| No slop patterns in TypeScript                                                    | `pnpm lint` (anti-slop plugin)                   |
-| Registry copies stay in sync                                                      | `pnpm check:registry-drift`                      |
-| The error reference matches the code                                              | `pnpm check:error-docs`                          |
-| Every docs route builds                                                           | `pnpm check:site`                                |
-| Coverage never drops                                                              | `pnpm coverage` floors                           |
-| New dependencies are at least three days old                                      | `minimumReleaseAge` in `pnpm-workspace.yaml`     |
-| An agent can learn Graft from MCP alone                                           | `pnpm test:cold-agent`                           |
-| No mono labels, literal colors, odd font weights or `transition: all` in docs CSS | `pnpm check:design`                              |
-| No em dashes in docs prose, every `CodeBlock` has a title                         | `pnpm check:design`                              |
-| Tests never reach live Neon, S3 or GitHub by accident                             | `.agents/skills/graft-verify/scripts/offline.sh` |
-| Visual changes are rendered before they are claimed                               | This file and `graft-design` only                |
+| Rule                                                                                                   | Enforced by                                      |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| Formatting matches the repo                                                                            | `pnpm format:check`, pre-commit hook             |
+| No slop patterns in TypeScript                                                                         | `pnpm lint` (anti-slop plugin)                   |
+| Registry copies stay in sync                                                                           | `pnpm check:registry-drift`                      |
+| The error reference matches the code                                                                   | `pnpm check:error-docs`                          |
+| Every docs route builds                                                                                | `pnpm check:site`                                |
+| Coverage never drops                                                                                   | `pnpm coverage` floors                           |
+| New dependencies are at least three days old                                                           | `minimumReleaseAge` in `pnpm-workspace.yaml`     |
+| An agent can learn Graft from MCP alone                                                                | `pnpm test:cold-agent`                           |
+| No mono labels, literal colors, undefined variables, odd font weights or `transition: all` in docs CSS | `pnpm check:design`                              |
+| No em dashes in docs prose, every `CodeBlock` has a title                                              | `pnpm check:design`                              |
+| Tests never reach live Neon, S3 or GitHub by accident                                                  | `.agents/skills/graft-verify/scripts/offline.sh` |
+| Visual changes are rendered before they are claimed                                                    | This file and `graft-design` only                |

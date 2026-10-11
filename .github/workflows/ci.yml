@@ -54,7 +54,8 @@ jobs:
       # a patched vulnerability ships unpatched.
       - run: pnpm check:registry-drift
       # The parts of DESIGN.md a machine can catch: mono labels, literal colors,
-      # stray font weights, `transition: all`, em dashes in docs prose.
+      # undefined variables, stray font weights, `transition: all`, em dashes
+      # in docs prose.
       - run: pnpm check:design
       # While the repo is in beta, `latest` is an older version than the docs
       # describe. A README saying `npm i @usegraft/cli` sends a reader to a build

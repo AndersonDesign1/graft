@@ -18,11 +18,12 @@ chips, brand marks and callouts. Both are easy to get wrong.
 
 - Both themes follow the OS by default. A toggle sets `data-theme` on `html`
   and must win in both directions.
-- Write light values on `:root`, dark values in
-  `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`
-  and again in `:root[data-theme="dark"]`. Set `color-scheme` in each.
-- Do not just invert. Dark surfaces step up in lightness (0, 0.17, 0.20,
-  0.24); light surfaces step down from white.
+- `tokens.css` defines every semantic token once with
+  `light-dark(<light>, <dark>)`, and the theme switches `color-scheme`
+  (`data-theme`, `.light` or `.dark` on the root, else the OS). Write new
+  tokens the same way; never add a second dark-mode block.
+- Do not just invert. Dark surfaces step up in lightness (0, 0.17, 0.22,
+  0.27, 0.32); light surfaces step down from chalk paper.
 
 ## Contrast
 

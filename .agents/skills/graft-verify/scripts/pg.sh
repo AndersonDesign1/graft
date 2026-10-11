@@ -4,7 +4,8 @@
 #   pg.sh up <dir>     start one; writes <dir>/url
 #   pg.sh down <dir>   stop it (its data directory, named in <dir>/datadir, stays until you delete it)
 #
-# Uses the system's PostgreSQL 16 binaries on a free port from 54330. Runs as
+# Uses the newest PostgreSQL under /usr/lib/postgresql (or $PG_BIN) on a free
+# port from 54330. Runs as
 # the `postgres` user when invoked as root, because Postgres refuses root.
 set -euo pipefail
 

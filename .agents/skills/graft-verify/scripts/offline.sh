@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Run a command with every cloud credential removed from its environment, so
-# a test or a CLI call cannot reach a real database, Neon project, bucket or
-# GitHub repository by accident.
+# Run a command with the database, Neon, S3/AWS/R2 and GitHub credentials
+# removed from its environment, so a test or a CLI call cannot reach a real
+# database, Neon project, bucket or GitHub repository by accident.
 #
 #   offline.sh pnpm test
 #   offline.sh --db <url> env RUN_INTEGRATION=1 pnpm --filter @usegraft/db exec vitest run

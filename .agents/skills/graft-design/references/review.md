@@ -53,7 +53,7 @@ One table, one row per finding:
 
 | Rank | Where | Before | After | Rule |
 | --- | --- | --- | --- | --- |
-| P1 | `examples/docs-site/src/styles/fumadocs.css:80`, `:203`, `:1433` | Sidebar group labels, page eyebrow and "On this page" set in Plex Mono | Plex Sans 13px 500, `--faint-foreground`, sentence case | DESIGN.md, Type: no mono labels |
+| P1 | `fumadocs.css` (example: the selectors for the sidebar group label and "On this page") | Labels set in Plex Mono | Plex Sans 13px 500, `--faint-foreground`, sentence case | DESIGN.md, Type: no mono labels |
 
 Merge a systemic issue into one row and list every location. Say what you
 did not inspect. Do not pad the list.

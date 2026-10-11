@@ -20,11 +20,12 @@ nice" is not an answer.
 
 - Entering or exiting: `--ease-out` `cubic-bezier(0.23, 1, 0.32, 1)`.
 - Moving on screen: `--ease-in-out` `cubic-bezier(0.77, 0, 0.175, 1)`.
-- Hover color: plain `ease`.
+- Hover color, border and background: `--duration-fast` (180ms) with
+  `--ease-out`.
 - Never `ease-in` for UI: it delays the moment the user is watching.
 - UI stays under 300ms. Exits are faster than enters (150ms in, 100ms out).
 
-## Patterns Graft uses
+## Patterns
 
 ```css
 /* Press */
@@ -35,9 +36,6 @@ button:active { scale: var(--press-scale); }
 [role="menu"] { transform-origin: top right; transition: opacity 150ms var(--ease-out), scale 150ms var(--ease-out); }
 [role="menu"][hidden] { display: block; opacity: 0; scale: 0.97; visibility: hidden; transition-duration: 100ms; }
 
-/* Icon swap: both icons in the DOM, cross-fade */
-.icon { transition: opacity 200ms cubic-bezier(0.2, 0, 0, 1), scale 200ms cubic-bezier(0.2, 0, 0, 1), filter 200ms cubic-bezier(0.2, 0, 0, 1); }
-.icon[data-hidden] { opacity: 0; scale: 0.25; filter: blur(4px); }
 ```
 
 - Use CSS transitions for anything a user can interrupt. Keyframes only for a
@@ -68,8 +66,9 @@ ambient motion, motion that is the only signal of a change.
 
 ## Accessibility
 
-Wrap motion in `@media (prefers-reduced-motion: no-preference)` or neutralize
-it under `reduce`. A reduced-motion user gets the final state, instantly.
+Wrap movement (scale, translate) in
+`@media (prefers-reduced-motion: no-preference)`. Under `reduce`, the docs
+keep color fades but shorten them to 60ms, and nothing moves.
 
 ## Debugging
 

@@ -29,11 +29,11 @@ Preconditions: `REPO` and `O` from the skill's Launch step, a sandbox from `scri
 - **Compile rejects a bad field.**
   `printf -- '---\ntitle: About\ntagline: 42\n---\nHi.\n' > content/pages/about.mdx`
   then compile. Expect:
-  `Error SCHEMA_VALIDATION_FAILED: pages/about.mdx does not match collection "pages"`,
+  `error SCHEMA_VALIDATION_FAILED: pages/about.mdx does not match collection "pages"`,
   a `fix:` line naming `tagline`, a `details:` JSON line, and `exit=1`.
 - **The fix works.** Quote the value (`tagline: "42"`), compile again, expect
   `+1 added`.
-- **Content list** (Postgres sandbox): `$G content` prints
+- **Content list** (Postgres sandbox): `$O $G content` prints
   `pages/home  (Hello, Graft)  pages/home.mdx`.
 
 ## Gotchas
@@ -43,5 +43,6 @@ Preconditions: `REPO` and `O` from the skill's Launch step, a sandbox from `scri
 - Node prints `ExperimentalWarning: SQLite is an experimental feature` on
   stderr. It is not a failure.
 - Without `$O`, a command that touches the database reaches whatever the
-  environment's `DATABASE_URL` points at. A Postgres sandbox's own `.env`
-  still applies, because the CLI reads it from the project directory.
+  environment's `DATABASE_URL` points at. The CLI reads the project's `.env`
+  only for variables that are not already set, so a Postgres sandbox's
+  `.env` applies only once `$O` has removed the environment's value.

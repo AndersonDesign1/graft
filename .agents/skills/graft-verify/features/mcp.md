@@ -28,18 +28,18 @@ Preconditions: `REPO` and `O` from the skill's Launch step, a sandbox, `cd "$P"`
 
 - **Tools are listed.** `$O node $M tools/list` includes
   `get_content`, `write_content`, `delete_content`, `explain_error`.
-- **Read.** `node $M get_content '{"collection":"pages","slug":"home"}'`
+- **Read.** `$O node $M get_content '{"collection":"pages","slug":"home"}'`
   prints the document with `"title": "Hello, Graft"`.
 - **A bad write fails with a fix.**
-  `node $M write_content '{"collection":"pages","slug":"about","data":{"title":42}}'`
+  `$O node $M write_content '{"collection":"pages","slug":"about","data":{"title":42}}'`
   prints `"error": "SCHEMA_VALIDATION_FAILED"` and a `fix` naming `title`.
   `ls content/pages` shows no `about.mdx`.
 - **The corrected write lands.**
-  `node $M write_content '{"collection":"pages","slug":"about","data":{"title":"About"},"body":"Hi."}'`
+  `$O node $M write_content '{"collection":"pages","slug":"about","data":{"title":"About"},"body":"Hi."}'`
   prints `"written": "pages/about.mdx"` and `"added": ["pages/about"]`.
   `cat content/pages/about.mdx` shows the frontmatter.
 - **The gate holds** (Postgres sandbox).
-  `node $M delete_content '{"collection":"pages","slug":"home"}'` returns
+  `$O node $M delete_content '{"collection":"pages","slug":"home"}'` returns
   `DESTRUCTIVE_OP_REQUIRES_APPROVAL` with an `approvalId` and a `fix` naming
   `graft approve <id>`. `ls content/pages` still shows `home.mdx`.
 
@@ -51,7 +51,7 @@ Preconditions: `REPO` and `O` from the skill's Launch step, a sandbox, `cd "$P"`
   drive a failing call on purpose.
 - While any file in the tree is invalid, `write_content` and
   `delete_content` both fail with that file's `SCHEMA_VALIDATION_FAILED`,
-  including a delete of the invalid file itself (observed on a static
-  sandbox, 2026-10-11). Fix or remove the file on disk first.
+  including a delete of the invalid file itself. Fix or remove the file on
+  disk first.
 - Anonymous HTTP callers are refused unless the mount opts in. Stdio runs as
   the local operator.
