@@ -14,7 +14,9 @@ coverage/
 Thumbs.db
 
 # Local / not part of the Graft source (private planning — see phases.md / PRD.md)
-.claude/
+.claude/*
+# The one shared part: Claude Code reads skills here, and they live in .agents/skills.
+!.claude/skills
 .codex/
 ideas.md
 phases.md
