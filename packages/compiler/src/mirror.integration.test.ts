@@ -111,6 +111,31 @@ describe.skipIf(!runIntegration)("mirrorToGit (integration)", () => {
     expect(fake.pulls()[0]).toMatchObject({ state: "closed", merged: true });
   });
 
+  it("keeps one pull request while it waits, and records it once merged", async () => {
+    const fake = createGitHubFake();
+    const run = () =>
+      mirrorToGit({ db: handle.db, github: github(fake), branchId: BRANCH, via: "pull-request" });
+    await publish("posts/a.mdx", post("A"));
+    // Required checks still running: GitHub won't merge yet.
+    fake.failNext("PUT", "/repos/acme/site/pulls/", 405);
+    expect(await run()).toMatchObject({ status: "mirrored", merged: false, review: { number: 1 } });
+
+    // Not in git yet, so not recorded: the next run tries again, on the same
+    // pull request, with what was published since.
+    await publish("posts/b.mdx", post("B"));
+    fake.failNext("PUT", "/repos/acme/site/pulls/", 405);
+    expect(await run()).toMatchObject({
+      paths: ["posts/a.mdx", "posts/b.mdx"],
+      merged: false,
+      review: { number: 1 },
+    });
+    expect(fake.pulls()).toHaveLength(1);
+
+    expect(await run()).toMatchObject({ merged: true, review: { number: 1 } });
+    expect(fake.files()["content/posts/b.mdx"]).toBe(post("B"));
+    expect(await run()).toEqual({ status: "up-to-date" });
+  });
+
   it("commits once when two runs start together", async () => {
     const fake = createGitHubFake();
     await publish("posts/a.mdx", post("A"));

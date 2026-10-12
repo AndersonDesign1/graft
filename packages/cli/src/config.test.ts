@@ -192,6 +192,14 @@ describe("loadConfig — content", () => {
     ).toBe("CONFIG_INVALID");
   });
 
+  it("refuses a mirror interval longer than a week", async () => {
+    expect(
+      await graftErrorCodeAsync(() =>
+        loadConfig(join(fixtures, "content-mirror-forever", "graft.config.ts")),
+      ),
+    ).toBe("CONFIG_INVALID");
+  });
+
   it("refuses an unknown source rather than falling back to git", async () => {
     // Falling back would have a hosted Studio write files that nothing commits.
     expect(

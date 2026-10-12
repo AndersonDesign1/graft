@@ -113,6 +113,13 @@ function classify(
 
 /** How the checkout compares with the live content, path by path. */
 export async function syncStatus(options: SyncOptions): Promise<SyncEntry[]> {
+  return (await compare(options)).entries;
+}
+
+/** syncStatus, with the bytes each local version was hashed from. */
+async function compare(
+  options: SyncOptions,
+): Promise<{ entries: SyncEntry[]; local: Map<string, { raw: string; version: string }> }> {
   const branch = options.branchId ?? "main";
   const live = await liveVersions(options.db, branch);
   const state = readState(options.stateFile, branch);
@@ -133,7 +140,7 @@ export async function syncStatus(options: SyncOptions): Promise<SyncEntry[]> {
       live: liveVersion,
     });
   }
-  return entries;
+  return { entries, local };
 }
 
 function selected(entries: SyncEntry[], only: string[] | undefined): SyncEntry[] {
@@ -162,7 +169,8 @@ export async function pullContent(
   options: SyncOptions & { only?: string[]; force?: boolean },
 ): Promise<PullResult> {
   const branch = options.branchId ?? "main";
-  const entries = selected(await syncStatus(options), options.only);
+  const status = await compare(options);
+  const entries = selected(status.entries, options.only);
   const live = new Map(
     (await publishedFiles(options.db, branch)).map((file) => [file.path, file.raw]),
   );
@@ -220,7 +228,8 @@ export interface PushResult {
  */
 export async function pushContent(options: PushOptions): Promise<PushResult> {
   const branch = options.branchId ?? "main";
-  const entries = selected(await syncStatus(options), options.only);
+  const status = await compare(options);
+  const entries = selected(status.entries, options.only);
   const pushing = entries.filter(
     (entry) => entry.state === "ahead" || (entry.state === "conflict" && options.force),
   );
@@ -243,13 +252,21 @@ export async function pushContent(options: PushOptions): Promise<PushResult> {
     };
   }
 
-  const writing = pushing
-    .filter((entry) => entry.local !== null)
-    .map((entry) => {
-      const full = join(options.contentDir, entry.path);
-      return { sourcePath: entry.path, raw: readFileSync(full, "utf8") };
-    });
-  validateDocuments(writing, options.collections, { mdxTrust: options.mdxTrust });
+  // The bytes that were hashed, so each version is the blob SHA of what is
+  // stored even if a file is saved again mid-push.
+  const writing = pushing.flatMap((entry) => {
+    const file = status.local.get(entry.path);
+    return entry.local !== null && file ? [{ sourcePath: entry.path, raw: file.raw }] : [];
+  });
+  // Slugs are unique across documents, so check the tree as it will be after
+  // the push: what stays live, and what is pushed.
+  const pushingPaths = new Set(pushing.map((entry) => entry.path));
+  const staying = (await publishedFiles(options.db, branch))
+    .filter((file) => !pushingPaths.has(file.path))
+    .map((file) => ({ sourcePath: file.path, raw: file.raw }));
+  validateDocuments([...staying, ...writing], options.collections, {
+    mdxTrust: options.mdxTrust,
+  });
   const raws = new Map(writing.map((file) => [file.sourcePath, file.raw]));
 
   const result = await importPublished(options.db, {

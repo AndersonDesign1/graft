@@ -47,7 +47,7 @@ import type {
   WriteOptions,
 } from "../types";
 import type { GitHubAuth } from "./auth";
-import { GitHubClient, type CommitAuthor, type NewTreeEntry } from "./client";
+import { GitHubClient, type CommitAuthor, type NewTreeEntry, type PullRequest } from "./client";
 
 export interface GitHubStoreOptions {
   /** "owner/name". */
@@ -270,15 +270,28 @@ export class GitHubStore implements ContentStore {
           merged: true,
         };
       }
-      const head = `${this.prefix}/mirror/${Date.now().toString(36)}`;
-      await this.client.createRef(head, commit);
-      const title = options.message.split("\n")[0] ?? options.message;
-      const pull = await this.client.createPull({
-        title,
-        head,
-        base: this.branch,
-        body: options.message,
-      });
+      // One mirror pull request at a time: while one waits on checks or a
+      // review, each run moves it to the latest commit instead of opening
+      // another.
+      const mirrors = `${this.prefix}/mirror/`;
+      const open = (await this.client.listOpenPulls(this.branch)).find((pull) =>
+        pull.head.ref.startsWith(mirrors),
+      );
+      let pull: PullRequest;
+      if (open) {
+        await this.client.setRef(open.head.ref, commit);
+        pull = open;
+      } else {
+        const head = `${mirrors}${Date.now().toString(36)}`;
+        await this.client.createRef(head, commit);
+        const title = options.message.split("\n")[0] ?? options.message;
+        pull = await this.client.createPull({
+          title,
+          head,
+          base: this.branch,
+          body: options.message,
+        });
+      }
       const merged = await this.client.mergePull(pull.number);
       return {
         commit: { sha: commit, url: this.client.webUrl(`/commit/${commit}`) },

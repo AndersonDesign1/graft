@@ -9,7 +9,7 @@
  * - `init` writes a small workflow that runs `graft check` on content changes.
  */
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, type ProjectConfig } from "../config";
@@ -26,12 +26,37 @@ function git(cwd: string, args: string[]): string | null {
   }
 }
 
-/** The base to compare against: --base, the pull request's base branch, else the previous commit. */
-function baseRef(cwd: string, base: string | undefined): string {
-  if (base) return base;
+/** The commit a GitHub push event started from, when the event says. */
+function pushedFrom(): string | undefined {
+  if (process.env.GITHUB_EVENT_NAME !== "push" || !process.env.GITHUB_EVENT_PATH) return undefined;
+  try {
+    const event: unknown = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
+    const before =
+      event && typeof event === "object" && "before" in event ? event.before : undefined;
+    // A new branch's push starts from all zeros: there is nothing before it.
+    return typeof before === "string" && !/^0+$/.test(before) ? before : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The base to compare against: --base, the pull request's base branch, the
+ * host's previous deploy, or the commit a push started from. Else the previous
+ * commit, which is a guess: one push can hold several commits.
+ */
+function baseRef(cwd: string, base: string | undefined): { ref: string; known: boolean } {
+  if (base) return { ref: base, known: true };
   const prBase = process.env.GITHUB_BASE_REF?.trim();
-  if (prBase && git(cwd, ["rev-parse", "--verify", `origin/${prBase}`])) return `origin/${prBase}`;
-  return "HEAD~1";
+  if (prBase && git(cwd, ["rev-parse", "--verify", `origin/${prBase}`])) {
+    return { ref: `origin/${prBase}`, known: true };
+  }
+  for (const sha of [process.env.VERCEL_GIT_PREVIOUS_SHA?.trim(), pushedFrom()]) {
+    if (sha && git(cwd, ["rev-parse", "--verify", `${sha}^{commit}`])) {
+      return { ref: sha, known: true };
+    }
+  }
+  return { ref: "HEAD~1", known: false };
 }
 
 export interface ChangesResult {
@@ -41,6 +66,8 @@ export interface ChangesResult {
   contentOnly: boolean;
   /** The content directory, relative to the repository root. */
   contentPath: string;
+  /** False when the base is only the previous commit, a guess. */
+  baseKnown: boolean;
 }
 
 export async function ciChanges(options: { cwd: string; base?: string }): Promise<ChangesResult> {
@@ -50,7 +77,7 @@ export async function ciChanges(options: { cwd: string; base?: string }): Promis
 
 function changesFor(config: ProjectConfig, cwd: string, base: string | undefined): ChangesResult {
   const root = git(cwd, ["rev-parse", "--show-toplevel"]);
-  const ref = baseRef(cwd, base);
+  const { ref, known } = baseRef(cwd, base);
   if (!root) {
     throw new GraftError({
       code: "GIT_UNAVAILABLE",
@@ -67,7 +94,7 @@ function changesFor(config: ProjectConfig, cwd: string, base: string | undefined
   const files = diff === null ? [] : diff.split("\n").filter(Boolean);
   const contentOnly =
     diff !== null && files.length > 0 && files.every((file) => file.startsWith(`${contentPath}/`));
-  return { base: ref, files, contentOnly, contentPath };
+  return { base: ref, files, contentOnly, contentPath, baseKnown: known };
 }
 
 /** Print the result, and hand it to a GitHub Actions step through $GITHUB_OUTPUT. */
@@ -97,6 +124,15 @@ export async function ciSkipBuild(options: {
     return {
       skip: false,
       reason: `Build: ${changes.files.length} changed file(s), not only content.`,
+    };
+  }
+  // Skipping on a guess could leave a code change from an earlier commit in
+  // the same push undeployed.
+  if (!changes.baseKnown) {
+    return {
+      skip: false,
+      reason:
+        "Build: there is no previous deploy to compare against, only the last commit. Pass --base <the deployed commit> to skip content-only builds.",
     };
   }
   return {

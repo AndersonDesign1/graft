@@ -148,9 +148,9 @@ from [Host Studio for your team](/docs/studio-hosting)) to say where.
 
 | Setting | What it does |
 | --- | --- |
-| `mode: "batch"` | `graft serve` commits everything published since the last run, every `everyMinutes` (default 60). `graft mirror` does one run, for a scheduled job |
+| `mode: "batch"` | `graft serve` commits everything published since the last run, every `everyMinutes` (default 60, at most 10080, a week). `graft mirror` does one run, for a scheduled job |
 | `mode: "each"` | One commit after every publish |
-| `via: "pull-request"` | A pull request instead of a commit, merged straight away when the branch allows it, and left open when it needs checks or a review |
+| `via: "pull-request"` | A pull request instead of a commit, merged straight away when the branch allows it. When it needs checks or a review it stays open, and later runs add to that one pull request until it merges |
 
 A day of publishing becomes one commit or a few, not one per change. Git is a
 record here, never a second source: the content is already live, so nothing
@@ -186,9 +186,11 @@ steps:
 </CodeBlock>
 
 `graft ci skip-build` exits 0 when a deploy can be skipped: only content
-changed, and the site already serves it from the database. Use it as your
-host's command for deciding whether to build. A mirrored commit then costs no
-build at all.
+changed since the last deploy, and the site already serves it from the
+database. Use it as your host's command for deciding whether to build. A
+mirrored commit then costs no build at all. It compares with the previous
+deploy when the host says which that was, or with `--base <commit>`; with
+neither, it builds, since one push can hold a code change under a content one.
 
 ## What works differently
 

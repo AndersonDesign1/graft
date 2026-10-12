@@ -95,7 +95,12 @@ export async function mirrorToGit(options: MirrorOptions): Promise<MirrorResult>
       })),
       { message, via: options.via ?? "commit" },
     );
-    await recordMirrored(tx, branch, changed, committed.commit?.sha ?? null);
+    // A pull request still waiting on checks or a review hasn't put anything
+    // in git yet. Left unrecorded, the next run tries again, on the same
+    // pull request.
+    if (committed.merged) {
+      await recordMirrored(tx, branch, changed, committed.commit?.sha ?? null);
+    }
     return {
       status: "mirrored",
       paths: changed.map((c) => c.path),

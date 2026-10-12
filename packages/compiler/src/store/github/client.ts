@@ -224,6 +224,17 @@ export class GitHubClient {
     }
   }
 
+  /**
+   * Point a branch at any commit, forced. Only for a branch Graft owns
+   * outright, such as its mirror pull request's, never production.
+   */
+  async setRef(branch: string, sha: string): Promise<void> {
+    await this.request("PATCH", this.repoPath(`/git/refs/heads/${encodeRef(branch)}`), {
+      sha,
+      force: true,
+    });
+  }
+
   getCommit(sha: string): Promise<GitCommit> {
     return this.request("GET", this.repoPath(`/git/commits/${sha}`));
   }

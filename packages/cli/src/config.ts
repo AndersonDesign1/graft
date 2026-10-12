@@ -301,7 +301,7 @@ function parseMirror(
 ): MirrorConfig | undefined {
   if (value === undefined || value === false) return undefined;
   const fix =
-    'Use `mirror: { mode: "batch" }` (commit on a schedule or when asked) or `{ mode: "each" }` (commit after every publish), with optional `via: "pull-request"` and, for batch, `everyMinutes`. GRAFT_GITHUB_REPO and a token or app say where.';
+    'Use `mirror: { mode: "batch" }` (commit on a schedule or when asked) or `{ mode: "each" }` (commit after every publish), with optional `via: "pull-request"` and, for batch, `everyMinutes` (1 to 10080, a week). GRAFT_GITHUB_REPO and a token or app say where.';
   if (source !== "database") {
     throw new GraftError({
       code: "CONFIG_INVALID",
@@ -320,7 +320,11 @@ function parseMirror(
     throw invalidContent(configPath, "mirror", value, fix);
   }
   const every = mirror.everyMinutes;
-  if (every !== undefined && !(typeof every === "number" && every >= 1)) {
+  // At most a week: far past that, Node's timer overflows and fires at once.
+  if (
+    every !== undefined &&
+    !(typeof every === "number" && Number.isFinite(every) && every >= 1 && every <= 10_080)
+  ) {
     throw invalidContent(configPath, "mirror", value, fix);
   }
   return {

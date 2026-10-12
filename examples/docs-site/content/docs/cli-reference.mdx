@@ -118,7 +118,7 @@ for the route.
 | `--json` | compile | Print the branch, commit, and change list as JSON on stdout. See [Print what a compile changed](#print-what-a-compile-changed). |
 | `--dry-run` | add, content import, push | Preview what would change without writing it |
 | `--force` | pull, push | Settle conflicts: pull takes the published version, push publishes yours |
-| `--base <ref>` | ci changes, ci skip-build | The ref to compare against. Default: the pull request's base branch, else the previous commit |
+| `--base <ref>` | ci changes, ci skip-build | The ref to compare against. Default: the pull request's base branch, the host's previous deploy where the host names it, or the commit a push started from, else the previous commit. `skip-build` never skips on the previous commit alone |
 | `--overwrite` | add, asset put | Replace files that differ (add), or the file already stored under the key (asset put) |
 | `--port` / `--host` | serve, studio | Where to listen. Defaults to this machine only. |
 | `--studio` | serve | Include Studio. `GRAFT_STUDIO=1` does the same. |

@@ -146,6 +146,21 @@ describe.skipIf(!runIntegration)("pull and push (integration)", () => {
     expect(await live()).toEqual([]);
   });
 
+  it("refuses to push a file claiming a slug a live document holds", async () => {
+    await publish("posts/home.mdx", post("Home"));
+    await pullContent(opts());
+    writeFileSync(file("posts/new.mdx"), "---\ntitle: New\nslug: home\n---\n");
+    await expect(pushContent({ ...opts(), collections, actor: jo })).rejects.toMatchObject({
+      code: "SLUG_NOT_UNIQUE",
+    });
+    // Refused before anything was published, not found out after.
+    const states = (await syncStatus(opts())).map((e) => [e.path, e.state, e.live === null]);
+    expect(states).toEqual([
+      ["posts/home.mdx", "in-sync", false],
+      ["posts/new.mdx", "ahead", true],
+    ]);
+  });
+
   it("pulls only what --only names", async () => {
     await publish("posts/a.mdx", post("A"));
     await publish("posts/b.mdx", post("B"));

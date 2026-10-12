@@ -18,11 +18,14 @@ Moving content between the database, your files and git.
 - `content.mirror` copies what is published into GitHub: in batches from
   `graft serve` (`mode: "batch"`, every `everyMinutes`), or after every publish
   (`mode: "each"`). `graft mirror` does one run. A batch is one commit, or one
-  pull request merged straight away when the branch allows it.
+  pull request merged straight away when the branch allows it. A pull request
+  that waits on checks or a review stays the only one: later runs add to it
+  until it merges.
 - `graft check` runs every check a publish makes on the files, with no
   database, and now also finds references to documents that don't exist.
 - `graft ci changes`, `graft ci skip-build` and `graft ci init` keep CI cheap
-  on content-only changes.
+  on content-only changes. `skip-build` compares with the previous deploy, and
+  builds when it can't tell which that was.
 
 For git-sourced projects hosted on GitHub, some publishes now open a pull
 request even for an editor: deletions and renames, and changes over 200 lines.
