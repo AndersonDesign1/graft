@@ -56,7 +56,7 @@ export function runtimeRoleGrantsSql(role: string): string[] {
     `GRANT USAGE ON SCHEMA public TO ${role}`,
     // Reads: every Graft table is readable (content, scope resolution, rate
     // counting, approval diagnostics, ledgers).
-    `GRANT SELECT ON TABLE content_index, compilations, data_records, audit_log, approvals, migrations_applied, branches, content_revisions, content_heads, content_reviews TO ${role}`,
+    `GRANT SELECT ON TABLE content_index, compilations, data_records, audit_log, approvals, migrations_applied, branches, content_revisions, content_heads, content_reviews, content_mirror TO ${role}`,
     // Operational data is the runtime's to mutate (typed functions).
     `GRANT INSERT, UPDATE, DELETE ON TABLE data_records TO ${role}`,
     // Content projection. `write_content` writes the MDX file and then
@@ -91,6 +91,8 @@ export function runtimeRoleGrantsSql(role: string): string[] {
     `GRANT INSERT, UPDATE ON TABLE content_revisions TO ${role}`,
     `GRANT INSERT, UPDATE, DELETE ON TABLE content_heads TO ${role}`,
     `GRANT INSERT, UPDATE ON TABLE content_reviews TO ${role}`,
+    // Mirroring to git records what it committed; the commit itself is GitHub's.
+    `GRANT INSERT, UPDATE ON TABLE content_mirror TO ${role}`,
     // Every invocation audits itself. The row is reserved before the call runs
     // (that is what makes rate limiting immune to concurrency), then settled
     // with its outcome — so the runtime needs UPDATE as well as INSERT.

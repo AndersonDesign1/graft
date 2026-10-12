@@ -14,7 +14,11 @@ import {
   discardDrafts,
   draftHeads,
   importPublished,
+  mirroredVersions,
   openReviews,
+  publishedSince,
+  recordMirrored,
+  withMirrorLock,
   publishDrafts,
   publishedFiles,
   readHead,
@@ -250,6 +254,7 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
     ];
     const actor = { id: "jo", name: "Jo", kind: "human" as const };
     expect(await importPublished(handle.db, { branchId: BRANCH, files, actor })).toEqual({
+      ok: true,
       imported: ["posts/a.mdx", "posts/b.mdx"],
       unchanged: [],
       kept: [],
@@ -259,6 +264,7 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
       "posts/b.mdx",
     ]);
     expect(await importPublished(handle.db, { branchId: BRANCH, files, actor })).toEqual({
+      ok: true,
       imported: [],
       unchanged: ["posts/a.mdx", "posts/b.mdx"],
       kept: [],
@@ -276,11 +282,72 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
     expect(
       await importPublished(handle.db, { branchId: BRANCH, files: [file("Old file")], actor }),
     ).toEqual({
+      ok: true,
       imported: [],
       unchanged: [],
       kept: ["posts/a.mdx"],
     });
     expect((await readHead(handle.db, BRANCH, "posts/a.mdx"))?.published?.raw).toBe(doc("Live"));
+  });
+
+  it("refuses a push based on a version someone else replaced, writing nothing", async () => {
+    const actor = { id: "jo" };
+    const v1 = { path: "posts/a.mdx", raw: doc("V1"), version: sha(doc("V1")) };
+    await importPublished(handle.db, { branchId: BRANCH, files: [v1], actor });
+    // Ana publishes over it in Studio.
+    await importPublished(handle.db, {
+      branchId: BRANCH,
+      files: [
+        { path: "posts/a.mdx", raw: doc("Ana"), version: sha(doc("Ana")), expected: v1.version },
+      ],
+      actor: ana,
+    });
+    const result = await importPublished(handle.db, {
+      branchId: BRANCH,
+      files: [
+        { path: "posts/a.mdx", raw: doc("Jo"), version: sha(doc("Jo")), expected: v1.version },
+        { path: "posts/b.mdx", raw: doc("B"), version: sha(doc("B")), expected: null },
+      ],
+      actor,
+    });
+    expect(result).toEqual({
+      ok: false,
+      stale: [{ path: "posts/a.mdx", expected: v1.version, current: sha(doc("Ana")) }],
+    });
+    expect((await publishedFiles(handle.db, BRANCH)).map((f) => f.raw)).toEqual([doc("Ana")]);
+  });
+
+  it("publishes a pushed deletion, and lists what was published since a moment", async () => {
+    const before = new Date(Date.now() - 1000);
+    const a = { path: "posts/a.mdx", raw: doc("A"), version: sha(doc("A")) };
+    await importPublished(handle.db, { branchId: BRANCH, files: [a], actor: ana });
+    await importPublished(handle.db, {
+      branchId: BRANCH,
+      files: [{ path: "posts/a.mdx", raw: null, version: null, expected: a.version }],
+      actor: ana,
+    });
+    expect(await publishedFiles(handle.db, BRANCH)).toEqual([]);
+    const since = await publishedSince(handle.db, BRANCH, before);
+    expect(since.map((c) => [c.path, c.version, c.publishedBy])).toEqual([
+      ["posts/a.mdx", a.version, "Ana"],
+      ["posts/a.mdx", null, "Ana"],
+    ]);
+  });
+
+  it("lets one mirror run at a time per branch", async () => {
+    const results = await Promise.all([
+      withMirrorLock(handle.db, BRANCH, async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        return "first";
+      }),
+      new Promise((resolve) => setTimeout(resolve, 50)).then(() =>
+        withMirrorLock(handle.db, BRANCH, async () => "second"),
+      ),
+    ]);
+    expect(results).toEqual(["first", undefined]);
+    await recordMirrored(handle.db, BRANCH, [{ path: "posts/a.mdx", version: "abc" }], "c0ffee");
+    expect(await mirroredVersions(handle.db, BRANCH)).toEqual(new Map([["posts/a.mdx", "abc"]]));
+    await handle.sql`delete from content_mirror where branch_id = ${BRANCH}`;
   });
 
   it("keeps a draft on top of an imported revision", async () => {

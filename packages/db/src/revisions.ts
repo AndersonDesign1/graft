@@ -14,7 +14,7 @@
  * on hashing.
  */
 import { GraftError, type ChangeSet } from "@usegraft/contracts";
-import { and, asc, eq, inArray, isNotNull, isNull, like, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, isNull, like, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Database } from "./client";
 import type { ContentInput } from "./diff";
@@ -22,6 +22,7 @@ import {
   compilations,
   contentHeads,
   contentIndex,
+  contentMirror,
   contentReviews,
   contentRevisions,
 } from "./schema";
@@ -669,29 +670,52 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
+export interface ImportFile {
+  path: string;
+  /** Null makes the live revision a deletion. */
+  raw: string | null;
+  version: string | null;
+  /**
+   * The live version the caller's copy was based on (`graft push` reads it
+   * from the last pull). When set, a path whose live version moved since is
+   * refused and nothing is written. Omitted (an import): a path already
+   * published keeps what it has.
+   */
+  expected?: string | null;
+}
+
 export interface ImportInput {
   branchId: string;
-  files: Array<{ path: string; raw: string; version: string }>;
+  files: ImportFile[];
   actor: RevisionActor;
   message?: string;
 }
 
-export interface ImportResult {
-  /** Paths whose live revision is now the file's bytes. */
-  imported: string[];
-  /** Paths whose live revision already held exactly these bytes. */
-  unchanged: string[];
-  /** Paths already published with other bytes (or deleted), left as they are. */
-  kept: string[];
-}
+export type ImportResult =
+  | {
+      ok: true;
+      /** Paths whose live revision is now the file's bytes (or a deletion). */
+      imported: string[];
+      /** Paths whose live revision already held exactly these bytes. */
+      unchanged: string[];
+      /** Paths an import found already published with other bytes, left as they are. */
+      kept: string[];
+    }
+  | {
+      ok: false;
+      /** Paths published by someone else since the caller's copy was taken. */
+      stale: Array<{ path: string; expected: string | null; current: string | null }>;
+    };
 
 /**
- * Bring files in as the live revisions of paths that have none: how a
- * project switching to the database source loads its files. Additive and
- * safe to re-run: a path already published, or published as deleted, keeps
- * what it has, and a path with no file is left alone. A draft on a path
- * stays on top of the new live revision, so nobody's unpublished work is
- * lost. The caller validates the files and recompiles the index afterwards.
+ * Make files live revisions: how a project switching to the database
+ * source loads its files (an import), and what `graft push` lands.
+ * An import only brings in paths with nothing published, so it is safe to
+ * re-run; a push names the version each file was based on and overwrites
+ * only when nobody published since. A path with no file is left alone, and
+ * a draft on a path stays on top of the new live revision, so nobody's
+ * unpublished work is lost. The caller validates the files and recompiles
+ * the index afterwards.
  */
 export async function importPublished(db: Database, input: ImportInput): Promise<ImportResult> {
   return db.transaction(async (tx) => {
@@ -699,13 +723,30 @@ export async function importPublished(db: Database, input: ImportInput): Promise
     const imported: string[] = [];
     const unchanged: string[] = [];
     const kept: string[] = [];
+    const heads = new Map<string, HeadState>();
+    const stale: Array<{ path: string; expected: string | null; current: string | null }> = [];
     for (const file of input.files) {
       const head = await lockHead(tx, input.branchId, file.path);
+      heads.set(file.path, head);
+      const current = publishedVersion(head);
+      if (file.expected !== undefined && file.expected !== current && file.version !== current) {
+        stale.push({ path: file.path, expected: file.expected, current });
+      }
+    }
+    // Checked for every file before any is written, as a publish is.
+    if (stale.length > 0) {
+      for (const file of input.files) await dropHeadIfEmpty(tx, input.branchId, file.path);
+      return { ok: false, stale } as const;
+    }
+    for (const file of input.files) {
+      const head = heads.get(file.path) as HeadState;
       if (publishedVersion(head) === file.version) {
         unchanged.push(file.path);
+        await dropHeadIfEmpty(tx, input.branchId, file.path);
         continue;
       }
-      if (head.published) {
+      // An import (no base version) never overwrites what is published.
+      if (file.expected === undefined && head.published) {
         kept.push(file.path);
         continue;
       }
@@ -716,7 +757,7 @@ export async function importPublished(db: Database, input: ImportInput): Promise
           path: file.path,
           raw: file.raw,
           version: file.version,
-          parentId: null,
+          parentId: head.published?.id ?? null,
           actorKind: input.actor.kind ?? "human",
           actorId: input.actor.id,
           actorName: input.actor.name ?? null,
@@ -739,6 +780,119 @@ export async function importPublished(db: Database, input: ImportInput): Promise
         .where(and(eq(contentHeads.branchId, input.branchId), eq(contentHeads.path, file.path)));
       imported.push(file.path);
     }
-    return { imported, unchanged, kept };
+    return { ok: true, imported, unchanged, kept } as const;
+  });
+}
+
+/** One publish, for telling a developer what changed since they last looked. */
+export interface PublishedChange {
+  /** The revision, so a caller polling by time can tell one it has seen. */
+  id: string;
+  path: string;
+  /** Null: the publish deleted the document. */
+  version: string | null;
+  publishedAt: Date;
+  publishedBy: string | null;
+  message: string | null;
+}
+
+/**
+ * Revisions published at or after `since`, oldest first: what `graft dev`
+ * announces. At or after, because a JavaScript Date holds milliseconds and
+ * Postgres microseconds: a poller passes the last time it saw and drops the
+ * ids it already announced.
+ */
+export async function publishedSince(
+  db: Reader,
+  branchId: string,
+  since: Date,
+): Promise<PublishedChange[]> {
+  const rows = await db
+    .select({
+      id: contentRevisions.id,
+      path: contentRevisions.path,
+      version: contentRevisions.version,
+      publishedAt: contentRevisions.publishedAt,
+      publishedBy: contentRevisions.publishedByName,
+      publishedById: contentRevisions.publishedById,
+      message: contentRevisions.message,
+    })
+    .from(contentRevisions)
+    .where(and(eq(contentRevisions.branchId, branchId), gte(contentRevisions.publishedAt, since)))
+    .orderBy(asc(contentRevisions.publishedAt));
+  return rows.map((row) => ({
+    id: row.id,
+    path: row.path,
+    version: row.version,
+    publishedAt: row.publishedAt as Date,
+    publishedBy: row.publishedBy ?? row.publishedById,
+    message: row.message,
+  }));
+}
+
+/** Every path's live version, deletions included as null: what a mirror compares against. */
+export async function liveVersions(
+  db: Reader,
+  branchId: string,
+): Promise<Map<string, string | null>> {
+  const rows = await db
+    .select({ path: contentHeads.path, version: published.version })
+    .from(contentHeads)
+    .innerJoin(published, eq(published.id, contentHeads.publishedId))
+    .where(eq(contentHeads.branchId, branchId));
+  return new Map(rows.map((row) => [row.path, row.version]));
+}
+
+/* ---- mirroring to git -------------------------------------------------- */
+
+/** The version the mirror last committed for each path. */
+export async function mirroredVersions(
+  db: Reader,
+  branchId: string,
+): Promise<Map<string, string | null>> {
+  const rows = await db
+    .select({ path: contentMirror.path, version: contentMirror.version })
+    .from(contentMirror)
+    .where(eq(contentMirror.branchId, branchId));
+  return new Map(rows.map((row) => [row.path, row.version]));
+}
+
+/** Record what a mirror run committed. */
+export async function recordMirrored(
+  db: Reader,
+  branchId: string,
+  entries: Array<{ path: string; version: string | null }>,
+  commitSha: string | null,
+): Promise<void> {
+  if (entries.length === 0) return;
+  await db
+    .insert(contentMirror)
+    .values(entries.map((entry) => ({ branchId, ...entry, commitSha })))
+    .onConflictDoUpdate({
+      target: [contentMirror.branchId, contentMirror.path],
+      set: {
+        version: sql`excluded.version`,
+        commitSha: sql`excluded.commit_sha`,
+        mirroredAt: sql`now()`,
+      },
+    });
+}
+
+/**
+ * Run `fn` while holding this branch's mirror lock, or return `undefined`
+ * straight away when another process holds it. Two servers mirroring the
+ * same publishes at once would race to commit them twice.
+ */
+export async function withMirrorLock<T>(
+  db: Database,
+  branchId: string,
+  fn: (tx: Tx) => Promise<T>,
+): Promise<T | undefined> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.execute<{ locked: boolean }>(
+      sql`select pg_try_advisory_xact_lock(hashtext(${`graft-mirror:${branchId}`})) as locked`,
+    );
+    if (!row?.locked) return undefined;
+    return fn(tx);
   });
 }
