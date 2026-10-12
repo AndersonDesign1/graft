@@ -10,7 +10,12 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { GraftError, STATIC_INDEX_DEFAULT_PATH } from "@usegraft/contracts";
 import type { AnyCollection, AnyGraftFunction } from "@usegraft/core";
-import type { ContentSource } from "@usegraft/compiler";
+import {
+  DEFAULT_REVIEW_RULE,
+  type ContentSource,
+  type MirrorConfig,
+  type ReviewRule,
+} from "@usegraft/compiler";
 import type { MdxTrust } from "@usegraft/mdx-safety";
 import { createJiti } from "jiti";
 
@@ -68,6 +73,14 @@ export interface ProjectConfig {
 
 export interface ContentConfig {
   source: ContentSource;
+  /**
+   * Git-sourced projects hosted on GitHub: which publishes go through a pull
+   * request even for an editor. On by default (deletions, and changes over
+   * 200 lines); `false` turns it off.
+   */
+  review: ReviewRule | false;
+  /** Database-sourced projects: copy what is published into git. Off when absent. */
+  mirror?: MirrorConfig;
 }
 
 /** Who must approve mutations. See ProjectConfig.approvalPolicy. */
@@ -212,11 +225,12 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
  * writing files on a host where nothing commits them.
  */
 function parseContentConfig(value: unknown, index: IndexConfig, configPath: string): ContentConfig {
-  if (value === undefined) return { source: "git" };
-  const source =
+  if (value === undefined) return { source: "git", review: { ...DEFAULT_REVIEW_RULE } };
+  const record =
     typeof value === "object" && value !== null && !Array.isArray(value)
-      ? (value as { source?: unknown }).source
+      ? (value as Record<string, unknown>)
       : undefined;
+  const source = record?.source;
   if (source !== "git" && source !== "database") {
     throw new GraftError({
       code: "CONFIG_INVALID",
@@ -233,7 +247,91 @@ function parseContentConfig(value: unknown, index: IndexConfig, configPath: stri
       details: { content: value, index: index.driver },
     });
   }
-  return { source };
+  const review = parseReviewRule(record?.review, configPath);
+  const mirror = parseMirror(record?.mirror, source, configPath);
+  return { source, review, ...(mirror ? { mirror } : {}) };
+}
+
+function invalidContent(
+  configPath: string,
+  setting: string,
+  value: unknown,
+  fix: string,
+): GraftError {
+  return new GraftError({
+    code: "CONFIG_INVALID",
+    message: `${configPath} exports an invalid \`content.${setting}\` setting.`,
+    fix,
+    details: { [setting]: value },
+  });
+}
+
+function parseReviewRule(value: unknown, configPath: string): ReviewRule | false {
+  if (value === undefined) return { ...DEFAULT_REVIEW_RULE };
+  if (value === false) return false;
+  const fix =
+    "Use `review: { deletes?: boolean, collections?: string[], overLines?: number }`, or `review: false` to publish everything directly. Omit it for the default: deletions and changes over 200 lines open a pull request.";
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw invalidContent(configPath, "review", value, fix);
+  }
+  const rule = value as Record<string, unknown>;
+  const deletes = rule.deletes;
+  const collections = rule.collections;
+  const overLines = rule.overLines;
+  if (
+    (deletes !== undefined && typeof deletes !== "boolean") ||
+    (collections !== undefined &&
+      !(Array.isArray(collections) && collections.every((c) => typeof c === "string"))) ||
+    (overLines !== undefined &&
+      !(typeof overLines === "number" && Number.isInteger(overLines) && overLines >= 0))
+  ) {
+    throw invalidContent(configPath, "review", value, fix);
+  }
+  return {
+    deletes: deletes ?? DEFAULT_REVIEW_RULE.deletes,
+    overLines: overLines ?? DEFAULT_REVIEW_RULE.overLines,
+    ...(collections ? { collections: collections as string[] } : {}),
+  };
+}
+
+function parseMirror(
+  value: unknown,
+  source: ContentSource,
+  configPath: string,
+): MirrorConfig | undefined {
+  if (value === undefined || value === false) return undefined;
+  const fix =
+    'Use `mirror: { mode: "batch" }` (commit on a schedule or when asked) or `{ mode: "each" }` (commit after every publish), with optional `via: "pull-request"` and, for batch, `everyMinutes` (1 to 10080, a week). GRAFT_GITHUB_REPO and a token or app say where.';
+  if (source !== "database") {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message: `${configPath} mirrors content to git, but its content is already in git.`,
+      fix: 'Remove `mirror`, or set `source: "database"` to keep content in the database and copy it into git.',
+      details: { mirror: value },
+    });
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw invalidContent(configPath, "mirror", value, fix);
+  }
+  const mirror = value as Record<string, unknown>;
+  if (mirror.mode !== "batch" && mirror.mode !== "each")
+    throw invalidContent(configPath, "mirror", value, fix);
+  if (mirror.via !== undefined && mirror.via !== "commit" && mirror.via !== "pull-request") {
+    throw invalidContent(configPath, "mirror", value, fix);
+  }
+  const every = mirror.everyMinutes;
+  // At most a week: far past that, Node's timer overflows and fires at once.
+  if (
+    every !== undefined &&
+    !(typeof every === "number" && Number.isFinite(every) && every >= 1 && every <= 10_080)
+  ) {
+    throw invalidContent(configPath, "mirror", value, fix);
+  }
+  return {
+    mode: mirror.mode,
+    ...(mirror.via ? { via: mirror.via as "commit" | "pull-request" } : {}),
+    ...(every !== undefined ? { everyMinutes: every as number } : {}),
+  };
 }
 
 /**

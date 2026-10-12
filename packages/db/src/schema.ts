@@ -368,3 +368,23 @@ export const contentReviews = pgTable(
 
 export type ContentReviewRow = typeof contentReviews.$inferSelect;
 export type ContentReviewStatus = "open" | "published" | "closed";
+
+/**
+ * What a database-sourced project has copied to git, per path: the version
+ * the mirror last committed. The next run commits only paths whose live
+ * version differs, so a batch of a day's publishes becomes one commit.
+ */
+export const contentMirror = pgTable(
+  "content_mirror",
+  {
+    branchId: text("branch_id").notNull().default("main"),
+    path: text("path").notNull(),
+    /** Null: the mirror committed this path's deletion. */
+    version: text("version"),
+    commitSha: text("commit_sha"),
+    mirroredAt: timestamp("mirrored_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.branchId, t.path] })],
+);
+
+export type ContentMirrorRow = typeof contentMirror.$inferSelect;

@@ -81,6 +81,13 @@ for the route.
 | `graft migrate [--apply]` | Run your own [migrations](/docs/migrations). Lists them only, until `--apply`. |
 | `graft harden <role>` | Give an existing database role the limited rights a deployed app needs. See [Hardening](/docs/hardening). |
 | `graft content` | List documents in the compiled index |
+| `graft pull [doc...]` | Write what is published into your files, in a database-sourced project. Keeps files you changed. `--force` takes the published version over a conflict. |
+| `graft push [doc...]` | Publish the files you changed since your last pull, checked as a compile would. Refused if someone published them since. `--dry-run`, `--force`. |
+| `graft mirror` | Commit what was published since the last run to the repository in `GRAFT_GITHUB_REPO` |
+| `graft check` | Check every content file: schema, slugs, MDX safety, references. Needs no database. Exits 1 on a problem. |
+| `graft ci changes` | Print `content-only=true` when only content changed, and write it to `$GITHUB_OUTPUT`. `--base <ref>` |
+| `graft ci skip-build` | Exit 0 when a deploy can be skipped: only content changed and it is already live from the database |
+| `graft ci init` | Write a workflow that runs `graft check` on content changes |
 | `graft content import [--dry-run]` | Load the files under `contentDir` into the database, for a project with `content = { source: "database" }`. Every file is checked first. Only documents with nothing published come in: a published document is never overwritten, and a deleted file deletes nothing. Safe to run again. |
 | `graft compilations` | List recent compiles and what each one changed |
 
@@ -109,7 +116,9 @@ for the route.
 | `--apply` | migrate, merge | Make the change. Without it, these only report. |
 | `--prune-unknown` | compile | Remove index entries for collections the schema no longer has. Use after renaming or deleting a collection. |
 | `--json` | compile | Print the branch, commit, and change list as JSON on stdout. See [Print what a compile changed](#print-what-a-compile-changed). |
-| `--dry-run` | add, content import | Preview what would change without writing it |
+| `--dry-run` | add, content import, push | Preview what would change without writing it |
+| `--force` | pull, push | Settle conflicts: pull takes the published version, push publishes yours |
+| `--base <ref>` | ci changes, ci skip-build | The ref to compare against. Default: the pull request's base branch, the host's previous deploy where the host names it, or the commit a push started from, else the previous commit. `skip-build` never skips on the previous commit alone |
 | `--overwrite` | add, asset put | Replace files that differ (add), or the file already stored under the key (asset put) |
 | `--port` / `--host` | serve, studio | Where to listen. Defaults to this machine only. |
 | `--studio` | serve | Include Studio. `GRAFT_STUDIO=1` does the same. |

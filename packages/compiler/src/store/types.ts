@@ -87,6 +87,11 @@ export interface PublishResult {
   tookTheirs: string[];
   /** The pull request, in review mode. */
   review?: ReviewRequest;
+  /**
+   * Why a direct publish went to review instead: the project's rule for
+   * deletions, some collections or large changes. Absent when it didn't.
+   */
+  reviewReasons?: string[];
 }
 
 /**

@@ -84,6 +84,12 @@ Then, either way:
 If the production branch is protected against direct pushes, use
 `pull-request`.
 
+Even with `commit`, some publishes open a pull request: deletions and renames,
+and changes over 200 lines, so the riskiest changes get a second pair of eyes.
+Studio says why. Change the rule with `content.review` in `graft.config.ts`,
+including `collections` that are always reviewed, or turn it off with
+`review: false`. See [Configuration](/docs/configuration#content).
+
 ## 2. Let people sign in
 
 Set `GRAFT_STUDIO_SECRET` to at least 32 random characters

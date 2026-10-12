@@ -78,6 +78,13 @@
       "when": 1791787369633,
       "tag": "0010_content_revisions",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791788864890,
+      "tag": "0011_content_mirror",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createDb, type DbHandle } from "./client";
+import { projectPublishedContent } from "./content";
 import { runMigrations } from "./migrate";
 import {
   createReview,
@@ -14,7 +15,11 @@ import {
   discardDrafts,
   draftHeads,
   importPublished,
+  mirroredVersions,
   openReviews,
+  publishedSince,
+  recordMirrored,
+  withMirrorLock,
   publishDrafts,
   publishedFiles,
   readHead,
@@ -154,6 +159,53 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
     expect({ ...compiled }).toEqual({ git_sha: null, doc_count: 1, added: 1 });
   });
 
+  it("refuses a draft claiming a slug another live document holds, and publishes nothing", async () => {
+    await save("posts/home.mdx", doc("Home"));
+    await publishDrafts(handle.db, {
+      branchId: BRANCH,
+      drafts: [{ path: "posts/home.mdx", version: sha(doc("Home")) }],
+      actor: ana,
+      index: { upserts: [row("home", doc("Home"))], removals: [] },
+    });
+    await save("posts/other.mdx", doc("Other"));
+    await expect(
+      publishDrafts(handle.db, {
+        branchId: BRANCH,
+        drafts: [{ path: "posts/other.mdx", version: sha(doc("Other")) }],
+        actor: ana,
+        index: {
+          upserts: [{ ...row("home", doc("Other")), sourcePath: "posts/other.mdx" }],
+          removals: [],
+        },
+      }),
+    ).rejects.toMatchObject({ code: "SLUG_NOT_UNIQUE" });
+    expect((await draftHeads(handle.db, BRANCH)).map((h) => h.path)).toEqual(["posts/other.mdx"]);
+  });
+
+  it("projects the published revisions into the index under the content lock", async () => {
+    const actor = { id: "jo" };
+    await importPublished(handle.db, {
+      branchId: BRANCH,
+      files: ["a", "b"].map((slug) => ({
+        path: `posts/${slug}.mdx`,
+        raw: doc(slug),
+        version: sha(doc(slug)),
+      })),
+      actor,
+    });
+    const changes = await projectPublishedContent(
+      handle.db,
+      (files) => files.map((file) => row(file.path.slice(6, -4), file.raw)),
+      { branchId: BRANCH },
+    );
+    expect(changes).toEqual({
+      added: ["posts/a", "posts/b"],
+      changed: [],
+      removed: [],
+      unchanged: 0,
+    });
+  });
+
   it("publishes nothing when one of the drafts changed since it was checked", async () => {
     await save("posts/a.mdx", doc("A"));
     await save("posts/b.mdx", doc("B"));
@@ -250,6 +302,7 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
     ];
     const actor = { id: "jo", name: "Jo", kind: "human" as const };
     expect(await importPublished(handle.db, { branchId: BRANCH, files, actor })).toEqual({
+      ok: true,
       imported: ["posts/a.mdx", "posts/b.mdx"],
       unchanged: [],
       kept: [],
@@ -259,6 +312,7 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
       "posts/b.mdx",
     ]);
     expect(await importPublished(handle.db, { branchId: BRANCH, files, actor })).toEqual({
+      ok: true,
       imported: [],
       unchanged: ["posts/a.mdx", "posts/b.mdx"],
       kept: [],
@@ -276,11 +330,91 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
     expect(
       await importPublished(handle.db, { branchId: BRANCH, files: [file("Old file")], actor }),
     ).toEqual({
+      ok: true,
       imported: [],
       unchanged: [],
       kept: ["posts/a.mdx"],
     });
     expect((await readHead(handle.db, BRANCH, "posts/a.mdx"))?.published?.raw).toBe(doc("Live"));
+  });
+
+  it("refuses a push based on a version someone else replaced, writing nothing", async () => {
+    const actor = { id: "jo" };
+    const v1 = { path: "posts/a.mdx", raw: doc("V1"), version: sha(doc("V1")) };
+    await importPublished(handle.db, { branchId: BRANCH, files: [v1], actor });
+    // Ana publishes over it in Studio.
+    await importPublished(handle.db, {
+      branchId: BRANCH,
+      files: [
+        { path: "posts/a.mdx", raw: doc("Ana"), version: sha(doc("Ana")), expected: v1.version },
+      ],
+      actor: ana,
+    });
+    const result = await importPublished(handle.db, {
+      branchId: BRANCH,
+      files: [
+        { path: "posts/a.mdx", raw: doc("Jo"), version: sha(doc("Jo")), expected: v1.version },
+        { path: "posts/b.mdx", raw: doc("B"), version: sha(doc("B")), expected: null },
+      ],
+      actor,
+    });
+    expect(result).toEqual({
+      ok: false,
+      stale: [{ path: "posts/a.mdx", expected: v1.version, current: sha(doc("Ana")) }],
+    });
+    expect((await publishedFiles(handle.db, BRANCH)).map((f) => f.raw)).toEqual([doc("Ana")]);
+  });
+
+  it("overwrites what is published when a push is forced", async () => {
+    const actor = { id: "jo" };
+    const file = (title: string) => ({
+      path: "posts/a.mdx",
+      raw: doc(title),
+      version: sha(doc(title)),
+    });
+    await importPublished(handle.db, { branchId: BRANCH, files: [file("Live")], actor });
+    expect(
+      await importPublished(handle.db, {
+        branchId: BRANCH,
+        files: [file("Mine")],
+        actor,
+        replace: true,
+      }),
+    ).toMatchObject({ ok: true, imported: ["posts/a.mdx"], kept: [] });
+    expect((await readHead(handle.db, BRANCH, "posts/a.mdx"))?.published?.raw).toBe(doc("Mine"));
+  });
+
+  it("publishes a pushed deletion, and lists what was published since a moment", async () => {
+    const before = new Date(Date.now() - 1000);
+    const a = { path: "posts/a.mdx", raw: doc("A"), version: sha(doc("A")) };
+    await importPublished(handle.db, { branchId: BRANCH, files: [a], actor: ana });
+    await importPublished(handle.db, {
+      branchId: BRANCH,
+      files: [{ path: "posts/a.mdx", raw: null, version: null, expected: a.version }],
+      actor: ana,
+    });
+    expect(await publishedFiles(handle.db, BRANCH)).toEqual([]);
+    const since = await publishedSince(handle.db, BRANCH, before);
+    expect(since.map((c) => [c.path, c.version, c.publishedBy])).toEqual([
+      ["posts/a.mdx", a.version, "Ana"],
+      ["posts/a.mdx", null, "Ana"],
+    ]);
+  });
+
+  it("lets one mirror run at a time per branch", async () => {
+    const results = await Promise.all([
+      withMirrorLock(handle.db, BRANCH, async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        return "first";
+      }),
+      new Promise((resolve) => setTimeout(resolve, 50)).then(() =>
+        withMirrorLock(handle.db, BRANCH, async () => "second"),
+      ),
+    ]);
+    expect(results).toEqual(["first", undefined]);
+    await recordMirrored(handle.db, BRANCH, [{ path: "posts/a.mdx", version: "abc" }], "c0ffee");
+    expect(await mirroredVersions(handle.db, BRANCH)).toEqual(new Map([["posts/a.mdx", "abc"]]));
+    await handle.sql`delete from content_mirror where branch_id = ${BRANCH}`;
   });
 
   it("keeps a draft on top of an imported revision", async () => {

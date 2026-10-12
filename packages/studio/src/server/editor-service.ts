@@ -502,7 +502,9 @@ export class EditorService {
     });
     const refresh = result.changes ? await this.liveChanged(result.changes) : undefined;
     return {
-      action,
+      // The project's review rule can turn a direct publish into a review.
+      action: result.mode === "review" && action === "publish" ? "review" : action,
+      ...(result.reviewReasons ? { reviewReasons: result.reviewReasons } : {}),
       ...(result.changes ? { live: true } : {}),
       ...(refresh ? { refresh } : {}),
       published: result.published,

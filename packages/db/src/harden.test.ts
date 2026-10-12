@@ -25,7 +25,7 @@ describe("runtimeRoleGrantsSql — what the runtime may never do", () => {
       /\bapprovals\b/.test(s),
     );
     expect(approvalGrants).toEqual([
-      "GRANT SELECT ON TABLE content_index, compilations, data_records, audit_log, approvals, migrations_applied, branches, content_revisions, content_heads, content_reviews TO graft_runtime",
+      "GRANT SELECT ON TABLE content_index, compilations, data_records, audit_log, approvals, migrations_applied, branches, content_revisions, content_heads, content_reviews, content_mirror TO graft_runtime",
       "GRANT INSERT (branch_id, function_name, input, input_canonical, requested_by_kind, requested_by_id, correlation_id) ON TABLE approvals TO graft_runtime",
     ]);
     expect(grants()).toContain(

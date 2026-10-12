@@ -134,6 +134,9 @@ export async function contentImportCommand(
       actor: { id: operatorName(), name: operatorName() },
       message: "Imported from files",
     });
+    // An import names no base versions, so nothing can be refused as stale.
+    if (!result.ok) throw new Error("content import was refused without a base version");
+    const { imported, unchanged, kept } = result;
     // Compile even when nothing new came in: the index then matches what is
     // published, whatever state an earlier run left it in.
     const compiled = await compile({
@@ -146,7 +149,9 @@ export async function contentImportCommand(
     });
     return {
       branch,
-      ...result,
+      imported,
+      unchanged,
+      kept,
       compiled: {
         added: compiled.changes.added.length,
         changed: compiled.changes.changed.length,

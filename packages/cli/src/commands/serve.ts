@@ -37,7 +37,7 @@ import { githubStoreFromEnv, revalidateWebhookFromEnv } from "@usegraft/compiler
 import { GraftError } from "@usegraft/contracts";
 import { setRequestPeer } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
-import { databaseStoreFor } from "../content-source";
+import { databaseStoreFor, startMirrorSchedule } from "../content-source";
 
 export type FetchHandler = (request: Request) => Promise<Response>;
 
@@ -379,7 +379,9 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   const repository = githubStoreFromEnv({
     contentDir: config.contentDir,
     projectRoot: config.projectDir,
+    reviewRule: config.content.review,
   });
+  const stopMirror = await startMirrorSchedule(config, branch.db, writeBranch);
   const store = databaseStore ?? repository;
 
   const mcpHandler = createGraftMcpHandler({
@@ -574,6 +576,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     host,
     branch: branchName,
     close: async () => {
+      stopMirror();
       await new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
       });

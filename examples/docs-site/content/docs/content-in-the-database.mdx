@@ -1,0 +1,206 @@
+---
+title: Content in the database
+description: "Keep your content in Postgres so editors publish live with no rebuild and no GitHub setup, while developers pull it into files and push changes back."
+section: Content
+order: 7
+---
+
+<p className="kicker">Publishing is live in seconds. Your files are a checkout you pull and push.</p>
+
+<TierBadge tier="postgres" />
+
+By default your content is the MDX files in git. Every change goes through a
+commit, and the site rebuilds to show it. That suits a team of developers. For
+a site that people edit in Studio, it puts GitHub and a redeploy in front of
+every change.
+
+Keep the content in your Postgres database instead, and it works the way a
+hosted CMS does. A save is a draft. Publishing puts it on the live site
+straight away. A hosted Studio needs only `DATABASE_URL`.
+
+A project uses one source or the other, never both. The database source still
+stores MDX, checked by the same schema, so you can move between the two
+without losing anything.
+
+## Switch a project over
+
+<Steps>
+
+<Step title="Set the source">
+
+<CodeBlock title="graft.config.ts">
+
+```ts
+export const content = { source: "database" };
+```
+
+</CodeBlock>
+
+The Postgres engine is required, so `index` must not be `"static"`.
+
+</Step>
+
+<Step title="Load your files">
+
+<CodeBlock title="Terminal">
+
+```sh
+graft db migrate
+graft content import
+```
+
+</CodeBlock>
+
+Every file is checked first, so one bad file stops the import before anything
+is written. Running it again is safe: it only brings in documents with nothing
+published, and never overwrites one that has been. To publish changed files
+over what is live, use `graft push` below.
+
+</Step>
+
+<Step title="Edit in Studio">
+
+Open Studio with `graft studio`, or host it with `graft serve --studio`. Saves
+are drafts, shared by everyone who edits that entry. Publish, and the change
+is live.
+
+</Step>
+
+</Steps>
+
+## What happens when someone publishes
+
+Studio and agents check a draft exactly as `graft compile` checks a file: the
+schema, unique slugs, and safe MDX. A draft that would fail a compile never
+goes live. Then the published version and the index change together, and your
+app is told to refresh its cache.
+
+If two people, or a person and an agent, save the same entry from the same
+version, the second save is refused with `CONTENT_CONFLICT` instead of
+overwriting the first. Someone without publish rights submits for review
+instead, and someone who can publish approves it.
+
+## Work with the files
+
+The files under your content directory are a checkout, like a clone. Pull what
+is published, edit, and push your changes back.
+
+<CodeBlock title="Terminal">
+
+```sh
+graft pull                # write what is published into your files
+graft push                # publish the files you changed
+graft pull posts/launch   # just one document
+```
+
+</CodeBlock>
+
+Graft remembers the version each file was pulled at, in `.graft/sync.json`.
+That is how it tells your changes from everyone else's:
+
+| Your file | Published version | What happens |
+| --- | --- | --- |
+| Unchanged since your pull | Changed | `graft pull` updates the file |
+| Changed | Unchanged since your pull | `graft push` publishes it. `graft pull` keeps it |
+| Changed | Also changed | A conflict. `graft push` refuses, and `graft pull` keeps your file and lists it |
+
+To settle a conflict, bring your change into the published version and push.
+`graft pull --force` takes the published version instead, and
+`graft push --force` publishes yours over it.
+
+While `graft dev` runs, it tells you when someone publishes, so you know your
+files are behind:
+
+<CodeBlock title="Terminal">
+
+```text
+Ana published posts/spring-sale.
+Run graft pull to bring it into your files.
+```
+
+</CodeBlock>
+
+An agent working in the repository can ask the same question with the MCP tool
+`sync_status`, or skip the files and use `write_content`, which writes to the
+database directly.
+
+Pulled files don't have to go anywhere. Commit them with your code when a
+content change ships with a code change, or leave them out of git entirely.
+
+## Keep a copy in git
+
+To have history in GitHub without anyone running `graft pull`, mirror what is
+published:
+
+<CodeBlock title="graft.config.ts">
+
+```ts
+export const content = {
+  source: "database",
+  mirror: { mode: "batch", everyMinutes: 60 },
+};
+```
+
+</CodeBlock>
+
+Set `GRAFT_GITHUB_REPO` and `GRAFT_GITHUB_TOKEN` (or the GitHub App variables
+from [Host Studio for your team](/docs/studio-hosting)) to say where.
+
+| Setting | What it does |
+| --- | --- |
+| `mode: "batch"` | `graft serve` commits everything published since the last run, every `everyMinutes` (default 60, at most 10080, a week). `graft mirror` does one run, for a scheduled job |
+| `mode: "each"` | One commit after every publish |
+| `via: "pull-request"` | A pull request instead of a commit, merged straight away when the branch allows it. When it needs checks or a review it stays open, and later runs add to that one pull request until it merges |
+
+A day of publishing becomes one commit or a few, not one per change. Git is a
+record here, never a second source: the content is already live, so nothing
+that happens in git changes the site.
+
+## Keep CI cheap
+
+Content changes don't need your full test suite. Three commands help:
+
+- `graft check` runs every check a publish makes on the files, with no
+  database: the schema, slugs, MDX safety, and references to documents that
+  don't exist. It takes seconds.
+- `graft ci init` writes a workflow that runs `graft check` when content
+  changes.
+- `graft ci changes` prints `content-only=true` when a change touched nothing
+  but content, and hands it to later workflow steps, so a heavy job can skip
+  itself and still report a result. A path filter can't do that: a required
+  check it skips never reports, and the pull request waits forever.
+
+<CodeBlock title=".github/workflows/test.yml">
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
+  - id: graft
+    run: npx graft ci changes
+  - if: steps.graft.outputs.content-only != 'true'
+    run: npm test
+```
+
+</CodeBlock>
+
+`graft ci skip-build` exits 0 when a deploy can be skipped: only content
+changed since the last deploy, and the site already serves it from the
+database. Use it as your host's command for deciding whether to build. A
+mirrored commit then costs no build at all. It compares with the previous
+deploy when the host says which that was, or with `--base <commit>`; with
+neither, it builds, since one push can hold a code change under a content one.
+
+## What works differently
+
+Some operations work on files, so in a database-sourced project they refuse
+with `CONTENT_SOURCE_MISMATCH`: reverting to a commit in Studio, `graft merge`,
+and content migrations. For a content migration, pull, change the files, check
+them with `graft check`, and push.
+
+## Next steps
+
+- [Configuration](/docs/configuration#content): every `content` setting.
+- [Studio](/docs/studio): what editors see.
+- [CLI reference](/docs/cli-reference): `pull`, `push`, `mirror`, `check` and `ci`.

@@ -29,6 +29,7 @@
  */
 import { createHash } from "node:crypto";
 import { GraftError } from "@usegraft/contracts";
+import { reviewReason, type ReviewRule } from "../../review-rule";
 import { gitBlobSha } from "../blob";
 import { assertBaseVersion } from "../conflict";
 import { trimChar } from "../trim";
@@ -46,7 +47,7 @@ import type {
   WriteOptions,
 } from "../types";
 import type { GitHubAuth } from "./auth";
-import { GitHubClient, type CommitAuthor, type NewTreeEntry } from "./client";
+import { GitHubClient, type CommitAuthor, type NewTreeEntry, type PullRequest } from "./client";
 
 export interface GitHubStoreOptions {
   /** "owner/name". */
@@ -71,6 +72,12 @@ export interface GitHubStoreOptions {
   branchPrefix?: string;
   apiUrl?: string;
   fetch?: typeof fetch;
+  /**
+   * Publishes that go through a pull request even for someone allowed to
+   * publish directly: deletions, some collections, large changes. Off by
+   * default here; `graft serve` passes the project's rule, which is on.
+   */
+  reviewRule?: ReviewRule | false;
 }
 
 /** path (content-relative) -> blob SHA */
@@ -101,6 +108,7 @@ export class GitHubStore implements ContentStore {
   private readonly prefix: string;
   private readonly publishMode: PublishMode;
   private readonly deployedSha: string | undefined;
+  private readonly reviewRule: ReviewRule | false;
 
   private readonly commits = new Map<string, { tree: string; parents: string[] }>();
   private readonly files = new Map<string, Files>();
@@ -119,6 +127,7 @@ export class GitHubStore implements ContentStore {
     this.prefix = options.branchPrefix ?? "graft-studio";
     this.publishMode = options.publishMode ?? "direct";
     this.deployedSha = options.deployedSha;
+    this.reviewRule = options.reviewRule ?? false;
     this.drafts = {
       changes: (actor) => this.changes(actor),
       readPublished: (path) => this.readPublished(path),
@@ -224,6 +233,98 @@ export class GitHubStore implements ContentStore {
     return out;
   }
 
+  /**
+   * Commit files straight onto the production branch, or through a pull
+   * request that is merged at once when GitHub allows it: how a
+   * database-sourced project copies what it published into git. Files whose
+   * bytes the branch already has are skipped, so a repeat is a no-op.
+   */
+  async commitFiles(
+    files: Array<{ path: string; raw: string | null }>,
+    options: { message: string; author?: StoreActor; via?: "commit" | "pull-request" },
+  ): Promise<{
+    commit: { sha: string; url: string } | null;
+    review?: ReviewRequest;
+    merged: boolean;
+  }> {
+    const entries = files.map((file) => ({ path: normalisePath(file.path), raw: file.raw }));
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+      const main = await this.requireMain();
+      const mainFiles = await this.contentFiles(main);
+      const changes = entries.filter((entry) =>
+        entry.raw === null
+          ? mainFiles.has(entry.path)
+          : mainFiles.get(entry.path) !== gitBlobSha(entry.raw),
+      );
+      if (changes.length === 0) return { commit: null, merged: true };
+      const author = options.author ? authorOf(options.author) : undefined;
+      const commit = await this.commitOnto(main, mainFiles, changes, {
+        parents: [main],
+        message: options.message,
+        ...(author ? { author } : {}),
+      });
+      if (options.via !== "pull-request") {
+        if (!(await this.client.fastForward(this.branch, commit))) continue; // production moved
+        return {
+          commit: { sha: commit, url: this.client.webUrl(`/commit/${commit}`) },
+          merged: true,
+        };
+      }
+      // One mirror pull request at a time: while one waits on checks or a
+      // review, each run moves it to the latest commit instead of opening
+      // another.
+      const mirrors = `${this.prefix}/mirror/`;
+      const open = (await this.client.listOpenPulls(this.branch)).find((pull) =>
+        pull.head.ref.startsWith(mirrors),
+      );
+      let pull: PullRequest;
+      if (open) {
+        await this.client.setRef(open.head.ref, commit);
+        pull = open;
+      } else {
+        const head = `${mirrors}${Date.now().toString(36)}`;
+        await this.client.createRef(head, commit);
+        const title = options.message.split("\n")[0] ?? options.message;
+        pull = await this.client.createPull({
+          title,
+          head,
+          base: this.branch,
+          body: options.message,
+        });
+      }
+      const merged = await this.client.mergePull(pull.number);
+      return {
+        commit: { sha: commit, url: this.client.webUrl(`/commit/${commit}`) },
+        merged,
+        review: {
+          id: String(pull.number),
+          number: pull.number,
+          url: pull.html_url,
+          title: pull.title,
+          createdAt: pull.created_at,
+        },
+      };
+    }
+    throw busy(entries[0]?.path ?? "");
+  }
+
+  /** Why the project's review rule sends these paths to a pull request. */
+  private async reviewReasons(state: DraftState, paths: string[]): Promise<string[]> {
+    if (this.reviewRule === false) return [];
+    const reasons: string[] = [];
+    for (const path of paths) {
+      const beforeSha = state.mainFiles.get(path);
+      const afterSha = state.mine.get(path);
+      const reason = reviewReason(this.reviewRule, {
+        path,
+        before: beforeSha ? await this.blob(beforeSha) : null,
+        after: afterSha ? await this.blob(afterSha) : null,
+      });
+      if (reason) reasons.push(reason);
+    }
+    return reasons;
+  }
+
   /* ---- drafts ---------------------------------------------------------- */
 
   private async changes(actor: StoreActor): Promise<DraftChange[]> {
@@ -249,7 +350,7 @@ export class GitHubStore implements ContentStore {
   }
 
   private async publish(options: PublishOptions): Promise<PublishResult> {
-    const mode = options.mode ?? this.publishMode;
+    let mode = options.mode ?? this.publishMode;
     const resolve = options.resolve ?? {};
     const requested = [...new Set(options.paths.map(normalisePath))];
     if (requested.length === 0) {
@@ -287,6 +388,8 @@ export class GitHubStore implements ContentStore {
 
       const tookTheirs = requested.filter((path) => resolve[path] === "theirs");
       const publishing = requested.filter((path) => resolve[path] !== "theirs");
+      const reasons = mode === "direct" ? await this.reviewReasons(state, publishing) : [];
+      if (reasons.length > 0) mode = "review";
       const author = authorOf(options.actor);
       const message = options.message?.trim() || defaultMessage(publishing);
 
@@ -311,7 +414,7 @@ export class GitHubStore implements ContentStore {
             title: message.split("\n")[0] ?? message,
             head: reviewBranch,
             base: this.branch,
-            body: reviewBody(options.actor, publishing),
+            body: reviewBody(options.actor, publishing, reasons),
           });
           review = {
             id: String(pull.number),
@@ -335,6 +438,7 @@ export class GitHubStore implements ContentStore {
         published: publishing,
         tookTheirs,
         ...(review ? { review } : {}),
+        ...(reasons.length > 0 ? { reviewReasons: reasons } : {}),
       };
     }
     throw busy(requested[0] ?? "");
@@ -715,9 +819,16 @@ function defaultMessage(paths: string[]): string {
   return `Publish ${names.length} documents`;
 }
 
-function reviewBody(actor: StoreActor, paths: string[]): string {
+function reviewBody(actor: StoreActor, paths: string[], reasons: string[] = []): string {
   return [
     `Submitted for review from Graft Studio by ${actor.name ?? actor.id}.`,
+    ...(reasons.length > 0
+      ? [
+          "",
+          "This site reviews these changes before they go live:",
+          ...reasons.map((r) => `- ${r}`),
+        ]
+      : []),
     "",
     ...paths.map((path) => `- \`${path}\``),
   ].join("\n");

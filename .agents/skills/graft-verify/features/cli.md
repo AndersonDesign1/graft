@@ -11,6 +11,9 @@ a fix when a file is wrong.
 - `cli.compile-error`: a bad frontmatter field stops the compile with
   `SCHEMA_VALIDATION_FAILED` and a `fix` line.
 - `cli.content`: `graft content` lists the compiled tree (Postgres only today).
+- `cli.sync`: in a database-sourced project, `graft pull`, `graft push` and
+  `graft mirror` move content between Postgres, the files and GitHub.
+- `cli.check`: `graft check` validates the files with no database.
 
 ## How to get to it (user POV)
 
@@ -36,7 +39,22 @@ Preconditions: `REPO` and `O` from the skill's Launch step, a sandbox from `scri
 - **Content list** (Postgres sandbox): `$O $G content` prints
   `pages/home  (Hello, Graft)  pages/home.mdx`.
 
+- **Pull and push** (database-sourced sandbox, see `studio.md`): `$O --db "$URL" $G pull`
+  lists the files it updated. Edit one, `$O --db "$URL" $G push` prints
+  `Published 1 file(s)`. Publish the same document over MCP
+  (`GRAFT_DEV_SCOPES=content:publish`, `write_content` then `publish_drafts`),
+  edit the file again, and push: `error CONTENT_CONFLICT` and nothing is written.
+  `graft pull` then lists it under "changed both here and in the database".
+- **Mirror** without a real repository: serve the in-memory GitHub with a
+  script that calls `createGitHubFake().listen(0)` from
+  `packages/compiler/dist/testing.js`, then run
+  `$O --db "$URL" env GRAFT_GITHUB_REPO=acme/site GRAFT_GITHUB_TOKEN=test-token GRAFT_GITHUB_API_URL=<printed url> $G mirror`.
+  A second run prints "Git already has everything that is published."
+
 ## Gotchas
+
+- Anything `graft mcp` prints to stdout breaks the protocol stream, including a
+  log line from a hook. Log to stderr.
 
 - `graft content` needs `DATABASE_URL` even in a static project and fails with
   `ENV_VAR_MISSING`. Its help text says it reads "the compiled index".
