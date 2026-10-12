@@ -1,5 +1,14 @@
 # @usegraft/sdk-react
 
+## 1.0.0-beta.7
+
+### Patch Changes
+
+- Updated dependencies [c997e35]
+  - @usegraft/contracts@1.0.0-beta.7
+  - @usegraft/content-api@1.0.0-beta.7
+  - @usegraft/sdk-core@1.0.0-beta.7
+
 ## 1.0.0-beta.6
 
 ### Patch Changes

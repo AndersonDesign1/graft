@@ -1,5 +1,19 @@
 # @usegraft/sdk-next
 
+## 1.0.0-beta.7
+
+### Patch Changes
+
+- Updated dependencies [c997e35]
+- Updated dependencies [a761a13]
+- Updated dependencies [2d97fda]
+- Updated dependencies [e8b55ac]
+- Updated dependencies [b086a62]
+  - @usegraft/db@1.0.0-beta.7
+  - @usegraft/contracts@1.0.0-beta.7
+  - @usegraft/sdk-core@1.0.0-beta.7
+  - @usegraft/mdx-safety@1.0.0-beta.7
+
 ## 1.0.0-beta.6
 
 ### Patch Changes
