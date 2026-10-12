@@ -14,6 +14,11 @@ a fix when a file is wrong.
 - `cli.sync`: in a database-sourced project, `graft pull`, `graft push` and
   `graft mirror` move content between Postgres, the files and GitHub.
 - `cli.check`: `graft check` validates the files with no database.
+- `cli.create`: `graft create [dir]` (what `npm create graft` runs) writes a
+  site from a template, makes or connects a database, installs, migrates and
+  loads example content.
+- `cli.doctor`: `graft doctor` prints the setup checklist and the next step;
+  MCP `setup_status` returns the same.
 
 ## How to get to it (user POV)
 
@@ -50,6 +55,23 @@ Preconditions: `REPO` and `O` from the skill's Launch step, a sandbox from `scri
   `packages/compiler/dist/testing.js`, then run
   `$O --db "$URL" env GRAFT_GITHUB_REPO=acme/site GRAFT_GITHUB_TOKEN=test-token GRAFT_GITHUB_API_URL=<printed url> $G mirror`.
   A second run prints "Git already has everything that is published."
+
+- **Create, then build the Next.js site.** Inside the repo (so `@usegraft/*`
+  resolve), `$O $G create packages/cli/.test-tmp/blog --template blog
+  --framework next --edit code --database none --no-install` prints
+  `✓ Wrote a blog site with Next.js`. Link
+  `packages/sdk-next/compat/next16/node_modules` into it as `node_modules`
+  (copy `packages/sdk-next/dist` over the injected copy first, as
+  `compat/smoke.mjs` does), run `$G compile`, then `node_modules/.bin/next
+  build` and `next start -p 3217`. `/` lists "Hello, world" above "How we
+  work", and `/posts/hello-world` renders its body.
+- **Online editing goes live.** `create` with `--edit online --database
+  "$URL" --no-install` against an empty scratch database, then `content
+  import`, `doctor` (all pass except the Studio sign-in warning), `next
+  start`, and `graft studio`. Save and publish an entry over the Studio API;
+  the next request to the site shows it.
+- **Never run `--database new` in a test.** It makes a real database on an
+  outside service. The unit tests fake that service's answers.
 
 ## Gotchas
 

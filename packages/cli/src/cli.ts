@@ -6,15 +6,8 @@
  * project MCP over stdio) are real. Every failure crossing this boundary is a
  * GraftError printed with its agent-actionable `fix`.
  */
-import { createRequire } from "node:module";
-
 import { printGraftError } from "./report";
-
-// Read from the manifest rather than a literal: changesets bumps package.json,
-// and a hardcoded constant silently ships the wrong number (0.1.0 shipped as
-// "0.0.0"). `../package.json` resolves identically from src/ under vitest and
-// from dist/ in the published tarball, where npm always includes the manifest.
-const VERSION: string = createRequire(import.meta.url)("../package.json").version;
+import { VERSION } from "./version";
 
 interface PlannedCommand {
   name: string;
@@ -36,10 +29,14 @@ function printHelp(): void {
     "  init [dir]   Scaffold a Graft project (graft.config.ts, content/, llms.txt).",
     "               Static index by default — no database, no env. --postgres for the",
     "               Postgres tier (operational data, functions, DB branching)",
+    "  create [dir] Make a new site, with a template, a database and Studio set up",
+    "               (what `npm create graft` runs; asks a few questions, or --yes)",
+    "  doctor       Check the setup and print the one thing to do next",
     "  compile      Project the content tree into the content index once",
     "  dev          Watch content/ + graft.config.ts and recompile on change",
     "  db migrate   Apply the Postgres schema migrations that ship with @usegraft/db",
     "               (the first command a Postgres-tier project runs; --dry-run lists them)",
+    "  db claim     Keep the free database `graft create` made: claim it, then save its URL",
     "  asset put <file> [key]   Upload a binary to the asset store (S3_* env)",
     "  approvals    List pending approvals for human-gated (destructive) function calls",
     "  approve <id> Approve a pending approval (the caller retries with x-graft-approval)",
@@ -118,6 +115,41 @@ export const COMMAND_HELP = new Map<string, string[]>([
     ],
   ],
   [
+    "create",
+    [
+      "Usage: graft create [dir] [--template <name>] [--edit online|code]",
+      "                    [--database new|none|<postgres-url>] [--framework next|none]",
+      "                    [--yes] [--no-install]",
+      "",
+      "Make a new site: a template, a database, Studio and (by default) a Next.js app,",
+      "installed and ready. `npm create graft` runs this. It asks a few questions;",
+      "flags answer them, and --yes takes the defaults for the rest.",
+      "",
+      "  --template <name> blog, docs, shop, portfolio or blank (default: blog)",
+      "  --edit online     Content is edited in Studio and kept in the database (default)",
+      "  --edit code       Content is files in git",
+      "  --database new    Make a free Postgres for you, claimed later with `graft db claim`",
+      "  --database none   No database: the content compiles to a file (with --edit code)",
+      "  --database <url>  Use your own Postgres 13+",
+      "  --framework next  A Next.js site that shows every collection (default)",
+      "  --framework none  Just the content, for a site you already have",
+      "  --yes             Use the defaults for every question not answered by a flag",
+      "  --no-install      Write the files and stop before installing",
+    ],
+  ],
+  [
+    "doctor",
+    [
+      "Usage: graft doctor [--json]",
+      "",
+      "Check this project's setup: the database, its schema, content, the index and",
+      "Studio sign-in. Prints a checklist and the one thing to do next. Exits 1 when",
+      "something is missing.",
+      "",
+      "  --json           Print { ready, checks, next } as JSON",
+    ],
+  ],
+  [
     "compile",
     [
       "Usage: graft compile [--branch <id>] [--prune-unknown] [--json]",
@@ -144,10 +176,17 @@ export const COMMAND_HELP = new Map<string, string[]>([
     "db",
     [
       "Usage: graft db migrate [--dry-run]",
+      "       graft db claim [--url <postgres-url>]",
       "",
-      "Apply the Postgres schema migrations that ship with @usegraft/db.",
+      "`migrate` applies the Postgres schema migrations that ship with @usegraft/db.",
+      "",
+      "`claim` keeps the free database `graft create` made. It prints the link to",
+      "claim it (a free Neon account), waits until you have, then asks for the new",
+      "connection string and saves it to .env. Claiming changes the password, so",
+      "the old DATABASE_URL stops working.",
       "",
       "  --dry-run        List pending schema migrations without applying them",
+      "  --url <url>      The claimed database's connection string, without the prompt",
     ],
   ],
   [
@@ -410,6 +449,13 @@ interface ParsedArgs {
   force: boolean;
   /** `graft ci`: the ref to compare against. */
   base?: string;
+  /** `graft create` */
+  template?: string;
+  edit?: string;
+  database?: string;
+  framework?: string;
+  yes: boolean;
+  install: boolean;
   /** `graft pull` / `push`: limit to these documents (also given as arguments). */
   only: string[];
 }
@@ -440,6 +486,12 @@ function parseArgs(rest: string[]): ParsedArgs {
   let force = false;
   let base: string | undefined;
   const only: string[] = [];
+  let template: string | undefined;
+  let edit: string | undefined;
+  let database: string | undefined;
+  let framework: string | undefined;
+  let yes = false;
+  let install = true;
 
   const value = (flag: string, raw: string | undefined): string => {
     if (!raw || raw.startsWith("-")) {
@@ -473,6 +525,18 @@ function parseArgs(rest: string[]): ParsedArgs {
       base = value("--base", rest[++i]);
     } else if (arg === "--only") {
       only.push(value("--only", rest[++i]));
+    } else if (arg === "--template") {
+      template = value("--template", rest[++i]);
+    } else if (arg === "--edit") {
+      edit = value("--edit", rest[++i]);
+    } else if (arg === "--database") {
+      database = value("--database", rest[++i]);
+    } else if (arg === "--framework") {
+      framework = value("--framework", rest[++i]);
+    } else if (arg === "--yes" || arg === "-y") {
+      yes = true;
+    } else if (arg === "--no-install") {
+      install = false;
     } else if (arg === "--apply") {
       apply = true;
     } else if (arg === "--dry-run") {
@@ -535,6 +599,12 @@ function parseArgs(rest: string[]): ParsedArgs {
     force,
     ...(base ? { base } : {}),
     only,
+    ...(template ? { template } : {}),
+    ...(edit ? { edit } : {}),
+    ...(database ? { database } : {}),
+    ...(framework ? { framework } : {}),
+    yes,
+    install,
   };
 }
 
@@ -600,6 +670,29 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
         );
         return 0;
       }
+      case "create": {
+        const { createCommand } = await import("./commands/create");
+        await createCommand({
+          dir: args.positionals[0] ?? ".",
+          ...(args.template ? { template: args.template } : {}),
+          ...(args.edit ? { edit: args.edit } : {}),
+          ...(args.database ? { database: args.database } : {}),
+          ...(args.framework ? { framework: args.framework } : {}),
+          yes: args.yes,
+          install: args.install,
+        });
+        return 0;
+      }
+      case "doctor": {
+        const { doctorCommand } = await import("./commands/doctor");
+        const status = await doctorCommand({ cwd });
+        if (args.json) console.log(JSON.stringify(status, null, 2));
+        else {
+          const { formatSetupStatus } = await import("@usegraft/compiler");
+          console.log(formatSetupStatus(status));
+        }
+        return status.ready ? 0 : 1;
+      }
       case "compile": {
         const { compileCommand } = await import("./commands/compile");
         await compileCommand({
@@ -617,11 +710,16 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
       }
       case "db": {
         const [subcommand] = args.positionals;
+        if (subcommand === "claim") {
+          const { dbClaimCommand } = await import("./commands/db-claim");
+          await dbClaimCommand({ cwd, ...(args.url ? { url: args.url } : {}) });
+          return 0;
+        }
         if (subcommand !== "migrate") {
           throw new UsageError(
             subcommand
-              ? `unknown db subcommand "${subcommand}" — the only one is \`graft db migrate\``
-              : "usage: graft db migrate [--dry-run]",
+              ? `unknown db subcommand "${subcommand}" (try: migrate, claim)`
+              : "usage: graft db migrate [--dry-run] | graft db claim [--url <url>]",
           );
         }
         const { dbMigrateCommand, formatMigrateResult } = await import("./commands/db");

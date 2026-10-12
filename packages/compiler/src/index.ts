@@ -14,3 +14,4 @@ export * from "./sync";
 export * from "./mirror";
 export * from "./review-rule";
 export * from "./references";
+export * from "./setup-status";

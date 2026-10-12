@@ -32,6 +32,7 @@ import { registerAssetTools } from "./tools/assets";
 import { registerBranchTools } from "./tools/branches";
 import { registerContentReadTools, registerContentWriteTools } from "./tools/content";
 import { registerDraftTools } from "./tools/drafts";
+import { registerSetupTools } from "./tools/setup";
 import { registerSyncTools } from "./tools/sync";
 import { registerErrorTools } from "./tools/errors";
 import { registerPackageTools } from "./tools/packages";
@@ -455,6 +456,7 @@ const FULL_SURFACE: RegisterTools = (server, deps) => {
   registerContentWriteTools(server, deps);
   registerDraftTools(server, deps);
   registerSyncTools(server, deps);
+  registerSetupTools(server, deps);
   registerAssetTools(server, deps);
   registerBranchTools(server, deps);
   registerApprovalTools(server, deps);
