@@ -38,6 +38,13 @@ export const PACKAGE_KNOWLEDGE = {
     tier: "either",
     direct: true,
   },
+  "create-graft": {
+    name: "create-graft",
+    role: "`npm create graft`: a new site from a template, with a database, Studio and a Next.js app.",
+    when: "Starting a site from nothing. Never a dependency: it runs once, through npm create.",
+    tier: "either",
+    direct: false,
+  },
   "@usegraft/sdk-next": {
     name: "@usegraft/sdk-next",
     role: "Next.js adapter: typed reads in Server Components, plus route handlers.",

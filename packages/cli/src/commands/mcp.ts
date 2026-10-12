@@ -114,6 +114,7 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
           }
         : {}),
       contentDir: config.contentDir,
+      projectDir: config.projectDir,
       collections: config.collections,
       functions: config.functions,
       mdxTrust: config.mdxTrust,

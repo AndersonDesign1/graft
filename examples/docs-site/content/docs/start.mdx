@@ -1,0 +1,126 @@
+---
+title: Set up a site for someone
+description: "For a coding agent helping a person who doesn't code: what to ask, what to run, and how to explain each step."
+section: Get started
+order: 3
+---
+
+<p className="kicker">Written for coding agents. A person asked you for a website they can edit themselves; this is how to give them one.</p>
+
+You are setting up a site for someone who may never open a terminal. They
+should end up with a site that runs, an editor they can use in a browser, and
+an idea of what happens next. Keep every message short and free of jargon.
+When you must use a term, explain it once in a few words.
+
+## 1. Ask three questions
+
+Ask in plain words, all at once, and accept "I don't know" as an answer.
+
+| Question | Their answer | Flag |
+| --- | --- | --- |
+| What is the site for? | A blog, documentation, a shop or menu, a portfolio, or something else | `--template blog`, `docs`, `shop`, `portfolio` or `blank` |
+| Who changes the content, and how? | "Me, in a browser" (the usual answer), or "developers, in code" | `--edit online` or `--edit code` |
+| Do you already have a database? | Almost always "no" or "I don't know" | `--database new`, or `--database <their postgres url>` |
+
+When in doubt, choose `blog`, `online` and `new`. Editing online keeps the
+content in a database, and a change goes live as soon as it is published,
+with no rebuild.
+
+## 2. Make the site
+
+Run one command with their answers. `--yes` takes the defaults for anything
+you didn't ask.
+
+<CodeBlock title="Terminal">
+
+```sh
+npm create graft@latest bakery -- --template shop --edit online --database new --yes
+```
+
+</CodeBlock>
+
+It writes the site, makes a free database, installs everything, loads example
+content and prints what to run next. The folder gets an `AGENTS.md` that tells
+the next agent how this site works.
+
+Then tell the person what happened, in about this many words:
+
+> Your site is set up with example content. I also made a free database for
+> it. It's deleted after three days unless you keep it, which takes one sign-up
+> and costs nothing. I'll walk you through that next.
+
+## 3. Keep the free database
+
+The database `--database new` makes is free and needs no account, but it is
+deleted after 72 hours unless someone claims it, and until then it holds at
+most 100 MB. Claiming it moves it into a free account the person owns.
+
+<CodeBlock title="Terminal">
+
+```sh
+npx graft db claim
+```
+
+</CodeBlock>
+
+It prints a link. Give the link to the person and ask them to open it and sign
+up or sign in. The command waits until they have. Claiming changes the
+database's password, so it then asks for the new connection string: the person
+copies it from their database dashboard (Connect), and you paste it in. Never
+ask them to paste a password into a chat you don't control; if they must, tell
+them to change it afterwards.
+
+## 4. Show them the site and the editor
+
+<CodeBlock title="Terminal">
+
+```sh
+npm run dev      # the site, at http://localhost:3000
+npm run studio   # Studio, the editor, at http://localhost:4983
+```
+
+</CodeBlock>
+
+Studio is where they will work. On their own computer it needs no sign-in.
+Show them one thing: open a page, change a word, press Publish, and reload the
+site.
+
+## 5. Check where things stand
+
+Run `npx graft doctor` (or call the MCP tool `setup_status`) whenever you are
+unsure. It checks the database, its schema, the content, the index and Studio
+sign-in, and ends with the one thing to do next. Do that thing, then run it
+again.
+
+## 6. Put it online
+
+The site needs a host that runs Node.js, with two settings copied from `.env`:
+
+| Setting | What it is |
+| --- | --- |
+| `DATABASE_URL` | Where the content lives |
+| `GRAFT_STUDIO_SECRET` | What keeps people signed in to Studio |
+
+Studio runs with `graft serve --studio`, wherever the site's settings are. The
+first person to open `/studio` online creates the owner account. On a server
+anyone can reach, it asks for a setup code first, so nobody else can claim it:
+`graft serve` prints the code when it starts, and `npx graft studio setup-code`
+prints it from the settings. The owner then invites everyone else from
+**Settings, People**. See [Host Studio for your team](/docs/studio-hosting).
+
+## Words to use
+
+| Instead of | Say |
+| --- | --- |
+| Repository, commit, push | "The site's files", "save a version" |
+| Database, Postgres | "Where the content is stored" |
+| Environment variable | "A setting" |
+| Deploy | "Put it online" |
+| Migration | Don't mention it: `graft create` and `graft doctor` handle it |
+
+## Rules
+
+- Every Graft error has a `fix`. Do what it says before trying anything else.
+- Never commit `.env`, and never paste its contents anywhere public.
+- Ask before you publish anything on the person's behalf. A publish is live
+  immediately.

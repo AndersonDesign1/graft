@@ -177,6 +177,12 @@ export interface GraftMcpOptions {
    */
   syncStateFile?: string;
   /**
+   * The project folder, on a server that has it (`graft mcp`). Registers
+   * setup_status, which reads the free-database claim file and the content
+   * folder there.
+   */
+  projectDir?: string;
+  /**
    * Called after write_content or delete_content changed the index, with the
    * branch and ChangeSet, so the app can refresh its cache. An in-app mount
    * refreshes in-process (sdk-next: `revalidateContent(branch, changes)`);
