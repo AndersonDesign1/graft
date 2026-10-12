@@ -81,8 +81,8 @@ export interface SaveEntryResult {
 export type PublishAction = "commit" | "publish" | "review";
 
 export interface WorkspaceDto {
-  /** Where saves land. */
-  storage: "local" | "github";
+  /** Where saves land: files on this computer, GitHub, or the site's database. */
+  storage: "local" | "github" | "database";
   repository?: string;
   repositoryUrl?: string;
   /** The branch publishing lands on. */
@@ -146,4 +146,8 @@ export interface PublishResultDto {
   tookTheirs: string[];
   commit: { sha: string; shortSha: string; url?: string } | null;
   review?: ReviewRequest;
+  /** Published straight to the live site, with no rebuild to wait for. */
+  live?: boolean;
+  /** Present when publishing changed the live index: whether the app was told to refresh. */
+  refresh?: ContentChangeNotice;
 }

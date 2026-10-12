@@ -15,6 +15,7 @@ export * from "./ledger";
 export * from "./migrate";
 export * from "./neon";
 export * from "./reader";
+export * from "./revisions";
 export * from "./schema";
 export * from "./search";
 export * from "./static";

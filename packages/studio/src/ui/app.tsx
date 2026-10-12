@@ -201,7 +201,11 @@ function Shell({ initialBranch }: { initialBranch: string }) {
 
   const userName = user?.name ?? user?.id ?? "Local editor";
   const savingTo =
-    workspace.data?.storage === "github" ? "Saving to GitHub" : "Saving on this computer";
+    workspace.data?.storage === "github"
+      ? "Saving to GitHub"
+      : workspace.data?.storage === "database"
+        ? "Saving to the site's database"
+        : "Saving on this computer";
 
   const nav = (
     <SideNav

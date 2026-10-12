@@ -6,9 +6,22 @@ insecure-bind warning drifted from the thing it was meant to describe.
 
 ## Content
 
-**Authored content** — MDX files under `contentDir`, laid out as
-`<collection>/<slug>.mdx`. **Git is authoritative for it.** If git and the index
-disagree, git wins and the compiler rebuilds.
+**Authored content** — MDX documents laid out as `<collection>/<slug>.mdx`.
+Each project names one **content source** (ADR 0007), and that source is
+authoritative:
+
+- **git** (the default): the files under `contentDir`. If git and the index
+  disagree, git wins and the compiler rebuilds.
+- **database**: the published revisions in Postgres. The files are a
+  checkout; compile reads the revisions and never the files.
+
+Nothing treats both as authoritative at once.
+
+**Revision** — one version of one document in a database-sourced project: its
+exact MDX bytes (none, for a deletion), who wrote it, and whether it is
+published. A **draft** is a
+revision not yet published; there is one per document, shared by everyone.
+Revisions are never deleted, which is what history reads.
 
 **Collection** — a named, Zod-validated document type. `file-authoritative`
 (MDX on disk, the default) or `db-authoritative` (rows in Postgres, reached only
@@ -24,6 +37,7 @@ never authoritative: deleting it costs a `graft compile`, nothing more.
 
 **Compilation** — one projection run, recorded as a row with the git SHA it read
 and what changed. What makes "git wins" checkable, and what `revert` rewinds to.
+In a database-sourced project the SHA is null, and every publish records one.
 
 ## Operational data
 

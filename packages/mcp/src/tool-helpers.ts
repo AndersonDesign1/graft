@@ -177,7 +177,22 @@ export function assertSlugFree(
   collection: AnyCollection,
   slug: string,
   targetSourcePath: string,
+  /** The collection's files, when a store is the source and there is no checkout to read. */
+  files?: ReadonlyArray<{ path: string; raw: string }>,
 ): void {
+  if (files) {
+    for (const file of files) {
+      if (file.path === targetSourcePath || !/\.mdx?$/.test(file.path)) continue;
+      let existingSlug: string;
+      try {
+        existingSlug = parseDocument(file.raw, collection, file.path).slug;
+      } catch {
+        continue;
+      }
+      if (existingSlug === slug) throw slugTaken(slug, collectionName, file.path, targetSourcePath);
+    }
+    return;
+  }
   const dir = join(contentDir, collectionName);
   if (!existsSync(dir) || !statSync(dir).isDirectory()) return;
 
@@ -194,13 +209,20 @@ export function assertSlugFree(
     } catch {
       continue;
     }
-    if (existingSlug === slug) {
-      throw new GraftError({
-        code: "SLUG_NOT_UNIQUE",
-        message: `Slug "${slug}" in collection "${collectionName}" is already used by ${sourcePath}`,
-        fix: `Update that document instead (write_content with slug "${slug}" targets ${targetSourcePath}, but ${sourcePath} owns the slug via frontmatter), or pick a different slug.`,
-        details: { slug, collection: collectionName, existing: sourcePath },
-      });
-    }
+    if (existingSlug === slug) throw slugTaken(slug, collectionName, sourcePath, targetSourcePath);
   }
+}
+
+function slugTaken(
+  slug: string,
+  collectionName: string,
+  sourcePath: string,
+  targetSourcePath: string,
+): GraftError {
+  return new GraftError({
+    code: "SLUG_NOT_UNIQUE",
+    message: `Slug "${slug}" in collection "${collectionName}" is already used by ${sourcePath}`,
+    fix: `Update that document instead (write_content with slug "${slug}" targets ${targetSourcePath}, but ${sourcePath} owns the slug via frontmatter), or pick a different slug.`,
+    details: { slug, collection: collectionName, existing: sourcePath },
+  });
 }

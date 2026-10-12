@@ -118,15 +118,31 @@ export function HomeView() {
             </li>
           ) : null}
           {reviews.map((review) => (
-            <li key={review.number}>
-              <IconExternal className="waiting-icon" aria-hidden="true" />
+            <li key={review.id}>
+              {review.url ? (
+                <IconExternal className="waiting-icon" aria-hidden="true" />
+              ) : (
+                <IconWaiting className="waiting-icon" data-tone="waiting" aria-hidden="true" />
+              )}
               <span className="waiting-main">
                 <span className="waiting-title">{review.title}</span>
-                <span className="waiting-sub">In review as pull request #{review.number}</span>
+                <span className="waiting-sub">
+                  {review.number !== undefined
+                    ? `In review as pull request #${review.number}`
+                    : "Waiting for someone who can publish"}
+                </span>
               </span>
-              <a className="btn" data-size="sm" href={review.url} target="_blank" rel="noreferrer">
-                Open
-              </a>
+              {review.url ? (
+                <a
+                  className="btn"
+                  data-size="sm"
+                  href={review.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open
+                </a>
+              ) : null}
             </li>
           ))}
           {drafts.data &&

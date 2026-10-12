@@ -10,6 +10,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { GraftError, STATIC_INDEX_DEFAULT_PATH } from "@usegraft/contracts";
 import type { AnyCollection, AnyGraftFunction } from "@usegraft/core";
+import type { ContentSource } from "@usegraft/compiler";
 import type { MdxTrust } from "@usegraft/mdx-safety";
 import { createJiti } from "jiti";
 
@@ -57,6 +58,16 @@ export interface ProjectConfig {
    * variable is invisible to review. In graft.config.ts it appears in a diff.
    */
   approvalPolicy: ApprovalPolicy;
+  /**
+   * From the optional `content` export; defaults to { source: "git" }. Where
+   * authored content is authoritative: the files in git, or the published
+   * revisions in Postgres, with files as a checkout.
+   */
+  content: ContentConfig;
+}
+
+export interface ContentConfig {
+  source: ContentSource;
 }
 
 /** Who must approve mutations. See ProjectConfig.approvalPolicy. */
@@ -177,6 +188,7 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
   assertStaticSupports(index, collections as Record<string, AnyCollection>, functions, configPath);
   const mdxTrust = parseMdxTrust(mod.mdxTrust, configPath);
   const approvalPolicy = parseApprovalPolicy(mod.approvalPolicy, configPath);
+  const content = parseContentConfig(mod.content, index, configPath);
   const contentDirSetting = typeof mod.contentDir === "string" ? mod.contentDir : "content";
   const migrationsDirSetting =
     typeof mod.migrationsDir === "string" ? mod.migrationsDir : "migrations";
@@ -190,7 +202,38 @@ export async function loadConfig(configPath: string): Promise<ProjectConfig> {
     functions,
     mdxTrust,
     approvalPolicy,
+    content,
   };
+}
+
+/**
+ * Read the optional `content` export. Refused rather than defaulted on an
+ * unknown value: a typo that silently fell back to git would have Studio
+ * writing files on a host where nothing commits them.
+ */
+function parseContentConfig(value: unknown, index: IndexConfig, configPath: string): ContentConfig {
+  if (value === undefined) return { source: "git" };
+  const source =
+    typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as { source?: unknown }).source
+      : undefined;
+  if (source !== "git" && source !== "database") {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message: `${configPath} exports an invalid \`content\` setting.`,
+      fix: 'Use `export const content = { source: "git" }` (the files in git are authoritative, the default) or `{ source: "database" }` (Postgres is authoritative and files are a checkout). Omit the export to keep the default.',
+      details: { content: value },
+    });
+  }
+  if (source === "database" && index.driver === "static") {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message: `${configPath} keeps content in the database but uses the static index, which has no database.`,
+      fix: 'Remove `export const index = "static"` (Postgres is the default), set DATABASE_URL in .env, and run `graft db migrate`. Or keep the static index and use `content = { source: "git" }`.',
+      details: { content: value, index: index.driver },
+    });
+  }
+  return { source };
 }
 
 /**

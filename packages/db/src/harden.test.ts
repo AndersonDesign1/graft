@@ -25,7 +25,7 @@ describe("runtimeRoleGrantsSql — what the runtime may never do", () => {
       /\bapprovals\b/.test(s),
     );
     expect(approvalGrants).toEqual([
-      "GRANT SELECT ON TABLE content_index, compilations, data_records, audit_log, approvals, migrations_applied, branches TO graft_runtime",
+      "GRANT SELECT ON TABLE content_index, compilations, data_records, audit_log, approvals, migrations_applied, branches, content_revisions, content_heads, content_reviews TO graft_runtime",
       "GRANT INSERT (branch_id, function_name, input, input_canonical, requested_by_kind, requested_by_id, correlation_id) ON TABLE approvals TO graft_runtime",
     ]);
     expect(grants()).toContain(
@@ -76,6 +76,15 @@ describe("runtimeRoleGrantsSql — what the runtime must be able to do", () => {
     // protects removals. It does not: removal is the UPDATE granted above. See
     // the comment on that grant for what content-write access actually costs.
     expect(grants()).not.toMatch(/\bDELETE\b[^\n]*\bcontent_index\b/);
+  });
+
+  it("saves, publishes and discards database-sourced content, and never deletes a revision", () => {
+    expect(grants()).toContain("GRANT INSERT, UPDATE ON TABLE content_revisions TO graft_runtime");
+    expect(grants()).toContain(
+      "GRANT INSERT, UPDATE, DELETE ON TABLE content_heads TO graft_runtime",
+    );
+    expect(grants()).toContain("GRANT INSERT, UPDATE ON TABLE content_reviews TO graft_runtime");
+    expect(grants()).not.toMatch(/\bDELETE\b[^\n]*\bcontent_revisions\b/);
   });
 
   it("mutates operational data for typed functions", () => {

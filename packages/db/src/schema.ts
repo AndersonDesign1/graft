@@ -273,3 +273,98 @@ export const branches = pgTable(
 
 export type BranchRow = typeof branches.$inferSelect;
 export type BranchBackendKind = "overlay" | "neon";
+
+/**
+ * Authored content in a database-sourced project (`content.source:
+ * "database"`), where Postgres is authoritative and files are a checkout.
+ *
+ * A revision is one immutable version of one file: the exact MDX bytes, so a
+ * `graft pull` writes what was published byte for byte, and the version is the
+ * git blob SHA of those bytes on every store. `raw` null is a deletion. An
+ * unpublished revision is a draft; publishing stamps `published_at` and moves
+ * the head. Rows are never deleted by publishing, which is what history and
+ * restore read.
+ */
+export const contentRevisions = pgTable(
+  "content_revisions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    branchId: text("branch_id").notNull().default("main"),
+    /** Relative to the content directory: `<collection>/<slug>.mdx`. */
+    path: text("path").notNull(),
+    raw: text("raw"),
+    version: text("version"),
+    /** The revision this one was written on top of, for history. */
+    parentId: uuid("parent_id"),
+    actorKind: text("actor_kind").notNull().default("human"),
+    actorId: text("actor_id").notNull(),
+    actorName: text("actor_name"),
+    actorEmail: text("actor_email"),
+    message: text("message"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Autosaves by one person in one sitting update the draft in place. */
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    publishedById: text("published_by_id"),
+    publishedByName: text("published_by_name"),
+  },
+  (t) => [index("content_revisions_path").on(t.branchId, t.path, t.createdAt)],
+);
+
+export type ContentRevisionRow = typeof contentRevisions.$inferSelect;
+
+/**
+ * Where each path stands: the live revision and the draft, if any. One row
+ * per path, locked for the length of a write, so two saves of one document
+ * are serialised and the version check in between is a real compare-and-swap.
+ */
+export const contentHeads = pgTable(
+  "content_heads",
+  {
+    branchId: text("branch_id").notNull().default("main"),
+    path: text("path").notNull(),
+    publishedId: uuid("published_id"),
+    draftId: uuid("draft_id"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.branchId, t.path] }),
+    foreignKey({
+      columns: [t.publishedId],
+      foreignColumns: [contentRevisions.id],
+      name: "content_heads_published_fk",
+    }),
+    foreignKey({
+      columns: [t.draftId],
+      foreignColumns: [contentRevisions.id],
+      name: "content_heads_draft_fk",
+    }),
+  ],
+);
+
+export type ContentHeadRow = typeof contentHeads.$inferSelect;
+
+/**
+ * Drafts submitted for review by someone who may not publish. A person who
+ * may publish decides it, in Studio's inbox or over MCP; the drafts stay
+ * drafts until then.
+ */
+export const contentReviews = pgTable(
+  "content_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    branchId: text("branch_id").notNull().default("main"),
+    paths: jsonb("paths").$type<string[]>().notNull(),
+    title: text("title").notNull(),
+    requestedById: text("requested_by_id").notNull(),
+    requestedByName: text("requested_by_name"),
+    status: text("status").notNull().default("open"),
+    decidedById: text("decided_by_id"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("content_reviews_open").on(t.branchId, t.status, t.createdAt)],
+);
+
+export type ContentReviewRow = typeof contentReviews.$inferSelect;
+export type ContentReviewStatus = "open" | "published" | "closed";

@@ -26,9 +26,13 @@ const KIND_LABEL: Record<DraftChangeDto["kind"], string> = {
 /** One sentence: what happens when the button is pressed. */
 function consequence(action: DraftsDto["publish"], workspace: WorkspaceDto | null): string {
   const where = workspace?.repository ? ` on ${workspace.repository}` : "";
+  const database = workspace?.storage === "database";
   if (action === "review") {
-    return `Opens a pull request${where} for someone to review. Nothing goes live until it is merged.`;
+    return database
+      ? "Asks someone who can publish to review them. Nothing goes live until they approve."
+      : `Opens a pull request${where} for someone to review. Nothing goes live until it is merged.`;
   }
+  if (database) return "Puts these changes on the live site straight away.";
   if (action === "commit") {
     return "Records these changes in git on this computer. Nothing is pushed; push when you are ready to deploy.";
   }
@@ -346,12 +350,16 @@ function Reviews({ reviews }: { reviews: DraftsDto["reviews"] }) {
       <h3 className="sheet-subtitle">In review</h3>
       <ul>
         {reviews.map((review) => (
-          <li key={review.number}>
-            <a href={review.url} target="_blank" rel="noreferrer" className="link">
-              {review.title}
-              <IconExternal size={14} />
-            </a>
-            <span className="muted"> #{review.number}</span>
+          <li key={review.id}>
+            {review.url ? (
+              <a href={review.url} target="_blank" rel="noreferrer" className="link">
+                {review.title}
+                <IconExternal size={14} />
+              </a>
+            ) : (
+              review.title
+            )}
+            {review.number !== undefined ? <span className="muted"> #{review.number}</span> : null}
           </li>
         ))}
       </ul>
@@ -370,29 +378,39 @@ function Done({ result, onClose }: { result: PublishResultDto; onClose: () => vo
   // Every conflict resolved as "keep theirs": nothing went out, and saying
   // "Published 0 changes" would read as a failure.
   const onlyKept = count === 0 && kept > 0;
+  // Someone else published or discarded every one of them first.
+  const nothing = count === 0 && kept === 0;
   return (
     <div className="sheet-done">
       <IconCheck className="sheet-done-mark" size={20} aria-hidden="true" />
       <p className="sheet-done-title">
-        {onlyKept
-          ? `Kept the published ${kept === 1 ? "version" : "versions"}.`
-          : result.action === "review"
-            ? `Submitted ${what} for review.`
-            : result.action === "commit"
-              ? `Committed ${what}.`
-              : `Published ${what}.`}
+        {nothing
+          ? "Nothing left to publish."
+          : onlyKept
+            ? `Kept the published ${kept === 1 ? "version" : "versions"}.`
+            : result.action === "review"
+              ? `Submitted ${what} for review.`
+              : result.action === "commit"
+                ? `Committed ${what}.`
+                : `Published ${what}.`}
       </p>
       <p className="sheet-done-body">
-        {onlyKept
-          ? `Your ${kept === 1 ? "draft was" : "drafts were"} discarded; nothing else changed.`
-          : result.action === "review"
-            ? "They go live when the pull request is merged."
-            : result.action === "commit"
-              ? `Commit ${result.commit?.shortSha ?? ""} is on this computer. Push it to deploy.`
-              : "The site updates as soon as it redeploys."}
+        {nothing
+          ? "These changes were already published or discarded by someone else."
+          : onlyKept
+            ? `Your ${kept === 1 ? "draft was" : "drafts were"} discarded; nothing else changed.`
+            : result.action === "review"
+              ? result.review?.url
+                ? "They go live when the pull request is merged."
+                : "They go live when someone who can publish approves them."
+              : result.action === "commit"
+                ? `Commit ${result.commit?.shortSha ?? ""} is on this computer. Push it to deploy.`
+                : result.live
+                  ? "They're live on the site now."
+                  : "The site updates as soon as it redeploys."}
       </p>
       <div className="sheet-done-actions">
-        {result.review ? (
+        {result.review?.url ? (
           <a className="btn" href={result.review.url} target="_blank" rel="noreferrer">
             View pull request
           </a>

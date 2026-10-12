@@ -3,7 +3,7 @@
 You own the design. Decide it before you write it.
 
 1. **Check the invariants.** Read `CONTRIBUTING.md` "What gets turned down".
-   If the feature would break one (git is authoritative, operational data
+   If the feature would break one (one source of truth for content per project, operational data
    lives in Postgres behind typed functions, one Zod layer, destructive work
    is human-gated, errors that cross a package boundary carry a `fix`), stop
    and raise it.

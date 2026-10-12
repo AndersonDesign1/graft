@@ -1,3 +1,5 @@
+import type { ChangeSet } from "@usegraft/contracts";
+
 /**
  * Where authored content is read from and written to.
  *
@@ -18,6 +20,8 @@ export interface StoreActor {
   id: string;
   name?: string;
   email?: string;
+  /** A person or an agent, for history. Defaults to a person. */
+  kind?: "human" | "agent";
 }
 
 export interface StoredFile {
@@ -70,6 +74,11 @@ export interface PublishOptions {
 
 export interface PublishResult {
   mode: PublishMode;
+  /**
+   * What the live index did, when publishing updated it in the same step
+   * (a database-sourced project). Absent when the site rebuilds instead.
+   */
+  changes?: ChangeSet;
   /** The commit that carries the change, or null when nothing was published. */
   commit: { sha: string; url?: string } | null;
   /** Paths whose draft version was published (or submitted for review). */
@@ -80,11 +89,20 @@ export interface PublishResult {
   review?: ReviewRequest;
 }
 
+/**
+ * Changes waiting for someone who may publish. On GitHub it is a pull
+ * request, with its number and link; in a database-sourced project it is a
+ * request in Studio's inbox, with neither.
+ */
 export interface ReviewRequest {
-  number: number;
-  url: string;
+  id: string;
   title: string;
   createdAt: string;
+  number?: number;
+  url?: string;
+  /** The documents it covers, where the store knows them. */
+  paths?: string[];
+  requestedBy?: string;
 }
 
 /**
@@ -105,7 +123,7 @@ export interface DraftWorkflow {
 }
 
 export interface StoreInfo {
-  kind: "filesystem" | "github";
+  kind: "filesystem" | "github" | "database";
   /** "owner/name", for a remote store. */
   repository?: string;
   /** The branch publishing lands on. */
@@ -137,5 +155,11 @@ export interface ContentStore {
    * Absent on the filesystem store, where the checkout is the truth.
    */
   overlay?(actor?: StoreActor): Promise<Map<string, StoredFile | null>>;
+  /**
+   * Every file under a prefix as this actor sees it, when the store is the
+   * source of truth and there is no checkout to list (a database-sourced
+   * project). Lists use this instead of reading the content directory.
+   */
+  entries?(prefix: string, actor?: StoreActor): Promise<Array<StoredFile & { path: string }>>;
   drafts?: DraftWorkflow;
 }

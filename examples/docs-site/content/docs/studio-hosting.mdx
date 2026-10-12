@@ -20,6 +20,18 @@ Nothing is stored outside Git. An editor's draft is a branch you can open on
 GitHub, and an agent with repository access can read or finish it with plain
 Git.
 
+<Callout label="No GitHub needed" type="note">
+
+If you would rather not set up GitHub at all, keep your content in the
+database instead: `export const content = { source: "database" }` in
+`graft.config.ts`. A hosted Studio then saves and publishes to `DATABASE_URL`,
+and a publish is live without a redeploy. Steps 1 and 4 below don't apply;
+step 2 does, since people still sign in with `GRAFT_STUDIO_SECRET`. Use invite
+links, or list who may sign in with GitHub in `GRAFT_STUDIO_EDITORS`. See
+[Configuration](/docs/configuration#content).
+
+</Callout>
+
 ## How it works
 
 | Editor does | What happens in the repository |

@@ -287,6 +287,17 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 15 and 16. Or upgrade the framework.",
   },
+  CONTENT_SOURCE_MISMATCH: {
+    code: "CONTENT_SOURCE_MISMATCH",
+    meaning:
+      "The operation works on one source of content, and this project uses the other. A database-sourced project keeps its content in Postgres, so operations that read or rewrite the files in git (reverting to a commit, merging a branch's files, running a content migration over the files) have nothing to act on.",
+    typicalCauses: [
+      'graft.config.ts exports `content = { source: "database" }` and the call reached for files',
+      "A script written for a git-sourced project ran against a database-sourced one",
+    ],
+    howToRecover:
+      "Use the database-sourced equivalent the error's `fix` names. To change a document, write it with write_content and publish it with publish_drafts. Do not edit the files under the content directory and expect the site to change: they are a checkout, not the source.",
+  },
   REVALIDATE_FAILED: {
     code: "REVALIDATE_FAILED",
     meaning:

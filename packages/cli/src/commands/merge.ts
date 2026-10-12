@@ -23,6 +23,7 @@ import type { ContentChangeEvent } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import type { ChangeSet, MigrationAppliedRow } from "@usegraft/db";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
+import { assertGitSourced } from "../content-source";
 import { discoverMigrations } from "./migrate";
 
 export interface MergeCommandOptions {
@@ -82,6 +83,13 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
 
   loadProjectEnv(options.cwd);
   const config = await loadConfig(findConfig(options.cwd));
+  // A merge recompiles the git-merged working tree into the target, and in a
+  // database-sourced project that tree is not the content.
+  assertGitSourced(
+    config,
+    "merging a branch's files",
+    "Content in the database has no branch merge: make the change on the target branch instead, with graft studio --branch <target> or graft mcp --branch <target>.",
+  );
   const url = requireDatabaseUrl();
 
   const [
