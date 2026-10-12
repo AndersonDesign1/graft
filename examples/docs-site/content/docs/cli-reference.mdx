@@ -18,7 +18,7 @@ pass `--apply`.
 | --- | --- |
 | `graft init [dir]` | Create a Graft project: `graft.config.ts`, `content/`, sample content, and `llms.txt`. Add `--postgres` for the Postgres engine. |
 | `graft compile` | Check every content file against the schema and build the index, once |
-| `graft dev` | Watch `content/` and `graft.config.ts`, and recompile on every change |
+| `graft dev` | Watch `content/` and `graft.config.ts`, and recompile on every change. When content is in the database, it compiles once and watches only `graft.config.ts`. |
 | `graft asset put <file> [key]` | Upload a file to your bucket and print the frontmatter that points to it. Refuses a key that already holds a file. |
 | `graft add [item]` | Copy a ready-made [primitive](/docs/owned-primitives) into `graft/`. With no item, list them. |
 
@@ -81,6 +81,7 @@ for the route.
 | `graft migrate [--apply]` | Run your own [migrations](/docs/migrations). Lists them only, until `--apply`. |
 | `graft harden <role>` | Give an existing database role the limited rights a deployed app needs. See [Hardening](/docs/hardening). |
 | `graft content` | List documents in the compiled index |
+| `graft content import [--dry-run]` | Load the files under `contentDir` into the database, for a project with `content = { source: "database" }`. Every file is checked first. Safe to run again. |
 | `graft compilations` | List recent compiles and what each one changed |
 
 ## Approve actions
@@ -108,7 +109,7 @@ for the route.
 | `--apply` | migrate, merge | Make the change. Without it, these only report. |
 | `--prune-unknown` | compile | Remove index entries for collections the schema no longer has. Use after renaming or deleting a collection. |
 | `--json` | compile | Print the branch, commit, and change list as JSON on stdout. See [Print what a compile changed](#print-what-a-compile-changed). |
-| `--dry-run` | add | Preview the files without writing them |
+| `--dry-run` | add, content import | Preview what would change without writing it |
 | `--overwrite` | add, asset put | Replace files that differ (add), or the file already stored under the key (asset put) |
 | `--port` / `--host` | serve, studio | Where to listen. Defaults to this machine only. |
 | `--studio` | serve | Include Studio. `GRAFT_STUDIO=1` does the same. |

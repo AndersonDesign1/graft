@@ -23,8 +23,10 @@ a new public export, say that too.
 Graft holds a small number of invariants. A change that breaks one is refused
 no matter how well it is written:
 
-- Git is authoritative for authored content. The index is derived. If the two
-  disagree, git wins and the compiler rebuilds.
+- Each project has one source of truth for authored content: git by default,
+  or Postgres when it opts in (ADR 0007). The index is derived from that
+  source. A change that makes both authoritative, or reconciles one into the
+  other behind the user's back, is turned down.
 - Operational data belongs to Postgres and is reached only through typed
   functions.
 - Validation is one Zod layer, shared by schema, compiler, and functions.

@@ -10,6 +10,9 @@ edits a page.
 - `studio.openapi`: `GET /api/studio/v1/openapi.json`.
 - `studio.edit`: editing a document saves a draft; Commit makes a local Git
   commit in the project's checkout. It never pushes.
+- `studio.database`: with `content = { source: "database" }`, saves are draft
+  revisions in Postgres and Publish puts them live with no rebuild. Nothing is
+  written to `content/`.
 
 ## How to get to it (user POV)
 
@@ -33,6 +36,16 @@ database instead of the sandbox's. Ready when the log prints `graft studio — b
   change the title, save, and confirm the home screen lists it under
   "Not committed yet". Add the exact handles here the first time you run it.
 
+- **The database source publishes live.** Append
+  `export const content = { source: "database" };` to `graft.config.ts`, run
+  `$O --db "$URL" node $REPO/packages/cli/dist/index.js content import`, then
+  start Studio. `curl -s http://127.0.0.1:4999/api/studio/v1/workspace` says
+  `"storage":"database"`. In the browser: `New page` (dialog: `Title`, then
+  `Create page`), edit a field, top-bar `Publish`, then the sheet's `Publish`.
+  The sheet says "They're live on the site now.", and
+  `select slug from content_index where not deleted` lists the new page while
+  `content/` is unchanged.
+
 ## Gotchas
 
 - Studio needs Postgres. In a static project it exits with
@@ -40,3 +53,6 @@ database instead of the sandbox's. Ready when the log prints `graft studio — b
 - Studio is unauthenticated on loopback by design. Off loopback it needs
   scopes, so a remote check needs a token.
 - Stop it with `kill $STUDIO_PID`, then `pg.sh down "$P/pg"`.
+- Switching a sandbox to the database source without `content import` makes
+  the next compile remove every page: compile reads the revisions, and there
+  are none yet. That is correct behavior, not a bug.

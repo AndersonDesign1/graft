@@ -3,7 +3,7 @@
 # Source: ERROR_KNOWLEDGE in packages/mcp/src/explain.ts
 # Regenerate: node scripts/gen-error-docs.mjs
 title: Error reference
-description: "Every Graft error code, what it means, and how to recover. 46 codes."
+description: "Every Graft error code, what it means, and how to recover. 47 codes."
 section: Reference
 order: 5
 ---
@@ -18,7 +18,7 @@ you can tell whether the fix applies or something else is wrong.
 Agents can read the same entries without leaving their tools: the
 `explain_error` MCP tool returns them for any code.
 
-There are 46 codes, listed alphabetically.
+There are 47 codes, listed alphabetically.
 
 ## Codes
 
@@ -254,6 +254,19 @@ A document references another document that does not exist.
 **How to recover**
 
 Create the missing document, or update the reference to point at an existing collection/slug (list_content shows what exists).
+
+### CONTENT_SOURCE_MISMATCH
+
+The operation works on one source of content, and this project uses the other. A database-sourced project keeps its content in Postgres, so operations that read or rewrite the files in git (reverting to a commit, merging a branch's files, running a content migration over the files) have nothing to act on.
+
+**Usually because**
+
+- graft.config.ts exports `content = { source: "database" }` and the call reached for files
+- A script written for a git-sourced project ran against a database-sourced one
+
+**How to recover**
+
+Use the database-sourced equivalent the error's `fix` names. To change a document, write it with write_content and publish it with publish_drafts. Do not edit the files under the content directory and expect the site to change: they are a checkout, not the source.
 
 ### CONTENT_TREE_READ_ONLY
 
