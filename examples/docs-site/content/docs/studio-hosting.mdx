@@ -25,10 +25,9 @@ Git.
 If you would rather not set up GitHub at all, keep your content in the
 database instead: `export const content = { source: "database" }` in
 `graft.config.ts`. A hosted Studio then saves and publishes to `DATABASE_URL`,
-and a publish is live without a redeploy. Steps 1 and 4 below don't apply;
-step 2 does, since people still sign in with `GRAFT_STUDIO_SECRET`. Use invite
-links, or list who may sign in with GitHub in `GRAFT_STUDIO_EDITORS`. See
-[Configuration](/docs/configuration#content).
+and a publish is live without a redeploy. Steps 1 and 4 below don't apply.
+Step 2 does: set `GRAFT_STUDIO_SECRET`, and people sign in with Studio
+accounts. See [Configuration](/docs/configuration#content).
 
 </Callout>
 
@@ -93,8 +92,23 @@ including `collections` that are always reviewed, or turn it off with
 ## 2. Let people sign in
 
 Set `GRAFT_STUDIO_SECRET` to at least 32 random characters
-(`openssl rand -base64 48`). Studio signs its session cookies with it. Changing
-it signs everyone out and voids every unused invite link.
+(`openssl rand -base64 48`). Sign-in is off until it is set. Studio signs
+GitHub sessions and command-line invite links with it, so changing it signs
+out everyone who came in that way and voids those links. Account sessions live
+in your database and are not affected.
+
+**Studio accounts.** People sign in with an email and a password, kept in your
+database. The first time anyone opens Studio, it asks for the owner account.
+On a server anyone can reach, it also asks for a setup code, so only whoever
+deployed the site can claim it. `graft serve` prints the code when it starts,
+and `graft studio setup-code` prints it from the site's settings.
+
+The owner invites everyone else from **Settings, People**: an email and a role
+make a link to pass on. Studio sends no email, and shows each link once. The
+same list changes roles, makes a link to set a new password for someone who
+forgot theirs, and removes access, which signs that person out at once. Nobody
+can remove their own access, and the last admin can't be made anything else.
+Five wrong passwords in a row lock an account for 15 minutes.
 
 **Sign in with GitHub.** Create an OAuth app (Developer settings, OAuth Apps)
 with the callback URL `https://<your-site>/api/studio/v1/auth/github/callback`,
@@ -117,7 +131,7 @@ To choose who can sign in with GitHub, and with which role, set
 GRAFT_STUDIO_EDITORS="ana@shop.example.com=admin, octocat, ben@shop.example.com=contributor"
 ```
 
-**Invite links**, for people without a GitHub account:
+**Command-line invite links** sign someone in without an account:
 
 ```sh
 graft studio invite ana@shop.example.com --name "Ana Lima" --role editor
@@ -136,7 +150,7 @@ GitHub sign-in only, so an invited person does not need to be on that list.
 | `viewer` | Read everything |
 | `contributor` | Draft changes. Publishing opens a pull request |
 | `editor` | Draft and publish |
-| `admin` | Everything an editor can, and approve or deny actions waiting for a person |
+| `admin` | Everything an editor can, approve or deny actions waiting for a person, and manage people |
 
 ## 3. Deploy
 

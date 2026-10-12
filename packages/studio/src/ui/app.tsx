@@ -27,7 +27,7 @@ import {
 import { setEditorComponentSpecs } from "./components/mdx-card";
 import { CommandPalette } from "./components/palette";
 import { PublishSheet } from "./components/publish-sheet";
-import { SignIn } from "./components/sign-in";
+import { AcceptInvite, SignIn } from "./components/sign-in";
 import { ConfirmProvider } from "./components/ui/confirm";
 import { Dialog, DialogContent } from "./components/ui/dialog";
 import {
@@ -93,12 +93,16 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
     window.addEventListener(SIGNED_OUT_EVENT, onSignedOut);
     return () => window.removeEventListener(SIGNED_OUT_EVENT, onSignedOut);
   }, []);
+  // An invitation link opens Studio with ?invite=, signed in or not.
+  const [invite] = useState(() => new URLSearchParams(window.location.search).get("invite"));
 
   return (
     // One place decides icon size and stroke: Lucide at 16px and 1.75, as in
     // the docs.
     <LucideProvider size={16} strokeWidth={1.75}>
-      {signedOut ? (
+      {invite ? (
+        <AcceptInvite token={invite} />
+      ) : signedOut ? (
         <SignIn />
       ) : (
         <ErrorBoundary scope="page">

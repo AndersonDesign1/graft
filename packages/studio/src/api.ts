@@ -31,6 +31,7 @@ import { STUDIO_OPENAPI } from "./openapi";
 import { commitChanges, readChanges, readFileDiff } from "./git";
 import { preflightRevert, revertContentTo } from "./revert";
 import { EDITOR_ROUTES } from "./server/editor-routes";
+import { PEOPLE_ROUTES } from "./server/people-routes";
 import type {
   ApprovalList,
   BranchList,
@@ -107,6 +108,17 @@ export interface StudioApiOptions {
    * store makes a hosted Studio writable on a read-only filesystem.
    */
   store?: ContentStore;
+  /**
+   * Studio accounts are on: people sign in with an email and password, and an
+   * admin manages them under Settings. Set by the Studio handler when sign-in
+   * is configured with accounts.
+   */
+  accounts?: {
+    /** The public origin invitation links point at; the request's own otherwise. */
+    publicUrl?: string;
+    /** Where the UI is mounted, so a link opens it. */
+    uiBasePath: string;
+  };
 }
 
 /** Where the mounted project's content is authoritative, read from its store. */
@@ -162,7 +174,7 @@ function decodeRouteId(raw: string): string {
  * forces a preflight for anything that omits Origin, which the browser will
  * then refuse on our behalf.
  */
-function assertSameOrigin(request: Request, url: URL): void {
+export function assertSameOrigin(request: Request, url: URL): void {
   if (request.method === "GET" || request.method === "HEAD") return;
 
   const origin = request.headers.get("origin");
@@ -213,23 +225,28 @@ function assertSameOrigin(request: Request, url: URL): void {
  * tree has no business committing it, and deciding approvals is separated from
  * both: it is the human gate, and no agent runtime token should carry it.
  */
-export type StudioScope = "studio:read" | "studio:write" | "studio:publish" | "approvals:decide";
+export type StudioScope =
+  | "studio:read"
+  | "studio:write"
+  | "studio:publish"
+  | "approvals:decide"
+  | "studio:people";
 
-function json(data: unknown, status = 200): Response {
+export function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "content-type": "application/json; charset=utf-8" },
   });
 }
 
-function errorResponse(error: GraftError, status: number): Response {
+export function errorResponse(error: GraftError, status: number): Response {
   return new Response(JSON.stringify(error.toJSON()), {
     status,
     headers: { "content-type": "application/json; charset=utf-8" },
   });
 }
 
-function statusFor(error: GraftError): number {
+export function statusFor(error: GraftError): number {
   switch (error.code) {
     case "UNAUTHORIZED":
     case "TOKEN_INVALID":
@@ -253,6 +270,8 @@ function statusFor(error: GraftError): number {
       return 409;
     case "REMOTE_STORE_FAILED":
       return 502;
+    case "RATE_LIMITED":
+      return 429;
     case "SCHEMA_VALIDATION_FAILED":
     case "INPUT_VALIDATION_FAILED":
     case "INVALID_SLUG":
@@ -895,6 +914,7 @@ const ROUTES: readonly Route[] = [
     },
   },
   ...EDITOR_ROUTES,
+  ...PEOPLE_ROUTES,
 ];
 
 /** Tell the app the index changed. Undefined when there is no listener or no change. */

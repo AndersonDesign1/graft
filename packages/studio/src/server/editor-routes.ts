@@ -119,6 +119,7 @@ export const EDITOR_ROUTES: readonly Route[] = [
             }
           : null,
         sessions: Boolean(ctx.request.headers.get("cookie")?.includes("graft_studio=")),
+        accounts: Boolean(ctx.options.accounts),
       };
       return Response.json(body);
     },

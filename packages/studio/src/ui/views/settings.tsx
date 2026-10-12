@@ -10,11 +10,10 @@
  * server told us. Only the theme is a preference, and it is the only control
  * on the page that changes anything.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ContentTree } from "../../types";
 import {
   IconCheck,
-  IconCopy,
   IconDatabase,
   IconExternal,
   IconFile,
@@ -24,6 +23,9 @@ import {
   type IconComponent,
 } from "../components/icons";
 import { CollectionMark } from "../components/collection-icon";
+import { CopyButton, Row } from "../components/set-row";
+import { useStudio } from "../lib/studio";
+import { AccountPanel, PeoplePanel } from "./people";
 import { Pill } from "../components/primitives";
 import { ListSkeleton } from "../components/skeletons";
 import type { Theme } from "../lib/theme";
@@ -48,6 +50,16 @@ const SECTIONS = [
     id: "appearance",
     title: "Appearance",
     sub: "Light and dark are both first-class. Your choice is stored in this browser.",
+  },
+  {
+    id: "account",
+    title: "Account",
+    sub: "Who you're signed in as.",
+  },
+  {
+    id: "people",
+    title: "People",
+    sub: "Who can sign in to this Studio, and what each person can do.",
   },
   {
     id: "workspace",
@@ -134,50 +146,6 @@ function Section({
   );
 }
 
-function Row({
-  label,
-  hint,
-  children,
-  stack = false,
-}: {
-  label: string;
-  hint?: string;
-  children?: React.ReactNode;
-  stack?: boolean;
-}) {
-  return (
-    <div className="set-row" data-stack={stack}>
-      <div>
-        <p className="set-row-label">{label}</p>
-        {hint ? <p className="set-row-hint">{hint}</p> : null}
-      </div>
-      {children ? <div className="set-row-control">{children}</div> : null}
-    </div>
-  );
-}
-
-function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<number>(0);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-  return (
-    <button
-      type="button"
-      className="set-copy"
-      data-copied={copied}
-      aria-label={copied ? "Copied" : `Copy ${value}`}
-      onClick={() => {
-        void navigator.clipboard?.writeText(value);
-        setCopied(true);
-        window.clearTimeout(timer.current);
-        timer.current = window.setTimeout(() => setCopied(false), 1600);
-      }}
-    >
-      {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
-    </button>
-  );
-}
-
 /** A miniature of this Studio in one scheme: rail, sidebar, workspace. */
 function ThemePreview({ scheme, half = false }: { scheme: "light" | "dark"; half?: boolean }) {
   return (
@@ -213,8 +181,33 @@ export function SettingsView({
   const loopback = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
   const fileCollections = tree?.collections.filter((c) => c.authority === "file") ?? [];
   const dbCollections = tree?.collections.filter((c) => c.authority === "db") ?? [];
-  const idsRef = useRef(SECTIONS.map((s) => s.id));
-  const current = useCurrentSection(idsRef.current);
+  const { workspace } = useStudio();
+  const accounts = workspace.data?.accounts ?? false;
+  const canManagePeople = workspace.data?.user?.scopes.includes("studio:people") ?? false;
+  const database = workspace.data?.storage === "database";
+  // Your own account, when you signed in with one rather than GitHub or a link.
+  const [account, setAccount] = useState<{ email: string; role: string } | null>(null);
+  useEffect(() => {
+    if (!accounts) return;
+    fetch("/api/studio/v1/auth/session", { credentials: "same-origin" })
+      .then(
+        (res) =>
+          res.json() as Promise<{ user: { email: string; role: string; via: string } | null }>,
+      )
+      .then((body) => setAccount(body.user?.via === "account" ? body.user : null))
+      .catch(() => setAccount(null));
+  }, [accounts]);
+  const sections = useMemo(
+    () =>
+      SECTIONS.filter(
+        (s) =>
+          (s.id !== "account" || account !== null) &&
+          (s.id !== "people" || (accounts && canManagePeople)),
+      ),
+    [account, accounts, canManagePeople],
+  );
+  const ids = useMemo(() => sections.map((s) => s.id), [sections]);
+  const current = useCurrentSection(ids);
 
   return (
     <div className="view view-settings">
@@ -276,6 +269,18 @@ export function SettingsView({
               </Row>
             </div>
           </Section>
+
+          {account ? (
+            <Section id="account" title="Account" sub={SECTION_BY_ID.account.sub}>
+              <AccountPanel email={account.email} role={account.role} />
+            </Section>
+          ) : null}
+
+          {accounts && canManagePeople ? (
+            <Section id="people" title="People" sub={SECTION_BY_ID.people.sub}>
+              <PeoplePanel />
+            </Section>
+          ) : null}
 
           <Section id="workspace" title="Workspace" sub={SECTION_BY_ID.workspace.sub}>
             <div className="set-panel">
@@ -384,7 +389,11 @@ export function SettingsView({
               />
               <Row
                 label="Source of truth"
-                hint="Git owns the MDX. The Postgres index is a projection that compile refreshes."
+                hint={
+                  database
+                    ? "Postgres holds the content. Files are a copy that graft pull writes and graft push sends back."
+                    : "Git owns the MDX. The Postgres index is a projection that compile refreshes."
+                }
               />
             </div>
           </Section>
@@ -394,7 +403,7 @@ export function SettingsView({
             `href="#appearance"` would parse as an unknown view and throw the
             operator back to Overview. */}
         <nav className="settings-index" aria-label="Settings sections">
-          {SECTIONS.map((section) => (
+          {sections.map((section) => (
             <button
               key={section.id}
               type="button"

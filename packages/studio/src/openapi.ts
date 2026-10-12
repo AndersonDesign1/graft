@@ -127,6 +127,56 @@ export const STUDIO_OPENAPI = {
         responses: { "200": { description: "OK" } },
       },
     },
+    "/api/studio/v1/people": {
+      get: {
+        operationId: "listPeople",
+        summary: "Who can sign in with a Studio account, and open invitations",
+        description:
+          "Needs the studio:people scope (admins). Answers ROUTE_NOT_FOUND (404) when this Studio has no accounts.",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/people/invites": {
+      post: {
+        operationId: "invitePerson",
+        summary: "Invite someone by email, with a role",
+        description:
+          "Body: { email, name?, role }. Answers with the invitation link once; only its hash is stored. Inviting the same address again replaces the old link.",
+        responses: { "201": { description: "Created" } },
+      },
+    },
+    "/api/studio/v1/people/invites/{id}": {
+      delete: {
+        operationId: "revokeInvite",
+        summary: "Revoke an invitation nobody has used yet",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "204": { description: "Revoked" } },
+      },
+    },
+    "/api/studio/v1/people/{id}": {
+      put: {
+        operationId: "setPersonRole",
+        summary: "Change someone's role",
+        description: "Body: { role }. The last admin can't be given another role.",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "204": { description: "Changed" } },
+      },
+      delete: {
+        operationId: "removePerson",
+        summary: "Take away someone's access, ending their sessions",
+        description: "Nobody can remove their own access, and the last admin can't be removed.",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "204": { description: "Removed" } },
+      },
+    },
+    "/api/studio/v1/people/{id}/reset": {
+      post: {
+        operationId: "resetPassword",
+        summary: "A link that sets a new password for someone, keeping their role",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "201": { description: "Created" } },
+      },
+    },
     "/api/studio/v1/entries": {
       get: {
         operationId: "listEntries",

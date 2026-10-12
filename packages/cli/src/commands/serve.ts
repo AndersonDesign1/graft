@@ -283,6 +283,11 @@ export interface RunningGraftServer {
   port: number;
   host: string;
   branch: string;
+  /**
+   * Studio accounts are on and nobody has created the owner yet: what the
+   * first visit needs. `code` is absent on a loopback bind, which needs none.
+   */
+  studioSetup?: { code?: string };
   close(): Promise<void>;
 }
 
@@ -504,6 +509,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   }
 
   let studioHandler: FetchHandler | undefined;
+  let studioSetup: RunningGraftServer["studioSetup"];
   if (studioMod) {
     // Resolve the caller and hand the Studio their scopes; the Studio decides
     // per route what each one permits. This used to return
@@ -540,6 +546,9 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
               ...(repository
                 ? { permissionOf: (login: string) => repository.permissionOf(login) }
                 : {}),
+              // People also sign in with Studio accounts, kept in the project's
+              // own database (not a branch's): the first visit creates the owner.
+              accounts: { db: control.db, setupWithoutCode: loopback },
             },
           }
         : {}),
@@ -550,6 +559,12 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
       authenticate,
       onContentChange,
     });
+    if (access) {
+      const { countAccounts } = await import("@usegraft/db");
+      if ((await countAccounts(control.db)) === 0) {
+        studioSetup = loopback ? {} : { code: studioMod.setupCode(access.secret) };
+      }
+    }
   }
 
   const server = createServer(
@@ -575,6 +590,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     port,
     host,
     branch: branchName,
+    ...(studioSetup ? { studioSetup } : {}),
     close: async () => {
       stopMirror();
       await new Promise<void>((resolve, reject) => {
@@ -613,6 +629,13 @@ export async function serveCommand(options: ServeCommandOptions): Promise<void> 
         ? [
             `  studio     GET  ${base}/studio`,
             `  openapi    GET  ${base}/api/studio/v1/openapi.json`,
+          ]
+        : []),
+      ...(running.studioSetup
+        ? [
+            running.studioSetup.code
+              ? `  Studio has no accounts yet. Open /studio and create the owner with setup code ${running.studioSetup.code}.`
+              : "  Studio has no accounts yet. Open /studio to create the owner account.",
           ]
         : []),
       ...(process.env.GRAFT_REVALIDATE_URL?.trim()

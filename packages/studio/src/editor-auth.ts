@@ -1,6 +1,10 @@
 /**
- * Sign-in for a hosted Studio: GitHub, or an invite link, into a signed
- * session cookie.
+ * Sign-in for a hosted Studio: a Studio account (email and password), GitHub,
+ * or an invite link made on the command line.
+ *
+ * An account's session is a random token whose hash is a row in Postgres, so
+ * signing out, removing someone or changing their role takes effect on their
+ * next request. GitHub and command-line links still sign a stateless cookie.
  *
  * These routes are the only ones a signed-out browser may reach, so they sit
  * in front of the API's scope table rather than in it. Everything else still
@@ -9,7 +13,33 @@
  */
 import { withoutTrailingSlashes } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
-import type { StudioPrincipal } from "./api";
+import {
+  acceptInvite,
+  accountForSignIn,
+  countAccounts,
+  createOwner,
+  createSession,
+  deleteSession,
+  hasActiveAccount,
+  readInvite,
+  recordSignIn,
+  sessionAccount,
+  setPassword,
+  type Database,
+  type StudioAccount,
+} from "@usegraft/db";
+import {
+  assertPassword,
+  decoyHash,
+  hashPassword,
+  hashToken,
+  isAccountToken,
+  newToken,
+  normaliseEmail,
+  setupCodeMatches,
+  verifyPassword,
+} from "./accounts";
+import { assertSameOrigin, errorResponse, statusFor, type StudioPrincipal } from "./api";
 import {
   OAUTH_COOKIE,
   ROLE_SCOPES,
@@ -51,14 +81,31 @@ export interface EditorAuthOptions {
   github?: GitHubSignInOptions;
   /** A login's permission on the content repository, from the store's credentials. */
   permissionOf?: (login: string) => Promise<string>;
+  /**
+   * Studio accounts in this database: people sign in with an email and
+   * password, the first visit creates the owner, and admins invite the rest
+   * from Settings.
+   */
+  accounts?: {
+    db: Database;
+    /**
+     * Let the first visit create the owner without the setup code. Only for a
+     * Studio bound to this computer, where whoever can reach it already can
+     * run commands here.
+     */
+    setupWithoutCode?: boolean;
+  };
 }
 
 export interface EditorAuth {
   /** Answers an /auth route, or null for anything else. */
   handle(request: Request): Promise<Response | null>;
   /** The principal a session cookie carries, or null. */
-  authenticate(request: Request): StudioPrincipal | null;
+  authenticate(request: Request): Promise<StudioPrincipal | null>;
 }
+
+/** Wrong passwords in a row before an account is locked, and for how long. */
+const SIGN_IN_LIMITS = { maxFailures: 5, lockMs: 15 * 60_000 } as const;
 
 const AUTH = "/api/studio/v1/auth";
 
@@ -76,8 +123,51 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
   const ui = `${options.uiBasePath.replace(/\/$/, "")}/`;
   const editors = options.editors ?? new Map<string, StudioRole>();
 
-  function session(request: Request): EditorIdentity | null {
-    return verify<EditorIdentity>(options.secret, "session", readCookie(request, SESSION_COOKIE));
+  const accounts = options.accounts;
+
+  /** Who the session cookie says this is: an account's row, or a signed cookie. */
+  async function session(request: Request): Promise<EditorIdentity | null> {
+    const raw = readCookie(request, SESSION_COOKIE);
+    if (isAccountToken(raw)) {
+      const found = accounts ? await sessionAccount(accounts.db, hashToken(raw)) : null;
+      return found ? accountIdentity(found) : null;
+    }
+    return verify<EditorIdentity>(options.secret, "session", raw);
+  }
+
+  /** A new session for an account, answered as JSON with its cookie. */
+  async function accountSignedIn(request: Request, account: StudioAccount): Promise<Response> {
+    if (!accounts) throw accountsOff();
+    const { token, hash } = newToken();
+    await createSession(accounts.db, {
+      tokenHash: hash,
+      userId: account.id,
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    });
+    const headers = new Headers({ "cache-control": "no-store" });
+    headers.append("set-cookie", cookieHeader(request, SESSION_COOKIE, token, SESSION_TTL_MS));
+    return Response.json({ user: userJson(accountIdentity(account)) }, { headers });
+  }
+
+  /** Run an account route: same-origin JSON in, a GraftError out as JSON. */
+  async function accountRoute(
+    request: Request,
+    url: URL,
+    run: (db: Database, input: Record<string, unknown>) => Promise<Response>,
+  ): Promise<Response> {
+    try {
+      if (!accounts) throw accountsOff();
+      assertSameOrigin(request, url);
+      const parsed: unknown = await request.json().catch(() => null);
+      const input =
+        parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : {};
+      return await run(accounts.db, input);
+    } catch (error) {
+      if (error instanceof GraftError) return errorResponse(error, statusFor(error));
+      throw error;
+    }
   }
 
   function origin(request: Request): string {
@@ -228,8 +318,8 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
   }
 
   return {
-    authenticate(request) {
-      const identity = session(request);
+    async authenticate(request) {
+      const identity = await session(request);
       return identity ? principalFor(identity) : null;
     },
 
@@ -240,24 +330,156 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
 
       switch (route) {
         case "GET /session": {
-          const identity = session(request);
+          const identity = await session(request);
+          // No accounts yet: the first visit creates the owner.
+          const setup = accounts ? (await countAccounts(accounts.db)) === 0 : false;
           return Response.json(
             {
-              user: identity
-                ? {
-                    id: identity.id,
-                    name: identity.name ?? null,
-                    email: identity.email ?? null,
-                    role: identity.role,
-                    via: identity.via,
-                    scopes: ROLE_SCOPES[identity.role],
-                  }
-                : null,
-              methods: { github: Boolean(options.github), invite: true },
+              user: identity ? userJson(identity) : null,
+              methods: {
+                github: Boolean(options.github),
+                invite: true,
+                password: Boolean(accounts),
+              },
+              setup: setup ? { needsCode: !accounts?.setupWithoutCode } : null,
             },
             { headers: { "cache-control": "no-store" } },
           );
         }
+
+        case "POST /setup":
+          return accountRoute(request, url, async (db, input) => {
+            if (!accounts?.setupWithoutCode && !setupCodeMatches(options.secret, input.code)) {
+              throw new GraftError({
+                code: "UNAUTHORIZED",
+                message: "That setup code isn't right.",
+                fix: "Run graft studio setup-code with this site's settings (it reads GRAFT_STUDIO_SECRET), or ask whoever deployed it. graft serve also prints it when it starts.",
+              });
+            }
+            const email = normaliseEmail(input.email);
+            const password = assertPassword(input.password);
+            const name = typeof input.name === "string" ? input.name.trim().slice(0, 200) : "";
+            const owner = await createOwner(db, {
+              email,
+              ...(name ? { name } : {}),
+              passwordHash: await hashPassword(password),
+            });
+            if (!owner) {
+              throw new GraftError({
+                code: "UNAUTHORIZED",
+                message: "This Studio already has an owner.",
+                fix: "Sign in, or ask the owner for an invitation.",
+              });
+            }
+            return accountSignedIn(request, owner);
+          });
+
+        case "POST /sign-in":
+          return accountRoute(request, url, async (db, input) => {
+            const email = typeof input.email === "string" ? input.email.trim() : "";
+            const password = typeof input.password === "string" ? input.password : "";
+            const found = email ? await accountForSignIn(db, email) : null;
+            if (found?.lockedUntil && found.lockedUntil.getTime() > Date.now()) {
+              const minutes = Math.ceil((found.lockedUntil.getTime() - Date.now()) / 60_000);
+              throw new GraftError({
+                code: "RATE_LIMITED",
+                message: `Too many wrong passwords. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+                fix: "Wait, then sign in again. An admin can't unlock it sooner, but can invite you again if you've forgotten your password.",
+              });
+            }
+            // A wrong email is checked against a decoy, so it takes as long
+            // to refuse as a wrong password and says nothing about who exists.
+            const ok = await verifyPassword(password, found?.passwordHash ?? (await decoyHash()));
+            if (found) await recordSignIn(db, found.id, ok, SIGN_IN_LIMITS);
+            if (!found || !ok) {
+              throw new GraftError({
+                code: "UNAUTHORIZED",
+                message: "That email and password don't match an account.",
+                fix: "Check both and try again. Forgotten your password? Ask an admin to invite you again.",
+              });
+            }
+            return accountSignedIn(request, found);
+          });
+
+        case "GET /invite": {
+          const token = url.searchParams.get("token") ?? "";
+          const invite = accounts && token ? await readInvite(accounts.db, hashToken(token)) : null;
+          if (!invite) {
+            return errorResponse(
+              new GraftError({
+                code: "TOKEN_INVALID",
+                message: "This invitation was already used, replaced, or has expired.",
+                fix: "Ask whoever invited you for a new invitation.",
+              }),
+              401,
+            );
+          }
+          return Response.json(
+            {
+              email: invite.email,
+              name: invite.name,
+              role: invite.role,
+              // A link for someone who can already sign in sets a new password.
+              reset: accounts ? await hasActiveAccount(accounts.db, invite.email) : false,
+            },
+            { headers: { "cache-control": "no-store" } },
+          );
+        }
+
+        case "POST /invite":
+          return accountRoute(request, url, async (db, input) => {
+            const token = typeof input.token === "string" ? input.token : "";
+            const password = assertPassword(input.password);
+            const name = typeof input.name === "string" ? input.name.trim().slice(0, 200) : "";
+            const result = await acceptInvite(db, {
+              tokenHash: hashToken(token),
+              ...(name ? { name } : {}),
+              passwordHash: await hashPassword(password),
+            });
+            if (!result.ok) {
+              throw new GraftError({
+                code: "TOKEN_INVALID",
+                message: "This link was already used, replaced, or has expired.",
+                fix: "Ask whoever sent it for a new one.",
+              });
+            }
+            return accountSignedIn(request, result.account);
+          });
+
+        case "POST /password":
+          return accountRoute(request, url, async (db, input) => {
+            const raw = readCookie(request, SESSION_COOKIE);
+            const current = isAccountToken(raw) ? await sessionAccount(db, hashToken(raw)) : null;
+            if (!current || !isAccountToken(raw)) {
+              throw new GraftError({
+                code: "UNAUTHORIZED",
+                message: "Only someone signed in with a Studio account has a password to change.",
+                fix: "Sign in with your email and password first.",
+              });
+            }
+            const next = assertPassword(input.next);
+            const stored = await accountForSignIn(db, current.email);
+            const ok = stored
+              ? await verifyPassword(
+                  typeof input.current === "string" ? input.current : "",
+                  stored.passwordHash,
+                )
+              : false;
+            if (!ok) {
+              throw new GraftError({
+                code: "UNAUTHORIZED",
+                message: "Your current password isn't right.",
+                fix: "Type the password you signed in with.",
+              });
+            }
+            // Every other browser signed in as this person is signed out.
+            await setPassword(db, {
+              id: current.id,
+              passwordHash: await hashPassword(next),
+              keepSession: hashToken(raw),
+            });
+            return new Response(null, { status: 204 });
+          });
 
         case "GET /github": {
           if (!options.github) return failed(request, "github_off");
@@ -323,6 +545,8 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
               { status: 401 },
             );
           }
+          const raw = readCookie(request, SESSION_COOKIE);
+          if (accounts && isAccountToken(raw)) await deleteSession(accounts.db, hashToken(raw));
           const headers = new Headers({ "cache-control": "no-store" });
           headers.append("set-cookie", cookieHeader(request, SESSION_COOKIE, "", 0));
           return new Response(null, { status: 204, headers });
@@ -333,6 +557,35 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
       }
     },
   };
+}
+
+function accountIdentity(account: StudioAccount): EditorIdentity {
+  return {
+    id: account.email,
+    email: account.email,
+    ...(account.name ? { name: account.name } : {}),
+    role: account.role,
+    via: "account",
+  };
+}
+
+function userJson(identity: EditorIdentity) {
+  return {
+    id: identity.id,
+    name: identity.name ?? null,
+    email: identity.email ?? null,
+    role: identity.role,
+    via: identity.via,
+    scopes: ROLE_SCOPES[identity.role],
+  };
+}
+
+function accountsOff(): GraftError {
+  return new GraftError({
+    code: "ROUTE_NOT_FOUND",
+    message: "This Studio has no accounts.",
+    fix: "Sign in with GitHub or the link you were sent. To turn accounts on, run Studio with graft serve --studio and GRAFT_STUDIO_SECRET set.",
+  });
 }
 
 function hostOf(origin: string): string | null {

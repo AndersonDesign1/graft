@@ -23,7 +23,7 @@ export type StudioRole = (typeof STUDIO_ROLES)[number];
 /**
  * Roles are names for scope sets; routes still check scopes. A contributor
  * drafts and submits for review, an editor publishes, an admin also decides
- * approvals: the familiar split for a content team.
+ * approvals and manages who has access: the familiar split for a content team.
  */
 // Frozen, map and arrays alike: it is exported, and it decides what a signed-in
 // role may do, so no importer can widen a role at runtime.
@@ -31,7 +31,13 @@ export const ROLE_SCOPES: Readonly<Record<StudioRole, readonly string[]>> = Obje
   viewer: Object.freeze(["studio:read"]),
   contributor: Object.freeze(["studio:read", "studio:write"]),
   editor: Object.freeze(["studio:read", "studio:write", "studio:publish"]),
-  admin: Object.freeze(["studio:read", "studio:write", "studio:publish", "approvals:decide"]),
+  admin: Object.freeze([
+    "studio:read",
+    "studio:write",
+    "studio:publish",
+    "approvals:decide",
+    "studio:people",
+  ]),
 });
 
 export function isStudioRole(value: unknown): value is StudioRole {
@@ -39,12 +45,12 @@ export function isStudioRole(value: unknown): value is StudioRole {
 }
 
 export interface EditorIdentity {
-  /** GitHub login, or the invited email. */
+  /** GitHub login, or the email of an account or an invite link. */
   id: string;
   name?: string;
   email?: string;
   role: StudioRole;
-  via: "github" | "invite";
+  via: "github" | "invite" | "account";
 }
 
 interface Signed<T> {

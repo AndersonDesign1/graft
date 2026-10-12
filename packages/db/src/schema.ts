@@ -388,3 +388,71 @@ export const contentMirror = pgTable(
 );
 
 export type ContentMirrorRow = typeof contentMirror.$inferSelect;
+
+/* ---- Studio accounts ------------------------------------------------------ */
+
+/**
+ * A person who signs in to Studio with an email and password. Accounts belong
+ * to the project, not a branch. The first one is created on first visit and
+ * is the owner; everyone after is invited. `role` is one of the Studio roles
+ * (viewer, contributor, editor, admin), each a name for a set of scopes.
+ */
+export const studioUsers = pgTable(
+  "studio_users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    name: text("name"),
+    role: text("role").notNull(),
+    /** scrypt, with its parameters and salt: `scrypt$N$r$p$salt$hash`. */
+    passwordHash: text("password_hash").notNull(),
+    owner: boolean("owner").notNull().default(false),
+    failedSignIns: integer("failed_sign_ins").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("studio_users_email").on(sql`lower(${t.email})`)],
+);
+
+export type StudioUserRow = typeof studioUsers.$inferSelect;
+
+/**
+ * A signed-in browser. The cookie holds a random token; only its SHA-256 is
+ * stored, so a leaked table cannot be replayed. A row is what makes a session
+ * revocable: signing out, removing a person or changing their role takes
+ * effect on their next request.
+ */
+export const studioSessions = pgTable(
+  "studio_sessions",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => studioUsers.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("studio_sessions_user").on(t.userId)],
+);
+
+/** An invitation an admin sent from Settings: one use, until it expires or is revoked. */
+export const studioInvites = pgTable(
+  "studio_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    name: text("name"),
+    role: text("role").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    invitedById: uuid("invited_by_id").references(() => studioUsers.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [index("studio_invites_email").on(sql`lower(${t.email})`)],
+);
+
+export type StudioInviteRow = typeof studioInvites.$inferSelect;
