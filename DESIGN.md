@@ -255,17 +255,53 @@ Markdown tables, fences and inline code render through `Table`, `Pre` and
 Studio is an app: it is scanned and operated, not read top to bottom. Every
 rule above holds; this section adds what an app needs.
 
-**Frame.** The docs' frame. A 56px top bar across the full width: the
-wordmark and the branch left, search centred (24rem, with its shortcut), the
-Commit or Publish button and the account menu right. A 268px sidebar under it
-on the page colour holds navigation only. Below 48rem the sidebar opens as a
-drawer from a menu button and search becomes an icon.
+**Frame.** A 48px top bar across the full width: the wordmark and the branch
+left, search centred (24rem, with its shortcut), the Commit or Publish button
+for every draft and the account menu right. A 208px sidebar under it on the
+page colour holds navigation only. Below 48rem the sidebar opens as a drawer
+from a menu button and search becomes an icon.
+
+**Panes.** A view is one pane, or panes side by side when an entry is open: the
+collection's list (280px), the document, and the inspector (256px). Every pane
+starts with a 48px header, so the headers line up into one edge. A header has
+one title and at most one primary button; anything else is an icon button or
+lives in the More menu. Panes give way as the window narrows, widest last:
+
+| Width       | What shows                                            |
+| ----------- | ----------------------------------------------------- |
+| 1280px up   | Sidebar, list, document, inspector                    |
+| 1024-1280px | Sidebar, list, document; the inspector opens over it  |
+| 768-1024px  | Sidebar and document; the list is the breadcrumb away |
+| Under 768px | The document; sidebar and inspector open over it      |
+
+A pane's content follows the pane's width, not the window's: lay it out with
+container queries on the pane.
+
+**The list** marks the open entry with a wash and a 2px ink edge on its left.
+Rows are two lines, 56px: the title, then the state or the slug and when it
+changed. The arrow keys, Home and End move between rows and Enter opens one;
+moving never opens an entry by itself.
+
+**The inspector** holds what is about the entry rather than in it: its status,
+where it is saved, its file and version, and what changed. Tabs are words
+with a 2px underline on the chosen one. It toggles with ⌘\ or Ctrl+\,
+remembers the choice in the browser, and is closed by default where it would
+open over the document. Over the document it is a sheet: the floating shadow,
+a close button, and Escape.
+
+**Presence.** When Studio shows who else has an entry open, it goes in the
+document's toolbar, before the More menu: up to three avatars, then a count.
+Nowhere else.
 
 **Density.** 14px is the body size, 13px the floor. Controls are 36px; a
 smaller control (32px in a toolbar, an icon button) pads its hit area to 40px.
-Table rows are 44px, menu items 32px. Views open with a title (24px, 600), a
-one-line description, then their content; sections inside a view use 16px 600
-titles.
+Table rows are 44px, list rows 56px, menu items 32px. Views open with a title
+(24px, 600), a one-line description, then their content; sections inside a
+view use 16px 600 titles.
+
+**Spacing is the scale.** Every padding, margin and gap in Studio's
+stylesheets is a `--space-*` token (or another token). The only literals are
+1px and 2px hairline nudges. `pnpm check:design` enforces it.
 
 **State is a mark and a word.** Never a colored pill. The resting state shows
 nothing, so the exceptions are what the eye finds.

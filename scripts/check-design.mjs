@@ -17,6 +17,10 @@
  *   - no `var(--name)` that nothing defines: the declaration is silently
  *     dropped, so the bug only shows as a missing color
  *
+ * CSS (Studio stylesheets):
+ *   - padding, margin and gap come from the spacing scale (`--space-*`, or
+ *     another token); a literal is allowed only as a 1-2px hairline nudge
+ *
  * Content (docs MDX, generated pages skipped):
  *   - no em dashes in prose
  *   - every `<CodeBlock>` has a `title`
@@ -230,6 +234,41 @@ export function checkCss(css, defined) {
   return problems;
 }
 
+const SPACING_PROPERTY = /^(padding|margin|gap|row-gap|column-gap)(-[a-z-]+)?$/;
+
+/**
+ * A length in a padding, margin or gap that isn't on the scale: anything but
+ * 0, a percentage, a token, or a hairline of 2px or less.
+ */
+export function offScaleSpacing(property, value) {
+  if (!SPACING_PROPERTY.test(property)) return [];
+  const bare = value.replace(/var\([^)]*\)/g, "");
+  return [...bare.matchAll(/(-?\d*\.?\d+)(rem|em|px|ch|vw|vh)\b/g)]
+    .filter(([, number, unit]) => {
+      const n = Math.abs(Number(number));
+      if (n === 0) return false;
+      return !(unit === "px" && n <= 2);
+    })
+    .map(([length]) => length);
+}
+
+/** Studio's rules on top of checkCss: spacing from the scale. */
+export function checkStudioCss(css) {
+  const problems = [];
+  for (const { property, value, line } of declarations(css)) {
+    if (property.startsWith("--")) continue;
+    const off = offScaleSpacing(property, value);
+    if (off.length > 0) {
+      problems.push({
+        line,
+        message: `${property} ${off.join(", ")} is off the spacing scale`,
+        fix: "Use var(--space-1) (4px), --space-2 (8px), --space-3 (12px), --space-4 (16px), --space-5, --space-6, --space-8 or larger. Only a 1px or 2px hairline nudge may be a literal.",
+      });
+    }
+  }
+  return problems;
+}
+
 /** Design problems in one MDX page, each with the fix. Generated pages pass. */
 export function checkMdx(mdx) {
   if (/^---[\s\S]*?GENERATED FILE[\s\S]*?^---/m.test(mdx)) return [];
@@ -286,6 +325,7 @@ function main() {
   const studioDefined = definedVariables(tokens + studio.map(({ css }) => css).join("\n"));
   for (const { file, css } of studio) {
     for (const problem of checkCss(css, studioDefined)) report.push({ file, ...problem });
+    for (const problem of checkStudioCss(css)) report.push({ file, ...problem });
   }
   const pages = mdxFiles(DOCS_CONTENT);
   for (const file of pages) {
