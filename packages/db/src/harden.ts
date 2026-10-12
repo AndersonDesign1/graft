@@ -56,7 +56,7 @@ export function runtimeRoleGrantsSql(role: string): string[] {
     `GRANT USAGE ON SCHEMA public TO ${role}`,
     // Reads: every Graft table is readable (content, scope resolution, rate
     // counting, approval diagnostics, ledgers).
-    `GRANT SELECT ON TABLE content_index, compilations, data_records, audit_log, approvals, migrations_applied, branches, content_revisions, content_heads, content_reviews, content_mirror, studio_users, studio_sessions, studio_invites TO ${role}`,
+    `GRANT SELECT ON TABLE content_index, compilations, data_records, audit_log, approvals, migrations_applied, branches, content_revisions, content_heads, content_reviews, content_mirror, studio_users, studio_sessions, studio_invites, assets, agent_tokens, site_settings, deploy_hooks TO ${role}`,
     // Operational data is the runtime's to mutate (typed functions).
     `GRANT INSERT, UPDATE, DELETE ON TABLE data_records TO ${role}`,
     // Content projection. `write_content` writes the MDX file and then
@@ -101,6 +101,14 @@ export function runtimeRoleGrantsSql(role: string): string[] {
     `GRANT INSERT, UPDATE ON TABLE studio_users TO ${role}`,
     `GRANT INSERT, DELETE ON TABLE studio_sessions TO ${role}`,
     `GRANT INSERT, UPDATE ON TABLE studio_invites TO ${role}`,
+    // Media, agent tokens, site settings and deploy hooks are edited in
+    // Studio, so the same trust as accounts above. A file's catalogue row is
+    // deleted with the file; a token is revoked, never deleted, so what an
+    // agent did stays answerable; a hook is deleted when an admin removes it.
+    `GRANT INSERT, UPDATE, DELETE ON TABLE assets TO ${role}`,
+    `GRANT INSERT, UPDATE ON TABLE agent_tokens TO ${role}`,
+    `GRANT INSERT, UPDATE ON TABLE site_settings TO ${role}`,
+    `GRANT INSERT, UPDATE, DELETE ON TABLE deploy_hooks TO ${role}`,
     // Every invocation audits itself. The row is reserved before the call runs
     // (that is what makes rate limiting immune to concurrency), then settled
     // with its outcome — so the runtime needs UPDATE as well as INSERT.

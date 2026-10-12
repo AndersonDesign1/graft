@@ -184,6 +184,16 @@ to the connection's own draft branch, and `list_drafts`, `publish_drafts` and
 request unless its token carries `content:publish`. See
 [MCP tools](/docs/mcp-tools).
 
+Give each agent its own token from **Developer, Agents** in Studio. Pick
+Read, Write drafts or Publish; only Publish carries `content:publish`. The
+agent sends the token to `/api/mcp` as `Authorization: Bearer graft_at_…`.
+Revoke it there and the agent is refused from its next request. See
+[Studio, Agents](/docs/studio#agents).
+
+To rebuild or refresh the site after a publish when content is in the
+database, add a deploy hook under **Settings, Deploy hooks**. See
+[Studio, Site and deploy hooks](/docs/studio#site-and-deploy-hooks).
+
 ## Check it works
 
 1. Open `/studio`. You see the sign-in screen.

@@ -20,6 +20,7 @@ import { controlOf, emptyValue, formatMoney, labelOf, moneyInput, parseMoney } f
 import { humanise } from "../lib/fields";
 import { singular } from "../lib/studio";
 import { IconCaretDown, IconCheck, IconClose, IconFile, IconSearch, IconWarning } from "./icons";
+import { MediaPicker } from "../views/media";
 import { NumberField, Switch } from "./ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
@@ -770,23 +771,43 @@ export function AssetThumb({
   );
 }
 
+/**
+ * A file picked from the library. The entry keeps its own alt text when it has
+ * one; otherwise it starts from what the library says about the file.
+ */
+function picked(original: unknown, file: { key: string; alt: string | null }): Asset {
+  const current = asAsset(original).alt;
+  return withAsset(original, { key: file.key, alt: current || file.alt || undefined });
+}
+
 function AssetControl({ value, onChange, disabled, inputId, describedBy }: InputProps) {
   const asset = asAsset(value);
+  const [choosing, setChoosing] = useState(false);
   return (
     <div className="fc-asset">
       <AssetThumb assetKey={asset.key} alt={asset.alt} size="lg" />
       <div className="fc-asset-fields">
-        <input
-          id={inputId}
-          className="input"
-          value={asset.key}
-          placeholder="products/hat/front.jpg"
-          spellCheck={false}
-          disabled={disabled}
-          aria-describedby={describedBy}
-          aria-label="File"
-          onChange={(e) => onChange(withAsset(value, { key: e.target.value }))}
-        />
+        <div className="fc-asset-key">
+          <input
+            id={inputId}
+            className="input"
+            value={asset.key}
+            placeholder="products/hat/front.jpg"
+            spellCheck={false}
+            disabled={disabled}
+            aria-describedby={describedBy}
+            aria-label="File"
+            onChange={(e) => onChange(withAsset(value, { key: e.target.value }))}
+          />
+          <button
+            type="button"
+            className="btn"
+            disabled={disabled}
+            onClick={() => setChoosing(true)}
+          >
+            Choose…
+          </button>
+        </div>
         <input
           className="input"
           value={asset.alt ?? ""}
@@ -796,12 +817,18 @@ function AssetControl({ value, onChange, disabled, inputId, describedBy }: Input
           onChange={(e) => onChange(withAsset(value, { alt: e.target.value }))}
         />
       </div>
+      <MediaPicker
+        open={choosing}
+        onOpenChange={setChoosing}
+        onPick={(file) => onChange(picked(value, file))}
+      />
     </div>
   );
 }
 
 function GalleryControl({ value, onChange, disabled, path, problems }: InputProps) {
   const list = Array.isArray(value) ? (value as unknown[]) : [];
+  const [choosing, setChoosing] = useState(false);
   const update = (i: number, next: unknown) =>
     onChange(list.map((item, j) => (j === i ? next : item)));
   const move = (i: number, by: number) => {
@@ -873,10 +900,16 @@ function GalleryControl({ value, onChange, disabled, path, problems }: InputProp
         type="button"
         className="fc-tile fc-tile-add"
         disabled={disabled}
-        onClick={() => onChange([...list, { key: "" }])}
+        onClick={() => setChoosing(true)}
       >
         <span>Add image</span>
       </button>
+      <MediaPicker
+        open={choosing}
+        onOpenChange={setChoosing}
+        onPick={(file) => onChange([...list, picked({}, file)])}
+        onTypeInstead={() => onChange([...list, { key: "" }])}
+      />
     </div>
   );
 }

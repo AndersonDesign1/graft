@@ -177,6 +177,113 @@ export const STUDIO_OPENAPI = {
         responses: { "201": { description: "Created" } },
       },
     },
+    "/api/studio/v1/assets": {
+      get: {
+        operationId: "listAssets",
+        summary: "The media library: files uploaded through Studio and files entries use",
+        description:
+          "Query: q (matches the key and alt text). storage is false, with a reason, when the asset store isn't configured where Studio runs.",
+        parameters: [{ name: "q", in: "query", required: false, schema: { type: "string" } }],
+        responses: { "200": { description: "OK" } },
+      },
+      post: {
+        operationId: "uploadAsset",
+        summary: "Upload a file to the asset store",
+        description:
+          "Body: { name, base64, key?, alt?, overwrite? }, at most 10 MB: an image or a PDF, typed by its extension. The key defaults to assets/<name>. An existing key answers ASSET_EXISTS (409); overwrite: true replaces it and needs studio:publish. Needs studio:write.",
+        responses: {
+          "201": { description: "Created" },
+          "409": { description: "The key is taken" },
+        },
+      },
+      delete: {
+        operationId: "deleteAsset",
+        summary: "Delete a file nothing uses",
+        description:
+          "Needs studio:publish. A file an entry still uses answers CONTENT_CONFLICT (409) with the entries that use it.",
+        parameters: [{ name: "key", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Deleted" }, "409": { description: "Still used" } },
+      },
+    },
+    "/api/studio/v1/assets/detail": {
+      get: {
+        operationId: "assetDetail",
+        summary: "One file: its size, alt text, who uploaded it, and the entries that use it",
+        parameters: [{ name: "key", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/assets/alt": {
+      put: {
+        operationId: "setAssetAlt",
+        summary: "Set the alt text an image field starts from when the file is picked",
+        description:
+          "Body: { key, alt }. Only for files uploaded through Studio. Needs studio:write.",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/agents": {
+      get: {
+        operationId: "listAgentTokens",
+        summary: "Agent tokens, live and revoked, and the endpoints an agent connects to",
+        description:
+          "Needs the studio:settings scope (admins). Tokens are never returned, only their first characters.",
+        responses: { "200": { description: "OK" } },
+      },
+      post: {
+        operationId: "createAgentToken",
+        summary: "Make a token for one agent",
+        description:
+          'Body: { name, access }, where access is "read", "write" (drafts) or "publish". Answers with the token once; only its hash is stored. No token can decide approvals.',
+        responses: { "201": { description: "Created" } },
+      },
+    },
+    "/api/studio/v1/agents/{id}": {
+      delete: {
+        operationId: "revokeAgentToken",
+        summary: "Revoke a token; the agent is refused from its next request",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Revoked" } },
+      },
+    },
+    "/api/studio/v1/site": {
+      get: {
+        operationId: "getSite",
+        summary: "The site's name and address, and its deploy hooks for admins",
+        responses: { "200": { description: "OK" } },
+      },
+      put: {
+        operationId: "setSite",
+        summary: "Set the site's name and address",
+        description: "Body: { name, url }. Needs studio:settings.",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/site/hooks": {
+      post: {
+        operationId: "addDeployHook",
+        summary: "Add a URL to call after every publish",
+        description:
+          "Body: { name, url, secret? }. https, or http to this machine. The secret is sent as a bearer header. Needs studio:settings.",
+        responses: { "201": { description: "Created" } },
+      },
+    },
+    "/api/studio/v1/site/hooks/{id}/test": {
+      post: {
+        operationId: "testDeployHook",
+        summary: "Call one hook now and record what it answered",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/site/hooks/{id}": {
+      delete: {
+        operationId: "removeDeployHook",
+        summary: "Stop calling a hook after publishes",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Removed" } },
+      },
+    },
     "/api/studio/v1/entries": {
       get: {
         operationId: "listEntries",

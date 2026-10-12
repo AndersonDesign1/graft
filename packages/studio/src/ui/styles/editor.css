@@ -2234,3 +2234,13 @@
     display: none;
   }
 }
+
+.fc-asset-key {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.fc-asset-key .input {
+  flex: 1;
+  min-width: 0;
+}

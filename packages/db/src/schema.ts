@@ -456,3 +456,82 @@ export const studioInvites = pgTable(
 );
 
 export type StudioInviteRow = typeof studioInvites.$inferSelect;
+
+/* ---- media, agents and site settings -------------------------------------- */
+
+/**
+ * A file in the asset store, with what Studio knows about it: its type, its
+ * size and the alt text to offer when someone uses it. The bytes live in the
+ * bucket; a document refers to a file by its key (`{ key, alt }`), so this
+ * row is a catalogue, not the source of truth for what a page shows.
+ */
+export const assets = pgTable(
+  "assets",
+  {
+    key: text("key").primaryKey(),
+    contentType: text("content_type").notNull(),
+    bytes: integer("bytes").notNull(),
+    /** The alt text offered when the file is picked; each use can change it. */
+    alt: text("alt"),
+    uploadedById: text("uploaded_by_id"),
+    uploadedByName: text("uploaded_by_name"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("assets_created").on(t.createdAt)],
+);
+
+export type AssetRow = typeof assets.$inferSelect;
+
+/**
+ * A token an admin made in Studio for an agent: the Studio API and MCP accept
+ * it as a bearer. Only its SHA-256 is stored; `prefix` is the first few
+ * characters, enough to tell two tokens apart in a list.
+ */
+export const agentTokens = pgTable(
+  "agent_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    prefix: text("prefix").notNull(),
+    scopes: jsonb("scopes").$type<string[]>().notNull(),
+    createdById: uuid("created_by_id").references(() => studioUsers.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [index("agent_tokens_created").on(t.createdAt)],
+);
+
+export type AgentTokenRow = typeof agentTokens.$inferSelect;
+
+/** The site's own settings, edited in Studio: one row. */
+export const siteSettings = pgTable("site_settings", {
+  id: text("id").primaryKey().default("site"),
+  name: text("name"),
+  url: text("url"),
+  updatedById: text("updated_by_id"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type SiteSettingsRow = typeof siteSettings.$inferSelect;
+
+/**
+ * A URL called after every publish: a host's build hook, or a site's
+ * revalidate route. The last delivery is kept, so Studio can say whether the
+ * site heard about the last publish.
+ */
+export const deployHooks = pgTable("deploy_hooks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  /** Sent as `Authorization: Bearer`, for a revalidate route that checks it. */
+  secret: text("secret"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastAt: timestamp("last_at", { withTimezone: true }),
+  lastStatus: integer("last_status"),
+  lastError: text("last_error"),
+});
+
+export type DeployHookRow = typeof deployHooks.$inferSelect;

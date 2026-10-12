@@ -145,6 +145,30 @@ describe("createStudioApiHandler", () => {
     expect(res.status).toBe(200);
   });
 
+  it("asks for a migration when the database is missing a table", async () => {
+    // Drizzle wraps the driver's error; the SQLSTATE is on the cause.
+    const undefinedTable = Object.assign(new Error("Failed query"), {
+      cause: Object.assign(new Error('relation "agent_tokens" does not exist'), {
+        code: "42P01",
+      }),
+    });
+    const db = new Proxy(
+      {},
+      {
+        get: () => () => {
+          throw undefinedTable;
+        },
+      },
+    );
+    const handler = createStudioApiHandler({ ...baseOpts, db: db as never });
+    const res = await handler(new Request("http://localhost/api/studio/v1/agents"));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({
+      error: "MIGRATION_REQUIRED",
+      fix: expect.stringContaining("graft db migrate"),
+    });
+  });
+
   it("404s unknown studio paths", async () => {
     const handler = createStudioApiHandler(baseOpts);
     const res = await handler(new Request("http://localhost/api/studio/v1/edit"));

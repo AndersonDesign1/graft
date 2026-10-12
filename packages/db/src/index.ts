@@ -4,6 +4,7 @@
  * ./branch: `resolveBranchScope` + overlay-aware `readContent`/`searchContent`.
  */
 export * from "./accounts";
+export * from "./studio-data";
 export * from "./approvals";
 export * from "./audit";
 export * from "./branch";

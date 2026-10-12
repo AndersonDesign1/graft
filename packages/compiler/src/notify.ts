@@ -14,6 +14,7 @@
  *   from GRAFT_REVALIDATE_URL and GRAFT_WEBHOOK_SECRET.
  */
 import { GraftError, type ChangeSet, type GraftErrorJSON } from "@usegraft/contracts";
+import { readStart } from "./read-start";
 
 /** What changed, on which branch. The body a revalidate route reads. */
 export interface ContentChangeEvent {
@@ -181,30 +182,6 @@ export function createRevalidateWebhook(options: RevalidateWebhookOptions): Cont
       });
     }
   };
-}
-
-/**
- * The first `limit` characters of an error body, read without buffering the
- * rest: a misconfigured route can answer with an arbitrarily large page, and
- * only the start of it goes into the message. Never throws.
- */
-async function readStart(response: Response, limit: number): Promise<string> {
-  const reader = response.body?.getReader();
-  if (!reader) return "";
-  const decoder = new TextDecoder();
-  let text = "";
-  try {
-    while (text.length < limit) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      text += decoder.decode(value, { stream: true });
-    }
-  } catch {
-    // A body that fails mid-read still leaves whatever arrived.
-  } finally {
-    await reader.cancel().catch(() => {});
-  }
-  return text.slice(0, limit);
 }
 
 function parseWebhookUrl(raw: string): URL {

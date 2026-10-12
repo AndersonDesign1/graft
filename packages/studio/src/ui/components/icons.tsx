@@ -23,6 +23,8 @@ export {
   HistoryIcon as IconHistory,
   FileDiffIcon as IconChanges,
   SettingsIcon as IconSettings,
+  ImagesIcon as IconMedia,
+  BotIcon as IconAgents,
   MenuIcon as IconMenu,
 } from "lucide-react";
 

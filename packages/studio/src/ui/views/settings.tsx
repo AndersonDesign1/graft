@@ -11,6 +11,7 @@
  * on the page that changes anything.
  */
 import { useEffect, useMemo, useState } from "react";
+import type { SiteDto } from "../../editor-types";
 import type { ContentTree } from "../../types";
 import {
   IconCheck,
@@ -23,12 +24,14 @@ import {
   type IconComponent,
 } from "../components/icons";
 import { CollectionMark } from "../components/collection-icon";
-import { CopyButton, Row } from "../components/set-row";
+import { CopyButton, Row, Section } from "../components/set-row";
 import { useStudio } from "../lib/studio";
 import { AccountPanel, PeoplePanel } from "./people";
+import { HooksPanel, SitePanel } from "./site";
 import { Pill } from "../components/primitives";
 import { ListSkeleton } from "../components/skeletons";
 import type { Theme } from "../lib/theme";
+import { useResource } from "../lib/use-resource";
 import { plural } from "../lib/format";
 
 const THEMES: Array<{ id: Theme; label: string; Icon: IconComponent }> = [
@@ -60,6 +63,16 @@ const SECTIONS = [
     id: "people",
     title: "People",
     sub: "Who can sign in to this Studio, and what each person can do.",
+  },
+  {
+    id: "site",
+    title: "Site",
+    sub: "The site's name and where it is online.",
+  },
+  {
+    id: "hooks",
+    title: "Deploy hooks",
+    sub: "URLs called after every publish, so the site rebuilds or refreshes what it cached.",
   },
   {
     id: "workspace",
@@ -124,28 +137,6 @@ function useCurrentSection(ids: string[]): string {
   return current;
 }
 
-function Section({
-  id,
-  title,
-  sub,
-  children,
-}: {
-  id: string;
-  title: string;
-  sub: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="set-section" id={id}>
-      <div>
-        <h2 className="set-section-title">{title}</h2>
-        <p className="set-section-sub">{sub}</p>
-      </div>
-      {children}
-    </section>
-  );
-}
-
 /** A miniature of this Studio in one scheme: rail, sidebar, workspace. */
 function ThemePreview({ scheme, half = false }: { scheme: "light" | "dark"; half?: boolean }) {
   return (
@@ -184,6 +175,11 @@ export function SettingsView({
   const { workspace } = useStudio();
   const accounts = workspace.data?.accounts ?? false;
   const canManagePeople = workspace.data?.user?.scopes.includes("studio:people") ?? false;
+  // On this computer there is no sign-in, and the operator runs the site.
+  const canManageSite = workspace.data
+    ? !workspace.data.user || workspace.data.user.scopes.includes("studio:settings")
+    : false;
+  const site = useResource<SiteDto>(canManageSite ? "/site" : null);
   const database = workspace.data?.storage === "database";
   // Your own account, when you signed in with one rather than GitHub or a link.
   const [account, setAccount] = useState<{ email: string; role: string } | null>(null);
@@ -202,9 +198,10 @@ export function SettingsView({
       SECTIONS.filter(
         (s) =>
           (s.id !== "account" || account !== null) &&
-          (s.id !== "people" || (accounts && canManagePeople)),
+          (s.id !== "people" || (accounts && canManagePeople)) &&
+          ((s.id !== "site" && s.id !== "hooks") || canManageSite),
       ),
-    [account, accounts, canManagePeople],
+    [account, accounts, canManagePeople, canManageSite],
   );
   const ids = useMemo(() => sections.map((s) => s.id), [sections]);
   const current = useCurrentSection(ids);
@@ -280,6 +277,17 @@ export function SettingsView({
             <Section id="people" title="People" sub={SECTION_BY_ID.people.sub}>
               <PeoplePanel />
             </Section>
+          ) : null}
+
+          {canManageSite ? (
+            <>
+              <Section id="site" title="Site" sub={SECTION_BY_ID.site.sub}>
+                <SitePanel site={site} />
+              </Section>
+              <Section id="hooks" title="Deploy hooks" sub={SECTION_BY_ID.hooks.sub}>
+                <HooksPanel site={site} />
+              </Section>
+            </>
           ) : null}
 
           <Section id="workspace" title="Workspace" sub={SECTION_BY_ID.workspace.sub}>

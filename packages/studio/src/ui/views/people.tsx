@@ -18,7 +18,7 @@ const ROLES: Array<{ id: StudioRoleName; label: string; can: string }> = [
   { id: "viewer", label: "Viewer", can: "Reads everything" },
   { id: "contributor", label: "Contributor", can: "Drafts and submits for review" },
   { id: "editor", label: "Editor", can: "Drafts and publishes" },
-  { id: "admin", label: "Admin", can: "Publishes, approves and invites people" },
+  { id: "admin", label: "Admin", can: "Publishes, approves, invites people and runs the site" },
 ];
 
 function RoleSelect({

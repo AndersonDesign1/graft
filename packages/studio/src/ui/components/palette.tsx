@@ -13,7 +13,9 @@ import {
   useStudio,
 } from "../lib/studio";
 import {
+  IconAgents,
   IconInbox,
+  IconMedia,
   IconBranches,
   IconChanges,
   IconComponentBlock,
@@ -34,6 +36,7 @@ const DEVELOPER: Array<[DevView, string, IconComponent]> = [
   ["schema", "Schema", IconSchema],
   ["history", "History", IconHistory],
   ["branches", "Branches", IconBranches],
+  ["agents", "Agents", IconAgents],
   ["settings", "Settings", IconSettings],
 ];
 
@@ -55,7 +58,9 @@ export function CommandPalette({
   /** The project's component declarations, for the insert group. */
   components: readonly EditorComponentSpec[];
 }) {
-  const { schema, drafts, navigate, openPublish, openCreate } = useStudio();
+  const { schema, drafts, workspace, navigate, openPublish, openCreate } = useStudio();
+  const user = workspace.data?.user;
+  const canManageAgents = workspace.data ? !user || user.scopes.includes("studio:settings") : false;
   const collections = editableCollections(schema.data);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<EntrySummary[]>([]);
@@ -169,6 +174,14 @@ export function CommandPalette({
                 <IconInbox />
                 <span className="palette-item-label">Inbox</span>
               </Command.Item>
+              <Command.Item
+                value="go media images files uploads"
+                className="palette-item"
+                onSelect={() => go(() => navigate({ view: "media" }))}
+              >
+                <IconMedia />
+                <span className="palette-item-label">Media</span>
+              </Command.Item>
               {collections.map((collection) => (
                 <Command.Item
                   key={collection.name}
@@ -215,17 +228,19 @@ export function CommandPalette({
             </Command.Group>
 
             <Command.Group heading="Developer" className="palette-group">
-              {DEVELOPER.map(([view, label, Icon]) => (
-                <Command.Item
-                  key={view}
-                  value={`developer ${label} ${view}`}
-                  className="palette-item"
-                  onSelect={() => go(() => navigate({ view }))}
-                >
-                  <Icon />
-                  <span className="palette-item-label">{label}</span>
-                </Command.Item>
-              ))}
+              {DEVELOPER.filter(([view]) => view !== "agents" || canManageAgents).map(
+                ([view, label, Icon]) => (
+                  <Command.Item
+                    key={view}
+                    value={`developer ${label} ${view}`}
+                    className="palette-item"
+                    onSelect={() => go(() => navigate({ view }))}
+                  >
+                    <Icon />
+                    <span className="palette-item-label">{label}</span>
+                  </Command.Item>
+                ),
+              )}
             </Command.Group>
           </Command.List>
           <div className="palette-foot">

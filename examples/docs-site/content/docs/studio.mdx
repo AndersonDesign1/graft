@@ -156,6 +156,23 @@ The inbox holds what is waiting on a decision:
 
 The sidebar shows how many things are waiting.
 
+## Media
+
+**Media** in the sidebar lists every file in the asset store that Studio
+uploaded or an entry uses. Search by name or alt text, and press **Upload** to
+add images or PDFs (10 MB each at most). Open a file to copy its key, write
+its alt text, and see which entries use it. A file can be deleted only when
+nothing uses it, by someone who can publish.
+
+An image field has **Choose…**, which opens the same library: pick a file or
+upload one. The field takes the file's alt text when it has none of its own,
+and you can still word it differently for that entry.
+
+Media needs an asset store: set `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`
+and `S3_BUCKET` (any S3-compatible store) where Studio runs, and
+`S3_PUBLIC_URL` for public links. Without them the library says so, and image
+fields still take a key you type.
+
 ## Give people access
 
 On your own machine Studio asks for no login. A hosted Studio has sign-in, with
@@ -170,11 +187,54 @@ The roles name scopes, which is also what bearer tokens carry:
 | `studio:write` | Saving drafts, discarding, compiling. Publishing opens a pull request |
 | `studio:publish` | Publishing straight to the production branch |
 | `approvals:decide` | Approving and denying |
+| `studio:people` | Inviting people and changing their roles (admins) |
+| `studio:settings` | Agent tokens, the site's address and deploy hooks (admins) |
+
+## Agents
+
+**Developer, Agents** gives an agent its own token, for the MCP endpoint and
+the Studio API. Name the token after the agent and pick how far it may go:
+
+| Access | The agent can |
+| --- | --- |
+| Read | Read content, never change it |
+| Write drafts | Write drafts, which a person publishes |
+| Publish | Write and publish |
+
+The token is shown once, so copy it then. Studio keeps only its hash, so a lost
+token is revoked and replaced, never shown again. Revoking takes effect on the
+agent's next request. No token can approve: destructive calls still wait in the
+inbox for a person. Only admins see this page.
+
+Tokens work where the site runs `graft serve`. `graft studio` on your own
+machine has no MCP endpoint, so tokens made there are for the hosted site on
+the same database.
+
+## Site and deploy hooks
+
+**Settings, Site** holds the site's name and address. Studio shows them, and
+agents can read them.
+
+**Settings, Deploy hooks** lists URLs called with a `POST` after every publish:
+a host's build hook, so a static site rebuilds, or the site's own revalidate
+route, so cached pages refresh. Add a secret if the URL checks one; it is sent
+as `Authorization: Bearer <secret>`. Each hook shows what it answered last, and
+**Send a test** calls it now. A hook that fails never undoes the publish.
+
+The body names what went live:
+
+```json title="Deploy hook body"
+{ "event": "publish", "branch": "main", "paths": ["posts/hello-world.mdx"], "at": "2026-10-12T09:00:00.000Z" }
+```
+
+Hooks need https, or http to the same machine. They are called when content is
+in the database. When content is in git, the host builds from the commit.
 
 ## Developer views
 
 Under **Developer**: index health (each document's state against the compiled
-index), the schema, the compile history with restore, branches, and settings. The index states are explained in [How Graft works](/docs/the-model).
+index), the schema, the compile history with restore, branches, agents, and
+settings. The index states are explained in [How Graft works](/docs/the-model).
 
 ## Do it without Studio
 

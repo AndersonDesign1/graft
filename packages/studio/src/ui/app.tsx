@@ -7,7 +7,9 @@ import { CollectionMark } from "./components/collection-icon";
 import { CreateDialog } from "./components/create-dialog";
 import { ErrorBoundary } from "./components/error-boundary";
 import {
+  IconAgents,
   IconInbox,
+  IconMedia,
   IconBranches,
   IconCaretDown,
   IconCheck,
@@ -64,7 +66,9 @@ import { CollectionView } from "./views/collection";
 import { EntryView } from "./views/entry";
 import { HomeView } from "./views/home";
 import { BranchesView, HistoryView } from "./views/operations";
+import { AgentsView } from "./views/agents";
 import { InboxView } from "./views/inbox";
+import { MediaView } from "./views/media";
 import { OverviewView } from "./views/overview";
 import { SchemaView } from "./views/schema";
 import { SettingsView } from "./views/settings";
@@ -74,6 +78,7 @@ const DEV_NAV: Array<{ view: DevView; label: string; Icon: IconComponent }> = [
   { view: "schema", label: "Schema", Icon: IconSchema },
   { view: "history", label: "History", Icon: IconHistory },
   { view: "branches", label: "Branches", Icon: IconBranches },
+  { view: "agents", label: "Agents", Icon: IconAgents },
   { view: "settings", label: "Settings", Icon: IconSettings },
 ];
 
@@ -175,6 +180,8 @@ function Shell({ initialBranch }: { initialBranch: string }) {
   // What the inbox holds: agents asking first, and changes sent for review.
   const pending = (approvals.data?.approvals.length ?? 0) + (drafts.data?.reviews.length ?? 0);
   const user = workspace.data?.user;
+  // Agent tokens are an admin's to give out; a Studio with no sign-in is its owner's.
+  const canManageAgents = workspace.data ? !user || user.scopes.includes("studio:settings") : false;
 
   let main: React.ReactNode;
   if (route.view === "entry" && route.collection && route.slug) {
@@ -202,6 +209,8 @@ function Shell({ initialBranch }: { initialBranch: string }) {
     );
   } else if (route.view === "schema") main = <SchemaView />;
   else if (route.view === "inbox") main = <InboxView onDecided={approvals.refresh} />;
+  else if (route.view === "media") main = <MediaView />;
+  else if (route.view === "agents") main = <AgentsView />;
   else if (route.view === "branches")
     main = <BranchesView branch={branch} onSelectBranch={selectBranch} />;
   else if (route.view === "history") main = <HistoryView branch={branch} />;
@@ -226,6 +235,7 @@ function Shell({ initialBranch }: { initialBranch: string }) {
       devOpen={devOpen}
       onToggleDev={() => setDevOpen((v) => !v)}
       pending={pending}
+      canManageAgents={canManageAgents}
     />
   );
 
@@ -416,6 +426,7 @@ function SideNav({
   devOpen,
   onToggleDev,
   pending,
+  canManageAgents,
 }: {
   route: Route;
   collections: readonly string[];
@@ -424,6 +435,7 @@ function SideNav({
   devOpen: boolean;
   onToggleDev: () => void;
   pending: number;
+  canManageAgents: boolean;
 }) {
   return (
     <>
@@ -450,6 +462,15 @@ function SideNav({
               {pending}
             </span>
           ) : null}
+        </a>
+        <a
+          href="#/media"
+          className="side-item"
+          data-active={route.view === "media" || undefined}
+          aria-current={route.view === "media" ? "page" : undefined}
+        >
+          <IconMedia />
+          <span className="side-text">Media</span>
         </a>
         <p className="side-label">Content</p>
         {collections.map((name) => {
@@ -489,18 +510,20 @@ function SideNav({
         </button>
         {devOpen ? (
           <nav className="side-nav" aria-label="Developer">
-            {DEV_NAV.map(({ view, label, Icon }) => (
-              <a
-                key={view}
-                href={`#/dev/${view}`}
-                className="side-item"
-                data-active={route.view === view || undefined}
-                aria-current={route.view === view ? "page" : undefined}
-              >
-                <Icon />
-                <span className="side-text">{label}</span>
-              </a>
-            ))}
+            {DEV_NAV.filter((item) => item.view !== "agents" || canManageAgents).map(
+              ({ view, label, Icon }) => (
+                <a
+                  key={view}
+                  href={`#/dev/${view}`}
+                  className="side-item"
+                  data-active={route.view === view || undefined}
+                  aria-current={route.view === view ? "page" : undefined}
+                >
+                  <Icon />
+                  <span className="side-text">{label}</span>
+                </a>
+              ),
+            )}
           </nav>
         ) : null}
       </div>

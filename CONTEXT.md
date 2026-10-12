@@ -114,6 +114,19 @@ password, kept in the project's database (not a branch's). The first is the
 (viewer, contributor, editor, admin) is a name for a set of scopes, and an
 account is disabled rather than deleted, so its history stays attributed.
 
+**Agent token** — a bearer credential (`graft_at_…`) an admin makes in Studio
+for one agent, with Read, Write drafts or Publish access. Only its hash is
+stored; it acts as `token:<name>` and never carries `approvals:decide`.
+Revoked tokens stay on record.
+
+**Deploy hook** — a URL called with a `POST` after every publish of
+database-sourced content, so the site rebuilds or refreshes its cache. It never
+fails the publish; its last answer is recorded on it.
+
+**Asset** — a file in the S3-compatible asset store, referred to from content
+by its key (`{ key, alt }`). Studio's media library records what it uploaded,
+with alt text, and finds where each key is used.
+
 **Adapter** — the thin translation between a runtime and Graft's Web-standard
 handlers (`Request → Response`). The Node adapter in `graft serve` is one; a
 Next.js route is another. Handlers never know which.

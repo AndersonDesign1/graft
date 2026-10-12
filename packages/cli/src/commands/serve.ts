@@ -306,7 +306,14 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     { createFunctionsHandler },
     { createGraftMcpHandler },
     { createContentApiHandler },
-    { createDb, createDbIndexReader, resolveBranchHandle, scopeWriteBranch, sql },
+    {
+      actorForAgentToken,
+      createDb,
+      createDbIndexReader,
+      resolveBranchHandle,
+      scopeWriteBranch,
+      sql,
+    },
     studioMod,
   ] = await Promise.all([
     import("@usegraft/core"),
@@ -328,6 +335,9 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   const resolveActor = createActorResolver({
     issuers,
     devTokens: devToken ? { [devToken]: { kind: "agent", id: "graft-serve", scopes } } : undefined,
+    // Tokens an admin made in Studio's Agents page, kept hashed in the
+    // project's database: the Studio API, MCP and functions accept them.
+    tokens: (token) => actorForAgentToken(control.db, token),
   });
 
   // From graft.config.ts, not the environment. This is the setting that turns
@@ -380,7 +390,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   // GRAFT_GITHUB_REPO is set, which is what lets a read-only deployment write.
   // A database-sourced project writes to Postgres, wherever it runs, so the
   // GitHub store never takes its writes; it still answers who may sign in.
-  const databaseStore = await databaseStoreFor(config, branch.db, writeBranch);
+  const databaseStore = await databaseStoreFor(config, branch.db, writeBranch, control.db);
   const repository = githubStoreFromEnv({
     contentDir: config.contentDir,
     projectRoot: config.projectDir,
@@ -516,22 +526,25 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     // `actor.kind !== "anonymous"`, which admitted ANY authenticated principal
     // — including the agent tokens GRAFT_DEV_TOKEN and OIDC issuers mint — to
     // approve/deny, document writes, commits and reverts.
-    const authenticate =
-      !loopback && (devToken || issuers.length > 0)
-        ? async (request: Request) => {
-            const actor = await resolveActor(request);
-            if (actor.kind === "anonymous" || !actor.id) return null;
-            return { kind: actor.kind, id: actor.id, scopes: actor.scopes ?? [] };
-          }
-        : !loopback
-          ? () => null
-          : undefined;
+    // Off loopback every caller is resolved: a dev token, an OIDC issuer's
+    // JWT, or a token made in Studio's Agents page, which can exist even when
+    // nothing is configured in the environment.
+    const authenticate = !loopback
+      ? async (request: Request) => {
+          const actor = await resolveActor(request);
+          if (actor.kind === "anonymous" || !actor.id) return null;
+          return { kind: actor.kind, id: actor.id, scopes: actor.scopes ?? [] };
+        }
+      : undefined;
     // People sign in when GRAFT_STUDIO_SECRET is set. GitHub sign-in admits
     // whoever can push to the content repository unless GRAFT_STUDIO_EDITORS
     // narrows it, so the store's credentials answer that question.
     const access = studioMod.editorAccessFromEnv();
     studioHandler = studioMod.createStudioHandler({
       db: branch.db,
+      // Accounts, media, agent tokens and deploy hooks belong to the project.
+      workspaceDb: control.db,
+      agentTokens: true,
       collections: config.collections,
       contentDir: config.contentDir,
       mdxTrust: config.mdxTrust,
