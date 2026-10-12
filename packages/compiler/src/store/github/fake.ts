@@ -166,11 +166,26 @@ export function createGitHubFake(options: GitHubFakeOptions = {}): GitHubFake {
   const flatMap = (treeSha: string): Map<string, string> =>
     new Map(flatten(treeSha).map((entry) => [entry.path, entry.sha]));
 
+  const committedAt = new Map<string, string>();
+
   function makeCommit(input: Commit): string {
     clock += 1000;
     const sha = sha1(`commit:${JSON.stringify(input)}:${clock}:${commits.size}`);
     commits.set(sha, input);
+    committedAt.set(sha, new Date(clock).toISOString());
     return sha;
+  }
+
+  /** Whether a commit changed anything at or under a path, against its first parent. */
+  function touches(sha: string, path: string): boolean {
+    const commit = commits.get(sha) as Commit;
+    const parent = commit.parents[0] ? (commits.get(commit.parents[0]) as Commit) : undefined;
+    const after = flatMap(commit.tree);
+    const before = parent ? flatMap(parent.tree) : new Map<string, string>();
+    const under = (p: string) => p === path || p.startsWith(`${path}/`);
+    for (const [p, blob] of after) if (under(p) && before.get(p) !== blob) return true;
+    for (const p of before.keys()) if (under(p) && !after.has(p)) return true;
+    return false;
   }
 
   function ancestors(sha: string): string[] {
@@ -359,6 +374,29 @@ export function createGitHubFake(options: GitHubFakeOptions = {}): GitHubFake {
       const base = mergeBase(match[1] as string, match[2] as string);
       if (!base) return notFound();
       return json(200, { merge_base_commit: { sha: base } });
+    }
+    if (rest === "/commits" && method === "GET") {
+      const path = url.searchParams.get("path");
+      const perPage = Number(url.searchParams.get("per_page") ?? 30);
+      const out = [];
+      let sha = refs.get(url.searchParams.get("sha") ?? defaultBranch);
+      while (sha && out.length < perPage) {
+        const commit = commits.get(sha) as Commit;
+        if (!path || touches(sha, path)) {
+          const date = committedAt.get(sha);
+          out.push({
+            sha,
+            commit: {
+              message: commit.message,
+              author: { name: commit.author.name, email: commit.author.email, date },
+              committer: { date },
+            },
+            author: null,
+          });
+        }
+        sha = commit.parents[0];
+      }
+      return json(200, out);
     }
     if (rest === "/pulls" && method === "POST") {
       const pull: Pull = {

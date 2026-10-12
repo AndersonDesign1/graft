@@ -18,6 +18,9 @@ import {
   draftHeads,
   openReviews,
   publishDrafts,
+  publishedHistory,
+  readPublishedRevision,
+  recentlyPublished,
   readHead,
   readHeads,
   writeDraft,
@@ -33,9 +36,11 @@ import { gitBlobSha } from "./blob";
 import { assertBaseVersion } from "./conflict";
 import { normalisePath } from "./github/store";
 import type {
+  ActivityEntry,
   ContentStore,
   DraftChange,
   DraftWorkflow,
+  HistoryEntry,
   PublishMode,
   PublishOptions,
   PublishResult,
@@ -256,6 +261,61 @@ export class DatabaseStore implements ContentStore {
     };
   }
 
+  /* ---- history ---------------------------------------------------------- */
+
+  async history(path: string, options: { limit?: number } = {}): Promise<HistoryEntry[]> {
+    const rows = await publishedHistory(
+      this.db,
+      this.branchId,
+      normalisePath(path),
+      options.limit ?? 50,
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      at: row.publishedAt.toISOString(),
+      by: row.actorName,
+      byKind: row.actorKind,
+      ...(row.message ? { message: row.message } : {}),
+      version: row.version,
+    }));
+  }
+
+  async readVersion(path: string, id: string): Promise<StoredFile | null> {
+    const row = await readPublishedRevision(this.db, this.branchId, normalisePath(path), id);
+    if (row === undefined) throw versionNotFound(path, id);
+    return row.raw === null ? null : { raw: row.raw, version: row.version ?? gitBlobSha(row.raw) };
+  }
+
+  /**
+   * Publishes, newest first. Revisions that went live in one publish share
+   * its moment and its publisher, so they read as one entry.
+   */
+  async activity(options: { limit?: number } = {}): Promise<ActivityEntry[]> {
+    const limit = options.limit ?? 20;
+    const rows = await recentlyPublished(this.db, this.branchId, limit * 10);
+    const entries: ActivityEntry[] = [];
+    let last: { key: string; entry: ActivityEntry & { paths: string[] } } | undefined;
+    for (const row of rows) {
+      const key = `${row.publishedAt.toISOString()} ${row.publishedBy ?? ""}`;
+      if (last?.key === key) {
+        last.entry.paths.push(row.path);
+        continue;
+      }
+      if (entries.length === limit) break;
+      const entry = {
+        id: row.id,
+        at: row.publishedAt.toISOString(),
+        by: row.publishedBy ?? row.actorName,
+        byKind: row.actorKind,
+        ...(row.message ? { message: row.message } : {}),
+        paths: [row.path],
+      };
+      entries.push(entry);
+      last = { key, entry };
+    }
+    return entries;
+  }
+
   private async reviews(): Promise<ReviewRequest[]> {
     const rows = await openReviews(this.db, this.branchId);
     return rows.map((row) => ({
@@ -266,6 +326,15 @@ export class DatabaseStore implements ContentStore {
       ...(row.requestedByName ? { requestedBy: row.requestedByName } : {}),
     }));
   }
+}
+
+function versionNotFound(path: string, id: string): GraftError {
+  return new GraftError({
+    code: "DOCUMENT_NOT_FOUND",
+    message: `"${path}" has no published version ${id}.`,
+    fix: "Pick a version from the document's history.",
+    details: { path, id },
+  });
 }
 
 interface IndexChanges {

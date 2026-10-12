@@ -240,6 +240,44 @@ export const STUDIO_OPENAPI = {
         responses: { "200": { description: "OK" } },
       },
     },
+    "/api/studio/v1/entry/history": {
+      get: {
+        operationId: "entryHistory",
+        summary: "What was published for one document, newest first",
+        description:
+          "Published revisions in a database-sourced project, commits to the production branch on GitHub, and the checkout's commits locally. available is false, with a reason, where there is no history.",
+        parameters: [{ name: "path", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/entry/version": {
+      get: {
+        operationId: "entryVersion",
+        summary: "One version of a document, and its diff to what the caller has now",
+        description:
+          "To restore it, save its raw bytes with PUT /entry: the restore is a draft like any other edit.",
+        parameters: [
+          { name: "path", in: "query", required: true, schema: { type: "string" } },
+          { name: "id", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/activity": {
+      get: {
+        operationId: "activity",
+        summary: "What was published lately across the content, newest first",
+        parameters: [
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            schema: { type: "integer", maximum: 100 },
+          },
+        ],
+        responses: { "200": { description: "OK" } },
+      },
+    },
     "/api/studio/v1/drafts/publish": {
       post: {
         operationId: "publishDrafts",

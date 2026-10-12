@@ -15,11 +15,14 @@ import { createDb, runMigrations, type DbHandle } from "@usegraft/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createStudioApiHandler } from "../api";
 import type {
+  ActivityDto,
   DraftsDto,
   EntryDto,
   EntryList,
   PublishResultDto,
   SaveEntryResult,
+  VersionDetailDto,
+  VersionListDto,
   WorkspaceDto,
 } from "../editor-types";
 
@@ -145,6 +148,56 @@ describe.skipIf(!runIntegration)("editor API on the database store (integration)
     });
     expect(await live()).toEqual([{ slug: "hello-there", title: "Hello, world" }]);
     expect(existsSync(contentDir)).toBe(false);
+  });
+
+  it("lists what was published, and restores an old version as a draft", async () => {
+    const handler = handlerFor(["studio:read", "studio:write", "studio:publish"]);
+    const publishAs = async (title: string, baseVersion?: string | null) => {
+      const saved = await call<SaveEntryResult>(handler, "PUT", "/entry", {
+        collection: "posts",
+        slug: "story",
+        raw: `---\ntitle: ${title}\n---\n\nThe story.\n`,
+        ...(baseVersion === undefined ? {} : { baseVersion }),
+      });
+      await call(handler, "POST", "/drafts/publish", { paths: ["posts/story.mdx"] });
+      return saved.json.version;
+    };
+    const first = await publishAs("First", null);
+    await publishAs("Second", first);
+
+    const history = await call<VersionListDto>(
+      handler,
+      "GET",
+      "/entry/history?path=posts/story.mdx",
+    );
+    expect(history.json.available).toBe(true);
+    expect(history.json.versions.map((v) => v.by)).toEqual(["Ana", "Ana"]);
+    const older = history.json.versions[1]?.id as string;
+    const version = await call<VersionDetailDto>(
+      handler,
+      "GET",
+      `/entry/version?path=posts/story.mdx&id=${older}`,
+    );
+    expect(version.json.diff.fields).toEqual([
+      { field: "title", before: "First", after: "Second" },
+    ]);
+
+    const opened = await call<EntryDto>(handler, "GET", "/entry?collection=posts&slug=story");
+    const restored = await call<SaveEntryResult>(handler, "PUT", "/entry", {
+      collection: "posts",
+      slug: "story",
+      raw: version.json.raw,
+      baseVersion: opened.json.version,
+    });
+    // A draft: the live site still has the second title until it is published.
+    expect(restored.json.status).toBe("changed");
+    expect(await live()).toEqual([{ slug: "story", title: "Second" }]);
+
+    const activity = await call<ActivityDto>(handler, "GET", "/activity");
+    expect(activity.json.events.map((event) => event.documents.map((doc) => doc.title))).toEqual([
+      ["Second"],
+      ["Second"],
+    ]);
   });
 
   it("refuses a save made from a version someone else replaced", async () => {

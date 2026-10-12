@@ -14,7 +14,7 @@
  * on hashing.
  */
 import { GraftError, type ChangeSet } from "@usegraft/contracts";
-import { and, asc, eq, gte, inArray, isNotNull, isNull, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, like, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Database } from "./client";
 import type { ContentInput } from "./diff";
@@ -830,6 +830,121 @@ export async function publishedSince(
     publishedBy: row.publishedBy ?? row.publishedById,
     message: row.message,
   }));
+}
+
+/** A revision that went live, for a document's history or the activity feed. */
+export interface PublishedRevision {
+  id: string;
+  path: string;
+  /** Null: the publish deleted the document. */
+  version: string | null;
+  publishedAt: Date;
+  /** Who wrote it, which is not always who published it. */
+  actorName: string;
+  actorKind: "human" | "agent";
+  publishedBy: string | null;
+  message: string | null;
+}
+
+const publishedColumns = {
+  id: contentRevisions.id,
+  path: contentRevisions.path,
+  version: contentRevisions.version,
+  publishedAt: contentRevisions.publishedAt,
+  actorId: contentRevisions.actorId,
+  actorName: contentRevisions.actorName,
+  actorKind: contentRevisions.actorKind,
+  publishedById: contentRevisions.publishedById,
+  publishedByName: contentRevisions.publishedByName,
+  message: contentRevisions.message,
+};
+
+function toPublishedRevision(row: {
+  id: string;
+  path: string;
+  version: string | null;
+  publishedAt: Date | null;
+  actorId: string;
+  actorName: string | null;
+  actorKind: string;
+  publishedById: string | null;
+  publishedByName: string | null;
+  message: string | null;
+}): PublishedRevision {
+  return {
+    id: row.id,
+    path: row.path,
+    version: row.version,
+    publishedAt: row.publishedAt as Date,
+    actorName: row.actorName ?? row.actorId,
+    actorKind: row.actorKind === "agent" ? "agent" : "human",
+    publishedBy: row.publishedByName ?? row.publishedById,
+    message: row.message,
+  };
+}
+
+/** What went live for one path, newest first. */
+export async function publishedHistory(
+  db: Reader,
+  branchId: string,
+  path: string,
+  limit = 50,
+): Promise<PublishedRevision[]> {
+  const rows = await db
+    .select(publishedColumns)
+    .from(contentRevisions)
+    .where(
+      and(
+        eq(contentRevisions.branchId, branchId),
+        eq(contentRevisions.path, path),
+        isNotNull(contentRevisions.publishedAt),
+      ),
+    )
+    .orderBy(desc(contentRevisions.publishedAt), desc(contentRevisions.createdAt))
+    .limit(limit);
+  return rows.map(toPublishedRevision);
+}
+
+/** What went live across the branch, newest first. */
+export async function recentlyPublished(
+  db: Reader,
+  branchId: string,
+  limit = 50,
+): Promise<PublishedRevision[]> {
+  const rows = await db
+    .select(publishedColumns)
+    .from(contentRevisions)
+    .where(and(eq(contentRevisions.branchId, branchId), isNotNull(contentRevisions.publishedAt)))
+    .orderBy(desc(contentRevisions.publishedAt), asc(contentRevisions.path))
+    .limit(limit);
+  return rows.map(toPublishedRevision);
+}
+
+/**
+ * The bytes of one published revision of a path. Undefined when the path
+ * has no such published revision (a draft's id is not one), `raw: null`
+ * when that revision deleted the document.
+ */
+export async function readPublishedRevision(
+  db: Reader,
+  branchId: string,
+  path: string,
+  id: string,
+): Promise<{ raw: string | null; version: string | null } | undefined> {
+  // Not a revision id at all: nothing to look up, rather than a cast error.
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return undefined;
+  const [row] = await db
+    .select({ raw: contentRevisions.raw, version: contentRevisions.version })
+    .from(contentRevisions)
+    .where(
+      and(
+        eq(contentRevisions.id, id),
+        eq(contentRevisions.branchId, branchId),
+        eq(contentRevisions.path, path),
+        isNotNull(contentRevisions.publishedAt),
+      ),
+    );
+  return row;
 }
 
 /** Every path's live version, deletions included as null: what a mirror compares against. */

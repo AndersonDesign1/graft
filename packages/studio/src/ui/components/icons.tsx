@@ -14,6 +14,7 @@
 // shell / navigation
 export {
   HouseIcon as IconHome,
+  InboxIcon as IconInbox,
   ActivityIcon as IconOverview,
   FilesIcon as IconCollections,
   BracesIcon as IconSchema,

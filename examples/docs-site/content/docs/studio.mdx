@@ -38,11 +38,12 @@ Content comes first.
 
 | Where | What it is for |
 | --- | --- |
-| Home | What is waiting to publish, and every collection with its count |
+| Home | What is waiting for you, what was published lately and by whom, and every collection with its count |
+| Inbox | Changes sent for review, and agents asking before they delete or overwrite anything |
 | A collection | A table of its entries: search, filter, sort, select many |
-| An entry | Its fields and its content, saved as you type |
+| An entry | Its fields and its content, saved as you type, between its collection's list and a panel with its details and history |
 | Publish | Every unpublished change, what changed in it, and the button that puts it live |
-| Developer | Index health, schema, history, branches, approvals and settings |
+| Developer | Index health, schema, compile history, branches and settings |
 
 Press <kbd>⌘K</kbd> anywhere to find an entry by name, create one, or jump to a
 collection. Search runs on the server, so it is as quick on five thousand
@@ -84,6 +85,29 @@ touch. When it can't, the content opens as Markdown beside the same form. This
 matters for MDX: a change as small as escaping `{` can break a page that looks
 identical. Use **Edit source** in the entry's menu to edit the whole file.
 
+### The list and the panel
+
+An open entry keeps its collection's list on the left, with the entry marked,
+so the next one is a click away. The arrow keys move through the list and
+Enter opens an entry.
+
+The panel on the right has three tabs:
+
+- **Details**: whether the entry is published, where it is saved, its URL
+  name, file and version.
+- **Changes**: what your draft changes, field by field.
+- **History**: every published version, who made it and when. Open one to see
+  how the entry differs from it now, and press **Restore this version** to go
+  back to it. A restore is a draft like any other edit: nothing on the site
+  changes until you publish it.
+
+History comes from wherever the content lives: the published revisions when
+content is in the database, the production branch's commits on GitHub, and
+your checkout's commits on your machine.
+
+Press <kbd>⌘&#92;</kbd> (<kbd>Ctrl+&#92;</kbd>) to hide the panel for a full-width
+page. On a narrower window it opens over the entry instead of beside it.
+
 ### Saving
 
 Studio saves automatically, and never rewrites an entry you only opened. Every
@@ -118,6 +142,20 @@ Deleting an entry is a draft too: it stays live until you publish the deletion,
 and the toast that follows a delete has an Undo. Until then the entry stays in
 its collection marked Deleted; open it to read it or press Restore.
 
+## Inbox
+
+The inbox holds what is waiting on a decision:
+
+- **Changes for review.** A contributor's Submit for review lands here. When
+  content is in the database, someone who can publish presses **Publish** on
+  the request. On GitHub, the request is a pull request, and **Open on
+  GitHub** takes you to it.
+- **Agents asking first.** A destructive call from an agent waits until a
+  person approves or denies it. Nothing runs until then. See
+  [Audit & approvals](/docs/audit-and-approvals).
+
+The sidebar shows how many things are waiting.
+
 ## Give people access
 
 On your own machine Studio asks for no login. A hosted Studio has sign-in, with
@@ -136,8 +174,7 @@ The roles name scopes, which is also what bearer tokens carry:
 ## Developer views
 
 Under **Developer**: index health (each document's state against the compiled
-index), the schema, the compile history with restore, branches, approvals, and
-settings. The index states are explained in [How Graft works](/docs/the-model).
+index), the schema, the compile history with restore, branches, and settings. The index states are explained in [How Graft works](/docs/the-model).
 
 ## Do it without Studio
 
@@ -149,6 +186,8 @@ settings. The index states are explained in [How Graft works](/docs/the-model).
 | Publish, locally | `git commit` | |
 | Publish, hosted | Merge the draft branch (all of its changes at once) | `publish_drafts` |
 | Discard a draft | `git restore` | `discard_drafts` |
+| See an entry's history | `git log -- <file>` | |
+| Restore an old version | `git checkout <commit> -- <file>` | `write_content` with the old bytes |
 | See past compiles | `graft compilations` | `list_compilations` |
 | Approve or deny | `graft approve` / `graft deny` | `decide_approval` |
 

@@ -38,7 +38,6 @@ export function DiffView({
 }) {
   const [diff, setDiff] = useState<DraftDiffDto | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showFile, setShowFile] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,7 +58,20 @@ export function DiffView({
     );
   }
   if (!diff) return <p className="diff-note">Comparing with the published version…</p>;
+  return <ChangesList diff={diff} fields={fields} />;
+}
 
+/** A diff already in hand, said field by field, with the file's lines one click away. */
+export function ChangesList({
+  diff,
+  fields = [],
+  empty = "No visible changes.",
+}: {
+  diff: DraftDiffDto;
+  fields?: readonly SchemaFieldDto[];
+  empty?: string;
+}) {
+  const [showFile, setShowFile] = useState(false);
   const file = diff.file;
   return (
     <div className="changes">
@@ -100,7 +112,7 @@ export function DiffView({
           ) : null}
         </dl>
       ) : (
-        <p className="diff-note">No visible changes.</p>
+        <p className="diff-note">{empty}</p>
       )}
 
       {file.hunks.length > 0 ? (

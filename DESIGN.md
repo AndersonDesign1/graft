@@ -283,7 +283,8 @@ changed. The arrow keys, Home and End move between rows and Enter opens one;
 moving never opens an entry by itself.
 
 **The inspector** holds what is about the entry rather than in it: its status,
-where it is saved, its file and version, and what changed. Tabs are words
+where it is saved, its file and version, what changed, and its published
+versions. Restoring a version saves it as a draft; history never publishes. Tabs are words
 with a 2px underline on the chosen one. It toggles with ⌘\ or Ctrl+\,
 remembers the choice in the browser, and is closed by default where it would
 open over the document. Over the document it is a sheet: the floating shadow,
@@ -431,8 +432,8 @@ component; do not copy them.
 - `<TierBadge>` is a pill around metadata.
 - Most fences are not wrapped in a titled `<CodeBlock>`. `check:design` only
   checks the ones that are.
-- Studio: Approvals are still bordered cards, Settings keeps its own section
-  layout, and Branches and History use the older table styles.
+- Studio: Settings keeps its own section layout, and Branches and History use
+  the older table styles.
 - Studio: the editor chunk (Milkdown and CodeMirror, about 2.7 MB) loads with
   the app instead of when an entry opens.
 

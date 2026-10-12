@@ -7,7 +7,8 @@
  * stylesheets. The standalone SPA pulls the styles in via `ui/main.tsx`.
  */
 import { StudioApp } from "./ui/app";
-import { ApprovalsView, BranchesView, HistoryView } from "./ui/views/operations";
+import { ApprovalQueue } from "./ui/views/inbox";
+import { BranchesView, HistoryView } from "./ui/views/operations";
 
 export { StudioApp } from "./ui/app";
 
@@ -22,7 +23,7 @@ export function ContentTreePanel({ branch = "main" }: { branch?: string }) {
 }
 
 export function ApprovalQueuePanel() {
-  return <ApprovalsView />;
+  return <ApprovalQueue />;
 }
 
 export function BranchListPanel({

@@ -248,7 +248,7 @@ export function OverviewView({
                 <h2 className="section-title" id="health-approvals">
                   Waiting for approval
                 </h2>
-                <a className="link" href="#/dev/approvals">
+                <a className="link" href="#/inbox">
                   Review
                 </a>
               </div>
@@ -258,12 +258,12 @@ export function OverviewView({
                     <tr
                       key={row.id}
                       className="list-row"
-                      onClick={() => navigate({ view: "approvals" })}
+                      onClick={() => navigate({ view: "inbox" })}
                     >
                       <td>
                         <a
                           className="list-name"
-                          href="#/dev/approvals"
+                          href="#/inbox"
                           onClick={(event) => event.stopPropagation()}
                         >
                           <code>{row.functionName}</code>

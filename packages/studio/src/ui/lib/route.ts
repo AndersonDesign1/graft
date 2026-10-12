@@ -7,23 +7,16 @@ import { useCallback, useEffect, useState } from "react";
  */
 export type ViewId =
   | "home"
+  | "inbox"
   | "collection"
   | "entry"
   | "overview"
   | "schema"
-  | "approvals"
   | "branches"
   | "history"
   | "settings";
 
-export const DEV_VIEWS = [
-  "overview",
-  "schema",
-  "approvals",
-  "branches",
-  "history",
-  "settings",
-] as const;
+export const DEV_VIEWS = ["overview", "schema", "branches", "history", "settings"] as const;
 export type DevView = (typeof DEV_VIEWS)[number];
 
 export interface Route {
@@ -53,6 +46,9 @@ export function parseHash(hash: string): Route {
   if (head === "c" && a) {
     return b ? { view: "entry", collection: a, slug: b } : { view: "collection", collection: a };
   }
+  if (head === "inbox") return { view: "inbox" };
+  // Approvals moved into the inbox, with review requests.
+  if ((head === "dev" && a === "approvals") || head === "approvals") return { view: "inbox" };
   if (head === "dev" && a && (DEV_VIEWS as readonly string[]).includes(a)) {
     return { view: a as DevView };
   }
@@ -69,6 +65,8 @@ export function toHash(route: Route): string {
   switch (route.view) {
     case "home":
       return "#/";
+    case "inbox":
+      return "#/inbox";
     case "collection":
       return `#/c/${enc(route.collection ?? "")}`;
     case "entry":
