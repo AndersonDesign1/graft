@@ -39,6 +39,7 @@ export {
   ExternalLinkIcon as IconExternal,
   ArrowUpDownIcon as IconSort,
   PanelLeftIcon as IconSidebar,
+  PanelRightIcon as IconInspector,
   Undo2Icon as IconRevert,
   PlusIcon as IconPlus,
   EllipsisIcon as IconMore,

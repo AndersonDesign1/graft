@@ -115,7 +115,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--radius-inner);
   background: transparent;
@@ -389,7 +389,7 @@ h3 {
 .segmented-tab {
   position: relative;
   z-index: 1;
-  padding: 0.2rem 0.55rem;
+  padding: var(--space-1) var(--space-2);
   border: 0;
   border-radius: 2px;
   background: transparent;
@@ -439,7 +439,7 @@ h3 {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: var(--space-1);
 }
 
 .field-label {
@@ -457,7 +457,7 @@ h3 {
 .input {
   width: 100%;
   min-height: var(--control-height);
-  padding: 0.4375rem var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-inner);
   background: var(--paper);
@@ -566,7 +566,7 @@ h3 {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0.32rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-inner);
   background: var(--paper);
@@ -654,7 +654,7 @@ h3 {
 .tile {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 2px;
   padding: var(--space-3) var(--space-4);
   background: var(--paper);
 }
@@ -733,7 +733,7 @@ h3 {
 }
 
 .card-sub {
-  margin: 0.15rem 0 0;
+  margin: 2px 0 0;
   color: var(--ink-muted);
   font-size: var(--text-xs);
 }
@@ -766,7 +766,7 @@ h3 {
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  padding: 0.4rem 0.35rem;
+  padding: var(--space-2) var(--space-1);
   border: 0;
   border-radius: var(--radius-inner);
   background: transparent;
@@ -789,7 +789,7 @@ h3 {
 .mini-row-main {
   display: flex;
   flex-direction: column;
-  gap: 0.03rem;
+  gap: 1px;
   flex: 1;
   min-width: 0;
 }
@@ -818,7 +818,7 @@ h3 {
 
 .delta {
   display: inline-flex;
-  gap: 0.4rem;
+  gap: var(--space-2);
   font-size: var(--text-2xs);
 }
 
@@ -876,7 +876,7 @@ h3 {
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  padding: 0.45rem 0.5rem;
+  padding: var(--space-2) var(--space-2);
   border: 0;
   border-radius: var(--radius-inner);
   background: transparent;
@@ -887,7 +887,7 @@ h3 {
 }
 
 .row-lg {
-  padding: 0.7rem;
+  padding: var(--space-3);
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
   background: var(--paper-raised);
@@ -906,7 +906,7 @@ h3 {
 .row-main {
   display: flex;
   flex-direction: column;
-  gap: 0.03rem;
+  gap: 1px;
   flex: 1;
   min-width: 0;
 }
@@ -936,7 +936,7 @@ h3 {
 .crumbs {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: var(--space-1);
   font-size: var(--text-2xs);
   color: var(--ink-faint);
 }
@@ -961,7 +961,7 @@ h3 {
   align-items: flex-start;
   gap: var(--space-2);
   margin: var(--space-2) var(--space-4) 0;
-  padding: 0.45rem 0.6rem;
+  padding: var(--space-2) var(--space-2);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-inner);
   background: var(--paper-sunken);
@@ -1011,7 +1011,7 @@ h3 {
 }
 
 .empty p {
-  margin: 0.3rem auto 0;
+  margin: var(--space-1) auto 0;
   max-width: 44ch;
   color: var(--ink-muted);
   font-size: var(--text-xs);
@@ -1030,7 +1030,7 @@ h3 {
 }
 
 .table th {
-  padding: 0.35rem 0.6rem;
+  padding: var(--space-1) var(--space-2);
   border-bottom: 1px solid var(--hairline);
   font-size: var(--text-2xs);
   font-weight: var(--weight-medium);
@@ -1039,7 +1039,7 @@ h3 {
 }
 
 .table td {
-  padding: 0.42rem 0.6rem;
+  padding: var(--space-2) var(--space-2);
   border-bottom: 1px solid var(--hairline);
   vertical-align: top;
 }
@@ -1054,7 +1054,7 @@ h3 {
 
 .table-tight td,
 .table-tight th {
-  padding: 0.28rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
 }
 
 /* History rows open a detail dialog. */
@@ -1076,7 +1076,7 @@ h3 {
 .field-name {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: var(--space-1);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
 }
@@ -1096,7 +1096,7 @@ h3 {
 }
 
 .disclosure summary {
-  padding: 0.25rem 0;
+  padding: var(--space-1) 0;
   color: var(--ink-muted);
   font-size: var(--text-xs);
   cursor: pointer;
@@ -1121,7 +1121,7 @@ h3 {
 
 .well {
   margin: 0;
-  padding: 0.6rem 0.7rem;
+  padding: var(--space-2) var(--space-3);
   max-height: 14rem;
   overflow: auto;
   border-radius: var(--radius-inner);
@@ -1179,7 +1179,7 @@ h3 {
 }
 
 .settings-index button {
-  padding: 0.3rem 0.4rem;
+  padding: var(--space-1) var(--space-2);
   border: 0;
   border-radius: var(--radius-inner);
   background: none;
@@ -1221,7 +1221,7 @@ h3 {
 }
 
 .set-section-sub {
-  margin: 0.15rem 0 0;
+  margin: 2px 0 0;
   max-width: 60ch;
   color: var(--ink-muted);
   font-size: var(--text-sm);
@@ -1249,7 +1249,7 @@ h3 {
   align-items: center;
   /* Concentric: a 10px panel radius over 14px padding keeps the inner
      controls at 6px without the corners fighting. */
-  padding: 0.875rem var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -1279,7 +1279,7 @@ h3 {
 }
 
 .set-row-hint {
-  margin: 0.15rem 0 0;
+  margin: 2px 0 0;
   max-width: 52ch;
   color: var(--ink-faint);
   font-size: var(--text-xs);
@@ -1388,8 +1388,8 @@ h3 {
 .theme-choice-row {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0 0.15rem 0.1rem;
+  gap: var(--space-2);
+  padding: 0 2px 2px;
   color: var(--ink-muted);
 }
 
@@ -1413,7 +1413,7 @@ h3 {
   display: flex;
   gap: 2px;
   height: 3.5rem;
-  padding: 3px;
+  padding: var(--space-1);
   border-radius: var(--radius-inner);
   background: var(--tp-bg);
   overflow: hidden;
@@ -1461,10 +1461,10 @@ h3 {
 .tp-side {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-1);
   flex-shrink: 0;
   width: 16px;
-  padding: 3px 2px;
+  padding: var(--space-1) 2px;
   border-radius: 1px;
   background: var(--tp-rail);
 }
@@ -1472,10 +1472,10 @@ h3 {
 .tp-main {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-1);
   flex: 1;
   min-width: 0;
-  padding: 3px;
+  padding: var(--space-1);
   border: 1px solid var(--tp-hairline);
   border-radius: 2px;
   background: var(--tp-panel);
@@ -1513,7 +1513,7 @@ h3 {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 0.625rem var(--space-4);
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -1531,7 +1531,7 @@ h3 {
 .set-collection-where {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: var(--space-1);
   color: var(--ink-faint);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
@@ -1597,12 +1597,12 @@ h3 {
 .set-keys {
   display: flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: var(--space-1);
 }
 
 .facts {
   display: grid;
-  gap: 0.45rem;
+  gap: var(--space-2);
   margin: 0;
 }
 
@@ -1627,19 +1627,19 @@ h3 {
 .fact-copy {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
 .fact-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: var(--space-1);
   color: var(--ink);
 }
 
 kbd {
-  padding: 0.05rem 0.3rem;
+  padding: 1px var(--space-1);
   border: 1px solid var(--hairline);
   border-radius: 3px;
   background: var(--paper-sunken);

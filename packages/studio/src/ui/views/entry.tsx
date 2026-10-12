@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import type { EntryDto, EntryStatus, PublishResultDto, SaveEntryResult } from "../../editor-types";
 import type { SchemaFieldDto } from "../../types";
 import { useConfirm } from "../components/ui/confirm";
+import { Inspector, useInspector } from "../components/inspector";
 import { Tooltip } from "../components/ui/tooltip";
 import { FieldRow } from "../components/fields";
 import {
@@ -27,6 +28,7 @@ import {
   IconCode,
   IconDuplicate,
   IconLink,
+  IconInspector,
   IconMore,
   IconRevert,
   IconTrash,
@@ -56,6 +58,7 @@ type Mode = "form" | "source";
 export function EntryView({ collection, slug }: { collection: string; slug: string }) {
   const { schema, workspace, drafts, navigate, openPublish } = useStudio();
   const confirm = useConfirm();
+  const [inspectorOpen, toggleInspector, setInspectorOpen] = useInspector();
   const fields = useMemo<SchemaFieldDto[]>(
     () => schema.data?.collections.find((c) => c.name === collection)?.fields ?? [],
     [schema.data, collection],
@@ -496,232 +499,262 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
   );
 
   return (
-    <div className="entry">
-      <div className="entry-bar">
-        <nav className="entry-crumbs" aria-label="Breadcrumb">
-          <a href={`#/c/${encodeURIComponent(collection)}`} className="crumb">
-            <IconBack size={14} aria-hidden="true" />
-            {collectionLabel(collection)}
-          </a>
-          <span className="crumb-sep" aria-hidden="true">
-            /
-          </span>
-          <span className="crumb" aria-current="page">
-            {String(entry.data[headline?.name ?? "title"] ?? slug) || slug}
-          </span>
-        </nav>
-        <StatusLabel
-          status={status}
-          conflict={draft?.conflict ?? entry.conflict}
-          action={drafts.data?.publish}
-        />
-        <span
-          className="save"
-          data-state={conflict ? "conflict" : autosave.state}
-          aria-live="polite"
-        >
-          {saveLabel}
-        </span>
-        <span className="entry-bar-spacer" />
-        <Menu>
-          <Tooltip label="More actions">
-            <MenuTrigger className="icon-btn" aria-label="More actions">
-              <IconMore />
-            </MenuTrigger>
-          </Tooltip>
-          <MenuContent align="end">
-            <MenuItem onClick={() => void switchMode(mode === "form" ? "source" : "form")}>
-              <IconCode />
-              <span className="menu-item-label">
-                {mode === "form" ? "Edit source" : "Edit as form"}
-              </span>
-            </MenuItem>
-            <MenuItem disabled={readOnly} onClick={() => void duplicate()}>
-              <IconDuplicate />
-              <span className="menu-item-label">Duplicate</span>
-            </MenuItem>
-            <MenuItem
-              onClick={() => {
-                void navigator.clipboard?.writeText(window.location.href);
-                toast.success("Link copied");
-              }}
+    <div className="entry" data-inspector={inspectorOpen ? "open" : undefined}>
+      <div className="entry-main">
+        <div className="entry-bar">
+          <nav className="entry-crumbs" aria-label="Breadcrumb">
+            <a
+              href={`#/c/${encodeURIComponent(collection)}`}
+              className="crumb"
+              aria-label={collectionLabel(collection)}
             >
-              <IconLink />
-              <span className="menu-item-label">Copy link</span>
-            </MenuItem>
-            {status !== "published" ? (
-              <MenuItem disabled={!canWrite} onClick={() => void discardThis()}>
-                <IconRevert />
+              <IconBack size={14} aria-hidden="true" />
+              <span className="crumb-label">{collectionLabel(collection)}</span>
+            </a>
+            <span className="crumb-sep" aria-hidden="true">
+              /
+            </span>
+            <span className="crumb" aria-current="page">
+              {String(entry.data[headline?.name ?? "title"] ?? slug) || slug}
+            </span>
+          </nav>
+          <StatusLabel
+            status={status}
+            conflict={draft?.conflict ?? entry.conflict}
+            action={drafts.data?.publish}
+          />
+          <span
+            className="save"
+            data-state={conflict ? "conflict" : autosave.state}
+            aria-live="polite"
+          >
+            {saveLabel}
+          </span>
+          <span className="entry-bar-spacer" />
+          <Menu>
+            <Tooltip label="More actions">
+              <MenuTrigger className="icon-btn" aria-label="More actions">
+                <IconMore />
+              </MenuTrigger>
+            </Tooltip>
+            <MenuContent align="end">
+              <MenuItem onClick={() => void switchMode(mode === "form" ? "source" : "form")}>
+                <IconCode />
                 <span className="menu-item-label">
-                  {status === "deleted" ? "Restore" : "Discard changes"}
+                  {mode === "form" ? "Edit source" : "Edit as form"}
                 </span>
               </MenuItem>
-            ) : null}
-            <MenuSeparator />
-            <MenuItem
-              disabled={readOnly}
-              className="menu-item-danger"
-              onClick={() => void remove()}
+              <MenuItem disabled={readOnly} onClick={() => void duplicate()}>
+                <IconDuplicate />
+                <span className="menu-item-label">Duplicate</span>
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  void navigator.clipboard?.writeText(window.location.href);
+                  toast.success("Link copied");
+                }}
+              >
+                <IconLink />
+                <span className="menu-item-label">Copy link</span>
+              </MenuItem>
+              {status !== "published" ? (
+                <MenuItem disabled={!canWrite} onClick={() => void discardThis()}>
+                  <IconRevert />
+                  <span className="menu-item-label">
+                    {status === "deleted" ? "Restore" : "Discard changes"}
+                  </span>
+                </MenuItem>
+              ) : null}
+              <MenuSeparator />
+              <MenuItem
+                disabled={readOnly}
+                className="menu-item-danger"
+                onClick={() => void remove()}
+              >
+                <IconTrash />
+                <span className="menu-item-label">Delete {singular(collection)}</span>
+              </MenuItem>
+            </MenuContent>
+          </Menu>
+          <Tooltip label={inspectorOpen ? "Hide details (⌘\\)" : "Show details (⌘\\)"}>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={inspectorOpen ? "Hide details" : "Show details"}
+              aria-pressed={inspectorOpen}
+              aria-keyshortcuts={"Meta+\\ Control+\\"}
+              onClick={toggleInspector}
             >
-              <IconTrash />
-              <span className="menu-item-label">Delete {singular(collection)}</span>
-            </MenuItem>
-          </MenuContent>
-        </Menu>
-        <button
-          type="button"
-          className="btn"
-          data-variant="primary"
-          data-size="sm"
-          disabled={!canWrite || status === "published" || autosave.state === "saving"}
-          onClick={() => void publishThis()}
-          title={status === "published" ? `No draft to ${actionWord(action)}` : undefined}
-        >
-          {action === "review" ? "Submit" : publishVerb(action)}
-        </button>
-      </div>
-
-      {status === "deleted" && !conflict ? (
-        <div className="banner" data-tone="conflict" role="status">
-          <IconWarning size={14} />
-          <span>
-            You deleted this {singular(collection)}. It stays live until you{" "}
-            {action === "review" ? "submit" : action === "commit" ? "commit" : "publish"} the
-            deletion.
-          </span>
+              <IconInspector />
+            </button>
+          </Tooltip>
           <button
             type="button"
             className="btn"
-            data-size="sm"
-            disabled={!canWrite}
-            onClick={() => void restoreThis()}
-          >
-            Restore
-          </button>
-        </div>
-      ) : null}
-
-      {conflict ? (
-        <div className="banner" data-tone="conflict" role="alert">
-          <IconWarning size={14} />
-          <span>
-            This {singular(collection)} was changed somewhere else after you opened it. Your edits
-            are still here, not saved.
-          </span>
-          <button type="button" className="btn" data-size="sm" onClick={() => void load()}>
-            Load their version
-          </button>
-          <button
-            type="button"
-            className="btn"
-            data-size="sm"
             data-variant="primary"
-            onClick={() => {
-              void persist(true)
-                .then(() => toast.success("Saved your version"))
-                .catch((error: unknown) => toast.error(plainError(error)));
-            }}
+            data-size="sm"
+            disabled={!canWrite || status === "published" || autosave.state === "saving"}
+            onClick={() => void publishThis()}
+            title={status === "published" ? `No draft to ${actionWord(action)}` : undefined}
           >
-            Keep mine
+            {action === "review" ? "Submit" : publishVerb(action)}
           </button>
         </div>
-      ) : null}
 
-      <div className="page-scroll">
-        <article className="page" aria-label={`Editing ${collectionLabel(collection)}`}>
-          {mode === "source" ? (
-            <>
-              <p className="page-kicker">Source</p>
-              <p className="muted page-note">
-                The file exactly as stored, frontmatter included. Saves are checked against the
-                schema the same way.
-              </p>
-              <div className="page-source">
-                <MdxEditor
-                  value={raw}
-                  readOnly={readOnly}
-                  showLineNumbers
-                  ariaLabel="Entry source"
-                  onChange={(next) => {
-                    setRaw(next);
-                    autosave.touch();
-                  }}
-                />
-              </div>
-            </>
-          ) : (
-            <>
-              {headline ? (
-                <TitleInput
-                  label={labelOf(headline)}
-                  value={String(data[headline.name] ?? "")}
-                  placeholder={`Untitled ${singular(collection)}`}
-                  readOnly={readOnly}
-                  problem={visibleProblems.get(headline.name)}
-                  onChange={(next) => setField(headline.name, next)}
-                />
-              ) : null}
-              <p className="page-slug">
-                <span className="muted">{collection}/</span>
-                {slug}
-              </p>
+        {status === "deleted" && !conflict ? (
+          <div className="banner" data-tone="conflict" role="status">
+            <IconWarning size={14} />
+            <span>
+              You deleted this {singular(collection)}. It stays live until you{" "}
+              {action === "review" ? "submit" : action === "commit" ? "commit" : "publish"} the
+              deletion.
+            </span>
+            <button
+              type="button"
+              className="btn"
+              data-size="sm"
+              disabled={!canWrite}
+              onClick={() => void restoreThis()}
+            >
+              Restore
+            </button>
+          </div>
+        ) : null}
 
-              {others.length > 0 ? (
-                <div className="form-grid">
-                  {others.map((field) => (
-                    <FieldRow
-                      key={field.name}
-                      field={field}
-                      value={data[field.name]}
-                      path={field.name}
-                      problems={visibleProblems}
-                      disabled={readOnly}
-                      onChange={(next) => setField(field.name, next)}
-                    />
-                  ))}
-                </div>
-              ) : null}
+        {conflict ? (
+          <div className="banner" data-tone="conflict" role="alert">
+            <IconWarning size={14} />
+            <span>
+              This {singular(collection)} was changed somewhere else after you opened it. Your edits
+              are still here, not saved.
+            </span>
+            <button type="button" className="btn" data-size="sm" onClick={() => void load()}>
+              Load their version
+            </button>
+            <button
+              type="button"
+              className="btn"
+              data-size="sm"
+              data-variant="primary"
+              onClick={() => {
+                void persist(true)
+                  .then(() => toast.success("Saved your version"))
+                  .catch((error: unknown) => toast.error(plainError(error)));
+              }}
+            >
+              Keep mine
+            </button>
+          </div>
+        ) : null}
 
-              <section className="page-body" aria-label="Content">
-                <div className="page-body-head">
-                  <h2 className="page-section">Content</h2>
-                  {bodyAsSource ? <span className="page-body-mode">Markdown</span> : null}
-                </div>
-                {bodyAsSource ? (
-                  <p className="notice" data-tone="warn">
-                    <IconWarning size={14} />
-                    <span>{describeFidelity(fidelity)}</span>
-                  </p>
-                ) : null}
-                {bodyAsSource ? (
+        <div className="page-scroll">
+          <article className="page" aria-label={`Editing ${collectionLabel(collection)}`}>
+            {mode === "source" ? (
+              <>
+                <p className="page-kicker">Source</p>
+                <p className="muted page-note">
+                  The file exactly as stored, frontmatter included. Saves are checked against the
+                  schema the same way.
+                </p>
+                <div className="page-source">
                   <MdxEditor
-                    value={body}
+                    value={raw}
                     readOnly={readOnly}
-                    ariaLabel="Content as markdown"
+                    showLineNumbers
+                    ariaLabel="Entry source"
                     onChange={(next) => {
-                      setBody(next);
+                      setRaw(next);
                       autosave.touch();
                     }}
                   />
-                ) : (
-                  <RichEditor
-                    key={`${collection}/${slug}`}
-                    value={entry.body}
+                </div>
+              </>
+            ) : (
+              <>
+                {headline ? (
+                  <TitleInput
+                    label={labelOf(headline)}
+                    value={String(data[headline.name] ?? "")}
+                    placeholder={`Untitled ${singular(collection)}`}
                     readOnly={readOnly}
-                    onFidelity={(roundTripped) =>
-                      setFidelity(compareRoundTrip(entry.body, roundTripped))
-                    }
-                    onChange={(next) => {
-                      setBody(next);
-                      autosave.touch();
-                    }}
+                    problem={visibleProblems.get(headline.name)}
+                    onChange={(next) => setField(headline.name, next)}
                   />
-                )}
-              </section>
-            </>
-          )}
-        </article>
+                ) : null}
+                <p className="page-slug">
+                  <span className="muted">{collection}/</span>
+                  {slug}
+                </p>
+
+                {others.length > 0 ? (
+                  <div className="form-grid">
+                    {others.map((field) => (
+                      <FieldRow
+                        key={field.name}
+                        field={field}
+                        value={data[field.name]}
+                        path={field.name}
+                        problems={visibleProblems}
+                        disabled={readOnly}
+                        onChange={(next) => setField(field.name, next)}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+
+                <section className="page-body" aria-label="Content">
+                  <div className="page-body-head">
+                    <h2 className="page-section">Content</h2>
+                    {bodyAsSource ? <span className="page-body-mode">Markdown</span> : null}
+                  </div>
+                  {bodyAsSource ? (
+                    <p className="notice" data-tone="warn">
+                      <IconWarning size={14} />
+                      <span>{describeFidelity(fidelity)}</span>
+                    </p>
+                  ) : null}
+                  {bodyAsSource ? (
+                    <MdxEditor
+                      value={body}
+                      readOnly={readOnly}
+                      ariaLabel="Content as markdown"
+                      onChange={(next) => {
+                        setBody(next);
+                        autosave.touch();
+                      }}
+                    />
+                  ) : (
+                    <RichEditor
+                      key={`${collection}/${slug}`}
+                      value={entry.body}
+                      readOnly={readOnly}
+                      onFidelity={(roundTripped) =>
+                        setFidelity(compareRoundTrip(entry.body, roundTripped))
+                      }
+                      onChange={(next) => {
+                        setBody(next);
+                        autosave.touch();
+                      }}
+                    />
+                  )}
+                </section>
+              </>
+            )}
+          </article>
+        </div>
       </div>
+      {inspectorOpen ? (
+        <Inspector
+          path={entry.path}
+          slug={slug}
+          status={status}
+          version={entry.version}
+          fields={fields}
+          workspace={workspace.data}
+          action={action}
+          onClose={() => setInspectorOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

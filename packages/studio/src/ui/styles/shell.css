@@ -3,9 +3,11 @@
  * buttons, and every popup (menu, popover, dialog, confirm, sheet, command
  * palette, tooltip, toast). Role names only, like the other sheets.
  *
- * The frame is the docs' frame: a 56px bar across the full width with the
- * wordmark left, search centred and actions right; a 268px sidebar under it
- * on the page colour; one canvas, no grey rail.
+ * The frame is a workspace of panes: a 48px bar across the full width with
+ * the wordmark left, search centred and the account right; a 208px sidebar
+ * under it on the page colour; then the view, which is itself panes when an
+ * entry is open (a 280px list, the document, a 256px inspector). Every pane
+ * header is the same 48px.
  *
  * Popups share one material: the elevated surface, a 1px hairline ring and
  * the floating shadow, a 10px radius, and a scrim that dims and never blurs.
@@ -13,8 +15,11 @@
  */
 
 :root {
-  --top-height: 3.5rem;
-  --side-width: 16.75rem;
+  --top-height: 3rem;
+  --side-width: 13rem;
+  --pane-head-height: 3rem;
+  --list-width: 17.5rem;
+  --inspector-width: 16rem;
   /* Opening is quick, closing quicker: the person already decided. */
   --duration-open: 160ms;
   --duration-close: 100ms;
@@ -73,7 +78,7 @@
 }
 
 .wordmark-sep {
-  margin-inline: 0.4rem;
+  margin-inline: var(--space-2);
   color: var(--ink-faint);
   font-weight: var(--weight-regular);
   letter-spacing: 0;
@@ -229,7 +234,7 @@
   place-items: center;
   min-width: 1.25rem;
   height: 1.25rem;
-  padding: 0 0.375rem;
+  padding: 0 var(--space-1);
   border-radius: 999px;
   /* Sits on the primary fill, so it is a step of that fill, not a colour. */
   background: color-mix(in oklch, var(--primary-foreground) 22%, transparent);
@@ -354,6 +359,141 @@
   overflow: auto;
 }
 
+/* ---- panes --------------------------------------------------------------- */
+
+/* An open entry: the collection's list beside the document. */
+.workspace {
+  display: grid;
+  grid-template-columns: var(--list-width) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+
+.pane-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--pane-head-height);
+  padding: 0 var(--space-3) 0 var(--space-4);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--paper);
+}
+
+.pane-title {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pane-sub {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.pane-head-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.list-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--hairline);
+}
+
+.list-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.list-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* Two lines, 56px: denser than a table row, roomy enough to aim at. */
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--hairline);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .list-row:hover {
+    background: var(--wash);
+  }
+}
+
+/* The open entry: a tint, and a 2px ink edge, so the eye finds it at once. */
+.list-row[aria-current="page"] {
+  background: var(--wash);
+  box-shadow: inset 2px 0 0 var(--ink);
+}
+
+.list-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.list-row-title {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-row-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.list-row-slug {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-row-when {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.list-note {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+/* Under 1024px there is room for one pane beside the sidebar: the document,
+   with the list a click away through its breadcrumb. */
+@media (width < 64rem) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace > .list-pane {
+    display: none;
+  }
+}
+
 /* ---- narrow screens: the sidebar becomes a drawer behind a menu button ---- */
 
 @media (width < 48rem) {
@@ -431,7 +571,7 @@
   display: flex;
   align-items: center;
   min-height: 2.75rem;
-  padding-inline: var(--space-3) 3rem;
+  padding-inline: var(--space-3) var(--space-12);
 }
 
 /* ==========================================================================
@@ -638,7 +778,7 @@ kbd {
   place-items: center;
   min-width: 1.375rem;
   height: 1.375rem;
-  padding-inline: 0.3rem;
+  padding-inline: var(--space-1);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-inner);
   background: var(--paper);
@@ -1050,7 +1190,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0.3125rem var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius);
   background: var(--ink);
   color: var(--paper);
@@ -1156,7 +1296,13 @@ kbd {
   white-space: nowrap;
 }
 
+a.crumb {
+  flex-shrink: 0;
+}
+
+/* A block, so a long name ends in an ellipsis. */
 .crumb[aria-current="page"] {
+  display: block;
   color: var(--ink);
   font-weight: var(--weight-medium);
 }
@@ -1169,4 +1315,18 @@ kbd {
 
 .crumb-sep {
   color: var(--ink-faint);
+}
+
+/* On a phone the way back is the arrow alone, and the entry keeps its name. */
+@media (width < 48rem) {
+  .crumb-label,
+  .crumb-sep {
+    display: none;
+  }
+
+  a.crumb {
+    justify-content: center;
+    min-width: var(--control-height);
+    min-height: var(--control-height);
+  }
 }

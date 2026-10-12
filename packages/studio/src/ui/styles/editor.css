@@ -244,7 +244,7 @@
 .search-clear {
   display: grid;
   place-items: center;
-  padding: 0.2rem;
+  padding: var(--space-1);
   border: 0;
   background: none;
   color: var(--ink-faint);
@@ -266,7 +266,7 @@
   align-items: center;
   gap: var(--space-1);
   height: calc(var(--control-height) - 6px);
-  padding: 0 0.7rem;
+  padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-inner);
   background: none;
@@ -293,7 +293,7 @@
 .filter {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: var(--space-1);
   height: var(--control-height);
   padding: 0 var(--space-3);
   border: 1px solid var(--hairline-strong);
@@ -445,7 +445,7 @@
 .row-problem {
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: var(--space-1);
   color: var(--field-problem-text);
   font-size: var(--text-2xs);
 }
@@ -551,26 +551,44 @@
    ========================================================================== */
 
 .entry {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
+  min-height: 0;
 }
 
+.entry[data-inspector="open"] {
+  grid-template-columns: minmax(0, 1fr) var(--inspector-width);
+}
+
+.entry-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The document's toolbar: one height with every other pane's header. */
 .entry-bar {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   flex-shrink: 0;
-  min-height: 3rem;
+  height: var(--pane-head-height);
   padding: 0 var(--space-4);
   border-bottom: 1px solid var(--hairline);
   background: var(--paper);
 }
 
+/* When the bar runs short, the entry's name gives way first. */
+.entry-bar > :not(.entry-crumbs, .entry-bar-spacer) {
+  flex-shrink: 0;
+}
+
 .status {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--space-2);
   font-size: var(--text-xs);
   color: var(--state-published-text);
 }
@@ -643,11 +661,20 @@
   min-width: 16rem;
 }
 
+/* The document is a pane whose width depends on what is open beside it, so
+   its fields follow the pane, not the window. */
 .page-scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
   background: var(--paper);
+  container-type: inline-size;
+}
+
+@container (width < 40rem) {
+  .page .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* The page being edited sits in the docs' column on the same canvas as the
@@ -822,7 +849,7 @@
 .fr-problem {
   display: flex;
   align-items: flex-start;
-  gap: 0.35rem;
+  gap: var(--space-1);
   margin: 0;
   font-size: var(--text-xs);
   line-height: 1.4;
@@ -832,7 +859,7 @@
 
 .fr-problem svg {
   flex-shrink: 0;
-  margin-top: 0.1rem;
+  margin-top: 2px;
 }
 
 /* Opacity only: a limit message can toggle as someone types across it. */
@@ -936,7 +963,7 @@
 .fc-select select {
   width: 100%;
   appearance: none;
-  padding-right: 2rem;
+  padding-right: var(--space-8);
 }
 
 .fc-select-caret {
@@ -1032,7 +1059,7 @@
   justify-content: space-between;
   gap: var(--space-3);
   width: 100%;
-  padding: 0.45rem var(--space-2);
+  padding: var(--space-2) var(--space-2);
   border: 0;
   border-radius: var(--radius-inner);
   background: none;
@@ -1067,7 +1094,7 @@
 
 .fc-tags {
   min-height: var(--control-height);
-  padding: 0.2rem var(--space-1);
+  padding: var(--space-1) var(--space-1);
   border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-inner);
   background: var(--paper-raised);
@@ -1092,9 +1119,9 @@
 .fc-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--space-1);
   height: 1.6rem;
-  padding: 0 0.3rem 0 0.6rem;
+  padding: 0 var(--space-1) 0 var(--space-2);
   border: 1px solid var(--chip-border);
   border-radius: 999px;
   background: var(--chip-bg);
@@ -1103,7 +1130,7 @@
 }
 
 .fc-chip-toggle {
-  padding: 0 0.65rem;
+  padding: 0 var(--space-3);
   color: var(--ink-muted);
   cursor: pointer;
 }
@@ -1137,7 +1164,7 @@
   display: inline-flex;
   align-items: center;
   height: 1.6rem;
-  padding: 0 0.65rem;
+  padding: 0 var(--space-3);
   border: 1px dashed var(--hairline-strong);
   border-radius: 999px;
   color: var(--ink-muted);
@@ -1203,7 +1230,7 @@
   position: absolute;
   top: calc(var(--space-2) + 0.35rem);
   left: calc(var(--space-2) + 0.35rem);
-  padding: 0.05rem 0.4rem;
+  padding: 1px var(--space-2);
   border-radius: var(--radius-inner);
   background: var(--ink);
   color: var(--paper);
@@ -1354,7 +1381,7 @@
 
 .fc-add {
   align-self: flex-start;
-  padding: 0.35rem 0.7rem;
+  padding: var(--space-1) var(--space-3);
   border: 1px dashed var(--hairline-strong);
   border-radius: var(--radius-inner);
   background: none;
@@ -1512,7 +1539,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
-  margin: 0 var(--space-6) var(--space-4) calc(var(--space-6) + 1.6rem);
+  margin: 0 var(--space-6) var(--space-4) var(--space-12);
 }
 
 .changes-fields {
@@ -1545,7 +1572,7 @@
 }
 
 .changes-arrow {
-  margin: 0 0.4rem;
+  margin: 0 var(--space-2);
   color: var(--ink-faint);
 }
 
@@ -1574,7 +1601,7 @@
 
 .sheet-conflict p {
   display: flex;
-  gap: 0.35rem;
+  gap: var(--space-1);
   margin: 0 0 var(--space-2);
 }
 
@@ -1587,7 +1614,7 @@
 .sheet-conflict-choices label {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: var(--space-1);
   color: var(--ink);
 }
 
@@ -1611,7 +1638,7 @@
 .sheet-reviews a {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: var(--space-1);
 }
 
 .sheet-foot {
@@ -1782,6 +1809,133 @@
 
 .notice .notice-action {
   margin-left: auto;
-  padding: 0.1rem 0.5rem;
+  padding: 2px var(--space-2);
   font-size: inherit;
+}
+
+/* ==========================================================================
+   Inspector: beside the document, or over it when there is no room
+   ========================================================================== */
+
+.inspector {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--hairline);
+  background: var(--paper);
+}
+
+.inspector-tabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.inspector-head {
+  align-items: stretch;
+  gap: var(--space-4);
+}
+
+.inspector-tablist {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-4);
+}
+
+.inspector-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.inspector-tab[data-selected] {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+
+.inspector-tab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.inspector-close {
+  align-self: center;
+  margin-left: auto;
+}
+
+.inspector-body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.inspector-body .changes {
+  margin: 0;
+}
+
+.inspector-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.inspector-facts dt {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.inspector-facts dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+}
+
+.inspector-slug,
+.inspector-path,
+.inspector-sha {
+  font-family: var(--font-mono);
+}
+
+.inspector-empty {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+/* Under 1280px there is no room for three panes: the inspector opens over the
+   document, from the right edge, and the list stays. */
+@media (width < 80rem) {
+  .entry[data-inspector="open"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .entry > .inspector {
+    position: fixed;
+    top: var(--top-height);
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(var(--inspector-width), 100%);
+    box-shadow: var(--shadow-floating);
+  }
+}
+
+/* On a phone the bar keeps what can go wrong: a saved draft says nothing. */
+@media (width < 48rem) {
+  .save[data-state="saved"],
+  .save[data-state="idle"] {
+    display: none;
+  }
 }

@@ -27,6 +27,7 @@ import {
 import { setEditorComponentSpecs } from "./components/mdx-card";
 import { CommandPalette } from "./components/palette";
 import { PublishSheet } from "./components/publish-sheet";
+import { ListPane } from "./components/list-pane";
 import { AcceptInvite, SignIn } from "./components/sign-in";
 import { ConfirmProvider } from "./components/ui/confirm";
 import { Dialog, DialogContent } from "./components/ui/dialog";
@@ -176,12 +177,16 @@ function Shell({ initialBranch }: { initialBranch: string }) {
 
   let main: React.ReactNode;
   if (route.view === "entry" && route.collection && route.slug) {
+    // Panes, not pages: the collection stays beside the open entry.
     main = (
-      <EntryView
-        key={`${route.collection}/${route.slug}`}
-        collection={route.collection}
-        slug={route.slug}
-      />
+      <div className="workspace">
+        <ListPane collection={route.collection} selected={route.slug} />
+        <EntryView
+          key={`${route.collection}/${route.slug}`}
+          collection={route.collection}
+          slug={route.slug}
+        />
+      </div>
     );
   } else if (route.view === "collection" && route.collection) {
     main = <CollectionView collection={route.collection} />;

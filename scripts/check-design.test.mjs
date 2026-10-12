@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkCss, checkMdx, declarations, definedVariables } from "./check-design.mjs";
+import {
+  checkCss,
+  checkMdx,
+  checkStudioCss,
+  declarations,
+  definedVariables,
+} from "./check-design.mjs";
 
 const messages = (problems) => problems.map((problem) => problem.message);
 
@@ -138,4 +144,17 @@ test("variables Base UI and Studio set at runtime are not undefined", () => {
 test("a misspelled runtime variable is still undefined", () => {
   const css = ".tabs { width: var(--active-tab-wdith); }";
   assert.equal(checkCss(css, definedVariables(css)).length, 1);
+});
+
+test("Studio spacing comes from the scale, with 1-2px hairlines allowed", () => {
+  const css = [
+    ".a { padding: var(--space-2) var(--space-4); gap: 0; margin: 0 auto; }",
+    ".b { margin-top: 2px; padding: 1px var(--space-1); }",
+    ".c { padding-inline: calc(-1 * var(--space-2)); width: 37px; }",
+  ].join("\n");
+  assert.deepEqual(checkStudioCss(css), []);
+  assert.deepEqual(messages(checkStudioCss(".d { padding: 0.35rem 6px; gap: 3px; }")), [
+    "padding 0.35rem, 6px is off the spacing scale",
+    "gap 3px is off the spacing scale",
+  ]);
 });
