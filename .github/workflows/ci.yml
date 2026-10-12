@@ -196,8 +196,13 @@ jobs:
       # Per-package floors, not one repo-wide number — a single figure hides
       # that `core` is above 95% while `studio` is far lower. A ratchet: it
       # stops coverage sliding, and floors are raised when they are earned.
+      # Measured with the integration suites this job just ran: code that only
+      # a live database can exercise (revisions, publishing, mirroring) is
+      # tested there, and a unit-only figure would read it as untested.
       - name: Coverage floors
         run: pnpm coverage
+        env:
+          RUN_INTEGRATION: "1"
 
   # The container is the "one `docker run`, full backend" claim, and nothing
   # here built it. That is how `prepare` (added in 0d2fe7b) broke the image for
