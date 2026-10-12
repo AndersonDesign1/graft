@@ -1148,6 +1148,11 @@ h3 {
   margin-inline: auto;
 }
 
+/* `.view .notice` zeroes its margin; a notice in this column stays centred. */
+.view-settings > .notice {
+  margin-inline: auto;
+}
+
 .settings-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 11rem;
@@ -1901,4 +1906,213 @@ kbd {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   overflow-wrap: anywhere;
+}
+
+/* ---- media ---- */
+
+.media {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.media-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.media-empty {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.media-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-outer);
+  background: var(--paper-raised);
+  color: var(--ink);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.media-card:hover {
+  border-color: var(--hairline-strong);
+}
+
+.media-card:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.media-thumb {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  margin-bottom: var(--space-1);
+  border-radius: var(--radius-inner);
+  background: var(--paper-sunken);
+  color: var(--ink-faint);
+  overflow: hidden;
+}
+
+.media-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-name {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-meta {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.dialog.media-picker {
+  width: min(48rem, calc(100vw - 2rem));
+}
+
+.media-picker .media-grid {
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+}
+
+.media-picker-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dialog.media-detail {
+  width: min(34rem, calc(100vw - 2rem));
+}
+
+.media-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.media-preview .media-thumb {
+  aspect-ratio: auto;
+  height: 12rem;
+  margin: 0;
+}
+
+.media-preview .media-thumb img {
+  object-fit: contain;
+}
+
+.media-key {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.media-key code {
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.media-alt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.media-uses {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.media-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 48rem) {
+  .media-grid {
+    grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  }
+}
+
+/* ---- site, deploy hooks and agents ---- */
+
+.site-form {
+  display: contents;
+}
+
+.site-form .input {
+  width: min(22rem, 100%);
+}
+
+.set-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-3) var(--space-4);
+}
+
+.hook-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.hook-last {
+  max-width: 24rem;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  text-align: right;
+}
+
+.hook-last[data-tone="error"] {
+  color: var(--state-orphaned-text);
+}
+
+.agents-revoked {
+  margin-top: var(--space-3);
+}
+
+.agents-revoked .set-panel {
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 48rem) {
+  .hook-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hook-last {
+    text-align: start;
+  }
 }

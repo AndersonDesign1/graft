@@ -15,9 +15,11 @@ export async function databaseStoreFor(
   config: ProjectConfig,
   db: Database,
   branchId: string,
+  /** Where the deploy hooks are kept: the project's own database, not a branch's. */
+  workspaceDb: Database = db,
 ): Promise<ContentStore | undefined> {
   if (config.content.source !== "database") return undefined;
-  const { DatabaseStore } = await import("@usegraft/compiler");
+  const { DatabaseStore, fireDeployHooks } = await import("@usegraft/compiler");
   const mirror =
     config.content.mirror?.mode === "each" ? await mirrorFor(config, db, branchId) : undefined;
   return new DatabaseStore({
@@ -25,7 +27,12 @@ export async function databaseStoreFor(
     branchId,
     collections: config.collections,
     mdxTrust: config.mdxTrust,
-    ...(mirror ? { onPublished: () => mirror().then(() => undefined) } : {}),
+    // After every publish: the git mirror when it runs per publish, then the
+    // deploy hooks, so a site that caches pages hears that they changed.
+    onPublished: async (paths) => {
+      await mirror?.();
+      await fireDeployHooks(workspaceDb, { event: "publish", branch: branchId, paths });
+    },
   });
 }
 

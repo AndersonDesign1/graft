@@ -10,6 +10,7 @@ export * from "./compile";
 export * from "./serialize";
 export * from "./store";
 export * from "./notify";
+export * from "./deploy-hooks";
 export * from "./sync";
 export * from "./mirror";
 export * from "./review-rule";

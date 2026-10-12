@@ -6,6 +6,8 @@ describe("routes", () => {
     for (const route of [
       { view: "home" as const },
       { view: "inbox" as const },
+      { view: "media" as const },
+      { view: "agents" as const },
       { view: "collection" as const, collection: "products" },
       { view: "entry" as const, collection: "products", slug: "linen-shirt" },
       { view: "history" as const },

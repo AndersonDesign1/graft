@@ -102,7 +102,9 @@ function inviteUrl(
 async function callerAccountId(ctx: RouteContext): Promise<string | null> {
   const email = ctx.principal?.email?.toLowerCase();
   if (!email) return null;
-  const found = (await listAccounts(ctx.options.db)).find((a) => a.email.toLowerCase() === email);
+  const found = (await listAccounts(ctx.options.workspaceDb ?? ctx.options.db)).find(
+    (a) => a.email.toLowerCase() === email,
+  );
   return found?.id ?? null;
 }
 
@@ -125,8 +127,8 @@ export const PEOPLE_ROUTES: readonly Route[] = [
     handle: async (ctx) => {
       accountsOn(ctx);
       const [people, invites] = await Promise.all([
-        listAccounts(ctx.options.db),
-        openInvites(ctx.options.db),
+        listAccounts(ctx.options.workspaceDb ?? ctx.options.db),
+        openInvites(ctx.options.workspaceDb ?? ctx.options.db),
       ]);
       const you = ctx.principal?.email?.toLowerCase();
       const body: PeopleDto = {
@@ -158,7 +160,7 @@ export const PEOPLE_ROUTES: readonly Route[] = [
       const email = normaliseEmail(input.email);
       const name = typeof input.name === "string" ? input.name.trim().slice(0, 200) : "";
       const { token, hash } = newToken();
-      const result = await createInvite(ctx.options.db, {
+      const result = await createInvite(ctx.options.workspaceDb ?? ctx.options.db, {
         email,
         ...(name ? { name } : {}),
         role: role(input.role ?? "editor"),
@@ -186,7 +188,7 @@ export const PEOPLE_ROUTES: readonly Route[] = [
     scope: "studio:people",
     handle: async (ctx) => {
       accountsOn(ctx);
-      if (!(await revokeInvite(ctx.options.db, idOf(ctx)))) {
+      if (!(await revokeInvite(ctx.options.workspaceDb ?? ctx.options.db, idOf(ctx)))) {
         throw new GraftError({
           code: "ROUTE_NOT_FOUND",
           message: "That invitation was already used, revoked or expired.",
@@ -207,7 +209,7 @@ export const PEOPLE_ROUTES: readonly Route[] = [
       const accounts = accountsOn(ctx);
       const id = idOf(ctx);
       const { token, hash } = newToken();
-      const result = await createPasswordReset(ctx.options.db, {
+      const result = await createPasswordReset(ctx.options.workspaceDb ?? ctx.options.db, {
         accountId: id,
         tokenHash: hash,
         invitedById: await callerAccountId(ctx),
@@ -225,7 +227,10 @@ export const PEOPLE_ROUTES: readonly Route[] = [
       accountsOn(ctx);
       const input = await body(ctx.request);
       const id = idOf(ctx);
-      refused(await setAccountRole(ctx.options.db, id, role(input.role)), id);
+      refused(
+        await setAccountRole(ctx.options.workspaceDb ?? ctx.options.db, id, role(input.role)),
+        id,
+      );
       return new Response(null, { status: 204 });
     },
   },
@@ -243,7 +248,7 @@ export const PEOPLE_ROUTES: readonly Route[] = [
           fix: "Ask another admin to remove you.",
         });
       }
-      refused(await disableAccount(ctx.options.db, id), id);
+      refused(await disableAccount(ctx.options.workspaceDb ?? ctx.options.db, id), id);
       return new Response(null, { status: 204 });
     },
   },

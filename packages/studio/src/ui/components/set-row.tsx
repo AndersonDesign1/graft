@@ -1,6 +1,6 @@
 /**
- * The parts Settings is built from: a labelled row in a panel, and a copy
- * button for a value someone will paste elsewhere.
+ * The parts Settings is built from: a section with its heading, a labelled
+ * row in a panel, and a copy button for a value someone will paste elsewhere.
  */
 import { useEffect, useRef, useState } from "react";
 import { IconCheck, IconCopy } from "./icons";
@@ -46,5 +46,28 @@ export function CopyButton({ value }: { value: string }) {
     >
       {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
     </button>
+  );
+}
+
+/** A heading, the line under it, and its panels. */
+export function Section({
+  id,
+  title,
+  sub,
+  children,
+}: {
+  id: string;
+  title: string;
+  sub: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="set-section" id={id}>
+      <div>
+        <h2 className="set-section-title">{title}</h2>
+        <p className="set-section-sub">{sub}</p>
+      </div>
+      {children}
+    </section>
   );
 }

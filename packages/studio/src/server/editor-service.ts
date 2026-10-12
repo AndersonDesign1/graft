@@ -27,6 +27,7 @@ import { assertSafeMdx, type MdxTrust } from "@usegraft/mdx-safety";
 import matter from "gray-matter";
 import type {
   ActivityDocumentDto,
+  AssetUseDto,
   ActivityDto,
   ActivityEventDto,
   DraftDiffDto,
@@ -178,6 +179,27 @@ export class EditorService {
       }),
     );
     return [...entries, ...restored.filter((entry): entry is CatalogEntry => entry !== null)];
+  }
+
+  /** Every file the entries use, and where: the media library's "Used in". */
+  async assetUses(actor: StoreActor): Promise<Map<string, AssetUseDto[]>> {
+    const uses = new Map<string, AssetUseDto[]>();
+    for (const [name, collection] of Object.entries(this.options.collections)) {
+      if (collection.authority === "db-authoritative") continue;
+      for (const entry of await this.entries(name, actor)) {
+        for (const ref of assetRefsIn(entry.data, "")) {
+          const list = uses.get(ref.key) ?? [];
+          list.push({
+            collection: name,
+            slug: entry.slug,
+            title: titleOf(entry),
+            field: ref.field,
+          });
+          uses.set(ref.key, list);
+        }
+      }
+    }
+    return uses;
   }
 
   async list(
@@ -711,4 +733,29 @@ function compare(path: string, beforeRaw: string | null, afterRaw: string | null
     bodyChanged: (old?.body ?? "").trim() !== (next?.body ?? "").trim(),
     file: lineDiff(path, beforeRaw, afterRaw),
   };
+}
+
+const ASSET_KEY = /^[a-z0-9][a-z0-9._-]*(\/[a-z0-9][a-z0-9._-]*)*$/;
+
+/**
+ * The `{ key, alt }` values anywhere in an entry's data, with the field path
+ * that holds each: a top-level image, a gallery, an image inside a list of
+ * variants. An object counts only when `key` is an asset key and it has no
+ * other properties, so a reference or a group with a `key` field doesn't.
+ */
+export function assetRefsIn(value: unknown, path: string): Array<{ key: string; field: string }> {
+  if (Array.isArray(value)) {
+    return value.flatMap((item, i) => assetRefsIn(item, path ? `${path}.${i}` : String(i)));
+  }
+  if (!value || typeof value !== "object") return [];
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record);
+  if (
+    typeof record.key === "string" &&
+    ASSET_KEY.test(record.key) &&
+    keys.every((k) => k === "key" || k === "alt")
+  ) {
+    return [{ key: record.key, field: path }];
+  }
+  return keys.flatMap((k) => assetRefsIn(record[k], path ? `${path}.${k}` : k));
 }

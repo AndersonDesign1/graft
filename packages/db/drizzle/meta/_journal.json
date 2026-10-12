@@ -92,6 +92,13 @@
       "when": 1791805170664,
       "tag": "0012_studio_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791826496527,
+      "tag": "0013_media_agents_settings",
+      "breakpoints": true
     }
   ]
 }

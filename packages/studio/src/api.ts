@@ -32,6 +32,7 @@ import { commitChanges, readChanges, readFileDiff } from "./git";
 import { preflightRevert, revertContentTo } from "./revert";
 import { EDITOR_ROUTES } from "./server/editor-routes";
 import { PEOPLE_ROUTES } from "./server/people-routes";
+import { WORKSPACE_ROUTES } from "./server/workspace-routes";
 import type {
   ApprovalList,
   BranchList,
@@ -53,6 +54,19 @@ export type StudioFetchHandler = (request: Request) => Promise<Response>;
 
 export interface StudioApiOptions {
   db: Database;
+  /**
+   * The project's own database, for what belongs to no branch: accounts,
+   * the media library, agent tokens, site settings and deploy hooks.
+   * Defaults to `db`; `graft serve` passes its control connection, so a
+   * Studio on a preview branch still sees the project's people and agents.
+   */
+  workspaceDb?: Database;
+  /**
+   * This host accepts agent tokens on its MCP endpoint and API. `graft serve`
+   * does; `graft studio` on a laptop has no MCP endpoint, so Settings says
+   * where the tokens it makes will work.
+   */
+  agentTokens?: boolean;
   collections: Record<string, AnyCollection>;
   /** Absolute content root — required for get/put document. */
   contentDir: string;
@@ -230,7 +244,8 @@ export type StudioScope =
   | "studio:write"
   | "studio:publish"
   | "approvals:decide"
-  | "studio:people";
+  | "studio:people"
+  | "studio:settings";
 
 export function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -267,7 +282,12 @@ export function statusFor(error: GraftError): number {
     case "CONTENT_CONFLICT":
     case "SLUG_NOT_UNIQUE":
     case "CONTENT_TREE_READ_ONLY":
+    case "ASSET_EXISTS":
       return 409;
+    // The request is fine; this server isn't set up for it yet.
+    case "ENV_VAR_MISSING":
+    case "MIGRATION_REQUIRED":
+      return 503;
     case "REMOTE_STORE_FAILED":
       return 502;
     case "RATE_LIMITED":
@@ -915,6 +935,7 @@ const ROUTES: readonly Route[] = [
   },
   ...EDITOR_ROUTES,
   ...PEOPLE_ROUTES,
+  ...WORKSPACE_ROUTES,
 ];
 
 /** Tell the app the index changed. Undefined when there is no listener or no change. */
@@ -1019,7 +1040,29 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
       if (error instanceof GraftError) {
         return errorResponse(error, statusFor(error));
       }
+      if (sqlState(error) === "42P01") {
+        // undefined_table: the database is older than this Studio.
+        const where = { pathname: new URL(request.url).pathname, method: request.method };
+        const missing = new GraftError({
+          code: "MIGRATION_REQUIRED",
+          message: `${where.method} ${where.pathname} needs a table this database doesn't have yet.`,
+          fix: "Run `graft db migrate` against this database, then reload Studio.",
+          details: where,
+        });
+        return errorResponse(missing, statusFor(missing));
+      }
       throw error;
     }
   };
+}
+
+/** The Postgres SQLSTATE behind an error. Drizzle wraps it, so walk the causes. */
+function sqlState(error: unknown): string | undefined {
+  let current: unknown = error;
+  for (let depth = 0; current && typeof current === "object" && depth < 5; depth += 1) {
+    const { code, cause } = current as { code?: unknown; cause?: unknown };
+    if (typeof code === "string" && /^[0-9A-Z]{5}$/.test(code)) return code;
+    current = cause;
+  }
+  return undefined;
 }

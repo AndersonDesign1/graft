@@ -15,7 +15,7 @@ const V1 = "/api/studio/v1";
 
 const services = new WeakMap<StudioApiOptions, EditorService>();
 
-function service(ctx: RouteContext): EditorService {
+export function service(ctx: RouteContext): EditorService {
   let found = services.get(ctx.options);
   if (!found) {
     found = new EditorService({
@@ -36,7 +36,7 @@ function service(ctx: RouteContext): EditorService {
  * Who a write is attributed to: the signed-in person, or, on an
  * unauthenticated loopback mount, the operator the Studio was started for.
  */
-function actorOf(ctx: RouteContext): StoreActor {
+export function actorOf(ctx: RouteContext): StoreActor {
   if (ctx.principal) {
     return {
       id: ctx.principal.id,

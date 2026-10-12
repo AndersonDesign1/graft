@@ -245,3 +245,93 @@ export interface PublishResultDto {
   /** Present when publishing changed the live index: whether the app was told to refresh. */
   refresh?: ContentChangeNotice;
 }
+
+/* ---- media, agents and site settings ---------------------------------- */
+
+/** Where a file is used: an entry, and the field that holds it. */
+export interface AssetUseDto {
+  collection: string;
+  slug: string;
+  title: string;
+  /** The field's path in the entry: `image`, or `gallery.2` for a list. */
+  field: string;
+}
+
+/** A file in the media library: uploaded through Studio, or used by an entry. */
+export interface AssetDto {
+  key: string;
+  /** Null for a file an entry uses that wasn't uploaded through Studio. */
+  contentType: string | null;
+  bytes: number | null;
+  alt: string | null;
+  uploadedBy: string | null;
+  createdAt: string | null;
+  /** A loadable URL, or null when the asset store isn't configured. */
+  url: string | null;
+  uses: number;
+}
+
+export interface AssetListDto {
+  /** The asset store is configured, so files can be uploaded and shown. */
+  storage: boolean;
+  /** Why it isn't, when it isn't. */
+  storageReason?: string;
+  items: AssetDto[];
+}
+
+export interface AssetDetailDto extends AssetDto {
+  usedIn: AssetUseDto[];
+}
+
+/** What an agent token may do, named for a person choosing it. */
+export type AgentAccess = "read" | "write" | "publish";
+
+export interface AgentTokenDto {
+  id: string;
+  name: string;
+  /** The token's first characters, enough to tell two apart. */
+  prefix: string;
+  access: AgentAccess | "custom";
+  scopes: string[];
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface AgentsDto {
+  tokens: AgentTokenDto[];
+  /** Where an agent connects: the MCP endpoint and the Studio API. */
+  endpoints: { mcp: string; api: string };
+  /**
+   * This host takes the tokens. False under `graft studio`, which has no MCP
+   * endpoint: tokens made there work where the site runs `graft serve`.
+   */
+  accepted: boolean;
+}
+
+/** The token itself, returned once when it is made. */
+export interface NewAgentTokenDto extends AgentTokenDto {
+  token: string;
+}
+
+export interface SiteSettingsDto {
+  name: string | null;
+  url: string | null;
+}
+
+export interface DeployHookDto {
+  id: string;
+  name: string;
+  /** Origin and path only: a hook's query often carries its own token. */
+  url: string;
+  hasSecret: boolean;
+  createdAt: string;
+  lastAt: string | null;
+  lastStatus: number | null;
+  lastError: string | null;
+}
+
+export interface SiteDto {
+  settings: SiteSettingsDto;
+  hooks: DeployHookDto[];
+}

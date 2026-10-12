@@ -23,7 +23,8 @@ export type StudioRole = (typeof STUDIO_ROLES)[number];
 /**
  * Roles are names for scope sets; routes still check scopes. A contributor
  * drafts and submits for review, an editor publishes, an admin also decides
- * approvals and manages who has access: the familiar split for a content team.
+ * approvals, manages who has access, and runs the site: its settings, deploy
+ * hooks and agent tokens. The familiar split for a content team.
  */
 // Frozen, map and arrays alike: it is exported, and it decides what a signed-in
 // role may do, so no importer can widen a role at runtime.
@@ -37,6 +38,7 @@ export const ROLE_SCOPES: Readonly<Record<StudioRole, readonly string[]>> = Obje
     "studio:publish",
     "approvals:decide",
     "studio:people",
+    "studio:settings",
   ]),
 });
 
