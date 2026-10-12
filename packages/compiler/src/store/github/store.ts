@@ -314,6 +314,7 @@ export class GitHubStore implements ContentStore {
             body: reviewBody(options.actor, publishing),
           });
           review = {
+            id: String(pull.number),
             number: pull.number,
             url: pull.html_url,
             title: pull.title,
@@ -373,6 +374,7 @@ export class GitHubStore implements ContentStore {
     return pulls
       .filter((pull) => pull.head.ref.startsWith(mine))
       .map((pull) => ({
+        id: String(pull.number),
         number: pull.number,
         url: pull.html_url,
         title: pull.title,

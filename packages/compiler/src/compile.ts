@@ -17,13 +17,27 @@ import type { AnyCollection } from "@usegraft/core";
 import {
   projectBranchContent,
   projectStaticContent,
+  publishedFiles,
   type ChangeSet,
   type Database,
 } from "@usegraft/db";
 import { parseDocument, type ProjectedDoc } from "./parse";
 
+/**
+ * Where a project's authored content is authoritative.
+ *
+ * - `git`: the files under `contentDir`. If the index disagrees, the files
+ *   win and compile rebuilds it.
+ * - `database`: the published revisions in Postgres. Files are a checkout
+ *   that `graft pull` writes and `graft push` sends back; compile reads the
+ *   revisions and never the files.
+ */
+export type ContentSource = "git" | "database";
+
 export interface CompileOptions {
   contentDir: string;
+  /** Defaults to `git`. */
+  source?: ContentSource;
   collections: Record<string, AnyCollection>;
   db: Database;
   branchId?: string;
@@ -65,6 +79,13 @@ export interface ReadDocsOptions {
   mdxTrust?: MdxTrust;
 }
 
+/** One authored file: its path inside the content directory, and its bytes. */
+export interface SourceFile {
+  /** `<collection>/<slug>.mdx`, forward slashes. */
+  sourcePath: string;
+  raw: string;
+}
+
 /** Read + validate the content tree into normalized docs. Pure of the database. */
 export function readDocs(
   contentDir: string,
@@ -80,6 +101,28 @@ export function readDocs(
     });
   }
 
+  const files = (function* (): Generator<SourceFile> {
+    for (const file of walkContentFiles(contentDir)) {
+      yield {
+        sourcePath: relative(contentDir, file).split(sep).join("/"),
+        raw: readFileSync(file, "utf8"),
+      };
+    }
+  })();
+  return validateDocuments(files, collections, options);
+}
+
+/**
+ * Validate authored files into normalized docs: the schema, slug uniqueness,
+ * and MDX safety. The same checks whether the files came from a checkout or
+ * from Postgres in a database-sourced project, so the two sources can never
+ * accept different content.
+ */
+export function validateDocuments(
+  files: Iterable<SourceFile>,
+  collections: Record<string, AnyCollection>,
+  options: ReadDocsOptions = {},
+): ProjectedDoc[] {
   const docs: ProjectedDoc[] = [];
   const seen = new Map<string, string>();
   // Collected rather than thrown per file: an author fixing one document at a
@@ -89,8 +132,7 @@ export function readDocs(
   const unreadable: { sourcePath: string; reason: string }[] = [];
   const mdxTrust: MdxTrust = options.mdxTrust ?? "restricted";
 
-  for (const file of walkContentFiles(contentDir)) {
-    const sourcePath = relative(contentDir, file).split(sep).join("/");
+  for (const { sourcePath, raw } of files) {
     const segments = sourcePath.split("/");
     const collectionName = segments.length > 1 ? (segments[0] ?? "") : "";
     const collection = collections[collectionName];
@@ -119,7 +161,7 @@ export function readDocs(
       });
     }
 
-    const doc = parseDocument(readFileSync(file, "utf8"), collection, sourcePath);
+    const doc = parseDocument(raw, collection, sourcePath);
 
     // MdxBody refuses executable bodies at render, and content can reach the
     // index without passing a write handler, so that check stays where it is.
@@ -191,10 +233,26 @@ export function readDocs(
 }
 
 export async function compile(options: CompileOptions): Promise<CompileResult> {
-  const docs = readDocs(options.contentDir, options.collections, {
-    mdxTrust: options.mdxTrust,
-  });
-  const gitSha = options.gitSha === undefined ? resolveGitSha(options.contentDir) : options.gitSha;
+  const branchId = options.branchId ?? "main";
+  const fromDatabase = options.source === "database";
+  const docs = fromDatabase
+    ? validateDocuments(
+        (await publishedFiles(options.db, branchId)).map((file) => ({
+          sourcePath: file.path,
+          raw: file.raw,
+        })),
+        options.collections,
+        { mdxTrust: options.mdxTrust },
+      )
+    : readDocs(options.contentDir, options.collections, { mdxTrust: options.mdxTrust });
+  // A database-sourced index was built from revisions, not from a commit, so
+  // the checkout's HEAD would be a false claim about where it came from.
+  const gitSha =
+    options.gitSha !== undefined
+      ? options.gitSha
+      : fromDatabase
+        ? null
+        : resolveGitSha(options.contentDir);
   const changes = await projectBranchContent(
     options.db,
     docs.map((doc) => ({
@@ -206,7 +264,7 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
       sourcePath: doc.sourcePath,
     })),
     {
-      branchId: options.branchId ?? "main",
+      branchId,
       gitSha,
       knownCollections: Object.keys(options.collections),
       pruneUnknown: options.pruneUnknown,
