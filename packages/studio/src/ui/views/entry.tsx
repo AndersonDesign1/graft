@@ -288,8 +288,12 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
             : "Published",
         {
           description:
-            result.action === "publish" ? "The site updates when it redeploys." : undefined,
-          ...(result.review
+            result.action === "publish"
+              ? result.live
+                ? "It's live on the site now."
+                : "The site updates when it redeploys."
+              : undefined,
+          ...(result.review?.url
             ? {
                 action: { label: "View", onClick: () => window.open(result.review?.url, "_blank") },
               }

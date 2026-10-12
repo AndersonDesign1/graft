@@ -59,6 +59,7 @@ function printHelp(): void {
     "                           POST /api/mcp, GET /healthz (what a self-host container runs)",
     "  studio                   Opt-in Studio UI (edit content, approve/deny, OpenAPI)",
     "  content                  List the content tree from the compiled index (Studio parity)",
+    "  content import           Load the content files into the database (database-sourced projects)",
     "  compilations             List recent content projection trail rows (Studio parity)",
     "  harden <role>            Grant an existing Postgres role the runtime privilege set",
     "                           (can request + consume approvals but never decide them)",
@@ -271,8 +272,13 @@ export const COMMAND_HELP = new Map<string, string[]>([
     "content",
     [
       "Usage: graft content [--branch <id>]",
+      "       graft content import [--dry-run] [--branch <id>]",
       "",
       "List the content tree from the compiled index.",
+      "",
+      "import  Make the files under the content directory the live versions in the",
+      '        database, for a project with content = { source: "database" }. Every',
+      "        file is checked first. Re-running imports only what changed.",
       "",
       BRANCH_OPTION,
     ],
@@ -715,6 +721,19 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
         return 0;
       }
       case "content": {
+        if (args.positionals[0] === "import") {
+          const { contentImportCommand, formatImport } = await import("./commands/content");
+          const result = await contentImportCommand({
+            cwd,
+            branchId: args.branchId,
+            dryRun: args.dryRun,
+          });
+          for (const line of formatImport(result)) console.log(line);
+          return 0;
+        }
+        if (args.positionals[0] !== undefined) {
+          throw new UsageError(`unknown content command "${args.positionals[0]}" (try: import)`);
+        }
         const { contentListCommand, formatContentLine } = await import("./commands/content");
         const { branch, lines } = await contentListCommand({ cwd, branchId: args.branchId });
         if (lines.length === 0) {

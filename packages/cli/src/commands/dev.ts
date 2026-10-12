@@ -91,6 +91,7 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
               collections: config.collections,
               mdxTrust: config.mdxTrust,
               branchId: writeBranch,
+              source: config.content.source,
             })
           : await compileStatic({
               contentDir: config.contentDir,
@@ -120,7 +121,12 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
 
   await runCompile();
 
-  let contentWatcher = watch(config.contentDir, { recursive: true }, () => schedule());
+  // In a database-sourced project the files are a checkout: an edit to one
+  // changes nothing until it is pushed, so watching them would only mislead.
+  const fromDatabase = config.content.source === "database";
+  let contentWatcher: FSWatcher | undefined = fromDatabase
+    ? undefined
+    : watch(config.contentDir, { recursive: true }, () => schedule());
   const watchers: FSWatcher[] = [
     watch(config.projectDir, (_event, filename) => {
       if (filename && (CONFIG_FILENAMES as readonly string[]).includes(filename)) schedule(true);
@@ -128,7 +134,8 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
   ];
 
   rewatchContent = (dir: string): void => {
-    contentWatcher.close();
+    if (fromDatabase) return;
+    contentWatcher?.close();
     contentWatcher = watch(dir, { recursive: true }, () => schedule());
     console.log(`now watching ${relative(options.cwd, dir) || "."}`);
   };
@@ -141,13 +148,15 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
         ? `${branch.name} (neon)`
         : (options.branchId ?? "main");
   console.log(
-    `Watching ${watchedContent} + ${basename(configPath)} (branch: ${branchLabel}). Ctrl+C to stop.`,
+    fromDatabase
+      ? `Content is in the database (branch: ${branchLabel}): edit it in Studio. Watching ${basename(configPath)}. Ctrl+C to stop.`
+      : `Watching ${watchedContent} + ${basename(configPath)} (branch: ${branchLabel}). Ctrl+C to stop.`,
   );
 
   await new Promise<void>((resolveStopped) => {
     const stop = (): void => {
       clearTimeout(timer);
-      contentWatcher.close();
+      contentWatcher?.close();
       for (const watcher of watchers) watcher.close();
       resolveStopped();
     };

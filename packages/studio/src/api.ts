@@ -9,6 +9,7 @@ import {
   type CompileResult,
   type ContentChangeListener,
   type ContentStore,
+  type ContentSource,
 } from "@usegraft/compiler";
 import type { AnyCollection } from "@usegraft/core";
 import type { MdxTrust } from "@usegraft/mdx-safety";
@@ -106,6 +107,11 @@ export interface StudioApiOptions {
    * store makes a hosted Studio writable on a read-only filesystem.
    */
   store?: ContentStore;
+}
+
+/** Where the mounted project's content is authoritative, read from its store. */
+function sourceOf(options: StudioApiOptions): ContentSource {
+  return options.store?.kind === "database" ? "database" : "git";
 }
 
 /** The identity a Studio request authenticated as. */
@@ -547,6 +553,12 @@ export interface Route {
    * remote store, where the checkout is the deployment and not the draft.
    */
   writesCheckout?: true;
+  /**
+   * The route still applies in a database-sourced project, where the
+   * revisions in Postgres are the source rather than the checkout: compile
+   * reads them, and revert refuses with its own reason.
+   */
+  databaseSource?: true;
   handle: (ctx: RouteContext) => Promise<Response> | Response;
 }
 
@@ -629,6 +641,7 @@ const ROUTES: readonly Route[] = [
     path: `${V1}/compile`,
     scope: "studio:write",
     writesCheckout: true,
+    databaseSource: true,
     handle: async ({ request, url, options, defaultBranch }) => {
       const payload = (await request.json().catch(() => ({}))) as { branch?: string };
       const branch =
@@ -639,6 +652,7 @@ const ROUTES: readonly Route[] = [
         db: options.db,
         mdxTrust: options.mdxTrust,
         branchId: branch,
+        source: sourceOf(options),
       });
       const refresh = await tellApp(options, branch, result);
       const body: CompileResultDto = {
@@ -834,7 +848,17 @@ const ROUTES: readonly Route[] = [
     path: COMPILATION_REVERT_PATH,
     scope: "studio:write",
     writesCheckout: true,
+    databaseSource: true,
     handle: async ({ options, id }) => {
+      if (sourceOf(options) === "database") {
+        throw new GraftError({
+          code: "CONTENT_SOURCE_MISMATCH",
+          message:
+            "This project keeps its content in the database, so there is no commit to go back to.",
+          fix: "Restore an earlier version of each document from its history instead.",
+          details: { compilation: id },
+        });
+      }
       const row = await requireCompilation(options, id);
       const changed = await revertContentTo(options.contentDir, row.gitSha as string);
       // Recompile only after the files landed, so the index can never describe
@@ -945,7 +969,12 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
         }
       }
 
-      if (matched.route.writesCheckout && options.store && options.store.kind !== "filesystem") {
+      if (
+        matched.route.writesCheckout &&
+        options.store &&
+        options.store.kind !== "filesystem" &&
+        !(options.store.kind === "database" && matched.route.databaseSource)
+      ) {
         throw new GraftError({
           code: "CONTENT_TREE_READ_ONLY",
           message: `${method} ${pathname} writes the deployed files, and this Studio saves to ${options.store.kind} instead.`,

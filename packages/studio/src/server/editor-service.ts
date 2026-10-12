@@ -20,7 +20,7 @@ import {
   type DraftWorkflow,
   type StoreActor,
 } from "@usegraft/compiler";
-import { GraftError } from "@usegraft/contracts";
+import { GraftError, type ChangeSet } from "@usegraft/contracts";
 import type { AnyCollection } from "@usegraft/core";
 import type { Database } from "@usegraft/db";
 import { assertSafeMdx, type MdxTrust } from "@usegraft/mdx-safety";
@@ -80,6 +80,11 @@ export class EditorService {
     return this.store.kind !== "filesystem";
   }
 
+  /** Where saves land, in the words the workspace reports. */
+  get storage(): "local" | "github" | "database" {
+    return this.store.kind === "filesystem" ? "local" : this.store.kind;
+  }
+
   /** What Publish does for a person, given whether they may publish directly. */
   publishAction(canPublishDirectly: boolean): PublishAction {
     if (!this.remote) return "commit";
@@ -126,6 +131,12 @@ export class EditorService {
   }
 
   private async entries(name: string, actor: StoreActor): Promise<CatalogEntry[]> {
+    // A store that is the source of truth lists itself: there may be no
+    // checkout at all, and one that exists can be behind.
+    if (this.store.entries) {
+      const files = await this.store.entries(`${name}/`, actor);
+      return files.filter((file) => /\.mdx?$/.test(file.path)).map((file) => this.parsed(file));
+    }
     const disk = this.catalog.list(name);
     if (!this.store.overlay) return disk;
     return applyOverlay(disk, await this.store.overlay(actor), name);
@@ -179,6 +190,19 @@ export class EditorService {
         ? new Map(entries.map((entry) => [entry.path, searchText(entry, fields)]))
         : undefined,
     );
+  }
+
+  /** Parsed entries by version: a list re-parses only what changed since the last one. */
+  private readonly parsedByVersion = new Map<string, CatalogEntry>();
+
+  private parsed(file: { path: string; raw: string; version: string }): CatalogEntry {
+    const key = `${file.path}@${file.version}`;
+    const hit = this.parsedByVersion.get(key);
+    if (hit) return hit;
+    const entry = parseEntry(file.path, file.raw);
+    if (this.parsedByVersion.size > 20_000) this.parsedByVersion.clear();
+    this.parsedByVersion.set(key, entry);
+    return entry;
   }
 
   /** The path for a slug: the file that declares it, or the conventional one. */
@@ -476,8 +500,11 @@ export class EditorService {
       ...(input.resolve ? { resolve: input.resolve } : {}),
       ...(this.remote ? { mode: action === "publish" ? "direct" : "review" } : {}),
     });
+    const refresh = result.changes ? await this.liveChanged(result.changes) : undefined;
     return {
       action,
+      ...(result.changes ? { live: true } : {}),
+      ...(refresh ? { refresh } : {}),
       published: result.published,
       tookTheirs: result.tookTheirs,
       commit: result.commit
@@ -489,6 +516,15 @@ export class EditorService {
         : null,
       ...(result.review ? { review: result.review } : {}),
     };
+  }
+
+  /** Tell the app a publish changed the live index, so it drops its cached pages. */
+  private liveChanged(changes: ChangeSet): Promise<ContentChangeNotice | undefined> {
+    return notifyContentChange(this.options.onContentChange, {
+      branch: this.options.branchId,
+      gitSha: null,
+      changes,
+    });
   }
 
   async discard(paths: string[], actor: StoreActor): Promise<ContentChangeNotice | undefined> {

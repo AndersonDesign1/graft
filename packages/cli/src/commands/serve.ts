@@ -37,6 +37,7 @@ import { githubStoreFromEnv, revalidateWebhookFromEnv } from "@usegraft/compiler
 import { GraftError } from "@usegraft/contracts";
 import { setRequestPeer } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
+import { databaseStoreFor } from "../content-source";
 
 export type FetchHandler = (request: Request) => Promise<Response>;
 
@@ -372,13 +373,20 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   // One store for every writing surface, so a hosted agent's write_content
   // and a hosted editor's save land the same way: as drafts on GitHub when
   // GRAFT_GITHUB_REPO is set, which is what lets a read-only deployment write.
-  const repository = githubStoreFromEnv({
-    contentDir: config.contentDir,
-    projectRoot: config.projectDir,
-  });
+  // A database-sourced project writes to Postgres, wherever it runs, so the
+  // GitHub store never mounts for it.
+  const databaseStore = await databaseStoreFor(config, branch.db, writeBranch);
+  const repository = databaseStore
+    ? undefined
+    : githubStoreFromEnv({
+        contentDir: config.contentDir,
+        projectRoot: config.projectDir,
+      });
+  const store = databaseStore ?? repository;
 
   const mcpHandler = createGraftMcpHandler({
-    ...(repository ? { store: repository } : {}),
+    ...(store ? { store } : {}),
+    ...(databaseStore ? { source: "database" as const } : {}),
     name: "graft-serve",
     contentDir: config.contentDir,
     collections: config.collections,
@@ -524,7 +532,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
       defaultBranch: writeBranch,
       // Saves land in git on GitHub when GRAFT_GITHUB_REPO is set: the only
       // way a hosted Studio on a read-only filesystem can save at all.
-      ...(repository ? { store: repository } : {}),
+      ...(store ? { store } : {}),
       ...(access
         ? {
             editors: {

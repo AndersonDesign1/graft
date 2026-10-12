@@ -106,6 +106,7 @@ async function runCompile(options: CompileCommandOptions): Promise<CompiledBranc
         mdxTrust: config.mdxTrust,
         branchId: scopeWriteBranch(branch.scope),
         pruneUnknown: options.pruneUnknown,
+        source: config.content.source,
       });
       console.log(formatCompileResult(result));
       return { branch: branch.name, result };

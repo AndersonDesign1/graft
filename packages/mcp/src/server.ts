@@ -25,7 +25,7 @@ import {
 import type { BranchScope, ContentSearchHit, Database } from "@usegraft/db";
 import { openStaticIndex, resolveBranchScope, searchContent } from "@usegraft/db";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { findDoc, requireCollection } from "./content-hints";
+import { documentNotFound, findDoc, requireCollection } from "./content-hints";
 import type { ProjectedContent, RegisterTools, ToolDeps } from "./tools/deps";
 import { registerApprovalTools } from "./tools/approvals";
 import { registerAssetTools } from "./tools/assets";
@@ -173,6 +173,7 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
             db: requireDb("compile", ""),
             branchId,
             mdxTrust: options.mdxTrust,
+            ...(options.source ? { source: options.source } : {}),
           })
         : await compileStatic({
             contentDir,
@@ -299,6 +300,7 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
         // document until a human publishes the change.
         const path = `${input.collection}/${input.slug}.mdx`;
         if (!(await remoteStore.read(path, storeActor()))) {
+          if (remoteStore.entries) throw documentNotFound(input.collection, input.slug);
           findDoc(contentDir, input.collection, collection, input.slug);
         }
         await remoteStore.write(path, null, { actor: storeActor() });

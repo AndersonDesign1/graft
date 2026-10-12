@@ -1,22 +1,29 @@
 /**
- * Drafts on a remote content store: the agent's side of a hosted Studio's
- * Publish button. Registered only when the mount writes through a store that
- * keeps drafts (GitHub), since locally the headless equivalent is git itself.
+ * Drafts on a content store that keeps them: the agent's side of Studio's
+ * Publish button. Registered only when the mount writes through such a store
+ * (GitHub, or the database in a database-sourced project), since with files
+ * in a checkout the headless equivalent is git itself.
  *
- * Publishing defaults to a pull request. Moving the production branch
+ * Publishing defaults to a review: a pull request on GitHub, a request in
+ * Studio's inbox in the database. Moving the production branch
  * directly takes the `content:publish` scope, the agent counterpart of
  * Studio's `studio:publish`: an agent drafts freely, and a human, or a token
  * deliberately trusted to, puts it live.
  */
+import { notifyContentChange } from "@usegraft/compiler";
 import { z } from "zod";
 import { DESTROYS, READS, WRITES } from "./annotations";
+import { ContentRefresh } from "./outputs";
 import type { RegisterTools } from "./deps";
 
 const Review = z.object({
-  number: z.number(),
-  url: z.string(),
+  id: z.string(),
   title: z.string(),
   createdAt: z.string(),
+  number: z.number().optional(),
+  url: z.string().optional(),
+  paths: z.array(z.string()).optional(),
+  requestedBy: z.string().optional(),
 });
 
 const listDraftsOutput = {
@@ -39,6 +46,16 @@ const publishDraftsOutput = {
   published: z.array(z.string()),
   tookTheirs: z.array(z.string()),
   review: Review.optional(),
+  /** Database-sourced projects: what the live index did. The site needs no rebuild. */
+  changes: z
+    .object({
+      added: z.array(z.string()),
+      changed: z.array(z.string()),
+      removed: z.array(z.string()),
+      unchanged: z.number(),
+    })
+    .optional(),
+  refresh: ContentRefresh.optional(),
 };
 
 const discardDraftsOutput = { discarded: z.array(z.string()) };
@@ -62,7 +79,7 @@ export const registerDraftTools: RegisterTools = (server, deps) => {
       outputSchema: listDraftsOutput,
       annotations: READS,
       description:
-        "This connection's unpublished changes (documents written with write_content or delete_content since the last publish) and its open review requests. Each change says whether it is added, modified or deleted, and whether the published version changed since the draft began (conflict: true).",
+        "Unpublished changes (documents written with write_content or delete_content since the last publish) and open review requests. On GitHub these are this connection's own; in a database-sourced project there is one shared draft per document, so they include everyone's. Each change says whether it is added, modified or deleted, and whether the published version changed since the draft began (conflict: true).",
       inputSchema: {},
     },
     () =>
@@ -88,7 +105,7 @@ export const registerDraftTools: RegisterTools = (server, deps) => {
       outputSchema: publishDraftsOutput,
       annotations: WRITES,
       description:
-        'Publish drafts by path (from list_drafts). Opens a pull request for a human to merge, unless this credential carries the "content:publish" scope and the site publishes directly, in which case it commits to the production branch and the site redeploys. A path the published version also changed is refused with CONTENT_CONFLICT; resend with resolve: { "<path>": "mine" | "theirs" }.',
+        'Publish drafts by path (from list_drafts). Without the "content:publish" scope this asks for review: a pull request on GitHub, or a request a person approves in Studio when content is in the database. With it, and a site that publishes directly, it goes live: a commit to the production branch that the site redeploys from, or, when content is in the database, straight onto the live site with no rebuild (the result carries `changes`). A path the published version also changed is refused with CONTENT_CONFLICT; resend with resolve: { "<path>": "mine" | "theirs" }.',
       inputSchema: {
         paths: z.array(z.string()).min(1).describe("Content paths, e.g. products/blue-shirt.mdx"),
         message: z.string().optional().describe("Commit or pull request title"),
@@ -102,13 +119,22 @@ export const registerDraftTools: RegisterTools = (server, deps) => {
       guarded(async () => {
         deps.requireScope("publish_drafts", "content:write");
         const direct = canPublishDirectly() && store.info().publishMode !== "review";
-        return drafts.publish({
+        const result = await drafts.publish({
           actor: deps.storeActor(),
           paths,
           ...(message ? { message } : {}),
           ...(resolve ? { resolve } : {}),
           mode: direct ? "direct" : "review",
         });
+        // Live already (the database store updated the index): tell the app
+        // now, since no rebuild is coming to do it.
+        if (!result.changes) return result;
+        const refresh = await notifyContentChange(deps.options.onContentChange, {
+          branch: deps.branchId,
+          gitSha: null,
+          changes: result.changes,
+        });
+        return refresh ? { ...result, refresh } : result;
       }),
   );
 

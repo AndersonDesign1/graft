@@ -19,7 +19,7 @@ import type { AnyCollection } from "@usegraft/core";
 import { assertSafeMdx } from "@usegraft/mdx-safety";
 import { assertSearchQuery, scopeChain } from "@usegraft/db";
 import { z } from "zod";
-import { findDoc, requireCollection } from "../content-hints";
+import { documentNotFound, findDoc, requireCollection } from "../content-hints";
 import { assertSlugFree, invokeFunctionWithApproval } from "../tool-helpers";
 import { documentLink } from "./resource-uri";
 import { guarded } from "../tool-result";
@@ -68,15 +68,26 @@ export const registerContentReadTools: RegisterTools = (server, deps) => {
     name: string,
     collection: AnyCollection,
   ): Promise<{ docs: ProjectedDoc[]; deleted: Set<string> }> {
-    const docs = readCollectionDocs(contentDir, name, collection);
-    const deleted = new Set<string>();
     // Only an identified caller has a draft; anyone else reads what is deployed.
     let actor: ReturnType<typeof deps.storeActor> | undefined;
     try {
-      actor = deps.remoteStore?.overlay ? deps.storeActor() : undefined;
+      actor =
+        deps.remoteStore?.overlay || deps.remoteStore?.entries ? deps.storeActor() : undefined;
     } catch {
       actor = undefined;
     }
+    // A store that is the source of truth (the database) is read directly:
+    // the checkout, if there is one, is only as current as the last pull.
+    if (deps.remoteStore?.entries) {
+      const files = await deps.remoteStore.entries(`${name}/`, actor);
+      const docs = files
+        .filter((file) => /\.mdx?$/.test(file.path))
+        .map((file) => parseDocument(file.raw, collection, file.path))
+        .sort((a, b) => a.slug.localeCompare(b.slug));
+      return { docs, deleted: new Set() };
+    }
+    const docs = readCollectionDocs(contentDir, name, collection);
+    const deleted = new Set<string>();
     const overlay = actor ? await deps.remoteStore?.overlay?.(actor) : undefined;
     if (!overlay || overlay.size === 0) return { docs, deleted };
     const byPath = new Map(docs.map((doc) => [doc.sourcePath, doc]));
@@ -137,10 +148,12 @@ export const registerContentReadTools: RegisterTools = (server, deps) => {
       guarded(
         async () => {
           const collection = requireCollection(collections, name);
-          const current = deps.remoteStore?.overlay
-            ? await currentDocs(name, collection)
-            : undefined;
+          const current =
+            deps.remoteStore?.overlay || deps.remoteStore?.entries
+              ? await currentDocs(name, collection)
+              : undefined;
           const drafted = current?.docs.find((candidate) => candidate.slug === slug);
+          if (!drafted && deps.remoteStore?.entries) throw documentNotFound(name, slug);
           const doc = drafted ?? findDoc(contentDir, name, collection, slug);
           // Deleted in this caller's draft: gone for them, though still deployed.
           if (!drafted && current?.deleted.has(doc.sourcePath)) {
@@ -239,7 +252,7 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
       outputSchema: writeContentOutput,
       annotations: WRITES,
       description:
-        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. When the server is set up to refresh the app and the write changed content, the result also carries `refresh`; `ok: false` means the write landed but the site may show the old copy, so tell the human and do not retry the write. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit. On a hosted server that writes to GitHub (list_drafts is registered), the write is instead an unpublished draft on your own branch, nothing is compiled (gitSha is null), and it goes live only through publish_drafts.",
+        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. When the server is set up to refresh the app and the write changed content, the result also carries `refresh`; `ok: false` means the write landed but the site may show the old copy, so tell the human and do not retry the write. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit. When the server keeps drafts (list_drafts is registered: a hosted server writing to GitHub, or a project whose content is in the database), the write is instead an unpublished draft, nothing is compiled (gitSha is null), and it goes live only through publish_drafts.",
       inputSchema: {
         collection: z.string().describe("Collection name"),
         slug: z
@@ -305,7 +318,14 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
             const existing = await remoteStore.read(sourcePath, actor);
             const raw = composeDocument(existing?.raw, data as Record<string, unknown>, body ?? "");
             parseDocument(raw, collection, sourcePath);
-            assertSlugFree(contentDir, name, collection, slug, sourcePath);
+            assertSlugFree(
+              contentDir,
+              name,
+              collection,
+              slug,
+              sourcePath,
+              remoteStore.entries ? await remoteStore.entries(`${name}/`, actor) : undefined,
+            );
             // The version just read: a Studio save or another agent landing
             // in between is refused with CONTENT_CONFLICT, not overwritten.
             await remoteStore.write(sourcePath, raw, {
@@ -385,7 +405,12 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
         assertSlugShape(slug, name);
         // Fail fast on a missing document — never file an approval a human
         // would review for nothing.
-        findDoc(contentDir, name, collection, slug);
+        if (deps.remoteStore?.entries) {
+          const exists = (await deps.remoteStore.entries(`${name}/`, deps.storeActor())).some(
+            (file) => file.path === `${name}/${slug}.mdx`,
+          );
+          if (!exists) throw documentNotFound(name, slug);
+        } else findDoc(contentDir, name, collection, slug);
 
         const { data, correlationId } = await invokeFunctionWithApproval(
           getDeleteHandler(),

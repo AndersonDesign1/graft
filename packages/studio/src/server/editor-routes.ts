@@ -102,7 +102,7 @@ export const EDITOR_ROUTES: readonly Route[] = [
       const history = await svc.history();
       const scopes = ctx.principal?.scopes ?? ["studio:read", "studio:write", "studio:publish"];
       const body: WorkspaceDto = {
-        storage: svc.remote ? "github" : "local",
+        storage: svc.storage,
         ...(info.repository ? { repository: info.repository } : {}),
         ...(info.url ? { repositoryUrl: info.url } : {}),
         ...(info.branch ? { branch: info.branch } : {}),
