@@ -281,6 +281,50 @@ export const EDITOR_ROUTES: readonly Route[] = [
       ),
   },
   {
+    method: "GET",
+    path: `${V1}/entry/history`,
+    scope: "studio:read",
+    handle: async (ctx) =>
+      Response.json(
+        await service(ctx).versions(
+          required(
+            ctx.url.searchParams.get("path"),
+            "path",
+            "GET /api/studio/v1/entry/history?path=products/blue-shirt.mdx",
+          ),
+        ),
+      ),
+  },
+  {
+    method: "GET",
+    path: `${V1}/entry/version`,
+    scope: "studio:read",
+    handle: async (ctx) => {
+      const example =
+        "GET /api/studio/v1/entry/version?path=products/blue-shirt.mdx&id=<version id>";
+      return Response.json(
+        await service(ctx).version(
+          required(ctx.url.searchParams.get("path"), "path", example),
+          required(ctx.url.searchParams.get("id"), "id", example),
+          actorOf(ctx),
+        ),
+      );
+    },
+  },
+  {
+    method: "GET",
+    path: `${V1}/activity`,
+    scope: "studio:read",
+    handle: async (ctx) => {
+      const limit = Number(ctx.url.searchParams.get("limit") ?? 20);
+      return Response.json(
+        await service(ctx).activity(
+          Number.isInteger(limit) ? Math.min(Math.max(limit, 1), 100) : 20,
+        ),
+      );
+    },
+  },
+  {
     method: "POST",
     path: `${V1}/drafts/publish`,
     scope: "studio:write",

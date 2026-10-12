@@ -34,9 +34,11 @@ import { gitBlobSha } from "../blob";
 import { assertBaseVersion } from "../conflict";
 import { trimChar } from "../trim";
 import type {
+  ActivityEntry,
   ContentStore,
   DraftChange,
   DraftWorkflow,
+  HistoryEntry,
   PublishMode,
   PublishOptions,
   PublishResult,
@@ -47,7 +49,13 @@ import type {
   WriteOptions,
 } from "../types";
 import type { GitHubAuth } from "./auth";
-import { GitHubClient, type CommitAuthor, type NewTreeEntry, type PullRequest } from "./client";
+import {
+  GitHubClient,
+  type CommitAuthor,
+  type ListedCommit,
+  type NewTreeEntry,
+  type PullRequest,
+} from "./client";
 
 export interface GitHubStoreOptions {
   /** "owner/name". */
@@ -231,6 +239,50 @@ export class GitHubStore implements ContentStore {
       out.set(path, sha ? { raw: await this.blob(sha), version: sha } : null);
     }
     return out;
+  }
+
+  /* ---- history -------------------------------------------------------- */
+
+  /**
+   * The production branch's commits that touched a path, newest first. The
+   * version is left out: finding it costs a tree read per commit, and
+   * `readVersion` reads it when someone opens one.
+   */
+  async history(path: string, options: { limit?: number } = {}): Promise<HistoryEntry[]> {
+    const commits = await this.client.listCommits(this.branch, {
+      path: this.repoPathOf(normalisePath(path)),
+      perPage: Math.min(options.limit ?? 30, 100),
+    });
+    return commits.map(historyOf);
+  }
+
+  async readVersion(path: string, id: string): Promise<StoredFile | null> {
+    if (!/^[0-9a-f]{40}$/i.test(id)) {
+      throw new GraftError({
+        code: "DOCUMENT_NOT_FOUND",
+        message: `"${path}" has no version ${id}: a version here is a commit SHA.`,
+        fix: "Pick a version from the document's history.",
+        details: { path, id },
+      });
+    }
+    const sha = (await this.contentFiles(id)).get(normalisePath(path));
+    return sha === undefined ? null : { raw: await this.blob(sha), version: sha };
+  }
+
+  /** Commits on the production branch under the content path, newest first. */
+  async activity(options: { limit?: number } = {}): Promise<ActivityEntry[]> {
+    const commits = await this.client.listCommits(this.branch, {
+      ...(this.contentPath ? { path: this.contentPath } : {}),
+      perPage: Math.min(options.limit ?? 20, 100),
+    });
+    return commits.map((commit) => {
+      const { version: _version, ...entry } = historyOf(commit);
+      return entry;
+    });
+  }
+
+  private repoPathOf(path: string): string {
+    return this.contentPath ? `${this.contentPath}/${path}` : path;
   }
 
   /**
@@ -768,6 +820,17 @@ function diff(from: Files, to: Files): Map<string, string | null> {
  * store never touches a filesystem, but a path still names a place in
  * someone's repository, and `../.github/workflows/x.yml` is not content.
  */
+function historyOf(commit: ListedCommit): HistoryEntry {
+  const by = commit.author?.login ?? commit.commit.author?.name;
+  return {
+    id: commit.sha,
+    at: commit.commit.committer?.date ?? commit.commit.author?.date ?? new Date(0).toISOString(),
+    ...(by ? { by } : {}),
+    // The first line: the rest of a commit message is detail for git.
+    message: commit.commit.message.split("\n")[0] ?? commit.commit.message,
+  };
+}
+
 export function normalisePath(path: string): string {
   const rel = path.replace(/\\/g, "/").replace(/^\/+/, "");
   const segments = rel.split("/");

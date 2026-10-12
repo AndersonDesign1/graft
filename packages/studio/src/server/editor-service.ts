@@ -26,6 +26,9 @@ import type { Database } from "@usegraft/db";
 import { assertSafeMdx, type MdxTrust } from "@usegraft/mdx-safety";
 import matter from "gray-matter";
 import type {
+  ActivityDocumentDto,
+  ActivityDto,
+  ActivityEventDto,
   DraftDiffDto,
   DraftChangeDto,
   DraftsDto,
@@ -34,6 +37,8 @@ import type {
   PublishAction,
   PublishResultDto,
   SaveEntryResult,
+  VersionDetailDto,
+  VersionListDto,
 } from "../editor-types";
 import type { SchemaFieldDto } from "../types";
 import { requireCollection } from "../content";
@@ -53,6 +58,10 @@ import {
 import { slugify as slugText } from "../slug";
 import { lineDiff } from "./line-diff";
 import { localDrafts } from "./local-drafts";
+import { localHistory, type LocalHistory } from "./local-history";
+
+/** Documents named per activity entry; the rest are counted. */
+const ACTIVITY_DOCUMENTS = 3;
 
 export interface EditorServiceOptions {
   contentDir: string;
@@ -458,22 +467,114 @@ export class EditorService {
       this.drafts.readPublished(path),
       this.store.read(path, actor),
     ]);
-    const old = before ? parseEntry(path, before.raw) : null;
-    const next = after ? parseEntry(path, after.raw) : null;
-    const keys = new Set([...Object.keys(old?.data ?? {}), ...Object.keys(next?.data ?? {})]);
-    const fields = [...keys]
-      .filter((key) => !sameValue(old?.data[key], next?.data[key]))
-      .map((field) => ({
-        field,
-        before: old?.data[field] ?? null,
-        after: next?.data[field] ?? null,
-      }));
+    return compare(path, before?.raw ?? null, after?.raw ?? null);
+  }
+
+  /* ---- history ---------------------------------------------------------- */
+
+  /** Where history comes from: the store, or locally the checkout's git log. */
+  private get historySource(): LocalHistory | null {
+    const { store } = this;
+    if (store.history && store.readVersion && store.activity) {
+      return {
+        history: store.history.bind(store),
+        readVersion: store.readVersion.bind(store),
+        activity: store.activity.bind(store),
+      };
+    }
+    return this.remote ? null : localHistory(this.options.contentDir);
+  }
+
+  /** Why there is no history to show, or null when there is. */
+  private async noHistory(): Promise<string | null> {
+    if (!this.historySource) return "This storage keeps no history.";
+    const { available, reason } = await this.history();
+    return available ? null : (reason ?? "There is no history here yet.");
+  }
+
+  /** What was published for one document, newest first. */
+  async versions(path: string): Promise<VersionListDto> {
+    const reason = await this.noHistory();
+    const source = this.historySource;
+    if (reason !== null || !source) {
+      return { available: false, reason: reason ?? "", versions: [] };
+    }
+    const entries = await source.history(path, { limit: 50 });
     return {
-      path,
-      fields,
-      bodyChanged: (old?.body ?? "").trim() !== (next?.body ?? "").trim(),
-      file: lineDiff(path, before?.raw ?? null, after?.raw ?? null),
+      available: true,
+      versions: entries.map((entry) => ({
+        id: entry.id,
+        at: entry.at,
+        ...(entry.by ? { by: entry.by } : {}),
+        ...(entry.byKind ? { byKind: entry.byKind } : {}),
+        ...(entry.message ? { message: entry.message } : {}),
+        ...(entry.version === null ? { deleted: true } : {}),
+      })),
     };
+  }
+
+  /** One version's bytes, and how what the editor has now differs from it. */
+  async version(path: string, id: string, actor: StoreActor): Promise<VersionDetailDto> {
+    const source = this.historySource;
+    if (!source) {
+      throw new GraftError({
+        code: "DOCUMENT_NOT_FOUND",
+        message: "This storage keeps no history to read a version from.",
+        fix: "Restore it from wherever this content's history is kept.",
+        details: { path, id },
+      });
+    }
+    const [then, now] = await Promise.all([
+      source.readVersion(path, id),
+      this.store.read(path, actor),
+    ]);
+    return {
+      id,
+      path,
+      raw: then?.raw ?? null,
+      diff: compare(path, then?.raw ?? null, now?.raw ?? null),
+    };
+  }
+
+  /** What was published lately, across the content. */
+  async activity(limit = 20): Promise<ActivityDto> {
+    const reason = await this.noHistory();
+    const source = this.historySource;
+    if (reason !== null || !source) {
+      return { available: false, reason: reason ?? "", events: [] };
+    }
+    const entries = await source.activity({ limit });
+    const events = await Promise.all(
+      entries.map(async (entry) => {
+        const paths = (entry.paths ?? []).filter((path) => /\.mdx?$/.test(path));
+        const shown = paths.slice(0, ACTIVITY_DOCUMENTS);
+        const event: ActivityEventDto = {
+          id: entry.id,
+          at: entry.at,
+          documents: await Promise.all(shown.map((path) => this.documentAt(path))),
+          more: paths.length - shown.length,
+        };
+        if (entry.by) event.by = entry.by;
+        if (entry.byKind) event.byKind = entry.byKind;
+        if (entry.message) event.message = entry.message;
+        return event;
+      }),
+    );
+    return { available: true, events };
+  }
+
+  /** A path as an entry to link to: its slug and title now, if it still exists. */
+  private async documentAt(path: string): Promise<ActivityDocumentDto> {
+    const collection = path.split("/")[0] ?? "";
+    const name =
+      path
+        .split("/")
+        .pop()
+        ?.replace(/\.mdx?$/, "") ?? path;
+    const file = await this.drafts.readPublished(path).catch(() => null);
+    if (!file) return { path, collection, title: name };
+    const entry = parseEntry(path, file.raw);
+    return { path, collection, slug: entry.slug, title: titleOf(entry) };
   }
 
   async publish(
@@ -590,4 +691,24 @@ function invalidSlug(slug: string): GraftError {
     fix: 'Use lowercase letters, numbers and single hyphens, like "summer-linen-shirt".',
     details: { slug, pattern: SLUG_RE.source },
   });
+}
+
+/** Field by field and line by line: what changed from one copy of a document to the next. */
+function compare(path: string, beforeRaw: string | null, afterRaw: string | null): DraftDiffDto {
+  const old = beforeRaw === null ? null : parseEntry(path, beforeRaw);
+  const next = afterRaw === null ? null : parseEntry(path, afterRaw);
+  const keys = new Set([...Object.keys(old?.data ?? {}), ...Object.keys(next?.data ?? {})]);
+  const fields = [...keys]
+    .filter((key) => !sameValue(old?.data[key], next?.data[key]))
+    .map((field) => ({
+      field,
+      before: old?.data[field] ?? null,
+      after: next?.data[field] ?? null,
+    }));
+  return {
+    path,
+    fields,
+    bodyChanged: (old?.body ?? "").trim() !== (next?.body ?? "").trim(),
+    file: lineDiff(path, beforeRaw, afterRaw),
+  };
 }

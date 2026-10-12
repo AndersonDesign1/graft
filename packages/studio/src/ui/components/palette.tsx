@@ -13,7 +13,7 @@ import {
   useStudio,
 } from "../lib/studio";
 import {
-  IconApprovals,
+  IconInbox,
   IconBranches,
   IconChanges,
   IconComponentBlock,
@@ -34,7 +34,6 @@ const DEVELOPER: Array<[DevView, string, IconComponent]> = [
   ["schema", "Schema", IconSchema],
   ["history", "History", IconHistory],
   ["branches", "Branches", IconBranches],
-  ["approvals", "Approvals", IconApprovals],
   ["settings", "Settings", IconSettings],
 ];
 
@@ -161,6 +160,14 @@ export function CommandPalette({
               >
                 <IconHome />
                 <span className="palette-item-label">Home</span>
+              </Command.Item>
+              <Command.Item
+                value="go inbox approvals reviews"
+                className="palette-item"
+                onSelect={() => go(() => navigate({ view: "inbox" }))}
+              >
+                <IconInbox />
+                <span className="palette-item-label">Inbox</span>
               </Command.Item>
               {collections.map((collection) => (
                 <Command.Item

@@ -704,3 +704,39 @@ describe("GitHubStore: commitFiles", () => {
     expect(again).toEqual({ commit: null, merged: true });
   });
 });
+
+describe("GitHubStore: history", () => {
+  it("lists the commits that touched a document, and reads it at any of them", async () => {
+    const { fake, store } = setup();
+    const better = shirt.replace("A shirt.", "A better shirt.");
+    fake.push("main", { "content/products/shirt.mdx": better }, "Better shirt\n\nDetail.");
+    fake.push("main", { "content/products/hat.mdx": `${hat}More.\n` }, "Hat");
+    fake.push("main", { "content/products/shirt.mdx": null }, "Drop the shirt");
+
+    const history = await store.history("products/shirt.mdx");
+    expect(history.map((entry) => entry.message)).toEqual([
+      "Drop the shirt",
+      "Better shirt",
+      expect.any(String), // the commit that added it
+    ]);
+    expect(history[0]?.at).toMatch(/^2026-/);
+
+    expect(await store.readVersion("products/shirt.mdx", history[0]?.id as string)).toBeNull();
+    expect(await store.readVersion("products/shirt.mdx", history[1]?.id as string)).toEqual({
+      raw: better,
+      version: gitBlobSha(better),
+    });
+    expect((await caught(store.readVersion("products/shirt.mdx", "not-a-sha"))).code).toBe(
+      "DOCUMENT_NOT_FOUND",
+    );
+  });
+
+  it("lists recent commits to the content as activity, and nothing outside it", async () => {
+    const { fake, store } = setup();
+    fake.push("main", { "README.md": "# shop, renamed\n" }, "Docs");
+    fake.push("main", { "content/products/hat.mdx": `${hat}More.\n` }, "Hat");
+    const activity = await store.activity({ limit: 5 });
+    expect(activity.map((entry) => entry.message)).toEqual(["Hat", expect.any(String)]);
+    expect(activity[0]).not.toHaveProperty("version");
+  });
+});

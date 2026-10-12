@@ -53,6 +53,9 @@ GitHub:
 | `POST` | `/entry` | `studio:write` |
 | `DELETE` | `/entry` | `studio:write` |
 | `POST` | `/entry/duplicate` | `studio:write` |
+| `GET` | `/entry/history?path=…` | `studio:read` |
+| `GET` | `/entry/version?path=…&id=…` | `studio:read` |
+| `GET` | `/activity?limit=…` | `studio:read` |
 | `GET` | `/drafts` | `studio:read` |
 | `GET` | `/drafts/diff?path=…` | `studio:read` |
 | `POST` | `/drafts/publish` | `studio:write` |
@@ -65,6 +68,15 @@ All paths are prefixed with `/api/studio/v1`. Sign-in lives beside them at
 `changed`, `deleted`), `where.<field>=<value>`, `sort` (`site`, `title`, `updated` or a
 field), `dir`, `cursor` and `limit` (at most 500), and returns a page with the
 facets to filter by.
+
+`GET /entry/history` lists an entry's published versions, newest first: its
+revisions when content is in the database, the production branch's commits on
+GitHub, and the checkout's commits locally. Where there is no history it
+answers `available: false` with a `reason`. `GET /entry/version` returns one
+version's `raw` bytes and a `diff` from it to what the caller has now. To
+restore it, send that `raw` to `PUT /entry`: a restore is a draft. `GET
+/activity` lists recent publishes across the content (at most 100), each with
+who made it and the first few entries it changed.
 
 `PUT /entry` takes `{ collection, slug, data, body, baseVersion }`, where
 `baseVersion` is the `version` from `GET /entry`. A stale one is refused with

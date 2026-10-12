@@ -6,6 +6,8 @@
  */
 import type { ContentChangeNotice, ReviewRequest } from "@usegraft/compiler";
 
+export type { ReviewRequest };
+
 /**
  * Where an entry stands, for this person.
  * - `published`: no unpublished changes
@@ -170,6 +172,64 @@ export interface DraftDiffDto {
   fields: FieldChangeDto[];
   bodyChanged: boolean;
   file: import("./types").FileDiffDto;
+}
+
+/** One published version of a document, in its history. */
+export interface VersionDto {
+  /** What `GET /entry/version` takes: a revision id or a commit SHA. */
+  id: string;
+  at: string;
+  by?: string;
+  byKind?: "human" | "agent";
+  message?: string;
+  /** This version deleted the document. */
+  deleted?: boolean;
+}
+
+export interface VersionListDto {
+  /** False where there is no history: no git locally, say. `reason` says why. */
+  available: boolean;
+  reason?: string;
+  versions: VersionDto[];
+}
+
+export interface VersionDetailDto {
+  id: string;
+  path: string;
+  /** The document at this version; null when the version deleted it. */
+  raw: string | null;
+  /** From this version to what the editor has now. */
+  diff: DraftDiffDto;
+}
+
+/** A publish (or a commit) anywhere in the content, newest first. */
+export interface ActivityEventDto {
+  id: string;
+  at: string;
+  by?: string;
+  byKind?: "human" | "agent";
+  message?: string;
+  /**
+   * The first few documents it changed, as entries: deleted ones have no
+   * slug to open. Empty where the store doesn't say which.
+   */
+  documents: ActivityDocumentDto[];
+  /** How many more it changed beyond `documents`. */
+  more: number;
+}
+
+export interface ActivityDocumentDto {
+  path: string;
+  collection: string;
+  /** Absent when the document is gone now. */
+  slug?: string;
+  title: string;
+}
+
+export interface ActivityDto {
+  available: boolean;
+  reason?: string;
+  events: ActivityEventDto[];
 }
 
 export interface PublishResultDto {

@@ -32,6 +32,17 @@ export interface GitCommit {
   parents: { sha: string }[];
 }
 
+/** One entry of GitHub's commit list, trimmed to what history shows. */
+export interface ListedCommit {
+  sha: string;
+  commit: {
+    message: string;
+    author: { name?: string; date?: string } | null;
+    committer: { date?: string } | null;
+  };
+  author: { login: string } | null;
+}
+
 export interface NewTreeEntry {
   path: string;
   mode: "100644";
@@ -311,6 +322,13 @@ export class GitHubClient {
       if (error instanceof GitHubStatus) return false;
       throw error;
     }
+  }
+
+  /** Commits on a branch, newest first, optionally only those touching a path. */
+  listCommits(branch: string, options: { path?: string; perPage?: number } = {}) {
+    const query = new URLSearchParams({ sha: branch, per_page: String(options.perPage ?? 30) });
+    if (options.path) query.set("path", options.path);
+    return this.request<ListedCommit[]>("GET", this.repoPath(`/commits?${query}`));
   }
 
   listOpenPulls(base: string) {

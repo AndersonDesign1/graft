@@ -5,6 +5,7 @@ describe("routes", () => {
   it("round-trips content and developer routes", () => {
     for (const route of [
       { view: "home" as const },
+      { view: "inbox" as const },
       { view: "collection" as const, collection: "products" },
       { view: "entry" as const, collection: "products", slug: "linen-shirt" },
       { view: "history" as const },
@@ -20,6 +21,7 @@ describe("routes", () => {
       slug: "getting-started",
     });
     expect(parseHash("#/history")).toEqual({ view: "history" });
+    expect(parseHash("#/dev/approvals")).toEqual({ view: "inbox" });
   });
 
   it("never throws on a malformed link", () => {

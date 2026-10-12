@@ -22,8 +22,12 @@ import {
   withMirrorLock,
   publishDrafts,
   publishedFiles,
+  publishedHistory,
   readHead,
+  readPublishedRevision,
+  recentlyPublished,
   writeDraft,
+  type RevisionActor,
 } from "./revisions";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -502,5 +506,39 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
     expect((await openReviews(handle.db, BRANCH)).map((r) => r.title)).toEqual(["Both"]);
     await publish("posts/b.mdx", doc("B"), "b");
     expect(await openReviews(handle.db, BRANCH)).toEqual([]);
+  });
+
+  it("keeps every published revision as history, newest first, and reads any of them", async () => {
+    const publish = async (raw: string, actor: RevisionActor = ana) => {
+      await save("posts/h.mdx", raw, { actor });
+      await publishDrafts(handle.db, {
+        branchId: BRANCH,
+        drafts: [{ path: "posts/h.mdx", version: sha(raw) }],
+        actor: ana,
+        index: { upserts: [{ ...row("h", raw), sourcePath: "posts/h.mdx" }], removals: [] },
+      });
+    };
+    await publish(doc("One"));
+    await publish(doc("Two"), { ...ben, kind: "agent" });
+    // A draft is not history until it is published.
+    await save("posts/h.mdx", doc("Three"));
+
+    const history = await publishedHistory(handle.db, BRANCH, "posts/h.mdx");
+    expect(history.map((r) => [r.actorName, r.actorKind, r.publishedBy])).toEqual([
+      ["Ben", "agent", "Ana"],
+      ["Ana", "human", "Ana"],
+    ]);
+    const first = history[1]?.id as string;
+    expect(await readPublishedRevision(handle.db, BRANCH, "posts/h.mdx", first)).toEqual({
+      raw: doc("One"),
+      version: sha(doc("One")),
+    });
+    // Another path's revision, and an id that isn't one, are not found.
+    expect(await readPublishedRevision(handle.db, BRANCH, "posts/x.mdx", first)).toBeUndefined();
+    expect(await readPublishedRevision(handle.db, BRANCH, "posts/h.mdx", "nope")).toBeUndefined();
+
+    expect((await recentlyPublished(handle.db, BRANCH, 1)).map((r) => r.version)).toEqual([
+      sha(doc("Two")),
+    ]);
   });
 });

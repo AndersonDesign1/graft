@@ -1,18 +1,20 @@
 /**
- * Where an editor lands. It answers, in order, the two questions an editor
- * opens Studio with: what is waiting for me, and where is everything.
+ * Where an editor lands. It answers, in order, the questions an editor opens
+ * Studio with: what is waiting for me, what changed since I was last here,
+ * and where is everything.
  *
- * "Waiting for you" comes first because it is the only part that changes
- * between visits: drafts to commit or publish, an agent waiting on an
- * approval, a pull request in review. When nothing waits, it says so in one
- * line. The index-health dashboard is one click away, under Developer.
+ * "Waiting for you" comes first because it is what needs a person: drafts to
+ * commit or publish, and the inbox (changes sent for review, agents asking
+ * first). When nothing waits, it says so in one line. Then what was
+ * published lately, by whom. The index-health dashboard is one click away,
+ * under Developer.
  */
 import { useEffect, useState } from "react";
-import type { EntryList } from "../../editor-types";
+import type { ActivityDto, ActivityEventDto, EntryList } from "../../editor-types";
 import { CollectionMark } from "../components/collection-icon";
-import { IconCheck, IconCommit, IconExternal, IconPlus, IconWaiting } from "../components/icons";
+import { IconCheck, IconCommit, IconInbox, IconPlus } from "../components/icons";
 import { api, qs } from "../lib/api";
-import { plural } from "../lib/format";
+import { absoluteTime, plural, relativeTime } from "../lib/format";
 import {
   collectionLabel,
   editableCollections,
@@ -49,6 +51,8 @@ export function HomeView() {
   const changes = drafts.data?.changes ?? [];
   const reviews = drafts.data?.reviews ?? [];
   const pending = approvals.data?.approvals.length ?? 0;
+  const waiting = pending + reviews.length;
+  const activity = useResource<ActivityDto>("/activity?limit=12", [drafts.data]);
   const canWrite = workspace.data?.canWrite ?? true;
   const action = drafts.data?.publish;
   const verb = publishVerb(action);
@@ -101,55 +105,28 @@ export function HomeView() {
               </button>
             </li>
           ) : null}
-          {pending > 0 ? (
+          {waiting > 0 ? (
             <li>
-              <IconWaiting className="waiting-icon" data-tone="waiting" aria-hidden="true" />
+              <IconInbox className="waiting-icon" data-tone="waiting" aria-hidden="true" />
               <span className="waiting-main">
                 <span className="waiting-title">
-                  {pending === 1
-                    ? "An agent is waiting on your approval"
-                    : `${pending} agent requests are waiting on your approval`}
+                  {plural(waiting, "thing")} waiting on a decision
                 </span>
-                <span className="waiting-sub">Nothing destructive happens until you decide.</span>
+                <span className="waiting-sub">
+                  {[
+                    reviews.length > 0 ? plural(reviews.length, "change") + " for review" : null,
+                    pending > 0 ? plural(pending, "agent request") : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                </span>
               </span>
-              <a className="btn" data-size="sm" href="#/dev/approvals">
-                Review
+              <a className="btn" data-size="sm" href="#/inbox">
+                Open the inbox
               </a>
             </li>
           ) : null}
-          {reviews.map((review) => (
-            <li key={review.id}>
-              {review.url ? (
-                <IconExternal className="waiting-icon" aria-hidden="true" />
-              ) : (
-                <IconWaiting className="waiting-icon" data-tone="waiting" aria-hidden="true" />
-              )}
-              <span className="waiting-main">
-                <span className="waiting-title">{review.title}</span>
-                <span className="waiting-sub">
-                  {review.number !== undefined
-                    ? `In review as pull request #${review.number}`
-                    : "Waiting for someone who can publish"}
-                </span>
-              </span>
-              {review.url ? (
-                <a
-                  className="btn"
-                  data-size="sm"
-                  href={review.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open
-                </a>
-              ) : null}
-            </li>
-          ))}
-          {drafts.data &&
-          !approvals.loading &&
-          changes.length === 0 &&
-          pending === 0 &&
-          reviews.length === 0 ? (
+          {drafts.data && !approvals.loading && changes.length === 0 && waiting === 0 ? (
             <li>
               <IconCheck className="waiting-icon" aria-hidden="true" />
               <span className="waiting-main">
@@ -162,6 +139,19 @@ export function HomeView() {
           ) : null}
         </ul>
       </section>
+
+      {activity.data?.available && activity.data.events.length > 0 ? (
+        <section className="home-section" aria-labelledby="activity-title">
+          <h2 className="section-title" id="activity-title">
+            Recently {done}
+          </h2>
+          <ol className="activity">
+            {activity.data.events.map((event) => (
+              <ActivityRow key={event.id} event={event} />
+            ))}
+          </ol>
+        </section>
+      ) : null}
 
       <section className="home-section" aria-labelledby="collections-title">
         <h2 className="section-title" id="collections-title">
@@ -226,5 +216,43 @@ export function HomeView() {
         </table>
       </section>
     </div>
+  );
+}
+
+/** One publish: who, what, when. Each document still there links to its entry. */
+function ActivityRow({ event }: { event: ActivityEventDto }) {
+  return (
+    <li className="activity-row">
+      <span className="activity-who">
+        {event.by ?? "Someone"}
+        {event.byKind === "agent" ? <span className="activity-tag">Agent</span> : null}
+      </span>
+      <span className="activity-what">
+        {event.documents.length > 0 ? (
+          <>
+            {event.documents.map((doc, i) => (
+              <span key={doc.path}>
+                {i > 0 ? ", " : null}
+                {doc.slug ? (
+                  <a
+                    href={`#/c/${encodeURIComponent(doc.collection)}/${encodeURIComponent(doc.slug)}`}
+                  >
+                    {doc.title}
+                  </a>
+                ) : (
+                  <span className="activity-gone">{doc.title}</span>
+                )}
+              </span>
+            ))}
+            {event.more > 0 ? `, and ${event.more} more` : null}
+          </>
+        ) : (
+          (event.message ?? "Changed the content")
+        )}
+      </span>
+      <time className="activity-when" dateTime={event.at} title={absoluteTime(event.at)}>
+        {relativeTime(event.at)}
+      </time>
+    </li>
   );
 }

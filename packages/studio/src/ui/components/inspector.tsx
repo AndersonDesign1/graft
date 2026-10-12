@@ -6,10 +6,11 @@
  */
 import { Tabs as TabsPrimitive } from "@base-ui-components/react/tabs";
 import { useCallback, useEffect, useState } from "react";
-import type { DraftsDto, EntryStatus, WorkspaceDto } from "../../editor-types";
+import type { DraftsDto, EntryStatus, VersionDto, WorkspaceDto } from "../../editor-types";
 import type { SchemaFieldDto } from "../../types";
 import { doneWord } from "../lib/studio";
 import { DiffView } from "./diff-view";
+import { HistoryPanel } from "./history-panel";
 import { IconClose } from "./icons";
 
 const KEY = "graft-studio:inspector";
@@ -80,6 +81,8 @@ export function Inspector({
   fields,
   workspace,
   action,
+  canRestore,
+  onRestore,
   onClose,
 }: {
   path: string;
@@ -89,6 +92,8 @@ export function Inspector({
   fields: readonly SchemaFieldDto[];
   workspace: WorkspaceDto | null;
   action: DraftsDto["publish"] | undefined;
+  canRestore: boolean;
+  onRestore: (raw: string, from: VersionDto) => void;
   onClose: () => void;
 }) {
   const changed = status !== "published";
@@ -102,6 +107,9 @@ export function Inspector({
             </TabsPrimitive.Tab>
             <TabsPrimitive.Tab value="changes" className="inspector-tab">
               Changes
+            </TabsPrimitive.Tab>
+            <TabsPrimitive.Tab value="history" className="inspector-tab">
+              History
             </TabsPrimitive.Tab>
           </TabsPrimitive.List>
           <button
@@ -147,6 +155,15 @@ export function Inspector({
           ) : (
             <p className="inspector-empty">No changes. This is the {doneWord(action)} version.</p>
           )}
+        </TabsPrimitive.Panel>
+        <TabsPrimitive.Panel value="history" className="inspector-body">
+          <HistoryPanel
+            path={path}
+            version={version}
+            fields={fields}
+            canRestore={canRestore}
+            onRestore={onRestore}
+          />
         </TabsPrimitive.Panel>
       </TabsPrimitive.Root>
     </aside>

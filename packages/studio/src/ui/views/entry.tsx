@@ -17,7 +17,13 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { EntryDto, EntryStatus, PublishResultDto, SaveEntryResult } from "../../editor-types";
+import type {
+  EntryDto,
+  EntryStatus,
+  PublishResultDto,
+  SaveEntryResult,
+  VersionDto,
+} from "../../editor-types";
 import type { SchemaFieldDto } from "../../types";
 import { useConfirm } from "../components/ui/confirm";
 import { Inspector, useInspector } from "../components/inspector";
@@ -42,6 +48,7 @@ import { ApiError, api, plainError, qs } from "../lib/api";
 import { useAutosave } from "../lib/autosave";
 import { labelOf, problemsFromServer, problemsIn, titleField } from "../lib/fields";
 import { compareRoundTrip, describeFidelity, type FidelityResult } from "../lib/fidelity";
+import { relativeTime } from "../lib/format";
 import { buildForm, composeData, sameValue } from "../lib/schema-form";
 import {
   actionWord,
@@ -352,6 +359,39 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
         toast.success(`Back to the ${doneWord(drafts.data?.publish)} version`);
         await load();
       }
+    } catch (error) {
+      toast.error(plainError(error));
+    }
+  }
+
+  async function restoreVersion(versionRaw: string, from: VersionDto): Promise<void> {
+    const ok = await confirm({
+      kind: "discard",
+      title: "Restore this version?",
+      body: `The ${singular(collection)} goes back to how it was ${relativeTime(from.at)}, as a draft. Nothing on the site changes until you ${actionWord(drafts.data?.publish)} it.`,
+      action: "Restore version",
+    });
+    if (!ok) return;
+    try {
+      await autosave.flush();
+    } catch {
+      return; // the flush said why
+    }
+    const base = saved.current;
+    if (!base) return;
+    try {
+      await api<SaveEntryResult>("/entry", {
+        method: "PUT",
+        body: JSON.stringify({
+          collection: base.collection,
+          slug: base.slug,
+          raw: versionRaw,
+          baseVersion: base.version,
+        }),
+      });
+      drafts.refresh();
+      await load();
+      toast.success("Restored as a draft");
     } catch (error) {
       toast.error(plainError(error));
     }
@@ -752,6 +792,8 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
           fields={fields}
           workspace={workspace.data}
           action={action}
+          canRestore={!readOnly}
+          onRestore={(versionRaw, from) => void restoreVersion(versionRaw, from)}
           onClose={() => setInspectorOpen(false)}
         />
       ) : null}

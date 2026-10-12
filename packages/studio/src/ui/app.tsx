@@ -7,7 +7,7 @@ import { CollectionMark } from "./components/collection-icon";
 import { CreateDialog } from "./components/create-dialog";
 import { ErrorBoundary } from "./components/error-boundary";
 import {
-  IconApprovals,
+  IconInbox,
   IconBranches,
   IconCaretDown,
   IconCheck,
@@ -63,7 +63,8 @@ import { useResource } from "./lib/use-resource";
 import { CollectionView } from "./views/collection";
 import { EntryView } from "./views/entry";
 import { HomeView } from "./views/home";
-import { ApprovalsView, BranchesView, HistoryView } from "./views/operations";
+import { BranchesView, HistoryView } from "./views/operations";
+import { InboxView } from "./views/inbox";
 import { OverviewView } from "./views/overview";
 import { SchemaView } from "./views/schema";
 import { SettingsView } from "./views/settings";
@@ -73,7 +74,6 @@ const DEV_NAV: Array<{ view: DevView; label: string; Icon: IconComponent }> = [
   { view: "schema", label: "Schema", Icon: IconSchema },
   { view: "history", label: "History", Icon: IconHistory },
   { view: "branches", label: "Branches", Icon: IconBranches },
-  { view: "approvals", label: "Approvals", Icon: IconApprovals },
   { view: "settings", label: "Settings", Icon: IconSettings },
 ];
 
@@ -172,7 +172,8 @@ function Shell({ initialBranch }: { initialBranch: string }) {
 
   const collections = editableCollections(schema.data);
   const unpublished = drafts.data?.changes.length ?? 0;
-  const pending = approvals.data?.approvals.length ?? 0;
+  // What the inbox holds: agents asking first, and changes sent for review.
+  const pending = (approvals.data?.approvals.length ?? 0) + (drafts.data?.reviews.length ?? 0);
   const user = workspace.data?.user;
 
   let main: React.ReactNode;
@@ -200,7 +201,7 @@ function Shell({ initialBranch }: { initialBranch: string }) {
       />
     );
   } else if (route.view === "schema") main = <SchemaView />;
-  else if (route.view === "approvals") main = <ApprovalsView onDecided={approvals.refresh} />;
+  else if (route.view === "inbox") main = <InboxView onDecided={approvals.refresh} />;
   else if (route.view === "branches")
     main = <BranchesView branch={branch} onSelectBranch={selectBranch} />;
   else if (route.view === "history") main = <HistoryView branch={branch} />;
@@ -436,6 +437,20 @@ function SideNav({
           <IconHome />
           <span className="side-text">Home</span>
         </a>
+        <a
+          href="#/inbox"
+          className="side-item"
+          data-active={route.view === "inbox" || undefined}
+          aria-current={route.view === "inbox" ? "page" : undefined}
+        >
+          <IconInbox />
+          <span className="side-text">Inbox</span>
+          {pending > 0 ? (
+            <span className="side-count" data-numeric="" aria-label={`${pending} waiting`}>
+              {pending}
+            </span>
+          ) : null}
+        </a>
         <p className="side-label">Content</p>
         {collections.map((name) => {
           const active = route.collection === name && !developer;
@@ -484,11 +499,6 @@ function SideNav({
               >
                 <Icon />
                 <span className="side-text">{label}</span>
-                {view === "approvals" && pending > 0 ? (
-                  <span className="side-count" data-numeric="">
-                    {pending} waiting
-                  </span>
-                ) : null}
               </a>
             ))}
           </nav>

@@ -153,6 +153,37 @@ describe.skipIf(!runIntegration)("DatabaseStore (integration)", () => {
     expect((await store.drafts.reviews(ana)).map((r) => r.title)).toEqual(["Spring sale"]);
   });
 
+  it("keeps every published version of a document, and reads any of them", async () => {
+    const jo = { id: "jo", name: "Jo", kind: "agent" as const };
+    await store.write("posts/h.mdx", post("One"), { actor: ana });
+    await store.drafts.publish({ actor: ana, paths: ["posts/h.mdx"] });
+    await store.write("posts/h.mdx", post("Two"), { actor: jo });
+    await store.write("posts/other.mdx", post("Other"), { actor: jo });
+    await store.drafts.publish({ actor: ana, paths: ["posts/h.mdx", "posts/other.mdx"] });
+    // A draft is not history until it is published.
+    await store.write("posts/h.mdx", post("Three"), { actor: ana });
+
+    const history = await store.history("posts/h.mdx");
+    expect(history.map((entry) => [entry.by, entry.byKind])).toEqual([
+      ["Jo", "agent"],
+      ["Ana", "human"],
+    ]);
+    expect((await store.readVersion("posts/h.mdx", history[1]?.id as string))?.raw).toBe(
+      post("One"),
+    );
+    await expect(
+      store.readVersion("posts/other.mdx", history[1]?.id as string),
+    ).rejects.toMatchObject({ code: "DOCUMENT_NOT_FOUND" });
+
+    // One publish of two documents is one entry in the activity feed.
+    const activity = await store.activity();
+    expect(activity.map((entry) => entry.paths?.sort())).toEqual([
+      ["posts/h.mdx", "posts/other.mdx"],
+      ["posts/h.mdx"],
+    ]);
+    expect(activity[0]?.by).toBe("Ana");
+  });
+
   it("lists what an editor sees, and what the live site holds", async () => {
     await store.write("posts/live.mdx", post("Live"), { actor: ana });
     await store.drafts.publish({ actor: ana, paths: ["posts/live.mdx"] });

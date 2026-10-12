@@ -116,6 +116,180 @@
   white-space: nowrap;
 }
 
+/* What was published lately: who, what, when, one line each. */
+.activity {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-height: 2.75rem;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--text-sm);
+}
+
+.activity-who {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-weight: var(--weight-medium);
+}
+
+.activity-tag {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+}
+
+.activity-what {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-what a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .activity-what a:hover {
+    text-decoration: underline;
+  }
+}
+
+.activity-gone {
+  text-decoration: line-through;
+}
+
+.activity-when {
+  flex-shrink: 0;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Inbox: what waits on a decision, a row per thing
+   ========================================================================== */
+
+.inbox {
+  max-width: 56rem;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.inbox-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.inbox-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  list-style: none;
+}
+
+.inbox-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.inbox-item + .inbox-item {
+  border-top: 1px solid var(--hairline);
+}
+
+.inbox-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--ink-muted);
+}
+
+.inbox-icon[data-tone="waiting"] {
+  color: var(--state-pending-text);
+}
+
+.inbox-main {
+  display: grid;
+  flex: 1;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.inbox-title,
+.inbox-sub {
+  margin: 0;
+}
+
+.inbox-title {
+  font-weight: var(--weight-medium);
+}
+
+.inbox-sub {
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.inbox-paths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  font-size: var(--text-sm);
+  list-style: none;
+}
+
+.inbox-main .disclosure {
+  margin-top: var(--space-1);
+}
+
+.inbox-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.inbox-note {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.inbox-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+@media (width < 48rem) {
+  .inbox-item {
+    flex-wrap: wrap;
+  }
+
+  .inbox-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
 /* A plain list table: quiet head, hairline rows, numbers to the right. */
 .list {
   width: 100%;
@@ -1884,6 +2058,16 @@
   margin: 0;
 }
 
+/* Too narrow for a label column: each field's name sits over its change. */
+.inspector .changes-fields {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 0;
+}
+
+.inspector .changes-row dd {
+  margin-bottom: var(--space-3);
+}
+
 .inspector-facts {
   display: flex;
   flex-direction: column;
@@ -1912,6 +2096,117 @@
   margin: 0;
   color: var(--ink-muted);
   font-size: var(--text-sm);
+}
+
+/* ---- history: published versions, newest first ---- */
+
+.versions {
+  display: flex;
+  flex-direction: column;
+  margin: 0 calc(-1 * var(--space-2));
+  padding: 0;
+  list-style: none;
+}
+
+.version {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-inner);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .version:hover {
+    background: var(--wash);
+  }
+}
+
+.version:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.version-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+
+.version-by {
+  overflow: hidden;
+  font-weight: var(--weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.version-tag {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.version-when {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.version-note {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.version-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.version-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.version-title,
+.version-message {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.version-title {
+  font-weight: var(--weight-medium);
+}
+
+.version-message {
+  color: var(--ink-muted);
+}
+
+.version-section {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.version-detail .changes {
+  align-self: stretch;
 }
 
 /* Under 1280px there is no room for three panes: the inspector opens over the
