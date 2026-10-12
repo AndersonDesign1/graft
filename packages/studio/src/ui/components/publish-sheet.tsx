@@ -400,9 +400,15 @@ function Done({ result, onClose }: { result: PublishResultDto; onClose: () => vo
           : onlyKept
             ? `Your ${kept === 1 ? "draft was" : "drafts were"} discarded; nothing else changed.`
             : result.action === "review"
-              ? result.review?.url
-                ? "They go live when the pull request is merged."
-                : "They go live when someone who can publish approves them."
+              ? `${
+                  result.reviewReasons?.length
+                    ? `This site reviews these first: ${result.reviewReasons.join("; ")}. `
+                    : ""
+                }${
+                  result.review?.url
+                    ? "They go live when the pull request is merged."
+                    : "They go live when someone who can publish approves them."
+                }`
               : result.action === "commit"
                 ? `Commit ${result.commit?.shortSha ?? ""} is on this computer. Push it to deploy.`
                 : result.live

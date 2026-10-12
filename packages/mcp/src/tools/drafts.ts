@@ -56,6 +56,8 @@ const publishDraftsOutput = {
     })
     .optional(),
   refresh: ContentRefresh.optional(),
+  /** Why a direct publish went to review: the site's rule for deletions, some collections or large changes. */
+  reviewReasons: z.array(z.string()).optional(),
 };
 
 const discardDraftsOutput = { discarded: z.array(z.string()) };

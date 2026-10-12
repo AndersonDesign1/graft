@@ -148,6 +148,8 @@ export interface PublishResultDto {
   review?: ReviewRequest;
   /** Published straight to the live site, with no rebuild to wait for. */
   live?: boolean;
+  /** Why a publish went to review: the site reviews deletions, some collections or large changes. */
+  reviewReasons?: string[];
   /** Present when publishing changed the live index: whether the app was told to refresh. */
   refresh?: ContentChangeNotice;
 }

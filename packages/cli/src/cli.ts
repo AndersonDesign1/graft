@@ -61,6 +61,11 @@ function printHelp(): void {
     "  content                  List the content tree from the compiled index (Studio parity)",
     "  content import           Load the content files into the database (database-sourced projects)",
     "  compilations             List recent content projection trail rows (Studio parity)",
+    "  pull [doc...]            Write what is published into your files (database-sourced projects)",
+    "  push [doc...]            Publish the files you changed since your last pull",
+    "  mirror                   Commit what was published since the last run to GitHub",
+    "  check                    Check every content file: schema, slugs, MDX, references. No database",
+    "  ci changes|skip-build|init   Keep CI cheap on content-only changes",
     "  harden <role>            Grant an existing Postgres role the runtime privilege set",
     "                           (can request + consume approvals but never decide them)",
     ...PLANNED.map((cmd) => `  ${cmd.name.padEnd(12)} ${cmd.summary}  (${cmd.phase})`),
@@ -284,6 +289,72 @@ export const COMMAND_HELP = new Map<string, string[]>([
     ],
   ],
   [
+    "pull",
+    [
+      "Usage: graft pull [doc...] [--force] [--branch <id>]",
+      "",
+      'For a project with content = { source: "database" }: write what is published',
+      "into the files under the content directory. A file you changed since your last",
+      "pull is kept for graft push. One changed both here and in the database is left",
+      "as it is and listed, unless --force takes the published version.",
+      "",
+      "  doc...    Only these documents, like posts/launch",
+      BRANCH_OPTION,
+    ],
+  ],
+  [
+    "push",
+    [
+      "Usage: graft push [doc...] [--dry-run] [--force] [--branch <id>]",
+      "",
+      "Publish the files you changed since your last graft pull, checked as graft",
+      "compile checks them. Refused, with nothing written, if someone published one",
+      "of those documents since your pull: pull first. --force publishes over it.",
+      "",
+      "  doc...    Only these documents, like posts/launch",
+      BRANCH_OPTION,
+    ],
+  ],
+  [
+    "mirror",
+    [
+      "Usage: graft mirror [--branch <id>]",
+      "",
+      "Commit everything published since the last run to the GitHub repository in",
+      "GRAFT_GITHUB_REPO, as one commit. Run it on a schedule, or let graft serve do",
+      "it when graft.config.ts sets content.mirror.",
+      "",
+      BRANCH_OPTION,
+    ],
+  ],
+  [
+    "check",
+    [
+      "Usage: graft check",
+      "",
+      "Check every content file the way a compile or a publish would: the schema,",
+      "slug uniqueness, MDX safety, and references to documents that don't exist.",
+      "Needs no database. Exits 1 when there is a problem.",
+    ],
+  ],
+  [
+    "ci",
+    [
+      "Usage: graft ci changes [--base <ref>]",
+      "       graft ci skip-build [--base <ref>]",
+      "       graft ci init [--overwrite]",
+      "",
+      "changes      Print content-only=true when every changed file is content, and",
+      "             write it to $GITHUB_OUTPUT for later steps to read.",
+      "skip-build   Exit 0 when the deploy can be skipped: only content changed and",
+      "             the site already serves it from the database. Exit 1 otherwise.",
+      "init         Write .github/workflows/graft-content.yml, which runs graft check",
+      "             on content changes.",
+      "",
+      "  --base <ref>  Compare against this ref. Default: the pull request's base, else HEAD~1",
+    ],
+  ],
+  [
     "compilations",
     [
       "Usage: graft compilations [--branch <id>]",
@@ -330,6 +401,12 @@ interface ParsedArgs {
   role?: string;
   days?: number;
   url?: string;
+  /** `graft pull` / `push`: publish or take over conflicts. */
+  force: boolean;
+  /** `graft ci`: the ref to compare against. */
+  base?: string;
+  /** `graft pull` / `push`: limit to these documents (also given as arguments). */
+  only: string[];
 }
 
 class UsageError extends Error {}
@@ -355,6 +432,9 @@ function parseArgs(rest: string[]): ParsedArgs {
   let role: string | undefined;
   let days: number | undefined;
   let url: string | undefined;
+  let force = false;
+  let base: string | undefined;
+  const only: string[] = [];
 
   const value = (flag: string, raw: string | undefined): string => {
     if (!raw || raw.startsWith("-")) {
@@ -382,6 +462,12 @@ function parseArgs(rest: string[]): ParsedArgs {
       port = Number(raw);
     } else if (arg === "--host") {
       host = value("--host", rest[++i]);
+    } else if (arg === "--force") {
+      force = true;
+    } else if (arg === "--base") {
+      base = value("--base", rest[++i]);
+    } else if (arg === "--only") {
+      only.push(value("--only", rest[++i]));
     } else if (arg === "--apply") {
       apply = true;
     } else if (arg === "--dry-run") {
@@ -441,6 +527,9 @@ function parseArgs(rest: string[]): ParsedArgs {
     role,
     days,
     url,
+    force,
+    ...(base ? { base } : {}),
+    only,
   };
 }
 
@@ -719,6 +808,55 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
           host: args.host,
         });
         return 0;
+      }
+      case "pull":
+      case "push": {
+        const { pullCommand, pushCommand } = await import("./commands/sync");
+        const options = {
+          cwd,
+          branchId: args.branchId,
+          only: [...args.positionals, ...args.only],
+          force: args.force,
+          dryRun: args.dryRun,
+        };
+        const lines = command === "pull" ? await pullCommand(options) : await pushCommand(options);
+        for (const line of lines) console.log(line);
+        return 0;
+      }
+      case "mirror": {
+        const { mirrorCommand } = await import("./commands/sync");
+        for (const line of await mirrorCommand({ cwd, branchId: args.branchId })) console.log(line);
+        return 0;
+      }
+      case "check": {
+        const { checkCommand } = await import("./commands/check");
+        const result = await checkCommand({ cwd });
+        if (result.problems.length === 0) {
+          console.log(`Checked ${result.documents} document(s): no problems.`);
+          return 0;
+        }
+        for (const problem of result.problems) console.error(problem);
+        console.error(`\n${result.problems.length} problem(s).`);
+        return 1;
+      }
+      case "ci": {
+        const sub = args.positionals[0];
+        const ci = await import("./commands/ci");
+        if (sub === "changes") {
+          const result = await ci.ciChanges({ cwd, ...(args.base ? { base: args.base } : {}) });
+          for (const line of ci.reportChanges(result)) console.log(line);
+          return 0;
+        }
+        if (sub === "skip-build") {
+          const result = await ci.ciSkipBuild({ cwd, ...(args.base ? { base: args.base } : {}) });
+          console.log(result.reason);
+          return result.skip ? 0 : 1;
+        }
+        if (sub === "init") {
+          for (const line of await ci.ciInit({ cwd, overwrite: args.overwrite })) console.log(line);
+          return 0;
+        }
+        throw new UsageError("usage: graft ci changes|skip-build|init");
       }
       case "content": {
         if (args.positionals[0] === "import") {

@@ -158,7 +158,7 @@ export async function migrateCommand(
         assertGitSourced(
           config,
           `content migration ${id}, which rewrites the files,`,
-          "Rewrite the documents through write_content, then publish them.",
+          "Run graft pull, make the change in the files, check them with graft check, then graft push.",
         );
         const report = await runContentMigration({
           contentDir: config.contentDir,

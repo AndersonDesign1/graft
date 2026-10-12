@@ -172,6 +172,11 @@ export interface GraftMcpOptions {
    */
   source?: ContentSource;
   /**
+   * `.graft/sync.json` in the project, for `sync_status`. Only a server with
+   * the project's checkout (local stdio) sets it.
+   */
+  syncStateFile?: string;
+  /**
    * Called after write_content or delete_content changed the index, with the
    * branch and ChangeSet, so the app can refresh its cache. An in-app mount
    * refreshes in-process (sdk-next: `revalidateContent(branch, changes)`);

@@ -159,6 +159,33 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
       : branch.scope.kind === "physical"
         ? `${branch.name} (neon)`
         : (options.branchId ?? "main");
+  // Publishes already update the index; what a developer needs to hear is
+  // that their files are now behind. Polled, not LISTENed: a pooled
+  // connection (most hosted Postgres) drops LISTEN between transactions.
+  let announcer: NodeJS.Timeout | undefined;
+  if (fromDatabase && branch !== undefined) {
+    const { publishedSince } = await import("@usegraft/db");
+    let since = new Date();
+    let seen = new Set<string>();
+    announcer = setInterval(() => {
+      void publishedSince(branch.db, writeBranch, since)
+        .then((changes) => {
+          const fresh = changes.filter((change) => !seen.has(change.id));
+          const last = changes.at(-1);
+          if (last) {
+            since = last.publishedAt;
+            // Only revisions at the newest timestamp can come back next time.
+            seen = new Set(
+              changes.filter((c) => c.publishedAt.getTime() === since.getTime()).map((c) => c.id),
+            );
+          }
+          for (const line of announce(fresh)) console.log(line);
+        })
+        .catch(() => {
+          // A dropped connection is retried on the next tick.
+        });
+    }, ANNOUNCE_MS);
+  }
   console.log(
     fromDatabase
       ? `Content is in the database (branch: ${branchLabel}): edit it in Studio. Watching ${basename(configPath)}. Ctrl+C to stop.`
@@ -168,6 +195,7 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
   await new Promise<void>((resolveStopped) => {
     const stop = (): void => {
       clearTimeout(timer);
+      clearInterval(announcer);
       contentWatcher?.close();
       for (const watcher of watchers) watcher.close();
       resolveStopped();
@@ -178,4 +206,26 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
 
   await branch?.close();
   await control?.close();
+}
+
+/** How often `graft dev` asks whether anything was published in a database-sourced project. */
+const ANNOUNCE_MS = 5_000;
+
+/** One line per publisher: who published what, and the command that brings it into the files. */
+export function announce(
+  changes: ReadonlyArray<{ path: string; version: string | null; publishedBy: string | null }>,
+): string[] {
+  if (changes.length === 0) return [];
+  const byWho = new Map<string, Set<string>>();
+  for (const change of changes) {
+    const who = change.publishedBy ?? "Someone";
+    const doc = change.path.replace(/\.mdx?$/, "");
+    byWho.set(
+      who,
+      (byWho.get(who) ?? new Set()).add(change.version === null ? `${doc} (deleted)` : doc),
+    );
+  }
+  const lines = [...byWho].map(([who, docs]) => `${who} published ${[...docs].join(", ")}.`);
+  lines.push("Run graft pull to bring it into your files.");
+  return lines;
 }
