@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createCommand } from "./commands/create";
+import { createCommand, packageName } from "./commands/create";
 import { dbClaimCommand, setEnvVar } from "./commands/db-claim";
 import { doctorCommand } from "./commands/doctor";
 import { claimState, createClaimableDatabase, directUrlOf } from "./create/neon";
@@ -158,6 +158,20 @@ describe("graft create, with the content in git and no database", () => {
       "Make the website too",
     ]);
     expect(result).toMatchObject({ template: "blog", source: "git", framework: "next" });
+  });
+});
+
+describe("the package name", () => {
+  it("comes from the folder, lowercase, with no leading dot or trailing dash", () => {
+    expect(packageName("/sites/My Bakery")).toBe("my-bakery");
+    expect(packageName("/sites/.-_shop--")).toBe("shop");
+    expect(packageName("/sites/---")).toBe("my-site");
+  });
+
+  it("stays fast on a name that is a long run of dashes", () => {
+    const started = performance.now();
+    expect(packageName(`/sites/a${"-".repeat(50_000)}!`)).toBe("a");
+    expect(performance.now() - started).toBeLessThan(200);
   });
 });
 

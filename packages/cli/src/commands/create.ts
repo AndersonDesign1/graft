@@ -61,12 +61,18 @@ export interface CreateResult {
 
 const DEFAULTS = { template: "blog", framework: "next", edit: "online", database: "new" } as const;
 
-function packageName(dir: string): string {
+/** The folder's name as an npm package name: lowercase, no leading dot or dash. */
+export function packageName(dir: string): string {
   const name = basename(dir)
     .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, "-")
-    .replace(/^[._-]+|[-]+$/g, "");
-  return name || "my-site";
+    .replace(/[^a-z0-9._-]+/g, "-");
+  // Trimmed by index, not by a regex: an anchored alternation backtracks on a
+  // long run of dashes, and the folder name is whatever the person typed.
+  let start = 0;
+  let end = name.length;
+  while (start < end && "._-".includes(name[start] ?? "")) start += 1;
+  while (end > start && name[end - 1] === "-") end -= 1;
+  return name.slice(start, end) || "my-site";
 }
 
 function isPostgresUrl(value: string): boolean {
