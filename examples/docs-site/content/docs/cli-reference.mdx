@@ -72,6 +72,7 @@ for the route.
 | `graft serve [--port 3903]` | Run Graft's HTTP endpoints: functions, MCP, the Content API, and `/healthz`. Add `--studio` to include Studio. |
 | `graft studio` | Open Studio on this machine, at port 4983 |
 | `graft studio invite <email>` | Print a sign-in link for a hosted Studio. `--role` (viewer, contributor, editor, admin), `--name`, `--days`, `--url`. Needs `GRAFT_STUDIO_SECRET`, and Studio's public address from `--url` or `GRAFT_STUDIO_URL`: https, or plain http on `localhost`, `127.0.0.1` or `[::1]` |
+| `graft studio setup-code` | Print the code a hosted Studio asks for before it creates its owner account. It comes from `GRAFT_STUDIO_SECRET`, so run it with the site's settings |
 
 ## Manage the database (Postgres engine)
 

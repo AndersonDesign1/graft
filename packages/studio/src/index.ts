@@ -17,10 +17,12 @@ export {
   editorAccessFromEnv,
   isStudioRole,
   parseEditorList,
+  requireSecret,
   type EditorAccessConfig,
   type StudioRole,
 } from "./session";
 export type { EditorAuthOptions, GitHubSignInOptions } from "./editor-auth";
+export { setupCode } from "./accounts";
 export type {
   ApprovalList,
   BranchDto,
@@ -50,6 +52,9 @@ export type {
   EntrySummary,
   Facet,
   FieldChangeDto,
+  InviteDto,
+  PeopleDto,
+  PersonDto,
   PublishAction,
   PublishResultDto,
   SaveEntryResult,

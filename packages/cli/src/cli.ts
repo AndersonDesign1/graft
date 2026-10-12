@@ -259,11 +259,16 @@ export const COMMAND_HELP = new Map<string, string[]>([
     [
       "Usage: graft studio [--port <n>] [--host <h>] [--branch <id>]",
       "       graft studio invite <email> [--name <name>] [--role <role>] [--days <n>] [--url <url>]",
+      "       graft studio setup-code",
       "",
       "Run the opt-in Studio UI (edit content, approve/deny, OpenAPI).",
       "",
       "`invite` prints a sign-in link for a hosted Studio, for someone without a",
       "GitHub account. Signed with GRAFT_STUDIO_SECRET; expires after --days (7).",
+      "To give someone an account instead, invite them from Studio's Settings.",
+      "",
+      "`setup-code` prints the code a hosted Studio asks for on its first visit,",
+      "before it creates the owner account. It comes from GRAFT_STUDIO_SECRET.",
       "",
       BRANCH_OPTION,
       "  --port <n>       Port (default: 4983, or GRAFT_STUDIO_PORT)",
@@ -772,6 +777,11 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
         return 0;
       }
       case "studio": {
+        if (args.positionals[0] === "setup-code") {
+          const { studioSetupCodeCommand } = await import("./commands/studio");
+          console.log(await studioSetupCodeCommand({ cwd }));
+          return 0;
+        }
         if (args.positionals[0] === "invite") {
           const email = args.positionals[1];
           if (!email) {

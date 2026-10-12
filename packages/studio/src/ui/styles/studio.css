@@ -1544,6 +1544,54 @@ h3 {
   text-align: right;
 }
 
+/* ---- people ---- */
+
+.people-invite,
+.people-password {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) 10rem auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.people-password {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.set-row .notice {
+  margin: 0;
+}
+
+.people-role {
+  min-width: 9rem;
+}
+
+.people-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.people-link-value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.people-link-value .set-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 48rem) {
+  .people-invite,
+  .people-password {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* ---- keyboard ---- */
 
 .set-keys {

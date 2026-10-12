@@ -108,6 +108,12 @@ Anonymous callers are refused unless a mount explicitly opts in.
 **Studio** — the optional human surface: an editor, the approval queue, the
 changes drawer. Unauthenticated on loopback by design; scope-gated anywhere else.
 
+**Account** — a person who signs in to a hosted Studio with an email and
+password, kept in the project's database (not a branch's). The first is the
+**owner**, created on Studio's first visit; admins invite the rest. A role
+(viewer, contributor, editor, admin) is a name for a set of scopes, and an
+account is disabled rather than deleted, so its history stays attributed.
+
 **Adapter** — the thin translation between a runtime and Graft's Web-standard
 handlers (`Request → Response`). The Node adapter in `graft serve` is one; a
 Next.js route is another. Handlers never know which.

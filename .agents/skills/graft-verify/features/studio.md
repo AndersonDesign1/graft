@@ -13,6 +13,10 @@ edits a page.
 - `studio.database`: with `content = { source: "database" }`, saves are draft
   revisions in Postgres and Publish puts them live with no rebuild. Nothing is
   written to `content/`.
+- `studio.accounts`: with `GRAFT_STUDIO_SECRET` set, `graft serve --studio`
+  asks for the owner account on the first visit, then signs people in with an
+  email and password. Admins invite people and reset passwords from
+  Settings, People.
 
 ## How to get to it (user POV)
 
@@ -46,6 +50,19 @@ database instead of the sandbox's. Ready when the log prints `graft studio — b
   `select slug from content_index where not deleted` lists the new page while
   `content/` is unchanged.
 
+- **Accounts sign people in.** In a Postgres sandbox, add
+  `GRAFT_STUDIO_SECRET=$(openssl rand -base64 48)` to `.env`, then start
+  `$O --db "$(cat "$P/pg/url")" env GRAFT_STUDIO_SECRET=... node
+  $REPO/packages/cli/dist/index.js serve --studio --host 0.0.0.0 --port 4997 &`
+  and keep its PID in a file. The banner ends with `create the owner with
+  setup code XXXXX-XXXXX`; `graft studio setup-code` prints the same code.
+  Open `http://127.0.0.1:4997/studio/`: the form is "Create the owner
+  account" (`Your name`, `Email`, `Password`, `Setup code`, `Create account`).
+  In Settings, People, invite someone; the link shows once under the form.
+  Open it with `agent-browser --session other open "$LINK"`: "Join this
+  Studio" (`Your name`, `Choose a password`, `Join`). `select email, role from
+  studio_users` lists both.
+
 ## Gotchas
 
 - Studio needs Postgres. In a static project it exits with
@@ -53,6 +70,10 @@ database instead of the sandbox's. Ready when the log prints `graft studio — b
 - Studio is unauthenticated on loopback by design. Off loopback it needs
   scopes, so a remote check needs a token.
 - Stop it with `kill $STUDIO_PID`, then `pg.sh down "$P/pg"`.
+- Never stop a server with `pkill -f` on its command line: the shell running
+  that command matches too, and gets killed. Kill the PID you saved.
+- Account tests and `studio_users` rows are per database, not per branch, so
+  the integration suites create and drop a throwaway database for them.
 - Switching a sandbox to the database source without `content import` makes
   the next compile remove every page: compile reads the revisions, and there
   are none yet. That is correct behavior, not a bug.

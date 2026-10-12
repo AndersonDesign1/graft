@@ -295,3 +295,14 @@ export async function studioInviteCommand(
   });
   return { ...link, role };
 }
+
+/**
+ * `graft studio setup-code`: the code a hosted Studio asks for before it
+ * creates its owner account. It is derived from GRAFT_STUDIO_SECRET, so it
+ * prints the same code the deployment expects when run with its environment.
+ */
+export async function studioSetupCodeCommand(options: { cwd: string }): Promise<string> {
+  loadProjectEnv(options.cwd);
+  const { requireSecret, setupCode } = await import("@usegraft/studio");
+  return setupCode(requireSecret(process.env.GRAFT_STUDIO_SECRET));
+}

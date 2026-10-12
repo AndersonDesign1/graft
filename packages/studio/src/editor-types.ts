@@ -104,6 +104,38 @@ export interface WorkspaceDto {
    * control makes sense. It does not say whether sign-in is configured.
    */
   sessions: boolean;
+  /** People sign in with Studio accounts, and admins manage them under Settings. */
+  accounts: boolean;
+}
+
+export type StudioRoleName = "viewer" | "contributor" | "editor" | "admin";
+
+/** Someone who can sign in to Studio with an account. */
+export interface PersonDto {
+  id: string;
+  email: string;
+  name: string | null;
+  role: StudioRoleName;
+  /** Created the Studio on its first visit. */
+  owner: boolean;
+  /** The person asking. */
+  you: boolean;
+  createdAt: string;
+}
+
+/** An invitation nobody has used yet. */
+export interface InviteDto {
+  id: string;
+  email: string;
+  name: string | null;
+  role: StudioRoleName;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface PeopleDto {
+  people: PersonDto[];
+  invites: InviteDto[];
 }
 
 export interface DraftChangeDto {
