@@ -3,6 +3,7 @@
  * against a live database and the in-memory GitHub (opt-in).
  * Run with: RUN_INTEGRATION=1 and DATABASE_URL set.
  */
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineCollection, field } from "@usegraft/core";
@@ -22,7 +23,7 @@ try {
 }
 
 const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
-const BRANCH = "mirror-it";
+const BRANCH = `mirror-it-${randomUUID().slice(0, 8)}`;
 const TIMEOUT = 30_000;
 const collections = {
   posts: defineCollection({ name: "posts", fields: { title: field.string() } }),

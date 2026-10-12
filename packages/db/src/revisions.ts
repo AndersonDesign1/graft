@@ -678,8 +678,8 @@ export interface ImportFile {
   /**
    * The live version the caller's copy was based on (`graft push` reads it
    * from the last pull). When set, a path whose live version moved since is
-   * refused and nothing is written. Omitted (an import): a path already
-   * published keeps what it has.
+   * refused and nothing is written. Omitted: a path already published
+   * keeps what it has, unless the input says `replace`.
    */
   expected?: string | null;
 }
@@ -687,6 +687,8 @@ export interface ImportFile {
 export interface ImportInput {
   branchId: string;
   files: ImportFile[];
+  /** Write files with no base version over what is published (`graft push --force`). */
+  replace?: boolean;
   actor: RevisionActor;
   message?: string;
 }
@@ -746,7 +748,7 @@ export async function importPublished(db: Database, input: ImportInput): Promise
         continue;
       }
       // An import (no base version) never overwrites what is published.
-      if (file.expected === undefined && head.published) {
+      if (file.expected === undefined && !input.replace && head.published) {
         kept.push(file.path);
         continue;
       }

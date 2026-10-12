@@ -3,6 +3,7 @@
  * checkout, against a live database (opt-in).
  * Run with: RUN_INTEGRATION=1 and DATABASE_URL set.
  */
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -21,7 +22,7 @@ try {
 }
 
 const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
-const BRANCH = "sync-it";
+const BRANCH = `sync-it-${randomUUID().slice(0, 8)}`;
 const TIMEOUT = 30_000;
 const collections = {
   posts: defineCollection({ name: "posts", fields: { title: field.string() } }),

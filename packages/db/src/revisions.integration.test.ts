@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createDb, type DbHandle } from "./client";
+import { projectPublishedContent } from "./content";
 import { runMigrations } from "./migrate";
 import {
   createReview,
@@ -156,6 +157,53 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
     const [compiled] =
       await handle.sql`select git_sha, doc_count, added from compilations where branch_id = ${BRANCH}`;
     expect({ ...compiled }).toEqual({ git_sha: null, doc_count: 1, added: 1 });
+  });
+
+  it("refuses a draft claiming a slug another live document holds, and publishes nothing", async () => {
+    await save("posts/home.mdx", doc("Home"));
+    await publishDrafts(handle.db, {
+      branchId: BRANCH,
+      drafts: [{ path: "posts/home.mdx", version: sha(doc("Home")) }],
+      actor: ana,
+      index: { upserts: [row("home", doc("Home"))], removals: [] },
+    });
+    await save("posts/other.mdx", doc("Other"));
+    await expect(
+      publishDrafts(handle.db, {
+        branchId: BRANCH,
+        drafts: [{ path: "posts/other.mdx", version: sha(doc("Other")) }],
+        actor: ana,
+        index: {
+          upserts: [{ ...row("home", doc("Other")), sourcePath: "posts/other.mdx" }],
+          removals: [],
+        },
+      }),
+    ).rejects.toMatchObject({ code: "SLUG_NOT_UNIQUE" });
+    expect((await draftHeads(handle.db, BRANCH)).map((h) => h.path)).toEqual(["posts/other.mdx"]);
+  });
+
+  it("projects the published revisions into the index under the content lock", async () => {
+    const actor = { id: "jo" };
+    await importPublished(handle.db, {
+      branchId: BRANCH,
+      files: ["a", "b"].map((slug) => ({
+        path: `posts/${slug}.mdx`,
+        raw: doc(slug),
+        version: sha(doc(slug)),
+      })),
+      actor,
+    });
+    const changes = await projectPublishedContent(
+      handle.db,
+      (files) => files.map((file) => row(file.path.slice(6, -4), file.raw)),
+      { branchId: BRANCH },
+    );
+    expect(changes).toEqual({
+      added: ["posts/a", "posts/b"],
+      changed: [],
+      removed: [],
+      unchanged: 0,
+    });
   });
 
   it("publishes nothing when one of the drafts changed since it was checked", async () => {
@@ -315,6 +363,25 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
       stale: [{ path: "posts/a.mdx", expected: v1.version, current: sha(doc("Ana")) }],
     });
     expect((await publishedFiles(handle.db, BRANCH)).map((f) => f.raw)).toEqual([doc("Ana")]);
+  });
+
+  it("overwrites what is published when a push is forced", async () => {
+    const actor = { id: "jo" };
+    const file = (title: string) => ({
+      path: "posts/a.mdx",
+      raw: doc(title),
+      version: sha(doc(title)),
+    });
+    await importPublished(handle.db, { branchId: BRANCH, files: [file("Live")], actor });
+    expect(
+      await importPublished(handle.db, {
+        branchId: BRANCH,
+        files: [file("Mine")],
+        actor,
+        replace: true,
+      }),
+    ).toMatchObject({ ok: true, imported: ["posts/a.mdx"], kept: [] });
+    expect((await readHead(handle.db, BRANCH, "posts/a.mdx"))?.published?.raw).toBe(doc("Mine"));
   });
 
   it("publishes a pushed deletion, and lists what was published since a moment", async () => {

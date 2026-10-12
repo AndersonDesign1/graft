@@ -5,6 +5,7 @@
  * tells an agent in the checkout which files are behind.
  * Run with: RUN_INTEGRATION=1 and DATABASE_URL set.
  */
+import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -25,7 +26,7 @@ try {
 }
 
 const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
-const BRANCH = "mcp-db-it";
+const BRANCH = `mcp-db-it-${randomUUID().slice(0, 8)}`;
 const TIMEOUT = 30_000;
 const collections = {
   pages: defineCollection({ name: "pages", fields: { title: field.string() } }),
@@ -121,7 +122,7 @@ describe.skipIf(!runIntegration)("MCP on a database-sourced project (integration
       data: { title: "Sale" },
     });
     const asked = await writer.call("publish_drafts", { paths: ["pages/sale.mdx"] });
-    expect(asked.payload).toMatchObject({ mode: "review", published: [] });
+    expect(asked.payload).toMatchObject({ mode: "review", published: ["pages/sale.mdx"] });
     expect(await live()).toEqual([]);
 
     const publisher = await connect(["content:write", "content:publish"]);

@@ -256,6 +256,7 @@ export async function pushContent(options: PushOptions): Promise<PushResult> {
     branchId: branch,
     actor: options.actor,
     message: "Pushed from files",
+    ...(options.force ? { replace: true } : {}),
     files: pushing.map((entry) => ({
       path: entry.path,
       raw: raws.get(entry.path) ?? null,
