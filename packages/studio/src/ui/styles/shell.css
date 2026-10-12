@@ -409,14 +409,14 @@
   border-right: 1px solid var(--hairline);
 }
 
-.list-rows {
+.pane-rows {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
-.list-row {
+.pane-row {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -430,23 +430,23 @@
 }
 
 @media (hover: hover) {
-  .list-row:hover {
+  .pane-row:hover {
     background: var(--wash);
   }
 }
 
 /* The open entry: a tint, and a 2px ink edge, so the eye finds it at once. */
-.list-row[aria-current="page"] {
+.pane-row[aria-current="page"] {
   background: var(--wash);
   box-shadow: inset 2px 0 0 var(--ink);
 }
 
-.list-row:focus-visible {
+.pane-row:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 
-.list-row-title {
+.pane-row-title {
   overflow: hidden;
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
@@ -454,7 +454,7 @@
   white-space: nowrap;
 }
 
-.list-row-meta {
+.pane-row-meta {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -463,19 +463,19 @@
   font-size: var(--text-xs);
 }
 
-.list-row-slug {
+.pane-row-slug {
   overflow: hidden;
   font-family: var(--font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.list-row-when {
+.pane-row-when {
   margin-left: auto;
   white-space: nowrap;
 }
 
-.list-note {
+.pane-note {
   display: block;
   padding: var(--space-3) var(--space-4);
   color: var(--ink-muted);

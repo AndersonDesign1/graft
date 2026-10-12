@@ -24,7 +24,7 @@ const STATE_WORD = {
 
 /** Move focus to the next or previous row link in the list. */
 function moveFocus(event: KeyboardEvent<HTMLElement>): void {
-  const links = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>("a.list-row")];
+  const links = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>("a.pane-row")];
   if (links.length === 0) return;
   const at = links.findIndex((link) => link === document.activeElement);
   let next: number | undefined;
@@ -75,40 +75,40 @@ export function ListPane({ collection, selected }: { collection: string; selecte
         </span>
       </header>
       <nav
-        className="list-rows"
+        className="pane-rows"
         aria-label={`${collectionLabel(collection)} entries`}
         onKeyDown={moveFocus}
       >
-        {list.error ? <p className="list-note">{list.error}</p> : null}
+        {list.error ? <p className="pane-note">{list.error}</p> : null}
         {items.map((item) => {
           const open = item.slug === selected;
           return (
             <a
               key={item.path}
               ref={open ? current : undefined}
-              className="list-row"
+              className="pane-row"
               href={`#/c/${encodeURIComponent(collection)}/${encodeURIComponent(item.slug)}`}
               aria-current={open ? "page" : undefined}
             >
-              <span className="list-row-title">{item.title || item.slug}</span>
-              <span className="list-row-meta">
+              <span className="pane-row-title">{item.title || item.slug}</span>
+              <span className="pane-row-meta">
                 {item.status !== "published" ? (
                   <span className="status" data-status={item.status}>
                     <span className="status-dot" />
                     {STATE_WORD[item.status]}
                   </span>
                 ) : (
-                  <span className="list-row-slug">{item.slug}</span>
+                  <span className="pane-row-slug">{item.slug}</span>
                 )}
                 {item.updatedAt ? (
-                  <span className="list-row-when">{relativeTime(item.updatedAt)}</span>
+                  <span className="pane-row-when">{relativeTime(item.updatedAt)}</span>
                 ) : null}
               </span>
             </a>
           );
         })}
         {list.data && list.data.total > items.length ? (
-          <a className="list-note" href={`#/c/${encodeURIComponent(collection)}`}>
+          <a className="pane-note" href={`#/c/${encodeURIComponent(collection)}`}>
             {list.data.total - items.length} more in the full list
           </a>
         ) : null}
