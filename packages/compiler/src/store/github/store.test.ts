@@ -636,3 +636,71 @@ describe("githubStoreFromEnv", () => {
     }
   });
 });
+
+describe("GitHubStore: the review rule", () => {
+  const rule = { deletes: true, collections: ["legal"], overLines: 5 };
+
+  it("publishes a small edit straight onto production", async () => {
+    const { fake, store } = setup(undefined, { reviewRule: rule });
+    await store.write("products/shirt.mdx", shirt.replace("A shirt.", "A fine shirt."), {
+      actor: ana,
+    });
+    const result = await store.drafts.publish({ actor: ana, paths: ["products/shirt.mdx"] });
+    expect(result.mode).toBe("direct");
+    expect(result.reviewReasons).toBeUndefined();
+    expect(fake.pulls()).toHaveLength(0);
+  });
+
+  it("sends a deletion to a pull request, saying why", async () => {
+    const { fake, store } = setup(undefined, { reviewRule: rule });
+    await store.write("products/hat.mdx", null, { actor: ana });
+    const result = await store.drafts.publish({ actor: ana, paths: ["products/hat.mdx"] });
+    expect(result.mode).toBe("review");
+    expect(result.reviewReasons).toEqual(["products/hat.mdx is deleted"]);
+    expect(fake.files()["content/products/hat.mdx"]).toBe(hat);
+    expect(fake.pulls()[0]?.body).toContain("products/hat.mdx is deleted");
+  });
+
+  it("sends a large change, or any change to a reviewed collection, to a pull request", async () => {
+    const { store } = setup(
+      {
+        "content/products/shirt.mdx": shirt,
+        "content/legal/terms.mdx": "---\ntitle: Terms\n---\n",
+      },
+      { reviewRule: rule },
+    );
+    const long = `${shirt}${Array.from({ length: 10 }, (_, i) => `Line ${i}`).join("\n")}\n`;
+    await store.write("products/shirt.mdx", long, { actor: ana });
+    expect(
+      (await store.drafts.publish({ actor: ana, paths: ["products/shirt.mdx"] })).reviewReasons,
+    ).toEqual(["products/shirt.mdx changes 10 lines (over 5)"]);
+    await store.write("legal/terms.mdx", "---\ntitle: Terms of sale\n---\n", { actor: ana });
+    expect(
+      (await store.drafts.publish({ actor: ana, paths: ["legal/terms.mdx"] })).reviewReasons,
+    ).toEqual(["legal changes are always reviewed"]);
+  });
+});
+
+describe("GitHubStore: commitFiles", () => {
+  it("commits only what production doesn't already have", async () => {
+    const { fake, store } = setup();
+    const result = await store.commitFiles(
+      [
+        { path: "products/shirt.mdx", raw: shirt },
+        { path: "products/scarf.mdx", raw: "---\ntitle: Scarf\n---\n" },
+        { path: "products/hat.mdx", raw: null },
+      ],
+      { message: "content: mirror" },
+    );
+    expect(result.commit).not.toBeNull();
+    expect(Object.keys(fake.files()).sort()).toEqual([
+      "README.md",
+      "content/products/scarf.mdx",
+      "content/products/shirt.mdx",
+    ]);
+    const again = await store.commitFiles([{ path: "products/shirt.mdx", raw: shirt }], {
+      message: "content: mirror",
+    });
+    expect(again).toEqual({ commit: null, merged: true });
+  });
+});

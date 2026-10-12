@@ -55,6 +55,13 @@ export interface DatabaseStoreOptions {
   mdxTrust?: MdxTrust;
   /** How publishing happens for someone allowed to publish. Default `direct`. */
   publishMode?: PublishMode;
+  /**
+   * Called after drafts went live, with their paths: how a mirror to git
+   * runs after every publish. Awaited, so a short-lived process (an MCP
+   * call, a CLI command) doesn't exit before it finishes, but its failure
+   * doesn't fail the publish: the content is live either way.
+   */
+  onPublished?: (paths: string[]) => void | Promise<void>;
 }
 
 export class DatabaseStore implements ContentStore {
@@ -195,6 +202,15 @@ export class DatabaseStore implements ContentStore {
         fix: "Review the latest version of those documents, then publish again.",
         details: { stale: result.stale },
       });
+    }
+    if (this.options.onPublished) {
+      try {
+        await this.options.onPublished(result.published);
+      } catch (error) {
+        console.error(
+          `graft: after publish: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
     return {
       mode,

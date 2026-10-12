@@ -383,6 +383,14 @@ export function createGitHubFake(options: GitHubFakeOptions = {}): GitHubFake {
           .map(toPullJson),
       );
     }
+    if (method === "PUT" && (match = /^\/pulls\/(\d+)\/merge$/.exec(rest))) {
+      try {
+        const sha = fake.mergePull(Number(match[1]));
+        return json(200, { sha, merged: true });
+      } catch (error) {
+        return json(405, { message: error instanceof Error ? error.message : String(error) });
+      }
+    }
     if (method === "GET" && (match = /^\/collaborators\/([^/]+)\/permission$/.exec(rest))) {
       const login = decodeURIComponent(match[1] as string);
       const permission = permissions[login];

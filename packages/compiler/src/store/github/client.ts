@@ -283,6 +283,25 @@ export class GitHubClient {
     return this.request<PullRequest>("POST", this.repoPath("/pulls"), input);
   }
 
+  /**
+   * Merge a pull request. False when GitHub won't (405: required checks or
+   * reviews still pending, or a conflict), which leaves it open for a person.
+   */
+  async mergePull(number: number, method: "merge" | "squash" = "squash"): Promise<boolean> {
+    try {
+      await this.request(
+        "PUT",
+        this.repoPath(`/pulls/${number}/merge`),
+        { merge_method: method },
+        [405, 409],
+      );
+      return true;
+    } catch (error) {
+      if (error instanceof GitHubStatus) return false;
+      throw error;
+    }
+  }
+
   listOpenPulls(base: string) {
     return this.request<PullRequest[]>(
       "GET",

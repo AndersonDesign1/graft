@@ -5,6 +5,7 @@
  */
 import { relative, sep } from "node:path";
 import { GraftError } from "@usegraft/contracts";
+import type { ReviewRule } from "../../review-rule";
 import type { PublishMode } from "../types";
 import { appAuth, tokenAuth, type GitHubAuth } from "./auth";
 import { GitHubStore } from "./store";
@@ -43,6 +44,8 @@ export interface GitHubStoreFromEnvOptions {
   projectRoot?: string;
   env?: Record<string, string | undefined>;
   fetch?: typeof fetch;
+  /** The project's rule for which publishes go through a pull request. */
+  reviewRule?: ReviewRule | false;
 }
 
 export function githubStoreFromEnv(options: GitHubStoreFromEnvOptions): GitHubStore | undefined {
@@ -98,6 +101,7 @@ export function githubStoreFromEnv(options: GitHubStoreFromEnvOptions): GitHubSt
     deployedSha: deployedShaFrom(env),
     apiUrl,
     fetch: options.fetch,
+    ...(options.reviewRule !== undefined ? { reviewRule: options.reviewRule } : {}),
   });
 }
 
