@@ -88,7 +88,7 @@ export async function mergeCommand(options: MergeCommandOptions): Promise<MergeC
   assertGitSourced(
     config,
     "merging a branch's files",
-    "Publish the documents from the branch in Studio, or with MCP publish_drafts.",
+    "Content in the database has no branch merge: make the change on the target branch instead, with graft studio --branch <target> or graft mcp --branch <target>.",
   );
   const url = requireDatabaseUrl();
 

@@ -566,6 +566,17 @@ const V1 = "/api/studio/v1";
 const APPROVAL_DECIDE_PATH = /^\/api\/studio\/v1\/approvals\/([^/]+)\/decide$/;
 const COMPILATION_REVERT_PATH = /^\/api\/studio\/v1\/compilations\/([^/]+)\/revert$/;
 
+/** Revert restores a commit's files, and database-sourced content has no commit. */
+function assertRevertible(options: StudioApiOptions, compilation: string): void {
+  if (sourceOf(options) !== "database") return;
+  throw new GraftError({
+    code: "CONTENT_SOURCE_MISMATCH",
+    message: "This project keeps its content in the database, so there is no commit to go back to.",
+    fix: "Restore an earlier version of each document from its history instead.",
+    details: { compilation },
+  });
+}
+
 /** The compilation a revert route names, or a miss the operator can act on. */
 async function requireCompilation(
   options: StudioApiOptions,
@@ -829,6 +840,7 @@ const ROUTES: readonly Route[] = [
     path: COMPILATION_REVERT_PATH,
     scope: "studio:read",
     handle: async ({ options, id }) => {
+      assertRevertible(options, id);
       const row = await requireCompilation(options, id);
       const pre = await preflightRevert(options.contentDir, row.gitSha);
       const body: RevertPreviewDto = {
@@ -850,15 +862,7 @@ const ROUTES: readonly Route[] = [
     writesCheckout: true,
     databaseSource: true,
     handle: async ({ options, id }) => {
-      if (sourceOf(options) === "database") {
-        throw new GraftError({
-          code: "CONTENT_SOURCE_MISMATCH",
-          message:
-            "This project keeps its content in the database, so there is no commit to go back to.",
-          fix: "Restore an earlier version of each document from its history instead.",
-          details: { compilation: id },
-        });
-      }
+      assertRevertible(options, id);
       const row = await requireCompilation(options, id);
       const changed = await revertContentTo(options.contentDir, row.gitSha as string);
       // Recompile only after the files landed, so the index can never describe

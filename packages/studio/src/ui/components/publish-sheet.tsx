@@ -378,30 +378,36 @@ function Done({ result, onClose }: { result: PublishResultDto; onClose: () => vo
   // Every conflict resolved as "keep theirs": nothing went out, and saying
   // "Published 0 changes" would read as a failure.
   const onlyKept = count === 0 && kept > 0;
+  // Someone else published or discarded every one of them first.
+  const nothing = count === 0 && kept === 0;
   return (
     <div className="sheet-done">
       <IconCheck className="sheet-done-mark" size={20} aria-hidden="true" />
       <p className="sheet-done-title">
-        {onlyKept
-          ? `Kept the published ${kept === 1 ? "version" : "versions"}.`
-          : result.action === "review"
-            ? `Submitted ${what} for review.`
-            : result.action === "commit"
-              ? `Committed ${what}.`
-              : `Published ${what}.`}
+        {nothing
+          ? "Nothing left to publish."
+          : onlyKept
+            ? `Kept the published ${kept === 1 ? "version" : "versions"}.`
+            : result.action === "review"
+              ? `Submitted ${what} for review.`
+              : result.action === "commit"
+                ? `Committed ${what}.`
+                : `Published ${what}.`}
       </p>
       <p className="sheet-done-body">
-        {onlyKept
-          ? `Your ${kept === 1 ? "draft was" : "drafts were"} discarded; nothing else changed.`
-          : result.action === "review"
-            ? result.review?.url
-              ? "They go live when the pull request is merged."
-              : "They go live when someone who can publish approves them."
-            : result.action === "commit"
-              ? `Commit ${result.commit?.shortSha ?? ""} is on this computer. Push it to deploy.`
-              : result.live
-                ? "They're live on the site now."
-                : "The site updates as soon as it redeploys."}
+        {nothing
+          ? "These changes were already published or discarded by someone else."
+          : onlyKept
+            ? `Your ${kept === 1 ? "draft was" : "drafts were"} discarded; nothing else changed.`
+            : result.action === "review"
+              ? result.review?.url
+                ? "They go live when the pull request is merged."
+                : "They go live when someone who can publish approves them."
+              : result.action === "commit"
+                ? `Commit ${result.commit?.shortSha ?? ""} is on this computer. Push it to deploy.`
+                : result.live
+                  ? "They're live on the site now."
+                  : "The site updates as soon as it redeploys."}
       </p>
       <div className="sheet-done-actions">
         {result.review?.url ? (

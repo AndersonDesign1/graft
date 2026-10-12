@@ -128,8 +128,10 @@ export const content = { source: "database" };
 
 The database source needs the Postgres engine, so it can't be combined with
 `index = "static"`. To move an existing project, set the export and run
-`graft content import`, which loads your files into the database. Running it
-again imports only what changed.
+`graft content import`, which loads your files into the database. It brings
+in documents that have nothing published yet, and never overwrites one that
+does, so running it again is safe. Deleting a file does not delete its
+document: delete it in Studio instead.
 
 In a database-sourced project these refuse with `CONTENT_SOURCE_MISMATCH`,
 because they work on files: reverting to a commit in Studio, `graft merge`,

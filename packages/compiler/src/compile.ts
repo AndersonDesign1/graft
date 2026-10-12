@@ -16,8 +16,8 @@ import { walkContentFiles } from "./content-files";
 import type { AnyCollection } from "@usegraft/core";
 import {
   projectBranchContent,
+  projectPublishedContent,
   projectStaticContent,
-  publishedFiles,
   type ChangeSet,
   type Database,
 } from "@usegraft/db";
@@ -92,24 +92,23 @@ export function readDocs(
   collections: Record<string, AnyCollection>,
   options: ReadDocsOptions = {},
 ): ProjectedDoc[] {
+  return validateDocuments(readSourceFiles(contentDir), collections, options);
+}
+
+/** Every content file under `contentDir`, read once, with its path relative to it. */
+export function readSourceFiles(contentDir: string): SourceFile[] {
   if (!existsSync(contentDir) || !statSync(contentDir).isDirectory()) {
     throw new GraftError({
       code: "CONTENT_DIR_NOT_FOUND",
       message: `Content directory not found: ${contentDir}`,
       fix: `Create it (documents live at <contentDir>/<collection>/<slug>.mdx, e.g. content/pages/home.mdx) or pass the correct \`contentDir\` to compile().`,
-      details: { contentDir, collections: Object.keys(collections) },
+      details: { contentDir },
     });
   }
-
-  const files = (function* (): Generator<SourceFile> {
-    for (const file of walkContentFiles(contentDir)) {
-      yield {
-        sourcePath: relative(contentDir, file).split(sep).join("/"),
-        raw: readFileSync(file, "utf8"),
-      };
-    }
-  })();
-  return validateDocuments(files, collections, options);
+  return walkContentFiles(contentDir).map((file) => ({
+    sourcePath: relative(contentDir, file).split(sep).join("/"),
+    raw: readFileSync(file, "utf8"),
+  }));
 }
 
 /**
@@ -235,16 +234,6 @@ export function validateDocuments(
 export async function compile(options: CompileOptions): Promise<CompileResult> {
   const branchId = options.branchId ?? "main";
   const fromDatabase = options.source === "database";
-  const docs = fromDatabase
-    ? validateDocuments(
-        (await publishedFiles(options.db, branchId)).map((file) => ({
-          sourcePath: file.path,
-          raw: file.raw,
-        })),
-        options.collections,
-        { mdxTrust: options.mdxTrust },
-      )
-    : readDocs(options.contentDir, options.collections, { mdxTrust: options.mdxTrust });
   // A database-sourced index was built from revisions, not from a commit, so
   // the checkout's HEAD would be a false claim about where it came from.
   const gitSha =
@@ -253,24 +242,44 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
       : fromDatabase
         ? null
         : resolveGitSha(options.contentDir);
-  const changes = await projectBranchContent(
+  const project = {
+    branchId,
+    gitSha,
+    knownCollections: Object.keys(options.collections),
+    pruneUnknown: options.pruneUnknown,
+  };
+  if (!fromDatabase) {
+    const docs = readDocs(options.contentDir, options.collections, { mdxTrust: options.mdxTrust });
+    const changes = await projectBranchContent(options.db, docs.map(indexRow), project);
+    return { count: docs.length, docs, changes, gitSha };
+  }
+  // Read the published revisions and project them under the lock a publish
+  // takes, so no publish can land between the read and the write.
+  let docs: ProjectedDoc[] = [];
+  const changes = await projectPublishedContent(
     options.db,
-    docs.map((doc) => ({
-      collection: doc.collection,
-      slug: doc.slug,
-      data: doc.data,
-      body: doc.body,
-      contentHash: doc.contentHash,
-      sourcePath: doc.sourcePath,
-    })),
-    {
-      branchId,
-      gitSha,
-      knownCollections: Object.keys(options.collections),
-      pruneUnknown: options.pruneUnknown,
+    (files) => {
+      docs = validateDocuments(
+        files.map((file) => ({ sourcePath: file.path, raw: file.raw })),
+        options.collections,
+        { mdxTrust: options.mdxTrust },
+      );
+      return docs.map(indexRow);
     },
+    project,
   );
   return { count: docs.length, docs, changes, gitSha };
+}
+
+function indexRow(doc: ProjectedDoc) {
+  return {
+    collection: doc.collection,
+    slug: doc.slug,
+    data: doc.data,
+    body: doc.body,
+    contentHash: doc.contentHash,
+    sourcePath: doc.sourcePath,
+  };
 }
 
 export interface CompileStaticOptions {

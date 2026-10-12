@@ -4,6 +4,7 @@
  * live with no rebuild, and nothing touches the content directory.
  * Run with: RUN_INTEGRATION=1 and DATABASE_URL set.
  */
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -30,7 +31,7 @@ try {
 }
 
 const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
-const BRANCH = "studio-db-it";
+const BRANCH = `studio-db-it-${randomUUID().slice(0, 8)}`;
 const TIMEOUT = 30_000;
 const ORIGIN = "http://localhost";
 
@@ -196,5 +197,7 @@ describe.skipIf(!runIntegration)("editor API on the database store (integration)
     const handler = handlerFor(["studio:read", "studio:write", "studio:publish"]);
     const refused = await call<{ error: string }>(handler, "POST", "/compilations/c1/revert", {});
     expect(refused.json.error).toBe("CONTENT_SOURCE_MISMATCH");
+    const preview = await call<{ error: string }>(handler, "GET", "/compilations/c1/revert");
+    expect(preview.json.error).toBe("CONTENT_SOURCE_MISMATCH");
   });
 });

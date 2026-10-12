@@ -7,7 +7,14 @@
  * and this repo requires every GraftError to carry a fix its caller can act on.
  */
 import { GraftError } from "@usegraft/contracts";
-import { findDoc as findDocIn, requireCollection as requireCollectionIn } from "@usegraft/compiler";
+import {
+  findDoc as findDocIn,
+  parseDocument,
+  requireCollection as requireCollectionIn,
+  type ContentStore,
+  type StoreActor,
+} from "@usegraft/compiler";
+import type { AnyCollection } from "@usegraft/core";
 
 /**
  * How the MCP surface tells an agent to fix a content miss. The shared readers
@@ -40,3 +47,31 @@ export const findDoc = (
   slug: string,
 ): ReturnType<typeof findDocIn> =>
   findDocIn(contentDir, collectionName, collection, slug, MCP_HINTS);
+
+/**
+ * The path a store keeps a document under: `<slug>.mdx`, `<slug>.md`, or a
+ * file whose frontmatter claims the slug. Null when the store has none.
+ */
+export async function findStoredPath(
+  store: Pick<ContentStore, "entries">,
+  collectionName: string,
+  collection: AnyCollection,
+  slug: string,
+  actor: StoreActor,
+): Promise<string | null> {
+  const files = (await store.entries?.(`${collectionName}/`, actor)) ?? [];
+  const named = files.find(
+    (file) =>
+      file.path === `${collectionName}/${slug}.mdx` || file.path === `${collectionName}/${slug}.md`,
+  );
+  if (named) return named.path;
+  for (const file of files) {
+    if (!/\.mdx?$/.test(file.path)) continue;
+    try {
+      if (parseDocument(file.raw, collection, file.path).slug === slug) return file.path;
+    } catch {
+      // A draft that does not parse claims no slug.
+    }
+  }
+  return null;
+}

@@ -54,8 +54,10 @@ There is one draft per document, shared by everyone, and each revision records
 who wrote it, person or agent. Saves by one person within ten minutes update
 their draft in place, so history shows sittings rather than keystrokes. Every
 write locks the document's head row first, so the version check and the write
-are one compare-and-swap. Two tabs, two people, or an agent and a person saving
-one document are serialised, and the loser gets `CONTENT_CONFLICT`.
+are one compare-and-swap. A save that names the version it started from
+(`baseVersion`) is refused with `CONTENT_CONFLICT` when someone saved since;
+two tabs, two people, or an agent and a person saving one document are
+serialised either way. A save that names no version writes over the draft.
 
 ## Premise
 

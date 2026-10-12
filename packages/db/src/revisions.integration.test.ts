@@ -2,7 +2,7 @@
  * Integration: database-sourced content against a live database (opt-in).
  * Run with: RUN_INTEGRATION=1 and DATABASE_URL set.
  */
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -30,7 +30,7 @@ try {
 
 const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
 const TEST_TIMEOUT = 30_000;
-const BRANCH = "it-revisions";
+const BRANCH = `it-revisions-${randomUUID().slice(0, 8)}`;
 const ana = { id: "ana@example.com", name: "Ana" };
 const ben = { id: "ben@example.com", name: "Ben" };
 
@@ -252,6 +252,7 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
     expect(await importPublished(handle.db, { branchId: BRANCH, files, actor })).toEqual({
       imported: ["posts/a.mdx", "posts/b.mdx"],
       unchanged: [],
+      kept: [],
     });
     expect((await publishedFiles(handle.db, BRANCH)).map((f) => f.path)).toEqual([
       "posts/a.mdx",
@@ -260,7 +261,26 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
     expect(await importPublished(handle.db, { branchId: BRANCH, files, actor })).toEqual({
       imported: [],
       unchanged: ["posts/a.mdx", "posts/b.mdx"],
+      kept: [],
     });
+  });
+
+  it("never overwrites a document that is already published", async () => {
+    const actor = { id: "jo" };
+    const file = (title: string) => ({
+      path: "posts/a.mdx",
+      raw: doc(title),
+      version: sha(doc(title)),
+    });
+    await importPublished(handle.db, { branchId: BRANCH, files: [file("Live")], actor });
+    expect(
+      await importPublished(handle.db, { branchId: BRANCH, files: [file("Old file")], actor }),
+    ).toEqual({
+      imported: [],
+      unchanged: [],
+      kept: ["posts/a.mdx"],
+    });
+    expect((await readHead(handle.db, BRANCH, "posts/a.mdx"))?.published?.raw).toBe(doc("Live"));
   });
 
   it("keeps a draft on top of an imported revision", async () => {
@@ -275,13 +295,57 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
   });
 
   it("records review requests and lists the open ones", async () => {
+    await save("posts/a.mdx", doc("A"));
     const review = await createReview(handle.db, {
       branchId: BRANCH,
       paths: ["posts/a.mdx"],
       title: "Spring sale",
       actor: ben,
     });
-    expect((await openReviews(handle.db, BRANCH)).map((r) => r.id)).toEqual([review.id]);
+    expect((await openReviews(handle.db, BRANCH)).map((r) => r.id)).toEqual([review?.id]);
+  });
+
+  it("files no review when the drafts are already gone", async () => {
+    expect(
+      await createReview(handle.db, {
+        branchId: BRANCH,
+        paths: ["posts/none.mdx"],
+        title: "X",
+        actor: ben,
+      }),
+    ).toBeNull();
+    expect(await openReviews(handle.db, BRANCH)).toEqual([]);
+  });
+
+  it("withdraws a discarded path from its review, and closes an empty one unpublished", async () => {
+    await save("posts/a.mdx", doc("A"));
+    await save("posts/b.mdx", doc("B"));
+    await createReview(handle.db, {
+      branchId: BRANCH,
+      paths: ["posts/a.mdx", "posts/b.mdx"],
+      title: "Both",
+      actor: ben,
+    });
+    await discardDrafts(handle.db, { branchId: BRANCH, paths: ["posts/a.mdx"] });
+    expect((await openReviews(handle.db, BRANCH)).map((r) => r.paths)).toEqual([["posts/b.mdx"]]);
+    await discardDrafts(handle.db, { branchId: BRANCH, paths: ["posts/b.mdx"] });
+    expect(await openReviews(handle.db, BRANCH)).toEqual([]);
+    const [row] = await handle.sql`select status from content_reviews where branch_id = ${BRANCH}`;
+    expect(row?.status).toBe("closed");
+  });
+
+  it("refuses to rewrite a published revision, even by raw SQL", async () => {
+    const raw = doc("Live");
+    await save("posts/live.mdx", raw);
+    await publishDrafts(handle.db, {
+      branchId: BRANCH,
+      drafts: [{ path: "posts/live.mdx", version: sha(raw) }],
+      actor: ana,
+      index: { upserts: [row("live", raw)], removals: [] },
+    });
+    await expect(
+      handle.sql`update content_revisions set raw = 'tampered' where branch_id = ${BRANCH} and published_at is not null`,
+    ).rejects.toThrow(/published revision/);
   });
 
   it("closes a review once everything in it is published", async () => {

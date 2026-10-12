@@ -2,6 +2,7 @@
  * Integration: the database content store against a live database (opt-in).
  * Run with: RUN_INTEGRATION=1 and DATABASE_URL set.
  */
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineCollection, field } from "@usegraft/core";
@@ -18,7 +19,7 @@ try {
 }
 
 const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
-const BRANCH = "store-db-it";
+const BRANCH = `store-db-it-${randomUUID().slice(0, 8)}`;
 const TIMEOUT = 30_000;
 const collections = {
   posts: defineCollection({ name: "posts", fields: { title: field.string() } }),
@@ -124,6 +125,17 @@ describe.skipIf(!runIntegration)("DatabaseStore (integration)", () => {
     expect(await liveSlugs()).toEqual([]);
   });
 
+  it("takes the old slug off the live site when a published file changes its slug", async () => {
+    await store.write("posts/moved.mdx", post("Moved"), { actor: ana });
+    await store.drafts.publish({ actor: ana, paths: ["posts/moved.mdx"] });
+    await store.write("posts/moved.mdx", "---\ntitle: Moved\nslug: elsewhere\n---\n", {
+      actor: ana,
+    });
+    const result = await store.drafts.publish({ actor: ana, paths: ["posts/moved.mdx"] });
+    expect(result.changes).toMatchObject({ added: ["posts/elsewhere"], removed: ["posts/moved"] });
+    expect(await liveSlugs()).toEqual(["elsewhere"]);
+  });
+
   it("files a review instead of publishing for someone who may not publish", async () => {
     await store.write("posts/sale.mdx", post("Sale"), { actor: ana });
     const result = await store.drafts.publish({
@@ -134,7 +146,7 @@ describe.skipIf(!runIntegration)("DatabaseStore (integration)", () => {
     });
     expect(result).toMatchObject({
       mode: "review",
-      published: [],
+      published: ["posts/sale.mdx"],
       review: { title: "Spring sale" },
     });
     expect(await liveSlugs()).toEqual([]);

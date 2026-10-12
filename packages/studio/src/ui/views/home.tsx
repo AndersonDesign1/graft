@@ -119,7 +119,11 @@ export function HomeView() {
           ) : null}
           {reviews.map((review) => (
             <li key={review.id}>
-              <IconExternal className="waiting-icon" aria-hidden="true" />
+              {review.url ? (
+                <IconExternal className="waiting-icon" aria-hidden="true" />
+              ) : (
+                <IconWaiting className="waiting-icon" data-tone="waiting" aria-hidden="true" />
+              )}
               <span className="waiting-main">
                 <span className="waiting-title">{review.title}</span>
                 <span className="waiting-sub">

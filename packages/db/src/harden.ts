@@ -85,7 +85,9 @@ export function runtimeRoleGrantsSql(role: string): string[] {
     // runtime's job there, the way writing a file is in a git-sourced project,
     // so it carries the same honest cost as content_index above. Revisions are
     // never deleted: history is the record. A head row is deleted only when a
-    // draft of an entry that was never published is thrown away.
+    // draft of an entry that was never published is thrown away. UPDATE on
+    // revisions is for drafts; a trigger refuses any change to one that has
+    // been published, so a stolen credential can't rewrite what went live.
     `GRANT INSERT, UPDATE ON TABLE content_revisions TO ${role}`,
     `GRANT INSERT, UPDATE, DELETE ON TABLE content_heads TO ${role}`,
     `GRANT INSERT, UPDATE ON TABLE content_reviews TO ${role}`,

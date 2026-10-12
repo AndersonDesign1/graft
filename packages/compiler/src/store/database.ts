@@ -162,10 +162,13 @@ export class DatabaseStore implements ContentStore {
         title: options.message?.trim() || defaultTitle(heads),
         actor: revisionActor(options.actor),
       });
+      // Every draft was published or discarded while the review was filed.
+      if (!review) return { mode, commit: null, published: [], tookTheirs: [] };
+      // As with a pull request: `published` is what went out, here for review.
       return {
         mode,
         commit: null,
-        published: [],
+        published: review.paths,
         tookTheirs: [],
         review: {
           id: review.id,

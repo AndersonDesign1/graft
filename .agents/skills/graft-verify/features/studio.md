@@ -38,7 +38,7 @@ database instead of the sandbox's. Ready when the log prints `graft studio — b
 
 - **The database source publishes live.** Append
   `export const content = { source: "database" };` to `graft.config.ts`, run
-  `$O --db "$URL" node $REPO/packages/cli/dist/index.js content import`, then
+  `URL=$(cat "$P/pg/url")`, then `$O --db "$URL" node $REPO/packages/cli/dist/index.js content import`, then
   start Studio. `curl -s http://127.0.0.1:4999/api/studio/v1/workspace` says
   `"storage":"database"`. In the browser: `New page` (dialog: `Title`, then
   `Create page`), edit a field, top-bar `Publish`, then the sheet's `Publish`.

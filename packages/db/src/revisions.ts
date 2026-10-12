@@ -210,6 +210,15 @@ export type WriteDraftResult =
 
 const DEFAULT_COALESCE_MS = 10 * 60 * 1000;
 
+/**
+ * Serialise everything that changes what a branch has published: publishing,
+ * importing, and a compile from the revisions. Held to the end of the
+ * transaction. Saving drafts doesn't take it, so editing is never blocked.
+ */
+export async function lockContent(tx: Tx, branchId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`graft-content:${branchId}`}))`);
+}
+
 /** Lock a path's head, creating it when the path is new. */
 async function lockHead(tx: Tx, branchId: string, path: string): Promise<HeadState> {
   await tx.insert(contentHeads).values({ branchId, path }).onConflictDoNothing();
@@ -335,6 +344,7 @@ export async function publishDrafts(
   input: PublishDraftsInput,
 ): Promise<PublishDraftsResult> {
   return db.transaction(async (tx) => {
+    await lockContent(tx, input.branchId);
     const stale: string[] = [];
     const moving: Array<{ path: string; draftId: string }> = [];
     for (const wanted of input.drafts) {
@@ -366,8 +376,8 @@ export async function publishDrafts(
         .where(and(eq(contentHeads.branchId, input.branchId), eq(contentHeads.path, move.path)));
     }
 
-    const changes = await projectEntries(tx, input.branchId, input.index);
     const published = moving.map((move) => move.path);
+    const changes = await projectEntries(tx, input.branchId, input.index, published);
     if (published.length === 0) return { ok: true, changes, published } as const;
     // A review is answered once everything in it is live, by whichever
     // route it got there: approved from the inbox, or published directly.
@@ -403,6 +413,7 @@ async function projectEntries(
   tx: Tx,
   branchId: string,
   changes: PublishDraftsInput["index"],
+  paths: string[],
 ): Promise<ChangeSet> {
   const result: ChangeSet = { added: [], changed: [], removed: [], unchanged: 0 };
   const keys = [...changes.upserts, ...changes.removals];
@@ -491,6 +502,38 @@ async function projectEntries(
       );
   }
 
+  // A published file whose slug changed leaves its old row behind: whatever
+  // a published path no longer produces comes off the live site.
+  const kept = new Set(changes.upserts.map((row) => `${row.collection}/${row.slug}`));
+  const stale =
+    paths.length === 0
+      ? []
+      : await tx
+          .select({ collection: contentIndex.collection, slug: contentIndex.slug })
+          .from(contentIndex)
+          .where(
+            and(
+              eq(contentIndex.branchId, branchId),
+              eq(contentIndex.deleted, false),
+              inArray(contentIndex.sourcePath, paths),
+            ),
+          );
+  for (const row of stale) {
+    const key = `${row.collection}/${row.slug}`;
+    if (kept.has(key)) continue;
+    result.removed.push(key);
+    await tx
+      .update(contentIndex)
+      .set({ deleted: true, updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(contentIndex.branchId, branchId),
+          eq(contentIndex.collection, row.collection),
+          eq(contentIndex.slug, row.slug),
+        ),
+      );
+  }
+
   const [live] = await tx
     .select({ n: sql<number>`count(*)::int` })
     .from(contentIndex)
@@ -511,6 +554,7 @@ export async function discardDrafts(
   db: Database,
   input: { branchId: string; paths: string[] },
 ): Promise<void> {
+  if (input.paths.length === 0) return;
   await db.transaction(async (tx) => {
     for (const path of input.paths) {
       await lockHead(tx, input.branchId, path);
@@ -520,6 +564,33 @@ export async function discardDrafts(
         .where(and(eq(contentHeads.branchId, input.branchId), eq(contentHeads.path, path)));
       await dropHeadIfEmpty(tx, input.branchId, path);
     }
+    // A discarded path is no longer asking for review. Take it out of open
+    // requests, and close a request with nothing left: it was withdrawn, not
+    // published, and must not later read as published.
+    const discarded = sql`array[${sql.join(
+      input.paths.map((path) => sql`${path}`),
+      sql`, `,
+    )}]::text[]`;
+    await tx
+      .update(contentReviews)
+      .set({ paths: sql`${contentReviews.paths} - ${discarded}` })
+      .where(
+        and(
+          eq(contentReviews.branchId, input.branchId),
+          eq(contentReviews.status, "open"),
+          sql`${contentReviews.paths} ?| ${discarded}`,
+        ),
+      );
+    await tx
+      .update(contentReviews)
+      .set({ status: "closed", decidedAt: sql`now()` })
+      .where(
+        and(
+          eq(contentReviews.branchId, input.branchId),
+          eq(contentReviews.status, "open"),
+          sql`jsonb_array_length(${contentReviews.paths}) = 0`,
+        ),
+      );
   });
 }
 
@@ -542,22 +613,36 @@ export interface ContentReview {
   createdAt: Date;
 }
 
+/**
+ * File a review for the paths that still have a draft, or return null when
+ * none does: someone else published or discarded them first. The heads are
+ * locked while it checks, so the review never names a path whose draft is
+ * gone by the time it is written.
+ */
 export async function createReview(
   db: Database,
   input: { branchId: string; paths: string[]; title: string; actor: RevisionActor },
-): Promise<ContentReview> {
-  const [row] = await db
-    .insert(contentReviews)
-    .values({
-      branchId: input.branchId,
-      paths: input.paths,
-      title: input.title,
-      requestedById: input.actor.id,
-      requestedByName: input.actor.name ?? null,
-    })
-    .returning();
-  if (!row) throw new Error("content_reviews insert returned no row");
-  return toReview(row);
+): Promise<ContentReview | null> {
+  return db.transaction(async (tx) => {
+    const drafted: string[] = [];
+    for (const path of input.paths) {
+      const head = await lockHead(tx, input.branchId, path);
+      if (head.draft) drafted.push(path);
+      else await dropHeadIfEmpty(tx, input.branchId, path);
+    }
+    if (drafted.length === 0) return null;
+    const [row] = await tx
+      .insert(contentReviews)
+      .values({
+        branchId: input.branchId,
+        paths: drafted,
+        title: input.title,
+        requestedById: input.actor.id,
+        requestedByName: input.actor.name ?? null,
+      })
+      .returning();
+    return row ? toReview(row) : null;
+  });
 }
 
 export async function openReviews(db: Reader, branchId: string): Promise<ContentReview[]> {
@@ -596,23 +681,32 @@ export interface ImportResult {
   imported: string[];
   /** Paths whose live revision already held exactly these bytes. */
   unchanged: string[];
+  /** Paths already published with other bytes (or deleted), left as they are. */
+  kept: string[];
 }
 
 /**
- * Make each file the live revision of its path: how a project switching to
- * the database source brings its files in, and what `graft push` lands.
- * Additive: a path with no file is left as it is. A draft on a path stays on
- * top of the new live revision, so nobody's unpublished work is lost. The
- * caller validates the files and recompiles the index afterwards.
+ * Bring files in as the live revisions of paths that have none: how a
+ * project switching to the database source loads its files. Additive and
+ * safe to re-run: a path already published, or published as deleted, keeps
+ * what it has, and a path with no file is left alone. A draft on a path
+ * stays on top of the new live revision, so nobody's unpublished work is
+ * lost. The caller validates the files and recompiles the index afterwards.
  */
 export async function importPublished(db: Database, input: ImportInput): Promise<ImportResult> {
   return db.transaction(async (tx) => {
+    await lockContent(tx, input.branchId);
     const imported: string[] = [];
     const unchanged: string[] = [];
+    const kept: string[] = [];
     for (const file of input.files) {
       const head = await lockHead(tx, input.branchId, file.path);
       if (publishedVersion(head) === file.version) {
         unchanged.push(file.path);
+        continue;
+      }
+      if (head.published) {
+        kept.push(file.path);
         continue;
       }
       const [row] = await tx
@@ -622,7 +716,7 @@ export async function importPublished(db: Database, input: ImportInput): Promise
           path: file.path,
           raw: file.raw,
           version: file.version,
-          parentId: head.published?.id ?? null,
+          parentId: null,
           actorKind: input.actor.kind ?? "human",
           actorId: input.actor.id,
           actorName: input.actor.name ?? null,
@@ -645,6 +739,6 @@ export async function importPublished(db: Database, input: ImportInput): Promise
         .where(and(eq(contentHeads.branchId, input.branchId), eq(contentHeads.path, file.path)));
       imported.push(file.path);
     }
-    return { imported, unchanged };
+    return { imported, unchanged, kept };
   });
 }

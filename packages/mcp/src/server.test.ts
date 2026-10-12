@@ -146,6 +146,14 @@ describe("introspection", () => {
   });
 });
 
+describe("content source", () => {
+  it("refuses database-sourced content without a database store to write it", () => {
+    expect(() =>
+      createGraftMcp({ contentDir: dir, collections, db: untouchableDb, source: "database" }),
+    ).toThrow(expect.objectContaining({ code: "CONFIG_INVALID" }));
+  });
+});
+
 describe("tool scopes", () => {
   async function connectAs(scopes: readonly string[]) {
     const server = createGraftMcp({

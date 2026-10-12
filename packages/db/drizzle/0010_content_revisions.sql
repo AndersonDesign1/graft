@@ -49,3 +49,27 @@ CREATE INDEX "content_revisions_path" ON "content_revisions" USING btree ("branc
 ALTER TABLE "content_reviews"
   ADD CONSTRAINT "content_reviews_status_known"
   CHECK ("status" IN ('open', 'published', 'closed'));
+--> statement-breakpoint
+
+-- A published revision is the record of what went live, and history and
+-- restore read it. Nothing legitimate changes one: a later edit is a new
+-- revision. The runtime role holds UPDATE on this table for drafts (an
+-- autosave updates its draft in place, and publishing stamps it once), so
+-- this refuses the rest below the application, where no grant change can
+-- reopen it.
+CREATE OR REPLACE FUNCTION graft_revision_published_is_final()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF OLD.published_at IS NOT NULL THEN
+    RAISE EXCEPTION 'a published revision is final; write a new revision instead';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+--> statement-breakpoint
+CREATE TRIGGER "content_revisions_published_is_final"
+  BEFORE UPDATE ON "content_revisions"
+  FOR EACH ROW EXECUTE FUNCTION graft_revision_published_is_final();

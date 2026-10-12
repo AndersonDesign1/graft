@@ -19,7 +19,7 @@ import type { AnyCollection } from "@usegraft/core";
 import { assertSafeMdx } from "@usegraft/mdx-safety";
 import { assertSearchQuery, scopeChain } from "@usegraft/db";
 import { z } from "zod";
-import { documentNotFound, findDoc, requireCollection } from "../content-hints";
+import { documentNotFound, findDoc, findStoredPath, requireCollection } from "../content-hints";
 import { assertSlugFree, invokeFunctionWithApproval } from "../tool-helpers";
 import { documentLink } from "./resource-uri";
 import { guarded } from "../tool-result";
@@ -251,8 +251,7 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
       title: "Write a document (create or update)",
       outputSchema: writeContentOutput,
       annotations: WRITES,
-      description:
-        "Author or update a document: validates the data against the collection schema, writes <contentDir>/<collection>/<slug>.mdx, and compiles the content tree into the database. Returns exactly what changed. When the server is set up to refresh the app and the write changed content, the result also carries `refresh`; `ok: false` means the write landed but the site may show the old copy, so tell the human and do not retry the write. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit. When the server keeps drafts (list_drafts is registered: a hosted server writing to GitHub, or a project whose content is in the database), the write is instead an unpublished draft, nothing is compiled (gitSha is null), and it goes live only through publish_drafts.",
+      description: writeContentDescription(deps.remoteStore?.kind),
       inputSchema: {
         collection: z.string().describe("Collection name"),
         slug: z
@@ -406,10 +405,14 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
         // Fail fast on a missing document — never file an approval a human
         // would review for nothing.
         if (deps.remoteStore?.entries) {
-          const exists = (await deps.remoteStore.entries(`${name}/`, deps.storeActor())).some(
-            (file) => file.path === `${name}/${slug}.mdx`,
+          const path = await findStoredPath(
+            deps.remoteStore,
+            name,
+            collection,
+            slug,
+            deps.storeActor(),
           );
-          if (!exists) throw documentNotFound(name, slug);
+          if (!path) throw documentNotFound(name, slug);
         } else findDoc(contentDir, name, collection, slug);
 
         const { data, correlationId } = await invokeFunctionWithApproval(
@@ -423,3 +426,16 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
       }),
   );
 };
+
+/** What write_content does, told for the store this server writes to. */
+function writeContentDescription(store: string | undefined): string {
+  const head =
+    "Author or update a document: validates the data against the collection schema and returns exactly what changed.";
+  if (store === "database") {
+    return `${head} This project keeps its content in the database: the write is an unpublished draft (gitSha is null), shared with everyone editing the document, and it goes live only through publish_drafts. No file is written.`;
+  }
+  if (store !== undefined) {
+    return `${head} The write is an unpublished draft on your own branch (gitSha is null); nothing is compiled, and it goes live only through publish_drafts.`;
+  }
+  return `${head} Writes <contentDir>/<collection>/<slug>.mdx and compiles the content tree into the database. When the server is set up to refresh the app and the write changed content, the result also carries \`refresh\`; \`ok: false\` means the write landed but the site may show the old copy, so tell the human and do not retry the write. Git is the version history: commit the file afterwards if you have the server's checkout; remote callers can't and needn't — the checkout's operator owns the commit.`;
+}

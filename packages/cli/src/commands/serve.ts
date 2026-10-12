@@ -374,14 +374,12 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   // and a hosted editor's save land the same way: as drafts on GitHub when
   // GRAFT_GITHUB_REPO is set, which is what lets a read-only deployment write.
   // A database-sourced project writes to Postgres, wherever it runs, so the
-  // GitHub store never mounts for it.
+  // GitHub store never takes its writes; it still answers who may sign in.
   const databaseStore = await databaseStoreFor(config, branch.db, writeBranch);
-  const repository = databaseStore
-    ? undefined
-    : githubStoreFromEnv({
-        contentDir: config.contentDir,
-        projectRoot: config.projectDir,
-      });
+  const repository = githubStoreFromEnv({
+    contentDir: config.contentDir,
+    projectRoot: config.projectDir,
+  });
   const store = databaseStore ?? repository;
 
   const mcpHandler = createGraftMcpHandler({

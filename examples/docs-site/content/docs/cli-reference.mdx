@@ -81,7 +81,7 @@ for the route.
 | `graft migrate [--apply]` | Run your own [migrations](/docs/migrations). Lists them only, until `--apply`. |
 | `graft harden <role>` | Give an existing database role the limited rights a deployed app needs. See [Hardening](/docs/hardening). |
 | `graft content` | List documents in the compiled index |
-| `graft content import [--dry-run]` | Load the files under `contentDir` into the database, for a project with `content = { source: "database" }`. Every file is checked first. Safe to run again. |
+| `graft content import [--dry-run]` | Load the files under `contentDir` into the database, for a project with `content = { source: "database" }`. Every file is checked first. Only documents with nothing published come in: a published document is never overwritten, and a deleted file deletes nothing. Safe to run again. |
 | `graft compilations` | List recent compiles and what each one changed |
 
 ## Approve actions

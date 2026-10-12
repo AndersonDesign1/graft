@@ -60,7 +60,7 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
   const writeBranch = branch !== undefined ? scopeWriteBranch(branch.scope) : "main";
   let timer: NodeJS.Timeout | undefined;
   /** Set once the watchers exist; recompiles are scheduled before that. */
-  let rewatchContent: ((dir: string) => void) | undefined;
+  let rewatchContent: (() => void) | undefined;
   let compiling = false;
   let dirty = false;
   let configDirty = false;
@@ -74,14 +74,21 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
     try {
       if (configDirty) {
         configDirty = false;
-        const previousContentDir = config.contentDir;
+        const previous = config;
         config = await loadConfig(configPath);
         console.log(`reloaded ${basename(configPath)}`);
         // Watchers were created once at startup against the ORIGINAL
         // contentDir, so a config edit that relocated it left compile reading
         // one directory while the watcher polled another: every later save was
         // invisible and `graft dev` silently stopped recompiling.
-        if (config.contentDir !== previousContentDir) rewatchContent?.(config.contentDir);
+        // Switching the content source starts or stops the file watcher the
+        // same way.
+        if (
+          config.contentDir !== previous.contentDir ||
+          config.content.source !== previous.content.source
+        ) {
+          rewatchContent?.();
+        }
       }
       const result =
         branch !== undefined
@@ -123,21 +130,26 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
 
   // In a database-sourced project the files are a checkout: an edit to one
   // changes nothing until it is pushed, so watching them would only mislead.
+  const watchContent = (): FSWatcher | undefined =>
+    config.content.source === "database"
+      ? undefined
+      : watch(config.contentDir, { recursive: true }, () => schedule());
   const fromDatabase = config.content.source === "database";
-  let contentWatcher: FSWatcher | undefined = fromDatabase
-    ? undefined
-    : watch(config.contentDir, { recursive: true }, () => schedule());
+  let contentWatcher = watchContent();
   const watchers: FSWatcher[] = [
     watch(config.projectDir, (_event, filename) => {
       if (filename && (CONFIG_FILENAMES as readonly string[]).includes(filename)) schedule(true);
     }),
   ];
 
-  rewatchContent = (dir: string): void => {
-    if (fromDatabase) return;
+  rewatchContent = (): void => {
     contentWatcher?.close();
-    contentWatcher = watch(dir, { recursive: true }, () => schedule());
-    console.log(`now watching ${relative(options.cwd, dir) || "."}`);
+    contentWatcher = watchContent();
+    console.log(
+      contentWatcher
+        ? `now watching ${relative(options.cwd, config.contentDir) || "."}`
+        : "content is in the database: edit it in Studio",
+    );
   };
 
   const watchedContent = relative(options.cwd, config.contentDir) || ".";

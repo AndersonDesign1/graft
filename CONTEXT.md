@@ -18,7 +18,8 @@ authoritative:
 Nothing treats both as authoritative at once.
 
 **Revision** — one version of one document in a database-sourced project: its
-exact MDX bytes, who wrote it, and whether it is published. A **draft** is a
+exact MDX bytes (none, for a deletion), who wrote it, and whether it is
+published. A **draft** is a
 revision not yet published; there is one per document, shared by everyone.
 Revisions are never deleted, which is what history reads.
 

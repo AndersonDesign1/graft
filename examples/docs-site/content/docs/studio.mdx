@@ -1,6 +1,6 @@
 ---
 title: Studio
-description: "An editor for people who would rather not edit files: find, create, edit and publish content in a browser, with every change ending up in Git."
+description: "An editor for people who would rather not edit files: find, create, edit and publish content in a browser, with every change kept in Git or the database."
 section: Content
 order: 5
 ---
@@ -11,12 +11,14 @@ order: 5
 
 Not everyone on your team wants to edit Markdown files and run Git commands.
 Studio is an editor for them. They find an entry, change it in a form built from
-your schema, and publish. Everything still ends up as files in Git, exactly as
-if a developer had edited them, and nothing an editor can do in Studio is
-unavailable to an agent or a developer.
+your schema, and publish. In a project that keeps its content in Git, every
+change ends up as files there, exactly as if a developer had edited them. In
+one that keeps it in the database, every change is a revision in Postgres.
+Nothing an editor can do in Studio is unavailable to an agent or a developer.
 
 Studio needs the [Postgres engine](/docs/tiers) for its developer views
-(history, approvals, branches). Content stays files in Git either way.
+(history, approvals, branches). Your content stays where your project keeps it
+either way.
 
 ## Open Studio
 
