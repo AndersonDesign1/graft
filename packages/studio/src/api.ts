@@ -9,6 +9,7 @@ import {
   type CompileResult,
   type ContentChangeListener,
   type ContentStore,
+  type ContentSource,
 } from "@usegraft/compiler";
 import type { AnyCollection } from "@usegraft/core";
 import type { MdxTrust } from "@usegraft/mdx-safety";
@@ -30,6 +31,8 @@ import { STUDIO_OPENAPI } from "./openapi";
 import { commitChanges, readChanges, readFileDiff } from "./git";
 import { preflightRevert, revertContentTo } from "./revert";
 import { EDITOR_ROUTES } from "./server/editor-routes";
+import { PEOPLE_ROUTES } from "./server/people-routes";
+import { WORKSPACE_ROUTES } from "./server/workspace-routes";
 import type {
   ApprovalList,
   BranchList,
@@ -51,6 +54,19 @@ export type StudioFetchHandler = (request: Request) => Promise<Response>;
 
 export interface StudioApiOptions {
   db: Database;
+  /**
+   * The project's own database, for what belongs to no branch: accounts,
+   * the media library, agent tokens, site settings and deploy hooks.
+   * Defaults to `db`; `graft serve` passes its control connection, so a
+   * Studio on a preview branch still sees the project's people and agents.
+   */
+  workspaceDb?: Database;
+  /**
+   * This host accepts agent tokens on its MCP endpoint and API. `graft serve`
+   * does; `graft studio` on a laptop has no MCP endpoint, so Settings says
+   * where the tokens it makes will work.
+   */
+  agentTokens?: boolean;
   collections: Record<string, AnyCollection>;
   /** Absolute content root — required for get/put document. */
   contentDir: string;
@@ -106,6 +122,22 @@ export interface StudioApiOptions {
    * store makes a hosted Studio writable on a read-only filesystem.
    */
   store?: ContentStore;
+  /**
+   * Studio accounts are on: people sign in with an email and password, and an
+   * admin manages them under Settings. Set by the Studio handler when sign-in
+   * is configured with accounts.
+   */
+  accounts?: {
+    /** The public origin invitation links point at; the request's own otherwise. */
+    publicUrl?: string;
+    /** Where the UI is mounted, so a link opens it. */
+    uiBasePath: string;
+  };
+}
+
+/** Where the mounted project's content is authoritative, read from its store. */
+function sourceOf(options: StudioApiOptions): ContentSource {
+  return options.store?.kind === "database" ? "database" : "git";
 }
 
 /** The identity a Studio request authenticated as. */
@@ -156,7 +188,7 @@ function decodeRouteId(raw: string): string {
  * forces a preflight for anything that omits Origin, which the browser will
  * then refuse on our behalf.
  */
-function assertSameOrigin(request: Request, url: URL): void {
+export function assertSameOrigin(request: Request, url: URL): void {
   if (request.method === "GET" || request.method === "HEAD") return;
 
   const origin = request.headers.get("origin");
@@ -207,23 +239,29 @@ function assertSameOrigin(request: Request, url: URL): void {
  * tree has no business committing it, and deciding approvals is separated from
  * both: it is the human gate, and no agent runtime token should carry it.
  */
-export type StudioScope = "studio:read" | "studio:write" | "studio:publish" | "approvals:decide";
+export type StudioScope =
+  | "studio:read"
+  | "studio:write"
+  | "studio:publish"
+  | "approvals:decide"
+  | "studio:people"
+  | "studio:settings";
 
-function json(data: unknown, status = 200): Response {
+export function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "content-type": "application/json; charset=utf-8" },
   });
 }
 
-function errorResponse(error: GraftError, status: number): Response {
+export function errorResponse(error: GraftError, status: number): Response {
   return new Response(JSON.stringify(error.toJSON()), {
     status,
     headers: { "content-type": "application/json; charset=utf-8" },
   });
 }
 
-function statusFor(error: GraftError): number {
+export function statusFor(error: GraftError): number {
   switch (error.code) {
     case "UNAUTHORIZED":
     case "TOKEN_INVALID":
@@ -244,9 +282,16 @@ function statusFor(error: GraftError): number {
     case "CONTENT_CONFLICT":
     case "SLUG_NOT_UNIQUE":
     case "CONTENT_TREE_READ_ONLY":
+    case "ASSET_EXISTS":
       return 409;
+    // The request is fine; this server isn't set up for it yet.
+    case "ENV_VAR_MISSING":
+    case "MIGRATION_REQUIRED":
+      return 503;
     case "REMOTE_STORE_FAILED":
       return 502;
+    case "RATE_LIMITED":
+      return 429;
     case "SCHEMA_VALIDATION_FAILED":
     case "INPUT_VALIDATION_FAILED":
     case "INVALID_SLUG":
@@ -547,12 +592,29 @@ export interface Route {
    * remote store, where the checkout is the deployment and not the draft.
    */
   writesCheckout?: true;
+  /**
+   * The route still applies in a database-sourced project, where the
+   * revisions in Postgres are the source rather than the checkout: compile
+   * reads them, and revert refuses with its own reason.
+   */
+  databaseSource?: true;
   handle: (ctx: RouteContext) => Promise<Response> | Response;
 }
 
 const V1 = "/api/studio/v1";
 const APPROVAL_DECIDE_PATH = /^\/api\/studio\/v1\/approvals\/([^/]+)\/decide$/;
 const COMPILATION_REVERT_PATH = /^\/api\/studio\/v1\/compilations\/([^/]+)\/revert$/;
+
+/** Revert restores a commit's files, and database-sourced content has no commit. */
+function assertRevertible(options: StudioApiOptions, compilation: string): void {
+  if (sourceOf(options) !== "database") return;
+  throw new GraftError({
+    code: "CONTENT_SOURCE_MISMATCH",
+    message: "This project keeps its content in the database, so there is no commit to go back to.",
+    fix: "Restore an earlier version of each document from its history instead.",
+    details: { compilation },
+  });
+}
 
 /** The compilation a revert route names, or a miss the operator can act on. */
 async function requireCompilation(
@@ -629,6 +691,7 @@ const ROUTES: readonly Route[] = [
     path: `${V1}/compile`,
     scope: "studio:write",
     writesCheckout: true,
+    databaseSource: true,
     handle: async ({ request, url, options, defaultBranch }) => {
       const payload = (await request.json().catch(() => ({}))) as { branch?: string };
       const branch =
@@ -639,6 +702,7 @@ const ROUTES: readonly Route[] = [
         db: options.db,
         mdxTrust: options.mdxTrust,
         branchId: branch,
+        source: sourceOf(options),
       });
       const refresh = await tellApp(options, branch, result);
       const body: CompileResultDto = {
@@ -815,6 +879,7 @@ const ROUTES: readonly Route[] = [
     path: COMPILATION_REVERT_PATH,
     scope: "studio:read",
     handle: async ({ options, id }) => {
+      assertRevertible(options, id);
       const row = await requireCompilation(options, id);
       const pre = await preflightRevert(options.contentDir, row.gitSha);
       const body: RevertPreviewDto = {
@@ -834,7 +899,9 @@ const ROUTES: readonly Route[] = [
     path: COMPILATION_REVERT_PATH,
     scope: "studio:write",
     writesCheckout: true,
+    databaseSource: true,
     handle: async ({ options, id }) => {
+      assertRevertible(options, id);
       const row = await requireCompilation(options, id);
       const changed = await revertContentTo(options.contentDir, row.gitSha as string);
       // Recompile only after the files landed, so the index can never describe
@@ -867,6 +934,8 @@ const ROUTES: readonly Route[] = [
     },
   },
   ...EDITOR_ROUTES,
+  ...PEOPLE_ROUTES,
+  ...WORKSPACE_ROUTES,
 ];
 
 /** Tell the app the index changed. Undefined when there is no listener or no change. */
@@ -945,7 +1014,12 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
         }
       }
 
-      if (matched.route.writesCheckout && options.store && options.store.kind !== "filesystem") {
+      if (
+        matched.route.writesCheckout &&
+        options.store &&
+        options.store.kind !== "filesystem" &&
+        !(options.store.kind === "database" && matched.route.databaseSource)
+      ) {
         throw new GraftError({
           code: "CONTENT_TREE_READ_ONLY",
           message: `${method} ${pathname} writes the deployed files, and this Studio saves to ${options.store.kind} instead.`,
@@ -966,7 +1040,29 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
       if (error instanceof GraftError) {
         return errorResponse(error, statusFor(error));
       }
+      if (sqlState(error) === "42P01") {
+        // undefined_table: the database is older than this Studio.
+        const where = { pathname: new URL(request.url).pathname, method: request.method };
+        const missing = new GraftError({
+          code: "MIGRATION_REQUIRED",
+          message: `${where.method} ${where.pathname} needs a table this database doesn't have yet.`,
+          fix: "Run `graft db migrate` against this database, then reload Studio.",
+          details: where,
+        });
+        return errorResponse(missing, statusFor(missing));
+      }
       throw error;
     }
   };
+}
+
+/** The Postgres SQLSTATE behind an error. Drizzle wraps it, so walk the causes. */
+function sqlState(error: unknown): string | undefined {
+  let current: unknown = error;
+  for (let depth = 0; current && typeof current === "object" && depth < 5; depth += 1) {
+    const { code, cause } = current as { code?: unknown; cause?: unknown };
+    if (typeof code === "string" && /^[0-9A-Z]{5}$/.test(code)) return code;
+    current = cause;
+  }
+  return undefined;
 }

@@ -1,3 +1,5 @@
+import type { ChangeSet } from "@usegraft/contracts";
+
 /**
  * Where authored content is read from and written to.
  *
@@ -18,6 +20,8 @@ export interface StoreActor {
   id: string;
   name?: string;
   email?: string;
+  /** A person or an agent, for history. Defaults to a person. */
+  kind?: "human" | "agent";
 }
 
 export interface StoredFile {
@@ -70,6 +74,11 @@ export interface PublishOptions {
 
 export interface PublishResult {
   mode: PublishMode;
+  /**
+   * What the live index did, when publishing updated it in the same step
+   * (a database-sourced project). Absent when the site rebuilds instead.
+   */
+  changes?: ChangeSet;
   /** The commit that carries the change, or null when nothing was published. */
   commit: { sha: string; url?: string } | null;
   /** Paths whose draft version was published (or submitted for review). */
@@ -78,13 +87,27 @@ export interface PublishResult {
   tookTheirs: string[];
   /** The pull request, in review mode. */
   review?: ReviewRequest;
+  /**
+   * Why a direct publish went to review instead: the project's rule for
+   * deletions, some collections or large changes. Absent when it didn't.
+   */
+  reviewReasons?: string[];
 }
 
+/**
+ * Changes waiting for someone who may publish. On GitHub it is a pull
+ * request, with its number and link; in a database-sourced project it is a
+ * request in Studio's inbox, with neither.
+ */
 export interface ReviewRequest {
-  number: number;
-  url: string;
+  id: string;
   title: string;
   createdAt: string;
+  number?: number;
+  url?: string;
+  /** The documents it covers, where the store knows them. */
+  paths?: string[];
+  requestedBy?: string;
 }
 
 /**
@@ -104,8 +127,34 @@ export interface DraftWorkflow {
   reviews(actor: StoreActor): Promise<ReviewRequest[]>;
 }
 
+/**
+ * One published change to a document, newest first in a history: a
+ * revision in the database, a commit on GitHub or in a local checkout.
+ */
+export interface HistoryEntry {
+  /** What `readVersion` takes: a revision id or a commit SHA. */
+  id: string;
+  /** When it went live (published, or committed). ISO 8601. */
+  at: string;
+  /** Who made it, as the store records them. */
+  by?: string;
+  byKind?: "human" | "agent";
+  message?: string;
+  /**
+   * The document's version after this change, and null when the change
+   * deleted it. Absent where finding it would cost a request per entry.
+   */
+  version?: string | null;
+}
+
+/** A published change anywhere in the content, for an activity feed. */
+export interface ActivityEntry extends Omit<HistoryEntry, "version"> {
+  /** The documents it changed, where the store knows them without asking again. */
+  paths?: string[];
+}
+
 export interface StoreInfo {
-  kind: "filesystem" | "github";
+  kind: "filesystem" | "github" | "database";
   /** "owner/name", for a remote store. */
   repository?: string;
   /** The branch publishing lands on. */
@@ -137,5 +186,20 @@ export interface ContentStore {
    * Absent on the filesystem store, where the checkout is the truth.
    */
   overlay?(actor?: StoreActor): Promise<Map<string, StoredFile | null>>;
+  /**
+   * Every file under a prefix as this actor sees it, when the store is the
+   * source of truth and there is no checkout to list (a database-sourced
+   * project). Lists use this instead of reading the content directory.
+   */
+  entries?(prefix: string, actor?: StoreActor): Promise<Array<StoredFile & { path: string }>>;
   drafts?: DraftWorkflow;
+  /**
+   * What was published for one path, newest first. Absent on the filesystem
+   * store, whose history is git's: Studio reads it from the checkout.
+   */
+  history?(path: string, options?: { limit?: number }): Promise<HistoryEntry[]>;
+  /** The bytes a path had at a history entry. Null when it had none (deleted). */
+  readVersion?(path: string, id: string): Promise<StoredFile | null>;
+  /** What was published across the content, newest first. */
+  activity?(options?: { limit?: number }): Promise<ActivityEntry[]>;
 }

@@ -159,6 +159,63 @@ describe("loadConfig — approvalPolicy", () => {
   });
 });
 
+describe("loadConfig — content", () => {
+  it("defaults to git, where the files are authoritative, with the review rule on", async () => {
+    const config = await loadConfig(join(fixtures, "basic", "graft.config.ts"));
+    expect(config.content).toEqual({ source: "git", review: { deletes: true, overLines: 200 } });
+  });
+
+  it("reads a database source from the project", async () => {
+    const config = await loadConfig(join(fixtures, "content-database", "graft.config.ts"));
+    expect(config.content.source).toBe("database");
+  });
+
+  it("turns the review rule off with review: false", async () => {
+    const config = await loadConfig(join(fixtures, "content-review-off", "graft.config.ts"));
+    expect(config.content.review).toBe(false);
+  });
+
+  it("reads a review rule and a mirror", async () => {
+    const config = await loadConfig(join(fixtures, "content-mirror", "graft.config.ts"));
+    expect(config.content).toEqual({
+      source: "database",
+      review: { deletes: true, overLines: 50, collections: ["legal"] },
+      mirror: { mode: "batch", via: "pull-request", everyMinutes: 30 },
+    });
+  });
+
+  it("refuses a mirror on a project whose content is already in git", async () => {
+    expect(
+      await graftErrorCodeAsync(() =>
+        loadConfig(join(fixtures, "content-mirror-git", "graft.config.ts")),
+      ),
+    ).toBe("CONFIG_INVALID");
+  });
+
+  it("refuses a mirror interval longer than a week", async () => {
+    expect(
+      await graftErrorCodeAsync(() =>
+        loadConfig(join(fixtures, "content-mirror-forever", "graft.config.ts")),
+      ),
+    ).toBe("CONFIG_INVALID");
+  });
+
+  it("refuses an unknown source rather than falling back to git", async () => {
+    // Falling back would have a hosted Studio write files that nothing commits.
+    expect(
+      await graftErrorCodeAsync(() => loadConfig(join(fixtures, "content-bad", "graft.config.ts"))),
+    ).toBe("CONFIG_INVALID");
+  });
+
+  it("refuses a database source on the static index, which has no database", async () => {
+    expect(
+      await graftErrorCodeAsync(() =>
+        loadConfig(join(fixtures, "content-database-static", "graft.config.ts")),
+      ),
+    ).toBe("CONFIG_INVALID");
+  });
+});
+
 describe("loadConfig — mdxTrust", () => {
   it('defaults to "restricted" when the project does not export it', async () => {
     const config = await loadConfig(join(fixtures, "basic", "graft.config.ts"));

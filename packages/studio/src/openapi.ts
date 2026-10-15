@@ -127,6 +127,163 @@ export const STUDIO_OPENAPI = {
         responses: { "200": { description: "OK" } },
       },
     },
+    "/api/studio/v1/people": {
+      get: {
+        operationId: "listPeople",
+        summary: "Who can sign in with a Studio account, and open invitations",
+        description:
+          "Needs the studio:people scope (admins). Answers ROUTE_NOT_FOUND (404) when this Studio has no accounts.",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/people/invites": {
+      post: {
+        operationId: "invitePerson",
+        summary: "Invite someone by email, with a role",
+        description:
+          "Body: { email, name?, role }. Answers with the invitation link once; only its hash is stored. Inviting the same address again replaces the old link.",
+        responses: { "201": { description: "Created" } },
+      },
+    },
+    "/api/studio/v1/people/invites/{id}": {
+      delete: {
+        operationId: "revokeInvite",
+        summary: "Revoke an invitation nobody has used yet",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "204": { description: "Revoked" } },
+      },
+    },
+    "/api/studio/v1/people/{id}": {
+      put: {
+        operationId: "setPersonRole",
+        summary: "Change someone's role",
+        description: "Body: { role }. The last admin can't be given another role.",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "204": { description: "Changed" } },
+      },
+      delete: {
+        operationId: "removePerson",
+        summary: "Take away someone's access, ending their sessions",
+        description: "Nobody can remove their own access, and the last admin can't be removed.",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "204": { description: "Removed" } },
+      },
+    },
+    "/api/studio/v1/people/{id}/reset": {
+      post: {
+        operationId: "resetPassword",
+        summary: "A link that sets a new password for someone, keeping their role",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "201": { description: "Created" } },
+      },
+    },
+    "/api/studio/v1/assets": {
+      get: {
+        operationId: "listAssets",
+        summary: "The media library: files uploaded through Studio and files entries use",
+        description:
+          "Query: q (matches the key and alt text). storage is false, with a reason, when the asset store isn't configured where Studio runs.",
+        parameters: [{ name: "q", in: "query", required: false, schema: { type: "string" } }],
+        responses: { "200": { description: "OK" } },
+      },
+      post: {
+        operationId: "uploadAsset",
+        summary: "Upload a file to the asset store",
+        description:
+          "Body: { name, base64, key?, alt?, overwrite? }, at most 10 MB: an image or a PDF, typed by its extension. The key defaults to assets/<name>. An existing key answers ASSET_EXISTS (409); overwrite: true replaces it and needs studio:publish. Needs studio:write.",
+        responses: {
+          "201": { description: "Created" },
+          "409": { description: "The key is taken" },
+        },
+      },
+      delete: {
+        operationId: "deleteAsset",
+        summary: "Delete a file nothing uses",
+        description:
+          "Needs studio:publish. A file an entry still uses answers CONTENT_CONFLICT (409) with the entries that use it.",
+        parameters: [{ name: "key", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Deleted" }, "409": { description: "Still used" } },
+      },
+    },
+    "/api/studio/v1/assets/detail": {
+      get: {
+        operationId: "assetDetail",
+        summary: "One file: its size, alt text, who uploaded it, and the entries that use it",
+        parameters: [{ name: "key", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/assets/alt": {
+      put: {
+        operationId: "setAssetAlt",
+        summary: "Set the alt text an image field starts from when the file is picked",
+        description:
+          "Body: { key, alt }. Only for files uploaded through Studio. Needs studio:write.",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/agents": {
+      get: {
+        operationId: "listAgentTokens",
+        summary: "Agent tokens, live and revoked, and the endpoints an agent connects to",
+        description:
+          "Needs the studio:settings scope (admins). Tokens are never returned, only their first characters.",
+        responses: { "200": { description: "OK" } },
+      },
+      post: {
+        operationId: "createAgentToken",
+        summary: "Make a token for one agent",
+        description:
+          'Body: { name, access }, where access is "read", "write" (drafts) or "publish". Answers with the token once; only its hash is stored. No token can decide approvals.',
+        responses: { "201": { description: "Created" } },
+      },
+    },
+    "/api/studio/v1/agents/{id}": {
+      delete: {
+        operationId: "revokeAgentToken",
+        summary: "Revoke a token; the agent is refused from its next request",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Revoked" } },
+      },
+    },
+    "/api/studio/v1/site": {
+      get: {
+        operationId: "getSite",
+        summary: "The site's name and address, and its deploy hooks for admins",
+        responses: { "200": { description: "OK" } },
+      },
+      put: {
+        operationId: "setSite",
+        summary: "Set the site's name and address",
+        description: "Body: { name, url }. Needs studio:settings.",
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/site/hooks": {
+      post: {
+        operationId: "addDeployHook",
+        summary: "Add a URL to call after every publish",
+        description:
+          "Body: { name, url, secret? }. https, or http to this machine. The secret is sent as a bearer header. Needs studio:settings.",
+        responses: { "201": { description: "Created" } },
+      },
+    },
+    "/api/studio/v1/site/hooks/{id}/test": {
+      post: {
+        operationId: "testDeployHook",
+        summary: "Call one hook now and record what it answered",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/site/hooks/{id}": {
+      delete: {
+        operationId: "removeDeployHook",
+        summary: "Stop calling a hook after publishes",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Removed" } },
+      },
+    },
     "/api/studio/v1/entries": {
       get: {
         operationId: "listEntries",
@@ -187,6 +344,44 @@ export const STUDIO_OPENAPI = {
         operationId: "diffDraft",
         summary: "Line diff of a draft against the published version",
         parameters: [{ name: "path", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/entry/history": {
+      get: {
+        operationId: "entryHistory",
+        summary: "What was published for one document, newest first",
+        description:
+          "Published revisions in a database-sourced project, commits to the production branch on GitHub, and the checkout's commits locally. available is false, with a reason, where there is no history.",
+        parameters: [{ name: "path", in: "query", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/entry/version": {
+      get: {
+        operationId: "entryVersion",
+        summary: "One version of a document, and its diff to what the caller has now",
+        description:
+          "To restore it, save its raw bytes with PUT /entry: the restore is a draft like any other edit.",
+        parameters: [
+          { name: "path", in: "query", required: true, schema: { type: "string" } },
+          { name: "id", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: { "200": { description: "OK" } },
+      },
+    },
+    "/api/studio/v1/activity": {
+      get: {
+        operationId: "activity",
+        summary: "What was published lately across the content, newest first",
+        parameters: [
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            schema: { type: "integer", maximum: 100 },
+          },
+        ],
         responses: { "200": { description: "OK" } },
       },
     },

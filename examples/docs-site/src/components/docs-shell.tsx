@@ -11,7 +11,15 @@ import { DocsLayout } from "fumadocs-ui/layouts/notebook";
 import { DocsBody, DocsPage, DocsTitle } from "fumadocs-ui/layouts/notebook/page";
 import { TOCPopover, TOCProvider } from "fumadocs-ui/layouts/notebook/page/slots/toc";
 import { RootProvider } from "fumadocs-ui/provider/astro";
-import { Check, Copy, FileText, History, MessageSquareWarning, SquarePen } from "lucide-react";
+import {
+  Check,
+  Clock,
+  Copy,
+  FileText,
+  History,
+  MessageSquareWarning,
+  SquarePen,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { docSourcePath } from "../lib/doc-source";
 import { AnthropicMark, OpenAIMark } from "./brand-icons";
@@ -152,7 +160,7 @@ export function DocsShell({
   toc: TOCItemType[];
   title: string;
   slug: string;
-  /** Sidebar group the page belongs to, shown above the title. */
+  /** Sidebar group the page belongs to, shown in the meta line under the actions. */
   section: string;
   /** The page's kicker as HTML, lifted out of the body to sit under the title. */
   lede?: string;
@@ -176,20 +184,20 @@ export function DocsShell({
           mode: "top",
           // A span, not a link like its counterpart on the landing: fumadocs
           // wraps this whole title in its own <a href={url}>, and an anchor
-          // inside an anchor is invalid. The explanation lives one click away
-          // on getting-started, which the badge sits next to in the sidebar
-          // anyway.
+          // inside an anchor is invalid. The wordmark is the same on every
+          // surface; the surface name and the stage follow it as plain text,
+          // never in a box.
           title: (
-            <span className="inline-flex items-baseline gap-2 whitespace-nowrap">
-              <span className="font-serif text-lg md:text-xl">
-                graft<b style={{ color: "var(--mark)" }}>.</b> docs
+            <span className="doc-brand">
+              <span className="doc-wordmark">graft.</span>
+              <span className="doc-brand-sep" aria-hidden="true">
+                /
               </span>
-              <span className="wordmark-badge self-center rounded px-1.5 py-0.5 font-mono text-xs uppercase tracking-wider">
-                beta
-              </span>
+              <span className="doc-brand-surface">Docs</span>
+              <span className="doc-brand-stage">beta</span>
             </span>
           ),
-          // The wordmark reads "graft. docs", so it goes to the docs index —
+          // The wordmark reads "graft. / Docs", so it goes to the docs index —
           // clicking the name of where you are should not eject you from it.
           // Leaving the site is what the Home link below is for, and having
           // both means neither has to be guessed at.
@@ -213,17 +221,22 @@ export function DocsShell({
             ),
           }}
         >
+          {/* Title, promise, actions, then where the page sits and how long it
+              takes. The meta line comes last because it answers the reader's
+              least urgent question. */}
           <header className="doc-header">
-            <p className="doc-eyebrow">
-              <span>{section}</span>
-              <span aria-hidden="true">·</span>
-              <span>{minutes} min read</span>
-            </p>
             <DocsTitle>{title}</DocsTitle>
             {/* The lede is the page's kicker, rendered from the repository's own
                 MDX at build time, so it is trusted HTML (inline code, links). */}
             {lede && <p className="doc-lede" dangerouslySetInnerHTML={{ __html: lede }} />}
             <DocActions slug={slug} />
+            <p className="doc-page-meta">
+              <span>{section}</span>
+              <span>
+                <Clock {...ICON} />
+                {minutes} min read
+              </span>
+            </p>
           </header>
           <DocsBody>{children}</DocsBody>
           <PageMeta slug={slug} title={title} updated={updated} className="doc-meta-end" />

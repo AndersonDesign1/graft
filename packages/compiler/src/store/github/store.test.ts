@@ -636,3 +636,107 @@ describe("githubStoreFromEnv", () => {
     }
   });
 });
+
+describe("GitHubStore: the review rule", () => {
+  const rule = { deletes: true, collections: ["legal"], overLines: 5 };
+
+  it("publishes a small edit straight onto production", async () => {
+    const { fake, store } = setup(undefined, { reviewRule: rule });
+    await store.write("products/shirt.mdx", shirt.replace("A shirt.", "A fine shirt."), {
+      actor: ana,
+    });
+    const result = await store.drafts.publish({ actor: ana, paths: ["products/shirt.mdx"] });
+    expect(result.mode).toBe("direct");
+    expect(result.reviewReasons).toBeUndefined();
+    expect(fake.pulls()).toHaveLength(0);
+  });
+
+  it("sends a deletion to a pull request, saying why", async () => {
+    const { fake, store } = setup(undefined, { reviewRule: rule });
+    await store.write("products/hat.mdx", null, { actor: ana });
+    const result = await store.drafts.publish({ actor: ana, paths: ["products/hat.mdx"] });
+    expect(result.mode).toBe("review");
+    expect(result.reviewReasons).toEqual(["products/hat.mdx is deleted"]);
+    expect(fake.files()["content/products/hat.mdx"]).toBe(hat);
+    expect(fake.pulls()[0]?.body).toContain("products/hat.mdx is deleted");
+  });
+
+  it("sends a large change, or any change to a reviewed collection, to a pull request", async () => {
+    const { store } = setup(
+      {
+        "content/products/shirt.mdx": shirt,
+        "content/legal/terms.mdx": "---\ntitle: Terms\n---\n",
+      },
+      { reviewRule: rule },
+    );
+    const long = `${shirt}${Array.from({ length: 10 }, (_, i) => `Line ${i}`).join("\n")}\n`;
+    await store.write("products/shirt.mdx", long, { actor: ana });
+    expect(
+      (await store.drafts.publish({ actor: ana, paths: ["products/shirt.mdx"] })).reviewReasons,
+    ).toEqual(["products/shirt.mdx changes 10 lines (over 5)"]);
+    await store.write("legal/terms.mdx", "---\ntitle: Terms of sale\n---\n", { actor: ana });
+    expect(
+      (await store.drafts.publish({ actor: ana, paths: ["legal/terms.mdx"] })).reviewReasons,
+    ).toEqual(["legal changes are always reviewed"]);
+  });
+});
+
+describe("GitHubStore: commitFiles", () => {
+  it("commits only what production doesn't already have", async () => {
+    const { fake, store } = setup();
+    const result = await store.commitFiles(
+      [
+        { path: "products/shirt.mdx", raw: shirt },
+        { path: "products/scarf.mdx", raw: "---\ntitle: Scarf\n---\n" },
+        { path: "products/hat.mdx", raw: null },
+      ],
+      { message: "content: mirror" },
+    );
+    expect(result.commit).not.toBeNull();
+    expect(Object.keys(fake.files()).sort()).toEqual([
+      "README.md",
+      "content/products/scarf.mdx",
+      "content/products/shirt.mdx",
+    ]);
+    const again = await store.commitFiles([{ path: "products/shirt.mdx", raw: shirt }], {
+      message: "content: mirror",
+    });
+    expect(again).toEqual({ commit: null, merged: true });
+  });
+});
+
+describe("GitHubStore: history", () => {
+  it("lists the commits that touched a document, and reads it at any of them", async () => {
+    const { fake, store } = setup();
+    const better = shirt.replace("A shirt.", "A better shirt.");
+    fake.push("main", { "content/products/shirt.mdx": better }, "Better shirt\n\nDetail.");
+    fake.push("main", { "content/products/hat.mdx": `${hat}More.\n` }, "Hat");
+    fake.push("main", { "content/products/shirt.mdx": null }, "Drop the shirt");
+
+    const history = await store.history("products/shirt.mdx");
+    expect(history.map((entry) => entry.message)).toEqual([
+      "Drop the shirt",
+      "Better shirt",
+      expect.any(String), // the commit that added it
+    ]);
+    expect(history[0]?.at).toMatch(/^2026-/);
+
+    expect(await store.readVersion("products/shirt.mdx", history[0]?.id as string)).toBeNull();
+    expect(await store.readVersion("products/shirt.mdx", history[1]?.id as string)).toEqual({
+      raw: better,
+      version: gitBlobSha(better),
+    });
+    expect((await caught(store.readVersion("products/shirt.mdx", "not-a-sha"))).code).toBe(
+      "DOCUMENT_NOT_FOUND",
+    );
+  });
+
+  it("lists recent commits to the content as activity, and nothing outside it", async () => {
+    const { fake, store } = setup();
+    fake.push("main", { "README.md": "# shop, renamed\n" }, "Docs");
+    fake.push("main", { "content/products/hat.mdx": `${hat}More.\n` }, "Hat");
+    const activity = await store.activity({ limit: 5 });
+    expect(activity.map((entry) => entry.message)).toEqual(["Hat", expect.any(String)]);
+    expect(activity[0]).not.toHaveProperty("version");
+  });
+});

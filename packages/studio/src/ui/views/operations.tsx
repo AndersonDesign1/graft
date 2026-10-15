@@ -1,4 +1,4 @@
-/** Approvals, Branches, History — the operational list views. */
+/** Branches and History: the operational list views. Approvals moved to the inbox. */
 import { useState } from "react";
 import { toast } from "sonner";
 import type {
@@ -18,108 +18,6 @@ import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { api, qs } from "../lib/api";
 import { absoluteTime, relativeTime, shortSha, plural } from "../lib/format";
 import { useResource } from "../lib/use-resource";
-
-export function ApprovalsView({ onDecided }: { onDecided?: () => void }) {
-  const { data, error, loading, refresh } = useResource<ApprovalList>("/approvals");
-  const [busy, setBusy] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  async function decide(row: PendingApprovalDto, decision: "approved" | "denied") {
-    setBusy(row.id);
-    setActionError(null);
-    setMsg(null);
-    try {
-      await api(`/approvals/${encodeURIComponent(row.id)}/decide`, {
-        method: "POST",
-        body: JSON.stringify({ decision }),
-      });
-      setMsg(`${row.functionName} ${decision}`);
-      refresh();
-      onDecided?.();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const rows = data?.approvals ?? [];
-
-  return (
-    <div className="view">
-      <header className="view-head">
-        <div>
-          <h1 className="view-title">Approvals</h1>
-          <p className="view-sub">
-            Destructive calls from agents wait here. Approve so the agent can retry; deny to refuse.
-          </p>
-        </div>
-        {rows.length > 0 ? <Pill tone="pending">{plural(rows.length, "waiting")}</Pill> : null}
-      </header>
-
-      <Status
-        loading={loading && !data}
-        error={error ?? actionError}
-        empty={rows.length === 0}
-        skeleton={<CardsSkeleton />}
-      >
-        <EmptyState
-          title="Queue is clear"
-          icon={<IconCheck size={20} />}
-          body="No agent is waiting on a decision. Destructive typed functions land here when they need a human."
-        />
-      </Status>
-      {msg ? (
-        <p className="notice" data-tone="ok">
-          {msg}
-        </p>
-      ) : null}
-
-      <ul className="stack">
-        {rows.map((row) => (
-          <li key={row.id}>
-            <article className="card">
-              <div className="card-head">
-                <div>
-                  <h2 className="card-title">{row.functionName}</h2>
-                  <p className="card-sub">
-                    {row.requestedByKind}
-                    {row.requestedById ? `:${row.requestedById}` : ""} · branch {row.branchId} ·{" "}
-                    <time dateTime={row.createdAt} title={absoluteTime(row.createdAt)}>
-                      {relativeTime(row.createdAt)}
-                    </time>
-                  </p>
-                </div>
-                <Pill tone="pending">Pending</Pill>
-              </div>
-              <details className="disclosure">
-                <summary>Request payload</summary>
-                <pre className="well">{JSON.stringify(row.input, null, 2)}</pre>
-              </details>
-              <div className="card-actions">
-                <Button
-                  variant="primary"
-                  disabled={busy === row.id}
-                  onClick={() => void decide(row, "approved")}
-                >
-                  Approve
-                </Button>
-                <Button
-                  variant="destructive"
-                  disabled={busy === row.id}
-                  onClick={() => void decide(row, "denied")}
-                >
-                  Deny
-                </Button>
-              </div>
-            </article>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 export function BranchesView({
   branch,
@@ -208,7 +106,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
         window.setTimeout(() => setCopied(false), 1600);
       }}
     >
-      {copied ? <IconCheck size={12} /> : <IconCopy size={12} />}
+      {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
       {copied ? "Copied" : "Copy"}
     </button>
   );
@@ -265,7 +163,7 @@ function CompilationDetail({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="dialog-detail">
-        <DialogTitle>Compilation</DialogTitle>
+        <DialogTitle className="dialog-title">Compilation</DialogTitle>
         <dl className="facts">
           <div>
             <dt>When</dt>
@@ -314,8 +212,8 @@ function CompilationDetail({
           </div>
         </dl>
         <p className="dialog-note">
-          The trail records counts, not which documents changed — the projection is a hash diff, so
-          per-document history lives in git.
+          The trail records counts, not which documents changed. The projection is a hash diff, so
+          per-document history lives in Git.
         </p>
 
         {/* Revert */}
@@ -334,7 +232,7 @@ function CompilationDetail({
             <IconWarning size={14} />
             <span>
               {plural(pre.dirty.length, "uncommitted change")} in the content directory would be
-              destroyed. Commit or stash first — reverting cannot bring them back.
+              destroyed. Commit or stash first: reverting cannot bring them back.
             </span>
           </p>
         ) : confirming ? (
@@ -345,7 +243,7 @@ function CompilationDetail({
                 Restore every content file to <code>{pre.shortSha}</code>?
               </p>
               <p className="confirm-body">
-                Files are rewritten and staged in git — not committed, so you can review the diff.
+                Files are rewritten and staged in Git, not committed, so you can review the diff.
                 The index recompiles to match.
               </p>
               <div className="card-actions">
@@ -387,8 +285,8 @@ export function HistoryView({ branch }: { branch: string }) {
         <div>
           <h1 className="view-title">History</h1>
           <p className="view-sub">
-            Every projection of <code>{branch}</code> into the index — newest first. Select a run
-            for detail.
+            Every projection of <code>{branch}</code> into the index, newest first. Select a run for
+            detail.
           </p>
         </div>
       </header>

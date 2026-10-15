@@ -12,9 +12,10 @@ try {
 }
 
 const hasR2 = Boolean(process.env.S3_ENDPOINT && process.env.S3_ACCESS_KEY);
-// Opt-in: network integration tests are skipped by default (and in CI) so `pnpm test`
-// stays fast and deterministic. Run them explicitly with RUN_INTEGRATION=1.
-const runIntegration = process.env.RUN_INTEGRATION === "1" && hasR2;
+// Opt-in twice: this writes to a real, billed bucket, so RUN_INTEGRATION=1 (which
+// CI sets for the throwaway Postgres suites) is not enough on its own. Run it
+// with RUN_INTEGRATION=1 RUN_LIVE=1 and the S3_* keys.
+const runIntegration = process.env.RUN_INTEGRATION === "1" && process.env.RUN_LIVE === "1" && hasR2;
 
 describe.skipIf(!runIntegration)("R2 storage (integration)", () => {
   it("put -> exists -> get -> delete round-trips against the bucket", async () => {

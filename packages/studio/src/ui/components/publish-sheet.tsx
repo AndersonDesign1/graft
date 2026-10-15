@@ -11,10 +11,11 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { DraftChangeDto, DraftsDto, PublishResultDto, WorkspaceDto } from "../../editor-types";
 import { ApiError, api, plainError } from "../lib/api";
-import { publishVerb, collectionLabel, useStudio } from "../lib/studio";
+import { actionWord, collectionLabel, doneWord, publishVerb, useStudio } from "../lib/studio";
 import { DiffView } from "./diff-view";
-import { IconCaretDown, IconExternal, IconWarning } from "./icons";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
+import { IconCaretDown, IconCheck, IconExternal, IconWarning } from "./icons";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
+import { useConfirm } from "./ui/confirm";
 
 const KIND_LABEL: Record<DraftChangeDto["kind"], string> = {
   added: "New",
@@ -25,9 +26,13 @@ const KIND_LABEL: Record<DraftChangeDto["kind"], string> = {
 /** One sentence: what happens when the button is pressed. */
 function consequence(action: DraftsDto["publish"], workspace: WorkspaceDto | null): string {
   const where = workspace?.repository ? ` on ${workspace.repository}` : "";
+  const database = workspace?.storage === "database";
   if (action === "review") {
-    return `Opens a pull request${where} for someone to review. Nothing goes live until it is merged.`;
+    return database
+      ? "Asks someone who can publish to review them. Nothing goes live until they approve."
+      : `Opens a pull request${where} for someone to review. Nothing goes live until it is merged.`;
   }
+  if (database) return "Puts these changes on the live site straight away.";
   if (action === "commit") {
     return "Records these changes in git on this computer. Nothing is pushed; push when you are ready to deploy.";
   }
@@ -44,6 +49,7 @@ export function PublishSheet({
   onDone: () => void;
 }) {
   const { drafts, workspace, schema, navigate } = useStudio();
+  const confirm = useConfirm();
   const changes = drafts.data?.changes ?? [];
   const action = drafts.data?.publish ?? "publish";
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -93,10 +99,13 @@ export function PublishSheet({
 
   async function discard(): Promise<void> {
     const names = chosen.map((change) => change.title).join(", ");
-    if (
-      !window.confirm(`Discard your changes to ${names}? The published versions stay as they are.`)
-    )
-      return;
+    const ok = await confirm({
+      kind: "discard",
+      title: `Discard your changes to ${names}?`,
+      body: `Your edits are thrown away. The ${doneWord(action)} versions stay as they are.`,
+      action: chosen.length === 1 ? "Discard changes" : `Discard ${chosen.length} changes`,
+    });
+    if (!ok) return;
     setBusy("discard");
     try {
       await api("/drafts/discard", {
@@ -127,9 +136,6 @@ export function PublishSheet({
                 ? "Commit changes"
                 : "Publish changes"}
           </DialogTitle>
-          <DialogClose className="icon-btn sheet-close" aria-label="Close">
-            ×
-          </DialogClose>
         </header>
 
         {done ? (
@@ -148,9 +154,10 @@ export function PublishSheet({
               </>
             ) : (
               <>
-                <p className="sheet-empty-title">Everything is published.</p>
+                <p className="sheet-empty-title">Everything is {doneWord(action)}.</p>
                 <p className="sheet-empty-body">
-                  Edits you make are saved as drafts and gather here until you publish them.
+                  Edits you make are saved as drafts and gather here until you {actionWord(action)}{" "}
+                  them.
                 </p>
               </>
             )}
@@ -211,7 +218,7 @@ export function PublishSheet({
                         {collectionLabel(change.collection)} ·{" "}
                         <span data-kind={change.kind}>{KIND_LABEL[change.kind]}</span>
                       </span>
-                      <IconCaretDown size={12} className="sheet-row-caret" />
+                      <IconCaretDown size={14} className="sheet-row-caret" />
                     </button>
                     {change.kind !== "deleted" ? (
                       <button
@@ -237,7 +244,7 @@ export function PublishSheet({
                       aria-label={`Resolve ${change.title}`}
                     >
                       <p>
-                        <IconWarning size={13} />
+                        <IconWarning size={14} />
                         Someone published a newer version of this since you started editing.
                       </p>
                       <div className="sheet-conflict-choices">
@@ -343,12 +350,16 @@ function Reviews({ reviews }: { reviews: DraftsDto["reviews"] }) {
       <h3 className="sheet-subtitle">In review</h3>
       <ul>
         {reviews.map((review) => (
-          <li key={review.number}>
-            <a href={review.url} target="_blank" rel="noreferrer" className="link">
-              {review.title}
-              <IconExternal size={12} />
-            </a>
-            <span className="muted"> #{review.number}</span>
+          <li key={review.id}>
+            {review.url ? (
+              <a href={review.url} target="_blank" rel="noreferrer" className="link">
+                {review.title}
+                <IconExternal size={14} />
+              </a>
+            ) : (
+              review.title
+            )}
+            {review.number !== undefined ? <span className="muted"> #{review.number}</span> : null}
           </li>
         ))}
       </ul>
@@ -357,8 +368,8 @@ function Reviews({ reviews }: { reviews: DraftsDto["reviews"] }) {
 }
 
 /**
- * The one celebratory moment in the Studio: it happens a few times a day at
- * most, and it is the point of everything else. A wax seal presses in.
+ * The result, in words: what went where, and what to do next. A success is
+ * bright, not an animation.
  */
 function Done({ result, onClose }: { result: PublishResultDto; onClose: () => void }) {
   const count = result.published.length;
@@ -367,37 +378,45 @@ function Done({ result, onClose }: { result: PublishResultDto; onClose: () => vo
   // Every conflict resolved as "keep theirs": nothing went out, and saying
   // "Published 0 changes" would read as a failure.
   const onlyKept = count === 0 && kept > 0;
+  // Someone else published or discarded every one of them first.
+  const nothing = count === 0 && kept === 0;
   return (
     <div className="sheet-done">
-      <span className="seal" aria-hidden="true">
-        <svg viewBox="0 0 64 64" width="64" height="64">
-          <path
-            className="seal-wax"
-            d="M32 3c4 0 6 3 9 4s7 0 9 3 1 6 3 9 4 5 4 9-3 6-4 9 0 7-3 9-6 1-9 3-5 4-9 4-6-3-9-4-7 0-9-3-1-6-3-9-4-5-4-9 3-6 4-9 0-7 3-9 6-1 9-3 5-4 9-4z"
-          />
-          <path className="seal-mark" d="M22 33l7 7 14-15" />
-        </svg>
-      </span>
+      <IconCheck className="sheet-done-mark" size={20} aria-hidden="true" />
       <p className="sheet-done-title">
-        {onlyKept
-          ? `Kept the published ${kept === 1 ? "version" : "versions"}.`
-          : result.action === "review"
-            ? `Submitted ${what} for review.`
-            : result.action === "commit"
-              ? `Committed ${what}.`
-              : `Published ${what}.`}
+        {nothing
+          ? "Nothing left to publish."
+          : onlyKept
+            ? `Kept the published ${kept === 1 ? "version" : "versions"}.`
+            : result.action === "review"
+              ? `Submitted ${what} for review.`
+              : result.action === "commit"
+                ? `Committed ${what}.`
+                : `Published ${what}.`}
       </p>
       <p className="sheet-done-body">
-        {onlyKept
-          ? `Your ${kept === 1 ? "draft was" : "drafts were"} discarded; nothing else changed.`
-          : result.action === "review"
-            ? "They go live when the pull request is merged."
-            : result.action === "commit"
-              ? `Commit ${result.commit?.shortSha ?? ""} is on this computer. Push it to deploy.`
-              : "The site updates as soon as it redeploys."}
+        {nothing
+          ? "These changes were already published or discarded by someone else."
+          : onlyKept
+            ? `Your ${kept === 1 ? "draft was" : "drafts were"} discarded; nothing else changed.`
+            : result.action === "review"
+              ? `${
+                  result.reviewReasons?.length
+                    ? `This site reviews these first: ${result.reviewReasons.join("; ")}. `
+                    : ""
+                }${
+                  result.review?.url
+                    ? "They go live when the pull request is merged."
+                    : "They go live when someone who can publish approves them."
+                }`
+              : result.action === "commit"
+                ? `Commit ${result.commit?.shortSha ?? ""} is on this computer. Push it to deploy.`
+                : result.live
+                  ? "They're live on the site now."
+                  : "The site updates as soon as it redeploys."}
       </p>
       <div className="sheet-done-actions">
-        {result.review ? (
+        {result.review?.url ? (
           <a className="btn" href={result.review.url} target="_blank" rel="noreferrer">
             View pull request
           </a>

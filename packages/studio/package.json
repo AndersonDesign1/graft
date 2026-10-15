@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/studio",
-  "version": "1.0.0-beta.5",
+  "version": "1.0.0-beta.7",
   "description": "Graft's optional editing UI. Headless-first: every operation also exists on MCP and the CLI.",
   "keywords": [
     "admin-ui",
@@ -77,22 +77,19 @@
     "@codemirror/language": "^6.12.4",
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.9",
-    "@fontsource-variable/geist": "^5.3.0",
-    "@fontsource-variable/geist-mono": "^5.3.0",
-    "@fontsource-variable/instrument-sans": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
-    "@fontsource/instrument-serif": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
     "@lezer/highlight": "^1.2.3",
     "@milkdown/core": "^7.22.1",
     "@milkdown/crepe": "^7.22.1",
     "@milkdown/kit": "^7.22.1",
     "@milkdown/react": "^7.22.1",
-    "@phosphor-icons/react": "^2.1.10",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "@usegraft/tokens": "workspace:*",
     "@vitejs/plugin-react": "^5.2.0",
     "cmdk": "^1.1.1",
+    "lucide-react": "^1.37.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "sonner": "^2.0.8",
@@ -103,7 +100,7 @@
     "@codemirror/lang-markdown": "^6.5.1",
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.7",
-    "@phosphor-icons/react": "^2.1.10",
+    "lucide-react": "^1.37.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -120,7 +117,7 @@
     "@codemirror/view": {
       "optional": true
     },
-    "@phosphor-icons/react": {
+    "lucide-react": {
       "optional": true
     },
     "react": {

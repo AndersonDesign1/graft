@@ -32,6 +32,17 @@ export interface GitCommit {
   parents: { sha: string }[];
 }
 
+/** One entry of GitHub's commit list, trimmed to what history shows. */
+export interface ListedCommit {
+  sha: string;
+  commit: {
+    message: string;
+    author: { name?: string; date?: string } | null;
+    committer: { date?: string } | null;
+  };
+  author: { login: string } | null;
+}
+
 export interface NewTreeEntry {
   path: string;
   mode: "100644";
@@ -224,6 +235,17 @@ export class GitHubClient {
     }
   }
 
+  /**
+   * Point a branch at any commit, forced. Only for a branch Graft owns
+   * outright, such as its mirror pull request's, never production.
+   */
+  async setRef(branch: string, sha: string): Promise<void> {
+    await this.request("PATCH", this.repoPath(`/git/refs/heads/${encodeRef(branch)}`), {
+      sha,
+      force: true,
+    });
+  }
+
   getCommit(sha: string): Promise<GitCommit> {
     return this.request("GET", this.repoPath(`/git/commits/${sha}`));
   }
@@ -281,6 +303,32 @@ export class GitHubClient {
 
   createPull(input: { title: string; head: string; base: string; body: string }) {
     return this.request<PullRequest>("POST", this.repoPath("/pulls"), input);
+  }
+
+  /**
+   * Merge a pull request. False when GitHub won't (405: required checks or
+   * reviews still pending, or a conflict), which leaves it open for a person.
+   */
+  async mergePull(number: number, method: "merge" | "squash" = "squash"): Promise<boolean> {
+    try {
+      await this.request(
+        "PUT",
+        this.repoPath(`/pulls/${number}/merge`),
+        { merge_method: method },
+        [405, 409],
+      );
+      return true;
+    } catch (error) {
+      if (error instanceof GitHubStatus) return false;
+      throw error;
+    }
+  }
+
+  /** Commits on a branch, newest first, optionally only those touching a path. */
+  listCommits(branch: string, options: { path?: string; perPage?: number } = {}) {
+    const query = new URLSearchParams({ sha: branch, per_page: String(options.perPage ?? 30) });
+    if (options.path) query.set("path", options.path);
+    return this.request<ListedCommit[]>("GET", this.repoPath(`/commits?${query}`));
   }
 
   listOpenPulls(base: string) {

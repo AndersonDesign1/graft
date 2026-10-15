@@ -13,10 +13,12 @@
  * createActorResolver — the CLI stays issuer-free (verify-don't-mint only for
  * static dev tokens). See docs/design-notes/agent-mcp.md.
  */
+import { join } from "node:path";
 import { createActorResolver } from "@usegraft/auth";
 import { revalidateWebhookFromEnv } from "@usegraft/compiler";
 import type { FunctionActor } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
+import { databaseStoreFor } from "../content-source";
 import { assertNoStaticBranch } from "./compile";
 import { operatorName } from "./approvals";
 
@@ -98,9 +100,21 @@ export async function mcpCommand(options: McpCommandOptions): Promise<void> {
       ? { decider: { kind: "human", id: operatorName() } }
       : undefined;
 
+    const store =
+      branch !== undefined
+        ? await databaseStoreFor(config, branch.db, scopeWriteBranch(branch.scope))
+        : undefined;
     const server = createGraftMcp({
       name: "graft",
+      ...(store
+        ? {
+            store,
+            source: "database" as const,
+            syncStateFile: join(config.projectDir, ".graft", "sync.json"),
+          }
+        : {}),
       contentDir: config.contentDir,
+      projectDir: config.projectDir,
       collections: config.collections,
       functions: config.functions,
       mdxTrust: config.mdxTrust,

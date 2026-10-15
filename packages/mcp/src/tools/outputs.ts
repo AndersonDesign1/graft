@@ -36,7 +36,7 @@ const ChangeSet = z.object({
 });
 
 /** ContentChangeNotice from @usegraft/compiler. */
-const ContentRefresh = z.union([
+export const ContentRefresh = z.union([
   z.object({ ok: z.literal(true) }),
   z.object({
     ok: z.literal(false),

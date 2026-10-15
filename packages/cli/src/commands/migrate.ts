@@ -21,6 +21,7 @@ import {
 import { runDataMigration, type AnyDataMigration, type DataMigrationReport } from "@usegraft/core";
 import { createJiti } from "jiti";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
+import { assertGitSourced } from "../content-source";
 
 export type AnyMigration = AnyContentMigration | AnyDataMigration;
 
@@ -154,6 +155,11 @@ export async function migrateCommand(
       const label = `${id} [${migration.kind}] ${migration.collection.name} — ${migration.description}`;
 
       if (migration.kind === "content") {
+        assertGitSourced(
+          config,
+          `content migration ${id}, which rewrites the files,`,
+          "Run graft pull, make the change in the files, check them with graft check, then graft push.",
+        );
         const report = await runContentMigration({
           contentDir: config.contentDir,
           migration,

@@ -1,20 +1,27 @@
-import { IconContext } from "@phosphor-icons/react";
+import { LucideProvider } from "lucide-react";
 import { Toaster } from "sonner";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { EditorComponentList } from "@usegraft/contracts";
 import type { ContentTree } from "../types";
 import { CollectionMark } from "./components/collection-icon";
 import { CreateDialog } from "./components/create-dialog";
+import { ErrorBoundary } from "./components/error-boundary";
 import {
-  IconApprovals,
+  IconAgents,
+  IconInbox,
+  IconMedia,
   IconBranches,
   IconCaretDown,
+  IconCheck,
   IconHistory,
+  IconHome,
+  IconMenu,
   IconMoon,
   IconOverview,
   IconSchema,
   IconSearch,
   IconSettings,
+  IconSignOut,
   IconSun,
   IconSystem,
   type IconComponent,
@@ -22,17 +29,29 @@ import {
 import { setEditorComponentSpecs } from "./components/mdx-card";
 import { CommandPalette } from "./components/palette";
 import { PublishSheet } from "./components/publish-sheet";
-import { SignIn } from "./components/sign-in";
+import { ListPane } from "./components/list-pane";
+import { AcceptInvite, SignIn } from "./components/sign-in";
+import { ConfirmProvider } from "./components/ui/confirm";
+import { Dialog, DialogContent } from "./components/ui/dialog";
 import {
   Menu,
   MenuContent,
   MenuItem,
-  MenuLabel,
+  MenuSection,
   MenuSeparator,
   MenuTrigger,
 } from "./components/ui/menu";
+import { TooltipProvider } from "./components/ui/tooltip";
 import { SIGNED_OUT_EVENT, qs } from "./lib/api";
-import { DEV_VIEWS, currentBranch, setBranchInUrl, useRoute, type DevView } from "./lib/route";
+import {
+  DEV_VIEWS,
+  currentBranch,
+  setBranchInUrl,
+  toHash,
+  useRoute,
+  type DevView,
+  type Route,
+} from "./lib/route";
 import {
   StudioProvider,
   collectionLabel,
@@ -46,7 +65,10 @@ import { useResource } from "./lib/use-resource";
 import { CollectionView } from "./views/collection";
 import { EntryView } from "./views/entry";
 import { HomeView } from "./views/home";
-import { ApprovalsView, BranchesView, HistoryView } from "./views/operations";
+import { BranchesView, HistoryView } from "./views/operations";
+import { AgentsView } from "./views/agents";
+import { InboxView } from "./views/inbox";
+import { MediaView } from "./views/media";
 import { OverviewView } from "./views/overview";
 import { SchemaView } from "./views/schema";
 import { SettingsView } from "./views/settings";
@@ -56,9 +78,13 @@ const DEV_NAV: Array<{ view: DevView; label: string; Icon: IconComponent }> = [
   { view: "schema", label: "Schema", Icon: IconSchema },
   { view: "history", label: "History", Icon: IconHistory },
   { view: "branches", label: "Branches", Icon: IconBranches },
-  { view: "approvals", label: "Approvals", Icon: IconApprovals },
+  { view: "agents", label: "Agents", Icon: IconAgents },
   { view: "settings", label: "Settings", Icon: IconSettings },
 ];
+
+/** The command key as this keyboard labels it. */
+const MOD_KEY =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
 
 const THEME: Record<Theme, { label: string; Icon: IconComponent }> = {
   system: { label: "Match system", Icon: IconSystem },
@@ -73,14 +99,24 @@ export function StudioApp({ branch: initialBranch = "main" }: { branch?: string 
     window.addEventListener(SIGNED_OUT_EVENT, onSignedOut);
     return () => window.removeEventListener(SIGNED_OUT_EVENT, onSignedOut);
   }, []);
+  // An invitation link opens Studio with ?invite=, signed in or not.
+  const [invite] = useState(() => new URLSearchParams(window.location.search).get("invite"));
 
   return (
-    // One place decides icon weight and size, so glyphs stay optically
-    // consistent with the 1px hairlines they sit beside.
-    <IconContext.Provider value={{ size: 16, weight: "regular" }}>
-      {signedOut ? <SignIn /> : <Shell initialBranch={initialBranch} />}
-      <Toaster position="bottom-right" closeButton toastOptions={{ className: "sonner-toast" }} />
-    </IconContext.Provider>
+    // One place decides icon size and stroke: Lucide at 16px and 1.75, as in
+    // the docs.
+    <LucideProvider size={16} strokeWidth={1.75}>
+      {invite ? (
+        <AcceptInvite token={invite} />
+      ) : signedOut ? (
+        <SignIn />
+      ) : (
+        <ErrorBoundary scope="page">
+          <Shell initialBranch={initialBranch} />
+        </ErrorBoundary>
+      )}
+      <Toaster position="bottom-right" closeButton visibleToasts={1} duration={5000} />
+    </LucideProvider>
   );
 }
 
@@ -89,6 +125,9 @@ function Shell({ initialBranch }: { initialBranch: string }) {
   const [route, navigate] = useRoute();
   const [theme, setTheme] = useTheme();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  // Choosing a destination in the phone drawer closes it.
+  useEffect(() => setNavOpen(false), [route]);
   const [publishOpen, setPublishOpen] = useState(false);
   const [creating, setCreating] = useState<string | null>(null);
   const resources = useStudioResources();
@@ -138,24 +177,40 @@ function Shell({ initialBranch }: { initialBranch: string }) {
 
   const collections = editableCollections(schema.data);
   const unpublished = drafts.data?.changes.length ?? 0;
-  const pending = approvals.data?.approvals.length ?? 0;
+  // What the inbox holds: agents asking first, and changes sent for review.
+  const pending = (approvals.data?.approvals.length ?? 0) + (drafts.data?.reviews.length ?? 0);
   const user = workspace.data?.user;
+  // Agent tokens are an admin's to give out; a Studio with no sign-in is its owner's.
+  const canManageAgents = workspace.data ? !user || user.scopes.includes("studio:settings") : false;
 
   let main: React.ReactNode;
   if (route.view === "entry" && route.collection && route.slug) {
+    // Panes, not pages: the collection stays beside the open entry.
     main = (
-      <EntryView
-        key={`${route.collection}/${route.slug}`}
-        collection={route.collection}
-        slug={route.slug}
-      />
+      <div className="workspace">
+        <ListPane collection={route.collection} selected={route.slug} />
+        <EntryView
+          key={`${route.collection}/${route.slug}`}
+          collection={route.collection}
+          slug={route.slug}
+        />
+      </div>
     );
   } else if (route.view === "collection" && route.collection) {
     main = <CollectionView collection={route.collection} />;
   } else if (route.view === "overview") {
-    main = <OverviewView branch={branch} tree={tree} navigate={navigate} />;
+    main = (
+      <OverviewView
+        branch={branch}
+        tree={tree}
+        navigate={navigate}
+        canWrite={workspace.data?.canWrite ?? false}
+      />
+    );
   } else if (route.view === "schema") main = <SchemaView />;
-  else if (route.view === "approvals") main = <ApprovalsView onDecided={approvals.refresh} />;
+  else if (route.view === "inbox") main = <InboxView onDecided={approvals.refresh} />;
+  else if (route.view === "media") main = <MediaView />;
+  else if (route.view === "agents") main = <AgentsView />;
   else if (route.view === "branches")
     main = <BranchesView branch={branch} onSelectBranch={selectBranch} />;
   else if (route.view === "history") main = <HistoryView branch={branch} />;
@@ -163,234 +218,315 @@ function Shell({ initialBranch }: { initialBranch: string }) {
     main = <SettingsView branch={branch} theme={theme} setTheme={setTheme} tree={tree.data} />;
   } else main = <HomeView />;
 
-  const crumbs = (
-    <nav className="crumbs" aria-label="Breadcrumb">
-      <a href="#/" className="crumb">
-        Home
-      </a>
-      {route.collection ? (
-        <>
-          <span className="crumb-sep" aria-hidden="true">
-            /
-          </span>
-          <a
-            href={`#/c/${encodeURIComponent(route.collection)}`}
-            className="crumb"
-            aria-current={route.view === "collection" ? "page" : undefined}
-          >
-            {collectionLabel(route.collection)}
-          </a>
-        </>
-      ) : null}
-      {developer ? (
-        <>
-          <span className="crumb-sep" aria-hidden="true">
-            /
-          </span>
-          <span className="crumb" aria-current="page">
-            {DEV_NAV.find((item) => item.view === route.view)?.label}
-          </span>
-        </>
-      ) : null}
-    </nav>
+  const userName = user?.name ?? user?.id ?? "Local editor";
+  const savingTo =
+    workspace.data?.storage === "github"
+      ? "Saving to GitHub"
+      : workspace.data?.storage === "database"
+        ? "Saving to the site's database"
+        : "Saving on this computer";
+
+  const nav = (
+    <SideNav
+      route={route}
+      collections={collections.map((c) => c.name)}
+      drafts={drafts.data?.changes ?? []}
+      developer={developer}
+      devOpen={devOpen}
+      onToggleDev={() => setDevOpen((v) => !v)}
+      pending={pending}
+      canManageAgents={canManageAgents}
+    />
   );
 
   return (
     <StudioProvider value={state}>
-      <div className="shell">
-        <aside className="side" aria-label="Studio">
-          <div className="side-head">
-            <a href="#/" className="wordmark" aria-label="Studio home">
-              graft<b>.</b>
-            </a>
-            <span className="side-site" title={workspace.data?.repository ?? undefined}>
-              {workspace.data?.repository?.split("/")[1] ?? "studio"}
-            </span>
-          </div>
-
-          <button type="button" className="side-search" onClick={() => setPaletteOpen(true)}>
-            <IconSearch size={14} />
-            <span>Search</span>
-            <kbd>⌘K</kbd>
-          </button>
-
-          <nav className="side-nav" aria-label="Content">
-            <a
-              href="#/"
-              className="side-item"
-              data-active={route.view === "home" || undefined}
-              aria-current={route.view === "home" ? "page" : undefined}
-            >
-              <IconOverview size={15} />
-              <span className="side-text">Home</span>
-            </a>
-            <p className="side-label">Content</p>
-            {collections.map((collection) => {
-              const active = route.collection === collection.name && !developer;
-              const changed = (drafts.data?.changes ?? []).filter(
-                (c) => c.collection === collection.name,
-              ).length;
-              return (
-                <a
-                  key={collection.name}
-                  href={`#/c/${encodeURIComponent(collection.name)}`}
-                  className="side-item"
-                  data-active={active || undefined}
-                  aria-current={active ? "page" : undefined}
+      <ConfirmProvider>
+        <TooltipProvider delay={500}>
+          <div className="shell">
+            <header className="top">
+              <div className="top-start">
+                <button
+                  type="button"
+                  className="icon-btn top-menu"
+                  aria-label="Open navigation"
+                  onClick={() => setNavOpen(true)}
                 >
-                  <CollectionMark name={collection.name} authority="file" size="sm" />
-                  <span className="side-text">{collectionLabel(collection.name)}</span>
-                  {changed > 0 ? (
-                    <span
-                      className="side-dot"
-                      title={`${changed} unpublished`}
-                      aria-label={`${changed} unpublished`}
-                    />
-                  ) : null}
-                </a>
-              );
-            })}
-          </nav>
-
-          <div className="side-foot">
-            <button
-              type="button"
-              className="side-label side-toggle"
-              aria-expanded={devOpen}
-              onClick={() => setDevOpen((v) => !v)}
-            >
-              Developer
-              <IconCaretDown size={11} />
-            </button>
-            {devOpen ? (
-              <nav className="side-nav" aria-label="Developer">
-                {DEV_NAV.map(({ view, label, Icon }) => (
-                  <a
-                    key={view}
-                    href={`#/dev/${view}`}
-                    className="side-item"
-                    data-active={route.view === view || undefined}
-                    aria-current={route.view === view ? "page" : undefined}
-                  >
-                    <Icon size={15} />
-                    <span className="side-text">{label}</span>
-                    {view === "approvals" && pending > 0 ? (
-                      <span className="side-count" data-numeric="">
-                        {pending}
-                      </span>
-                    ) : null}
-                  </a>
-                ))}
-              </nav>
-            ) : null}
-
-            <Menu>
-              <MenuTrigger className="side-user">
-                <span className="avatar" aria-hidden="true">
-                  {(user?.name ?? user?.id ?? "You").slice(0, 1).toUpperCase()}
-                </span>
-                <span className="side-user-text">
-                  <span className="side-user-name">{user?.name ?? user?.id ?? "Local editor"}</span>
-                  <span className="side-user-role">
-                    {workspace.data?.storage === "github"
-                      ? `Saving to ${workspace.data.branch ? "GitHub" : "GitHub"}`
-                      : "Saving on this computer"}
+                  <IconMenu />
+                </button>
+                <a href="#/" className="wordmark" aria-label="Studio home">
+                  graft.
+                  <span className="wordmark-sep" aria-hidden="true">
+                    /
                   </span>
-                </span>
-              </MenuTrigger>
-              <MenuContent align="start" side="top">
-                <MenuLabel>Appearance</MenuLabel>
-                {(Object.keys(THEME) as Theme[]).map((key) => {
-                  const { label, Icon } = THEME[key];
-                  return (
-                    <MenuItem
-                      key={key}
-                      data-active={theme === key || undefined}
-                      onClick={() => setTheme(key)}
-                    >
-                      <Icon size={14} />
-                      <span className="menu-item-label">{label}</span>
-                    </MenuItem>
-                  );
-                })}
-                {workspace.data?.sessions ? (
-                  <>
-                    <MenuSeparator />
-                    <MenuItem
-                      onClick={() => {
-                        void fetch("/api/studio/v1/auth/sign-out", {
-                          method: "POST",
-                          credentials: "same-origin",
-                        }).then(() => window.location.reload());
-                      }}
-                    >
-                      <span className="menu-item-label">Sign out</span>
-                    </MenuItem>
-                  </>
-                ) : null}
-              </MenuContent>
-            </Menu>
-          </div>
-        </aside>
+                  <span className="wordmark-surface">Studio</span>
+                </a>
+                {workspace.data?.storage === "github" && workspace.data.repositoryUrl ? (
+                  <a
+                    className="top-repo"
+                    href={workspace.data.repositoryUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="The repository your content lives in"
+                  >
+                    {workspace.data.repository}
+                    {workspace.data.branch ? ` · ${workspace.data.branch}` : ""}
+                  </a>
+                ) : (
+                  <a
+                    className="top-branch"
+                    href="#/dev/branches"
+                    title="The branch Studio reads and writes"
+                  >
+                    <IconBranches size={14} />
+                    <span>{branch}</span>
+                  </a>
+                )}
+              </div>
 
-        <div className="stage">
-          <header className="bar">
-            {crumbs}
-            <span className="bar-spacer" />
-            {workspace.data?.storage === "github" && workspace.data.repositoryUrl ? (
-              <a
-                className="bar-repo"
-                href={workspace.data.repositoryUrl}
-                target="_blank"
-                rel="noreferrer"
-                title="The repository your content lives in"
+              <button
+                type="button"
+                className="top-search"
+                aria-label="Search"
+                aria-keyshortcuts="Meta+K Control+K"
+                onClick={() => setPaletteOpen(true)}
               >
-                {workspace.data.repository}
-                {workspace.data.branch ? (
-                  <span className="muted"> · {workspace.data.branch}</span>
-                ) : null}
-              </a>
-            ) : null}
-            <button
-              type="button"
-              className="publish"
-              data-pending={unpublished > 0 || undefined}
-              onClick={() => setPublishOpen(true)}
-              disabled={workspace.data ? !workspace.data.canWrite : false}
-            >
-              {publishVerb(drafts.data?.publish)}
-              {unpublished > 0 ? (
-                <span
-                  className="publish-count"
-                  data-numeric=""
-                  aria-label={`${unpublished} unpublished`}
-                >
-                  {unpublished}
+                <IconSearch />
+                <span>Search</span>
+                <span className="top-search-keys" aria-hidden="true">
+                  <kbd>{MOD_KEY}</kbd>
+                  <kbd>K</kbd>
                 </span>
-              ) : null}
-            </button>
-          </header>
-          <main className="main">{main}</main>
-        </div>
+              </button>
 
-        <PublishSheet
-          open={publishOpen}
-          onOpenChange={setPublishOpen}
-          onDone={() => {
-            drafts.refresh();
-          }}
-        />
-        <CreateDialog
-          collection={creating}
-          onOpenChange={(open) => !open && setCreating(null)}
-          onCreated={drafts.refresh}
-        />
-        <CommandPalette
-          open={paletteOpen}
-          onOpenChange={setPaletteOpen}
-          components={editorComponents.data?.components ?? []}
-        />
-      </div>
+              <div className="top-end">
+                <button
+                  type="button"
+                  className="publish"
+                  data-pending={unpublished > 0 || undefined}
+                  onClick={() => setPublishOpen(true)}
+                  disabled={workspace.data ? !workspace.data.canWrite : false}
+                >
+                  {publishVerb(drafts.data?.publish)}
+                  {unpublished > 0 ? (
+                    <span
+                      className="publish-count"
+                      data-numeric=""
+                      aria-label={`${unpublished} ${unpublished === 1 ? "draft" : "drafts"}`}
+                    >
+                      {unpublished}
+                    </span>
+                  ) : null}
+                </button>
+                <Menu>
+                  <MenuTrigger className="top-account" aria-label={`${userName}, ${savingTo}`}>
+                    <span className="avatar" aria-hidden="true">
+                      {userName.slice(0, 1).toUpperCase()}
+                    </span>
+                  </MenuTrigger>
+                  <MenuContent align="end">
+                    <div className="menu-head">
+                      <b>{userName}</b>
+                      <span>{savingTo}</span>
+                    </div>
+                    <MenuSection label="Appearance">
+                      {(Object.keys(THEME) as Theme[]).map((key) => {
+                        const { label, Icon } = THEME[key];
+                        return (
+                          <MenuItem
+                            key={key}
+                            data-active={theme === key || undefined}
+                            onClick={() => setTheme(key)}
+                          >
+                            <Icon />
+                            <span className="menu-item-label">{label}</span>
+                            {theme === key ? <IconCheck aria-label="Selected" /> : null}
+                          </MenuItem>
+                        );
+                      })}
+                    </MenuSection>
+                    {workspace.data?.sessions ? (
+                      <>
+                        <MenuSeparator />
+                        <MenuItem
+                          onClick={() => {
+                            void fetch("/api/studio/v1/auth/sign-out", {
+                              method: "POST",
+                              credentials: "same-origin",
+                            }).then(() => window.location.reload());
+                          }}
+                        >
+                          <IconSignOut />
+                          <span className="menu-item-label">Sign out</span>
+                        </MenuItem>
+                      </>
+                    ) : null}
+                  </MenuContent>
+                </Menu>
+              </div>
+            </header>
+
+            <aside className="side" aria-label="Studio">
+              {nav}
+            </aside>
+
+            <main className="main">
+              {/* Keyed by route, so leaving a view that crashed brings the panel back. */}
+              <ErrorBoundary key={toHash(route)} scope="view">
+                {main}
+              </ErrorBoundary>
+            </main>
+
+            {/* Below 48rem the sidebar lives here, behind the menu button. */}
+            <Dialog open={navOpen} onOpenChange={setNavOpen}>
+              <DialogContent className="drawer" aria-label="Navigation">
+                <div className="drawer-head">
+                  <a href="#/" className="wordmark" onClick={() => setNavOpen(false)}>
+                    graft.
+                    <span className="wordmark-sep" aria-hidden="true">
+                      /
+                    </span>
+                    <span className="wordmark-surface">Studio</span>
+                  </a>
+                </div>
+                {nav}
+              </DialogContent>
+            </Dialog>
+
+            <PublishSheet
+              open={publishOpen}
+              onOpenChange={setPublishOpen}
+              onDone={() => {
+                drafts.refresh();
+              }}
+            />
+            <CreateDialog
+              collection={creating}
+              onOpenChange={(open) => !open && setCreating(null)}
+              onCreated={drafts.refresh}
+            />
+            <CommandPalette
+              open={paletteOpen}
+              onOpenChange={setPaletteOpen}
+              components={editorComponents.data?.components ?? []}
+            />
+          </div>
+        </TooltipProvider>
+      </ConfirmProvider>
     </StudioProvider>
+  );
+}
+
+/** The navigation, shared by the sidebar and the phone drawer. */
+function SideNav({
+  route,
+  collections,
+  drafts,
+  developer,
+  devOpen,
+  onToggleDev,
+  pending,
+  canManageAgents,
+}: {
+  route: Route;
+  collections: readonly string[];
+  drafts: readonly { collection: string }[];
+  developer: boolean;
+  devOpen: boolean;
+  onToggleDev: () => void;
+  pending: number;
+  canManageAgents: boolean;
+}) {
+  return (
+    <>
+      <nav className="side-nav" aria-label="Content">
+        <a
+          href="#/"
+          className="side-item"
+          data-active={route.view === "home" || undefined}
+          aria-current={route.view === "home" ? "page" : undefined}
+        >
+          <IconHome />
+          <span className="side-text">Home</span>
+        </a>
+        <a
+          href="#/inbox"
+          className="side-item"
+          data-active={route.view === "inbox" || undefined}
+          aria-current={route.view === "inbox" ? "page" : undefined}
+        >
+          <IconInbox />
+          <span className="side-text">Inbox</span>
+          {pending > 0 ? (
+            <span className="side-count" data-numeric="" aria-label={`${pending} waiting`}>
+              {pending}
+            </span>
+          ) : null}
+        </a>
+        <a
+          href="#/media"
+          className="side-item"
+          data-active={route.view === "media" || undefined}
+          aria-current={route.view === "media" ? "page" : undefined}
+        >
+          <IconMedia />
+          <span className="side-text">Media</span>
+        </a>
+        <p className="side-label">Content</p>
+        {collections.map((name) => {
+          const active = route.collection === name && !developer;
+          const count = drafts.filter((change) => change.collection === name).length;
+          return (
+            <a
+              key={name}
+              href={`#/c/${encodeURIComponent(name)}`}
+              className="side-item"
+              data-active={active || undefined}
+              aria-current={active ? "page" : undefined}
+            >
+              <CollectionMark name={name} authority="file" />
+              <span className="side-text">{collectionLabel(name)}</span>
+              {count > 0 ? (
+                <span
+                  className="side-dot"
+                  title={`${count} ${count === 1 ? "draft" : "drafts"}`}
+                  aria-label={`${count} ${count === 1 ? "draft" : "drafts"}`}
+                />
+              ) : null}
+            </a>
+          );
+        })}
+      </nav>
+
+      <div className="side-foot">
+        <button
+          type="button"
+          className="side-label side-toggle"
+          aria-expanded={devOpen}
+          onClick={onToggleDev}
+        >
+          Developer
+          <IconCaretDown size={14} />
+        </button>
+        {devOpen ? (
+          <nav className="side-nav" aria-label="Developer">
+            {DEV_NAV.filter((item) => item.view !== "agents" || canManageAgents).map(
+              ({ view, label, Icon }) => (
+                <a
+                  key={view}
+                  href={`#/dev/${view}`}
+                  className="side-item"
+                  data-active={route.view === view || undefined}
+                  aria-current={route.view === view ? "page" : undefined}
+                >
+                  <Icon />
+                  <span className="side-text">{label}</span>
+                </a>
+              ),
+            )}
+          </nav>
+        ) : null}
+      </div>
+    </>
   );
 }

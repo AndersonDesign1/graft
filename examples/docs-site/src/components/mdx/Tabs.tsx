@@ -28,7 +28,10 @@ import {
   TanstackIcon,
   TypescriptIcon,
 } from "../icons/FrameworkIcons";
+import { SquareTerminal } from "lucide-react";
 import { PM_ICONS } from "./pm-icons";
+
+const BAR_ICON = { size: 15, strokeWidth: 1.5, "aria-hidden": true } as const;
 
 function getTabIcon(rawLabel: string): ReactNode {
   const norm = rawLabel.toLowerCase().trim();
@@ -140,6 +143,11 @@ function getTabIcon(rawLabel: string): ReactNode {
   return null;
 }
 
+/** Every label names a package manager: the tabs are one code block. */
+function isPackageManagerSet(labels: string[]): boolean {
+  return labels.every((label) => Object.hasOwn(PM_ICONS, label.toLowerCase().trim()));
+}
+
 export interface TabsProps {
   /** Comma-separated tab labels, in order, e.g. "npm, pnpm, bun". */
   labels: string;
@@ -159,8 +167,10 @@ export function Tabs({ labels, children }: TabsProps) {
   const count = Math.min(names.length, panels.length);
   if (count === 0) return null;
 
+  const variant = isPackageManagerSet(names.slice(0, count)) ? "code" : "section";
+
   return (
-    <div className="tabs" data-tabs={count}>
+    <div className="tabs" data-tabs={count} data-variant={variant}>
       {names.slice(0, count).map((label, index) => (
         <input
           key={`input-${label}`}
@@ -172,6 +182,7 @@ export function Tabs({ labels, children }: TabsProps) {
         />
       ))}
       <div className="tab-list">
+        {variant === "code" && <SquareTerminal className="tab-list-icon" {...BAR_ICON} />}
         {names.slice(0, count).map((label, index) => {
           const icon = getTabIcon(label);
           return (

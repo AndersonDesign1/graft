@@ -9,30 +9,60 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { EntryList, EntryStatus, EntrySummary } from "../../editor-types";
+import type { DraftsDto, EntryList, EntryStatus, EntrySummary } from "../../editor-types";
 import type { SchemaFieldDto } from "../../types";
 import { AssetThumb, formatCell } from "../components/fields";
-import { IconCaretDown, IconClose, IconSearch, IconSort, IconWarning } from "../components/icons";
-import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from "../components/ui/menu";
+import {
+  IconCaretDown,
+  IconClose,
+  IconPlus,
+  IconSearch,
+  IconSort,
+  IconWarning,
+} from "../components/icons";
+import { useConfirm } from "../components/ui/confirm";
+import { Menu, MenuContent, MenuItem, MenuSection, MenuTrigger } from "../components/ui/menu";
 import { api, plainError, qs } from "../lib/api";
 import { humanise, labelOf, titleField } from "../lib/fields";
 import { relativeTime } from "../lib/format";
-import { collectionLabel, publishVerb, singular, useStudio } from "../lib/studio";
+import {
+  actionWord,
+  collectionLabel,
+  doneWord,
+  publishVerb,
+  singular,
+  useStudio,
+} from "../lib/studio";
 
+/** How a row names its state. A published entry is the resting state: nothing. */
 const STATUS_TEXT: Record<EntryStatus, string> = {
-  published: "Published",
-  changed: "Changed",
-  new: "New",
+  published: "",
+  changed: "Draft",
+  new: "New draft",
   deleted: "Deleted",
 };
 
-export function StatusLabel({ status, conflict }: { status: EntryStatus; conflict?: boolean }) {
+/**
+ * The entry's state, as a mark and a word. The word follows what the
+ * workspace's action is called: "Committed" on a laptop, "Published" when
+ * Studio publishes.
+ */
+export function StatusLabel({
+  status,
+  conflict,
+  action,
+}: {
+  status: EntryStatus;
+  conflict?: boolean;
+  action?: DraftsDto["publish"];
+}) {
+  const done = doneWord(action);
   if (conflict) {
     return (
       <span
         className="status"
         data-status="conflict"
-        title="Published again by someone else since you started editing"
+        title={`Someone else ${done} this entry after you started editing`}
       >
         <span className="status-dot" />
         Needs a decision
@@ -43,12 +73,12 @@ export function StatusLabel({ status, conflict }: { status: EntryStatus; conflic
     <span className="status" data-status={status}>
       <span className="status-dot" />
       {status === "published"
-        ? "Published"
+        ? done.charAt(0).toUpperCase() + done.slice(1)
         : status === "new"
-          ? "Not published yet"
+          ? "New draft"
           : status === "changed"
-            ? "Unpublished changes"
-            : "Deletion not published"}
+            ? "Draft"
+            : `Deleted, not ${done} yet`}
     </span>
   );
 }
@@ -80,6 +110,7 @@ const MAX_PAGE = 500;
 
 export function CollectionView({ collection }: { collection: string }) {
   const { schema, workspace, drafts, navigate, openCreate } = useStudio();
+  const confirm = useConfirm();
   const meta = schema.data?.collections.find((c) => c.name === collection);
   const fields = useMemo(() => meta?.fields ?? [], [meta]);
   const columns = useMemo(() => columnsFor(fields), [fields]);
@@ -200,19 +231,32 @@ export function CollectionView({ collection }: { collection: string }) {
     if (chosen.length === 0) return;
     const noun =
       chosen.length === 1 ? (chosen[0]?.title ?? "1 entry") : `${chosen.length} ${collection}`;
-    if (
-      kind === "delete" &&
-      !window.confirm(`Delete ${noun}? Published entries stay live until you publish the deletion.`)
-    )
-      return;
-    if (kind === "discard" && !window.confirm(`Discard unpublished changes to ${noun}?`)) return;
+    const what = chosen.length === 1 ? singular(collection) : `${chosen.length} entries`;
+    if (kind === "delete") {
+      const ok = await confirm({
+        kind: "delete",
+        title: `Delete ${chosen.length === 1 ? `“${noun}”` : noun}?`,
+        body: `They stay live until you ${actionWord(drafts.data?.publish)} the deletion.`,
+        action: `Delete ${what}`,
+      });
+      if (!ok) return;
+    }
+    if (kind === "discard") {
+      const ok = await confirm({
+        kind: "discard",
+        title: `Discard your changes to ${chosen.length === 1 ? `“${noun}”` : noun}?`,
+        body: `Your edits are thrown away. The ${doneWord(drafts.data?.publish)} versions stay as they are.`,
+        action: "Discard changes",
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     try {
       if (kind === "publish") {
         const paths = chosen.filter((item) => item.status !== "published").map((item) => item.path);
         if (paths.length === 0) {
-          toast("Nothing to publish", {
-            description: "The selected entries have no unpublished changes.",
+          toast(`Nothing to ${actionWord(drafts.data?.publish)}`, {
+            description: "The selected entries have no drafts.",
           });
         } else {
           await api("/drafts/publish", { method: "POST", body: JSON.stringify({ paths }) });
@@ -232,7 +276,12 @@ export function CollectionView({ collection }: { collection: string }) {
           });
         }
         toast.success(`Deleted ${noun}`, {
-          description: "Publish the deletion to remove it from the site.",
+          description:
+            drafts.data?.publish === "commit"
+              ? "Commit the deletion to record it in Git."
+              : drafts.data?.publish === "review"
+                ? "Submit the deletion for review."
+                : "Publish the deletion to remove it from the site.",
         });
       }
       setSelected(new Set());
@@ -260,12 +309,8 @@ export function CollectionView({ collection }: { collection: string }) {
           </p>
         </div>
         {canWrite ? (
-          <button
-            type="button"
-            className="btn"
-            data-variant="primary"
-            onClick={() => openCreate(collection)}
-          >
+          <button type="button" className="btn" onClick={() => openCreate(collection)}>
+            <IconPlus aria-hidden="true" />
             New {singular(collection)}
           </button>
         ) : null}
@@ -287,7 +332,7 @@ export function CollectionView({ collection }: { collection: string }) {
               aria-label="Clear search"
               onClick={() => setQ("")}
             >
-              <IconClose size={12} />
+              <IconClose size={14} />
             </button>
           ) : null}
         </label>
@@ -303,7 +348,13 @@ export function CollectionView({ collection }: { collection: string }) {
               data-active={status === value || undefined}
               onClick={() => setStatus(value)}
             >
-              {value === "all" ? "All" : value === "unpublished" ? "Unpublished" : "Published"}
+              {value === "all"
+                ? "All"
+                : value === "unpublished"
+                  ? "Drafts"
+                  : drafts.data?.publish === "commit"
+                    ? "Committed"
+                    : "Published"}
               {value === "unpublished" && list?.counts.unpublished ? (
                 <span className="segment-count" data-numeric="">
                   {list.counts.unpublished}
@@ -329,42 +380,43 @@ export function CollectionView({ collection }: { collection: string }) {
                     )}
                   </b>
                 ) : null}
-                <IconCaretDown size={11} />
+                <IconCaretDown size={14} />
               </MenuTrigger>
               <MenuContent>
-                <MenuLabel>{field ? labelOf(field) : humanise(facet.field)}</MenuLabel>
-                <MenuItem
-                  onClick={() =>
-                    setWhere((prev) => {
-                      const next = { ...prev };
-                      delete next[facet.field];
-                      return next;
-                    })
-                  }
-                >
-                  <span className="menu-item-label">Any</span>
-                </MenuItem>
-                {facet.values.map((value) => (
+                <MenuSection label={field ? labelOf(field) : humanise(facet.field)}>
                   <MenuItem
-                    key={value.value}
-                    data-active={active === value.value || undefined}
-                    onClick={() => setWhere((prev) => ({ ...prev, [facet.field]: value.value }))}
+                    onClick={() =>
+                      setWhere((prev) => {
+                        const next = { ...prev };
+                        delete next[facet.field];
+                        return next;
+                      })
+                    }
                   >
-                    <span className="menu-item-label">
-                      {formatCell(
-                        field,
-                        value.value === "true"
-                          ? true
-                          : value.value === "false"
-                            ? false
-                            : value.value,
-                      )}
-                    </span>
-                    <span className="menu-item-hint" data-numeric="">
-                      {value.count}
-                    </span>
+                    <span className="menu-item-label">Any</span>
                   </MenuItem>
-                ))}
+                  {facet.values.map((value) => (
+                    <MenuItem
+                      key={value.value}
+                      data-active={active === value.value || undefined}
+                      onClick={() => setWhere((prev) => ({ ...prev, [facet.field]: value.value }))}
+                    >
+                      <span className="menu-item-label">
+                        {formatCell(
+                          field,
+                          value.value === "true"
+                            ? true
+                            : value.value === "false"
+                              ? false
+                              : value.value,
+                        )}
+                      </span>
+                      <span className="menu-item-hint" data-numeric="">
+                        {value.count}
+                      </span>
+                    </MenuItem>
+                  ))}
+                </MenuSection>
               </MenuContent>
             </Menu>
           );
@@ -374,7 +426,7 @@ export function CollectionView({ collection }: { collection: string }) {
 
         <Menu>
           <MenuTrigger className="filter">
-            <IconSort size={13} />
+            <IconSort size={14} />
             {sort.key === "site"
               ? "Default order"
               : sort.key === "title"
@@ -385,32 +437,33 @@ export function CollectionView({ collection }: { collection: string }) {
             {sort.key !== "site" ? (sort.dir === "asc" ? " ↑" : " ↓") : null}
           </MenuTrigger>
           <MenuContent align="end">
-            <MenuLabel>Sort by</MenuLabel>
-            {[
-              { key: "site", label: "Default order" },
-              { key: "title", label: "Name" },
-              ...(local ? [{ key: "updated", label: "Last edited" }] : []),
-              ...columns.map((field) => ({ key: field.name, label: labelOf(field) })),
-            ].map((option) => (
-              <MenuItem
-                key={option.key}
-                data-active={sort.key === option.key || undefined}
-                onClick={() =>
-                  setSort((prev) => ({
-                    key: option.key,
-                    dir:
-                      prev.key === option.key && prev.dir === "asc" && option.key !== "site"
-                        ? "desc"
-                        : "asc",
-                  }))
-                }
-              >
-                <span className="menu-item-label">{option.label}</span>
-                {sort.key === option.key && option.key !== "site" ? (
-                  <span className="menu-item-hint">{sort.dir === "asc" ? "↑" : "↓"}</span>
-                ) : null}
-              </MenuItem>
-            ))}
+            <MenuSection label="Sort by">
+              {[
+                { key: "site", label: "Default order" },
+                { key: "title", label: "Name" },
+                ...(local ? [{ key: "updated", label: "Last edited" }] : []),
+                ...columns.map((field) => ({ key: field.name, label: labelOf(field) })),
+              ].map((option) => (
+                <MenuItem
+                  key={option.key}
+                  data-active={sort.key === option.key || undefined}
+                  onClick={() =>
+                    setSort((prev) => ({
+                      key: option.key,
+                      dir:
+                        prev.key === option.key && prev.dir === "asc" && option.key !== "site"
+                          ? "desc"
+                          : "asc",
+                    }))
+                  }
+                >
+                  <span className="menu-item-label">{option.label}</span>
+                  {sort.key === option.key && option.key !== "site" ? (
+                    <span className="menu-item-hint">{sort.dir === "asc" ? "↑" : "↓"}</span>
+                  ) : null}
+                </MenuItem>
+              ))}
+            </MenuSection>
           </MenuContent>
         </Menu>
       </div>
@@ -443,7 +496,7 @@ export function CollectionView({ collection }: { collection: string }) {
                   }
                 />
               </th>
-              <th className="col-title">Name</th>
+              <th className="col-title">Title</th>
               {columns.map((field) => (
                 <th key={field.name} data-align={field.type === "number" ? "end" : undefined}>
                   {labelOf(field)}
@@ -489,18 +542,13 @@ export function CollectionView({ collection }: { collection: string }) {
                       <span
                         className="row-state"
                         data-status={item.conflict ? "conflict" : item.status}
-                        title={
-                          item.conflict
-                            ? "Needs a decision before publishing"
-                            : STATUS_TEXT[item.status]
-                        }
                       >
-                        {item.conflict ? "Conflict" : STATUS_TEXT[item.status]}
+                        {item.conflict ? "Needs a decision" : STATUS_TEXT[item.status]}
                       </span>
                     ) : null}
                     {item.problem ? (
                       <span className="row-problem" title={item.problem}>
-                        <IconWarning size={12} /> Can't be read
+                        <IconWarning size={14} /> Can't be read
                       </span>
                     ) : null}
                   </a>

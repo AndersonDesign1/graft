@@ -1,5 +1,161 @@
 # @usegraft/compiler
 
+## 1.0.0-beta.7
+
+### Minor Changes
+
+- c997e35: Content can now live in your Postgres database instead of in git. Add
+  `export const content = { source: "database" }` to `graft.config.ts` and run
+  `graft content import` to load your files once.
+
+  Studio and agents then save drafts to the database, and publishing puts a
+  change on the live site straight away, with no rebuild and no GitHub setup. A
+  hosted Studio needs only `DATABASE_URL`. Every publish is checked exactly as
+  `graft compile` checks a file (the schema, slug uniqueness and MDX safety), and
+  a draft that would fail compile never goes live. `graft compile` reads the
+  published versions, never the files.
+
+  There is one draft per document, shared by everyone who edits it. Two people
+  or an agent saving the same document from the same version can't overwrite
+  each other: the second save gets `CONTENT_CONFLICT`. Someone without publish
+  rights submits for review instead, and the request closes once everything in
+  it is live.
+
+  Git stays the default and works as before. A project uses one source or the
+  other, never both. Reverting to a commit, `graft merge` and content migrations
+  work on files, so in a database-sourced project they refuse with the new
+  `CONTENT_SOURCE_MISMATCH`.
+
+  `graft db migrate` adds three tables (`content_revisions`, `content_heads`,
+  `content_reviews`), and `graft harden` grants the runtime role access to them.
+
+  For code that reads review requests from a content store: `ReviewRequest` now
+  has an `id`, and its `number` and `url` are optional, since a review in the
+  database is not a pull request. The `review` that MCP `list_drafts` and
+  `publish_drafts` return follows the same shape.
+
+- 95ecc3e: A new site in one command, and a checklist that says what to do next.
+
+  - `npm create graft` (the new `create-graft` package) runs `graft create`: it
+    asks what kind of site (blog, docs, shop, portfolio or blank), how people
+    will edit it (online in Studio, or as files in git) and which database to
+    use, then writes the site with a Next.js app, installs it, migrates, loads
+    the example content and compiles. Every question has a flag, and `--yes`
+    takes the defaults, so an agent can run it with no prompts.
+  - `--database new` makes a free Postgres with no account. It lasts 72 hours
+    unless claimed: `graft db claim` prints the link, waits for the claim, and
+    saves the new connection string to `.env`. Any Postgres 13 or newer works
+    instead.
+  - `graft doctor` and the MCP tool `setup_status` check the database and its
+    version, the schema, a database waiting to be claimed, content, the index
+    and Studio sign-in, and end with the one thing to do next.
+  - A new site gets an `AGENTS.md`, and the docs serve a setup guide for agents
+    at `/start.md`.
+
+- a761a13: Moving content between the database, your files and git.
+
+  - `graft pull` writes what is published into your files, and `graft push`
+    publishes the files you changed. Graft remembers what each file was pulled
+    at (`.graft/sync.json`), so a pull never overwrites your changes, and a push
+    is refused with `CONTENT_CONFLICT` if someone published that document since.
+    `--force` settles a conflict either way.
+  - `graft dev` tells you when someone publishes, so you know your files are
+    behind. Agents get the same answer from the new MCP tool `sync_status`.
+  - `content.mirror` copies what is published into GitHub: in batches from
+    `graft serve` (`mode: "batch"`, every `everyMinutes`), or after every publish
+    (`mode: "each"`). `graft mirror` does one run. A batch is one commit, or one
+    pull request merged straight away when the branch allows it. A pull request
+    that waits on checks or a review stays the only one: later runs add to it
+    until it merges.
+  - `graft check` runs every check a publish makes on the files, with no
+    database, and now also finds references to documents that don't exist.
+  - `graft ci changes`, `graft ci skip-build` and `graft ci init` keep CI cheap
+    on content-only changes. `skip-build` compares with the previous deploy, and
+    builds when it can't tell which that was.
+
+  For git-sourced projects hosted on GitHub, some publishes now open a pull
+  request even for an editor: deletions and renames, and changes over 200 lines.
+  Studio says why. Change the rule with `content.review` (`deletes`,
+  `collections`, `overLines`), or turn it off with `review: false`.
+
+  `graft db migrate` adds the `content_mirror` table.
+
+- e8b55ac: Studio keeps each entry's history, puts every decision in one inbox, and
+  shows what was published lately.
+
+  - **History.** The entry's panel has a History tab. It lists every published
+    version with who made it and when. Open one to see how the entry differs
+    from it now, then restore it as a draft. History comes from the published
+    revisions when content is in the database, the production branch's commits
+    on GitHub, and the checkout's commits locally. New API routes:
+    `GET /entry/history` and `GET /entry/version`.
+  - **Inbox.** Changes sent for review and agents asking before a destructive
+    call share one inbox, with a count in the sidebar. When content is in the
+    database, someone who can publish publishes a review from there. Approvals
+    move out of the Developer views, and old `#/dev/approvals` links open the
+    inbox.
+  - **Home.** A "Recently published" feed lists who published what, with
+    links to the entries (`GET /activity`).
+  - Content stores gain optional `history`, `readVersion` and `activity`
+    methods. `DatabaseStore` and `GitHubStore` implement them, and
+    `@usegraft/db` adds `publishedHistory`, `recentlyPublished` and
+    `readPublishedRevision`.
+
+- b086a62: Studio gets a media library, agent tokens, and the site's settings with deploy
+  hooks.
+
+  - **Media.** A Media page lists the files in the asset store that Studio
+    uploaded or an entry uses. Upload, search, write alt text, see which entries
+    use a file, and delete one nothing uses. Image fields have Choose…, and a gallery's Add image, which pick from the same library and take the file's alt text when the field has none. New routes under `/api/studio/v1/assets`.
+  - **Agents.** Admins make a token per agent under Developer, Agents, with
+    Read, Write drafts or Publish access. The token is shown once and only its
+    hash is stored. `graft serve` accepts it on `/api/mcp`, the Studio API and
+    functions, and revoking it takes effect on the next request. No token can
+    decide approvals. `@usegraft/auth`'s resolver gains a `tokens` option for
+    this.
+  - **Site and deploy hooks.** Settings has the site's name and address, and
+    deploy hooks: URLs called with a `POST` after every publish of
+    database-sourced content, with an optional bearer secret. Each hook shows
+    what it answered last, and Send a test calls it now. A failing hook never
+    undoes a publish. `@usegraft/compiler` exports `fireDeployHooks`.
+  - New scope `studio:settings`, held by admins.
+  - A Studio route that needs a table the database doesn't have answers
+    `MIGRATION_REQUIRED` (503) with the fix, instead of failing the request.
+
+  Run `graft db migrate` (migration 0013 adds `assets`, `agent_tokens`,
+  `site_settings` and `deploy_hooks`). Run `graft harden <role>` again if you
+  use a runtime role.
+
+### Patch Changes
+
+- Updated dependencies [c997e35]
+- Updated dependencies [a761a13]
+- Updated dependencies [2d97fda]
+- Updated dependencies [e8b55ac]
+- Updated dependencies [b086a62]
+  - @usegraft/db@1.0.0-beta.7
+  - @usegraft/contracts@1.0.0-beta.7
+  - @usegraft/core@1.0.0-beta.7
+  - @usegraft/mdx-safety@1.0.0-beta.7
+
+## 1.0.0-beta.6
+
+### Patch Changes
+
+- 2386e74: Two error-handling fixes. `GRAFT_REVALIDATE_URL` with a `user:password@` part is refused at startup without repeating the credentials, and a network error that quotes the webhook URL has its query stripped, so a token in the URL no longer reaches logs, agents or Studio toasts. Creating a GitHub draft branch now reads only GitHub's "already exists" answer as a race: any other 422, such as a missing commit, fails with `REMOTE_STORE_FAILED` and GitHub's reason, where it used to retry to exhaustion and report the document busy.
+- 2386e74: Paths inside the content directory now refuse a dangling symbolic link. The check followed the link, so a link whose target did not exist read as absent, and a Studio or MCP write then created the target outside the content directory. A delete on a read-only filesystem now fails with `CONTENT_TREE_READ_ONLY`, the same error a save gives, instead of a raw `EROFS`.
+- 2386e74: A save to a GitHub draft can no longer be lost while the draft is being emptied. Publishing everything or discarding the last change used to read the draft branch and then delete it, and a save that landed in between was deleted with it after reporting success. The draft is now emptied with a fast-forward that fails if the branch moved, so the branch stays, holding no changes, and the next save reuses it.
+
+  Invite-link editors get new draft branch names. Their key joins the hash with `--`, which a GitHub login cannot produce, so a login shaped like an email's key (`ana-lima-shop-test-0123456789`) no longer shares that person's draft. A draft saved under the old name before upgrading stays on GitHub as a branch: publish or discard it first, or merge it by hand.
+
+- 2386e74: `GITHUB_STORE_ENV` now lists the host commit variables the store reads (`VERCEL_GIT_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `RAILWAY_GIT_COMMIT_SHA`, `COMMIT_REF`, `GITHUB_SHA`), exported on their own as `DEPLOYED_SHA_ENV`. A server that allowlisted its environment from the old list dropped them, so Studio could not tell which commit was deployed.
+- 2386e74: One loopback list decides every "https unless loopback" question: `@usegraft/compiler` exports `LOOPBACK_HOSTS` and `isLoopbackHost`, and the revalidate webhook, Studio's `Secure` session cookie and `graft studio invite` all use them, so the invite check and the cookie can never disagree about a host. Paths under a regular file now read as absent instead of failing with `ENOTDIR`, and deleting a document that is already gone succeeds.
+- Updated dependencies [2386e74]
+  - @usegraft/core@1.0.0-beta.6
+  - @usegraft/contracts@1.0.0-beta.6
+  - @usegraft/db@1.0.0-beta.6
+  - @usegraft/mdx-safety@1.0.0-beta.6
+
 ## 1.0.0-beta.5
 
 ### Minor Changes

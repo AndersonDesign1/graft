@@ -1,0 +1,42 @@
+{
+  "name": "create-graft",
+  "version": "1.0.0-beta.7",
+  "description": "Make a new Graft site: `npm create graft`. Asks a few questions, then sets up the content, a database, Studio and a Next.js app.",
+  "keywords": [
+    "cms",
+    "create",
+    "graft",
+    "mdx",
+    "nextjs",
+    "postgres",
+    "scaffold"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndersonDesign1/graft.git",
+    "directory": "packages/create-graft"
+  },
+  "bin": {
+    "create-graft": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@usegraft/cli": "workspace:*"
+  },
+  "engines": {
+    "node": ">=22.16"
+  }
+}

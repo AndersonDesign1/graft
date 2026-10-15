@@ -1,5 +1,32 @@
 # @usegraft/tokens
 
+## 1.0.0-beta.7
+
+### Minor Changes
+
+- f8c14f4: The light scheme moves from ivory to chalk paper. `--paper-0` is now `oklch(0.992 0.002 95)` (about `#fdfcfb`) and `--paper-2` is `oklch(0.966 0.003 95)` (about `#f4f4f1`), on the same warm hue as the ink, so light mode reads white without going cold. Light borders are lighter to match (`--border` 0.11, `--border-strong` 0.24). Dark mode does not change. Anything that reads `--paper`, `--background` or `--border`, including Studio's light preview, picks this up with no code change.
+
+  New type-role tokens set size, leading and tracking together: `--type-title`, `--type-section`, `--type-subsection`, `--type-lede` and `--type-meta`, each with its `--leading-*` and, for headings, `--tracking-*`. `--weight-regular`, `--weight-medium` and `--weight-semibold` name the only three weights in use. `--type-wordmark` and `--tracking-wordmark` set the docs top-bar "graft." wordmark. The landing page keeps its own wordmark for now.
+
+- b146045: Studio's frame and popups now match the docs. A 56px top bar runs across the
+  page with the `graft. / Studio` wordmark and the branch on the left, search
+  centred, and Commit (or Publish) and the account menu on the right. The
+  sidebar sits under it on the page colour. Below 768px the sidebar opens from a
+  menu button.
+
+  Popups share one material: the elevated surface and a 10px radius, opening in
+  160ms and closing in 100ms. Dialogs and sheets add a dimmed backdrop with no
+  blur and a visible close button; the command palette opens instantly and closes
+  on Escape or a choice. Deleting or discarding asks in a confirm dialog that starts on
+  Cancel and names the action ("Delete post") in place of the browser's
+  `confirm()`. The command palette shows its keys, menus carry icons, toasts
+  come one at a time, and committing ends with a plain check instead of an
+  animation.
+
+  `@usegraft/tokens` adds `--scrim`, the colour behind a dialog or sheet.
+
+## 1.0.0-beta.6
+
 ## 1.0.0-beta.5
 
 ## 1.0.0-beta.4

@@ -273,3 +273,265 @@ export const branches = pgTable(
 
 export type BranchRow = typeof branches.$inferSelect;
 export type BranchBackendKind = "overlay" | "neon";
+
+/**
+ * Authored content in a database-sourced project (`content.source:
+ * "database"`), where Postgres is authoritative and files are a checkout.
+ *
+ * A revision is one immutable version of one file: the exact MDX bytes, so a
+ * `graft pull` writes what was published byte for byte, and the version is the
+ * git blob SHA of those bytes on every store. `raw` null is a deletion. An
+ * unpublished revision is a draft; publishing stamps `published_at` and moves
+ * the head. Rows are never deleted by publishing, which is what history and
+ * restore read.
+ */
+export const contentRevisions = pgTable(
+  "content_revisions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    branchId: text("branch_id").notNull().default("main"),
+    /** Relative to the content directory: `<collection>/<slug>.mdx`. */
+    path: text("path").notNull(),
+    raw: text("raw"),
+    version: text("version"),
+    /** The revision this one was written on top of, for history. */
+    parentId: uuid("parent_id"),
+    actorKind: text("actor_kind").notNull().default("human"),
+    actorId: text("actor_id").notNull(),
+    actorName: text("actor_name"),
+    actorEmail: text("actor_email"),
+    message: text("message"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Autosaves by one person in one sitting update the draft in place. */
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    publishedById: text("published_by_id"),
+    publishedByName: text("published_by_name"),
+  },
+  (t) => [index("content_revisions_path").on(t.branchId, t.path, t.createdAt)],
+);
+
+export type ContentRevisionRow = typeof contentRevisions.$inferSelect;
+
+/**
+ * Where each path stands: the live revision and the draft, if any. One row
+ * per path, locked for the length of a write, so two saves of one document
+ * are serialised and the version check in between is a real compare-and-swap.
+ */
+export const contentHeads = pgTable(
+  "content_heads",
+  {
+    branchId: text("branch_id").notNull().default("main"),
+    path: text("path").notNull(),
+    publishedId: uuid("published_id"),
+    draftId: uuid("draft_id"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.branchId, t.path] }),
+    foreignKey({
+      columns: [t.publishedId],
+      foreignColumns: [contentRevisions.id],
+      name: "content_heads_published_fk",
+    }),
+    foreignKey({
+      columns: [t.draftId],
+      foreignColumns: [contentRevisions.id],
+      name: "content_heads_draft_fk",
+    }),
+  ],
+);
+
+export type ContentHeadRow = typeof contentHeads.$inferSelect;
+
+/**
+ * Drafts submitted for review by someone who may not publish. A person who
+ * may publish decides it, in Studio's inbox or over MCP; the drafts stay
+ * drafts until then.
+ */
+export const contentReviews = pgTable(
+  "content_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    branchId: text("branch_id").notNull().default("main"),
+    paths: jsonb("paths").$type<string[]>().notNull(),
+    title: text("title").notNull(),
+    requestedById: text("requested_by_id").notNull(),
+    requestedByName: text("requested_by_name"),
+    status: text("status").notNull().default("open"),
+    decidedById: text("decided_by_id"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("content_reviews_open").on(t.branchId, t.status, t.createdAt)],
+);
+
+export type ContentReviewRow = typeof contentReviews.$inferSelect;
+export type ContentReviewStatus = "open" | "published" | "closed";
+
+/**
+ * What a database-sourced project has copied to git, per path: the version
+ * the mirror last committed. The next run commits only paths whose live
+ * version differs, so a batch of a day's publishes becomes one commit.
+ */
+export const contentMirror = pgTable(
+  "content_mirror",
+  {
+    branchId: text("branch_id").notNull().default("main"),
+    path: text("path").notNull(),
+    /** Null: the mirror committed this path's deletion. */
+    version: text("version"),
+    commitSha: text("commit_sha"),
+    mirroredAt: timestamp("mirrored_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.branchId, t.path] })],
+);
+
+export type ContentMirrorRow = typeof contentMirror.$inferSelect;
+
+/* ---- Studio accounts ------------------------------------------------------ */
+
+/**
+ * A person who signs in to Studio with an email and password. Accounts belong
+ * to the project, not a branch. The first one is created on first visit and
+ * is the owner; everyone after is invited. `role` is one of the Studio roles
+ * (viewer, contributor, editor, admin), each a name for a set of scopes.
+ */
+export const studioUsers = pgTable(
+  "studio_users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    name: text("name"),
+    role: text("role").notNull(),
+    /** scrypt, with its parameters and salt: `scrypt$N$r$p$salt$hash`. */
+    passwordHash: text("password_hash").notNull(),
+    owner: boolean("owner").notNull().default(false),
+    failedSignIns: integer("failed_sign_ins").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("studio_users_email").on(sql`lower(${t.email})`)],
+);
+
+export type StudioUserRow = typeof studioUsers.$inferSelect;
+
+/**
+ * A signed-in browser. The cookie holds a random token; only its SHA-256 is
+ * stored, so a leaked table cannot be replayed. A row is what makes a session
+ * revocable: signing out, removing a person or changing their role takes
+ * effect on their next request.
+ */
+export const studioSessions = pgTable(
+  "studio_sessions",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => studioUsers.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("studio_sessions_user").on(t.userId)],
+);
+
+/** An invitation an admin sent from Settings: one use, until it expires or is revoked. */
+export const studioInvites = pgTable(
+  "studio_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    name: text("name"),
+    role: text("role").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    invitedById: uuid("invited_by_id").references(() => studioUsers.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [index("studio_invites_email").on(sql`lower(${t.email})`)],
+);
+
+export type StudioInviteRow = typeof studioInvites.$inferSelect;
+
+/* ---- media, agents and site settings -------------------------------------- */
+
+/**
+ * A file in the asset store, with what Studio knows about it: its type, its
+ * size and the alt text to offer when someone uses it. The bytes live in the
+ * bucket; a document refers to a file by its key (`{ key, alt }`), so this
+ * row is a catalogue, not the source of truth for what a page shows.
+ */
+export const assets = pgTable(
+  "assets",
+  {
+    key: text("key").primaryKey(),
+    contentType: text("content_type").notNull(),
+    bytes: integer("bytes").notNull(),
+    /** The alt text offered when the file is picked; each use can change it. */
+    alt: text("alt"),
+    uploadedById: text("uploaded_by_id"),
+    uploadedByName: text("uploaded_by_name"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("assets_created").on(t.createdAt)],
+);
+
+export type AssetRow = typeof assets.$inferSelect;
+
+/**
+ * A token an admin made in Studio for an agent: the Studio API and MCP accept
+ * it as a bearer. Only its SHA-256 is stored; `prefix` is the first few
+ * characters, enough to tell two tokens apart in a list.
+ */
+export const agentTokens = pgTable(
+  "agent_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    prefix: text("prefix").notNull(),
+    scopes: jsonb("scopes").$type<string[]>().notNull(),
+    createdById: uuid("created_by_id").references(() => studioUsers.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [index("agent_tokens_created").on(t.createdAt)],
+);
+
+export type AgentTokenRow = typeof agentTokens.$inferSelect;
+
+/** The site's own settings, edited in Studio: one row. */
+export const siteSettings = pgTable("site_settings", {
+  id: text("id").primaryKey().default("site"),
+  name: text("name"),
+  url: text("url"),
+  updatedById: text("updated_by_id"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type SiteSettingsRow = typeof siteSettings.$inferSelect;
+
+/**
+ * A URL called after every publish: a host's build hook, or a site's
+ * revalidate route. The last delivery is kept, so Studio can say whether the
+ * site heard about the last publish.
+ */
+export const deployHooks = pgTable("deploy_hooks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  /** Sent as `Authorization: Bearer`, for a revalidate route that checks it. */
+  secret: text("secret"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastAt: timestamp("last_at", { withTimezone: true }),
+  lastStatus: integer("last_status"),
+  lastError: text("last_error"),
+});
+
+export type DeployHookRow = typeof deployHooks.$inferSelect;

@@ -13,8 +13,11 @@ Foundational conventions for the Graft monorepo. Keep this short and current.
 
 ## Source of truth (invariants)
 
-- **Git is authoritative for authored content.** Postgres is a derived index; if they
-  disagree, git wins and the compiler rebuilds.
+- **One source of truth for authored content, per project** (ADR 0007). By default
+  that is git: Postgres holds a derived index, and if they disagree, git wins and the
+  compiler rebuilds. A project with `content = { source: "database" }` keeps its
+  content as revisions in Postgres instead, and its files are a checkout. Nothing
+  reads both and picks a winner.
 - **Operational data** (orders, accounts, progress) is owned by Postgres, accessed only
   through typed functions.
 - Validation is **one Zod layer** shared across schema, compiler, and functions.

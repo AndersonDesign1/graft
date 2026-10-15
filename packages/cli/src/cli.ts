@@ -6,15 +6,8 @@
  * project MCP over stdio) are real. Every failure crossing this boundary is a
  * GraftError printed with its agent-actionable `fix`.
  */
-import { createRequire } from "node:module";
-
 import { printGraftError } from "./report";
-
-// Read from the manifest rather than a literal: changesets bumps package.json,
-// and a hardcoded constant silently ships the wrong number (0.1.0 shipped as
-// "0.0.0"). `../package.json` resolves identically from src/ under vitest and
-// from dist/ in the published tarball, where npm always includes the manifest.
-const VERSION: string = createRequire(import.meta.url)("../package.json").version;
+import { VERSION } from "./version";
 
 interface PlannedCommand {
   name: string;
@@ -36,10 +29,14 @@ function printHelp(): void {
     "  init [dir]   Scaffold a Graft project (graft.config.ts, content/, llms.txt).",
     "               Static index by default — no database, no env. --postgres for the",
     "               Postgres tier (operational data, functions, DB branching)",
+    "  create [dir] Make a new site, with a template, a database and Studio set up",
+    "               (what `npm create graft` runs; asks a few questions, or --yes)",
+    "  doctor       Check the setup and print the one thing to do next",
     "  compile      Project the content tree into the content index once",
     "  dev          Watch content/ + graft.config.ts and recompile on change",
     "  db migrate   Apply the Postgres schema migrations that ship with @usegraft/db",
     "               (the first command a Postgres-tier project runs; --dry-run lists them)",
+    "  db claim     Keep the free database `graft create` made: claim it, then save its URL",
     "  asset put <file> [key]   Upload a binary to the asset store (S3_* env)",
     "  approvals    List pending approvals for human-gated (destructive) function calls",
     "  approve <id> Approve a pending approval (the caller retries with x-graft-approval)",
@@ -59,7 +56,13 @@ function printHelp(): void {
     "                           POST /api/mcp, GET /healthz (what a self-host container runs)",
     "  studio                   Opt-in Studio UI (edit content, approve/deny, OpenAPI)",
     "  content                  List the content tree from the compiled index (Studio parity)",
+    "  content import           Load the content files into the database (database-sourced projects)",
     "  compilations             List recent content projection trail rows (Studio parity)",
+    "  pull [doc...]            Write what is published into your files (database-sourced projects)",
+    "  push [doc...]            Publish the files you changed since your last pull",
+    "  mirror                   Commit what was published since the last run to GitHub",
+    "  check                    Check every content file: schema, slugs, MDX, references. No database",
+    "  ci changes|skip-build|init   Keep CI cheap on content-only changes",
     "  harden <role>            Grant an existing Postgres role the runtime privilege set",
     "                           (can request + consume approvals but never decide them)",
     ...PLANNED.map((cmd) => `  ${cmd.name.padEnd(12)} ${cmd.summary}  (${cmd.phase})`),
@@ -112,6 +115,41 @@ export const COMMAND_HELP = new Map<string, string[]>([
     ],
   ],
   [
+    "create",
+    [
+      "Usage: graft create [dir] [--template <name>] [--edit online|code]",
+      "                    [--database new|none|<postgres-url>] [--framework next|none]",
+      "                    [--yes] [--no-install]",
+      "",
+      "Make a new site: a template, a database, Studio and (by default) a Next.js app,",
+      "installed and ready. `npm create graft` runs this. It asks a few questions;",
+      "flags answer them, and --yes takes the defaults for the rest.",
+      "",
+      "  --template <name> blog, docs, shop, portfolio or blank (default: blog)",
+      "  --edit online     Content is edited in Studio and kept in the database (default)",
+      "  --edit code       Content is files in git",
+      "  --database new    Make a free Postgres for you, claimed later with `graft db claim`",
+      "  --database none   No database: the content compiles to a file (with --edit code)",
+      "  --database <url>  Use your own Postgres 13+",
+      "  --framework next  A Next.js site that shows every collection (default)",
+      "  --framework none  Just the content, for a site you already have",
+      "  --yes             Use the defaults for every question not answered by a flag",
+      "  --no-install      Write the files and stop before installing",
+    ],
+  ],
+  [
+    "doctor",
+    [
+      "Usage: graft doctor [--json]",
+      "",
+      "Check this project's setup: the database, its schema, content, the index and",
+      "Studio sign-in. Prints a checklist and the one thing to do next. Exits 1 when",
+      "something is missing.",
+      "",
+      "  --json           Print { ready, checks, next } as JSON",
+    ],
+  ],
+  [
     "compile",
     [
       "Usage: graft compile [--branch <id>] [--prune-unknown] [--json]",
@@ -138,10 +176,17 @@ export const COMMAND_HELP = new Map<string, string[]>([
     "db",
     [
       "Usage: graft db migrate [--dry-run]",
+      "       graft db claim [--url <postgres-url>]",
       "",
-      "Apply the Postgres schema migrations that ship with @usegraft/db.",
+      "`migrate` applies the Postgres schema migrations that ship with @usegraft/db.",
+      "",
+      "`claim` keeps the free database `graft create` made. It prints the link to",
+      "claim it (a free Neon account), waits until you have, then asks for the new",
+      "connection string and saves it to .env. Claiming changes the password, so",
+      "the old DATABASE_URL stops working.",
       "",
       "  --dry-run        List pending schema migrations without applying them",
+      "  --url <url>      The claimed database's connection string, without the prompt",
     ],
   ],
   [
@@ -253,11 +298,16 @@ export const COMMAND_HELP = new Map<string, string[]>([
     [
       "Usage: graft studio [--port <n>] [--host <h>] [--branch <id>]",
       "       graft studio invite <email> [--name <name>] [--role <role>] [--days <n>] [--url <url>]",
+      "       graft studio setup-code",
       "",
       "Run the opt-in Studio UI (edit content, approve/deny, OpenAPI).",
       "",
       "`invite` prints a sign-in link for a hosted Studio, for someone without a",
       "GitHub account. Signed with GRAFT_STUDIO_SECRET; expires after --days (7).",
+      "To give someone an account instead, invite them from Studio's Settings.",
+      "",
+      "`setup-code` prints the code a hosted Studio asks for on its first visit,",
+      "before it creates the owner account. It comes from GRAFT_STUDIO_SECRET.",
       "",
       BRANCH_OPTION,
       "  --port <n>       Port (default: 4983, or GRAFT_STUDIO_PORT)",
@@ -271,10 +321,81 @@ export const COMMAND_HELP = new Map<string, string[]>([
     "content",
     [
       "Usage: graft content [--branch <id>]",
+      "       graft content import [--dry-run] [--branch <id>]",
       "",
       "List the content tree from the compiled index.",
       "",
+      "import  Make the files under the content directory the live versions in the",
+      '        database, for a project with content = { source: "database" }. Every',
+      "        file is checked first. Re-running imports only what changed.",
+      "",
       BRANCH_OPTION,
+    ],
+  ],
+  [
+    "pull",
+    [
+      "Usage: graft pull [doc...] [--force] [--branch <id>]",
+      "",
+      'For a project with content = { source: "database" }: write what is published',
+      "into the files under the content directory. A file you changed since your last",
+      "pull is kept for graft push. One changed both here and in the database is left",
+      "as it is and listed, unless --force takes the published version.",
+      "",
+      "  doc...    Only these documents, like posts/launch",
+      BRANCH_OPTION,
+    ],
+  ],
+  [
+    "push",
+    [
+      "Usage: graft push [doc...] [--dry-run] [--force] [--branch <id>]",
+      "",
+      "Publish the files you changed since your last graft pull, checked as graft",
+      "compile checks them. Refused, with nothing written, if someone published one",
+      "of those documents since your pull: pull first. --force publishes over it.",
+      "",
+      "  doc...    Only these documents, like posts/launch",
+      BRANCH_OPTION,
+    ],
+  ],
+  [
+    "mirror",
+    [
+      "Usage: graft mirror [--branch <id>]",
+      "",
+      "Commit everything published since the last run to the GitHub repository in",
+      "GRAFT_GITHUB_REPO, as one commit. Run it on a schedule, or let graft serve do",
+      "it when graft.config.ts sets content.mirror.",
+      "",
+      BRANCH_OPTION,
+    ],
+  ],
+  [
+    "check",
+    [
+      "Usage: graft check",
+      "",
+      "Check every content file the way a compile or a publish would: the schema,",
+      "slug uniqueness, MDX safety, and references to documents that don't exist.",
+      "Needs no database. Exits 1 when there is a problem.",
+    ],
+  ],
+  [
+    "ci",
+    [
+      "Usage: graft ci changes [--base <ref>]",
+      "       graft ci skip-build [--base <ref>]",
+      "       graft ci init [--overwrite]",
+      "",
+      "changes      Print content-only=true when every changed file is content, and",
+      "             write it to $GITHUB_OUTPUT for later steps to read.",
+      "skip-build   Exit 0 when the deploy can be skipped: only content changed and",
+      "             the site already serves it from the database. Exit 1 otherwise.",
+      "init         Write .github/workflows/graft-content.yml, which runs graft check",
+      "             on content changes.",
+      "",
+      "  --base <ref>  Compare against this ref. Default: the pull request's base, else HEAD~1",
     ],
   ],
   [
@@ -324,6 +445,19 @@ interface ParsedArgs {
   role?: string;
   days?: number;
   url?: string;
+  /** `graft pull` / `push`: publish or take over conflicts. */
+  force: boolean;
+  /** `graft ci`: the ref to compare against. */
+  base?: string;
+  /** `graft create` */
+  template?: string;
+  edit?: string;
+  database?: string;
+  framework?: string;
+  yes: boolean;
+  install: boolean;
+  /** `graft pull` / `push`: limit to these documents (also given as arguments). */
+  only: string[];
 }
 
 class UsageError extends Error {}
@@ -349,6 +483,15 @@ function parseArgs(rest: string[]): ParsedArgs {
   let role: string | undefined;
   let days: number | undefined;
   let url: string | undefined;
+  let force = false;
+  let base: string | undefined;
+  const only: string[] = [];
+  let template: string | undefined;
+  let edit: string | undefined;
+  let database: string | undefined;
+  let framework: string | undefined;
+  let yes = false;
+  let install = true;
 
   const value = (flag: string, raw: string | undefined): string => {
     if (!raw || raw.startsWith("-")) {
@@ -376,6 +519,24 @@ function parseArgs(rest: string[]): ParsedArgs {
       port = Number(raw);
     } else if (arg === "--host") {
       host = value("--host", rest[++i]);
+    } else if (arg === "--force") {
+      force = true;
+    } else if (arg === "--base") {
+      base = value("--base", rest[++i]);
+    } else if (arg === "--only") {
+      only.push(value("--only", rest[++i]));
+    } else if (arg === "--template") {
+      template = value("--template", rest[++i]);
+    } else if (arg === "--edit") {
+      edit = value("--edit", rest[++i]);
+    } else if (arg === "--database") {
+      database = value("--database", rest[++i]);
+    } else if (arg === "--framework") {
+      framework = value("--framework", rest[++i]);
+    } else if (arg === "--yes" || arg === "-y") {
+      yes = true;
+    } else if (arg === "--no-install") {
+      install = false;
     } else if (arg === "--apply") {
       apply = true;
     } else if (arg === "--dry-run") {
@@ -435,6 +596,15 @@ function parseArgs(rest: string[]): ParsedArgs {
     role,
     days,
     url,
+    force,
+    ...(base ? { base } : {}),
+    only,
+    ...(template ? { template } : {}),
+    ...(edit ? { edit } : {}),
+    ...(database ? { database } : {}),
+    ...(framework ? { framework } : {}),
+    yes,
+    install,
   };
 }
 
@@ -500,6 +670,29 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
         );
         return 0;
       }
+      case "create": {
+        const { createCommand } = await import("./commands/create");
+        await createCommand({
+          dir: args.positionals[0] ?? ".",
+          ...(args.template ? { template: args.template } : {}),
+          ...(args.edit ? { edit: args.edit } : {}),
+          ...(args.database ? { database: args.database } : {}),
+          ...(args.framework ? { framework: args.framework } : {}),
+          yes: args.yes,
+          install: args.install,
+        });
+        return 0;
+      }
+      case "doctor": {
+        const { doctorCommand } = await import("./commands/doctor");
+        const status = await doctorCommand({ cwd });
+        if (args.json) console.log(JSON.stringify(status, null, 2));
+        else {
+          const { formatSetupStatus } = await import("@usegraft/compiler");
+          console.log(formatSetupStatus(status));
+        }
+        return status.ready ? 0 : 1;
+      }
       case "compile": {
         const { compileCommand } = await import("./commands/compile");
         await compileCommand({
@@ -517,11 +710,16 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
       }
       case "db": {
         const [subcommand] = args.positionals;
+        if (subcommand === "claim") {
+          const { dbClaimCommand } = await import("./commands/db-claim");
+          await dbClaimCommand({ cwd, ...(args.url ? { url: args.url } : {}) });
+          return 0;
+        }
         if (subcommand !== "migrate") {
           throw new UsageError(
             subcommand
-              ? `unknown db subcommand "${subcommand}" — the only one is \`graft db migrate\``
-              : "usage: graft db migrate [--dry-run]",
+              ? `unknown db subcommand "${subcommand}" (try: migrate, claim)`
+              : "usage: graft db migrate [--dry-run] | graft db claim [--url <url>]",
           );
         }
         const { dbMigrateCommand, formatMigrateResult } = await import("./commands/db");
@@ -677,6 +875,11 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
         return 0;
       }
       case "studio": {
+        if (args.positionals[0] === "setup-code") {
+          const { studioSetupCodeCommand } = await import("./commands/studio");
+          console.log(await studioSetupCodeCommand({ cwd }));
+          return 0;
+        }
         if (args.positionals[0] === "invite") {
           const email = args.positionals[1];
           if (!email) {
@@ -714,7 +917,69 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
         });
         return 0;
       }
+      case "pull":
+      case "push": {
+        const { pullCommand, pushCommand } = await import("./commands/sync");
+        const options = {
+          cwd,
+          branchId: args.branchId,
+          only: [...args.positionals, ...args.only],
+          force: args.force,
+          dryRun: args.dryRun,
+        };
+        const lines = command === "pull" ? await pullCommand(options) : await pushCommand(options);
+        for (const line of lines) console.log(line);
+        return 0;
+      }
+      case "mirror": {
+        const { mirrorCommand } = await import("./commands/sync");
+        for (const line of await mirrorCommand({ cwd, branchId: args.branchId })) console.log(line);
+        return 0;
+      }
+      case "check": {
+        const { checkCommand } = await import("./commands/check");
+        const result = await checkCommand({ cwd });
+        if (result.problems.length === 0) {
+          console.log(`Checked ${result.documents} document(s): no problems.`);
+          return 0;
+        }
+        for (const problem of result.problems) console.error(problem);
+        console.error(`\n${result.problems.length} problem(s).`);
+        return 1;
+      }
+      case "ci": {
+        const sub = args.positionals[0];
+        const ci = await import("./commands/ci");
+        if (sub === "changes") {
+          const result = await ci.ciChanges({ cwd, ...(args.base ? { base: args.base } : {}) });
+          for (const line of ci.reportChanges(result)) console.log(line);
+          return 0;
+        }
+        if (sub === "skip-build") {
+          const result = await ci.ciSkipBuild({ cwd, ...(args.base ? { base: args.base } : {}) });
+          console.log(result.reason);
+          return result.skip ? 0 : 1;
+        }
+        if (sub === "init") {
+          for (const line of await ci.ciInit({ cwd, overwrite: args.overwrite })) console.log(line);
+          return 0;
+        }
+        throw new UsageError("usage: graft ci changes|skip-build|init");
+      }
       case "content": {
+        if (args.positionals[0] === "import") {
+          const { contentImportCommand, formatImport } = await import("./commands/content");
+          const result = await contentImportCommand({
+            cwd,
+            branchId: args.branchId,
+            dryRun: args.dryRun,
+          });
+          for (const line of formatImport(result)) console.log(line);
+          return 0;
+        }
+        if (args.positionals[0] !== undefined) {
+          throw new UsageError(`unknown content command "${args.positionals[0]}" (try: import)`);
+        }
         const { contentListCommand, formatContentLine } = await import("./commands/content");
         const { branch, lines } = await contentListCommand({ cwd, branchId: args.branchId });
         if (lines.length === 0) {

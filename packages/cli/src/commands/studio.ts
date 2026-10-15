@@ -8,6 +8,7 @@ import { userInfo } from "node:os";
 import { isLoopbackHost, revalidateWebhookFromEnv } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
+import { databaseStoreFor } from "../content-source";
 import { allowedHostsFor, createNodeListener } from "./serve";
 
 export interface StudioCommandOptions {
@@ -125,6 +126,7 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
   try {
     const branch = await resolveBranchHandle(control.db, branchName, { databaseUrl: url });
     const writeBranch = scopeWriteBranch(branch.scope);
+    const store = await databaseStoreFor(config, branch.db, writeBranch);
     let server: Server | undefined;
     try {
       const host = options.host ?? process.env.HOST ?? "127.0.0.1";
@@ -169,6 +171,7 @@ export async function studioCommand(options: StudioCommandOptions): Promise<void
         contentDir: config.contentDir,
         mdxTrust: config.mdxTrust,
         defaultBranch: writeBranch,
+        ...(store ? { store } : {}),
         decider: operatorIdentity,
         authenticate,
         onContentChange,
@@ -291,4 +294,15 @@ export async function studioInviteCommand(
     ttlMs: days * 24 * 60 * 60 * 1000,
   });
   return { ...link, role };
+}
+
+/**
+ * `graft studio setup-code`: the code a hosted Studio asks for before it
+ * creates its owner account. It is derived from GRAFT_STUDIO_SECRET, so it
+ * prints the same code the deployment expects when run with its environment.
+ */
+export async function studioSetupCodeCommand(options: { cwd: string }): Promise<string> {
+  loadProjectEnv(options.cwd);
+  const { requireSecret, setupCode } = await import("@usegraft/studio");
+  return setupCode(requireSecret(process.env.GRAFT_STUDIO_SECRET));
 }

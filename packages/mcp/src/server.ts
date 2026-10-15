@@ -25,13 +25,15 @@ import {
 import type { BranchScope, ContentSearchHit, Database } from "@usegraft/db";
 import { openStaticIndex, resolveBranchScope, searchContent } from "@usegraft/db";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { findDoc, requireCollection } from "./content-hints";
+import { documentNotFound, findDoc, findStoredPath, requireCollection } from "./content-hints";
 import type { ProjectedContent, RegisterTools, ToolDeps } from "./tools/deps";
 import { registerApprovalTools } from "./tools/approvals";
 import { registerAssetTools } from "./tools/assets";
 import { registerBranchTools } from "./tools/branches";
 import { registerContentReadTools, registerContentWriteTools } from "./tools/content";
 import { registerDraftTools } from "./tools/drafts";
+import { registerSetupTools } from "./tools/setup";
+import { registerSyncTools } from "./tools/sync";
 import { registerErrorTools } from "./tools/errors";
 import { registerPackageTools } from "./tools/packages";
 import { registerFunctionTools } from "./tools/functions";
@@ -79,6 +81,17 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
       code: "CONFIG_INVALID",
       message: "createGraftMcp needs an index: pass `db` (Postgres) or `staticIndexPath`.",
       fix: "Pass `db` from createDb(DATABASE_URL), or `staticIndexPath` pointing at the compiled artifact (.graft/index.db) for a static project.",
+    });
+  }
+
+  // Database-sourced content is written through the database store: with any
+  // other store, writes would land somewhere compile never reads.
+  if (options.source === "database" && options.store?.kind !== "database") {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message: 'createGraftMcp was given source: "database" without a database store.',
+      fix: 'Pass `store: new DatabaseStore({ db, collections })` alongside `source: "database"`, or leave `source` unset for content in git.',
+      details: { source: options.source, store: options.store?.kind ?? "filesystem" },
     });
   }
 
@@ -173,6 +186,7 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
             db: requireDb("compile", ""),
             branchId,
             mdxTrust: options.mdxTrust,
+            ...(options.source ? { source: options.source } : {}),
           })
         : await compileStatic({
             contentDir,
@@ -297,9 +311,21 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
       if (remoteStore) {
         // A draft deletion on the caller's branch: the live site keeps the
         // document until a human publishes the change.
-        const path = `${input.collection}/${input.slug}.mdx`;
-        if (!(await remoteStore.read(path, storeActor()))) {
-          findDoc(contentDir, input.collection, collection, input.slug);
+        let path = `${input.collection}/${input.slug}.mdx`;
+        if (remoteStore.entries) {
+          // The store is the source: the document may be `.md`, or claim its
+          // slug in frontmatter, and there is no checkout to fall back on.
+          const stored = await findStoredPath(
+            remoteStore,
+            input.collection,
+            collection,
+            input.slug,
+            storeActor(),
+          );
+          if (!stored) throw documentNotFound(input.collection, input.slug);
+          path = stored;
+        } else if (!(await remoteStore.read(path, storeActor()))) {
+          path = findDoc(contentDir, input.collection, collection, input.slug).sourcePath;
         }
         await remoteStore.write(path, null, { actor: storeActor() });
         return {
@@ -429,6 +455,8 @@ const FULL_SURFACE: RegisterTools = (server, deps) => {
   registerContentReadTools(server, deps);
   registerContentWriteTools(server, deps);
   registerDraftTools(server, deps);
+  registerSyncTools(server, deps);
+  registerSetupTools(server, deps);
   registerAssetTools(server, deps);
   registerBranchTools(server, deps);
   registerApprovalTools(server, deps);

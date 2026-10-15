@@ -5,7 +5,9 @@ has to pass before a change can land, and how to open a pull request that gets
 reviewed quickly.
 
 Engineering details live in [`CONVENTIONS.md`](CONVENTIONS.md). Read it before
-your second pull request. This page is enough for your first.
+your second pull request. This page is enough for your first. How Graft looks
+is in [`DESIGN.md`](DESIGN.md), and how it is written is in the
+`graft-writing` skill (see [Design, writing and agents](#design-writing-and-agents)).
 
 ## Open an issue first, unless the fix is small
 
@@ -21,8 +23,10 @@ a new public export, say that too.
 Graft holds a small number of invariants. A change that breaks one is refused
 no matter how well it is written:
 
-- Git is authoritative for authored content. The index is derived. If the two
-  disagree, git wins and the compiler rebuilds.
+- Each project has one source of truth for authored content: git by default,
+  or Postgres when it opts in (ADR 0007). The index is derived from that
+  source. A change that makes both authoritative, or reconciles one into the
+  other behind the user's back, is turned down.
 - Operational data belongs to Postgres and is reached only through typed
   functions.
 - Validation is one Zod layer, shared by schema, compiler, and functions.
@@ -116,7 +120,26 @@ default. Name them `*.integration.test.ts` and gate them behind
 RUN_INTEGRATION=1 DATABASE_URL=postgres://... pnpm test
 ```
 
-`RUN_INTEGRATION` is declared in `turbo.json`. A variable that is not declared
+Suites that write to a real, billed service (the Neon branch backend, the
+S3/R2 asset store) also need `RUN_LIVE=1` and that service's keys, so
+`RUN_INTEGRATION=1` on its own reaches only the database in `DATABASE_URL`.
+
+Point `DATABASE_URL` at a database you can throw away. In a shell that has
+production credentials, run tests through `offline.sh`, which removes them
+and takes the throwaway database's URL with `--db`. It refuses to run while
+a repo-root `.env` exists, because the tests load that file themselves; move
+it aside first. `pg.sh` starts one
+(set `PG_BIN` to your Postgres `bin` directory if it is not under
+`/usr/lib/postgresql`):
+
+```bash
+S=.agents/skills/graft-verify/scripts
+URL=$($S/pg.sh up /tmp/graft-pg)
+$S/offline.sh --db "$URL" env RUN_INTEGRATION=1 pnpm test
+$S/pg.sh down /tmp/graft-pg
+```
+
+`RUN_INTEGRATION` and `RUN_LIVE` are declared in `turbo.json`. A variable that is not declared
 there is deleted before the task runs rather than merely uncached, so an
 undeclared flag silently does nothing.
 
@@ -190,6 +213,33 @@ more, and an explanation argues. Do not mix them on one page. Split and link
 instead.
 
 Write real symbol, file, and command names. Not a description of them.
+
+Run every command on a page before you publish it, and paste the real output
+where the page shows output. Visual changes to the site follow
+[`DESIGN.md`](DESIGN.md); words follow `.agents/skills/graft-writing/`.
+Render a changed page at desktop and phone width, in light and dark, before
+you open the pull request.
+
+## Design, writing and agents
+
+Graft is built with agents as well as people, so the house rules are written
+down where both can read them:
+
+| File                             | What it covers                                                                   |
+| -------------------------------- | -------------------------------------------------------------------------------- |
+| [`DESIGN.md`](DESIGN.md)         | How Graft looks: tokens, type, color, components, motion, and what to reject     |
+| [`AGENTS.md`](AGENTS.md)         | What any coding agent must know before it starts, and the rules table            |
+| `.agents/skills/graft-workflow/` | How a change goes from request to pull request, one playbook per kind of task    |
+| `.agents/skills/graft-verify/`   | How to prove a change works on the real CLI, MCP server, docs site and Studio    |
+| `.agents/skills/graft-design/`   | How to apply `DESIGN.md`, with deeper notes on interface, motion, type and color |
+| `.agents/skills/graft-writing/`  | How Graft writes: docs pages, product copy and errors, commits and pull requests |
+
+These apply to people too. A pull request that breaks a rule in `DESIGN.md`
+or the writing skill gets the same review comment whoever wrote it.
+
+When a reviewer corrects the same mistake twice, the fix is not another
+comment. Turn it into a check, a type or a test, and add a row to the rules
+table in `AGENTS.md`.
 
 ## Reporting a vulnerability
 

@@ -102,6 +102,7 @@
       // silently running the unit suite and reporting green.
       "env": [
         "RUN_INTEGRATION",
+        "RUN_LIVE",
         "DATABASE_URL",
         "NEON_API_KEY",
         "GRAFT_NEON_PROJECT_ID",

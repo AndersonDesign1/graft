@@ -33,15 +33,5 @@ export function absoluteTime(iso: string | undefined): string {
 
 export const shortSha = (sha: string | null | undefined): string => (sha ? sha.slice(0, 7) : "");
 
-/**
- * Stable colour index for a collection name. Same name always gets the same
- * identity hue, across reloads and across machines.
- */
-export function identityIndex(name: string, buckets = 5): number {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  return Math.abs(hash) % buckets;
-}
-
 export const plural = (n: number, one: string, many = `${one}s`): string =>
   `${n} ${n === 1 ? one : many}`;

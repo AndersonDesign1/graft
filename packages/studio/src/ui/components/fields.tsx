@@ -20,6 +20,7 @@ import { controlOf, emptyValue, formatMoney, labelOf, moneyInput, parseMoney } f
 import { humanise } from "../lib/fields";
 import { singular } from "../lib/studio";
 import { IconCaretDown, IconCheck, IconClose, IconFile, IconSearch, IconWarning } from "./icons";
+import { MediaPicker } from "../views/media";
 import { NumberField, Switch } from "./ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
@@ -79,7 +80,7 @@ export function FieldRow(props: ControlProps) {
       ) : null}
       {problem ? (
         <p className="fr-problem" id={`${id}-problem`} role="alert">
-          <IconWarning size={13} />
+          <IconWarning size={14} />
           <span>{problem}</span>
         </p>
       ) : null}
@@ -400,7 +401,7 @@ function SelectControl({ field, value, onChange, disabled, inputId, describedBy 
           </option>
         ))}
       </select>
-      <IconCaretDown size={12} className="fc-select-caret" aria-hidden="true" />
+      <IconCaretDown size={14} className="fc-select-caret" aria-hidden="true" />
     </div>
   );
 }
@@ -539,19 +540,19 @@ function ReferenceControl(props: InputProps) {
           slug ? (
             <span className="fc-ref-chosen">
               <span className="fc-ref-title">{title ?? humanise(slug)}</span>
-              <IconCaretDown size={12} />
+              <IconCaretDown size={14} />
             </span>
           ) : (
             <span className="fc-ref-placeholder">
               Choose a {singular(field.to)}…
-              <IconCaretDown size={12} />
+              <IconCaretDown size={14} />
             </span>
           )
         }
       />
       {slug && field.optional ? (
         <button type="button" className="fc-clear" aria-label="Clear" onClick={() => onChange("")}>
-          <IconClose size={12} />
+          <IconClose size={14} />
         </button>
       ) : null}
     </div>
@@ -608,7 +609,7 @@ function RefChip({
         disabled={disabled}
         aria-label={`Remove ${title ?? slug}`}
       >
-        <IconClose size={11} />
+        <IconClose size={14} />
       </button>
     </span>
   );
@@ -639,7 +640,7 @@ function TagsControl({ field, value, onChange, disabled, inputId }: InputProps) 
                 onChange(on ? list.filter((v) => v !== option.value) : [...list, option.value])
               }
             >
-              {on ? <IconCheck size={11} /> : null}
+              {on ? <IconCheck size={14} /> : null}
               {optionText(option)}
             </button>
           );
@@ -668,7 +669,7 @@ function TagsControl({ field, value, onChange, disabled, inputId }: InputProps) 
             aria-label={`Remove ${tag}`}
             onClick={() => onChange(list.filter((_, j) => j !== i))}
           >
-            <IconClose size={11} />
+            <IconClose size={14} />
           </button>
         </span>
       ))}
@@ -770,23 +771,43 @@ export function AssetThumb({
   );
 }
 
+/**
+ * A file picked from the library. The entry keeps its own alt text when it has
+ * one; otherwise it starts from what the library says about the file.
+ */
+function picked(original: unknown, file: { key: string; alt: string | null }): Asset {
+  const current = asAsset(original).alt;
+  return withAsset(original, { key: file.key, alt: current || file.alt || undefined });
+}
+
 function AssetControl({ value, onChange, disabled, inputId, describedBy }: InputProps) {
   const asset = asAsset(value);
+  const [choosing, setChoosing] = useState(false);
   return (
     <div className="fc-asset">
       <AssetThumb assetKey={asset.key} alt={asset.alt} size="lg" />
       <div className="fc-asset-fields">
-        <input
-          id={inputId}
-          className="input"
-          value={asset.key}
-          placeholder="products/hat/front.jpg"
-          spellCheck={false}
-          disabled={disabled}
-          aria-describedby={describedBy}
-          aria-label="File"
-          onChange={(e) => onChange(withAsset(value, { key: e.target.value }))}
-        />
+        <div className="fc-asset-key">
+          <input
+            id={inputId}
+            className="input"
+            value={asset.key}
+            placeholder="products/hat/front.jpg"
+            spellCheck={false}
+            disabled={disabled}
+            aria-describedby={describedBy}
+            aria-label="File"
+            onChange={(e) => onChange(withAsset(value, { key: e.target.value }))}
+          />
+          <button
+            type="button"
+            className="btn"
+            disabled={disabled}
+            onClick={() => setChoosing(true)}
+          >
+            Choose…
+          </button>
+        </div>
         <input
           className="input"
           value={asset.alt ?? ""}
@@ -796,12 +817,18 @@ function AssetControl({ value, onChange, disabled, inputId, describedBy }: Input
           onChange={(e) => onChange(withAsset(value, { alt: e.target.value }))}
         />
       </div>
+      <MediaPicker
+        open={choosing}
+        onOpenChange={setChoosing}
+        onPick={(file) => onChange(picked(value, file))}
+      />
     </div>
   );
 }
 
 function GalleryControl({ value, onChange, disabled, path, problems }: InputProps) {
   const list = Array.isArray(value) ? (value as unknown[]) : [];
+  const [choosing, setChoosing] = useState(false);
   const update = (i: number, next: unknown) =>
     onChange(list.map((item, j) => (j === i ? next : item)));
   const move = (i: number, by: number) => {
@@ -863,7 +890,7 @@ function GalleryControl({ value, onChange, disabled, path, problems }: InputProp
                 onClick={() => onChange(list.filter((_, j) => j !== i))}
                 aria-label={`Remove image ${i + 1}`}
               >
-                <IconClose size={11} />
+                <IconClose size={14} />
               </button>
             </div>
           </figure>
@@ -873,10 +900,16 @@ function GalleryControl({ value, onChange, disabled, path, problems }: InputProp
         type="button"
         className="fc-tile fc-tile-add"
         disabled={disabled}
-        onClick={() => onChange([...list, { key: "" }])}
+        onClick={() => setChoosing(true)}
       >
         <span>Add image</span>
       </button>
+      <MediaPicker
+        open={choosing}
+        onOpenChange={setChoosing}
+        onPick={(file) => onChange([...list, picked({}, file)])}
+        onTypeInstead={() => onChange([...list, { key: "" }])}
+      />
     </div>
   );
 }
@@ -986,12 +1019,12 @@ function ListControl({ field, value, onChange, disabled, path, problems }: Input
                 aria-expanded={open.has(i)}
                 onClick={() => toggle(i)}
               >
-                <IconCaretDown size={12} className="fc-item-caret" />
+                <IconCaretDown size={14} className="fc-item-caret" />
                 <span className="fc-item-index" data-numeric="">
                   {i + 1}
                 </span>
                 <span className="fc-item-summary">{itemSummary(entry, childFields, i)}</span>
-                {hasProblem(i) ? <IconWarning size={13} className="fc-item-warn" /> : null}
+                {hasProblem(i) ? <IconWarning size={14} className="fc-item-warn" /> : null}
               </button>
               <div className="fc-item-actions">
                 <button
@@ -1019,7 +1052,7 @@ function ListControl({ field, value, onChange, disabled, path, problems }: Input
                   onClick={() => onChange(list.filter((_, j) => j !== i))}
                   aria-label={`Remove ${noun} ${i + 1}`}
                 >
-                  <IconClose size={11} />
+                  <IconClose size={14} />
                 </button>
               </div>
             </div>

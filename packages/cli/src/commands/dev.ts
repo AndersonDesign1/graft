@@ -60,7 +60,7 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
   const writeBranch = branch !== undefined ? scopeWriteBranch(branch.scope) : "main";
   let timer: NodeJS.Timeout | undefined;
   /** Set once the watchers exist; recompiles are scheduled before that. */
-  let rewatchContent: ((dir: string) => void) | undefined;
+  let rewatchContent: (() => void) | undefined;
   let compiling = false;
   let dirty = false;
   let configDirty = false;
@@ -74,14 +74,21 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
     try {
       if (configDirty) {
         configDirty = false;
-        const previousContentDir = config.contentDir;
+        const previous = config;
         config = await loadConfig(configPath);
         console.log(`reloaded ${basename(configPath)}`);
         // Watchers were created once at startup against the ORIGINAL
         // contentDir, so a config edit that relocated it left compile reading
         // one directory while the watcher polled another: every later save was
         // invisible and `graft dev` silently stopped recompiling.
-        if (config.contentDir !== previousContentDir) rewatchContent?.(config.contentDir);
+        // Switching the content source starts or stops the file watcher the
+        // same way.
+        if (
+          config.contentDir !== previous.contentDir ||
+          config.content.source !== previous.content.source
+        ) {
+          rewatchContent?.();
+        }
       }
       const result =
         branch !== undefined
@@ -91,6 +98,7 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
               collections: config.collections,
               mdxTrust: config.mdxTrust,
               branchId: writeBranch,
+              source: config.content.source,
             })
           : await compileStatic({
               contentDir: config.contentDir,
@@ -120,17 +128,28 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
 
   await runCompile();
 
-  let contentWatcher = watch(config.contentDir, { recursive: true }, () => schedule());
+  // In a database-sourced project the files are a checkout: an edit to one
+  // changes nothing until it is pushed, so watching them would only mislead.
+  const watchContent = (): FSWatcher | undefined =>
+    config.content.source === "database"
+      ? undefined
+      : watch(config.contentDir, { recursive: true }, () => schedule());
+  const fromDatabase = config.content.source === "database";
+  let contentWatcher = watchContent();
   const watchers: FSWatcher[] = [
     watch(config.projectDir, (_event, filename) => {
       if (filename && (CONFIG_FILENAMES as readonly string[]).includes(filename)) schedule(true);
     }),
   ];
 
-  rewatchContent = (dir: string): void => {
-    contentWatcher.close();
-    contentWatcher = watch(dir, { recursive: true }, () => schedule());
-    console.log(`now watching ${relative(options.cwd, dir) || "."}`);
+  rewatchContent = (): void => {
+    contentWatcher?.close();
+    contentWatcher = watchContent();
+    console.log(
+      contentWatcher
+        ? `now watching ${relative(options.cwd, config.contentDir) || "."}`
+        : "content is in the database: edit it in Studio",
+    );
   };
 
   const watchedContent = relative(options.cwd, config.contentDir) || ".";
@@ -140,14 +159,44 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
       : branch.scope.kind === "physical"
         ? `${branch.name} (neon)`
         : (options.branchId ?? "main");
+  // Publishes already update the index; what a developer needs to hear is
+  // that their files are now behind. Polled, not LISTENed: a pooled
+  // connection (most hosted Postgres) drops LISTEN between transactions.
+  let announcer: NodeJS.Timeout | undefined;
+  if (fromDatabase && branch !== undefined) {
+    const { publishedSince } = await import("@usegraft/db");
+    let since = new Date();
+    let seen = new Set<string>();
+    announcer = setInterval(() => {
+      void publishedSince(branch.db, writeBranch, since)
+        .then((changes) => {
+          const fresh = changes.filter((change) => !seen.has(change.id));
+          const last = changes.at(-1);
+          if (last) {
+            since = last.publishedAt;
+            // Only revisions at the newest timestamp can come back next time.
+            seen = new Set(
+              changes.filter((c) => c.publishedAt.getTime() === since.getTime()).map((c) => c.id),
+            );
+          }
+          for (const line of announce(fresh)) console.log(line);
+        })
+        .catch(() => {
+          // A dropped connection is retried on the next tick.
+        });
+    }, ANNOUNCE_MS);
+  }
   console.log(
-    `Watching ${watchedContent} + ${basename(configPath)} (branch: ${branchLabel}). Ctrl+C to stop.`,
+    fromDatabase
+      ? `Content is in the database (branch: ${branchLabel}): edit it in Studio. Watching ${basename(configPath)}. Ctrl+C to stop.`
+      : `Watching ${watchedContent} + ${basename(configPath)} (branch: ${branchLabel}). Ctrl+C to stop.`,
   );
 
   await new Promise<void>((resolveStopped) => {
     const stop = (): void => {
       clearTimeout(timer);
-      contentWatcher.close();
+      clearInterval(announcer);
+      contentWatcher?.close();
       for (const watcher of watchers) watcher.close();
       resolveStopped();
     };
@@ -157,4 +206,26 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
 
   await branch?.close();
   await control?.close();
+}
+
+/** How often `graft dev` asks whether anything was published in a database-sourced project. */
+const ANNOUNCE_MS = 5_000;
+
+/** One line per publisher: who published what, and the command that brings it into the files. */
+export function announce(
+  changes: ReadonlyArray<{ path: string; version: string | null; publishedBy: string | null }>,
+): string[] {
+  if (changes.length === 0) return [];
+  const byWho = new Map<string, Set<string>>();
+  for (const change of changes) {
+    const who = change.publishedBy ?? "Someone";
+    const doc = change.path.replace(/\.mdx?$/, "");
+    byWho.set(
+      who,
+      (byWho.get(who) ?? new Set()).add(change.version === null ? `${doc} (deleted)` : doc),
+    );
+  }
+  const lines = [...byWho].map(([who, docs]) => `${who} published ${[...docs].join(", ")}.`);
+  lines.push("Run graft pull to bring it into your files.");
+  return lines;
 }

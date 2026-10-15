@@ -37,6 +37,7 @@ import { githubStoreFromEnv, revalidateWebhookFromEnv } from "@usegraft/compiler
 import { GraftError } from "@usegraft/contracts";
 import { setRequestPeer } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
+import { databaseStoreFor, startMirrorSchedule } from "../content-source";
 
 export type FetchHandler = (request: Request) => Promise<Response>;
 
@@ -282,6 +283,11 @@ export interface RunningGraftServer {
   port: number;
   host: string;
   branch: string;
+  /**
+   * Studio accounts are on and nobody has created the owner yet: what the
+   * first visit needs. `code` is absent on a loopback bind, which needs none.
+   */
+  studioSetup?: { code?: string };
   close(): Promise<void>;
 }
 
@@ -300,7 +306,14 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     { createFunctionsHandler },
     { createGraftMcpHandler },
     { createContentApiHandler },
-    { createDb, createDbIndexReader, resolveBranchHandle, scopeWriteBranch, sql },
+    {
+      actorForAgentToken,
+      createDb,
+      createDbIndexReader,
+      resolveBranchHandle,
+      scopeWriteBranch,
+      sql,
+    },
     studioMod,
   ] = await Promise.all([
     import("@usegraft/core"),
@@ -322,6 +335,9 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   const resolveActor = createActorResolver({
     issuers,
     devTokens: devToken ? { [devToken]: { kind: "agent", id: "graft-serve", scopes } } : undefined,
+    // Tokens an admin made in Studio's Agents page, kept hashed in the
+    // project's database: the Studio API, MCP and functions accept them.
+    tokens: (token) => actorForAgentToken(control.db, token),
   });
 
   // From graft.config.ts, not the environment. This is the setting that turns
@@ -372,13 +388,20 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   // One store for every writing surface, so a hosted agent's write_content
   // and a hosted editor's save land the same way: as drafts on GitHub when
   // GRAFT_GITHUB_REPO is set, which is what lets a read-only deployment write.
+  // A database-sourced project writes to Postgres, wherever it runs, so the
+  // GitHub store never takes its writes; it still answers who may sign in.
+  const databaseStore = await databaseStoreFor(config, branch.db, writeBranch, control.db);
   const repository = githubStoreFromEnv({
     contentDir: config.contentDir,
     projectRoot: config.projectDir,
+    reviewRule: config.content.review,
   });
+  const stopMirror = await startMirrorSchedule(config, branch.db, writeBranch);
+  const store = databaseStore ?? repository;
 
   const mcpHandler = createGraftMcpHandler({
-    ...(repository ? { store: repository } : {}),
+    ...(store ? { store } : {}),
+    ...(databaseStore ? { source: "database" as const } : {}),
     name: "graft-serve",
     contentDir: config.contentDir,
     collections: config.collections,
@@ -496,35 +519,39 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
   }
 
   let studioHandler: FetchHandler | undefined;
+  let studioSetup: RunningGraftServer["studioSetup"];
   if (studioMod) {
     // Resolve the caller and hand the Studio their scopes; the Studio decides
     // per route what each one permits. This used to return
     // `actor.kind !== "anonymous"`, which admitted ANY authenticated principal
     // — including the agent tokens GRAFT_DEV_TOKEN and OIDC issuers mint — to
     // approve/deny, document writes, commits and reverts.
-    const authenticate =
-      !loopback && (devToken || issuers.length > 0)
-        ? async (request: Request) => {
-            const actor = await resolveActor(request);
-            if (actor.kind === "anonymous" || !actor.id) return null;
-            return { kind: actor.kind, id: actor.id, scopes: actor.scopes ?? [] };
-          }
-        : !loopback
-          ? () => null
-          : undefined;
+    // Off loopback every caller is resolved: a dev token, an OIDC issuer's
+    // JWT, or a token made in Studio's Agents page, which can exist even when
+    // nothing is configured in the environment.
+    const authenticate = !loopback
+      ? async (request: Request) => {
+          const actor = await resolveActor(request);
+          if (actor.kind === "anonymous" || !actor.id) return null;
+          return { kind: actor.kind, id: actor.id, scopes: actor.scopes ?? [] };
+        }
+      : undefined;
     // People sign in when GRAFT_STUDIO_SECRET is set. GitHub sign-in admits
     // whoever can push to the content repository unless GRAFT_STUDIO_EDITORS
     // narrows it, so the store's credentials answer that question.
     const access = studioMod.editorAccessFromEnv();
     studioHandler = studioMod.createStudioHandler({
       db: branch.db,
+      // Accounts, media, agent tokens and deploy hooks belong to the project.
+      workspaceDb: control.db,
+      agentTokens: true,
       collections: config.collections,
       contentDir: config.contentDir,
       mdxTrust: config.mdxTrust,
       defaultBranch: writeBranch,
       // Saves land in git on GitHub when GRAFT_GITHUB_REPO is set: the only
       // way a hosted Studio on a read-only filesystem can save at all.
-      ...(repository ? { store: repository } : {}),
+      ...(store ? { store } : {}),
       ...(access
         ? {
             editors: {
@@ -532,6 +559,9 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
               ...(repository
                 ? { permissionOf: (login: string) => repository.permissionOf(login) }
                 : {}),
+              // People also sign in with Studio accounts, kept in the project's
+              // own database (not a branch's): the first visit creates the owner.
+              accounts: { db: control.db, setupWithoutCode: loopback },
             },
           }
         : {}),
@@ -542,6 +572,12 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
       authenticate,
       onContentChange,
     });
+    if (access) {
+      const { countAccounts } = await import("@usegraft/db");
+      if ((await countAccounts(control.db)) === 0) {
+        studioSetup = loopback ? {} : { code: studioMod.setupCode(access.secret) };
+      }
+    }
   }
 
   const server = createServer(
@@ -567,7 +603,9 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     port,
     host,
     branch: branchName,
+    ...(studioSetup ? { studioSetup } : {}),
     close: async () => {
+      stopMirror();
       await new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
       });
@@ -604,6 +642,13 @@ export async function serveCommand(options: ServeCommandOptions): Promise<void> 
         ? [
             `  studio     GET  ${base}/studio`,
             `  openapi    GET  ${base}/api/studio/v1/openapi.json`,
+          ]
+        : []),
+      ...(running.studioSetup
+        ? [
+            running.studioSetup.code
+              ? `  Studio has no accounts yet. Open /studio and create the owner with setup code ${running.studioSetup.code}.`
+              : "  Studio has no accounts yet. Open /studio to create the owner account.",
           ]
         : []),
       ...(process.env.GRAFT_REVALIDATE_URL?.trim()

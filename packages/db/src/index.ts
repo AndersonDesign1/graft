@@ -3,6 +3,8 @@
  * Postgres + Drizzle client and schema. The Phase 4 branching abstraction lives in
  * ./branch: `resolveBranchScope` + overlay-aware `readContent`/`searchContent`.
  */
+export * from "./accounts";
+export * from "./studio-data";
 export * from "./approvals";
 export * from "./audit";
 export * from "./branch";
@@ -15,6 +17,7 @@ export * from "./ledger";
 export * from "./migrate";
 export * from "./neon";
 export * from "./reader";
+export * from "./revisions";
 export * from "./schema";
 export * from "./search";
 export * from "./static";

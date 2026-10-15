@@ -1,5 +1,21 @@
 # @usegraft/content-migrations
 
+## 1.0.0-beta.7
+
+### Patch Changes
+
+- Updated dependencies [c997e35]
+  - @usegraft/contracts@1.0.0-beta.7
+  - @usegraft/core@1.0.0-beta.7
+
+## 1.0.0-beta.6
+
+### Patch Changes
+
+- Updated dependencies [2386e74]
+  - @usegraft/core@1.0.0-beta.6
+  - @usegraft/contracts@1.0.0-beta.6
+
 ## 1.0.0-beta.5
 
 ### Patch Changes

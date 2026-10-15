@@ -5,7 +5,7 @@
  * server that hosts them.
  */
 import type { Storage } from "@usegraft/assets";
-import type { ContentChangeListener, ContentStore } from "@usegraft/compiler";
+import type { ContentChangeListener, ContentSource, ContentStore } from "@usegraft/compiler";
 import type { AnyCollection, AnyGraftFunction, FunctionActor, RateLimit } from "@usegraft/core";
 import type { ApprovalStore, AuditStore, BranchScope, Database } from "@usegraft/db";
 import type { MdxTrust } from "@usegraft/mdx-safety";
@@ -165,6 +165,23 @@ export interface GraftMcpOptions {
    * writes but none of those three tools.
    */
   store?: ContentStore;
+  /**
+   * Where authored content is authoritative. `database` (with a database
+   * store) makes the server's compile read the published revisions instead
+   * of the files. Defaults to `git`.
+   */
+  source?: ContentSource;
+  /**
+   * `.graft/sync.json` in the project, for `sync_status`. Only a server with
+   * the project's checkout (local stdio) sets it.
+   */
+  syncStateFile?: string;
+  /**
+   * The project folder, on a server that has it (`graft mcp`). Registers
+   * setup_status, which reads the free-database claim file and the content
+   * folder there.
+   */
+  projectDir?: string;
   /**
    * Called after write_content or delete_content changed the index, with the
    * branch and ChangeSet, so the app can refresh its cache. An in-app mount

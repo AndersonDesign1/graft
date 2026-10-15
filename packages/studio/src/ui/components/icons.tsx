@@ -1,52 +1,76 @@
 /**
- * Icons — Phosphor, re-exported under Studio names.
+ * Icons: Lucide, re-exported under Studio names. The same set the docs use.
  *
  * Indirection on purpose: components import `IconCompile`, not
- * `ArrowsClockwise`. Swapping a glyph (or the whole set) is one line here,
- * the same discipline the colour tokens follow.
+ * `RefreshCwIcon`. Swapping a glyph is one line here, the same discipline the
+ * colour tokens follow. Size (16px) and stroke (1.75) are set once by
+ * `LucideProvider` in app.tsx, so a component passes `size` only when it
+ * means something smaller.
  *
- * Imported per-icon from `dist/icons/*` rather than the package barrel. The
- * barrel re-exports ~1,500 glyphs and pulls the lot into the bundle; the deep
- * paths cost ~1 kB each. Weight and size are set once via IconContext in
- * app.tsx, so "regular" at 16px sits correctly against the 1px hairlines.
+ * Named imports from the package root: Vite tree-shakes them, so the bundle
+ * carries only the glyphs listed here.
  */
 
 // shell / navigation
-export { SquaresFour as IconOverview } from "@phosphor-icons/react/dist/icons/SquaresFour";
-export { Files as IconCollections } from "@phosphor-icons/react/dist/icons/Files";
-export { TreeStructure as IconSchema } from "@phosphor-icons/react/dist/icons/TreeStructure";
-export { SealCheck as IconApprovals } from "@phosphor-icons/react/dist/icons/SealCheck";
-export { GitBranch as IconBranches } from "@phosphor-icons/react/dist/icons/GitBranch";
-export { ClockCounterClockwise as IconHistory } from "@phosphor-icons/react/dist/icons/ClockCounterClockwise";
-export { GitDiff as IconChanges } from "@phosphor-icons/react/dist/icons/GitDiff";
-export { GearSix as IconSettings } from "@phosphor-icons/react/dist/icons/GearSix";
+export {
+  HouseIcon as IconHome,
+  InboxIcon as IconInbox,
+  ActivityIcon as IconOverview,
+  FilesIcon as IconCollections,
+  BracesIcon as IconSchema,
+  ShieldCheckIcon as IconApprovals,
+  GitBranchIcon as IconBranches,
+  HistoryIcon as IconHistory,
+  FileDiffIcon as IconChanges,
+  SettingsIcon as IconSettings,
+  ImagesIcon as IconMedia,
+  BotIcon as IconAgents,
+  MenuIcon as IconMenu,
+} from "lucide-react";
 
 // actions
-export { ArrowsClockwise as IconCompile } from "@phosphor-icons/react/dist/icons/ArrowsClockwise";
-export { Cube as IconComponentBlock } from "@phosphor-icons/react/dist/icons/Cube";
-export { MagnifyingGlass as IconSearch } from "@phosphor-icons/react/dist/icons/MagnifyingGlass";
-export { CaretRight as IconChevron } from "@phosphor-icons/react/dist/icons/CaretRight";
-export { CaretDown as IconCaretDown } from "@phosphor-icons/react/dist/icons/CaretDown";
-export { CaretUpDown as IconCaretUpDown } from "@phosphor-icons/react/dist/icons/CaretUpDown";
-export { X as IconClose } from "@phosphor-icons/react/dist/icons/X";
-export { Check as IconCheck } from "@phosphor-icons/react/dist/icons/Check";
-export { Copy as IconCopy } from "@phosphor-icons/react/dist/icons/Copy";
-export { ArrowSquareOut as IconExternal } from "@phosphor-icons/react/dist/icons/ArrowSquareOut";
-export { SortAscending as IconSort } from "@phosphor-icons/react/dist/icons/SortAscending";
-export { Sidebar as IconSidebar } from "@phosphor-icons/react/dist/icons/Sidebar";
-export { ArrowCounterClockwise as IconRevert } from "@phosphor-icons/react/dist/icons/ArrowCounterClockwise";
+export {
+  RefreshCwIcon as IconCompile,
+  BoxIcon as IconComponentBlock,
+  SearchIcon as IconSearch,
+  ChevronRightIcon as IconChevron,
+  ChevronDownIcon as IconCaretDown,
+  ChevronsUpDownIcon as IconCaretUpDown,
+  XIcon as IconClose,
+  CheckIcon as IconCheck,
+  CopyIcon as IconCopy,
+  ExternalLinkIcon as IconExternal,
+  ArrowUpDownIcon as IconSort,
+  PanelLeftIcon as IconSidebar,
+  PanelRightIcon as IconInspector,
+  Undo2Icon as IconRevert,
+  PlusIcon as IconPlus,
+  EllipsisIcon as IconMore,
+  Trash2Icon as IconTrash,
+  CodeIcon as IconCode,
+  ArrowLeftIcon as IconBack,
+  GitCommitHorizontalIcon as IconCommit,
+  CopyPlusIcon as IconDuplicate,
+  LinkIcon as IconLink,
+  LogOutIcon as IconSignOut,
+} from "lucide-react";
 
 // status / meaning
-export { Warning as IconWarning } from "@phosphor-icons/react/dist/icons/Warning";
-export { Database as IconDatabase } from "@phosphor-icons/react/dist/icons/Database";
-export { FileText as IconFile } from "@phosphor-icons/react/dist/icons/FileText";
-export { Monitor as IconSystem } from "@phosphor-icons/react/dist/icons/Monitor";
-export { Sun as IconSun } from "@phosphor-icons/react/dist/icons/Sun";
-export { Moon as IconMoon } from "@phosphor-icons/react/dist/icons/Moon";
-export { Keyboard as IconKeyboard } from "@phosphor-icons/react/dist/icons/Keyboard";
-export { Plugs as IconConnection } from "@phosphor-icons/react/dist/icons/Plugs";
-export { Palette as IconPalette } from "@phosphor-icons/react/dist/icons/Palette";
-export { Info as IconInfo } from "@phosphor-icons/react/dist/icons/Info";
-export { Stack as IconStack } from "@phosphor-icons/react/dist/icons/Stack";
+export {
+  TriangleAlertIcon as IconWarning,
+  CircleAlertIcon as IconError,
+  ShieldAlertIcon as IconWaiting,
+  DatabaseIcon as IconDatabase,
+  FileTextIcon as IconFile,
+  NewspaperIcon as IconArticle,
+  MonitorIcon as IconSystem,
+  SunIcon as IconSun,
+  MoonIcon as IconMoon,
+  KeyboardIcon as IconKeyboard,
+  PlugIcon as IconConnection,
+  PaletteIcon as IconPalette,
+  InfoIcon as IconInfo,
+  LayersIcon as IconStack,
+} from "lucide-react";
 
-export type { Icon as IconComponent } from "@phosphor-icons/react";
+export type { LucideIcon as IconComponent } from "lucide-react";

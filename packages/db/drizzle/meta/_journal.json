@@ -71,6 +71,34 @@
       "when": 1787843371019,
       "tag": "0009_pending_by_construction",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791787369633,
+      "tag": "0010_content_revisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791788864890,
+      "tag": "0011_content_mirror",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791805170664,
+      "tag": "0012_studio_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791826496527,
+      "tag": "0013_media_agents_settings",
+      "breakpoints": true
     }
   ]
 }

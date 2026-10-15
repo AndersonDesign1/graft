@@ -103,7 +103,7 @@ export function CreateDialog({
 
   return (
     <Dialog open={collection !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="dialog create">
+      <DialogContent className="create">
         <form
           onSubmit={(e) => {
             e.preventDefault();

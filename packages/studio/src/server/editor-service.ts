@@ -20,12 +20,16 @@ import {
   type DraftWorkflow,
   type StoreActor,
 } from "@usegraft/compiler";
-import { GraftError } from "@usegraft/contracts";
+import { GraftError, type ChangeSet } from "@usegraft/contracts";
 import type { AnyCollection } from "@usegraft/core";
 import type { Database } from "@usegraft/db";
 import { assertSafeMdx, type MdxTrust } from "@usegraft/mdx-safety";
 import matter from "gray-matter";
 import type {
+  ActivityDocumentDto,
+  AssetUseDto,
+  ActivityDto,
+  ActivityEventDto,
   DraftDiffDto,
   DraftChangeDto,
   DraftsDto,
@@ -34,6 +38,8 @@ import type {
   PublishAction,
   PublishResultDto,
   SaveEntryResult,
+  VersionDetailDto,
+  VersionListDto,
 } from "../editor-types";
 import type { SchemaFieldDto } from "../types";
 import { requireCollection } from "../content";
@@ -53,6 +59,10 @@ import {
 import { slugify as slugText } from "../slug";
 import { lineDiff } from "./line-diff";
 import { localDrafts } from "./local-drafts";
+import { localHistory, type LocalHistory } from "./local-history";
+
+/** Documents named per activity entry; the rest are counted. */
+const ACTIVITY_DOCUMENTS = 3;
 
 export interface EditorServiceOptions {
   contentDir: string;
@@ -78,6 +88,11 @@ export class EditorService {
 
   get remote(): boolean {
     return this.store.kind !== "filesystem";
+  }
+
+  /** Where saves land, in the words the workspace reports. */
+  get storage(): "local" | "github" | "database" {
+    return this.store.kind === "filesystem" ? "local" : this.store.kind;
   }
 
   /** What Publish does for a person, given whether they may publish directly. */
@@ -126,6 +141,12 @@ export class EditorService {
   }
 
   private async entries(name: string, actor: StoreActor): Promise<CatalogEntry[]> {
+    // A store that is the source of truth lists itself: there may be no
+    // checkout at all, and one that exists can be behind.
+    if (this.store.entries) {
+      const files = await this.store.entries(`${name}/`, actor);
+      return files.filter((file) => /\.mdx?$/.test(file.path)).map((file) => this.parsed(file));
+    }
     const disk = this.catalog.list(name);
     if (!this.store.overlay) return disk;
     return applyOverlay(disk, await this.store.overlay(actor), name);
@@ -160,6 +181,27 @@ export class EditorService {
     return [...entries, ...restored.filter((entry): entry is CatalogEntry => entry !== null)];
   }
 
+  /** Every file the entries use, and where: the media library's "Used in". */
+  async assetUses(actor: StoreActor): Promise<Map<string, AssetUseDto[]>> {
+    const uses = new Map<string, AssetUseDto[]>();
+    for (const [name, collection] of Object.entries(this.options.collections)) {
+      if (collection.authority === "db-authoritative") continue;
+      for (const entry of await this.entries(name, actor)) {
+        for (const ref of assetRefsIn(entry.data, "")) {
+          const list = uses.get(ref.key) ?? [];
+          list.push({
+            collection: name,
+            slug: entry.slug,
+            title: titleOf(entry),
+            field: ref.field,
+          });
+          uses.set(ref.key, list);
+        }
+      }
+    }
+    return uses;
+  }
+
   async list(
     name: string,
     fields: SchemaFieldDto[],
@@ -179,6 +221,19 @@ export class EditorService {
         ? new Map(entries.map((entry) => [entry.path, searchText(entry, fields)]))
         : undefined,
     );
+  }
+
+  /** Parsed entries by version: a list re-parses only what changed since the last one. */
+  private readonly parsedByVersion = new Map<string, CatalogEntry>();
+
+  private parsed(file: { path: string; raw: string; version: string }): CatalogEntry {
+    const key = `${file.path}@${file.version}`;
+    const hit = this.parsedByVersion.get(key);
+    if (hit) return hit;
+    const entry = parseEntry(file.path, file.raw);
+    if (this.parsedByVersion.size > 20_000) this.parsedByVersion.clear();
+    this.parsedByVersion.set(key, entry);
+    return entry;
   }
 
   /** The path for a slug: the file that declares it, or the conventional one. */
@@ -434,22 +489,114 @@ export class EditorService {
       this.drafts.readPublished(path),
       this.store.read(path, actor),
     ]);
-    const old = before ? parseEntry(path, before.raw) : null;
-    const next = after ? parseEntry(path, after.raw) : null;
-    const keys = new Set([...Object.keys(old?.data ?? {}), ...Object.keys(next?.data ?? {})]);
-    const fields = [...keys]
-      .filter((key) => !sameValue(old?.data[key], next?.data[key]))
-      .map((field) => ({
-        field,
-        before: old?.data[field] ?? null,
-        after: next?.data[field] ?? null,
-      }));
+    return compare(path, before?.raw ?? null, after?.raw ?? null);
+  }
+
+  /* ---- history ---------------------------------------------------------- */
+
+  /** Where history comes from: the store, or locally the checkout's git log. */
+  private get historySource(): LocalHistory | null {
+    const { store } = this;
+    if (store.history && store.readVersion && store.activity) {
+      return {
+        history: store.history.bind(store),
+        readVersion: store.readVersion.bind(store),
+        activity: store.activity.bind(store),
+      };
+    }
+    return this.remote ? null : localHistory(this.options.contentDir);
+  }
+
+  /** Why there is no history to show, or null when there is. */
+  private async noHistory(): Promise<string | null> {
+    if (!this.historySource) return "This storage keeps no history.";
+    const { available, reason } = await this.history();
+    return available ? null : (reason ?? "There is no history here yet.");
+  }
+
+  /** What was published for one document, newest first. */
+  async versions(path: string): Promise<VersionListDto> {
+    const reason = await this.noHistory();
+    const source = this.historySource;
+    if (reason !== null || !source) {
+      return { available: false, reason: reason ?? "", versions: [] };
+    }
+    const entries = await source.history(path, { limit: 50 });
     return {
-      path,
-      fields,
-      bodyChanged: (old?.body ?? "").trim() !== (next?.body ?? "").trim(),
-      file: lineDiff(path, before?.raw ?? null, after?.raw ?? null),
+      available: true,
+      versions: entries.map((entry) => ({
+        id: entry.id,
+        at: entry.at,
+        ...(entry.by ? { by: entry.by } : {}),
+        ...(entry.byKind ? { byKind: entry.byKind } : {}),
+        ...(entry.message ? { message: entry.message } : {}),
+        ...(entry.version === null ? { deleted: true } : {}),
+      })),
     };
+  }
+
+  /** One version's bytes, and how what the editor has now differs from it. */
+  async version(path: string, id: string, actor: StoreActor): Promise<VersionDetailDto> {
+    const source = this.historySource;
+    if (!source) {
+      throw new GraftError({
+        code: "DOCUMENT_NOT_FOUND",
+        message: "This storage keeps no history to read a version from.",
+        fix: "Restore it from wherever this content's history is kept.",
+        details: { path, id },
+      });
+    }
+    const [then, now] = await Promise.all([
+      source.readVersion(path, id),
+      this.store.read(path, actor),
+    ]);
+    return {
+      id,
+      path,
+      raw: then?.raw ?? null,
+      diff: compare(path, then?.raw ?? null, now?.raw ?? null),
+    };
+  }
+
+  /** What was published lately, across the content. */
+  async activity(limit = 20): Promise<ActivityDto> {
+    const reason = await this.noHistory();
+    const source = this.historySource;
+    if (reason !== null || !source) {
+      return { available: false, reason: reason ?? "", events: [] };
+    }
+    const entries = await source.activity({ limit });
+    const events = await Promise.all(
+      entries.map(async (entry) => {
+        const paths = (entry.paths ?? []).filter((path) => /\.mdx?$/.test(path));
+        const shown = paths.slice(0, ACTIVITY_DOCUMENTS);
+        const event: ActivityEventDto = {
+          id: entry.id,
+          at: entry.at,
+          documents: await Promise.all(shown.map((path) => this.documentAt(path))),
+          more: paths.length - shown.length,
+        };
+        if (entry.by) event.by = entry.by;
+        if (entry.byKind) event.byKind = entry.byKind;
+        if (entry.message) event.message = entry.message;
+        return event;
+      }),
+    );
+    return { available: true, events };
+  }
+
+  /** A path as an entry to link to: its slug and title now, if it still exists. */
+  private async documentAt(path: string): Promise<ActivityDocumentDto> {
+    const collection = path.split("/")[0] ?? "";
+    const name =
+      path
+        .split("/")
+        .pop()
+        ?.replace(/\.mdx?$/, "") ?? path;
+    const file = await this.drafts.readPublished(path).catch(() => null);
+    if (!file) return { path, collection, title: name };
+    const entry = parseEntry(path, file.raw);
+    return { path, collection, slug: entry.slug, title: titleOf(entry) };
   }
 
   async publish(
@@ -476,8 +623,13 @@ export class EditorService {
       ...(input.resolve ? { resolve: input.resolve } : {}),
       ...(this.remote ? { mode: action === "publish" ? "direct" : "review" } : {}),
     });
+    const refresh = result.changes ? await this.liveChanged(result.changes) : undefined;
     return {
-      action,
+      // The project's review rule can turn a direct publish into a review.
+      action: result.mode === "review" && action === "publish" ? "review" : action,
+      ...(result.reviewReasons ? { reviewReasons: result.reviewReasons } : {}),
+      ...(result.changes ? { live: true } : {}),
+      ...(refresh ? { refresh } : {}),
       published: result.published,
       tookTheirs: result.tookTheirs,
       commit: result.commit
@@ -489,6 +641,15 @@ export class EditorService {
         : null,
       ...(result.review ? { review: result.review } : {}),
     };
+  }
+
+  /** Tell the app a publish changed the live index, so it drops its cached pages. */
+  private liveChanged(changes: ChangeSet): Promise<ContentChangeNotice | undefined> {
+    return notifyContentChange(this.options.onContentChange, {
+      branch: this.options.branchId,
+      gitSha: null,
+      changes,
+    });
   }
 
   async discard(paths: string[], actor: StoreActor): Promise<ContentChangeNotice | undefined> {
@@ -552,4 +713,49 @@ function invalidSlug(slug: string): GraftError {
     fix: 'Use lowercase letters, numbers and single hyphens, like "summer-linen-shirt".',
     details: { slug, pattern: SLUG_RE.source },
   });
+}
+
+/** Field by field and line by line: what changed from one copy of a document to the next. */
+function compare(path: string, beforeRaw: string | null, afterRaw: string | null): DraftDiffDto {
+  const old = beforeRaw === null ? null : parseEntry(path, beforeRaw);
+  const next = afterRaw === null ? null : parseEntry(path, afterRaw);
+  const keys = new Set([...Object.keys(old?.data ?? {}), ...Object.keys(next?.data ?? {})]);
+  const fields = [...keys]
+    .filter((key) => !sameValue(old?.data[key], next?.data[key]))
+    .map((field) => ({
+      field,
+      before: old?.data[field] ?? null,
+      after: next?.data[field] ?? null,
+    }));
+  return {
+    path,
+    fields,
+    bodyChanged: (old?.body ?? "").trim() !== (next?.body ?? "").trim(),
+    file: lineDiff(path, beforeRaw, afterRaw),
+  };
+}
+
+const ASSET_KEY = /^[a-z0-9][a-z0-9._-]*(\/[a-z0-9][a-z0-9._-]*)*$/;
+
+/**
+ * The `{ key, alt }` values anywhere in an entry's data, with the field path
+ * that holds each: a top-level image, a gallery, an image inside a list of
+ * variants. An object counts only when `key` is an asset key and it has no
+ * other properties, so a reference or a group with a `key` field doesn't.
+ */
+export function assetRefsIn(value: unknown, path: string): Array<{ key: string; field: string }> {
+  if (Array.isArray(value)) {
+    return value.flatMap((item, i) => assetRefsIn(item, path ? `${path}.${i}` : String(i)));
+  }
+  if (!value || typeof value !== "object") return [];
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record);
+  if (
+    typeof record.key === "string" &&
+    ASSET_KEY.test(record.key) &&
+    keys.every((k) => k === "key" || k === "alt")
+  ) {
+    return [{ key: record.key, field: path }];
+  }
+  return keys.flatMap((k) => assetRefsIn(record[k], path ? `${path}.${k}` : k));
 }

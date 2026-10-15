@@ -7,6 +7,14 @@ order: 1
 
 <p className="kicker">Go from an empty folder to your content on a page in about 10 minutes.</p>
 
+<Callout label="Starting from nothing?" type="note">
+
+`npm create graft@latest my-site` makes a whole site in one step: a template,
+a database, Studio and a Next.js app, with example content. This guide adds
+Graft to a project you already have.
+
+</Callout>
+
 In this guide you will:
 
 - Set up Graft in a project with `graft init`
@@ -19,11 +27,11 @@ In this guide you will:
 You need **Node.js 22.16 or newer**. Graft's static index uses the `node:sqlite`
 module that ships with it. You do not need a database or a cloud account.
 
-<Callout label="Prefer to let your agent do it?" type="note">
-  Paste this into Claude Code, Cursor, or another coding agent:
-  "Add Graft to this project following https://graft.page/docs/getting-started.md.
-  Use the static engine, compile the sample content, and render the `home` page."
-</Callout>
+<AgentPrompt>
+  Add Graft to this project following
+  https://graft.page/docs/getting-started.md. Use the static engine, compile
+  the sample content, and render the `home` page.
+</AgentPrompt>
 
 ## Set up your first project
 

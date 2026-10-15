@@ -53,10 +53,32 @@ GitHub:
 | `POST` | `/entry` | `studio:write` |
 | `DELETE` | `/entry` | `studio:write` |
 | `POST` | `/entry/duplicate` | `studio:write` |
+| `GET` | `/entry/history?path=…` | `studio:read` |
+| `GET` | `/entry/version?path=…&id=…` | `studio:read` |
+| `GET` | `/activity?limit=…` | `studio:read` |
 | `GET` | `/drafts` | `studio:read` |
 | `GET` | `/drafts/diff?path=…` | `studio:read` |
 | `POST` | `/drafts/publish` | `studio:write` |
 | `POST` | `/drafts/discard` | `studio:write` |
+
+Media, agent tokens and the site's settings belong to the project, not to a
+branch:
+
+| Method | Path | Scope |
+| --- | --- | --- |
+| `GET` | `/assets?q=…` | `studio:read` |
+| `GET` | `/assets/detail?key=…` | `studio:read` |
+| `POST` | `/assets` | `studio:write` |
+| `PUT` | `/assets/alt` | `studio:write` |
+| `DELETE` | `/assets?key=…` | `studio:publish` |
+| `GET` | `/agents` | `studio:settings` |
+| `POST` | `/agents` | `studio:settings` |
+| `DELETE` | `/agents/:id` | `studio:settings` |
+| `GET` | `/site` | `studio:read` |
+| `PUT` | `/site` | `studio:settings` |
+| `POST` | `/site/hooks` | `studio:settings` |
+| `POST` | `/site/hooks/:id/test` | `studio:settings` |
+| `DELETE` | `/site/hooks/:id` | `studio:settings` |
 
 All paths are prefixed with `/api/studio/v1`. Sign-in lives beside them at
 `/api/studio/v1/auth/*` and needs no scope, because it is how a session starts.
@@ -66,23 +88,46 @@ All paths are prefixed with `/api/studio/v1`. Sign-in lives beside them at
 field), `dir`, `cursor` and `limit` (at most 500), and returns a page with the
 facets to filter by.
 
+`GET /entry/history` lists an entry's published versions, newest first: its
+revisions when content is in the database, the production branch's commits on
+GitHub, and the checkout's commits locally. Where there is no history it
+answers `available: false` with a `reason`. `GET /entry/version` returns one
+version's `raw` bytes and a `diff` from it to what the caller has now. To
+restore it, send that `raw` to `PUT /entry`: a restore is a draft. `GET
+/activity` lists recent publishes across the content (at most 100), each with
+who made it and the first few entries it changed.
+
 `PUT /entry` takes `{ collection, slug, data, body, baseVersion }`, where
 `baseVersion` is the `version` from `GET /entry`. A stale one is refused with
 `CONTENT_CONFLICT` (409) and nothing is written. `POST /drafts/publish` takes
 `{ paths, message?, resolve? }`; a caller without `studio:publish` always opens
 a pull request on a hosted Studio.
 
+`POST /assets` takes `{ name, base64, key?, alt?, overwrite? }`, at most
+10 MB, and stores the file at `assets/<name>` unless `key` says otherwise. It
+takes images and PDFs, typed by their extension. A key that is taken is refused
+with `ASSET_EXISTS` (409). `overwrite: true` replaces it, which changes the
+live site at once, so it needs `studio:publish`. `DELETE /assets` refuses a file an entry still uses with
+`CONTENT_CONFLICT` (409), naming the entries. Without an asset store, the media
+routes answer `storage: false` or `ENV_VAR_MISSING` (503).
+
+`POST /agents` takes `{ name, access }`, where `access` is `read`, `write`
+(drafts only) or `publish`, and returns the token once. Only its hash is
+stored. No access level carries `approvals:decide`.
+
 Revert has two methods on one path. `GET` checks whether a revert is safe and
 needs only a read scope. `POST` performs it and needs a write scope.
 
-## The four scopes
+## Scopes
 
 | Scope | Why it is separate |
 | --- | --- |
 | `studio:read` | Looking at the project |
-| `studio:write` | Changing it: saving drafts, compiling, committing, reverting |
-| `studio:publish` | Putting drafts live on a hosted Studio without a review |
-| `approvals:decide` | The human gate. No agent runtime token should carry it |
+| `studio:write` | Changing it: saving drafts, uploading files, compiling, committing, reverting |
+| `studio:publish` | Putting drafts live on a hosted Studio without a review, and deleting files |
+| `approvals:decide` | The human gate. No agent token carries it |
+| `studio:people` | Inviting people and changing their roles. Admins only |
+| `studio:settings` | Agent tokens, the site's address and deploy hooks. Admins only |
 
 Being signed in grants nothing by itself. A caller needs the scope for each
 kind of action, so an agent can be allowed to read without being able to commit.

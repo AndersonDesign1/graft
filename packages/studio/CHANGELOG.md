@@ -1,5 +1,249 @@
 # @usegraft/studio
 
+## 1.0.0-beta.7
+
+### Minor Changes
+
+- c997e35: Content can now live in your Postgres database instead of in git. Add
+  `export const content = { source: "database" }` to `graft.config.ts` and run
+  `graft content import` to load your files once.
+
+  Studio and agents then save drafts to the database, and publishing puts a
+  change on the live site straight away, with no rebuild and no GitHub setup. A
+  hosted Studio needs only `DATABASE_URL`. Every publish is checked exactly as
+  `graft compile` checks a file (the schema, slug uniqueness and MDX safety), and
+  a draft that would fail compile never goes live. `graft compile` reads the
+  published versions, never the files.
+
+  There is one draft per document, shared by everyone who edits it. Two people
+  or an agent saving the same document from the same version can't overwrite
+  each other: the second save gets `CONTENT_CONFLICT`. Someone without publish
+  rights submits for review instead, and the request closes once everything in
+  it is live.
+
+  Git stays the default and works as before. A project uses one source or the
+  other, never both. Reverting to a commit, `graft merge` and content migrations
+  work on files, so in a database-sourced project they refuse with the new
+  `CONTENT_SOURCE_MISMATCH`.
+
+  `graft db migrate` adds three tables (`content_revisions`, `content_heads`,
+  `content_reviews`), and `graft harden` grants the runtime role access to them.
+
+  For code that reads review requests from a content store: `ReviewRequest` now
+  has an `id`, and its `number` and `url` are optional, since a review in the
+  database is not a pull request. The `review` that MCP `list_drafts` and
+  `publish_drafts` return follows the same shape.
+
+- a761a13: Moving content between the database, your files and git.
+
+  - `graft pull` writes what is published into your files, and `graft push`
+    publishes the files you changed. Graft remembers what each file was pulled
+    at (`.graft/sync.json`), so a pull never overwrites your changes, and a push
+    is refused with `CONTENT_CONFLICT` if someone published that document since.
+    `--force` settles a conflict either way.
+  - `graft dev` tells you when someone publishes, so you know your files are
+    behind. Agents get the same answer from the new MCP tool `sync_status`.
+  - `content.mirror` copies what is published into GitHub: in batches from
+    `graft serve` (`mode: "batch"`, every `everyMinutes`), or after every publish
+    (`mode: "each"`). `graft mirror` does one run. A batch is one commit, or one
+    pull request merged straight away when the branch allows it. A pull request
+    that waits on checks or a review stays the only one: later runs add to it
+    until it merges.
+  - `graft check` runs every check a publish makes on the files, with no
+    database, and now also finds references to documents that don't exist.
+  - `graft ci changes`, `graft ci skip-build` and `graft ci init` keep CI cheap
+    on content-only changes. `skip-build` compares with the previous deploy, and
+    builds when it can't tell which that was.
+
+  For git-sourced projects hosted on GitHub, some publishes now open a pull
+  request even for an editor: deletions and renames, and changes over 200 lines.
+  Studio says why. Change the rule with `content.review` (`deletes`,
+  `collections`, `overLines`), or turn it off with `review: false`.
+
+  `graft db migrate` adds the `content_mirror` table.
+
+- 2d97fda: Studio accounts: people sign in to a hosted Studio with an email and a password.
+
+  - The first visit creates the owner account. On a server anyone can reach,
+    it asks for a setup code first, which `graft serve` prints when it starts
+    and `graft studio setup-code` prints from the site's settings.
+  - Admins invite people from Settings, People: an email and a role make a link
+    to pass on. The same list changes roles, makes a link to set a new password,
+    and removes access, which signs that person out at once.
+  - Account sessions live in the database, so signing out, removing someone or
+    changing their role takes effect on their next request. Changing your
+    password signs out your other browsers. Five wrong passwords in a row lock
+    an account for 15 minutes.
+  - Admins get the new `studio:people` scope. GitHub sign-in and
+    `graft studio invite` links work as before.
+  - New tables `studio_users`, `studio_sessions` and `studio_invites`: run
+    `graft db migrate`, and `graft harden <role>` again if you use a runtime role.
+
+- 21b232a: Studio's developer views follow the docs. Health leads with its numbers
+  without boxes or a decorative chart, lists collections, recent compiles,
+  approvals and branches as plain tables, and has a Compile button again, so
+  out-of-date content is fixed where Studio shows it. Schema shows types as
+  plain identifiers and "Required" as a word instead of a pill, and the sign-in
+  page uses the `graft. / Studio` wordmark. States read "Out of date", "Never
+  compiled" and "File missing" in place of "Drifted", "Not indexed" and
+  "Orphaned".
+- fe7d03b: Studio's editor screens follow the docs. Home opens with what is waiting for
+  you (drafts, an agent waiting on an approval, a pull request in review) and a
+  plain table of collections, in place of the printed-paper front page. The
+  collection list marks drafts with a dot and a word instead of a pill. The
+  entry page sits in the docs' column at the docs' reading size, with no card
+  around it.
+
+  One word for one state: an edit not yet committed or published is a Draft
+  everywhere, and every sentence uses the workspace's own verb, so a Studio on
+  a laptop says "commit" and never "publish".
+
+- e8b55ac: Studio keeps each entry's history, puts every decision in one inbox, and
+  shows what was published lately.
+
+  - **History.** The entry's panel has a History tab. It lists every published
+    version with who made it and when. Open one to see how the entry differs
+    from it now, then restore it as a draft. History comes from the published
+    revisions when content is in the database, the production branch's commits
+    on GitHub, and the checkout's commits locally. New API routes:
+    `GET /entry/history` and `GET /entry/version`.
+  - **Inbox.** Changes sent for review and agents asking before a destructive
+    call share one inbox, with a count in the sidebar. When content is in the
+    database, someone who can publish publishes a review from there. Approvals
+    move out of the Developer views, and old `#/dev/approvals` links open the
+    inbox.
+  - **Home.** A "Recently published" feed lists who published what, with
+    links to the entries (`GET /activity`).
+  - Content stores gain optional `history`, `readVersion` and `activity`
+    methods. `DatabaseStore` and `GitHubStore` implement them, and
+    `@usegraft/db` adds `publishedHistory`, `recentlyPublished` and
+    `readPublishedRevision`.
+
+- b086a62: Studio gets a media library, agent tokens, and the site's settings with deploy
+  hooks.
+
+  - **Media.** A Media page lists the files in the asset store that Studio
+    uploaded or an entry uses. Upload, search, write alt text, see which entries
+    use a file, and delete one nothing uses. Image fields have Choose…, and a gallery's Add image, which pick from the same library and take the file's alt text when the field has none. New routes under `/api/studio/v1/assets`.
+  - **Agents.** Admins make a token per agent under Developer, Agents, with
+    Read, Write drafts or Publish access. The token is shown once and only its
+    hash is stored. `graft serve` accepts it on `/api/mcp`, the Studio API and
+    functions, and revoking it takes effect on the next request. No token can
+    decide approvals. `@usegraft/auth`'s resolver gains a `tokens` option for
+    this.
+  - **Site and deploy hooks.** Settings has the site's name and address, and
+    deploy hooks: URLs called with a `POST` after every publish of
+    database-sourced content, with an optional bearer secret. Each hook shows
+    what it answered last, and Send a test calls it now. A failing hook never
+    undoes a publish. `@usegraft/compiler` exports `fireDeployHooks`.
+  - New scope `studio:settings`, held by admins.
+  - A Studio route that needs a table the database doesn't have answers
+    `MIGRATION_REQUIRED` (503) with the fix, instead of failing the request.
+
+  Run `graft db migrate` (migration 0013 adds `assets`, `agent_tokens`,
+  `site_settings` and `deploy_hooks`). Run `graft harden <role>` again if you
+  use a runtime role.
+
+- 132107f: Studio now uses the docs' type, color and icons. IBM Plex Sans and Plex Mono
+  replace Geist and Instrument Serif, and mono is kept for identifiers (a slug,
+  a path, a field name) instead of labels. Labels are sentence case with no
+  letter-spacing, nothing is under 13px, and weights are 400, 500 and 600.
+
+  Color follows the docs' rule, monochrome chrome and colorful content: states
+  are a mark and a word on the neutral ramp, amber is kept for something waiting
+  on a person, red for errors and deletes, and diffs keep their code colors.
+  Collections are marked by an icon in the text color, not a tinted tile.
+
+  Icons are Lucide, at 16px and a 1.75 stroke, as in the docs.
+
+  **BREAKING (panels embed only):** if you embed `@usegraft/studio/panels`,
+  install `lucide-react` in place of `@phosphor-icons/react`. It is the optional
+  peer the panels now import. `graft studio` and `graft serve --studio` need
+  nothing.
+
+- b146045: Studio's frame and popups now match the docs. A 56px top bar runs across the
+  page with the `graft. / Studio` wordmark and the branch on the left, search
+  centred, and Commit (or Publish) and the account menu on the right. The
+  sidebar sits under it on the page colour. Below 768px the sidebar opens from a
+  menu button.
+
+  Popups share one material: the elevated surface and a 10px radius, opening in
+  160ms and closing in 100ms. Dialogs and sheets add a dimmed backdrop with no
+  blur and a visible close button; the command palette opens instantly and closes
+  on Escape or a choice. Deleting or discarding asks in a confirm dialog that starts on
+  Cancel and names the action ("Delete post") in place of the browser's
+  `confirm()`. The command palette shows its keys, menus carry icons, toasts
+  come one at a time, and committing ends with a plain check instead of an
+  animation.
+
+  `@usegraft/tokens` adds `--scrim`, the colour behind a dialog or sheet.
+
+- cafd545: Studio opens an entry as panes. The collection's list stays beside the
+  document, with the open entry marked, so the next entry is one click away and
+  the arrow keys move through the list. A new inspector beside the document shows
+  the entry's status, where it is saved, its file and version, and what changed;
+  ⌘\ or Ctrl+\ hides it for a full-width page. Under 1280px it opens over the
+  document instead, and the list gives way under 1024px. Every pane header is
+  the same height, and all of Studio's spacing now comes from the `--space-*`
+  scale.
+
+### Patch Changes
+
+- d6aec19: Opening the account, sort or filter menu no longer turns Studio into a blank
+  page. Each menu put its label outside a group, which the menu library refuses,
+  and nothing caught the error. Menu labels now always come with their group,
+  menu items sit on one line, and a rendering error shows what went wrong with a
+  Reload button instead of a white page.
+- Updated dependencies [c997e35]
+- Updated dependencies [95ecc3e]
+- Updated dependencies [a761a13]
+- Updated dependencies [2d97fda]
+- Updated dependencies [e8b55ac]
+- Updated dependencies [b086a62]
+  - @usegraft/db@1.0.0-beta.7
+  - @usegraft/compiler@1.0.0-beta.7
+  - @usegraft/contracts@1.0.0-beta.7
+  - @usegraft/core@1.0.0-beta.7
+  - @usegraft/mdx-safety@1.0.0-beta.7
+  - @usegraft/assets@1.0.0-beta.7
+
+## 1.0.0-beta.6
+
+### Patch Changes
+
+- 2386e74: Field descriptors now match what the validator checks. A pattern's flags are kept in the new `constraints.patternFlags`, so Studio checks `/^[a-z]+$/i` case-insensitively like the server does instead of flagging valid values. Constraints are listed only for the field types that enforce them: `field.string({ min: 10 })` validates nothing, so `describe_schema` no longer advertises a minimum for it.
+- 2386e74: A save to a GitHub draft can no longer be lost while the draft is being emptied. Publishing everything or discarding the last change used to read the draft branch and then delete it, and a save that landed in between was deleted with it after reporting success. The draft is now emptied with a fast-forward that fails if the branch moved, so the branch stays, holding no changes, and the next save reuses it.
+
+  Invite-link editors get new draft branch names. Their key joins the hash with `--`, which a GitHub login cannot produce, so a login shaped like an email's key (`ana-lima-shop-test-0123456789`) no longer shares that person's draft. A draft saved under the old name before upgrading stays on GitHub as a branch: publish or discard it first, or merge it by hand.
+
+- 2386e74: One loopback list decides every "https unless loopback" question: `@usegraft/compiler` exports `LOOPBACK_HOSTS` and `isLoopbackHost`, and the revalidate webhook, Studio's `Secure` session cookie and `graft studio invite` all use them, so the invite check and the cookie can never disagree about a host. Paths under a regular file now read as absent instead of failing with `ENOTDIR`, and deleting a document that is already gone succeeds.
+- 2386e74: A hosted Studio's change diff keeps its memory bounded. It kept a copy of the whole search frontier for every changed line, so a large rewrite (two 10,000-line versions with nothing in common) needed gigabytes and could take the server down. It now skips the unchanged start and end, keeps only the part of the frontier each step uses, and past 2,000 changed lines falls back to every old line removed and every new line added. As before, the drawer renders at most 600 lines and marks a longer diff as truncated. A hunk whose old or new side is empty now starts at the line before it, as git does (`-0,0` for a new file).
+- 2386e74: `@usegraft/studio` also exports `ContentChangeNotice` and `ReviewRequest`, the two types its editor DTOs refer to, so typing a response needs one import instead of a second one from `@usegraft/compiler`.
+- 2386e74: Studio fixes from review:
+
+  - Discarding a local file that was staged as new and then deleted works, including in a repository with no commits yet. It used to try to restore it from HEAD, where it never was.
+  - Local drafts report each changed file's version, as GitHub drafts do. Only a deletion has none.
+  - A failed GitHub sign-in returns to the page the person started from, branch and hash kept, instead of Studio's front page. That needs the sign-in's own state cookie: a callback without a valid one still lands on the front page.
+  - Slugs drop every combining mark, not only those in U+0300 to U+036F, so a title with one no longer gains a hyphen mid-word.
+  - "News", "series", "species", "media" and "data" keep their form in the singular ("New news" became "New new").
+  - `ContentTreePanel` follows a change to its `branch` prop. It kept showing the first branch.
+  - The first render after a view starts loading shows the loading state, not an empty page.
+  - The vermilion scale uses the same lightness steps as the other hues, so unpublished-state colour reads at the same brightness.
+  - `WorkspaceDto.sessions` is documented as what it is: whether the request carried a session cookie.
+
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+  - @usegraft/compiler@1.0.0-beta.6
+  - @usegraft/core@1.0.0-beta.6
+  - @usegraft/contracts@1.0.0-beta.6
+  - @usegraft/db@1.0.0-beta.6
+  - @usegraft/mdx-safety@1.0.0-beta.6
+  - @usegraft/assets@1.0.0-beta.6
+
 ## 1.0.0-beta.5
 
 ### Minor Changes

@@ -1,5 +1,142 @@
 # @usegraft/db
 
+## 1.0.0-beta.7
+
+### Minor Changes
+
+- c997e35: Content can now live in your Postgres database instead of in git. Add
+  `export const content = { source: "database" }` to `graft.config.ts` and run
+  `graft content import` to load your files once.
+
+  Studio and agents then save drafts to the database, and publishing puts a
+  change on the live site straight away, with no rebuild and no GitHub setup. A
+  hosted Studio needs only `DATABASE_URL`. Every publish is checked exactly as
+  `graft compile` checks a file (the schema, slug uniqueness and MDX safety), and
+  a draft that would fail compile never goes live. `graft compile` reads the
+  published versions, never the files.
+
+  There is one draft per document, shared by everyone who edits it. Two people
+  or an agent saving the same document from the same version can't overwrite
+  each other: the second save gets `CONTENT_CONFLICT`. Someone without publish
+  rights submits for review instead, and the request closes once everything in
+  it is live.
+
+  Git stays the default and works as before. A project uses one source or the
+  other, never both. Reverting to a commit, `graft merge` and content migrations
+  work on files, so in a database-sourced project they refuse with the new
+  `CONTENT_SOURCE_MISMATCH`.
+
+  `graft db migrate` adds three tables (`content_revisions`, `content_heads`,
+  `content_reviews`), and `graft harden` grants the runtime role access to them.
+
+  For code that reads review requests from a content store: `ReviewRequest` now
+  has an `id`, and its `number` and `url` are optional, since a review in the
+  database is not a pull request. The `review` that MCP `list_drafts` and
+  `publish_drafts` return follows the same shape.
+
+- a761a13: Moving content between the database, your files and git.
+
+  - `graft pull` writes what is published into your files, and `graft push`
+    publishes the files you changed. Graft remembers what each file was pulled
+    at (`.graft/sync.json`), so a pull never overwrites your changes, and a push
+    is refused with `CONTENT_CONFLICT` if someone published that document since.
+    `--force` settles a conflict either way.
+  - `graft dev` tells you when someone publishes, so you know your files are
+    behind. Agents get the same answer from the new MCP tool `sync_status`.
+  - `content.mirror` copies what is published into GitHub: in batches from
+    `graft serve` (`mode: "batch"`, every `everyMinutes`), or after every publish
+    (`mode: "each"`). `graft mirror` does one run. A batch is one commit, or one
+    pull request merged straight away when the branch allows it. A pull request
+    that waits on checks or a review stays the only one: later runs add to it
+    until it merges.
+  - `graft check` runs every check a publish makes on the files, with no
+    database, and now also finds references to documents that don't exist.
+  - `graft ci changes`, `graft ci skip-build` and `graft ci init` keep CI cheap
+    on content-only changes. `skip-build` compares with the previous deploy, and
+    builds when it can't tell which that was.
+
+  For git-sourced projects hosted on GitHub, some publishes now open a pull
+  request even for an editor: deletions and renames, and changes over 200 lines.
+  Studio says why. Change the rule with `content.review` (`deletes`,
+  `collections`, `overLines`), or turn it off with `review: false`.
+
+  `graft db migrate` adds the `content_mirror` table.
+
+- 2d97fda: Studio accounts: people sign in to a hosted Studio with an email and a password.
+
+  - The first visit creates the owner account. On a server anyone can reach,
+    it asks for a setup code first, which `graft serve` prints when it starts
+    and `graft studio setup-code` prints from the site's settings.
+  - Admins invite people from Settings, People: an email and a role make a link
+    to pass on. The same list changes roles, makes a link to set a new password,
+    and removes access, which signs that person out at once.
+  - Account sessions live in the database, so signing out, removing someone or
+    changing their role takes effect on their next request. Changing your
+    password signs out your other browsers. Five wrong passwords in a row lock
+    an account for 15 minutes.
+  - Admins get the new `studio:people` scope. GitHub sign-in and
+    `graft studio invite` links work as before.
+  - New tables `studio_users`, `studio_sessions` and `studio_invites`: run
+    `graft db migrate`, and `graft harden <role>` again if you use a runtime role.
+
+- e8b55ac: Studio keeps each entry's history, puts every decision in one inbox, and
+  shows what was published lately.
+
+  - **History.** The entry's panel has a History tab. It lists every published
+    version with who made it and when. Open one to see how the entry differs
+    from it now, then restore it as a draft. History comes from the published
+    revisions when content is in the database, the production branch's commits
+    on GitHub, and the checkout's commits locally. New API routes:
+    `GET /entry/history` and `GET /entry/version`.
+  - **Inbox.** Changes sent for review and agents asking before a destructive
+    call share one inbox, with a count in the sidebar. When content is in the
+    database, someone who can publish publishes a review from there. Approvals
+    move out of the Developer views, and old `#/dev/approvals` links open the
+    inbox.
+  - **Home.** A "Recently published" feed lists who published what, with
+    links to the entries (`GET /activity`).
+  - Content stores gain optional `history`, `readVersion` and `activity`
+    methods. `DatabaseStore` and `GitHubStore` implement them, and
+    `@usegraft/db` adds `publishedHistory`, `recentlyPublished` and
+    `readPublishedRevision`.
+
+- b086a62: Studio gets a media library, agent tokens, and the site's settings with deploy
+  hooks.
+
+  - **Media.** A Media page lists the files in the asset store that Studio
+    uploaded or an entry uses. Upload, search, write alt text, see which entries
+    use a file, and delete one nothing uses. Image fields have Choose…, and a gallery's Add image, which pick from the same library and take the file's alt text when the field has none. New routes under `/api/studio/v1/assets`.
+  - **Agents.** Admins make a token per agent under Developer, Agents, with
+    Read, Write drafts or Publish access. The token is shown once and only its
+    hash is stored. `graft serve` accepts it on `/api/mcp`, the Studio API and
+    functions, and revoking it takes effect on the next request. No token can
+    decide approvals. `@usegraft/auth`'s resolver gains a `tokens` option for
+    this.
+  - **Site and deploy hooks.** Settings has the site's name and address, and
+    deploy hooks: URLs called with a `POST` after every publish of
+    database-sourced content, with an optional bearer secret. Each hook shows
+    what it answered last, and Send a test calls it now. A failing hook never
+    undoes a publish. `@usegraft/compiler` exports `fireDeployHooks`.
+  - New scope `studio:settings`, held by admins.
+  - A Studio route that needs a table the database doesn't have answers
+    `MIGRATION_REQUIRED` (503) with the fix, instead of failing the request.
+
+  Run `graft db migrate` (migration 0013 adds `assets`, `agent_tokens`,
+  `site_settings` and `deploy_hooks`). Run `graft harden <role>` again if you
+  use a runtime role.
+
+### Patch Changes
+
+- Updated dependencies [c997e35]
+  - @usegraft/contracts@1.0.0-beta.7
+
+## 1.0.0-beta.6
+
+### Patch Changes
+
+- Updated dependencies [2386e74]
+  - @usegraft/contracts@1.0.0-beta.6
+
 ## 1.0.0-beta.5
 
 ### Patch Changes

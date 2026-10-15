@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectionLabel, publishVerb, singular } from "./studio";
+import { actionWord, collectionLabel, doneWord, publishVerb, singular } from "./studio";
 import { slugify } from "../../slug";
 
 describe("collection words", () => {
@@ -30,5 +30,15 @@ describe("collection words", () => {
     expect(publishVerb("publish")).toBe("Publish");
     expect(publishVerb("review")).toBe("Submit for review");
     expect(publishVerb("commit")).toBe("Commit");
+  });
+
+  it("names finished work by what this workspace does with it", () => {
+    // A laptop commits and never publishes, so no sentence may say "publish" there.
+    expect(actionWord("commit")).toBe("commit");
+    expect(doneWord("commit")).toBe("committed");
+    expect(actionWord("publish")).toBe("publish");
+    expect(doneWord("publish")).toBe("published");
+    expect(actionWord("review")).toBe("submit");
+    expect(doneWord("review")).toBe("published");
   });
 });

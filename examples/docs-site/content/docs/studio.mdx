@@ -1,6 +1,6 @@
 ---
 title: Studio
-description: "An editor for people who would rather not edit files: find, create, edit and publish content in a browser, with every change ending up in Git."
+description: "An editor for people who would rather not edit files: find, create, edit and publish content in a browser, with every change kept in Git or the database."
 section: Content
 order: 5
 ---
@@ -11,12 +11,14 @@ order: 5
 
 Not everyone on your team wants to edit Markdown files and run Git commands.
 Studio is an editor for them. They find an entry, change it in a form built from
-your schema, and publish. Everything still ends up as files in Git, exactly as
-if a developer had edited them, and nothing an editor can do in Studio is
-unavailable to an agent or a developer.
+your schema, and publish. In a project that keeps its content in Git, every
+change ends up as files there, exactly as if a developer had edited them. In
+one that keeps it in the database, every change is a revision in Postgres.
+Nothing an editor can do in Studio is unavailable to an agent or a developer.
 
 Studio needs the [Postgres engine](/docs/tiers) for its developer views
-(history, approvals, branches). Content stays files in Git either way.
+(history, approvals, branches). Your content stays where your project keeps it
+either way.
 
 ## Open Studio
 
@@ -36,11 +38,12 @@ Content comes first.
 
 | Where | What it is for |
 | --- | --- |
-| Home | What is waiting to publish, and every collection with its count |
+| Home | What is waiting for you, what was published lately and by whom, and every collection with its count |
+| Inbox | Changes sent for review, and agents asking before they delete or overwrite anything |
 | A collection | A table of its entries: search, filter, sort, select many |
-| An entry | Its fields and its content, saved as you type |
+| An entry | Its fields and its content, saved as you type, between its collection's list and a panel with its details and history |
 | Publish | Every unpublished change, what changed in it, and the button that puts it live |
-| Developer | Index health, schema, history, branches, approvals and settings |
+| Developer | Index health, schema, compile history, branches and settings |
 
 Press <kbd>⌘K</kbd> anywhere to find an entry by name, create one, or jump to a
 collection. Search runs on the server, so it is as quick on five thousand
@@ -82,6 +85,29 @@ touch. When it can't, the content opens as Markdown beside the same form. This
 matters for MDX: a change as small as escaping `{` can break a page that looks
 identical. Use **Edit source** in the entry's menu to edit the whole file.
 
+### The list and the panel
+
+An open entry keeps its collection's list on the left, with the entry marked,
+so the next one is a click away. The arrow keys move through the list and
+Enter opens an entry.
+
+The panel on the right has three tabs:
+
+- **Details**: whether the entry is published, where it is saved, its URL
+  name, file and version.
+- **Changes**: what your draft changes, field by field.
+- **History**: every published version, who made it and when. Open one to see
+  how the entry differs from it now, and press **Restore this version** to go
+  back to it. A restore is a draft like any other edit: nothing on the site
+  changes until you publish it.
+
+History comes from wherever the content lives: the published revisions when
+content is in the database, the production branch's commits on GitHub, and
+your checkout's commits on your machine.
+
+Press <kbd>⌘&#92;</kbd> (<kbd>Ctrl+&#92;</kbd>) to hide the panel for a full-width
+page. On a narrower window it opens over the entry instead of beside it.
+
 ### Saving
 
 Studio saves automatically, and never rewrites an entry you only opened. Every
@@ -102,11 +128,50 @@ Studio runs:
 | On your machine | Commit | A Git commit of the selected files. Nothing is pushed |
 | Hosted, editor | Publish | One commit on your production branch; the site redeploys. With `GRAFT_STUDIO_PUBLISH=pull-request`, a pull request instead |
 | Hosted, contributor | Submit for review | A pull request for someone to merge |
+| Content in the database, editor | Publish | The entries go live on the site straight away. Nothing to rebuild |
+| Content in the database, contributor | Submit for review | A request someone who can publish approves |
+
+When your project keeps its content in the database
+(`content = { source: "database" }`, see
+[Configuration](/docs/configuration#content)), there is one draft per entry,
+shared by everyone who edits it, and Studio works the same on your machine and
+hosted.
 
 **Discard** throws a draft away and leaves the published version as it is.
 Deleting an entry is a draft too: it stays live until you publish the deletion,
 and the toast that follows a delete has an Undo. Until then the entry stays in
 its collection marked Deleted; open it to read it or press Restore.
+
+## Inbox
+
+The inbox holds what is waiting on a decision:
+
+- **Changes for review.** A contributor's Submit for review lands here. When
+  content is in the database, someone who can publish presses **Publish** on
+  the request. On GitHub, the request is a pull request, and **Open on
+  GitHub** takes you to it.
+- **Agents asking first.** A destructive call from an agent waits until a
+  person approves or denies it. Nothing runs until then. See
+  [Audit & approvals](/docs/audit-and-approvals).
+
+The sidebar shows how many things are waiting.
+
+## Media
+
+**Media** in the sidebar lists every file in the asset store that Studio
+uploaded or an entry uses. Search by name or alt text, and press **Upload** to
+add images or PDFs (10 MB each at most). Open a file to copy its key, write
+its alt text, and see which entries use it. A file can be deleted only when
+nothing uses it, by someone who can publish.
+
+An image field has **Choose…**, which opens the same library: pick a file or
+upload one. The field takes the file's alt text when it has none of its own,
+and you can still word it differently for that entry.
+
+Media needs an asset store: set `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`
+and `S3_BUCKET` (any S3-compatible store) where Studio runs, and
+`S3_PUBLIC_URL` for public links. Without them the library says so, and image
+fields still take a key you type.
 
 ## Give people access
 
@@ -122,11 +187,53 @@ The roles name scopes, which is also what bearer tokens carry:
 | `studio:write` | Saving drafts, discarding, compiling. Publishing opens a pull request |
 | `studio:publish` | Publishing straight to the production branch |
 | `approvals:decide` | Approving and denying |
+| `studio:people` | Inviting people and changing their roles (admins) |
+| `studio:settings` | Agent tokens, the site's address and deploy hooks (admins) |
+
+## Agents
+
+**Developer, Agents** gives an agent its own token, for the MCP endpoint and
+the Studio API. Name the token after the agent and pick how far it may go:
+
+| Access | The agent can |
+| --- | --- |
+| Read | Read content, never change it |
+| Write drafts | Write drafts, which a person publishes |
+| Publish | Write and publish |
+
+The token is shown once, so copy it then. Studio keeps only its hash, so a lost
+token is revoked and replaced, never shown again. Revoking takes effect on the
+agent's next request. No token can approve: destructive calls still wait in the
+inbox for a person. Only admins see this page.
+
+Tokens work where the site runs `graft serve`. `graft studio` on your own
+machine has no MCP endpoint, so tokens made there are for the hosted site on
+the same database.
+
+## Site and deploy hooks
+
+**Settings, Site** holds the site's name and address. Studio shows them, and
+agents can read them.
+
+**Settings, Deploy hooks** lists URLs called with a `POST` after every publish:
+a host's build hook, so a static site rebuilds, or the site's own revalidate
+route, so cached pages refresh. Add a secret if the URL checks one; it is sent
+as `Authorization: Bearer <secret>`. Each hook shows what it answered last, and
+**Send a test** calls it now. A hook that fails never undoes the publish.
+
+The body names what went live:
+
+```json title="Deploy hook body"
+{ "event": "publish", "branch": "main", "paths": ["posts/hello-world.mdx"], "at": "2026-10-12T09:00:00.000Z" }
+```
+
+Hooks need https, or http to the same machine. They are called when content is
+in the database. When content is in git, the host builds from the commit.
 
 ## Developer views
 
 Under **Developer**: index health (each document's state against the compiled
-index), the schema, the compile history with restore, branches, approvals, and
+index), the schema, the compile history with restore, branches, agents, and
 settings. The index states are explained in [How Graft works](/docs/the-model).
 
 ## Do it without Studio
@@ -139,6 +246,8 @@ settings. The index states are explained in [How Graft works](/docs/the-model).
 | Publish, locally | `git commit` | |
 | Publish, hosted | Merge the draft branch (all of its changes at once) | `publish_drafts` |
 | Discard a draft | `git restore` | `discard_drafts` |
+| See an entry's history | `git log -- <file>` | |
+| Restore an old version | `git checkout <commit> -- <file>` | `write_content` with the old bytes |
 | See past compiles | `graft compilations` | `list_compilations` |
 | Approve or deny | `graft approve` / `graft deny` | `decide_approval` |
 

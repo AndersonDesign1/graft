@@ -33,8 +33,8 @@
 .sk {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.5rem 0.25rem;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-1);
 }
 
 .sk-bar,
@@ -68,7 +68,7 @@
 
 .sk-syncbar {
   height: 2px;
-  margin: 0 0.45rem 0.3rem 1.55rem;
+  margin: 0 var(--space-2) var(--space-1) var(--space-6);
 }
 
 @keyframes sk-pulse {
@@ -85,30 +85,30 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0.35rem 0.15rem;
+  padding: var(--space-1) 2px;
 }
 
 .sk-tree-children {
-  margin-left: 1.1rem;
-  padding-left: 0.45rem;
+  margin-left: var(--space-4);
+  padding-left: var(--space-2);
   border-left: 1px solid var(--hairline);
 }
 
 .sk-tree-doc {
-  padding: 0.25rem 0.15rem;
+  padding: var(--space-1) 2px;
 }
 
 .sk-row {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
 }
 
 .sk-row-main {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: var(--space-1);
   flex: 1;
   min-width: 0;
 }
@@ -137,7 +137,7 @@
   grid-template-columns: 1fr 1fr 1fr auto;
   gap: var(--space-4);
   align-items: center;
-  padding: 0.5rem 0.6rem;
+  padding: var(--space-2) var(--space-2);
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -159,13 +159,13 @@
 .sk-field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: var(--space-1);
 }
 
 .sk-prose {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: var(--space-2);
 }
 
 /* Matches `.chart`: same height and full width, so the real chart drops in
@@ -173,7 +173,7 @@
 .sk-chart {
   display: flex;
   align-items: flex-end;
-  gap: 3px;
+  gap: var(--space-1);
   width: 100%;
   height: 3rem;
 }
@@ -183,304 +183,13 @@
   min-width: 0;
 }
 
-/* ==========================================================================
-   Document sheet — one column, frontmatter above body
-   ========================================================================== */
-
-/* The sheet: a page raised off the desk, squared to the house geometry.
-   Elevation is a hairline plus one soft shadow rather than a heavy drop —
-   this should look like paper, not like a floating dialog.
-
-   48rem minus 2×48px padding leaves a ~672px column: about 72 characters at
-   18px, the middle of the 60–75 range prose wants. The page width *is* the
-   measure — there is no second cap fighting it. */
-.doc-sheet {
-  width: 100%;
-  max-width: 48rem;
-  margin-inline: auto;
-  padding: var(--space-12) var(--space-12) var(--space-16);
-  background: var(--paper-raised);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-outer);
-  box-shadow:
-    0 1px 2px light-dark(rgb(0 0 0 / 4%), rgb(0 0 0 / 30%)),
-    0 8px 24px -12px light-dark(rgb(0 0 0 / 10%), rgb(0 0 0 / 50%));
-}
-
-@media (width < 48rem) {
-  .doc-sheet {
-    padding: var(--space-6) var(--space-4) var(--space-12);
-  }
-}
-
-/* ==========================================================================
-   Page settings (schema-driven frontmatter)
-   ========================================================================== */
-
-/* Settings, not content. A sunken well inside the sheet says "this is the
-   document's metadata" without a heading announcing it, and the contrast
-   against the white body is what lets the body read as the writing surface.
-   Radius is concentric: sheet 10px at 48px padding leaves the well at 6px. */
-.settings-card {
-  padding: var(--space-4);
-  margin-bottom: var(--space-8);
-  background: var(--paper-sunken);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius);
-}
-
-.settings-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
-}
-
-/* Chrome, so it stays mono and small however editorial the canvas gets. */
-.settings-title {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: 500;
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--ink-muted);
-}
-
-.settings-count {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  /* The count changes as fields come and go; fixed-width digits keep the
-     header from twitching. */
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-faint);
-}
-
-.settings-grid {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-/* Label beside the value, not above it. Frontmatter is a short list of
-   properties; stacking each one doubled the height of the block sitting
-   between the operator and the thing they came to write. */
-.settings-field {
-  display: grid;
-  grid-template-columns: 9rem minmax(0, 1fr);
-  gap: var(--space-1) var(--space-3);
-  align-items: start;
-}
-
-/* The label column carries the name, the type chip and the required marker,
-   stacked — three facts about one field, reading top to bottom. */
-.settings-field-head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  /* Optical: line the label up with the first line of a control that has its
-     own border, rather than with the control's box. */
-  padding-top: 5px;
-}
-
-.settings-label {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--field-label);
-  overflow-wrap: anywhere;
-}
-
-.settings-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  align-items: center;
-}
-
-.settings-required {
-  padding: 1px 5px;
-  border-radius: var(--radius-inner);
-  background: var(--field-required-bg);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--field-required);
-}
-
-/* Help text comes from the schema's own `description`, so the thing that
-   teaches an agent in describe_schema teaches the operator here. */
-.settings-help {
-  grid-column: 2;
-  font-size: var(--text-2xs);
-  line-height: var(--leading-tight);
-  color: var(--ink-faint);
-  text-wrap: pretty;
-}
-
-.settings-empty {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--ink-faint);
-}
-
-.settings-divider {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin: var(--space-4) 0 var(--space-3);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--ink-faint);
-}
-
-.settings-divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--hairline);
-}
-
-/* ---- structured values (object / array) --------------------------------- */
-
-.settings-structured {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-  min-height: 1.75rem;
-}
-
-.settings-structured.is-empty {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--ink-faint);
-}
-
-.settings-structured-summary {
-  padding: 2px 6px;
-  border-radius: var(--radius-inner);
-  background: var(--mdx-component-bg);
-  border: 1px solid var(--mdx-component-border);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--mdx-component-text);
-}
-
-.settings-structured-edit {
-  padding: 2px 6px;
-  border: 0;
-  border-radius: var(--radius-inner);
-  background: none;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--ink-muted);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-out);
-}
-
-.settings-structured-edit:hover {
-  color: var(--ink);
-}
-
-/* ---- asset ---------------------------------------------------------------
-   The whole field used to render as nothing: `typeof value === "object"` fell
-   through every branch of the old value-driven form. */
-
-.asset-field {
-  display: flex;
-  gap: var(--space-3);
-  align-items: start;
-}
-
-.asset-preview {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 3rem;
-  height: 3rem;
-  overflow: hidden;
-  border-radius: var(--radius-inner);
-  background: var(--paper-raised);
-  /* A hairline outline rather than a border: it sits over the image edge
-     without changing the box, and pure black/white keeps it from reading as
-     dirt on the picture. */
-  outline: 1px solid light-dark(rgb(0 0 0 / 10%), rgb(255 255 255 / 10%));
-  outline-offset: -1px;
-}
-
-.asset-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.asset-preview-fallback {
-  color: var(--ink-faint);
-}
-
-.asset-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-  flex: 1;
-}
-
-@media (width < 40rem) {
-  .settings-field {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .settings-field-head {
-    flex-direction: row;
-    align-items: center;
-    padding-top: 0;
-  }
-
-  .settings-help {
-    grid-column: 1;
-  }
-}
-
-.save-state {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  transition: color var(--duration-fast) var(--ease-out);
-}
-
-.save-state[data-state="saving"] {
-  color: var(--state-drifted-text);
-}
-
-.save-state[data-state="saved"] {
-  color: var(--state-synced-text);
-}
-
-.save-state[data-state="error"] {
-  color: var(--state-orphaned-text);
-}
-
-/* ==========================================================================
-   Rich editor (Milkdown / ProseMirror)
-   ========================================================================== */
-
-.doc-body-editor {
-  min-height: 24rem;
-}
-
 .rich .milkdown,
 .rich .ProseMirror {
   outline: none;
 }
 
 /* Crepe ships `padding: 60px 120px` on the editor for its own standalone
-   layout. The sheet owns padding now, and leaving both in place inset the text
+   layout. The page owns padding now, and leaving both in place inset the text
    168px from the page edge — a ~40-character measure inside an 832px page,
    which is most of why the canvas read as a narrow grey column. */
 .rich .milkdown .ProseMirror {
@@ -506,9 +215,10 @@
    to render 16px body and a 24px h1, so the canvas was both flat and a lie
    about what the page would look like. The measure itself is the sheet's
    width minus its padding — see .doc-sheet. */
+/* The docs' reading size: an entry looks like the page it becomes. */
 .rich .ProseMirror {
-  font-size: var(--text-md);
-  line-height: var(--leading-body);
+  font-size: 1.0625rem;
+  line-height: 1.75;
   color: var(--ink);
   text-wrap: pretty;
 }
@@ -521,11 +231,10 @@
 .rich .ProseMirror h2,
 .rich .ProseMirror h3,
 .rich .ProseMirror h4 {
+  /* Plex Sans 600, as the published page sets its headings. */
   font-family: var(--font-editorial);
-  /* Instrument Serif ships one weight; asking for 560 would synthesise a
-     smeared fake bold. Size and the face itself carry the hierarchy. */
-  font-weight: 400;
-  letter-spacing: var(--editorial-tracking);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--display-tracking);
   line-height: var(--leading-snug);
   text-wrap: balance;
   /* Space above a heading belongs to the section it opens, so it is larger
@@ -540,15 +249,17 @@
 
 .rich .ProseMirror h1 {
   font-size: var(--text-xl);
-  line-height: var(--leading-tight);
+  line-height: 1.2;
 }
 
 .rich .ProseMirror h2 {
-  font-size: var(--text-lg);
+  font-size: 1.625rem;
+  line-height: 1.2;
 }
 
 .rich .ProseMirror h3 {
-  font-size: var(--text-md);
+  font-size: var(--text-h3);
+  line-height: 1.3;
 }
 
 .rich .ProseMirror h4 {
@@ -563,7 +274,7 @@
 }
 
 .rich .ProseMirror code {
-  padding: 0.1rem 0.3rem;
+  padding: 2px var(--space-1);
   border-radius: var(--radius-inner);
   background: var(--paper-sunken);
   font-size: 0.9em;
@@ -607,7 +318,7 @@
 
 .rich .ProseMirror th,
 .rich .ProseMirror td {
-  padding: 0.4rem 0.6rem;
+  padding: var(--space-2) var(--space-2);
   border: 1px solid var(--hairline);
   text-align: left;
 }
@@ -660,11 +371,8 @@
 }
 
 .palette [cmdk-group-heading] {
-  padding: var(--space-2) 0.5rem 0.15rem;
-  font-family: var(--font-mono);
+  padding: var(--space-2) var(--space-2) 2px;
   font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
   color: var(--ink-faint);
 }
 
@@ -672,7 +380,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0.45rem 0.5rem;
+  padding: var(--space-2) var(--space-2);
   border-radius: var(--radius-inner);
   color: var(--ink-muted);
   cursor: pointer;
@@ -697,28 +405,6 @@
 }
 
 /* ==========================================================================
-   Sonner — pointed at our surfaces rather than its own palette
-   ========================================================================== */
-
-[data-sonner-toaster] {
-  --normal-bg: var(--elevated);
-  --normal-text: var(--ink);
-  --normal-border: var(--hairline-strong);
-  --success-bg: var(--state-synced-bg);
-  --success-text: var(--state-synced-text);
-  --success-border: var(--state-synced-border);
-  --error-bg: var(--state-orphaned-bg);
-  --error-text: var(--state-orphaned-text);
-  --error-border: var(--state-orphaned-border);
-  font-family: var(--font-sans);
-}
-
-.sonner-toast {
-  border-radius: var(--radius) !important;
-  font-size: var(--text-xs) !important;
-}
-
-/* ==========================================================================
    Misc: warn notices, revert confirmation, file pill, tree search
    ========================================================================== */
 
@@ -734,7 +420,7 @@
 }
 
 .confirm-body {
-  margin: 0.25rem 0 var(--space-3);
+  margin: var(--space-1) 0 var(--space-3);
   opacity: 0.85;
   line-height: var(--leading-body);
 }
@@ -743,26 +429,6 @@
   border-color: var(--state-file-border);
   background: var(--state-file-bg);
   color: var(--state-file-text);
-}
-
-.search-tree {
-  width: 100%;
-  cursor: pointer;
-  text-align: left;
-  color: var(--ink-faint);
-  font-size: var(--text-xs);
-}
-
-.search-tree > span {
-  flex: 1;
-  min-width: 0;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .search-tree:hover {
-    border-color: var(--hairline-strong);
-    color: var(--ink-muted);
-  }
 }
 
 /* ==========================================================================
@@ -833,16 +499,13 @@
 .mdx-card-name {
   flex: 1;
   min-width: 0;
-  font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
   color: var(--mdx-component-text);
 }
 
 .mdx-card-edit {
   flex-shrink: 0;
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   /* Concentric: the card is 6px at 12px padding, so its controls sit at 3px. */
   border: 1px solid transparent;
   border-radius: var(--radius-inner);
@@ -879,7 +542,7 @@
 .mdx-card-item {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: var(--space-1);
   padding: var(--space-3);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-inner);
@@ -905,7 +568,6 @@
 }
 
 .mdx-card-link {
-  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   color: var(--ink-faint);
   overflow-wrap: anywhere;
@@ -921,7 +583,7 @@
 .mdx-card-attrs {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.15rem var(--space-2);
+  gap: 2px var(--space-2);
   margin: 0;
   font-family: var(--font-mono);
   font-size: var(--text-2xs);

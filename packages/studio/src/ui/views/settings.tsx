@@ -10,11 +10,11 @@
  * server told us. Only the theme is a preference, and it is the only control
  * on the page that changes anything.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { SiteDto } from "../../editor-types";
 import type { ContentTree } from "../../types";
 import {
   IconCheck,
-  IconCopy,
   IconDatabase,
   IconExternal,
   IconFile,
@@ -23,9 +23,15 @@ import {
   IconSystem,
   type IconComponent,
 } from "../components/icons";
-import { IdentityMark, Pill } from "../components/primitives";
+import { CollectionMark } from "../components/collection-icon";
+import { CopyButton, Row, Section } from "../components/set-row";
+import { useStudio } from "../lib/studio";
+import { AccountPanel, PeoplePanel } from "./people";
+import { HooksPanel, SitePanel } from "./site";
+import { Pill } from "../components/primitives";
 import { ListSkeleton } from "../components/skeletons";
 import type { Theme } from "../lib/theme";
+import { useResource } from "../lib/use-resource";
 import { plural } from "../lib/format";
 
 const THEMES: Array<{ id: Theme; label: string; Icon: IconComponent }> = [
@@ -46,7 +52,27 @@ const SECTIONS = [
   {
     id: "appearance",
     title: "Appearance",
-    sub: "Both schemes are first-class — the tokens are built on light-dark(). Stored in this browser.",
+    sub: "Light and dark are both first-class. Your choice is stored in this browser.",
+  },
+  {
+    id: "account",
+    title: "Account",
+    sub: "Who you're signed in as.",
+  },
+  {
+    id: "people",
+    title: "People",
+    sub: "Who can sign in to this Studio, and what each person can do.",
+  },
+  {
+    id: "site",
+    title: "Site",
+    sub: "The site's name and where it is online.",
+  },
+  {
+    id: "hooks",
+    title: "Deploy hooks",
+    sub: "URLs called after every publish, so the site rebuilds or refreshes what it cached.",
   },
   {
     id: "workspace",
@@ -66,7 +92,7 @@ const SECTIONS = [
   {
     id: "about",
     title: "About",
-    sub: "Studio is opt-in — nothing here runs unless you asked for it.",
+    sub: "Studio is opt-in: nothing here runs unless you asked for it.",
   },
 ] as const satisfies ReadonlyArray<{ id: string; title: string; sub: string }>;
 
@@ -111,72 +137,6 @@ function useCurrentSection(ids: string[]): string {
   return current;
 }
 
-function Section({
-  id,
-  title,
-  sub,
-  children,
-}: {
-  id: string;
-  title: string;
-  sub: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="set-section" id={id}>
-      <div>
-        <h2 className="set-section-title">{title}</h2>
-        <p className="set-section-sub">{sub}</p>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Row({
-  label,
-  hint,
-  children,
-  stack = false,
-}: {
-  label: string;
-  hint?: string;
-  children?: React.ReactNode;
-  stack?: boolean;
-}) {
-  return (
-    <div className="set-row" data-stack={stack}>
-      <div>
-        <p className="set-row-label">{label}</p>
-        {hint ? <p className="set-row-hint">{hint}</p> : null}
-      </div>
-      {children ? <div className="set-row-control">{children}</div> : null}
-    </div>
-  );
-}
-
-function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<number>(0);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-  return (
-    <button
-      type="button"
-      className="set-copy"
-      data-copied={copied}
-      aria-label={copied ? "Copied" : `Copy ${value}`}
-      onClick={() => {
-        void navigator.clipboard?.writeText(value);
-        setCopied(true);
-        window.clearTimeout(timer.current);
-        timer.current = window.setTimeout(() => setCopied(false), 1600);
-      }}
-    >
-      {copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
-    </button>
-  );
-}
-
 /** A miniature of this Studio in one scheme: rail, sidebar, workspace. */
 function ThemePreview({ scheme, half = false }: { scheme: "light" | "dark"; half?: boolean }) {
   return (
@@ -212,8 +172,39 @@ export function SettingsView({
   const loopback = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
   const fileCollections = tree?.collections.filter((c) => c.authority === "file") ?? [];
   const dbCollections = tree?.collections.filter((c) => c.authority === "db") ?? [];
-  const idsRef = useRef(SECTIONS.map((s) => s.id));
-  const current = useCurrentSection(idsRef.current);
+  const { workspace } = useStudio();
+  const accounts = workspace.data?.accounts ?? false;
+  const canManagePeople = workspace.data?.user?.scopes.includes("studio:people") ?? false;
+  // On this computer there is no sign-in, and the operator runs the site.
+  const canManageSite = workspace.data
+    ? !workspace.data.user || workspace.data.user.scopes.includes("studio:settings")
+    : false;
+  const site = useResource<SiteDto>(canManageSite ? "/site" : null);
+  const database = workspace.data?.storage === "database";
+  // Your own account, when you signed in with one rather than GitHub or a link.
+  const [account, setAccount] = useState<{ email: string; role: string } | null>(null);
+  useEffect(() => {
+    if (!accounts) return;
+    fetch("/api/studio/v1/auth/session", { credentials: "same-origin" })
+      .then(
+        (res) =>
+          res.json() as Promise<{ user: { email: string; role: string; via: string } | null }>,
+      )
+      .then((body) => setAccount(body.user?.via === "account" ? body.user : null))
+      .catch(() => setAccount(null));
+  }, [accounts]);
+  const sections = useMemo(
+    () =>
+      SECTIONS.filter(
+        (s) =>
+          (s.id !== "account" || account !== null) &&
+          (s.id !== "people" || (accounts && canManagePeople)) &&
+          ((s.id !== "site" && s.id !== "hooks") || canManageSite),
+      ),
+    [account, accounts, canManagePeople, canManageSite],
+  );
+  const ids = useMemo(() => sections.map((s) => s.id), [sections]);
+  const current = useCurrentSection(ids);
 
   return (
     <div className="view view-settings">
@@ -254,7 +245,7 @@ export function SettingsView({
                         <option.Icon size={14} />
                         <span className="theme-choice-label">{option.label}</span>
                         {theme === option.id ? (
-                          <IconCheck size={13} className="theme-choice-check" />
+                          <IconCheck size={14} className="theme-choice-check" />
                         ) : null}
                       </span>
                     </button>
@@ -276,6 +267,29 @@ export function SettingsView({
             </div>
           </Section>
 
+          {account ? (
+            <Section id="account" title="Account" sub={SECTION_BY_ID.account.sub}>
+              <AccountPanel email={account.email} role={account.role} />
+            </Section>
+          ) : null}
+
+          {accounts && canManagePeople ? (
+            <Section id="people" title="People" sub={SECTION_BY_ID.people.sub}>
+              <PeoplePanel />
+            </Section>
+          ) : null}
+
+          {canManageSite ? (
+            <>
+              <Section id="site" title="Site" sub={SECTION_BY_ID.site.sub}>
+                <SitePanel site={site} />
+              </Section>
+              <Section id="hooks" title="Deploy hooks" sub={SECTION_BY_ID.hooks.sub}>
+                <HooksPanel site={site} />
+              </Section>
+            </>
+          ) : null}
+
           <Section id="workspace" title="Workspace" sub={SECTION_BY_ID.workspace.sub}>
             <div className="set-panel">
               <Row label="Branch" hint="Every read and write on this window is scoped to it.">
@@ -290,7 +304,7 @@ export function SettingsView({
                 hint={
                   loopback
                     ? "Loopback binds are trusted; no bearer token is required."
-                    : "Bound beyond loopback — every request must carry a bearer token."
+                    : "Bound beyond loopback: every request must carry a bearer token."
                 }
               >
                 <Pill tone={loopback ? "ready" : "pending"}>
@@ -305,7 +319,7 @@ export function SettingsView({
                   rel="noreferrer"
                 >
                   openapi.json
-                  <IconExternal size={12} />
+                  <IconExternal size={14} />
                 </a>
               </Row>
             </div>
@@ -324,10 +338,10 @@ export function SettingsView({
                   <ul className="set-collections">
                     {fileCollections.map((collection) => (
                       <li key={collection.name}>
-                        <IdentityMark name={collection.name} size="sm" />
+                        <CollectionMark name={collection.name} authority="file" size="sm" />
                         <span className="set-collection-name">{collection.name}</span>
                         <span className="set-collection-where">
-                          <IconFile size={12} />
+                          <IconFile size={14} />
                           content/{collection.name}/
                         </span>
                         <span className="set-collection-count" data-numeric="">
@@ -337,10 +351,10 @@ export function SettingsView({
                     ))}
                     {dbCollections.map((collection) => (
                       <li key={collection.name}>
-                        <IdentityMark name={collection.name} size="sm" />
+                        <CollectionMark name={collection.name} authority="db" size="sm" />
                         <span className="set-collection-name">{collection.name}</span>
                         <span className="set-collection-where">
-                          <IconDatabase size={12} />
+                          <IconDatabase size={14} />
                           data_records
                         </span>
                         <span className="set-collection-count">
@@ -379,11 +393,15 @@ export function SettingsView({
               </Row>
               <Row
                 label="Parity"
-                hint="Every action here is also available through MCP and the CLI — the UI is a client of the same HTTP surface, never a privileged path."
+                hint="Every action here is also available through MCP and the CLI. The UI is a client of the same HTTP surface, never a privileged path."
               />
               <Row
                 label="Source of truth"
-                hint="Git owns the MDX. The Postgres index is a projection that compile refreshes."
+                hint={
+                  database
+                    ? "Postgres holds the content. Files are a copy that graft pull writes and graft push sends back."
+                    : "Git owns the MDX. The Postgres index is a projection that compile refreshes."
+                }
               />
             </div>
           </Section>
@@ -393,7 +411,7 @@ export function SettingsView({
             `href="#appearance"` would parse as an unknown view and throw the
             operator back to Overview. */}
         <nav className="settings-index" aria-label="Settings sections">
-          {SECTIONS.map((section) => (
+          {sections.map((section) => (
             <button
               key={section.id}
               type="button"

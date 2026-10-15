@@ -7,8 +7,8 @@
  * can't ship an icon per collection — but the common shapes of a CMS are
  * predictable, so match on the name and fall back to authority.
  *
- * The hue still comes from `--identity`, so two collections that happen to
- * share an icon stay tellable apart.
+ * The icon takes the text color, never a tinted tile: a collection is told
+ * apart by its name, and the icon only says what kind of thing it holds.
  */
 import {
   IconApprovals,
@@ -21,7 +21,6 @@ import {
   IconStack,
   type IconComponent,
 } from "./icons";
-import { identityIndex } from "../lib/format";
 
 /** name fragment -> icon. First match wins, so order is specificity. */
 const BY_NAME: Array<[RegExp, IconComponent]> = [
@@ -54,13 +53,8 @@ export function CollectionMark({
 }) {
   const Icon = collectionIcon(name, authority);
   return (
-    <span
-      className="identity"
-      data-size={size}
-      style={{ "--identity": `var(--identity-${identityIndex(name)})` } as React.CSSProperties}
-      aria-hidden="true"
-    >
-      <Icon size={size === "sm" ? 12 : 13} />
+    <span className="identity" data-size={size} aria-hidden="true">
+      <Icon size={size === "sm" ? 14 : 16} />
     </span>
   );
 }

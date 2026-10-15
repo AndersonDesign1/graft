@@ -6,7 +6,7 @@
 import type { ReactNode } from "react";
 
 export interface CalloutProps {
-  /** Small mono label above the body, e.g. "invariant", "gotcha". */
+  /** The point of the callout, as a sentence: "Deletes cannot be undone". */
   label?: string;
   type?: "note" | "warning" | "danger";
   children: ReactNode;

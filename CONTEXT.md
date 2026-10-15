@@ -6,9 +6,22 @@ insecure-bind warning drifted from the thing it was meant to describe.
 
 ## Content
 
-**Authored content** — MDX files under `contentDir`, laid out as
-`<collection>/<slug>.mdx`. **Git is authoritative for it.** If git and the index
-disagree, git wins and the compiler rebuilds.
+**Authored content** — MDX documents laid out as `<collection>/<slug>.mdx`.
+Each project names one **content source** (ADR 0007), and that source is
+authoritative:
+
+- **git** (the default): the files under `contentDir`. If git and the index
+  disagree, git wins and the compiler rebuilds.
+- **database**: the published revisions in Postgres. The files are a
+  checkout; compile reads the revisions and never the files.
+
+Nothing treats both as authoritative at once.
+
+**Revision** — one version of one document in a database-sourced project: its
+exact MDX bytes (none, for a deletion), who wrote it, and whether it is
+published. A **draft** is a
+revision not yet published; there is one per document, shared by everyone.
+Revisions are never deleted, which is what history reads.
 
 **Collection** — a named, Zod-validated document type. `file-authoritative`
 (MDX on disk, the default) or `db-authoritative` (rows in Postgres, reached only
@@ -24,6 +37,7 @@ never authoritative: deleting it costs a `graft compile`, nothing more.
 
 **Compilation** — one projection run, recorded as a row with the git SHA it read
 and what changed. What makes "git wins" checkable, and what `revert` rewinds to.
+In a database-sourced project the SHA is null, and every publish records one.
 
 ## Operational data
 
@@ -93,6 +107,25 @@ Anonymous callers are refused unless a mount explicitly opts in.
 
 **Studio** — the optional human surface: an editor, the approval queue, the
 changes drawer. Unauthenticated on loopback by design; scope-gated anywhere else.
+
+**Account** — a person who signs in to a hosted Studio with an email and
+password, kept in the project's database (not a branch's). The first is the
+**owner**, created on Studio's first visit; admins invite the rest. A role
+(viewer, contributor, editor, admin) is a name for a set of scopes, and an
+account is disabled rather than deleted, so its history stays attributed.
+
+**Agent token** — a bearer credential (`graft_at_…`) an admin makes in Studio
+for one agent, with Read, Write drafts or Publish access. Only its hash is
+stored; it acts as `token:<name>` and never carries `approvals:decide`.
+Revoked tokens stay on record.
+
+**Deploy hook** — a URL called with a `POST` after every publish of
+database-sourced content, so the site rebuilds or refreshes its cache. It never
+fails the publish; its last answer is recorded on it.
+
+**Asset** — a file in the S3-compatible asset store, referred to from content
+by its key (`{ key, alt }`). Studio's media library records what it uploaded,
+with alt text, and finds where each key is used.
 
 **Adapter** — the thin translation between a runtime and Graft's Web-standard
 handlers (`Request → Response`). The Node adapter in `graft serve` is one; a

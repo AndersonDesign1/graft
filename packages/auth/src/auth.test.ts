@@ -88,6 +88,24 @@ describe("createActorResolver", () => {
     });
   });
 
+  it("asks the deployment's own token lookup, and refuses a token it doesn't know", async () => {
+    const resolve = createActorResolver({
+      tokens: async (token) =>
+        token === "graft_at_live"
+          ? { kind: "agent", id: "docs-agent", scopes: ["studio:read"] }
+          : null,
+    });
+    await expect(resolve(requestWith("Bearer graft_at_live"))).resolves.toEqual({
+      kind: "agent",
+      id: "docs-agent",
+      scopes: ["studio:read"],
+    });
+    await expect(resolve(requestWith("Bearer graft_at_revoked"))).rejects.toMatchObject({
+      code: "TOKEN_INVALID",
+      message: expect.stringContaining("revoked"),
+    });
+  });
+
   it("never accepts an empty-string dev token (unset env var safety)", async () => {
     const resolve = createActorResolver({
       devTokens: { "": { kind: "human", id: "owner" } },

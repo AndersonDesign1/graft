@@ -13,13 +13,18 @@ import {
   useStudio,
 } from "../lib/studio";
 import {
-  IconApprovals,
+  IconAgents,
+  IconInbox,
+  IconMedia,
   IconBranches,
   IconChanges,
   IconComponentBlock,
   IconFile,
   IconHistory,
+  IconHome,
   IconOverview,
+  IconPlus,
+  IconSearch,
   IconSchema,
   IconSettings,
   type IconComponent,
@@ -31,7 +36,7 @@ const DEVELOPER: Array<[DevView, string, IconComponent]> = [
   ["schema", "Schema", IconSchema],
   ["history", "History", IconHistory],
   ["branches", "Branches", IconBranches],
-  ["approvals", "Approvals", IconApprovals],
+  ["agents", "Agents", IconAgents],
   ["settings", "Settings", IconSettings],
 ];
 
@@ -53,7 +58,9 @@ export function CommandPalette({
   /** The project's component declarations, for the insert group. */
   components: readonly EditorComponentSpec[];
 }) {
-  const { schema, drafts, navigate, openPublish, openCreate } = useStudio();
+  const { schema, drafts, workspace, navigate, openPublish, openCreate } = useStudio();
+  const user = workspace.data?.user;
+  const canManageAgents = workspace.data ? !user || user.scopes.includes("studio:settings") : false;
   const collections = editableCollections(schema.data);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<EntrySummary[]>([]);
@@ -97,16 +104,16 @@ export function CommandPalette({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="palette">
+      <DialogContent className="palette" close={false}>
         <DialogTitle className="sr-only">Search and commands</DialogTitle>
         <Command label="Search and commands" loop shouldFilter={true}>
           <div className="palette-input">
+            <IconSearch />
             <Command.Input
               value={query}
               onValueChange={setQuery}
-              placeholder="Find an entry, or type a command…"
+              placeholder="Find an entry, or type a command"
             />
-            <kbd>Esc</kbd>
           </div>
           <Command.List className="palette-list">
             <Command.Empty className="palette-empty">
@@ -126,7 +133,7 @@ export function CommandPalette({
                       )
                     }
                   >
-                    <IconFile size={14} />
+                    <IconFile />
                     <span className="palette-item-label">{hit.title}</span>
                     <span className="palette-item-hint">{collectionLabel(hit.collection)}</span>
                   </Command.Item>
@@ -143,7 +150,7 @@ export function CommandPalette({
                     className="palette-item"
                     onSelect={() => go(() => insertBlock(spec.snippet ?? ""))}
                   >
-                    <IconComponentBlock size={14} />
+                    <IconComponentBlock />
                     <span className="palette-item-label">{spec.label ?? spec.component}</span>
                   </Command.Item>
                 ))}
@@ -156,8 +163,24 @@ export function CommandPalette({
                 className="palette-item"
                 onSelect={() => go(() => navigate({ view: "home" }))}
               >
-                <IconOverview size={14} />
+                <IconHome />
                 <span className="palette-item-label">Home</span>
+              </Command.Item>
+              <Command.Item
+                value="go inbox approvals reviews"
+                className="palette-item"
+                onSelect={() => go(() => navigate({ view: "inbox" }))}
+              >
+                <IconInbox />
+                <span className="palette-item-label">Inbox</span>
+              </Command.Item>
+              <Command.Item
+                value="go media images files uploads"
+                className="palette-item"
+                onSelect={() => go(() => navigate({ view: "media" }))}
+              >
+                <IconMedia />
+                <span className="palette-item-label">Media</span>
               </Command.Item>
               {collections.map((collection) => (
                 <Command.Item
@@ -168,7 +191,7 @@ export function CommandPalette({
                     go(() => navigate({ view: "collection", collection: collection.name }))
                   }
                 >
-                  <IconFile size={14} />
+                  <IconFile />
                   <span className="palette-item-label">{collectionLabel(collection.name)}</span>
                 </Command.Item>
               ))}
@@ -182,42 +205,59 @@ export function CommandPalette({
                   className="palette-item"
                   onSelect={() => go(() => openCreate(collection.name))}
                 >
-                  <span className="palette-plus" aria-hidden="true">
-                    +
-                  </span>
+                  <IconPlus />
                   <span className="palette-item-label">New {singular(collection.name)}</span>
                 </Command.Item>
               ))}
             </Command.Group>
 
-            <Command.Group heading="Publish" className="palette-group">
+            <Command.Group heading="Drafts" className="palette-group">
               <Command.Item
                 value="publish review changes commit"
                 className="palette-item"
                 onSelect={() => go(openPublish)}
               >
-                <IconChanges size={14} />
+                <IconChanges />
                 <span className="palette-item-label">{publishVerb(drafts.data?.publish)}…</span>
                 <span className="palette-item-hint">
-                  {unpublished === 0 ? "nothing waiting" : `${unpublished} waiting`}
+                  {unpublished === 0
+                    ? "No drafts"
+                    : `${unpublished} ${unpublished === 1 ? "draft" : "drafts"}`}
                 </span>
               </Command.Item>
             </Command.Group>
 
             <Command.Group heading="Developer" className="palette-group">
-              {DEVELOPER.map(([view, label, Icon]) => (
-                <Command.Item
-                  key={view}
-                  value={`developer ${label} ${view}`}
-                  className="palette-item"
-                  onSelect={() => go(() => navigate({ view }))}
-                >
-                  <Icon size={14} />
-                  <span className="palette-item-label">{label}</span>
-                </Command.Item>
-              ))}
+              {DEVELOPER.filter(([view]) => view !== "agents" || canManageAgents).map(
+                ([view, label, Icon]) => (
+                  <Command.Item
+                    key={view}
+                    value={`developer ${label} ${view}`}
+                    className="palette-item"
+                    onSelect={() => go(() => navigate({ view }))}
+                  >
+                    <Icon />
+                    <span className="palette-item-label">{label}</span>
+                  </Command.Item>
+                ),
+              )}
             </Command.Group>
           </Command.List>
+          <div className="palette-foot">
+            <span>
+              <kbd>↑</kbd>
+              <kbd>↓</kbd>
+              Move
+            </span>
+            <span>
+              <kbd>↵</kbd>
+              Open
+            </span>
+            <span>
+              <kbd>Esc</kbd>
+              Close
+            </span>
+          </div>
         </Command>
       </DialogContent>
     </Dialog>

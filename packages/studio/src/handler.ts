@@ -15,7 +15,7 @@ export interface StudioHandlerOptions extends StudioApiOptions {
    */
   uiBasePath?: string;
   /**
-   * Let people sign in: GitHub, invite links, a session cookie. When set,
+   * Let people sign in: Studio accounts, GitHub, invite links. When set,
    * every API request needs a session or a bearer credential, and a signed-out
    * browser is shown the sign-in screen instead of a wall of 401s.
    */
@@ -138,7 +138,15 @@ export function createStudioHandler(options: StudioHandlerOptions): StudioFetchH
           // (an agent's bearer token keeps working beside people's cookies).
           // With neither, refuse: configuring sign-in makes it required.
           authenticate: async (request) =>
-            editors.authenticate(request) ?? (bearer ? await bearer(request) : null),
+            (await editors.authenticate(request)) ?? (bearer ? await bearer(request) : null),
+          ...(options.editors?.accounts
+            ? {
+                accounts: {
+                  uiBasePath: uiBase,
+                  ...(options.editors.publicUrl ? { publicUrl: options.editors.publicUrl } : {}),
+                },
+              }
+            : {}),
         }
       : options,
   );

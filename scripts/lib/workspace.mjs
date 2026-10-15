@@ -220,10 +220,18 @@ export async function fetchDistTags(name) {
  * throws rather than falling back to a shell. There is no path through here
  * that reaches one.
  */
+//
+// The workspace's own npm comes first. Root package.json pins it as `npm-cli`
+// (an alias, because pnpm reads a dependency named `npm` as a package-manager
+// switch), and the lockfile holds it. OIDC dist-tag writes need npm 11.21.0 or
+// later, so the npm that ships with whichever Node runs this is not enough, and
+// installing one ad hoc in CI would sit outside the lockfile.
 export function npm(args, options = {}) {
+  const pinned = join("node_modules", "npm-cli", "bin", "npm-cli.js");
   const bundled = join(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
-  const candidates = existsSync(bundled)
-    ? [[process.execPath, [bundled, ...args]]]
+  const entry = [pinned, bundled].find((path) => existsSync(path));
+  const candidates = entry
+    ? [[process.execPath, [entry, ...args]]]
     : [
         ["npm.cmd", args],
         ["npm", args],

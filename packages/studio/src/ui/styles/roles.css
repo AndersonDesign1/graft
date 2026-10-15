@@ -1,181 +1,151 @@
 /**
- * Studio roles — LAYER 2 of 3. Meaning -> scale. The swap surface.
+ * Studio roles: meaning -> token. The swap surface.
  *
- * Every value here is a var() of a palette.css slot. No literals, no
- * color-mix against literals. This is the file you edit to change what a
- * state LOOKS like; you never touch a component to do it.
+ * Every value is a var() of `@usegraft/tokens`, or a color-mix() over one.
+ * Components read only these names, never the tokens' palette, so changing
+ * what a state looks like is one line here.
  *
- *   want drifted to read blue instead of amber?  one line, here.
- *   adding a sixth document state?               one block, here.
- *   retuning green itself?                       palette.css, not here.
+ * The thesis is the docs': monochrome chrome, colorful content. A state is a
+ * mark and a word, not a hue. Hue is spent on three things only:
  *
- * Components read ONLY these names. A rule naming `--c-amber-*` directly is
- * a bug — the literal-and-scale grep in the tests will catch it.
+ *   --callout-warning  something is waiting on a person (an approval, a conflict)
+ *   --danger           something is broken, or an action destroys
+ *   --code-*           content: diffs and code, the way the docs color syntax
+ *
+ * Fills never carry hue. A pill, a chip or a card sits on the sunken neutral;
+ * the hue goes on its text or its mark, always beside a word or an icon.
  */
 
 :root {
-  /* ---- document state: disk vs index -------------------------------------
-     Graft's content is git-authoritative. Files on disk are truth; the
-     Postgres content_index is a projection built by `graft compile`. The gap
-     between the two is the Studio's central status axis — this is our
-     Draft/Published, and it is real rather than ceremonial. */
+  /* ---- shared slots -------------------------------------------------------- */
+  --wash: color-mix(in oklch, var(--ink) 5%, transparent);
+  --wash-strong: color-mix(in oklch, var(--ink) 8%, transparent);
 
-  /* on disk, in the index, hashes match */
-  --state-synced-bg: var(--c-green-bg);
-  --state-synced-bg-hover: var(--c-green-bg-hover);
-  --state-synced-border: var(--c-green-border);
-  --state-synced-solid: var(--c-green-solid);
-  --state-synced-text: var(--c-green-text);
-  --state-synced-text-loud: var(--c-green-text-loud);
+  /* ---- document state: disk vs index (Developer views) --------------------
+     In the index and on disk, hashes matching, is the resting state: quiet. */
+  --state-synced-bg: var(--paper-sunken);
+  --state-synced-border: var(--hairline);
+  --state-synced-solid: var(--ink-faint);
+  --state-synced-text: var(--ink-muted);
+  --state-synced-text-loud: var(--ink-muted);
 
-  /* in both, hashes differ — edited since the last compile */
-  --state-drifted-bg: var(--c-amber-bg);
-  --state-drifted-bg-hover: var(--c-amber-bg-hover);
-  --state-drifted-border: var(--c-amber-border);
-  --state-drifted-solid: var(--c-amber-solid);
-  --state-drifted-text: var(--c-amber-text);
-  --state-drifted-text-loud: var(--c-amber-text-loud);
+  /* Edited since the last compile. A chore, not an alarm: ink, not amber. */
+  --state-drifted-bg: var(--paper-sunken);
+  --state-drifted-bg-hover: var(--wash-strong);
+  --state-drifted-border: var(--hairline-strong);
+  --state-drifted-solid: var(--ink);
+  --state-drifted-text: var(--ink);
+  --state-drifted-text-loud: var(--ink);
 
-  /* on disk only — never compiled. Absence of state, so: no hue. */
-  --state-unindexed-bg: var(--c-neutral-bg);
-  --state-unindexed-bg-hover: var(--c-neutral-bg-hover);
-  --state-unindexed-border: var(--c-neutral-border);
-  --state-unindexed-solid: var(--c-neutral-solid);
-  --state-unindexed-text: var(--c-neutral-text);
-  --state-unindexed-text-loud: var(--c-neutral-text-loud);
+  /* On disk only, never compiled. Absence of state. */
+  --state-unindexed-bg: var(--paper-sunken);
+  --state-unindexed-border: var(--hairline);
+  --state-unindexed-solid: var(--ink-faint);
+  --state-unindexed-text: var(--ink-muted);
 
-  /* in the index only — the file is gone and the index is stale */
-  --state-orphaned-bg: var(--c-red-bg);
-  --state-orphaned-bg-hover: var(--c-red-bg-hover);
-  --state-orphaned-border: var(--c-red-border);
-  --state-orphaned-solid: var(--c-red-solid);
-  --state-orphaned-text: var(--c-red-text);
-  --state-orphaned-text-loud: var(--c-red-text-loud);
+  /* In the index, file gone. Something is broken. */
+  --state-orphaned-bg: var(--paper-sunken);
+  --state-orphaned-border: var(--hairline-strong);
+  --state-orphaned-solid: var(--danger);
+  --state-orphaned-text: var(--danger);
+  --state-orphaned-text-loud: var(--danger);
 
-  /* ---- editorial state: what is live and what is not ----------------------
-     The editor's status axis. Unpublished work wears the brand's vermilion,
-     the one place it appears in the chrome: it is the state an editor most
-     needs to see at a glance, and "not live yet" is not an error. Published
-     carries no hue at all, because it is the resting state. */
-  --state-unpublished-bg: var(--c-vermilion-bg);
-  --state-unpublished-border: var(--c-vermilion-border);
-  --state-unpublished-solid: var(--c-vermilion-solid);
-  --state-unpublished-text: var(--c-vermilion-text);
-  --state-unpublished-text-loud: var(--c-vermilion-text-loud);
+  /* ---- editorial state: drafts ---------------------------------------------
+     A draft is the state an editor most needs to see, so it is the brightest
+     mark on screen: ink, the same as the primary action. Published is the
+     resting state and shows nothing. */
+  --state-unpublished-bg: var(--paper-sunken);
+  --state-unpublished-solid: var(--ink);
+  --state-unpublished-text: var(--ink);
+  --state-unpublished-text-loud: var(--ink);
 
-  --state-published-solid: var(--c-neutral-solid);
-  --state-published-text: var(--c-neutral-text);
+  --state-published-solid: var(--ink-faint);
+  --state-published-text: var(--ink-muted);
 
-  --state-conflict-bg: var(--c-amber-bg);
-  --state-conflict-border: var(--c-amber-border);
-  --state-conflict-solid: var(--c-amber-solid);
-  --state-conflict-text: var(--c-amber-text);
+  /* Someone else published over this draft: a person has to decide. */
+  --state-conflict-bg: var(--paper-sunken);
+  --state-conflict-border: var(--hairline-strong);
+  --state-conflict-solid: var(--callout-warning);
+  --state-conflict-text: var(--callout-warning);
 
-  /* Field problems: the red the system already spends on errors. */
-  --field-problem-text: var(--c-red-text-loud);
-  --field-problem-border: var(--c-red-solid);
-  --field-problem-bg: var(--c-red-bg);
+  --field-problem-text: var(--danger);
+  --field-problem-border: var(--danger);
 
-  /* The brand mark itself, for the wordmark's dot and the publish seal. */
-  --brand-mark: var(--c-vermilion-solid);
+  /* The wordmark's period and the publish count: no brand hue, just ink. */
+  --brand-mark: var(--ink);
 
-  /* ---- operational state: approvals, branches ---- */
-  --state-pending-bg: var(--c-amber-bg);
-  --state-pending-border: var(--c-amber-border);
-  --state-pending-solid: var(--c-amber-solid);
-  --state-pending-text: var(--c-amber-text);
+  /* ---- operational state: approvals, branches ---------------------------- */
+  --state-pending-bg: var(--paper-sunken);
+  --state-pending-border: var(--hairline-strong);
+  --state-pending-text: var(--callout-warning);
 
-  --state-approved-bg: var(--c-green-bg);
-  --state-approved-border: var(--c-green-border);
-  --state-approved-solid: var(--c-green-solid);
-  --state-approved-text: var(--c-green-text);
+  --state-denied-bg: var(--paper-sunken);
+  --state-denied-border: var(--hairline);
+  --state-denied-text: var(--ink-muted);
 
-  --state-denied-bg: var(--c-red-bg);
-  --state-denied-border: var(--c-red-border);
-  --state-denied-solid: var(--c-red-solid);
-  --state-denied-text: var(--c-red-text);
+  --state-ready-bg: var(--paper-sunken);
+  --state-ready-border: var(--hairline);
+  --state-ready-text: var(--ink-muted);
 
-  --state-ready-bg: var(--c-green-bg);
-  --state-ready-border: var(--c-green-border);
-  --state-ready-solid: var(--c-green-solid);
-  --state-ready-text: var(--c-green-text);
+  /* Where a collection's content lives: a fact, not a state. */
+  --state-db-bg: var(--paper-sunken);
+  --state-db-border: var(--hairline);
+  --state-db-solid: var(--ink-faint);
+  --state-db-text: var(--ink-muted);
 
-  /* Where a collection's content lives. Two halves of one distinction, so
-     both get a colour — badging only the db half made "mdx files" read as
-     the absence of a property rather than a property. */
-  --state-db-bg: var(--c-purple-bg);
-  --state-db-border: var(--c-purple-border);
-  --state-db-solid: var(--c-purple-solid);
-  --state-db-text: var(--c-purple-text);
+  --state-file-bg: var(--paper-sunken);
+  --state-file-border: var(--hairline);
+  --state-file-text: var(--ink-muted);
 
-  --state-file-bg: var(--c-blue-bg);
-  --state-file-border: var(--c-blue-border);
-  --state-file-solid: var(--c-blue-solid);
-  --state-file-text: var(--c-blue-text);
+  /* ---- schema field types: identifiers, so plain ------------------------- */
+  --type-string: var(--ink-muted);
+  --type-text: var(--ink-muted);
+  --type-number: var(--ink-muted);
+  --type-boolean: var(--ink-muted);
+  --type-date: var(--ink-muted);
+  --type-array: var(--ink-muted);
+  --type-object: var(--ink-muted);
+  --type-asset: var(--ink-muted);
+  --type-reference: var(--ink-muted);
+  --type-json: var(--ink-muted);
+  --type-unknown: var(--ink-faint);
 
-  /* ---- schema field types -------------------------------------------------
-     Types are an identity axis, not a severity one — nothing here means
-     "worse". Hues are assigned so related types read as related: the two
-     text-ish types share green, the two container types share purple. */
-  --type-string: var(--c-green-text-loud);
-  --type-text: var(--c-green-text-loud);
-  --type-number: var(--c-blue-text-loud);
-  --type-boolean: var(--c-amber-text-loud);
-  --type-date: var(--c-amber-text-loud);
-  --type-array: var(--c-purple-text-loud);
-  --type-object: var(--c-purple-text-loud);
-  --type-asset: var(--c-red-text-loud);
-  --type-reference: var(--c-red-text-loud);
-  --type-json: var(--c-blue-text-loud);
-  --type-unknown: var(--ink-muted);
+  --mdx-component-text: var(--ink-muted);
+  --mdx-component-bg: var(--paper-sunken);
+  --mdx-component-border: var(--hairline-strong);
 
-  /* ---- MDX components in the canvas ---------------------------------------
-     Identity, not state: a component block is neither good nor bad news. It
-     borrows the purple the schema layer already spends on container types,
-     because that is what a component is — something with contents. */
-  --mdx-component-text: var(--c-purple-text-loud);
-  --mdx-component-bg: var(--c-purple-bg);
-  --mdx-component-border: var(--c-purple-border);
-
-  /* ---- component card tones ----------------------------------------------
-     The fixed vocabulary a project's `graft/editor/*.json` declaration may map
-     one of its component's props onto — `type="warning"` becoming a warning
-     card. Deliberately a closed set: a third-party declaration chooses a
-     meaning, never a colour, so the theme keeps control of the palette and a
-     card can never land unreadable in one scheme. */
-  --tone-info-bg: var(--c-blue-bg);
-  --tone-info-border: var(--c-blue-border);
-  --tone-warn-bg: var(--c-amber-bg);
-  --tone-warn-border: var(--c-amber-border);
-  --tone-danger-bg: var(--c-red-bg);
-  --tone-danger-border: var(--c-red-border);
-  --tone-success-bg: var(--c-green-bg);
-  --tone-success-border: var(--c-green-border);
+  /* ---- component card tones -----------------------------------------------
+     The closed vocabulary a project's `graft/editor/*.json` may map a prop
+     onto. A declaration chooses a meaning, never a colour. Cards are content
+     and follow the callout rule: the fill stays neutral. */
+  --tone-info-bg: var(--paper-sunken);
+  --tone-info-border: var(--hairline-strong);
+  --tone-warn-bg: var(--paper-sunken);
+  --tone-warn-border: var(--hairline-strong);
+  --tone-danger-bg: var(--paper-sunken);
+  --tone-danger-border: var(--hairline-strong);
+  --tone-success-bg: var(--paper-sunken);
+  --tone-success-border: var(--hairline-strong);
   --tone-neutral-bg: var(--paper-sunken);
   --tone-neutral-border: var(--hairline-strong);
 
-  --field-required: var(--c-amber-text);
-  --field-required-bg: var(--c-amber-bg);
+  --field-required: var(--ink-muted);
+  --field-required-bg: transparent;
   --field-optional: var(--ink-faint);
 
-  /* ---- theme preview swatches -------------------------------------------
+  /* ---- theme preview swatches ---------------------------------------------
      The one place that must NOT follow the active scheme: each swatch shows
      what picking that option looks like, so the light preview stays light
-     even in dark mode. Named here so the exception is deliberate and
-     documented rather than a component reaching into the ramp.
-
-     Two full sets rather than one bg each: the swatch is a miniature of this
-     Studio — rail, sidebar, workspace — so it needs every surface the real
-     chrome has. You pick a theme by recognising the app in it. */
+     even in dark mode. */
   --preview-light-bg: var(--paper-0);
-  --preview-light-rail: var(--paper-2);
+  --preview-light-rail: var(--paper-0);
   --preview-light-panel: var(--paper-1);
   --preview-light-hairline: var(--paper-2);
   --preview-light-mark: var(--ink-0);
   --preview-light-line: var(--ink-2);
 
   --preview-dark-bg: var(--n-0);
-  --preview-dark-rail: var(--n-1);
+  --preview-dark-rail: var(--n-0);
   --preview-dark-panel: var(--n-2);
   --preview-dark-hairline: var(--n-3);
   --preview-dark-mark: var(--n-9);
@@ -185,82 +155,53 @@
   --skeleton-bg: var(--paper-sunken);
 
   /* ---- rendered prose (the rich editor) ---- */
-  --prose-code: var(--code-string);
+  --prose-code: var(--ink);
 
   /* ---- code editor ---- */
-  --editor-active-line: color-mix(in oklch, var(--mark) 4%, transparent);
-  --editor-match: color-mix(in oklch, var(--c-blue-solid) 22%, transparent);
+  --editor-active-line: color-mix(in oklch, var(--ink) 4%, transparent);
+  --editor-match: color-mix(in oklch, var(--ink) 14%, transparent);
   --editor-gutter: var(--ink-faint);
 
   /* ---- the default chip surface: pills, counts and tags with no state ---- */
-  --chip-bg: var(--c-neutral-bg);
-  --chip-border: var(--c-neutral-border);
-  --chip-text: var(--c-neutral-text);
-  --chip-text-faint: var(--ink-faint);
+  --chip-bg: var(--paper-sunken);
+  --chip-border: var(--hairline);
+  --chip-text: var(--ink-muted);
 
-  /* ---- compilation deltas ---- */
-  --delta-add: var(--c-green-text-loud);
-  --delta-change: var(--c-amber-text-loud);
-  --delta-remove: var(--c-red-text-loud);
+  /* ---- compilation deltas and line diffs: content, colored like code ---- */
+  --delta-add: var(--code-ok);
+  --delta-change: var(--ink-muted);
+  --delta-remove: var(--code-keyword);
 
-  /* ---- line diffs (the Changes drawer) ------------------------------------
-     The same three meanings as the deltas above, one level down: a delta
-     counts changes, a diff shows them. Text reuses the delta roles so a "+3"
-     in History and a `+` line in the drawer cannot drift apart; the tinted
-     rows are new, because a line needs a background to be scannable at speed.
-
-     Kept low — a diff is mostly context, and a page of saturated stripes is
-     harder to read than the text it is decorating. */
   --diff-add-text: var(--delta-add);
-  --diff-add-bg: var(--c-green-bg);
+  --diff-add-bg: color-mix(in oklch, var(--code-ok) 10%, transparent);
   --diff-remove-text: var(--delta-remove);
-  --diff-remove-bg: var(--c-red-bg);
+  --diff-remove-bg: color-mix(in oklch, var(--code-keyword) 10%, transparent);
   --diff-gutter: var(--ink-faint);
   --diff-hunk-bg: var(--paper-sunken);
 
-  /* ---- git change status --------------------------------------------------
-     What happened to a file since the last commit. A *different* axis from
-     document state (disk vs index) and deliberately quieter: a new document
-     is not news the way a drifted one is, so these are chips, not alarms.
-     Only deletion takes a warning hue, because it is the one that cannot be
-     glanced past. */
-  --change-added-text: var(--c-green-text);
-  --change-added-bg: var(--c-green-bg);
-  --change-modified-text: var(--c-blue-text);
-  --change-modified-bg: var(--c-blue-bg);
-  --change-deleted-text: var(--c-red-text);
-  --change-deleted-bg: var(--c-red-bg);
-  --change-renamed-text: var(--c-purple-text);
-  --change-renamed-bg: var(--c-purple-bg);
+  /* ---- git change status: a word does the work; only deletion takes hue ---- */
+  --change-added-text: var(--ink);
+  --change-added-bg: var(--paper-sunken);
+  --change-modified-text: var(--ink);
+  --change-modified-bg: var(--paper-sunken);
+  --change-deleted-text: var(--danger);
+  --change-deleted-bg: var(--paper-sunken);
+  --change-renamed-text: var(--ink-muted);
+  --change-renamed-bg: var(--paper-sunken);
 
-  /* ---- chrome ------------------------------------------------------------
-     Deliberately neutral. "Monochrome chrome, color is state" is the whole
-     thesis, and pointing these at neutrals is how it's enforced — by a token
-     rather than by everyone remembering. Colouring the rail later is a
-     one-line change here, and an intentional one. */
-  --nav-active-bg: var(--elevated);
-  --nav-active-rail: var(--mark);
+  /* ---- chrome: a wash, as in the docs sidebar ----------------------------- */
+  --nav-active-bg: var(--wash-strong);
+  --nav-active-rail: var(--ink);
   --nav-active-text: var(--ink);
-  --nav-hover-bg: var(--mark-tint);
+  --nav-hover-bg: var(--wash);
   --nav-text: var(--ink-muted);
 
-  --row-active-bg: var(--mark-tint);
-  --row-active-rail: var(--mark);
-  --row-hover-bg: var(--mark-tint);
+  --row-active-bg: var(--wash);
+  --row-hover-bg: var(--wash);
 
-  --field-label: var(--ink-muted);
-  --focus-ring: var(--c-blue-solid);
-  --selection-bg: var(--c-blue-bg);
+  --field-label: var(--ink);
+  --selection-bg: color-mix(in oklch, var(--ink) 14%, transparent);
 
-  /* ---- per-collection identity -------------------------------------------
-     Collections get a stable mark colour, like Sanity's document-type icons.
-     Components hash the collection name to an index and read var(--identity)
-     only; extending the cycle is one line here. */
-  --identity-count: 5;
-  --identity-0: var(--c-blue-solid);
-  --identity-1: var(--c-green-solid);
-  --identity-2: var(--c-purple-solid);
-  --identity-3: var(--c-amber-solid);
-  --identity-4: var(--c-red-solid);
-  --identity: var(--identity-0);
+  /* ---- collection marks: an icon in the text color, never a tinted tile ---- */
+  --identity: var(--ink-muted);
 }

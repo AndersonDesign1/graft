@@ -20,6 +20,7 @@ const SUMMARY =
   "Graft is an open-source CMS that keeps content as Markdown files in Git, checks every file against a TypeScript schema, and gives your app fully typed reads. AI agents can edit the same content through the Model Context Protocol (MCP), within limits you set.";
 
 const NOTES = [
+  "Helping someone who doesn't code make a site? Read /start.md first.",
   "Every page below is also available as Markdown at the same path with a .md suffix.",
   "The whole corpus in one file: /llms-full.txt",
   "Source and issues: https://github.com/AndersonDesign1/graft",
@@ -85,8 +86,12 @@ export function componentsToMarkdown(body: string): string {
       const label = attr(trimmed, "label");
       out.push(label ? `> **${/[.?!]$/.test(label) ? label : `${label}.`}**` : ">");
       inCallout = true;
-    } else if (trimmed === "</Callout>") {
+    } else if (trimmed === "</Callout>" || trimmed === "</AgentPrompt>") {
       inCallout = false;
+    } else if (trimmed === "<AgentPrompt>") {
+      // The prompt reads as a quote an agent can lift whole.
+      out.push("> **Prompt for a coding agent:**");
+      inCallout = true;
     } else if (trimmed.startsWith("<TierBadge")) {
       const note = ENGINE_NOTE.get(attr(trimmed, "tier") ?? "");
       if (note) out.push(note);

@@ -18,10 +18,13 @@ import { createGitHubFake } from "@usegraft/compiler/testing";
 import { defineCollection, field } from "@usegraft/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  ActivityDto,
   DraftsDto,
   EntryDto,
   EntryList,
   SaveEntryResult,
+  VersionDetailDto,
+  VersionListDto,
   WorkspaceDto,
 } from "../editor-types";
 
@@ -142,6 +145,67 @@ describe("editor API on a local checkout", () => {
       canWrite: true,
       history: true,
     });
+  });
+
+  it("shows a document's commits, and restores an old one as a draft", async () => {
+    const root = join(contentDir, "..");
+    const path = join(contentDir, "products", "wool-hat.mdx");
+    const original = readFileSync(path, "utf8");
+    writeFileSync(path, product("Wool Hat", 3000, "active", "hats"));
+    git(root, "commit", "-qam", "Raise the hat's price");
+
+    const history = await call<VersionListDto>(
+      handler,
+      "GET",
+      "/entry/history?path=products/wool-hat.mdx",
+    );
+    expect(history.json.available).toBe(true);
+    expect(history.json.versions.map((v) => [v.message, v.by])).toEqual([
+      ["Raise the hat's price", "Dev"],
+      ["seed", "Dev"],
+    ]);
+
+    const seed = history.json.versions[1]?.id as string;
+    const version = await call<VersionDetailDto>(
+      handler,
+      "GET",
+      `/entry/version?path=products/wool-hat.mdx&id=${seed}`,
+    );
+    expect(version.json.raw).toBe(original);
+    expect(version.json.diff.fields).toEqual([{ field: "price", before: 2500, after: 3000 }]);
+
+    // Restoring is a save of the old bytes: a draft until it is committed.
+    const opened = await call<EntryDto>(handler, "GET", "/entry?collection=products&slug=wool-hat");
+    const saved = await call<SaveEntryResult>(handler, "PUT", "/entry", {
+      collection: "products",
+      slug: "wool-hat",
+      raw: version.json.raw,
+      baseVersion: opened.json.version,
+    });
+    expect(saved.status).toBe(200);
+    expect(readFileSync(path, "utf8")).toBe(original);
+
+    const activity = await call<ActivityDto>(handler, "GET", "/activity?limit=5");
+    expect(activity.json.events.map((event) => event.documents.map((doc) => doc.title))).toEqual([
+      ["Wool Hat"],
+      ["Linen Shirt", "Old Shirt", "Wool Hat"],
+    ]);
+    expect(activity.json.events[0]?.documents[0]).toMatchObject({
+      collection: "products",
+      slug: "wool-hat",
+    });
+  });
+
+  it("says why there is no history outside a repository", async () => {
+    const loose = mkdtempSync(join(tmpdir(), "graft-loose-"));
+    mkdirSync(join(loose, "products"));
+    writeFileSync(join(loose, "products", "a.mdx"), product("A", 1, "draft"));
+    const bare = createStudioApiHandler({ db: {} as never, collections, contentDir: loose });
+    const history = await call<VersionListDto>(bare, "GET", "/entry/history?path=products/a.mdx");
+    expect(history.json).toMatchObject({ available: false, versions: [] });
+    expect(history.json.reason).toBeTruthy();
+    const activity = await call<ActivityDto>(bare, "GET", "/activity");
+    expect(activity.json.available).toBe(false);
   });
 
   it("publishes or discards a rename from either of its entries", async () => {
@@ -468,6 +532,34 @@ describe("editor API on GitHub (hosted)", () => {
 
   it("keeps an entry deleted in the draft listed, readable and restorable", async () => {
     await deletionStaysListed(hosted().handler);
+  });
+
+  it("reads a document's history from the production branch's commits", async () => {
+    const { fake, handler } = hosted();
+    fake.push(
+      "main",
+      { "content/products/wool-hat.mdx": product("Wool Hat", 3000, "active", "hats") },
+      "Raise the hat's price",
+    );
+    const history = await call<VersionListDto>(
+      handler,
+      "GET",
+      "/entry/history?path=products/wool-hat.mdx",
+    );
+    expect(history.json.versions[0]?.message).toBe("Raise the hat's price");
+    const older = history.json.versions[1]?.id as string;
+    const version = await call<VersionDetailDto>(
+      handler,
+      "GET",
+      `/entry/version?path=products/wool-hat.mdx&id=${older}`,
+    );
+    expect(version.json.diff.fields).toEqual([{ field: "price", before: 2500, after: 3000 }]);
+    const activity = await call<ActivityDto>(handler, "GET", "/activity");
+    expect(activity.json.events[0]).toMatchObject({
+      message: "Raise the hat's price",
+      documents: [],
+      more: 0,
+    });
   });
 
   it("restores a deleted entry only while it is still deleted", async () => {

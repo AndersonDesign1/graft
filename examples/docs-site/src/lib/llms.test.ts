@@ -185,6 +185,26 @@ describe("componentsToMarkdown", () => {
     expect(componentsToMarkdown(body)).toBe("> **Prefer an agent?**\n> Text.");
   });
 
+  it("turns an agent prompt into a labelled quote", () => {
+    const body = [
+      "<AgentPrompt>",
+      "  Add Graft to this project following",
+      "  https://graft.page/docs/getting-started.md.",
+      "</AgentPrompt>",
+      "",
+      "## Next",
+    ].join("\n");
+    expect(componentsToMarkdown(body)).toBe(
+      [
+        "> **Prompt for a coding agent:**",
+        "> Add Graft to this project following",
+        "> https://graft.page/docs/getting-started.md.",
+        "",
+        "## Next",
+      ].join("\n"),
+    );
+  });
+
   it("keeps a code block's note, which tells two blocks with one file name apart", () => {
     const body = ['<CodeBlock title="lib/graft.ts" note="static engine">', "</CodeBlock>"].join(
       "\n",

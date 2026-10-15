@@ -29,11 +29,11 @@ On another framework, swap `@usegraft/sdk-next` for your adapter, such as
 `graft compile`. If anything in your project relies on an old behavior, the
 error's `fix` says what to change.
 
-<Callout label="Prefer to let your agent do it?" type="note">
-  Paste this into your coding agent: "Upgrade every @usegraft package in this
-  project to the latest version, following https://graft.page/docs/upgrading.md.
-  Run graft compile and fix anything it reports."
-</Callout>
+<AgentPrompt>
+  Upgrade every @usegraft package in this project to the latest version,
+  following https://graft.page/docs/upgrading.md. Run graft compile and fix
+  anything it reports.
+</AgentPrompt>
 
 ## 1.0.0-beta.5
 

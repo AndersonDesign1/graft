@@ -1,5 +1,124 @@
 # @usegraft/mcp
 
+## 1.0.0-beta.7
+
+### Minor Changes
+
+- c997e35: Content can now live in your Postgres database instead of in git. Add
+  `export const content = { source: "database" }` to `graft.config.ts` and run
+  `graft content import` to load your files once.
+
+  Studio and agents then save drafts to the database, and publishing puts a
+  change on the live site straight away, with no rebuild and no GitHub setup. A
+  hosted Studio needs only `DATABASE_URL`. Every publish is checked exactly as
+  `graft compile` checks a file (the schema, slug uniqueness and MDX safety), and
+  a draft that would fail compile never goes live. `graft compile` reads the
+  published versions, never the files.
+
+  There is one draft per document, shared by everyone who edits it. Two people
+  or an agent saving the same document from the same version can't overwrite
+  each other: the second save gets `CONTENT_CONFLICT`. Someone without publish
+  rights submits for review instead, and the request closes once everything in
+  it is live.
+
+  Git stays the default and works as before. A project uses one source or the
+  other, never both. Reverting to a commit, `graft merge` and content migrations
+  work on files, so in a database-sourced project they refuse with the new
+  `CONTENT_SOURCE_MISMATCH`.
+
+  `graft db migrate` adds three tables (`content_revisions`, `content_heads`,
+  `content_reviews`), and `graft harden` grants the runtime role access to them.
+
+  For code that reads review requests from a content store: `ReviewRequest` now
+  has an `id`, and its `number` and `url` are optional, since a review in the
+  database is not a pull request. The `review` that MCP `list_drafts` and
+  `publish_drafts` return follows the same shape.
+
+- 95ecc3e: A new site in one command, and a checklist that says what to do next.
+
+  - `npm create graft` (the new `create-graft` package) runs `graft create`: it
+    asks what kind of site (blog, docs, shop, portfolio or blank), how people
+    will edit it (online in Studio, or as files in git) and which database to
+    use, then writes the site with a Next.js app, installs it, migrates, loads
+    the example content and compiles. Every question has a flag, and `--yes`
+    takes the defaults, so an agent can run it with no prompts.
+  - `--database new` makes a free Postgres with no account. It lasts 72 hours
+    unless claimed: `graft db claim` prints the link, waits for the claim, and
+    saves the new connection string to `.env`. Any Postgres 13 or newer works
+    instead.
+  - `graft doctor` and the MCP tool `setup_status` check the database and its
+    version, the schema, a database waiting to be claimed, content, the index
+    and Studio sign-in, and end with the one thing to do next.
+  - A new site gets an `AGENTS.md`, and the docs serve a setup guide for agents
+    at `/start.md`.
+
+- a761a13: Moving content between the database, your files and git.
+
+  - `graft pull` writes what is published into your files, and `graft push`
+    publishes the files you changed. Graft remembers what each file was pulled
+    at (`.graft/sync.json`), so a pull never overwrites your changes, and a push
+    is refused with `CONTENT_CONFLICT` if someone published that document since.
+    `--force` settles a conflict either way.
+  - `graft dev` tells you when someone publishes, so you know your files are
+    behind. Agents get the same answer from the new MCP tool `sync_status`.
+  - `content.mirror` copies what is published into GitHub: in batches from
+    `graft serve` (`mode: "batch"`, every `everyMinutes`), or after every publish
+    (`mode: "each"`). `graft mirror` does one run. A batch is one commit, or one
+    pull request merged straight away when the branch allows it. A pull request
+    that waits on checks or a review stays the only one: later runs add to it
+    until it merges.
+  - `graft check` runs every check a publish makes on the files, with no
+    database, and now also finds references to documents that don't exist.
+  - `graft ci changes`, `graft ci skip-build` and `graft ci init` keep CI cheap
+    on content-only changes. `skip-build` compares with the previous deploy, and
+    builds when it can't tell which that was.
+
+  For git-sourced projects hosted on GitHub, some publishes now open a pull
+  request even for an editor: deletions and renames, and changes over 200 lines.
+  Studio says why. Change the rule with `content.review` (`deletes`,
+  `collections`, `overLines`), or turn it off with `review: false`.
+
+  `graft db migrate` adds the `content_mirror` table.
+
+### Patch Changes
+
+- Updated dependencies [c997e35]
+- Updated dependencies [95ecc3e]
+- Updated dependencies [a761a13]
+- Updated dependencies [2d97fda]
+- Updated dependencies [e8b55ac]
+- Updated dependencies [b086a62]
+  - @usegraft/db@1.0.0-beta.7
+  - @usegraft/compiler@1.0.0-beta.7
+  - @usegraft/contracts@1.0.0-beta.7
+  - @usegraft/core@1.0.0-beta.7
+  - @usegraft/mdx-safety@1.0.0-beta.7
+  - @usegraft/registry@1.0.0-beta.7
+  - @usegraft/assets@1.0.0-beta.7
+
+## 1.0.0-beta.6
+
+### Patch Changes
+
+- 2386e74: A save to a GitHub draft can no longer be lost while the draft is being emptied. Publishing everything or discarding the last change used to read the draft branch and then delete it, and a save that landed in between was deleted with it after reporting success. The draft is now emptied with a fast-forward that fails if the branch moved, so the branch stays, holding no changes, and the next save reuses it.
+
+  Invite-link editors get new draft branch names. Their key joins the hash with `--`, which a GitHub login cannot produce, so a login shaped like an email's key (`ana-lima-shop-test-0123456789`) no longer shares that person's draft. A draft saved under the old name before upgrading stays on GitHub as a branch: publish or discard it first, or merge it by hand.
+
+- 2386e74: `explain_error` for `REMOTE_STORE_FAILED` no longer promises that a failed save did not happen. A refusal means that one request was not applied, but a publish can move production before a later step is refused, and a network error can arrive after GitHub applied the request, so agents are told to check the branches before retrying. A 404 now also names its other cause: a private repository the token or GitHub App cannot see.
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+- Updated dependencies [2386e74]
+  - @usegraft/compiler@1.0.0-beta.6
+  - @usegraft/core@1.0.0-beta.6
+  - @usegraft/contracts@1.0.0-beta.6
+  - @usegraft/db@1.0.0-beta.6
+  - @usegraft/mdx-safety@1.0.0-beta.6
+  - @usegraft/registry@1.0.0-beta.6
+  - @usegraft/assets@1.0.0-beta.6
+
 ## 1.0.0-beta.5
 
 ### Minor Changes

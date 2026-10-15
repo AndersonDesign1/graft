@@ -15,7 +15,7 @@ const V1 = "/api/studio/v1";
 
 const services = new WeakMap<StudioApiOptions, EditorService>();
 
-function service(ctx: RouteContext): EditorService {
+export function service(ctx: RouteContext): EditorService {
   let found = services.get(ctx.options);
   if (!found) {
     found = new EditorService({
@@ -36,7 +36,7 @@ function service(ctx: RouteContext): EditorService {
  * Who a write is attributed to: the signed-in person, or, on an
  * unauthenticated loopback mount, the operator the Studio was started for.
  */
-function actorOf(ctx: RouteContext): StoreActor {
+export function actorOf(ctx: RouteContext): StoreActor {
   if (ctx.principal) {
     return {
       id: ctx.principal.id,
@@ -102,7 +102,7 @@ export const EDITOR_ROUTES: readonly Route[] = [
       const history = await svc.history();
       const scopes = ctx.principal?.scopes ?? ["studio:read", "studio:write", "studio:publish"];
       const body: WorkspaceDto = {
-        storage: svc.remote ? "github" : "local",
+        storage: svc.storage,
         ...(info.repository ? { repository: info.repository } : {}),
         ...(info.url ? { repositoryUrl: info.url } : {}),
         ...(info.branch ? { branch: info.branch } : {}),
@@ -119,6 +119,7 @@ export const EDITOR_ROUTES: readonly Route[] = [
             }
           : null,
         sessions: Boolean(ctx.request.headers.get("cookie")?.includes("graft_studio=")),
+        accounts: Boolean(ctx.options.accounts),
       };
       return Response.json(body);
     },
@@ -278,6 +279,50 @@ export const EDITOR_ROUTES: readonly Route[] = [
           actorOf(ctx),
         ),
       ),
+  },
+  {
+    method: "GET",
+    path: `${V1}/entry/history`,
+    scope: "studio:read",
+    handle: async (ctx) =>
+      Response.json(
+        await service(ctx).versions(
+          required(
+            ctx.url.searchParams.get("path"),
+            "path",
+            "GET /api/studio/v1/entry/history?path=products/blue-shirt.mdx",
+          ),
+        ),
+      ),
+  },
+  {
+    method: "GET",
+    path: `${V1}/entry/version`,
+    scope: "studio:read",
+    handle: async (ctx) => {
+      const example =
+        "GET /api/studio/v1/entry/version?path=products/blue-shirt.mdx&id=<version id>";
+      return Response.json(
+        await service(ctx).version(
+          required(ctx.url.searchParams.get("path"), "path", example),
+          required(ctx.url.searchParams.get("id"), "id", example),
+          actorOf(ctx),
+        ),
+      );
+    },
+  },
+  {
+    method: "GET",
+    path: `${V1}/activity`,
+    scope: "studio:read",
+    handle: async (ctx) => {
+      const limit = Number(ctx.url.searchParams.get("limit") ?? 20);
+      return Response.json(
+        await service(ctx).activity(
+          Number.isInteger(limit) ? Math.min(Math.max(limit, 1), 100) : 20,
+        ),
+      );
+    },
   },
   {
     method: "POST",
