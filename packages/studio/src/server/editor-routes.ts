@@ -21,7 +21,8 @@ export function service(ctx: RouteContext): EditorService {
     found = new EditorService({
       contentDir: ctx.options.contentDir,
       collections: ctx.options.collections,
-      db: ctx.options.db,
+      ...(ctx.options.db ? { db: ctx.options.db } : {}),
+      ...(ctx.options.staticIndexPath ? { staticIndexPath: ctx.options.staticIndexPath } : {}),
       branchId: ctx.defaultBranch,
       mdxTrust: ctx.options.mdxTrust,
       ...(ctx.options.store ? { store: ctx.options.store } : {}),
@@ -120,6 +121,8 @@ export const EDITOR_ROUTES: readonly Route[] = [
           : null,
         sessions: Boolean(ctx.request.headers.get("cookie")?.includes("graft_studio=")),
         accounts: Boolean(ctx.options.accounts),
+        database: Boolean(ctx.options.db),
+        index: ctx.options.db ? "postgres" : ctx.options.staticIndexPath ? "static" : "none",
       };
       return Response.json(body);
     },

@@ -365,7 +365,7 @@ Each is code, tests and one conventional commit, shippable on its own.
 | 4. Studio content API on the store, MCP parity | shipped | `feat(studio): editor API…`, `feat(mcp): write through the content store…` |
 | 5. The editor UI                               | shipped | `feat(studio): an editor for people…`                                      |
 | 6. Deploy story                                | shipped | `docs(studio): host Studio for a team…`                                    |
-| 7. Studio on the static tier                   | next    |                                                                            |
+| 7. Studio on the static tier                   | shipped | `feat(studio): open Studio without a database…`                            |
 | 8. Incremental projection and the rest         | next    |                                                                            |
 
 ### What verification found

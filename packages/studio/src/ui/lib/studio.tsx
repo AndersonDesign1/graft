@@ -64,6 +64,18 @@ export function singular(name: string): string {
   return label.replace(/s$/, "");
 }
 
+/**
+ * Whether this Studio has a database: true or false once the workspace has
+ * loaded, undefined before, and true in an embedded panel. A view asks for what lives in Postgres only when
+ * it is true, so a Studio without one makes no request that would fail.
+ */
+export function useDatabase(): boolean | undefined {
+  // An embedded panel has no Studio around it, and its host serves the API
+  // it calls, database and all.
+  const value = useContext(Context);
+  return value ? value.workspace.data?.database : true;
+}
+
 /** The verb inside a sentence: "until you commit the deletion". */
 export function actionWord(action: DraftsDto["publish"] | undefined): string {
   if (action === "review") return "submit";

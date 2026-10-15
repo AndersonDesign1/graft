@@ -120,6 +120,14 @@ export interface WorkspaceDto {
   sessions: boolean;
   /** People sign in with Studio accounts, and admins manage them under Settings. */
   accounts: boolean;
+  /**
+   * Studio has a Postgres database. Without one it still edits the files;
+   * approvals, the compile history, branches, people, agents, the media
+   * library and site settings each say they need one.
+   */
+  database: boolean;
+  /** The index a local save updates: Postgres, the static artifact, or none. */
+  index: "postgres" | "static" | "none";
 }
 
 export type StudioRoleName = "viewer" | "contributor" | "editor" | "admin";

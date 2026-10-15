@@ -9,7 +9,6 @@
 import {
   FilesystemStore,
   checkRemoval,
-  compileDocuments,
   notifyContentChange,
   type ContentChangeListener,
   type ContentChangeNotice,
@@ -60,6 +59,7 @@ import {
 } from "./catalog";
 import { slugify as slugText } from "../slug";
 import { lineDiff } from "./line-diff";
+import { compileIndex } from "./compile-index";
 import { localDrafts } from "./local-drafts";
 import { localHistory, type LocalHistory } from "./local-history";
 
@@ -79,7 +79,10 @@ const ACTIVITY_DOCUMENTS = 3;
 export interface EditorServiceOptions {
   contentDir: string;
   collections: Record<string, AnyCollection>;
-  db: Database;
+  /** The Postgres index a local save updates, if there is one. */
+  db?: Database;
+  /** Otherwise the static engine's artifact, if the project uses it. */
+  staticIndexPath?: string;
   branchId: string;
   mdxTrust?: MdxTrust;
   store?: ContentStore;
@@ -295,21 +298,23 @@ export class EditorService {
   /* ---- writing --------------------------------------------------------- */
 
   /**
-   * Locally a save is live at once: project the files it wrote, then tell the
-   * app so it drops its cached copy. Only those files: recompiling the tree
-   * made one save of a 2,000-product catalog take over a second. A remote
-   * draft is neither; the host rebuilds on publish.
+   * Locally a save is live at once: project the files it wrote into the
+   * index this Studio has, then tell the app so it drops its cached copy.
+   * Only those files: recompiling the tree made one save of a 2,000-product
+   * catalog take over a second. A remote draft is neither; the host rebuilds
+   * on publish.
    */
   private async afterWrite(paths: string[]): Promise<ContentChangeNotice | undefined> {
     if (this.remote) return undefined;
-    const result = await compileDocuments({
+    const result = await compileIndex(this.options, {
       contentDir: this.options.contentDir,
       paths,
       collections: this.options.collections,
-      db: this.options.db,
       mdxTrust: this.options.mdxTrust,
       branchId: this.options.branchId,
     });
+    // No index at all: the file is the save, and there is nothing to refresh.
+    if (!result) return undefined;
     return notifyContentChange(this.options.onContentChange, {
       branch: this.options.branchId,
       gitSha: result.gitSha ?? null,
@@ -515,8 +520,9 @@ export class EditorService {
     const path = await this.pathFor(input.collection, input.slug, actor);
     // Locally a deletion is live at once, so one that would leave other
     // entries pointing at nothing is refused before the file goes. Hosted,
-    // the publish makes the same check.
-    if (!this.remote) {
+    // the publish makes the same check. With no database there is no index,
+    // so nothing live points at it.
+    if (!this.remote && this.options.db) {
       await checkRemoval({
         db: this.options.db,
         branchId: this.options.branchId,

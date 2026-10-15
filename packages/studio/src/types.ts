@@ -55,6 +55,8 @@ export interface ContentTreeCollection {
 
 export interface ContentTree {
   branch: string;
+  /** The index the states are measured against; `none` means every document reads as not indexed. */
+  index: "postgres" | "static" | "none";
   collections: ContentTreeCollection[];
   /** Rolled-up counts, so the header and Overview don't each recompute them. */
   summary: {

@@ -83,8 +83,12 @@ database instead of the sandbox's. Ready when the log prints `graft studio — b
 
 ## Gotchas
 
-- Studio needs Postgres. In a static project it exits with
-  `ENV_VAR_MISSING: DATABASE_URL is not set`.
+- Studio runs without Postgres. In a static sandbox (`sandbox.sh` with no
+  flag), `$O node $REPO/packages/cli/dist/index.js studio --port 4998` prints
+  `No database: saves update .graft/index.db`, `/workspace` says
+  `"database":false,"index":"static"`, and `/approvals` answers 503
+  `NEEDS_DATABASE`. A save updates `content/` and `.graft/index.db`; read the
+  artifact back with `openStaticIndex` from `@usegraft/db`.
 - Studio is unauthenticated on loopback by design. Off loopback it needs
   scopes, so a remote check needs a token.
 - Stop it with `kill $STUDIO_PID`, then `pg.sh down "$P/pg"`.
