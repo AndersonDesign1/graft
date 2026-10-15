@@ -240,4 +240,4 @@ jobs:
         if: ${{ steps.changesets.outputs.published == 'true' || (github.event_name == 'workflow_dispatch' && !inputs.canary) }}
         run: |
           pnpm sync:dist-tags
-          pnpm check:dist-tags
+          pnpm check:dist-tags --settle 120
