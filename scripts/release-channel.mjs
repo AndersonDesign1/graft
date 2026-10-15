@@ -15,7 +15,7 @@
  * Beta is changesets prerelease mode, which is stateful — `.changeset/pre.json`
  * is committed, and while it exists EVERY release off this branch is a
  * prerelease. release.yml's own comment names that as the reason pre mode was
- * avoided: feat/core takes every ordinary push, so entering pre mode puts all
+ * avoided: main takes every ordinary push, so entering pre mode puts all
  * of it into prerelease versioning "until someone remembered to exit".
  *
  * That is the failure this script exists to make impossible. The state is

@@ -9,13 +9,11 @@ name: Release
 # short-lived, workflow-scoped token at publish time; `id-token: write` below
 # is what makes that possible.
 #
-# main is the default branch, the one visitors and npm land on, and it is merged
-# from feat/core at each release. feat/core is the working mainline and the only
-# branch that publishes, so it is the only branch listed here. Adding main would
-# fire a second, redundant release the moment feat/core merged into it.
+# main is the only long-lived branch: every change lands there, and it is the
+# branch that publishes.
 on:
   push:
-    branches: [feat/core]
+    branches: [main]
   # Retry surface, and the canary surface. With no pending changesets and
   # `canary` unchecked, dispatching re-runs `publish`, which is idempotent —
   # changesets skips versions the registry already has.
@@ -139,7 +137,7 @@ jobs:
       # Beta is changesets prerelease mode, which IS stateful — `.changeset/pre.json`
       # is committed, and while it exists every release off this branch is a
       # prerelease. That state used to be the argument against pre mode here,
-      # because feat/core takes every ordinary push and nothing would remind you
+      # because main takes every ordinary push and nothing would remind you
       # to leave. It is committed state now for the same reason approvalPolicy
       # is: it appears in a diff and a review. And the "Which channel is this"
       # step above prints it before anything publishes, so being in beta is
@@ -187,7 +185,7 @@ jobs:
 
       # Action v2.x requires Changesets CLI v3. This repo is on CLI v2.31.1,
       # so the pin stays on action v1.9.0. Dependabot's grouped bump in #29
-      # moved this to v2.1.1 and the next feat/core push failed:
+      # moved this to v2.1.1 and the next push to the release branch failed:
       # "use Changesets action v1 instead, which is compatible with CLI v2."
       - name: Create release PR or publish
         id: changesets

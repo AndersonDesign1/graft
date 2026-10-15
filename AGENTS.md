@@ -21,7 +21,7 @@ Skills live in `.agents/skills/` (`.claude/skills` links to it).
 
 ## Facts that save you an hour
 
-- PRs target `feat/core`, never `main`.
+- PRs target `main`, the only long-lived branch.
 - Build with `pnpm -r --filter <pkg>... run build` if `pnpm build` (Turbo)
   fails with `Exec format error` in a container.
 - Run tests and CLI calls through `.agents/skills/graft-verify/scripts/offline.sh`.
@@ -35,7 +35,7 @@ Skills live in `.agents/skills/` (`.claude/skills` links to it).
 
 ## Never
 
-- Push to `main` or `feat/core`, publish, or deploy unless asked. Commits and
+- Push to `main`, publish, or deploy unless asked. Commits and
   pushes to your own working branch are fine.
 - Delete or change anything on a real external service without the user's
   say-so.

@@ -8,10 +8,13 @@ Committing a change here changes nothing until someone imports it.
 
 ## Verified
 
-| File             | Ruleset           | ID         |
-| ---------------- | ----------------- | ---------- |
-| `feat-core.json` | Protect feat/core | `21730847` |
-| `main.json`      | Protect main      | `21730831` |
+| File        | Ruleset      | ID         |
+| ----------- | ------------ | ---------- |
+| `main.json` | Protect main | `21730831` |
+
+`main` is the only long-lived branch. Until 2026-10 the repository also had
+`feat/core` as a working mainline, synced into `main` by pull request at each
+release. `feat/core` became `main`, and its stricter ruleset moved with it.
 
 This used to say "checked <date>", which is a claim with a shelf life — and the
 one thing a record of branch protection cannot afford is going quietly stale.
@@ -48,12 +51,12 @@ An automated reviewer reads these files and reports three things every time.
 All three are accurate; none is an accident. Recorded here so the reasoning is
 in the repository rather than re-derived in each review.
 
-**Zero required approvals, on both branches.** Graft has one maintainer.
+**Zero required approvals.** Graft has one maintainer.
 Requiring an approving review would mean nobody can merge anything, because the
 author cannot approve their own pull request. The protection that is actually
-load-bearing here is the eight required status checks — `verify`,
+load-bearing here is the nine required status checks — `verify`,
 `integration`, `container`, `Conventional title`, `Changeset present`,
-`CodeQL`, `Dependency review`, `Workflow audit` — plus
+`CodeQL`, `Dependency review`, `Workflow audit`, `Vercel` — plus
 `required_review_thread_resolution`, which does bind: an unresolved review
 thread blocks the merge whether or not anyone approved.
 
@@ -61,18 +64,11 @@ thread blocks the merge whether or not anyone approved.
 reason. `CODEOWNERS` still assigns review and still tells a contributor which
 surfaces are security-sensitive, which is the job it is doing here.
 
-**`bypass_mode: "always"` for the maintainer on `feat/core`.** `feat/core` is
-the working mainline — every change lands there, and it is the only branch that
-publishes. Routing every commit through a pull request to the branch that _is_
-the trunk would mean opening a pull request against itself. The bypass is
-deliberate and it is visible when used: a bypassing push prints
-`Bypassed rule violations for refs/heads/feat/core` in the git output, so it
-cannot happen quietly.
-
-`main` has **no bypass actors at all**, and that is the one that matters: `main`
-is the public default branch, it is what visitors and npm land on, and it is
-merged from `feat/core` at each release through a pull request that has to pass
-every check.
+**A `bypass_mode: "pull_request"` entry for the maintainer.** It lets the
+maintainer merge a pull request the rules would otherwise hold, for example the
+changesets version PR, whose CI GitHub never starts on its own. It does not
+allow a direct push: every change to `main` still arrives through a pull
+request.
 
 These are the trade-offs of a single-maintainer pre-1.0 repository. They are
 worth revisiting when there is a second maintainer, and not before — at which

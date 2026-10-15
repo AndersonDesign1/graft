@@ -174,9 +174,7 @@ Skip the changeset for a change that touches only docs, tests, or CI.
 
 ## Open the pull request
 
-Target `feat/core`, not `main`. `feat/core` is the working mainline and the only
-branch that publishes. `main` is the default branch, and it is merged from
-`feat/core` at each release.
+Target `main`. It is the only long-lived branch, and the one that publishes.
 
 Use [Conventional Commits](https://www.conventionalcommits.org) for the commit
 messages and the pull request title:

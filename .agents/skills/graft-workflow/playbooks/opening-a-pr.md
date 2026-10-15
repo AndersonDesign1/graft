@@ -2,8 +2,8 @@
 
 Every playbook ends here.
 
-1. **Branch.** Work on your assigned branch. PRs target `feat/core`, never
-   `main` (`CONTRIBUTING.md`).
+1. **Branch.** Work on your assigned branch. PRs target `main`
+   (`CONTRIBUTING.md`).
 2. **Checks**, all of them, before pushing:
    `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, the tests of every
    package you touched, and the `check:*` scripts that cover what you

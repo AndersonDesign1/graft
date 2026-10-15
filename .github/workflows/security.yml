@@ -9,7 +9,7 @@ name: Security
 
 on:
   push:
-    branches: [main, feat/core]
+    branches: [main]
   pull_request:
   schedule:
     # CodeQL's query packs improve after a commit lands. A weekly run finds
