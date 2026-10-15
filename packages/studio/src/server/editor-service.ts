@@ -459,7 +459,8 @@ export class EditorService {
         });
       }
     }
-    const refresh = saved.length > 0 ? await this.afterWrite() : undefined;
+    const refresh =
+      saved.length > 0 ? await this.afterWrite(saved.map((entry) => entry.path)) : undefined;
     return {
       collection: input.collection,
       field: input.field,

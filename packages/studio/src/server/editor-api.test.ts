@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GitHubStore, tokenAuth } from "@usegraft/compiler";
+import { GitHubStore, compileDocuments, tokenAuth } from "@usegraft/compiler";
 import { createGitHubFake } from "@usegraft/compiler/testing";
 import { defineCollection, field } from "@usegraft/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -497,8 +497,11 @@ describe("editor API on a local checkout", () => {
     expect(set.json.failed).toMatchObject([{ slug: "no-such-hat", error: "DOCUMENT_NOT_FOUND" }]);
     // Only the field changed: the other bytes are the author's.
     expect(read("wool-hat")).toBe(product("Wool Hat", 2500, "archived", "hats"));
-    // One index update for the batch, not one per entry.
+    // One index update for the batch, not one per entry, of just the files it wrote.
     expect(projections() - before).toBe(1);
+    expect(vi.mocked(compileDocuments).mock.lastCall?.[0]).toMatchObject({
+      paths: ["products/linen-shirt.mdx", "products/wool-hat.mdx"],
+    });
     const drafts = await call<DraftsDto>(handler, "GET", "/drafts");
     expect(drafts.json.changes.map((change) => [change.slug, change.kind])).toEqual([
       ["linen-shirt", "modified"],
