@@ -143,3 +143,24 @@ async function projectRows(
 
   return changes;
 }
+
+/** A document on a branch's live index, as much of it as a reference check reads. */
+export interface LiveDocument {
+  collection: string;
+  slug: string;
+  sourcePath: string;
+  data: Record<string, unknown>;
+}
+
+/** Every live document on a branch's index. */
+export async function liveDocuments(db: Database, branchId = "main"): Promise<LiveDocument[]> {
+  return db
+    .select({
+      collection: contentIndex.collection,
+      slug: contentIndex.slug,
+      sourcePath: contentIndex.sourcePath,
+      data: contentIndex.data,
+    })
+    .from(contentIndex)
+    .where(and(eq(contentIndex.branchId, branchId), eq(contentIndex.deleted, false)));
+}

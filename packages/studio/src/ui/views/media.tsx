@@ -17,6 +17,7 @@ import {
   IconTrash,
   IconWarning,
 } from "../components/icons";
+import { RequiresDatabase } from "../components/primitives";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { useConfirm } from "../components/ui/confirm";
 import { ApiError, api, plainError, qs } from "../lib/api";
@@ -90,7 +91,18 @@ function Thumb({ asset }: { asset: AssetDto }) {
  * The grid of files, searchable, with an upload button. `onPick` turns it into
  * a picker: a click chooses a file instead of opening its details.
  */
-export function MediaLibrary({ onPick }: { onPick?: (asset: AssetDto) => void }) {
+export function MediaLibrary(props: { onPick?: (asset: AssetDto) => void }) {
+  return (
+    <RequiresDatabase
+      title="The media library needs a database"
+      does="It records each file you upload, with its alt text and where it is used, in Postgres. You can still type a file's key into an image field."
+    >
+      <Library {...props} />
+    </RequiresDatabase>
+  );
+}
+
+function Library({ onPick }: { onPick?: (asset: AssetDto) => void }) {
   const { workspace } = useStudio();
   const [q, setQ] = useState("");
   const list = useResource<AssetListDto>(`/assets${qs({ q: q.trim() || undefined })}`, [q]);

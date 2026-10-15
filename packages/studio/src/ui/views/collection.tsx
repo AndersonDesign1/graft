@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import type { DraftsDto, EntryList, EntryStatus, EntrySummary } from "../../editor-types";
 import type { SchemaFieldDto } from "../../types";
 import { AssetThumb, formatCell } from "../components/fields";
+import { SetFieldDialog } from "../components/set-field-dialog";
 import {
   IconCaretDown,
   IconClose,
@@ -23,7 +24,7 @@ import {
 import { useConfirm } from "../components/ui/confirm";
 import { Menu, MenuContent, MenuItem, MenuSection, MenuTrigger } from "../components/ui/menu";
 import { api, plainError, qs } from "../lib/api";
-import { humanise, labelOf, titleField } from "../lib/fields";
+import { humanise, labelOf, settableFields, titleField } from "../lib/fields";
 import { relativeTime } from "../lib/format";
 import {
   actionWord,
@@ -134,6 +135,7 @@ export function CollectionView({ collection }: { collection: string }) {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [settingField, setSettingField] = useState(false);
 
   // Reset when the collection changes.
   useEffect(() => {
@@ -625,6 +627,20 @@ export function CollectionView({ collection }: { collection: string }) {
         ) : null}
       </div>
 
+      <SetFieldDialog
+        collection={collection}
+        entries={items.filter((item) => selected.has(item.path))}
+        fields={fields}
+        open={settingField}
+        onOpenChange={setSettingField}
+        onSaved={(failed) => {
+          // What wasn't saved stays selected, to fix and try again.
+          const keep = new Set(failed);
+          setSelected(new Set(items.filter((i) => keep.has(i.slug)).map((i) => i.path)));
+          drafts.refresh();
+        }}
+      />
+
       {selected.size > 0 ? (
         <div className="bulk" role="toolbar" aria-label="Selected entries">
           <span className="bulk-count" data-numeric="">
@@ -640,6 +656,17 @@ export function CollectionView({ collection }: { collection: string }) {
           >
             {publishVerb(drafts.data?.publish)}
           </button>
+          {settableFields(fields).length > 0 ? (
+            <button
+              type="button"
+              className="btn"
+              data-size="sm"
+              disabled={busy || !canWrite}
+              onClick={() => setSettingField(true)}
+            >
+              Set a field
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn"

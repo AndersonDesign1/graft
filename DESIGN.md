@@ -282,6 +282,13 @@ Rows are two lines, 56px: the title, then the state or the slug and when it
 changed. The arrow keys, Home and End move between rows and Enter opens one;
 moving never opens an entry by itself.
 
+**Selecting rows** raises the bulk bar at the foot of the list: the count, the
+workspace's verb as the one primary button, then Set a field, Discard changes
+and Delete, and a close button. On a phone the buttons wrap inside the bar;
+none runs off the screen. Set a field opens a dialog with the same field
+controls as the editor; entries it could not save are listed in the dialog,
+with the reason, and stay selected.
+
 **The inspector** holds what is about the entry rather than in it: its status,
 where it is saved, its file and version, what changed, and its published
 versions. Restoring a version saves it as a draft; history never publishes. Tabs are words
@@ -303,6 +310,13 @@ view use 16px 600 titles.
 **Spacing is the scale.** Every padding, margin and gap in Studio's
 stylesheets is a `--space-*` token (or another token). The only literals are
 1px and 2px hairline nudges. `pnpm check:design` enforces it.
+
+**Without a database** Studio still edits content. A view whose data lives in
+Postgres keeps its title and shows one empty state in its place: the database
+icon, "<What> needs a database", what it would hold, and the steps to add one.
+On a page that also shows content (Health, Settings) it is one such panel for
+everything that needs a database, never one per section. Nothing on screen
+asks the API for what a missing database can't answer.
 
 **State is a mark and a word.** Never a colored pill. The resting state shows
 nothing, so the exceptions are what the eye finds.
