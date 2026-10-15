@@ -34,7 +34,7 @@ import {
 import type { MdxTrust } from "@usegraft/mdx-safety";
 import matter from "gray-matter";
 import { validateDocuments, type SourceFile } from "../compile";
-import { brokenReferencesError, findBrokenReferences } from "../references";
+import { checkChangedDocuments } from "../references";
 import { gitBlobSha } from "./blob";
 import { assertBaseVersion } from "./conflict";
 import { normalisePath } from "./github/store";
@@ -250,21 +250,16 @@ export class DatabaseStore implements ContentStore {
         });
       }
     }
-    const publishing = new Set(heads.map((head) => head.path));
-    const key = (doc: { collection: string; slug: string }) => `${doc.collection}/${doc.slug}`;
-    const staying = live.filter((doc) => !publishing.has(doc.sourcePath));
-    const docs = validateDocuments(writing, this.options.collections, {
-      mdxTrust: this.options.mdxTrust,
-      references: new Set(staying.map(key)),
-    });
-    // Only references this publish breaks: one that was already broken is
-    // not this publish's to refuse.
-    const before = new Set(live.map(key));
-    const after = new Set(docs.map(key));
-    const stranded = findBrokenReferences(staying, this.options.collections, after).filter((ref) =>
-      before.has(`${ref.to}/${ref.slug}`),
+    const docs = checkChangedDocuments(
+      live,
+      new Set(heads.map((head) => head.path)),
+      this.options.collections,
+      (staying) =>
+        validateDocuments(writing, this.options.collections, {
+          mdxTrust: this.options.mdxTrust,
+          references: staying,
+        }),
     );
-    if (stranded.length > 0) throw brokenReferencesError(stranded);
     return {
       upserts: docs.map((doc) => ({
         collection: doc.collection,

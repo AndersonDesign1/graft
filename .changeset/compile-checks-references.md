@@ -25,6 +25,11 @@ whose reference isn't live, and refuses to publish the deletion (or a new
 slug) of a document that live documents still point at. Publish them together,
 changed to point elsewhere.
 
+A local Studio checks the same way: a save of an entry whose reference isn't
+in the index is refused, and so is deleting an entry other entries point at,
+before its file is removed. `checkRemoval` in `@usegraft/compiler` is that
+second check, and `compileDocuments` makes the first.
+
 `validateDocuments` takes a new `references` option. `"files"` checks targets
 among the files given, which is right for a whole tree, and `readDocs` uses it
 by default. A set of `collection/slug` keys also counts those as existing, for

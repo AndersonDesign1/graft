@@ -141,7 +141,8 @@ The slug has to name a document that exists. `graft compile` stops with
 the file, the field and the missing slug. In a database-sourced project,
 publishing refuses the same thing, and also refuses to publish the deletion of
 a document that live documents still point at. Publish the documents that
-point at it in the same step, changed to point elsewhere. A reference into a
+point at it in the same step, changed to point elsewhere. A local Studio refuses
+to delete an entry other entries point at, and says which ones. A reference into a
 collection kept in the database (`db-authoritative`) is not checked, because
 its targets are records, not documents.
 

@@ -16,6 +16,7 @@ import { walkContentFiles } from "./content-files";
 import type { AnyCollection } from "@usegraft/core";
 import {
   projectBranchContent,
+  liveDocuments,
   projectDocuments,
   projectPublishedContent,
   projectStaticContent,
@@ -24,7 +25,7 @@ import {
 } from "@usegraft/db";
 import { parseDocument, type ProjectedDoc } from "./parse";
 import { resolveContained } from "./paths";
-import { brokenReferencesError, findBrokenReferences } from "./references";
+import { brokenReferencesError, checkChangedDocuments, findBrokenReferences } from "./references";
 
 /**
  * Where a project's authored content is authoritative.
@@ -311,8 +312,8 @@ export interface CompileDocumentsOptions {
 /**
  * Compile a few files of a git-sourced project: what a save needs, where
  * `compile` would read, validate and diff the whole tree to change one row.
- * The files pass the same `validateDocuments` checks, and the projection
- * records a compilation like a full one. Documents that were not named are
+ * The files pass the same checks as a compile, references included, and
+ * the projection records a compilation like a full one. Documents that were not named are
  * left as they are, so drift elsewhere in the tree waits for `graft compile`.
  */
 export async function compileDocuments(options: CompileDocumentsOptions): Promise<CompileResult> {
@@ -321,14 +322,65 @@ export async function compileDocuments(options: CompileDocumentsOptions): Promis
     const full = resolveContained(options.contentDir, sourcePath, { label: "Content path" });
     if (existsSync(full)) files.push({ sourcePath, raw: readFileSync(full, "utf8") });
   }
-  const docs = validateDocuments(files, options.collections, { mdxTrust: options.mdxTrust });
+  const branchId = options.branchId ?? "main";
+  // The files are checked as a compile checks them, references included:
+  // against the documents the rest of the index holds, and so that the rest
+  // is not left pointing at a document these files no longer hold.
+  const docs = checkChangedDocuments(
+    await liveDocuments(options.db, branchId),
+    new Set(options.paths),
+    options.collections,
+    (staying) =>
+      validateDocuments(files, options.collections, {
+        mdxTrust: options.mdxTrust,
+        references: staying,
+      }),
+  );
   const gitSha = options.gitSha !== undefined ? options.gitSha : resolveGitSha(options.contentDir);
   const changes = await projectDocuments(
     options.db,
     { upserts: docs.map(indexRow), removals: [], paths: [...new Set(options.paths)] },
-    { branchId: options.branchId ?? "main", gitSha },
+    { branchId, gitSha },
   );
   return { count: docs.length, docs, changes, gitSha };
+}
+
+/**
+ * Refuse to remove files while live documents still point at what they
+ * hold, before anything is deleted: removing a category its products use
+ * would leave a tree `graft compile` refuses. Throws
+ * CONTENT_REFERENCE_NOT_FOUND naming each reference.
+ */
+export async function checkRemoval(options: {
+  db: Database;
+  branchId?: string;
+  collections: Record<string, AnyCollection>;
+  paths: string[];
+}): Promise<void> {
+  const removing = new Set(options.paths);
+  const live = await liveDocuments(options.db, options.branchId ?? "main");
+  const gone = new Set(
+    live
+      .filter((doc) => removing.has(doc.sourcePath))
+      .map((doc) => `${doc.collection}/${doc.slug}`),
+  );
+  if (gone.size === 0) return;
+  const stranded = findBrokenReferences(
+    live.filter((doc) => !removing.has(doc.sourcePath)),
+    options.collections,
+  ).filter((ref) => gone.has(`${ref.to}/${ref.slug}`));
+  if (stranded.length === 0) return;
+  const listed = stranded
+    .slice(0, 10)
+    .map((ref) => `${ref.sourcePath} "${ref.field}"`)
+    .join("; ");
+  const more = stranded.length > 10 ? ` …and ${stranded.length - 10} more` : "";
+  throw new GraftError({
+    code: "CONTENT_REFERENCE_NOT_FOUND",
+    message: `${[...gone].join(", ")} can't be deleted while ${stranded.length} reference(s) point at it: ${listed}${more}.`,
+    fix: "Point those fields at another document, or delete those entries first. Nothing was deleted.",
+    details: { references: stranded.slice(0, 50), total: stranded.length, removing: [...gone] },
+  });
 }
 
 function indexRow(doc: ProjectedDoc) {

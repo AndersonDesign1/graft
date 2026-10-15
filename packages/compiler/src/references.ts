@@ -78,6 +78,33 @@ export function findBrokenReferences(
   return broken;
 }
 
+/**
+ * Check a change to some documents of a larger whole, such as one save or
+ * one publish, against the documents that stay as they are. `validate` is
+ * the caller's own check of the changed files, given the keys of every
+ * document that stays, so their references can resolve to those. Then the
+ * documents that stay are checked against what the change leaves: a
+ * deletion or a new slug must not leave them pointing at nothing. Only
+ * references this change breaks are refused; ones already broken are not
+ * its to refuse. Throws CONTENT_REFERENCE_NOT_FOUND.
+ */
+export function checkChangedDocuments<T extends ReferencingDoc>(
+  live: ReferencingDoc[],
+  changedPaths: ReadonlySet<string>,
+  collections: Record<string, AnyCollection>,
+  validate: (staying: ReadonlySet<string>) => T[],
+): T[] {
+  const key = (doc: { collection: string; slug: string }) => `${doc.collection}/${doc.slug}`;
+  const staying = live.filter((doc) => !changedPaths.has(doc.sourcePath));
+  const docs = validate(new Set(staying.map(key)));
+  const before = new Set(live.map(key));
+  const stranded = findBrokenReferences(staying, collections, new Set(docs.map(key))).filter(
+    (ref) => before.has(`${ref.to}/${ref.slug}`),
+  );
+  if (stranded.length > 0) throw brokenReferencesError(stranded);
+  return docs;
+}
+
 /** The refusal for references that point at nothing, naming the first ten. */
 export function brokenReferencesError(broken: BrokenReference[]): GraftError {
   const listed = broken
