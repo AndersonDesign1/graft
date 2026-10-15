@@ -1579,6 +1579,12 @@
   font-size: var(--text-xs);
 }
 
+/* The editors load when an entry opens; until then the canvas keeps its room. */
+.editor-loading {
+  min-height: 12rem;
+  padding-block: var(--space-4);
+}
+
 /* ==========================================================================
    Create
    ========================================================================== */
