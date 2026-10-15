@@ -16,6 +16,7 @@ import {
   currentFiles,
   discardDrafts,
   draftHeads,
+  liveDocuments,
   openReviews,
   publishDrafts,
   publishedHistory,
@@ -27,11 +28,13 @@ import {
   type ContentInput,
   type Database,
   type HeadState,
+  type LiveDocument,
   type RevisionActor,
 } from "@usegraft/db";
 import type { MdxTrust } from "@usegraft/mdx-safety";
 import matter from "gray-matter";
 import { validateDocuments, type SourceFile } from "../compile";
+import { checkChangedDocuments } from "../references";
 import { gitBlobSha } from "./blob";
 import { assertBaseVersion } from "./conflict";
 import { normalisePath } from "./github/store";
@@ -192,7 +195,7 @@ export class DatabaseStore implements ContentStore {
       };
     }
 
-    const index = this.indexChanges(heads);
+    const index = this.indexChanges(heads, await liveDocuments(this.db, this.branchId));
     const result = await publishDrafts(this.db, {
       branchId: this.branchId,
       drafts: heads.map((head) => ({ path: head.path, version: head.draft?.version ?? null })),
@@ -228,10 +231,12 @@ export class DatabaseStore implements ContentStore {
 
   /**
    * The index rows the drafts produce, checked exactly as a compile checks a
-   * file: the collection, its schema, slug uniqueness among them, and MDX
-   * safety. A draft that would fail `graft compile` never goes live.
+   * file: the collection, its schema, slug uniqueness among them, MDX safety
+   * and references. A draft that would fail `graft compile` never goes live,
+   * and neither does a deletion or a new slug that would make it fail by
+   * leaving a live document pointing at nothing.
    */
-  private indexChanges(heads: HeadState[]): IndexChanges {
+  private indexChanges(heads: HeadState[], live: LiveDocument[]): IndexChanges {
     const writing: SourceFile[] = [];
     const removals: IndexChanges["removals"] = [];
     for (const head of heads) {
@@ -245,9 +250,16 @@ export class DatabaseStore implements ContentStore {
         });
       }
     }
-    const docs = validateDocuments(writing, this.options.collections, {
-      mdxTrust: this.options.mdxTrust,
-    });
+    const docs = checkChangedDocuments(
+      live,
+      new Set(heads.map((head) => head.path)),
+      this.options.collections,
+      (staying) =>
+        validateDocuments(writing, this.options.collections, {
+          mdxTrust: this.options.mdxTrust,
+          references: staying,
+        }),
+    );
     return {
       upserts: docs.map((doc) => ({
         collection: doc.collection,

@@ -34,6 +34,8 @@ vi.mock("@usegraft/db", async (importOriginal) => {
         unchanged: rows.length,
       }),
     ),
+    // A write checks references against the live index, which these tests keep empty.
+    liveDocuments: vi.fn(async () => []),
     // A write projects the files it touched; the whole tree only on compile.
     projectDocuments: vi.fn(
       async (

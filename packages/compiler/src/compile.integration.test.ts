@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { defineCollection, field } from "@usegraft/core";
 import { createDb, type DbHandle } from "@usegraft/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { compile, compileDocuments } from "./compile";
+import { checkRemoval, compile, compileDocuments } from "./compile";
 
 // Best-effort load of repo-root .env; skipped without RUN_INTEGRATION=1 + a database.
 try {
@@ -18,6 +18,7 @@ try {
 const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
 const BRANCH = "compiler-it";
 const DOCS_BRANCH = "compiler-it-docs";
+const REFS_BRANCH = "compiler-it-refs";
 const collections = {
   pages: defineCollection({ name: "pages", fields: { title: field.string() } }),
 };
@@ -35,7 +36,7 @@ describe.skipIf(!runIntegration)("compile -> content_index (integration)", () =>
   });
 
   afterAll(async () => {
-    for (const branch of [BRANCH, DOCS_BRANCH]) {
+    for (const branch of [BRANCH, DOCS_BRANCH, REFS_BRANCH]) {
       await handle.sql`delete from content_index where branch_id = ${branch}`;
       await handle.sql`delete from compilations where branch_id = ${branch}`;
     }
@@ -151,6 +152,54 @@ describe.skipIf(!runIntegration)("compile -> content_index (integration)", () =>
       ]);
     } finally {
       rmSync(docsDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it("checks a save's references against the index, and refuses a stranding delete", async () => {
+    const refsDir = mkdtempSync(join(tmpdir(), "graft-compile-refs-it-"));
+    const linked = {
+      topics: defineCollection({ name: "topics", fields: { title: field.string() } }),
+      notes: defineCollection({
+        name: "notes",
+        fields: { title: field.string(), topic: field.reference({ to: "topics" }) },
+      }),
+    };
+    const put = (path: string, raw: string) => {
+      mkdirSync(join(refsDir, path.split("/")[0] as string), { recursive: true });
+      writeFileSync(join(refsDir, path), raw);
+    };
+    const opts = { db: handle.db, contentDir: refsDir, collections: linked, branchId: REFS_BRANCH };
+    try {
+      put("topics/wool.mdx", "---\ntitle: Wool\n---\n");
+      put("notes/a.mdx", "---\ntitle: A\ntopic: wool\n---\n");
+      await compile(opts);
+
+      // A saved note resolves its topic from the index, not from the files it names.
+      put("notes/b.mdx", "---\ntitle: B\ntopic: wool\n---\n");
+      const saved = await compileDocuments({ ...opts, paths: ["notes/b.mdx"] });
+      expect(saved.changes.added).toEqual(["notes/b"]);
+
+      // A topic that isn't in the index is refused, and nothing is projected.
+      put("notes/c.mdx", "---\ntitle: C\ntopic: linen\n---\n");
+      await expect(compileDocuments({ ...opts, paths: ["notes/c.mdx"] })).rejects.toMatchObject({
+        code: "CONTENT_REFERENCE_NOT_FOUND",
+        details: { references: [{ sourcePath: "notes/c.mdx", field: "topic", slug: "linen" }] },
+      });
+
+      // Deleting the topic two live notes use is refused before anything goes.
+      await expect(checkRemoval({ ...opts, paths: ["topics/wool.mdx"] })).rejects.toMatchObject({
+        code: "CONTENT_REFERENCE_NOT_FOUND",
+        details: { total: 2 },
+      });
+      // A note nothing points at can go.
+      await expect(checkRemoval({ ...opts, paths: ["notes/a.mdx"] })).resolves.toBeUndefined();
+
+      const live = (
+        await handle.sql`select collection, slug from content_index where branch_id = ${REFS_BRANCH} and not deleted order by collection, slug`
+      ).map((r) => `${r.collection}/${r.slug}`);
+      expect(live).toEqual(["notes/a", "notes/b", "topics/wool"]);
+    } finally {
+      rmSync(refsDir, { recursive: true, force: true });
     }
   }, 60_000);
 });

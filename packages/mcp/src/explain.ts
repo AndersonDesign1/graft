@@ -92,13 +92,15 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
   },
   CONTENT_REFERENCE_NOT_FOUND: {
     code: "CONTENT_REFERENCE_NOT_FOUND",
-    meaning: "A document references another document that does not exist.",
+    meaning:
+      "A reference field names a document that does not exist. graft compile stops on it, and a database-sourced publish refuses it, including the deletion of a document that live documents still point at.",
     typicalCauses: [
-      "The referenced document was deleted or renamed",
+      "The referenced document was deleted, renamed or given a new slug",
       "A slug typo in the reference",
+      "The reference and its target were published separately, target last",
     ],
     howToRecover:
-      "Create the missing document, or update the reference to point at an existing collection/slug (list_content shows what exists).",
+      "Read details.references: each names the file, the field and the missing collection/slug. Create the missing document, or point the field at one that exists (list_content shows what exists). To delete a document others point at, change them in the same publish. graft check lists every broken reference at once.",
   },
   DOCUMENT_NOT_FOUND: {
     code: "DOCUMENT_NOT_FOUND",
