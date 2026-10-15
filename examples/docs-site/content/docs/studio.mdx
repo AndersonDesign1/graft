@@ -206,9 +206,10 @@ token is revoked and replaced, never shown again. Revoking takes effect on the
 agent's next request. No token can approve: destructive calls still wait in the
 inbox for a person. Only admins see this page.
 
-Tokens work where the site runs `graft serve`. `graft studio` on your own
-machine has no MCP endpoint, so tokens made there are for the hosted site on
-the same database.
+Tokens work at `/api/mcp` wherever the site runs `graft serve`. `graft studio`
+on your own machine has no MCP endpoint, so tokens made there are for the
+hosted site on the same database. An agent on your machine needs no token: it
+starts `npx graft mcp` itself.
 
 ## Site and deploy hooks
 

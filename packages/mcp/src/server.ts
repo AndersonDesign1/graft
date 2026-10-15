@@ -46,6 +46,8 @@ import { registerContentPrompts } from "./tools/prompts";
 import { registerRegistryTools } from "./tools/registry";
 import { registerDocumentResources, registerSchemaResource } from "./tools/resources";
 import type { GraftMcpOptions } from "./options";
+import { listToolsWithOwnZod } from "./tool-list";
+import { VERSION } from "./version";
 
 export type { GraftMcpOptions } from "./options";
 
@@ -144,8 +146,11 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
     if ((actor.scopes ?? []).includes(scope)) return;
     throw new GraftError({
       code: "UNAUTHORIZED",
-      message: `${tool} requires the "${scope}" scope, and this credential does not carry it.`,
-      fix: `Mint a token whose scope claim includes "${scope}" (for \`graft serve\`, add it to GRAFT_DEV_SCOPES). Content authoring, asset upload and approval decisions are deliberately separate from ordinary read scopes.`,
+      message: `This token can't call ${tool}: it doesn't carry the "${scope}" scope.`,
+      fix:
+        scope === "approvals:decide"
+          ? "Approval decisions are a person's: approve or deny it in Studio's inbox, or with `graft approve`. No agent token carries this scope."
+          : `Use a token made with Write drafts or Publish access in Studio, under Developer, Agents. For the dev token of \`graft serve\` or \`graft mcp\`, add "${scope}" to GRAFT_DEV_SCOPES.`,
       details: { tool, required: scope, held: actor.scopes ?? [] },
     });
   };
@@ -399,8 +404,9 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
 
   const server = new McpServer({
     name: options.name ?? "graft",
-    version: options.version ?? "0.0.0",
+    version: options.version ?? VERSION,
   });
+  const listTools = listToolsWithOwnZod(server);
 
   // The closure these tools used to capture implicitly, named and handed over.
   // The external interface (`createGraftMcp(options)`) is unchanged — this is
@@ -440,6 +446,7 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
   };
 
   register(server, deps);
+  listTools();
   return server;
 }
 
