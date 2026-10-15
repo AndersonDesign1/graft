@@ -159,6 +159,35 @@ export const EDITOR_ROUTES: readonly Route[] = [
     },
   },
   {
+    method: "POST",
+    path: `${V1}/entries/field`,
+    scope: "studio:write",
+    handle: async (ctx) => {
+      const payload = await body(ctx);
+      const example =
+        'POST { "collection": "products", "slugs": ["wool-hat"], "field": "status", "value": "active" }';
+      const slugs = stringList(payload.slugs);
+      if (slugs.length === 0 || !Object.hasOwn(payload, "value")) {
+        throw new GraftError({
+          code: "INPUT_VALIDATION_FAILED",
+          message: "Setting a field needs the entries' slugs and a value.",
+          fix: `${example}. Send "value": null to remove an optional field.`,
+        });
+      }
+      return Response.json(
+        await service(ctx).setField(
+          {
+            collection: required(payload.collection, "collection", example),
+            slugs,
+            field: required(payload.field, "field", example),
+            value: payload.value,
+          },
+          actorOf(ctx),
+        ),
+      );
+    },
+  },
+  {
     method: "GET",
     path: `${V1}/entry`,
     scope: "studio:read",

@@ -105,6 +105,25 @@ export function titleField(fields: readonly SchemaFieldDto[]): SchemaFieldDto | 
   );
 }
 
+/** Controls that hold one value, so one value can sensibly go on many entries. */
+const SETTABLE = new Set<Control>([
+  "text",
+  "textarea",
+  "number",
+  "money",
+  "toggle",
+  "select",
+  "reference",
+]);
+
+/** The fields a selection of entries can set at once: one value, not the entry's name. */
+export function settableFields(fields: readonly SchemaFieldDto[]): SchemaFieldDto[] {
+  const headline = titleField(fields);
+  return fields.filter(
+    (field) => field !== headline && field.name !== "slug" && SETTABLE.has(controlOf(field)),
+  );
+}
+
 /* ---- money --------------------------------------------------------------- */
 
 /** Minor units per major unit, from Intl; 2 for most currencies, 0 for JPY. */

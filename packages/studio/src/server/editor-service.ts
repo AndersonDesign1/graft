@@ -38,6 +38,7 @@ import type {
   PublishAction,
   PublishResultDto,
   SaveEntryResult,
+  SetFieldResultDto,
   VersionDetailDto,
   VersionListDto,
 } from "../editor-types";
@@ -61,6 +62,16 @@ import { lineDiff } from "./line-diff";
 import { compileIndex } from "./compile-index";
 import { localDrafts } from "./local-drafts";
 import { localHistory, type LocalHistory } from "./local-history";
+
+/** What a save of one entry carries: its fields and body, or its full source. */
+interface SaveInput {
+  collection: string;
+  slug: string;
+  data?: Record<string, unknown>;
+  body?: string;
+  raw?: string;
+  baseVersion?: string | null;
+}
 
 /** Documents named per activity entry; the rest are counted. */
 const ACTIVITY_DOCUMENTS = 3;
@@ -339,19 +350,19 @@ export class EditorService {
    * schema, MDX safety, a slug that names one file. Frontmatter bytes are
    * kept unless the data actually changed.
    */
-  async save(
-    input: {
-      collection: string;
-      slug: string;
-      data?: Record<string, unknown>;
-      body?: string;
-      raw?: string;
-      baseVersion?: string | null;
-    },
-    actor: StoreActor,
-  ): Promise<SaveEntryResult> {
-    const collection = this.fileCollection(input.collection);
+  async save(input: SaveInput, actor: StoreActor): Promise<SaveEntryResult> {
     const path = await this.pathFor(input.collection, input.slug, actor);
+    const { version } = await this.put(input, path, actor);
+    return this.written(input.collection, input.slug, path, version, actor);
+  }
+
+  /** A save's checks and its write, without the index update that follows. */
+  private async put(
+    input: SaveInput,
+    path: string,
+    actor: StoreActor,
+  ): Promise<{ version: string | null }> {
+    const collection = this.fileCollection(input.collection);
     const existing = await this.store.read(path, actor);
 
     let raw: string;
@@ -376,11 +387,93 @@ export class EditorService {
     assertSafeMdx(body, { label: `${input.collection}/${input.slug}` });
     parseDocument(raw, collection, path);
 
-    const { version } = await this.store.write(path, raw, {
+    return this.store.write(path, raw, {
       actor,
       ...(input.baseVersion !== undefined ? { baseVersion: input.baseVersion } : {}),
     });
-    return this.written(input.collection, input.slug, path, version, actor);
+  }
+
+  /**
+   * One field set to one value on many entries, from a selection in the list.
+   * Each entry is checked and written exactly as a save is, so each becomes a
+   * draft; the index is updated once, after the last write. An entry that
+   * fails is reported and the others are still saved. `null` removes the
+   * field, which only an optional field allows.
+   */
+  async setField(
+    input: { collection: string; slugs: string[]; field: string; value: unknown },
+    actor: StoreActor,
+  ): Promise<SetFieldResultDto> {
+    const collection = this.fileCollection(input.collection);
+    const names = collection
+      .describe()
+      .fields.map((field) => field.name)
+      .filter((name) => name !== "slug");
+    if (!names.includes(input.field)) {
+      throw new GraftError({
+        code: "INPUT_VALIDATION_FAILED",
+        message: `"${input.field}" is not a field of ${input.collection} that can be set on many entries.`,
+        fix: `Use one of: ${names.join(", ")}.`,
+        details: { collection: input.collection, field: input.field, fields: names },
+      });
+    }
+    // Paths for every slug from one listing, not one listing per entry.
+    const changes = await this.changeMap(actor);
+    const paths = new Map(
+      (await this.listed(input.collection, actor, changes)).map((entry) => [
+        entry.slug,
+        entry.path,
+      ]),
+    );
+    const saved: SetFieldResultDto["saved"] = [];
+    const failed: SetFieldResultDto["failed"] = [];
+    for (const slug of new Set(input.slugs)) {
+      try {
+        const path = paths.get(slug);
+        const file = path ? await this.store.read(path, actor) : null;
+        if (!path || !file) {
+          throw new GraftError({
+            code: "DOCUMENT_NOT_FOUND",
+            message: `There is no "${slug}" in ${input.collection}.`,
+            fix: "It may have been deleted or renamed. Refresh the list and select it again.",
+            details: { collection: input.collection, slug },
+          });
+        }
+        const parsed = matter(file.raw, {});
+        const data = { ...(parsed.data as Record<string, unknown>) };
+        if (input.value === null) delete data[input.field];
+        else data[input.field] = input.value;
+        const { version } = await this.put(
+          {
+            collection: input.collection,
+            slug,
+            data,
+            body: parsed.content.replace(/^\n/, ""),
+            baseVersion: file.version,
+          },
+          path,
+          actor,
+        );
+        saved.push({ slug, path, version });
+      } catch (error) {
+        if (!(error instanceof GraftError)) throw error;
+        failed.push({
+          slug,
+          error: error.code,
+          message: error.message,
+          ...(error.fix ? { fix: error.fix } : {}),
+        });
+      }
+    }
+    const refresh =
+      saved.length > 0 ? await this.afterWrite(saved.map((entry) => entry.path)) : undefined;
+    return {
+      collection: input.collection,
+      field: input.field,
+      saved,
+      failed,
+      ...(refresh ? { refresh } : {}),
+    };
   }
 
   async create(
