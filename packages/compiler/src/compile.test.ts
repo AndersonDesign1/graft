@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { GraftError } from "@usegraft/contracts";
 import { defineCollection, field } from "@usegraft/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readDocs } from "./compile";
+import { compile, compileStatic, readDocs } from "./compile";
 
 const collections = {
   pages: defineCollection({ name: "pages", fields: { title: field.string() } }),
@@ -31,6 +31,28 @@ describe("readDocs", () => {
     write("posts/hello.mdx", "---\ntitle: Hello\n---\nPost");
     const docs = readDocs(dir, collections);
     expect(docs.map((d) => `${d.collection}/${d.slug}`)).toEqual(["pages/home", "posts/hello"]);
+  });
+
+  it("fails a compile on a reference to a document that doesn't exist", async () => {
+    const linked = {
+      ...collections,
+      posts: defineCollection({
+        name: "posts",
+        fields: { title: field.string(), see: field.reference({ to: "pages", optional: true }) },
+      }),
+    };
+    write("pages/home.mdx", "---\ntitle: Home\n---\n");
+    write("posts/hello.mdx", "---\ntitle: Hello\nsee: about\n---\n");
+    // Refused while reading, before anything is projected, so no index is touched.
+    const broken = { code: "CONTENT_REFERENCE_NOT_FOUND" };
+    await expect(
+      compile({ contentDir: dir, collections: linked, db: {} as never, gitSha: null }),
+    ).rejects.toMatchObject(broken);
+    await expect(
+      compileStatic({ contentDir: dir, collections: linked, indexPath: join(dir, "i.db") }),
+    ).rejects.toMatchObject(broken);
+    write("posts/hello.mdx", "---\ntitle: Hello\nsee: home\n---\n");
+    expect(readDocs(dir, linked)).toHaveLength(2);
   });
 
   it("throws COLLECTION_NOT_FOUND for an unregistered directory", () => {

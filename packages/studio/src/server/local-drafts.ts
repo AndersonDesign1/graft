@@ -53,9 +53,20 @@ export function localDrafts(contentDir: string): DraftWorkflow {
 
     async publish(options): Promise<PublishResult> {
       const paths = await renameDestinations(contentDir, options.paths);
+      // A signed-in person is the commit's author, so history says who
+      // changed what; the server's own git identity stays the committer.
+      const { actor } = options;
       const result = await commitChanges(contentDir, {
         paths,
         message: options.message?.trim() || defaultMessage(paths),
+        ...(actor.name || actor.email
+          ? {
+              author: {
+                name: actor.name ?? actor.email ?? actor.id,
+                email: actor.email,
+              },
+            }
+          : {}),
       });
       return {
         mode: "direct",

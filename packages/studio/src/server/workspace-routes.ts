@@ -36,6 +36,7 @@ import {
   type DeployHookRow,
 } from "@usegraft/db";
 import type { Route, RouteContext } from "../api";
+import { requireDatabase } from "./needs-database";
 import type {
   AgentAccess,
   AgentsDto,
@@ -68,8 +69,9 @@ export const AGENT_ACCESS: Readonly<Record<AgentAccess, readonly string[]>> = Ob
   ]),
 });
 
-function db(ctx: RouteContext): Database {
-  return ctx.options.workspaceDb ?? ctx.options.db;
+/** The project's database, for the feature named, or NEEDS_DATABASE. */
+function db(ctx: RouteContext, feature: string): Database {
+  return requireDatabase(ctx.options, feature, "workspace");
 }
 
 async function body(request: Request): Promise<Record<string, unknown>> {
@@ -234,7 +236,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
       const q = ctx.url.searchParams.get("q")?.trim() ?? "";
       const [found, rows, uses] = await Promise.all([
         storage(),
-        listAssets(db(ctx), { limit: 1000 }),
+        listAssets(db(ctx, "The media library"), { limit: 1000 }),
         service(ctx).assetUses(actorOf(ctx)),
       ]);
       const store = found.ok ? found.store : null;
@@ -271,7 +273,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
       const key = keyOf(ctx.url.searchParams.get("key"));
       const [found, row, uses] = await Promise.all([
         storage(),
-        readAsset(db(ctx), key),
+        readAsset(db(ctx, "The media library"), key),
         service(ctx).assetUses(actorOf(ctx)),
       ]);
       const usedIn: AssetUseDto[] = uses.get(key) ?? [];
@@ -358,7 +360,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
       }
       const actor = actorOf(ctx);
       const alt = text(payload.alt, "alt", 500);
-      const row = await recordAsset(db(ctx), {
+      const row = await recordAsset(db(ctx, "The media library"), {
         key,
         contentType,
         bytes: bytes.byteLength,
@@ -377,7 +379,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
       const payload = await body(ctx.request);
       const key = keyOf(payload.key);
       const alt = text(payload.alt, "alt", 500);
-      if (!(await setAssetAlt(db(ctx), key, alt))) {
+      if (!(await setAssetAlt(db(ctx, "The media library"), key, alt))) {
         throw new GraftError({
           code: "DOCUMENT_NOT_FOUND",
           message: `"${key}" wasn't uploaded through Studio, so there is no library alt text to change.`,
@@ -405,7 +407,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
       }
       const store = await requireStorage();
       await store.delete(key);
-      await forgetAsset(db(ctx), key);
+      await forgetAsset(db(ctx, "The media library"), key);
       return Response.json({ key, deleted: true });
     },
   },
@@ -417,7 +419,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
     path: `${V1}/agents`,
     scope: "studio:settings",
     handle: async (ctx) => {
-      const tokens = await listAgentTokens(db(ctx));
+      const tokens = await listAgentTokens(db(ctx, "Agent tokens"));
       const base = origin(ctx);
       const result: AgentsDto = {
         tokens: tokens.map(tokenDto),
@@ -451,7 +453,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
       }
       const minted = mintAgentToken();
       const callerId = ctx.principal?.id;
-      const row = await createAgentToken(db(ctx), {
+      const row = await createAgentToken(db(ctx, "Agent tokens"), {
         name,
         tokenHash: minted.tokenHash,
         prefix: minted.prefix,
@@ -469,7 +471,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
     scope: "studio:settings",
     handle: async (ctx) => {
       const id = idOf(ctx, "token");
-      if (!(await revokeAgentToken(db(ctx), id))) {
+      if (!(await revokeAgentToken(db(ctx, "Agent tokens"), id))) {
         throw new GraftError({
           code: "ROUTE_NOT_FOUND",
           message: "That token doesn't exist, or it was revoked already.",
@@ -490,8 +492,8 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
     handle: async (ctx) => {
       const canManage = !ctx.principal || (ctx.principal.scopes ?? []).includes("studio:settings");
       const [settings, hooks] = await Promise.all([
-        readSiteSettings(db(ctx)),
-        canManage ? listDeployHooks(db(ctx)) : Promise.resolve([]),
+        readSiteSettings(db(ctx, "Site settings")),
+        canManage ? listDeployHooks(db(ctx, "Site settings")) : Promise.resolve([]),
       ]);
       const result: SiteDto = {
         settings: { name: settings?.name ?? null, url: settings?.url ?? null },
@@ -523,7 +525,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
           });
         }
       }
-      const row = await writeSiteSettings(db(ctx), {
+      const row = await writeSiteSettings(db(ctx, "Site settings"), {
         name,
         url,
         updatedById: actorOf(ctx).id,
@@ -554,7 +556,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
           fix: problem,
         });
       }
-      const row = await createDeployHook(db(ctx), {
+      const row = await createDeployHook(db(ctx, "Site settings"), {
         name,
         url,
         secret: text(payload.secret, "secret", 500),
@@ -568,7 +570,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
     scope: "studio:settings",
     handle: async (ctx) => {
       const id = idOf(ctx, "deploy hook");
-      const hook = (await listDeployHooks(db(ctx))).find((h) => h.id === id);
+      const hook = (await listDeployHooks(db(ctx, "Site settings"))).find((h) => h.id === id);
       if (!hook) {
         throw new GraftError({
           code: "ROUTE_NOT_FOUND",
@@ -577,7 +579,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
           details: { id },
         });
       }
-      const delivery = await sendDeployHook(db(ctx), hook, {
+      const delivery = await sendDeployHook(db(ctx, "Site settings"), hook, {
         event: "test",
         branch: ctx.defaultBranch,
         paths: [],
@@ -591,7 +593,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
     scope: "studio:settings",
     handle: async (ctx) => {
       const id = idOf(ctx, "deploy hook");
-      if (!(await deleteDeployHook(db(ctx), id))) {
+      if (!(await deleteDeployHook(db(ctx, "Site settings"), id))) {
         throw new GraftError({
           code: "ROUTE_NOT_FOUND",
           message: "That deploy hook doesn't exist.",

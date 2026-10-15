@@ -16,12 +16,16 @@ import { walkContentFiles } from "./content-files";
 import type { AnyCollection } from "@usegraft/core";
 import {
   projectBranchContent,
+  liveDocuments,
+  projectDocuments,
   projectPublishedContent,
   projectStaticContent,
   type ChangeSet,
   type Database,
 } from "@usegraft/db";
 import { parseDocument, type ProjectedDoc } from "./parse";
+import { resolveContained } from "./paths";
+import { brokenReferencesError, checkChangedDocuments, findBrokenReferences } from "./references";
 
 /**
  * Where a project's authored content is authoritative.
@@ -77,6 +81,16 @@ export interface ReadDocsOptions {
    * renders. Set "full" only where every author has commit access.
    */
   mdxTrust?: MdxTrust;
+  /**
+   * Refuse a `reference` field whose target doesn't exist, with
+   * CONTENT_REFERENCE_NOT_FOUND. `"files"`: the target must be among the
+   * files being validated, which is right for a whole tree. A set of
+   * `collection/slug` keys: the target may also be one of those, for a
+   * caller validating some documents of a larger whole, such as a publish.
+   * Omitted, references are not checked: a few files alone can't say
+   * whether a target exists. `readDocs` defaults to `"files"`.
+   */
+  references?: "files" | ReadonlySet<string>;
 }
 
 /** One authored file: its path inside the content directory, and its bytes. */
@@ -92,7 +106,10 @@ export function readDocs(
   collections: Record<string, AnyCollection>,
   options: ReadDocsOptions = {},
 ): ProjectedDoc[] {
-  return validateDocuments(readSourceFiles(contentDir), collections, options);
+  return validateDocuments(readSourceFiles(contentDir), collections, {
+    references: "files",
+    ...options,
+  });
 }
 
 /** Every content file under `contentDir`, read once, with its path relative to it. */
@@ -113,9 +130,9 @@ export function readSourceFiles(contentDir: string): SourceFile[] {
 
 /**
  * Validate authored files into normalized docs: the schema, slug uniqueness,
- * and MDX safety. The same checks whether the files came from a checkout or
- * from Postgres in a database-sourced project, so the two sources can never
- * accept different content.
+ * MDX safety and, when asked, references. The same checks whether the files
+ * came from a checkout or from Postgres in a database-sourced project, so the
+ * two sources can never accept different content.
  */
 export function validateDocuments(
   files: Iterable<SourceFile>,
@@ -224,6 +241,15 @@ export function validateDocuments(
     });
   }
 
+  if (options.references !== undefined) {
+    const broken = findBrokenReferences(
+      docs,
+      collections,
+      options.references === "files" ? undefined : options.references,
+    );
+    if (broken.length > 0) throw brokenReferencesError(broken);
+  }
+
   return docs.sort((a, b) =>
     a.collection === b.collection
       ? a.slug.localeCompare(b.slug)
@@ -262,13 +288,99 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
       docs = validateDocuments(
         files.map((file) => ({ sourcePath: file.path, raw: file.raw })),
         options.collections,
-        { mdxTrust: options.mdxTrust },
+        { mdxTrust: options.mdxTrust, references: "files" },
       );
       return docs.map(indexRow);
     },
     project,
   );
   return { count: docs.length, docs, changes, gitSha };
+}
+
+export interface CompileDocumentsOptions {
+  contentDir: string;
+  /** The files to project, as `<collection>/<slug>.mdx`. One that no longer exists comes off the index. */
+  paths: string[];
+  collections: Record<string, AnyCollection>;
+  db: Database;
+  branchId?: string;
+  /** As in CompileOptions: omit to auto-resolve, null to skip. */
+  gitSha?: string | null;
+  mdxTrust?: MdxTrust;
+}
+
+/**
+ * Compile a few files of a git-sourced project: what a save needs, where
+ * `compile` would read, validate and diff the whole tree to change one row.
+ * The files pass the same checks as a compile, references included, and
+ * the projection records a compilation like a full one. Documents that were not named are
+ * left as they are, so drift elsewhere in the tree waits for `graft compile`.
+ */
+export async function compileDocuments(options: CompileDocumentsOptions): Promise<CompileResult> {
+  const files: SourceFile[] = [];
+  for (const sourcePath of new Set(options.paths)) {
+    const full = resolveContained(options.contentDir, sourcePath, { label: "Content path" });
+    if (existsSync(full)) files.push({ sourcePath, raw: readFileSync(full, "utf8") });
+  }
+  const branchId = options.branchId ?? "main";
+  // The files are checked as a compile checks them, references included:
+  // against the documents the rest of the index holds, and so that the rest
+  // is not left pointing at a document these files no longer hold.
+  const docs = checkChangedDocuments(
+    await liveDocuments(options.db, branchId),
+    new Set(options.paths),
+    options.collections,
+    (staying) =>
+      validateDocuments(files, options.collections, {
+        mdxTrust: options.mdxTrust,
+        references: staying,
+      }),
+  );
+  const gitSha = options.gitSha !== undefined ? options.gitSha : resolveGitSha(options.contentDir);
+  const changes = await projectDocuments(
+    options.db,
+    { upserts: docs.map(indexRow), removals: [], paths: [...new Set(options.paths)] },
+    { branchId, gitSha },
+  );
+  return { count: docs.length, docs, changes, gitSha };
+}
+
+/**
+ * Refuse to remove files while live documents still point at what they
+ * hold, before anything is deleted: removing a category its products use
+ * would leave a tree `graft compile` refuses. Throws
+ * CONTENT_REFERENCE_NOT_FOUND naming each reference.
+ */
+export async function checkRemoval(options: {
+  db: Database;
+  branchId?: string;
+  collections: Record<string, AnyCollection>;
+  paths: string[];
+}): Promise<void> {
+  const removing = new Set(options.paths);
+  const live = await liveDocuments(options.db, options.branchId ?? "main");
+  const gone = new Set(
+    live
+      .filter((doc) => removing.has(doc.sourcePath))
+      .map((doc) => `${doc.collection}/${doc.slug}`),
+  );
+  if (gone.size === 0) return;
+  const stranded = findBrokenReferences(
+    live.filter((doc) => !removing.has(doc.sourcePath)),
+    options.collections,
+  ).filter((ref) => gone.has(`${ref.to}/${ref.slug}`));
+  if (stranded.length === 0) return;
+  const listed = stranded
+    .slice(0, 10)
+    .map((ref) => `${ref.sourcePath} "${ref.field}"`)
+    .join("; ");
+  const more = stranded.length > 10 ? ` …and ${stranded.length - 10} more` : "";
+  throw new GraftError({
+    code: "CONTENT_REFERENCE_NOT_FOUND",
+    message: `${[...gone].join(", ")} can't be deleted while ${stranded.length} reference(s) point at it: ${listed}${more}.`,
+    fix: "Point those fields at another document, or delete those entries first. Nothing was deleted.",
+    details: { references: stranded.slice(0, 50), total: stranded.length, removing: [...gone] },
+  });
 }
 
 function indexRow(doc: ProjectedDoc) {
