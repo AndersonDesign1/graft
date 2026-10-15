@@ -418,5 +418,6 @@ Hosted saves do not compile at all.
   removed once `feat/content-change-refresh` (#56) merged; their save-path,
   fidelity and refresh tests now run against `/entry`.
 - Rules for the old shell remain in `studio.css` and `parts.css`.
-- The editor chunk (Milkdown and CodeMirror) is 2.7 MB and should load only
-  when an entry opens.
+- Done since: the editor chunk (Milkdown and CodeMirror, 2.7 MB) loads when
+  an entry opens. Studio's first page loads 0.66 MB of JavaScript instead of
+  3.33 MB.

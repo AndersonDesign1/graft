@@ -434,8 +434,6 @@ component; do not copy them.
   checks the ones that are.
 - Studio: Settings keeps its own section layout, and Branches and History use
   the older table styles.
-- Studio: the editor chunk (Milkdown and CodeMirror, about 2.7 MB) loads with
-  the app instead of when an entry opens.
 
 ## Verify before you hand off
 
