@@ -136,6 +136,15 @@ value up:
 category: field.reference({ to: "categories" }),
 ```
 
+The slug has to name a document that exists. `graft compile` stops with
+`CONTENT_REFERENCE_NOT_FOUND` when a reference points at nothing, and names
+the file, the field and the missing slug. In a database-sourced project,
+publishing refuses the same thing, and also refuses to publish the deletion of
+a document that live documents still point at. Publish the documents that
+point at it in the same step, changed to point elsewhere. A reference into a
+collection kept in the database (`db-authoritative`) is not checked, because
+its targets are records, not documents.
+
 Both appear in `describe_schema` with their options and target, alongside each
 field's `label` and limits, so an agent and Studio see the same rules the
 validator applies.
