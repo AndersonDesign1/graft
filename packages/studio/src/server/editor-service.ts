@@ -8,6 +8,7 @@
  */
 import {
   FilesystemStore,
+  checkRemoval,
   compileDocuments,
   notifyContentChange,
   type ContentChangeListener,
@@ -512,6 +513,17 @@ export class EditorService {
   ): Promise<SaveEntryResult> {
     this.fileCollection(input.collection);
     const path = await this.pathFor(input.collection, input.slug, actor);
+    // Locally a deletion is live at once, so one that would leave other
+    // entries pointing at nothing is refused before the file goes. Hosted,
+    // the publish makes the same check.
+    if (!this.remote) {
+      await checkRemoval({
+        db: this.options.db,
+        branchId: this.options.branchId,
+        collections: this.options.collections,
+        paths: [path],
+      });
+    }
     await this.store.write(path, null, {
       actor,
       ...(input.baseVersion !== undefined ? { baseVersion: input.baseVersion } : {}),

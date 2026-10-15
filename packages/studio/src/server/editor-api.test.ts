@@ -36,6 +36,9 @@ vi.mock("@usegraft/compiler", async (importOriginal) => {
     // Projection has its own integration tests; this suite is about which
     // bytes land where.
     compileDocuments: vi.fn(async () => ({ count: 0, docs: [], changes: {}, gitSha: null })),
+    // Reads the index, which these tests have none of. Its refusal is
+    // covered against Postgres in the compiler's integration tests.
+    checkRemoval: vi.fn(async () => {}),
   };
 });
 
@@ -235,6 +238,29 @@ describe("editor API on a local checkout", () => {
 
   it("keeps an entry deleted in the draft listed, readable and restorable", async () => {
     await deletionStaysListed(handler);
+  });
+
+  it("refuses a deletion other entries point at, and leaves the file", async () => {
+    const { checkRemoval } = await import("@usegraft/compiler");
+    const { GraftError } = await import("@usegraft/contracts");
+    vi.mocked(checkRemoval).mockRejectedValueOnce(
+      new GraftError({
+        code: "CONTENT_REFERENCE_NOT_FOUND",
+        message: "products/wool-hat can't be deleted while 1 reference(s) point at it.",
+        fix: "Point those fields at another document, or delete those entries first. Nothing was deleted.",
+      }),
+    );
+    const refused = await call<{ error: string }>(handler, "DELETE", "/entry", {
+      collection: "products",
+      slug: "wool-hat",
+    });
+    expect([refused.status, refused.json.error]).toEqual([409, "CONTENT_REFERENCE_NOT_FOUND"]);
+    expect(vi.mocked(checkRemoval).mock.lastCall?.[0]).toMatchObject({
+      paths: ["products/wool-hat.mdx"],
+    });
+    expect(readFileSync(join(contentDir, "products", "wool-hat.mdx"), "utf8")).toContain(
+      "Wool Hat",
+    );
   });
 
   it("lists, searches, filters and sorts on the server", async () => {
