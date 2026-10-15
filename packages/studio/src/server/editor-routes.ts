@@ -21,8 +21,9 @@ export function service(ctx: RouteContext): EditorService {
     found = new EditorService({
       contentDir: ctx.options.contentDir,
       collections: ctx.options.collections,
-      db: ctx.options.db,
+      ...(ctx.options.db ? { db: ctx.options.db } : {}),
       ...(ctx.options.workspaceDb ? { workspaceDb: ctx.options.workspaceDb } : {}),
+      ...(ctx.options.staticIndexPath ? { staticIndexPath: ctx.options.staticIndexPath } : {}),
       branchId: ctx.defaultBranch,
       mdxTrust: ctx.options.mdxTrust,
       ...(ctx.options.store ? { store: ctx.options.store } : {}),
@@ -121,6 +122,8 @@ export const EDITOR_ROUTES: readonly Route[] = [
           : null,
         sessions: Boolean(ctx.request.headers.get("cookie")?.includes("graft_studio=")),
         accounts: Boolean(ctx.options.accounts),
+        database: Boolean(ctx.options.db),
+        index: ctx.options.db ? "postgres" : ctx.options.staticIndexPath ? "static" : "none",
       };
       return Response.json(body);
     },
@@ -153,6 +156,35 @@ export const EDITOR_ROUTES: readonly Route[] = [
       };
       return Response.json(
         await service(ctx).list(collection, fieldsOf(ctx, collection), query, actorOf(ctx)),
+      );
+    },
+  },
+  {
+    method: "POST",
+    path: `${V1}/entries/field`,
+    scope: "studio:write",
+    handle: async (ctx) => {
+      const payload = await body(ctx);
+      const example =
+        'POST { "collection": "products", "slugs": ["wool-hat"], "field": "status", "value": "active" }';
+      const slugs = stringList(payload.slugs);
+      if (slugs.length === 0 || !Object.hasOwn(payload, "value")) {
+        throw new GraftError({
+          code: "INPUT_VALIDATION_FAILED",
+          message: "Setting a field needs the entries' slugs and a value.",
+          fix: `${example}. Send "value": null to remove an optional field.`,
+        });
+      }
+      return Response.json(
+        await service(ctx).setField(
+          {
+            collection: required(payload.collection, "collection", example),
+            slugs,
+            field: required(payload.field, "field", example),
+            value: payload.value,
+          },
+          actorOf(ctx),
+        ),
       );
     },
   },

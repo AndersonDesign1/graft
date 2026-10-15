@@ -19,10 +19,14 @@ export async function checkCommand(options: { cwd: string }): Promise<CheckResul
     // A database-sourced checkout that was never pulled has nothing to check.
     return { documents: 0, problems: [] };
   }
-  const { findBrokenReferences, readDocs } = await import("@usegraft/compiler");
+  const { findBrokenReferences, readSourceFiles, validateDocuments } =
+    await import("@usegraft/compiler");
   let docs;
   try {
-    docs = readDocs(config.contentDir, config.collections, { mdxTrust: config.mdxTrust });
+    // References are left to findBrokenReferences below, which lists every one.
+    docs = validateDocuments(readSourceFiles(config.contentDir), config.collections, {
+      mdxTrust: config.mdxTrust,
+    });
   } catch (error) {
     if (!(error instanceof GraftError)) throw error;
     // readDocs stops at the first kind of problem; report it like the rest.

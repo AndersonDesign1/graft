@@ -41,6 +41,14 @@ export function useStudioResources(): Pick<StudioState, "workspace" | "drafts" |
   };
 }
 
+/** Whether this person's commit goes through. A contributor on a laptop saves drafts only. */
+export function useCanPublish(): boolean {
+  return useStudio().drafts.data?.canPublish ?? true;
+}
+
+/** Why the Commit button is off for a contributor. */
+export const PUBLISH_NEEDS_EDITOR = "Committing needs an editor. Ask one to commit your changes.";
+
 /** Collections an editor edits: the ones whose content is files. */
 export function editableCollections(schema: SchemaList | null): SchemaCollectionDto[] {
   return (schema?.collections ?? []).filter((collection) => collection.authority === "file");
@@ -62,6 +70,18 @@ export function singular(name: string): string {
   if (/(ss|us)$/.test(label)) return label;
   if (/(ches|shes|xes|ses)$/.test(label)) return label.replace(/es$/, "");
   return label.replace(/s$/, "");
+}
+
+/**
+ * Whether this Studio has a database: true or false once the workspace has
+ * loaded, undefined before, and true in an embedded panel. A view asks for what lives in Postgres only when
+ * it is true, so a Studio without one makes no request that would fail.
+ */
+export function useDatabase(): boolean | undefined {
+  // An embedded panel has no Studio around it, and its host serves the API
+  // it calls, database and all.
+  const value = useContext(Context);
+  return value ? value.workspace.data?.database : true;
 }
 
 /**

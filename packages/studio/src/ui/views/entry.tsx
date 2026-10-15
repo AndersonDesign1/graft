@@ -15,7 +15,7 @@
  * made elsewhere (another tab, another editor, an agent over MCP) is reported
  * instead of overwritten, and validation runs before a save rather than after.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
   EntryDto,
@@ -40,8 +40,7 @@ import {
   IconTrash,
   IconWarning,
 } from "../components/icons";
-import { MdxEditor } from "../components/editor";
-import { RichEditor } from "../components/rich-editor";
+import { Skeleton } from "../components/primitives";
 import { DocumentSkeleton } from "../components/skeletons";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "../components/ui/menu";
 import { ApiError, api, plainError, qs } from "../lib/api";
@@ -56,11 +55,31 @@ import {
   collectionLabel,
   deletionNote,
   doneWord,
+  PUBLISH_NEEDS_EDITOR,
   publishVerb,
   singular,
+  useCanPublish,
   useStudio,
 } from "../lib/studio";
 import { StatusLabel } from "./collection";
+
+// Milkdown and CodeMirror are most of Studio's JavaScript. They load when an
+// entry opens, not with the app, so the list and home appear first.
+const MdxEditor = lazy(() =>
+  import("../components/editor").then((module) => ({ default: module.MdxEditor })),
+);
+const RichEditor = lazy(() =>
+  import("../components/rich-editor").then((module) => ({ default: module.RichEditor })),
+);
+
+/** Where an editor appears while its code loads: the canvas, already the right shape. */
+function EditorLoading() {
+  return (
+    <div className="editor-loading" aria-busy="true" aria-label="Loading the editor">
+      <Skeleton rows={4} />
+    </div>
+  );
+}
 
 type Mode = "form" | "source";
 
@@ -74,6 +93,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
   );
   const headline = titleField(fields);
   const canWrite = workspace.data ? workspace.data.canWrite : true;
+  const canPublish = useCanPublish();
   const remote = workspace.data?.storage === "github";
 
   const [entry, setEntry] = useState<EntryDto | null>(null);
@@ -635,9 +655,17 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
             className="btn"
             data-variant="primary"
             data-size="sm"
-            disabled={!canWrite || status === "published" || autosave.state === "saving"}
+            disabled={
+              !canWrite || !canPublish || status === "published" || autosave.state === "saving"
+            }
             onClick={() => void publishThis()}
-            title={status === "published" ? `No draft to ${actionWord(action)}` : undefined}
+            title={
+              !canPublish
+                ? PUBLISH_NEEDS_EDITOR
+                : status === "published"
+                  ? `No draft to ${actionWord(action)}`
+                  : undefined
+            }
           >
             {action === "review" ? "Submit" : publishVerb(action)}
           </button>
@@ -697,16 +725,18 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
                   schema the same way.
                 </p>
                 <div className="page-source">
-                  <MdxEditor
-                    value={raw}
-                    readOnly={readOnly}
-                    showLineNumbers
-                    ariaLabel="Entry source"
-                    onChange={(next) => {
-                      setRaw(next);
-                      autosave.touch();
-                    }}
-                  />
+                  <Suspense fallback={<EditorLoading />}>
+                    <MdxEditor
+                      value={raw}
+                      readOnly={readOnly}
+                      showLineNumbers
+                      ariaLabel="Entry source"
+                      onChange={(next) => {
+                        setRaw(next);
+                        autosave.touch();
+                      }}
+                    />
+                  </Suspense>
                 </div>
               </>
             ) : (
@@ -754,28 +784,32 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
                     </p>
                   ) : null}
                   {bodyAsSource ? (
-                    <MdxEditor
-                      value={body}
-                      readOnly={readOnly}
-                      ariaLabel="Content as markdown"
-                      onChange={(next) => {
-                        setBody(next);
-                        autosave.touch();
-                      }}
-                    />
+                    <Suspense fallback={<EditorLoading />}>
+                      <MdxEditor
+                        value={body}
+                        readOnly={readOnly}
+                        ariaLabel="Content as markdown"
+                        onChange={(next) => {
+                          setBody(next);
+                          autosave.touch();
+                        }}
+                      />
+                    </Suspense>
                   ) : (
-                    <RichEditor
-                      key={`${collection}/${slug}`}
-                      value={entry.body}
-                      readOnly={readOnly}
-                      onFidelity={(roundTripped) =>
-                        setFidelity(compareRoundTrip(entry.body, roundTripped))
-                      }
-                      onChange={(next) => {
-                        setBody(next);
-                        autosave.touch();
-                      }}
-                    />
+                    <Suspense fallback={<EditorLoading />}>
+                      <RichEditor
+                        key={`${collection}/${slug}`}
+                        value={entry.body}
+                        readOnly={readOnly}
+                        onFidelity={(roundTripped) =>
+                          setFidelity(compareRoundTrip(entry.body, roundTripped))
+                        }
+                        onChange={(next) => {
+                          setBody(next);
+                          autosave.touch();
+                        }}
+                      />
+                    </Suspense>
                   )}
                 </section>
               </>

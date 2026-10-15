@@ -355,7 +355,7 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
 
           writeDocumentFile(contentDir, sourcePath, raw);
 
-          const result = await projectContent();
+          const result = await projectContent([sourcePath]);
           return {
             written: sourcePath,
             branch: branchId,
