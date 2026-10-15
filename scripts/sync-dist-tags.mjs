@@ -3,12 +3,12 @@
  * released, on every publishable package.
  *
  * The fixer half of check-dist-tags.mjs. That script detects the drift and
- * refuses to call a release finished; this one closes it. They are separate on
- * purpose: the check runs in CI after every publish, and this cannot, because
- * the pipeline authenticates through OIDC trusted publishing and holds no npm
- * token — OIDC authorises `npm publish` alone, and `npm dist-tag add` needs a
- * credential the workflow deliberately does not have. So the tag move is a
- * human with publish rights, running this.
+ * refuses to call a release finished; this one closes it. release.yml runs this
+ * and then the check after every publish. It authenticates through OIDC
+ * trusted publishing, which can move dist-tags once a package's trusted
+ * publisher has "Allow npm dist-tag" ticked (npm 11.21.0 or later). Run it by
+ * hand, logged in, only when CI could not: a package missing that permission
+ * fails here with a 403 or 404 until it is ticked.
  *
  * The package list and the version are both derived, never typed. The obvious
  * alternative is a shell loop over 21 hardcoded names against a hardcoded

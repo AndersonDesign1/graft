@@ -14,13 +14,10 @@
  * so the release the docs described was one a plain install could not get, and
  * `npx @usegraft/cli@latest` fetched the older CLI.
  *
- * The fix has to be a check rather than an action: this pipeline publishes
- * through OIDC trusted publishing and holds no npm token, and OIDC authorises
- * `npm publish` alone — `npm dist-tag add` needs a credential the workflow
- * deliberately does not have. So CI cannot move the tag. What it can do is
- * refuse to call a release finished when the tag did not move, and print the
- * command that finishes it. A wrong `latest` is now a red build instead of a
- * fact nobody learns from the repository.
+ * release.yml now moves the tag itself with sync-dist-tags.mjs, over OIDC, and
+ * runs this afterwards. The move and the check stay separate: the sync reports
+ * what it attempted, and this reads the registry back. If the move failed, this
+ * keeps the build red and prints the command that finishes it by hand.
  */
 import {
   fetchDistTags,
@@ -94,8 +91,8 @@ if (drift.length > 0) {
   console.error(
     "\nA `latest` left behind is the bug that survives a green build: the release" +
       "\npublishes, the docs describe it, and a plain install still resolves the" +
-      "\nolder version. OIDC trusted publishing cannot move a tag, so this is" +
-      "\nfinished by hand, from an account with publish rights:\n",
+      "\nolder version. In CI, check that each package's trusted publisher has" +
+      '\n"Allow npm dist-tag" ticked. Or finish it by hand, logged in:\n',
   );
   for (const d of drift) console.error(`  npm dist-tag add ${d.name}@${version} ${d.tag}`);
   console.error("");
