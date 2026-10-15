@@ -22,7 +22,7 @@ vi.mock("@usegraft/compiler", async (importOriginal) => {
     ...actual,
     // Projection is a separate concern with its own integration tests. What is
     // under test here is the bytes that land on disk.
-    compile: vi.fn(async () => ({ count: 0, docs: [], changes: {}, gitSha: null })),
+    compileDocuments: vi.fn(async () => ({ count: 0, docs: [], changes: {}, gitSha: null })),
   };
 });
 

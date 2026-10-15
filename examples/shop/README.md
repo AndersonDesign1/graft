@@ -23,6 +23,13 @@ pnpm seed --count 2000
 pnpm compile
 ```
 
+To measure Studio on a catalog that size, run `pnpm bench`. It seeds a copy of
+the shop in a temporary directory, starts Studio against a throwaway Postgres,
+and prints the median time of a compile, a list, a search, a save and a
+publish, with the size of Studio's JavaScript. Build the workspace first. It
+never uses `DATABASE_URL` from your environment; pass `--db <url>` to use a
+disposable database of your own.
+
 ## Host it
 
 Hosted, Studio saves to GitHub instead: each editor drafts on their own

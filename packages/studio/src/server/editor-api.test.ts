@@ -35,7 +35,7 @@ vi.mock("@usegraft/compiler", async (importOriginal) => {
     ...actual,
     // Projection has its own integration tests; this suite is about which
     // bytes land where.
-    compile: vi.fn(async () => ({ count: 0, docs: [], changes: {}, gitSha: null })),
+    compileDocuments: vi.fn(async () => ({ count: 0, docs: [], changes: {}, gitSha: null })),
   };
 });
 
@@ -345,8 +345,8 @@ describe("editor API on a local checkout", () => {
   });
 
   it("tells the app after a local save, and says so when that fails", async () => {
-    const { compile } = await import("@usegraft/compiler");
-    vi.mocked(compile).mockResolvedValueOnce({
+    const { compileDocuments } = await import("@usegraft/compiler");
+    vi.mocked(compileDocuments).mockResolvedValueOnce({
       count: 3,
       docs: [],
       changes: { added: [], changed: ["products/wool-hat"], removed: [], unchanged: 2 },
@@ -375,6 +375,10 @@ describe("editor API on a local checkout", () => {
       baseVersion: opened.json.version,
     });
     expect(saved.status).toBe(200);
+    // Only the file the save wrote is projected, not the tree.
+    expect(vi.mocked(compileDocuments).mock.lastCall?.[0]).toMatchObject({
+      paths: ["products/wool-hat.mdx"],
+    });
     expect(told).toEqual(["products/wool-hat"]);
     expect(saved.json.refresh).toMatchObject({ ok: false });
   });
