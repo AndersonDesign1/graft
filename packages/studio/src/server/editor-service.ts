@@ -56,6 +56,7 @@ import {
   type CatalogEntry,
   type EntryQuery,
 } from "./catalog";
+import { commitMessageFor } from "../commit-message";
 import { slugify as slugText } from "../slug";
 import { lineDiff } from "./line-diff";
 import { localDrafts } from "./local-drafts";
@@ -481,7 +482,12 @@ export class EditorService {
         conflict: change.conflict,
       });
     }
-    return { publish: this.publishAction(canPublishDirectly), changes: described, reviews };
+    return {
+      publish: this.publishAction(canPublishDirectly),
+      canPublish: this.remote || canPublishDirectly,
+      changes: described,
+      reviews,
+    };
   }
 
   async diff(path: string, actor: StoreActor): Promise<DraftDiffDto> {
@@ -605,6 +611,18 @@ export class EditorService {
     canPublishDirectly: boolean,
   ): Promise<PublishResultDto> {
     const action = this.publishAction(canPublishDirectly);
+    // Hosted on GitHub or the database, a person without publish rights
+    // submits for review. Locally there is no review: a commit lands on the
+    // checkout at once, so it is an editor's to make.
+    if (!this.remote && !canPublishDirectly) {
+      throw new GraftError({
+        code: "UNAUTHORIZED",
+        message: "Your role can save drafts here, but committing them needs an editor.",
+        fix: "Ask an editor to commit your changes, or ask an admin to make you an editor under Settings, People.",
+        details: { required: "studio:publish", paths: input.paths },
+      });
+    }
+    const message = input.message?.trim() || (await this.messageFor(input.paths, actor));
     if (this.remote) {
       // A remote draft was never compiled, so it is checked here, before it
       // can reach the branch the site builds from.
@@ -619,7 +637,7 @@ export class EditorService {
     const result = await this.drafts.publish({
       actor,
       paths: input.paths,
-      ...(input.message !== undefined ? { message: input.message } : {}),
+      message,
       ...(input.resolve ? { resolve: input.resolve } : {}),
       ...(this.remote ? { mode: action === "publish" ? "direct" : "review" } : {}),
     });
@@ -641,6 +659,13 @@ export class EditorService {
         : null,
       ...(result.review ? { review: result.review } : {}),
     };
+  }
+
+  /** The default message for these paths, by their entries' titles. */
+  private async messageFor(paths: string[], actor: StoreActor): Promise<string> {
+    const wanted = new Set(paths);
+    const { changes } = await this.draftList(actor, true);
+    return commitMessageFor(changes.filter((change) => wanted.has(change.path)));
   }
 
   /** Tell the app a publish changed the live index, so it drops its cached pages. */

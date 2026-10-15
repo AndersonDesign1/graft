@@ -54,8 +54,10 @@ import {
   actionWord,
   collectionLabel,
   doneWord,
+  PUBLISH_NEEDS_EDITOR,
   publishVerb,
   singular,
+  useCanPublish,
   useStudio,
 } from "../lib/studio";
 import { StatusLabel } from "./collection";
@@ -72,6 +74,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
   );
   const headline = titleField(fields);
   const canWrite = workspace.data ? workspace.data.canWrite : true;
+  const canPublish = useCanPublish();
   const remote = workspace.data?.storage === "github";
 
   const [entry, setEntry] = useState<EntryDto | null>(null);
@@ -633,9 +636,17 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
             className="btn"
             data-variant="primary"
             data-size="sm"
-            disabled={!canWrite || status === "published" || autosave.state === "saving"}
+            disabled={
+              !canWrite || !canPublish || status === "published" || autosave.state === "saving"
+            }
             onClick={() => void publishThis()}
-            title={status === "published" ? `No draft to ${actionWord(action)}` : undefined}
+            title={
+              !canPublish
+                ? PUBLISH_NEEDS_EDITOR
+                : status === "published"
+                  ? `No draft to ${actionWord(action)}`
+                  : undefined
+            }
           >
             {action === "review" ? "Submit" : publishVerb(action)}
           </button>

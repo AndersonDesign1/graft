@@ -29,8 +29,10 @@ import {
   actionWord,
   collectionLabel,
   doneWord,
+  PUBLISH_NEEDS_EDITOR,
   publishVerb,
   singular,
+  useCanPublish,
   useStudio,
 } from "../lib/studio";
 
@@ -118,6 +120,7 @@ export function CollectionView({ collection }: { collection: string }) {
     (f) => f.type === "asset" || (f.type === "array" && f.items?.type === "asset"),
   );
   const canWrite = workspace.data?.canWrite ?? true;
+  const canPublish = useCanPublish();
   const local = workspace.data?.storage === "local";
 
   const [q, setQ] = useState("");
@@ -635,8 +638,9 @@ export function CollectionView({ collection }: { collection: string }) {
             className="btn"
             data-size="sm"
             data-variant="primary"
-            disabled={busy || !canWrite}
+            disabled={busy || !canWrite || !canPublish}
             onClick={() => void bulk("publish")}
+            title={canPublish ? undefined : PUBLISH_NEEDS_EDITOR}
           >
             {publishVerb(drafts.data?.publish)}
           </button>

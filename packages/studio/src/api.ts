@@ -605,6 +605,38 @@ const V1 = "/api/studio/v1";
 const APPROVAL_DECIDE_PATH = /^\/api\/studio\/v1\/approvals\/([^/]+)\/decide$/;
 const COMPILATION_REVERT_PATH = /^\/api\/studio\/v1\/compilations\/([^/]+)\/revert$/;
 
+/** What each scope lets someone do, in the words a refusal uses. */
+const SCOPE_ACTIONS: Readonly<Record<StudioScope, string>> = {
+  "studio:read": "open Studio",
+  "studio:write": "save changes",
+  "studio:publish": "publish",
+  "approvals:decide": "decide what agents ask to do",
+  "studio:people": "manage who can sign in",
+  "studio:settings": "change the site's settings",
+};
+
+/**
+ * A refusal in the caller's terms. A person signed in with a role, and
+ * changes it by asking an admin; a token was made with an access level, and
+ * a new one is made under Developer, Agents. Neither mints scope claims.
+ */
+function scopeRefusal(
+  principal: StudioPrincipal,
+  scope: StudioScope,
+): { message: string; fix: string } {
+  const action = SCOPE_ACTIONS[scope] ?? `use "${scope}"`;
+  if (principal.kind === "human") {
+    return {
+      message: `Your role can't ${action}.`,
+      fix: "Ask an admin to change your role under Settings, People.",
+    };
+  }
+  return {
+    message: `This token can't ${action}: it doesn't carry the "${scope}" scope.`,
+    fix: `Make a token with the access it needs under Developer, Agents. For the dev token of \`graft serve\`, add "${scope}" to GRAFT_DEV_SCOPES. Approval decisions are a person's, so no token carries them.`,
+  };
+}
+
 /** Revert restores a commit's files, and database-sourced content has no commit. */
 function assertRevertible(options: StudioApiOptions, compilation: string): void {
   if (sourceOf(options) !== "database") return;
@@ -1002,8 +1034,7 @@ export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHa
         if (!(resolved.scopes ?? []).includes(matched.route.scope)) {
           throw new GraftError({
             code: "UNAUTHORIZED",
-            message: `${method} ${pathname} requires the "${matched.route.scope}" scope, and this credential does not carry it.`,
-            fix: `Mint a token whose scope claim includes "${matched.route.scope}" (for \`graft serve\`, add it to GRAFT_DEV_SCOPES). Studio read, Studio write and approval decisions are deliberately separate: a runtime token that can read content should not be able to commit it, and no agent token should be able to decide the human gate.`,
+            ...scopeRefusal(resolved, matched.route.scope),
             details: {
               pathname,
               method,

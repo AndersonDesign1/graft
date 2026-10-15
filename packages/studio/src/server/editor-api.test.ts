@@ -470,6 +470,104 @@ describe("editor API on a local checkout", () => {
     expect((await call<DraftsDto>(handler, "GET", "/drafts")).json.changes).toEqual([]);
   });
 
+  function signedIn(scopes: string[]): Handler {
+    return createStudioApiHandler({
+      db: {} as never,
+      collections,
+      contentDir,
+      authenticate: () => ({
+        kind: "human",
+        id: "ana",
+        name: "Ana",
+        email: "ana@shop.test",
+        scopes,
+      }),
+    });
+  }
+
+  async function raiseHatPrice(on: Handler): Promise<void> {
+    const opened = await call<EntryDto>(on, "GET", "/entry?collection=products&slug=wool-hat");
+    await call(on, "PUT", "/entry", {
+      collection: "products",
+      slug: "wool-hat",
+      data: { ...opened.json.data, price: 2900 },
+      body: opened.json.body,
+      baseVersion: opened.json.version,
+    });
+  }
+
+  it("commits as the signed-in person, named by the entries' titles", async () => {
+    const editor = signedIn(["studio:read", "studio:write", "studio:publish"]);
+    await raiseHatPrice(editor);
+    expect((await call<DraftsDto>(editor, "GET", "/drafts")).json.canPublish).toBe(true);
+
+    const published = await call(editor, "POST", "/drafts/publish", {
+      paths: ["products/wool-hat.mdx"],
+    });
+    expect(published.status).toBe(200);
+    // The author is the person; the committer stays whoever runs Studio.
+    expect(git(contentDir, "log", "-1", "--format=%s|%an|%ae|%cn")).toBe(
+      "Update “Wool Hat”|Ana|ana@shop.test|Dev",
+    );
+  });
+
+  it("lets a contributor save drafts locally, and refuses their commit", async () => {
+    const contributor = signedIn(["studio:read", "studio:write"]);
+    await raiseHatPrice(contributor);
+    const drafts = await call<DraftsDto>(contributor, "GET", "/drafts");
+    expect(drafts.json.canPublish).toBe(false);
+    expect(drafts.json.changes.map((change) => change.path)).toEqual(["products/wool-hat.mdx"]);
+
+    const head = git(contentDir, "rev-parse", "HEAD");
+    const refused = await call<{
+      error: string;
+      message: string;
+      details: { required: string };
+    }>(contributor, "POST", "/drafts/publish", {
+      paths: ["products/wool-hat.mdx"],
+    });
+    expect(refused.json).toMatchObject({
+      error: "UNAUTHORIZED",
+      message: "Your role can save drafts here, but committing them needs an editor.",
+      details: { required: "studio:publish" },
+    });
+    expect(git(contentDir, "rev-parse", "HEAD")).toBe(head);
+    // The draft is still there for an editor to commit.
+    expect((await call<DraftsDto>(contributor, "GET", "/drafts")).json.changes).toHaveLength(1);
+  });
+
+  it("refuses a person by role and a token by scope", async () => {
+    const viewer = signedIn(["studio:read"]);
+    const asPerson = await call<{ message: string; fix: string }>(viewer, "PUT", "/entry", {
+      collection: "products",
+      slug: "wool-hat",
+      data: {},
+    });
+    expect(asPerson.json).toMatchObject({
+      message: "Your role can't save changes.",
+      fix: "Ask an admin to change your role under Settings, People.",
+    });
+
+    const token = createStudioApiHandler({
+      db: {} as never,
+      collections,
+      contentDir,
+      authenticate: () => ({
+        kind: "token",
+        id: "ci",
+        scopes: ["studio:read"],
+      }),
+    });
+    const asToken = await call<{ message: string }>(token, "PUT", "/entry", {
+      collection: "products",
+      slug: "wool-hat",
+      data: {},
+    });
+    expect(asToken.json.message).toBe(
+      "This token can't save changes: it doesn't carry the \"studio:write\" scope.",
+    );
+  });
+
   it("refuses a database collection", async () => {
     const records = createStudioApiHandler({
       db: {} as never,
