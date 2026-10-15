@@ -115,6 +115,10 @@ save carries the version you started from. If the entry changed somewhere else
 in the meantime (another tab, a teammate, an agent), Studio does not overwrite
 it. It shows you, and you choose to load the newer version or keep yours.
 
+A save rewrites only the fields you changed. The rest of the frontmatter keeps
+its bytes, comments included, and an edited one-line string stays on one line,
+in the quotes it had, so the diff shows your change and nothing else.
+
 ## Publish
 
 Saved changes are drafts until you publish them. The Publish button in the top
