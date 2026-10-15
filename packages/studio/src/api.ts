@@ -297,6 +297,7 @@ export function statusFor(error: GraftError): number {
     case "COMMIT_FAILED":
     case "CONTENT_CONFLICT":
     case "SLUG_NOT_UNIQUE":
+    case "CONTENT_REFERENCE_NOT_FOUND":
     case "CONTENT_TREE_READ_ONLY":
     case "ASSET_EXISTS":
       return 409;
