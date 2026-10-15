@@ -41,29 +41,51 @@ try {
 }
 
 const { name: channelName, tags: shouldPoint } = releaseChannel();
-const drift = [];
-const absent = [];
-const unreadable = [];
+
+// `--settle <seconds>`: keep re-reading while tags still drift, up to this long.
+// release.yml reads straight after sync-dist-tags writes, and the registry's
+// read side lags its writes. The first OIDC run moved all 22 tags and this
+// check still saw four on the old version seconds later. Without the flag a
+// drift fails at once, which is right for a check run by hand.
+const settleArg = process.argv.indexOf("--settle");
+const settleSeconds = settleArg === -1 ? 0 : Number(process.argv[settleArg + 1]);
+if (!Number.isFinite(settleSeconds) || settleSeconds < 0) {
+  console.error("--settle takes a number of seconds.");
+  process.exit(1);
+}
 
 // Read in parallel: 21 sequential `npm view` subprocesses took over four
 // minutes and were timing out. These are plain GETs, so they cost seconds.
-const results = await Promise.all(packages.map((pkg) => fetchDistTags(pkg.name)));
-
-for (const [i, pkg] of packages.entries()) {
-  const result = results[i];
-  if (result.kind === "absent") {
-    absent.push(pkg.name);
-    continue;
-  }
-  if (result.kind === "failed") {
-    unreadable.push({ name: pkg.name, reason: result.reason });
-    continue;
-  }
-  for (const tag of shouldPoint) {
-    if (result.tags[tag] !== version) {
-      drift.push({ name: pkg.name, tag, points: result.tags[tag] ?? "(unset)" });
+async function readRegistry() {
+  const drift = [];
+  const absent = [];
+  const unreadable = [];
+  const results = await Promise.all(packages.map((pkg) => fetchDistTags(pkg.name)));
+  for (const [i, pkg] of packages.entries()) {
+    const result = results[i];
+    if (result.kind === "absent") {
+      absent.push(pkg.name);
+      continue;
+    }
+    if (result.kind === "failed") {
+      unreadable.push({ name: pkg.name, reason: result.reason });
+      continue;
+    }
+    for (const tag of shouldPoint) {
+      if (result.tags[tag] !== version) {
+        drift.push({ name: pkg.name, tag, points: result.tags[tag] ?? "(unset)" });
+      }
     }
   }
+  return { drift, absent, unreadable };
+}
+
+const deadline = Date.now() + settleSeconds * 1000;
+let { drift, absent, unreadable } = await readRegistry();
+while (drift.length > 0 && unreadable.length === 0 && Date.now() < deadline) {
+  console.log(`${drift.length} tag(s) not updated yet. Reading again in 10s.`);
+  await new Promise((resolve) => setTimeout(resolve, 10_000));
+  ({ drift, absent, unreadable } = await readRegistry());
 }
 
 if (absent.length > 0) {
