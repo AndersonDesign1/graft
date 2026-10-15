@@ -1618,6 +1618,36 @@
   margin-top: var(--space-6);
 }
 
+/* Entries a bulk edit could not save, next to the button that tried. */
+.set-field-failed {
+  margin-top: var(--space-5);
+  font-size: var(--text-sm);
+
+  & ul {
+    display: grid;
+    gap: var(--space-1);
+    max-height: 12rem;
+    overflow-y: auto;
+    margin: var(--space-2) 0 0;
+    padding-left: var(--space-5);
+    color: var(--ink-muted);
+  }
+
+  & b {
+    color: var(--ink);
+    font-weight: var(--weight-medium);
+  }
+}
+
+.set-field-failed-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--danger);
+  font-weight: var(--weight-medium);
+}
+
 /* ==========================================================================
    Publish sheet
    ========================================================================== */
@@ -1954,6 +1984,13 @@
   .entries th:nth-child(n + 4),
   .entries td:nth-child(n + 4) {
     display: none;
+  }
+
+  /* The actions wrap rather than run off a phone's edge. */
+  .bulk {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 100%;
   }
 }
 
