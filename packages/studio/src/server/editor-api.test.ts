@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GitHubStore, tokenAuth } from "@usegraft/compiler";
+import { GitHubStore, compileDocuments, tokenAuth } from "@usegraft/compiler";
 import { createGitHubFake } from "@usegraft/compiler/testing";
 import { defineCollection, field } from "@usegraft/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,6 +23,7 @@ import type {
   EntryDto,
   EntryList,
   SaveEntryResult,
+  SetFieldResultDto,
   VersionDetailDto,
   VersionListDto,
   WorkspaceDto,
@@ -34,7 +35,10 @@ vi.mock("@usegraft/compiler", async (importOriginal) => {
     ...actual,
     // Projection has its own integration tests; this suite is about which
     // bytes land where.
-    compile: vi.fn(async () => ({ count: 0, docs: [], changes: {}, gitSha: null })),
+    compileDocuments: vi.fn(async () => ({ count: 0, docs: [], changes: {}, gitSha: null })),
+    // Reads the index, which these tests have none of. Its refusal is
+    // covered against Postgres in the compiler's integration tests.
+    checkRemoval: vi.fn(async () => {}),
   };
 });
 
@@ -236,6 +240,29 @@ describe("editor API on a local checkout", () => {
     await deletionStaysListed(handler);
   });
 
+  it("refuses a deletion other entries point at, and leaves the file", async () => {
+    const { checkRemoval } = await import("@usegraft/compiler");
+    const { GraftError } = await import("@usegraft/contracts");
+    vi.mocked(checkRemoval).mockRejectedValueOnce(
+      new GraftError({
+        code: "CONTENT_REFERENCE_NOT_FOUND",
+        message: "products/wool-hat can't be deleted while 1 reference(s) point at it.",
+        fix: "Point those fields at another document, or delete those entries first. Nothing was deleted.",
+      }),
+    );
+    const refused = await call<{ error: string }>(handler, "DELETE", "/entry", {
+      collection: "products",
+      slug: "wool-hat",
+    });
+    expect([refused.status, refused.json.error]).toEqual([409, "CONTENT_REFERENCE_NOT_FOUND"]);
+    expect(vi.mocked(checkRemoval).mock.lastCall?.[0]).toMatchObject({
+      paths: ["products/wool-hat.mdx"],
+    });
+    expect(readFileSync(join(contentDir, "products", "wool-hat.mdx"), "utf8")).toContain(
+      "Wool Hat",
+    );
+  });
+
   it("lists, searches, filters and sorts on the server", async () => {
     const all = await call<EntryList>(handler, "GET", "/entries?collection=products");
     expect(all.json.total).toBe(3);
@@ -344,8 +371,8 @@ describe("editor API on a local checkout", () => {
   });
 
   it("tells the app after a local save, and says so when that fails", async () => {
-    const { compile } = await import("@usegraft/compiler");
-    vi.mocked(compile).mockResolvedValueOnce({
+    const { compileDocuments } = await import("@usegraft/compiler");
+    vi.mocked(compileDocuments).mockResolvedValueOnce({
       count: 3,
       docs: [],
       changes: { added: [], changed: ["products/wool-hat"], removed: [], unchanged: 2 },
@@ -374,6 +401,10 @@ describe("editor API on a local checkout", () => {
       baseVersion: opened.json.version,
     });
     expect(saved.status).toBe(200);
+    // Only the file the save wrote is projected, not the tree.
+    expect(vi.mocked(compileDocuments).mock.lastCall?.[0]).toMatchObject({
+      paths: ["products/wool-hat.mdx"],
+    });
     expect(told).toEqual(["products/wool-hat"]);
     expect(saved.json.refresh).toMatchObject({ ok: false });
   });
@@ -468,6 +499,79 @@ describe("editor API on a local checkout", () => {
     expect(existsSync(join(contentDir, "products", "old-shirt.mdx"))).toBe(true);
     expect(existsSync(join(contentDir, "products", "linen-shirt-copy.mdx"))).toBe(false);
     expect((await call<DraftsDto>(handler, "GET", "/drafts")).json.changes).toEqual([]);
+  });
+
+  it("sets one field on many entries as drafts, and reports the ones it can't save", async () => {
+    // Whichever compile the save path uses is the mocked one.
+    const compiler: Record<string, unknown> = await import("@usegraft/compiler");
+    const projections = () =>
+      Object.values(compiler)
+        .filter(vi.isMockFunction)
+        .reduce((n, fn) => n + fn.mock.calls.length, 0);
+    const before = projections();
+    const read = (slug: string) =>
+      readFileSync(join(contentDir, "products", `${slug}.mdx`), "utf8");
+
+    const set = await call<SetFieldResultDto>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["linen-shirt", "wool-hat", "no-such-hat"],
+      field: "status",
+      value: "archived",
+    });
+    expect(set.status).toBe(200);
+    expect(set.json.saved.map((entry) => entry.slug)).toEqual(["linen-shirt", "wool-hat"]);
+    expect(set.json.failed).toMatchObject([{ slug: "no-such-hat", error: "DOCUMENT_NOT_FOUND" }]);
+    // Only the field changed: the other bytes are the author's.
+    expect(read("wool-hat")).toBe(product("Wool Hat", 2500, "archived", "hats"));
+    // One index update for the batch, not one per entry, of just the files it wrote.
+    expect(projections() - before).toBe(1);
+    expect(vi.mocked(compileDocuments).mock.lastCall?.[0]).toMatchObject({
+      paths: ["products/linen-shirt.mdx", "products/wool-hat.mdx"],
+    });
+    const drafts = await call<DraftsDto>(handler, "GET", "/drafts");
+    expect(drafts.json.changes.map((change) => [change.slug, change.kind])).toEqual([
+      ["linen-shirt", "modified"],
+      ["wool-hat", "modified"],
+    ]);
+
+    // A value the schema refuses fails each entry, as a save would, and writes nothing.
+    const refused = await call<SetFieldResultDto>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["old-shirt"],
+      field: "price",
+      value: -5,
+    });
+    expect(refused.json).toMatchObject({
+      saved: [],
+      failed: [{ slug: "old-shirt", error: "SCHEMA_VALIDATION_FAILED" }],
+    });
+    expect(read("old-shirt")).toBe(product("Old Shirt", 1000, "archived", "shirts"));
+
+    // null removes an optional field; a required one can't be removed.
+    const cleared = await call<SetFieldResultDto>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["old-shirt"],
+      field: "category",
+      value: null,
+    });
+    expect(cleared.json.saved).toHaveLength(1);
+    expect(read("old-shirt")).not.toContain("category:");
+    const required = await call<SetFieldResultDto>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["old-shirt"],
+      field: "title",
+      value: null,
+    });
+    expect(required.json.failed).toMatchObject([{ error: "SCHEMA_VALIDATION_FAILED" }]);
+
+    const unknown = await call<{ error: string; fix: string }>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["old-shirt"],
+      field: "colour",
+      value: "red",
+    });
+    expect([unknown.status, unknown.json.error]).toEqual([400, "INPUT_VALIDATION_FAILED"]);
+    expect(unknown.json.fix).toContain("status");
   });
 
   function signedIn(scopes: string[]): Handler {
@@ -724,6 +828,23 @@ describe("editor API on GitHub (hosted)", () => {
       repository: "acme/shop",
       publish: "publish",
     });
+  });
+
+  it("sets a field on many entries in the editor's draft branch", async () => {
+    const { fake, handler, contentDir } = hosted();
+    const set = await call<SetFieldResultDto>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["wool-hat"],
+      field: "price",
+      value: 2900,
+    });
+    expect(set.json.saved).toMatchObject([{ slug: "wool-hat", path: "products/wool-hat.mdx" }]);
+    expect(fake.files("graft-studio/drafts/ana")["content/products/wool-hat.mdx"]).toContain(
+      "price: 2900",
+    );
+    expect(readFileSync(join(contentDir, "products", "wool-hat.mdx"), "utf8")).toContain(
+      "price: 2500",
+    );
   });
 
   it("publishes as one commit authored by the editor", async () => {

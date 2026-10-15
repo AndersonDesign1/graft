@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SchemaFieldDto } from "../../types";
 import {
+  settableFields,
   controlOf,
   emptyValue,
   formatMoney,
@@ -53,6 +54,36 @@ describe("controls", () => {
       titleField([f({ name: "price", type: "number" }), f({ name: "title", type: "string" })])
         ?.name,
     ).toBe("title");
+  });
+});
+
+describe("fields one value can be set on, for a selection", () => {
+  it("offers scalar fields, never the title, the slug, lists or groups", () => {
+    const fields = [
+      { name: "title", type: "string", optional: false },
+      { name: "slug", type: "string", optional: true },
+      { name: "status", type: "select", optional: false, options: [{ value: "a" }] },
+      { name: "price", type: "number", format: "money", optional: false },
+      { name: "featured", type: "boolean", optional: true },
+      { name: "category", type: "reference", to: "categories", optional: true },
+      { name: "summary", type: "text", optional: true },
+      { name: "published", type: "datetime", optional: true },
+      { name: "image", type: "asset", optional: true },
+      {
+        name: "tags",
+        type: "array",
+        optional: true,
+        items: { name: "item", type: "string", optional: false },
+      },
+      { name: "seo", type: "object", optional: true, fields: [] },
+    ] satisfies SchemaFieldDto[];
+    expect(settableFields(fields).map((field) => field.name)).toEqual([
+      "status",
+      "price",
+      "featured",
+      "category",
+      "summary",
+    ]);
   });
 });
 

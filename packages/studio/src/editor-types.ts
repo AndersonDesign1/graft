@@ -79,6 +79,18 @@ export interface SaveEntryResult {
   refresh?: ContentChangeNotice;
 }
 
+/** What setting one field on many entries did, entry by entry. */
+export interface SetFieldResultDto {
+  collection: string;
+  field: string;
+  /** Saved as drafts, with the version to send as `baseVersion` next. */
+  saved: Array<{ slug: string; path: string; version: string | null }>;
+  /** Not saved, each with the error a save of it alone would have given. */
+  failed: Array<{ slug: string; error: string; message: string; fix?: string }>;
+  /** Present when a local save changed the index: whether the app was told to refresh. */
+  refresh?: ContentChangeNotice;
+}
+
 /** What pressing Publish does for this person. */
 export type PublishAction = "commit" | "publish" | "review";
 
@@ -108,6 +120,14 @@ export interface WorkspaceDto {
   sessions: boolean;
   /** People sign in with Studio accounts, and admins manage them under Settings. */
   accounts: boolean;
+  /**
+   * Studio has a Postgres database. Without one it still edits the files;
+   * approvals, the compile history, branches, people, agents, the media
+   * library and site settings each say they need one.
+   */
+  database: boolean;
+  /** The index a local save updates: Postgres, the static artifact, or none. */
+  index: "postgres" | "static" | "none";
 }
 
 export type StudioRoleName = "viewer" | "contributor" | "editor" | "admin";

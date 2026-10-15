@@ -2,13 +2,13 @@
  * What the editor API does, independent of HTTP.
  *
  * Every write goes through the mounted content store. On the filesystem
- * store the index is recompiled afterwards, exactly as the old save did; on
- * a remote store it is not, because a draft must never reach the live site's
+ * store the files it wrote are projected into the index afterwards; on a
+ * remote store they are not, because a draft must never reach the live site's
  * index: production recompiles when the host redeploys the published commit.
  */
 import {
   FilesystemStore,
-  compile,
+  checkRemoval,
   notifyContentChange,
   type ContentChangeListener,
   type ContentChangeNotice,
@@ -38,6 +38,7 @@ import type {
   PublishAction,
   PublishResultDto,
   SaveEntryResult,
+  SetFieldResultDto,
   VersionDetailDto,
   VersionListDto,
 } from "../editor-types";
@@ -59,8 +60,19 @@ import {
 import { commitMessageFor } from "../commit-message";
 import { slugify as slugText } from "../slug";
 import { lineDiff } from "./line-diff";
+import { compileIndex } from "./compile-index";
 import { localDrafts } from "./local-drafts";
 import { localHistory, type LocalHistory } from "./local-history";
+
+/** What a save of one entry carries: its fields and body, or its full source. */
+interface SaveInput {
+  collection: string;
+  slug: string;
+  data?: Record<string, unknown>;
+  body?: string;
+  raw?: string;
+  baseVersion?: string | null;
+}
 
 /** Documents named per activity entry; the rest are counted. */
 const ACTIVITY_DOCUMENTS = 3;
@@ -68,7 +80,10 @@ const ACTIVITY_DOCUMENTS = 3;
 export interface EditorServiceOptions {
   contentDir: string;
   collections: Record<string, AnyCollection>;
-  db: Database;
+  /** The Postgres index a local save updates, if there is one. */
+  db?: Database;
+  /** Otherwise the static engine's artifact, if the project uses it. */
+  staticIndexPath?: string;
   branchId: string;
   mdxTrust?: MdxTrust;
   store?: ContentStore;
@@ -284,18 +299,23 @@ export class EditorService {
   /* ---- writing --------------------------------------------------------- */
 
   /**
-   * Locally a save is live at once: compile, then tell the app so it drops its
-   * cached copy. A remote draft is neither; the host rebuilds on publish.
+   * Locally a save is live at once: project the files it wrote into the
+   * index this Studio has, then tell the app so it drops its cached copy.
+   * Only those files: recompiling the tree made one save of a 2,000-product
+   * catalog take over a second. A remote draft is neither; the host rebuilds
+   * on publish.
    */
-  private async afterWrite(): Promise<ContentChangeNotice | undefined> {
+  private async afterWrite(paths: string[]): Promise<ContentChangeNotice | undefined> {
     if (this.remote) return undefined;
-    const result = await compile({
+    const result = await compileIndex(this.options, {
       contentDir: this.options.contentDir,
+      paths,
       collections: this.options.collections,
-      db: this.options.db,
       mdxTrust: this.options.mdxTrust,
       branchId: this.options.branchId,
     });
+    // No index at all: the file is the save, and there is nothing to refresh.
+    if (!result) return undefined;
     return notifyContentChange(this.options.onContentChange, {
       branch: this.options.branchId,
       gitSha: result.gitSha ?? null,
@@ -310,7 +330,7 @@ export class EditorService {
     version: string | null,
     actor: StoreActor,
   ): Promise<SaveEntryResult> {
-    const refresh = await this.afterWrite();
+    const refresh = await this.afterWrite([path]);
     const result = await this.result(name, slug, path, version, actor);
     return refresh ? { ...result, refresh } : result;
   }
@@ -331,19 +351,19 @@ export class EditorService {
    * schema, MDX safety, a slug that names one file. Frontmatter bytes are
    * kept unless the data actually changed.
    */
-  async save(
-    input: {
-      collection: string;
-      slug: string;
-      data?: Record<string, unknown>;
-      body?: string;
-      raw?: string;
-      baseVersion?: string | null;
-    },
-    actor: StoreActor,
-  ): Promise<SaveEntryResult> {
-    const collection = this.fileCollection(input.collection);
+  async save(input: SaveInput, actor: StoreActor): Promise<SaveEntryResult> {
     const path = await this.pathFor(input.collection, input.slug, actor);
+    const { version } = await this.put(input, path, actor);
+    return this.written(input.collection, input.slug, path, version, actor);
+  }
+
+  /** A save's checks and its write, without the index update that follows. */
+  private async put(
+    input: SaveInput,
+    path: string,
+    actor: StoreActor,
+  ): Promise<{ version: string | null }> {
+    const collection = this.fileCollection(input.collection);
     const existing = await this.store.read(path, actor);
 
     let raw: string;
@@ -368,11 +388,93 @@ export class EditorService {
     assertSafeMdx(body, { label: `${input.collection}/${input.slug}` });
     parseDocument(raw, collection, path);
 
-    const { version } = await this.store.write(path, raw, {
+    return this.store.write(path, raw, {
       actor,
       ...(input.baseVersion !== undefined ? { baseVersion: input.baseVersion } : {}),
     });
-    return this.written(input.collection, input.slug, path, version, actor);
+  }
+
+  /**
+   * One field set to one value on many entries, from a selection in the list.
+   * Each entry is checked and written exactly as a save is, so each becomes a
+   * draft; the index is updated once, after the last write. An entry that
+   * fails is reported and the others are still saved. `null` removes the
+   * field, which only an optional field allows.
+   */
+  async setField(
+    input: { collection: string; slugs: string[]; field: string; value: unknown },
+    actor: StoreActor,
+  ): Promise<SetFieldResultDto> {
+    const collection = this.fileCollection(input.collection);
+    const names = collection
+      .describe()
+      .fields.map((field) => field.name)
+      .filter((name) => name !== "slug");
+    if (!names.includes(input.field)) {
+      throw new GraftError({
+        code: "INPUT_VALIDATION_FAILED",
+        message: `"${input.field}" is not a field of ${input.collection} that can be set on many entries.`,
+        fix: `Use one of: ${names.join(", ")}.`,
+        details: { collection: input.collection, field: input.field, fields: names },
+      });
+    }
+    // Paths for every slug from one listing, not one listing per entry.
+    const changes = await this.changeMap(actor);
+    const paths = new Map(
+      (await this.listed(input.collection, actor, changes)).map((entry) => [
+        entry.slug,
+        entry.path,
+      ]),
+    );
+    const saved: SetFieldResultDto["saved"] = [];
+    const failed: SetFieldResultDto["failed"] = [];
+    for (const slug of new Set(input.slugs)) {
+      try {
+        const path = paths.get(slug);
+        const file = path ? await this.store.read(path, actor) : null;
+        if (!path || !file) {
+          throw new GraftError({
+            code: "DOCUMENT_NOT_FOUND",
+            message: `There is no "${slug}" in ${input.collection}.`,
+            fix: "It may have been deleted or renamed. Refresh the list and select it again.",
+            details: { collection: input.collection, slug },
+          });
+        }
+        const parsed = matter(file.raw, {});
+        const data = { ...(parsed.data as Record<string, unknown>) };
+        if (input.value === null) delete data[input.field];
+        else data[input.field] = input.value;
+        const { version } = await this.put(
+          {
+            collection: input.collection,
+            slug,
+            data,
+            body: parsed.content.replace(/^\n/, ""),
+            baseVersion: file.version,
+          },
+          path,
+          actor,
+        );
+        saved.push({ slug, path, version });
+      } catch (error) {
+        if (!(error instanceof GraftError)) throw error;
+        failed.push({
+          slug,
+          error: error.code,
+          message: error.message,
+          ...(error.fix ? { fix: error.fix } : {}),
+        });
+      }
+    }
+    const refresh =
+      saved.length > 0 ? await this.afterWrite(saved.map((entry) => entry.path)) : undefined;
+    return {
+      collection: input.collection,
+      field: input.field,
+      saved,
+      failed,
+      ...(refresh ? { refresh } : {}),
+    };
   }
 
   async create(
@@ -417,6 +519,18 @@ export class EditorService {
   ): Promise<SaveEntryResult> {
     this.fileCollection(input.collection);
     const path = await this.pathFor(input.collection, input.slug, actor);
+    // Locally a deletion is live at once, so one that would leave other
+    // entries pointing at nothing is refused before the file goes. Hosted,
+    // the publish makes the same check. With no database there is no index,
+    // so nothing live points at it.
+    if (!this.remote && this.options.db) {
+      await checkRemoval({
+        db: this.options.db,
+        branchId: this.options.branchId,
+        collections: this.options.collections,
+        paths: [path],
+      });
+    }
     await this.store.write(path, null, {
       actor,
       ...(input.baseVersion !== undefined ? { baseVersion: input.baseVersion } : {}),
@@ -679,7 +793,7 @@ export class EditorService {
 
   async discard(paths: string[], actor: StoreActor): Promise<ContentChangeNotice | undefined> {
     await this.drafts.discard(actor, paths);
-    return this.afterWrite();
+    return this.afterWrite(paths);
   }
 }
 

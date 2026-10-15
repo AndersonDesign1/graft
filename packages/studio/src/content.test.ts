@@ -19,7 +19,7 @@ vi.mock("@usegraft/compiler", async (importOriginal) => {
   return {
     ...actual,
     // Projection is not under test here; the file bytes are.
-    compile: vi.fn(async () => ({ count: 1, docs: [], changes: {}, gitSha: null })),
+    compileDocuments: vi.fn(async () => ({ count: 1, docs: [], changes: {}, gitSha: null })),
   };
 });
 

@@ -19,6 +19,12 @@
  * text so the caller can compare it against the bytes it loaded.
  */
 import { Crepe } from "@milkdown/crepe";
+// Crepe's structural CSS only — block handles, the slash menu, the link
+// tooltip. Its visual themes (nord/frame/classic) are deliberately not
+// imported: those bring a second palette and typography, and parts.css points
+// the editor at our tokens instead. Imported here, not in main.tsx, so it
+// loads with the editor.
+import "@milkdown/crepe/theme/common/style.css";
 // From @milkdown/core, the same entry Crepe resolves internally. Importing the
 // re-export at `@milkdown/kit/core` gives a *different* module instance under
 // Vite's dep pre-bundling, and a Slice is identified by object identity — so

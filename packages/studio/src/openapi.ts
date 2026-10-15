@@ -296,6 +296,15 @@ export const STUDIO_OPENAPI = {
         responses: { "200": { description: "OK" } },
       },
     },
+    "/api/studio/v1/entries/field": {
+      post: {
+        operationId: "setEntriesField",
+        summary: "Set one field to one value on many entries, each saved as a draft",
+        description:
+          'Body: { collection, slugs, field, value }. Each entry is validated and written like PUT /entry, against the version read just before; "value": null removes an optional field. Entries that fail are listed in `failed` with their error code, and the rest are saved.',
+        responses: { "200": { description: "Saved and failed entries" } },
+      },
+    },
     "/api/studio/v1/entry": {
       get: {
         operationId: "getEntry",

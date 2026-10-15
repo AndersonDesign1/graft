@@ -13,6 +13,9 @@ edits a page.
 - `studio.database`: with `content = { source: "database" }`, saves are draft
   revisions in Postgres and Publish puts them live with no rebuild. Nothing is
   written to `content/`.
+- `studio.bulk-field`: selecting rows in a collection and choosing Set a
+  field saves one field's new value on each as a draft
+  (`POST /api/studio/v1/entries/field`), and lists the entries it couldn't.
 - `studio.accounts`: with `GRAFT_STUDIO_SECRET` set, `graft serve --studio`
   asks for the owner account on the first visit, then signs people in with an
   email and password. Admins invite people and reset passwords from
@@ -50,6 +53,16 @@ database instead of the sandbox's. Ready when the log prints `graft studio — b
   `select slug from content_index where not deleted` lists the new page while
   `content/` is unchanged.
 
+- **A field set on many entries.** In `Products`, tick three rows
+  (`Select <title>` checkboxes), press `Set a field` in the `Selected entries`
+  toolbar, pick `Archived` in the dialog and press `Set Status on 3 products`.
+  The rows read Draft and Archived, `git diff --stat` in the sandbox shows
+  three one-line changes, and `compilations` gains one row with `changed 3`.
+  `curl -X POST .../api/studio/v1/entries/field -H 'content-type:
+  application/json' -d '{"collection":"products","slugs":["x"],"field":"price","value":-1}'`
+  answers with `failed: [{ error: "DOCUMENT_NOT_FOUND" }]` or
+  `SCHEMA_VALIDATION_FAILED` per entry.
+
 - **Accounts sign people in.** In a Postgres sandbox, add
   `GRAFT_STUDIO_SECRET=$(openssl rand -base64 48)` to `.env`, then start
   `$O --db "$(cat "$P/pg/url")" env GRAFT_STUDIO_SECRET=... node
@@ -63,10 +76,19 @@ database instead of the sandbox's. Ready when the log prints `graft studio — b
   Studio" (`Your name`, `Choose a password`, `Join`). `select email, role from
   studio_users` lists both.
 
+- **Saves stay fast at scale.** `pnpm bench` in `examples/shop` (after a
+  build) seeds 2,000 products in a temporary copy, starts its own Postgres
+  and Studio, and prints a table of medians. `--count` and `--runs` change
+  the size and the sample.
+
 ## Gotchas
 
-- Studio needs Postgres. In a static project it exits with
-  `ENV_VAR_MISSING: DATABASE_URL is not set`.
+- Studio runs without Postgres. In a static sandbox (`sandbox.sh` with no
+  flag), `$O node $REPO/packages/cli/dist/index.js studio --port 4998` prints
+  `No database: saves update .graft/index.db`, `/workspace` says
+  `"database":false,"index":"static"`, and `/approvals` answers 503
+  `NEEDS_DATABASE`. A save updates `content/` and `.graft/index.db`; read the
+  artifact back with `openStaticIndex` from `@usegraft/db`.
 - Studio is unauthenticated on loopback by design. Off loopback it needs
   scopes, so a remote check needs a token.
 - Stop it with `kill $STUDIO_PID`, then `pg.sh down "$P/pg"`.
