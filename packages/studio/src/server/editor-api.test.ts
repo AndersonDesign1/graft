@@ -23,6 +23,7 @@ import type {
   EntryDto,
   EntryList,
   SaveEntryResult,
+  SetFieldResultDto,
   VersionDetailDto,
   VersionListDto,
   WorkspaceDto,
@@ -470,6 +471,76 @@ describe("editor API on a local checkout", () => {
     expect((await call<DraftsDto>(handler, "GET", "/drafts")).json.changes).toEqual([]);
   });
 
+  it("sets one field on many entries as drafts, and reports the ones it can't save", async () => {
+    // Whichever compile the save path uses is the mocked one.
+    const compiler: Record<string, unknown> = await import("@usegraft/compiler");
+    const projections = () =>
+      Object.values(compiler)
+        .filter(vi.isMockFunction)
+        .reduce((n, fn) => n + fn.mock.calls.length, 0);
+    const before = projections();
+    const read = (slug: string) =>
+      readFileSync(join(contentDir, "products", `${slug}.mdx`), "utf8");
+
+    const set = await call<SetFieldResultDto>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["linen-shirt", "wool-hat", "no-such-hat"],
+      field: "status",
+      value: "archived",
+    });
+    expect(set.status).toBe(200);
+    expect(set.json.saved.map((entry) => entry.slug)).toEqual(["linen-shirt", "wool-hat"]);
+    expect(set.json.failed).toMatchObject([{ slug: "no-such-hat", error: "DOCUMENT_NOT_FOUND" }]);
+    // Only the field changed: the other bytes are the author's.
+    expect(read("wool-hat")).toBe(product("Wool Hat", 2500, "archived", "hats"));
+    // One index update for the batch, not one per entry.
+    expect(projections() - before).toBe(1);
+    const drafts = await call<DraftsDto>(handler, "GET", "/drafts");
+    expect(drafts.json.changes.map((change) => [change.slug, change.kind])).toEqual([
+      ["linen-shirt", "modified"],
+      ["wool-hat", "modified"],
+    ]);
+
+    // A value the schema refuses fails each entry, as a save would, and writes nothing.
+    const refused = await call<SetFieldResultDto>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["old-shirt"],
+      field: "price",
+      value: -5,
+    });
+    expect(refused.json).toMatchObject({
+      saved: [],
+      failed: [{ slug: "old-shirt", error: "SCHEMA_VALIDATION_FAILED" }],
+    });
+    expect(read("old-shirt")).toBe(product("Old Shirt", 1000, "archived", "shirts"));
+
+    // null removes an optional field; a required one can't be removed.
+    const cleared = await call<SetFieldResultDto>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["old-shirt"],
+      field: "category",
+      value: null,
+    });
+    expect(cleared.json.saved).toHaveLength(1);
+    expect(read("old-shirt")).not.toContain("category:");
+    const required = await call<SetFieldResultDto>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["old-shirt"],
+      field: "title",
+      value: null,
+    });
+    expect(required.json.failed).toMatchObject([{ error: "SCHEMA_VALIDATION_FAILED" }]);
+
+    const unknown = await call<{ error: string; fix: string }>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["old-shirt"],
+      field: "colour",
+      value: "red",
+    });
+    expect([unknown.status, unknown.json.error]).toEqual([400, "INPUT_VALIDATION_FAILED"]);
+    expect(unknown.json.fix).toContain("status");
+  });
+
   it("refuses a database collection", async () => {
     const records = createStudioApiHandler({
       db: {} as never,
@@ -626,6 +697,23 @@ describe("editor API on GitHub (hosted)", () => {
       repository: "acme/shop",
       publish: "publish",
     });
+  });
+
+  it("sets a field on many entries in the editor's draft branch", async () => {
+    const { fake, handler, contentDir } = hosted();
+    const set = await call<SetFieldResultDto>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["wool-hat"],
+      field: "price",
+      value: 2900,
+    });
+    expect(set.json.saved).toMatchObject([{ slug: "wool-hat", path: "products/wool-hat.mdx" }]);
+    expect(fake.files("graft-studio/drafts/ana")["content/products/wool-hat.mdx"]).toContain(
+      "price: 2900",
+    );
+    expect(readFileSync(join(contentDir, "products", "wool-hat.mdx"), "utf8")).toContain(
+      "price: 2500",
+    );
   });
 
   it("publishes as one commit authored by the editor", async () => {
