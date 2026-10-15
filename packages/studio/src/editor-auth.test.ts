@@ -139,7 +139,11 @@ describe("hosted Studio sign-in", () => {
       }),
     );
     expect(write.status).toBe(401);
-    expect((await write.json()).message).toContain("studio:write");
+    // A person is told about their role; the scope stays in the details.
+    expect(await write.json()).toMatchObject({
+      message: "Your role can't save changes.",
+      details: { required: "studio:write" },
+    });
   });
 
   it("keeps bearer credentials working beside sessions", async () => {

@@ -12,7 +12,8 @@
 import type { ReactNode } from "react";
 import type { DocumentState } from "../../types";
 import { cn } from "../lib/cn";
-import { IconCheck, IconWarning } from "./icons";
+import { useDatabase } from "../lib/studio";
+import { IconCheck, IconDatabase, IconWarning } from "./icons";
 
 /* ---- state vocabulary ---------------------------------------------------- */
 
@@ -130,6 +131,58 @@ export function EmptyState({
       <h3>{title}</h3>
       <p>{body}</p>
       {action ? <div className="empty-action">{action}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * What a view shows when its data lives in Postgres and this Studio has none:
+ * what it would hold, that editing still works, and how to add a database.
+ */
+export function NeedsDatabase({ title, does }: { title: string; does: string }) {
+  return (
+    <EmptyState
+      icon={<IconDatabase size={16} aria-hidden="true" />}
+      title={title}
+      body={
+        <>
+          {does} This Studio runs without one, so you can edit and commit content, but not this. To
+          add one, set <code>DATABASE_URL</code> in the project's <code>.env</code>, run{" "}
+          <code>graft db migrate</code> and <code>graft compile</code>, then restart Studio.
+        </>
+      }
+    />
+  );
+}
+
+/**
+ * Children that read Postgres mount only when this Studio has a database, so
+ * a Studio without one never asks for what would fail. Given `view`, the
+ * panel stands in for a whole view and keeps its title.
+ */
+export function RequiresDatabase({
+  view,
+  title,
+  does,
+  children,
+}: {
+  view?: string;
+  title: string;
+  does: string;
+  children: ReactNode;
+}) {
+  const database = useDatabase();
+  if (database === undefined) return <Skeleton rows={3} />;
+  if (database) return <>{children}</>;
+  if (!view) return <NeedsDatabase title={title} does={does} />;
+  return (
+    <div className="view">
+      <header className="view-head">
+        <div>
+          <h1 className="view-title">{view}</h1>
+        </div>
+      </header>
+      <NeedsDatabase title={title} does={does} />
     </div>
   );
 }

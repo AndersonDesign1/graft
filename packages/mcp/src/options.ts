@@ -53,6 +53,7 @@ export interface GraftMcpOptions {
   scope?: BranchScope;
   /** Server identity reported to MCP clients. */
   name?: string;
+  /** Defaults to this package's version, the Graft release serving the call. */
   version?: string;
   /**
    * Resolve the caller for run_function (and future gated tools). Same seam as

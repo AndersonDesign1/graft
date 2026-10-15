@@ -7,7 +7,7 @@ order: 5
 
 <p className="kicker">Give writers and merchandisers an editor, without giving up Git.</p>
 
-<TierBadge tier="postgres" />
+<TierBadge tier="either" />
 
 Not everyone on your team wants to edit Markdown files and run Git commands.
 Studio is an editor for them. They find an entry, change it in a form built from
@@ -16,9 +16,11 @@ change ends up as files there, exactly as if a developer had edited them. In
 one that keeps it in the database, every change is a revision in Postgres.
 Nothing an editor can do in Studio is unavailable to an agent or a developer.
 
-Studio needs the [Postgres engine](/docs/tiers) for its developer views
-(history, approvals, branches). Your content stays where your project keeps it
-either way.
+Studio runs on both [storage engines](/docs/tiers). Editing, saving and
+committing content need no database. The views that keep their data in
+Postgres (approvals, the compile history, branches, accounts, agents, the media
+library and site settings) need one, and say so when it is missing. Your
+content stays where your project keeps it either way.
 
 ## Open Studio
 
@@ -31,6 +33,37 @@ your machine can reach it, and saves go to the files in your checkout.
 
 To give a team a Studio URL, with sign-in and saves that land on GitHub, see
 [Host Studio for your team](/docs/studio-hosting).
+
+### Without a database
+
+`graft studio` starts without `DATABASE_URL`. You can find, edit, create and
+delete entries, and commit them, exactly as with one.
+
+- **In a static project** (`export const index = "static"`), each save also
+  updates the static index, `.graft/index.db`, so your local site shows it at
+  once, and Developer, Health compares your files with it. A static project
+  never uses a database, even when a `DATABASE_URL` is set.
+- **In a Postgres project with no `DATABASE_URL`**, saves go to your files and
+  the index waits for your next `graft compile` with a database.
+
+Approvals, the compile history, branches, people, agents, the media library and
+site settings keep their data in Postgres. Each of those views says it needs a
+database and how to add one. The Studio API answers their routes with
+`NEEDS_DATABASE` (HTTP 503) and the same steps in its `fix`.
+
+### Who signs in
+
+A Studio started with `graft studio` is bound to your computer: it listens on
+`127.0.0.1` only, and anyone who can reach that address is you. It asks nobody
+to sign in, with a database or without one. To reach it from another machine,
+start it with `--host` and set `GRAFT_DEV_TOKEN`; requests then need that token
+as a bearer header, which is checked without a database.
+
+Studio accounts are kept in Postgres, and so are the sessions of the people who
+sign in with them, so accounts need a database. A Studio for a team runs under
+`graft serve --studio`, which needs `DATABASE_URL` anyway. Without a database
+there is no sign-in to offer, and none is needed, because only this computer
+can open Studio.
 
 ## Find your way around
 
@@ -62,6 +95,21 @@ configuration.
 - **Select** several entries to publish, discard or delete them together.
 
 The table loads a page at a time as you scroll.
+
+### Change a field on many entries
+
+Select the entries, then choose **Set a field** in the bar at the bottom of the
+list. Pick the field and its value, with the same control the entry editor
+uses, and Studio saves each entry as a draft. Nothing changes on your site
+until you publish (or commit) them. Leave an optional field empty to remove it
+from every selected entry.
+
+Each entry is checked like any save, so a value the schema refuses is refused
+here too. If some entries can't be saved, the dialog lists them with the
+reason, and they stay selected so you can fix them and try again. The others
+are saved. You can set a choice, a number or amount, a yes/no field, a
+reference or a line of text. Lists, groups and images are edited one entry at
+a time.
 
 ## Edit an entry
 
@@ -115,6 +163,12 @@ save carries the version you started from. If the entry changed somewhere else
 in the meantime (another tab, a teammate, an agent), Studio does not overwrite
 it. It shows you, and you choose to load the newer version or keep yours.
 
+On your machine, a save also updates the index for that entry, so your local
+site shows it straight away. Studio checks and projects only the file it
+saved, which keeps a save fast on a large catalog. A file you change outside
+Studio reaches the index on your next `graft compile`, or at once while
+`graft dev` is running.
+
 A save rewrites only the fields you changed. The rest of the frontmatter keeps
 its bytes, comments included, and an edited one-line string stays on one line,
 in the quotes it had, so the diff shows your change and nothing else.
@@ -130,6 +184,7 @@ Studio runs:
 | Studio | Publish button | What happens |
 | --- | --- | --- |
 | On your machine | Commit | A Git commit of the selected files. Nothing is pushed |
+| On your machine, contributor | Commit, turned off | Nothing. The drafts wait for an editor to commit them |
 | Hosted, editor | Publish | One commit on your production branch; the site redeploys. With `GRAFT_STUDIO_PUBLISH=pull-request`, a pull request instead |
 | Hosted, contributor | Submit for review | A pull request for someone to merge |
 | Content in the database, editor | Publish | The entries go live on the site straight away. Nothing to rebuild |
@@ -140,6 +195,11 @@ When your project keeps its content in the database
 [Configuration](/docs/configuration#content)), there is one draft per entry,
 shared by everyone who edits it, and Studio works the same on your machine and
 hosted.
+
+A commit on your machine is authored by the person signed in, when Studio has
+sign-in, and committed by whoever runs Studio. Leave **Describe the change**
+empty and the message names the entries, such as `Update “Wool Hat”`, or counts
+them past three.
 
 **Discard** throws a draft away and leaves the published version as it is.
 Deleting an entry is a draft too: it stays live until you publish the deletion,
@@ -210,9 +270,10 @@ token is revoked and replaced, never shown again. Revoking takes effect on the
 agent's next request. No token can approve: destructive calls still wait in the
 inbox for a person. Only admins see this page.
 
-Tokens work where the site runs `graft serve`. `graft studio` on your own
-machine has no MCP endpoint, so tokens made there are for the hosted site on
-the same database.
+Tokens work at `/api/mcp` wherever the site runs `graft serve`. `graft studio`
+on your own machine has no MCP endpoint, so tokens made there are for the
+hosted site on the same database. An agent on your machine needs no token: it
+starts `npx graft mcp` itself.
 
 ## Site and deploy hooks
 

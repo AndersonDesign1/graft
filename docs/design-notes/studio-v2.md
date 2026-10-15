@@ -365,7 +365,7 @@ Each is code, tests and one conventional commit, shippable on its own.
 | 4. Studio content API on the store, MCP parity | shipped | `feat(studio): editor API…`, `feat(mcp): write through the content store…` |
 | 5. The editor UI                               | shipped | `feat(studio): an editor for people…`                                      |
 | 6. Deploy story                                | shipped | `docs(studio): host Studio for a team…`                                    |
-| 7. Studio on the static tier                   | next    |                                                                            |
+| 7. Studio on the static tier                   | shipped | `feat(studio): open Studio without a database…`                            |
 | 8. Incremental projection and the rest         | next    |                                                                            |
 
 ### What verification found
@@ -406,11 +406,18 @@ Measured on `node scripts/seed.mjs --count 2000`, local Studio:
 | Local save                   | 1.3 s       |
 
 Lists are fast because `DiskCatalog` caches parsed entries by mtime and size
-and the query runs on the server. A local save is slow because it recompiles
-the whole tree. `projectBranchContent` in `@usegraft/db` diffs the full branch
-and soft-deletes rows it was not given, so projecting one document needs a
-new function rather than a smaller input. That is the first item of unit 8.
-Hosted saves do not compile at all.
+and the query runs on the server. A local save was slow because it recompiled
+the whole tree: `projectBranchContent` in `@usegraft/db` diffs the full branch
+and soft-deletes rows it was not given. A save now calls `compileDocuments`,
+which validates the files it wrote and projects them with `projectDocuments`,
+the same function a database-sourced publish uses. Hosted saves do not
+compile at all.
+
+`pnpm bench` in `examples/shop` reruns these measurements: it seeds a copy of
+the shop, starts Studio against a throwaway Postgres, and prints medians. On
+the container that built unit 8, the same `main` measured slower than the
+table above (local save 1.60 s, `graft compile` 2.86 s), so compare runs from
+one machine. The incremental save measured 105 ms there.
 
 ### Debt left on purpose
 
@@ -418,5 +425,6 @@ Hosted saves do not compile at all.
   removed once `feat/content-change-refresh` (#56) merged; their save-path,
   fidelity and refresh tests now run against `/entry`.
 - Rules for the old shell remain in `studio.css` and `parts.css`.
-- The editor chunk (Milkdown and CodeMirror) is 2.7 MB and should load only
-  when an entry opens.
+- Done since: the editor chunk (Milkdown and CodeMirror, 2.7 MB) loads when
+  an entry opens. Studio's first page loads 0.66 MB of JavaScript instead of
+  3.33 MB.

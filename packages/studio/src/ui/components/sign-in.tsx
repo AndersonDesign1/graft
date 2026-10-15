@@ -74,6 +74,30 @@ function Card({ title, lede, children }: { title: string; lede: string; children
   );
 }
 
+/**
+ * The session cookie is `Secure` off loopback, and a browser drops a Secure
+ * cookie on an address that isn't a secure context: plain http anywhere but
+ * localhost. Signing in there succeeds and lands back here with no session,
+ * so say so instead of offering a form that can't work.
+ */
+function sessionWouldBeDropped(): boolean {
+  return window.isSecureContext === false;
+}
+
+function PlainHttp() {
+  return (
+    <Card
+      title="Sign-in needs https here"
+      lede="This address is plain http, so your browser won't keep a sign-in from it, and you'd land back on this screen."
+    >
+      <p className="signin-invite">
+        Open Studio at its https address, or at localhost on the computer that runs it. Whoever runs
+        the site can put it behind https.
+      </p>
+    </Card>
+  );
+}
+
 function TextField({
   id,
   label,
@@ -194,6 +218,7 @@ export function SignIn() {
     post("/sign-in", { email: form.get("email"), password: form.get("password") }),
   );
 
+  if (sessionWouldBeDropped()) return <PlainHttp />;
   if (session?.setup) return <Setup needsCode={session.setup.needsCode} />;
 
   // Keep the query (the branch being edited), minus the sign-in reason.
@@ -280,6 +305,8 @@ export function AcceptInvite({ token }: { token: string }) {
     post("/invite", { token, name: form.get("name"), password: form.get("password") }),
   );
 
+  // Before the form, so the link stays unused until it can sign someone in.
+  if (sessionWouldBeDropped()) return <PlainHttp />;
   if (invite === "invalid") {
     return (
       <Card
