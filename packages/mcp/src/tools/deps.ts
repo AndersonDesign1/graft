@@ -39,8 +39,11 @@ export interface ToolDeps {
   /** The verified identity a decision is attributed to, or a refusal. */
   requireDecider: () => { kind: string; id: string };
 
-  /** Project the content tree into whichever index this server serves, then tell the app. */
-  projectContent: () => Promise<ProjectedContent>;
+  /**
+   * Project into whichever index this server serves, then tell the app. Pass
+   * the files a tool wrote so a Postgres index projects only those.
+   */
+  projectContent: (paths?: string[]) => Promise<ProjectedContent>;
   /** Full-text search across the index, Postgres or static. */
   searchIndex: (query: {
     query: string;

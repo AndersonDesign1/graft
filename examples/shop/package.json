@@ -9,6 +9,7 @@
     "studio": "graft studio",
     "serve": "graft serve --studio",
     "seed": "node scripts/seed.mjs",
+    "bench": "node scripts/bench-studio.mjs",
     "typecheck": "tsc --noEmit",
     "e2e:hosted": "node scripts/e2e-hosted.mjs"
   },

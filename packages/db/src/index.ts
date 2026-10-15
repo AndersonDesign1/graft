@@ -16,6 +16,7 @@ export * from "./harden";
 export * from "./ledger";
 export * from "./migrate";
 export * from "./neon";
+export * from "./project";
 export * from "./reader";
 export * from "./revisions";
 export * from "./schema";

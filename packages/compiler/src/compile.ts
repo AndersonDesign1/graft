@@ -16,12 +16,14 @@ import { walkContentFiles } from "./content-files";
 import type { AnyCollection } from "@usegraft/core";
 import {
   projectBranchContent,
+  projectDocuments,
   projectPublishedContent,
   projectStaticContent,
   type ChangeSet,
   type Database,
 } from "@usegraft/db";
 import { parseDocument, type ProjectedDoc } from "./parse";
+import { resolveContained } from "./paths";
 
 /**
  * Where a project's authored content is authoritative.
@@ -267,6 +269,41 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
       return docs.map(indexRow);
     },
     project,
+  );
+  return { count: docs.length, docs, changes, gitSha };
+}
+
+export interface CompileDocumentsOptions {
+  contentDir: string;
+  /** The files to project, as `<collection>/<slug>.mdx`. One that no longer exists comes off the index. */
+  paths: string[];
+  collections: Record<string, AnyCollection>;
+  db: Database;
+  branchId?: string;
+  /** As in CompileOptions: omit to auto-resolve, null to skip. */
+  gitSha?: string | null;
+  mdxTrust?: MdxTrust;
+}
+
+/**
+ * Compile a few files of a git-sourced project: what a save needs, where
+ * `compile` would read, validate and diff the whole tree to change one row.
+ * The files pass the same `validateDocuments` checks, and the projection
+ * records a compilation like a full one. Documents that were not named are
+ * left as they are, so drift elsewhere in the tree waits for `graft compile`.
+ */
+export async function compileDocuments(options: CompileDocumentsOptions): Promise<CompileResult> {
+  const files: SourceFile[] = [];
+  for (const sourcePath of new Set(options.paths)) {
+    const full = resolveContained(options.contentDir, sourcePath, { label: "Content path" });
+    if (existsSync(full)) files.push({ sourcePath, raw: readFileSync(full, "utf8") });
+  }
+  const docs = validateDocuments(files, options.collections, { mdxTrust: options.mdxTrust });
+  const gitSha = options.gitSha !== undefined ? options.gitSha : resolveGitSha(options.contentDir);
+  const changes = await projectDocuments(
+    options.db,
+    { upserts: docs.map(indexRow), removals: [], paths: [...new Set(options.paths)] },
+    { branchId: options.branchId ?? "main", gitSha },
   );
   return { count: docs.length, docs, changes, gitSha };
 }

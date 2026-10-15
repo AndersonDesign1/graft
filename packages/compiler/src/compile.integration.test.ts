@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { defineCollection, field } from "@usegraft/core";
 import { createDb, type DbHandle } from "@usegraft/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { compile } from "./compile";
+import { compile, compileDocuments } from "./compile";
 
 // Best-effort load of repo-root .env; skipped without RUN_INTEGRATION=1 + a database.
 try {
@@ -17,6 +17,7 @@ try {
 
 const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
 const BRANCH = "compiler-it";
+const DOCS_BRANCH = "compiler-it-docs";
 const collections = {
   pages: defineCollection({ name: "pages", fields: { title: field.string() } }),
 };
@@ -34,8 +35,10 @@ describe.skipIf(!runIntegration)("compile -> content_index (integration)", () =>
   });
 
   afterAll(async () => {
-    await handle.sql`delete from content_index where branch_id = ${BRANCH}`;
-    await handle.sql`delete from compilations where branch_id = ${BRANCH}`;
+    for (const branch of [BRANCH, DOCS_BRANCH]) {
+      await handle.sql`delete from content_index where branch_id = ${branch}`;
+      await handle.sql`delete from compilations where branch_id = ${branch}`;
+    }
     await handle.close();
     rmSync(dir, { recursive: true, force: true });
   });
@@ -74,5 +77,80 @@ describe.skipIf(!runIntegration)("compile -> content_index (integration)", () =>
       await handle.sql`select doc_count, added, changed, removed, git_sha from compilations where branch_id = ${BRANCH} order by created_at`;
     expect(audits.length).toBe(3);
     expect(audits[2]).toMatchObject({ doc_count: 1, added: 0, changed: 1, removed: 1 });
+  }, 60_000);
+
+  it("compiles named files and leaves every other row alone", async () => {
+    const docsDir = mkdtempSync(join(tmpdir(), "graft-compile-docs-it-"));
+    const page = (slug: string, title: string, frontmatterSlug = slug) =>
+      writeFileSync(
+        join(docsDir, "pages", `${slug}.mdx`),
+        `---\ntitle: ${title}\nslug: ${frontmatterSlug}\n---\n${title}`,
+      );
+    const rows = async () =>
+      (
+        await handle.sql`select slug, deleted, updated_at from content_index where branch_id = ${DOCS_BRANCH} order by slug`
+      ).map((r) => ({ slug: r.slug, deleted: r.deleted, at: String(r.updated_at) }));
+    const opts = { db: handle.db, contentDir: docsDir, collections, branchId: DOCS_BRANCH };
+    try {
+      mkdirSync(join(docsDir, "pages"));
+      page("home", "Home");
+      page("about", "About");
+      page("contact", "Contact");
+      await compile(opts);
+      const before = await rows();
+
+      // A broken file nobody named does not block a save of another one.
+      writeFileSync(join(docsDir, "pages", "broken.mdx"), "---\nslug: broken\n---\nNo title");
+      page("about", "About us");
+      const edited = await compileDocuments({ ...opts, paths: ["pages/about.mdx"] });
+      expect(edited.changes).toEqual({
+        added: [],
+        changed: ["pages/about"],
+        removed: [],
+        unchanged: 0,
+      });
+      const after = await rows();
+      expect(after.find((r) => r.slug === "home")?.at).toBe(
+        before.find((r) => r.slug === "home")?.at,
+      );
+
+      unlinkSync(join(docsDir, "pages", "contact.mdx"));
+      const removed = await compileDocuments({ ...opts, paths: ["pages/contact.mdx"] });
+      expect(removed.changes.removed).toEqual(["pages/contact"]);
+
+      // A slug changed in frontmatter moves the row: the old key comes off.
+      page("about", "About us", "about-us");
+      const moved = await compileDocuments({ ...opts, paths: ["pages/about.mdx"] });
+      expect([moved.changes.added, moved.changes.removed]).toEqual([
+        ["pages/about-us"],
+        ["pages/about"],
+      ]);
+
+      // A second file claiming a live slug is refused, and nothing is written.
+      writeFileSync(join(docsDir, "pages", "home-2.mdx"), "---\ntitle: Two\nslug: home\n---\n");
+      const settled = await rows();
+      await expect(
+        compileDocuments({ ...opts, paths: ["pages/home-2.mdx"] }),
+      ).rejects.toMatchObject({ code: "SLUG_NOT_UNIQUE" });
+      expect(await rows()).toEqual(settled);
+
+      expect(settled.map((r) => `${r.slug}:${r.deleted}`)).toEqual([
+        "about:true",
+        "about-us:false",
+        "contact:true",
+        "home:false",
+      ]);
+      // Each projection is on the audit trail, counting the live index after it.
+      const audits =
+        await handle.sql`select doc_count, added, changed, removed from compilations where branch_id = ${DOCS_BRANCH} order by created_at`;
+      expect(audits.map((a) => [a.doc_count, a.added, a.changed, a.removed])).toEqual([
+        [3, 3, 0, 0],
+        [3, 0, 1, 0],
+        [2, 0, 0, 1],
+        [2, 1, 0, 1],
+      ]);
+    } finally {
+      rmSync(docsDir, { recursive: true, force: true });
+    }
   }, 60_000);
 });
