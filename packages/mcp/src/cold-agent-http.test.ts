@@ -34,6 +34,18 @@ vi.mock("@usegraft/db", async (importOriginal) => {
         unchanged: 0,
       }),
     ),
+    // A write projects the files it touched; the whole tree only on compile.
+    projectDocuments: vi.fn(
+      async (
+        _db: Database,
+        changes: { upserts: { collection: string; slug: string }[]; paths: string[] },
+      ): Promise<ChangeSet> => ({
+        added: changes.upserts.map((row) => `${row.collection}/${row.slug}`),
+        changed: [],
+        removed: [],
+        unchanged: 0,
+      }),
+    ),
   };
 });
 
