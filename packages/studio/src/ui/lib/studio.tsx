@@ -41,6 +41,14 @@ export function useStudioResources(): Pick<StudioState, "workspace" | "drafts" |
   };
 }
 
+/** Whether this person's commit goes through. A contributor on a laptop saves drafts only. */
+export function useCanPublish(): boolean {
+  return useStudio().drafts.data?.canPublish ?? true;
+}
+
+/** Why the Commit button is off for a contributor. */
+export const PUBLISH_NEEDS_EDITOR = "Committing needs an editor. Ask one to commit your changes.";
+
 /** Collections an editor edits: the ones whose content is files. */
 export function editableCollections(schema: SchemaList | null): SchemaCollectionDto[] {
   return (schema?.collections ?? []).filter((collection) => collection.authority === "file");

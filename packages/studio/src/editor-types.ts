@@ -171,6 +171,12 @@ export interface DraftChangeDto {
 
 export interface DraftsDto {
   publish: PublishAction;
+  /**
+   * Whether this person may take that action. Locally, drafts are committed
+   * straight to the checkout and there is no review to submit to, so a role
+   * without publish rights (a contributor) can save drafts but not commit.
+   */
+  canPublish: boolean;
   changes: DraftChangeDto[];
   reviews: ReviewRequest[];
 }
