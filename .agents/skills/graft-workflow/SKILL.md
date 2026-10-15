@@ -102,7 +102,7 @@ working branch.
 **Always stop and ask** before anything that is hard to undo or that other
 people see: force-pushes to shared branches, publishing packages, deploys,
 deleting data or branches on a real service (Neon, S3, GitHub), touching
-`main` or `feat/core` directly, posting public comments, and any command that
+`main` directly, posting public comments, and any command that
 uses a credential from the environment. This mirrors Graft's own rule:
 destructive operations wait for a person.
 

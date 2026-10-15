@@ -84,11 +84,10 @@ here and write down why.
 
 ## Git
 
-- `main` is the default branch and the public face of the repository. It is merged
-  from `feat/core` at each release, and nothing lands on it directly.
-- `feat/core` is the working mainline. Every change lands there, and it is the only
-  branch that publishes to npm.
-- Feature branches are cut from `feat/core` and merge back into it.
+- `main` is the only long-lived branch. It is the default branch, every change
+  lands there through a squash-merged pull request, and it is the branch that
+  publishes to npm.
+- Feature branches are cut from `main` and merge back into it.
 - Branch naming: `preview/<short-topic>` for content/feature branches (these map to
   copy-on-write DB preview branches from Phase 4).
 - Commits: Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`).
@@ -102,7 +101,7 @@ workflow would authenticate against nothing.
 
 ### Stable, to `latest`
 
-`changesets/action` runs on push to `feat/core`. It opens a
+`changesets/action` runs on push to `main`. It opens a
 "chore: version packages" PR, and **merging that PR publishes**. Both gates
 belong to the repository owner.
 
@@ -115,8 +114,14 @@ pnpm changeset status   # what the next release would bump
 ```
 
 CI on the version PR shows `action_required` and does not run, because GitHub
-holds workflows on PRs the changesets bot opens. Approve it, or rely on CI
-having passed on `feat/core` for the identical code.
+holds workflows on PRs the changesets bot opens. Approve the runs, then merge.
+The version PR is the release gate on purpose: nothing ships until someone
+merges it.
+
+After the publish, the same job moves `latest` (and `beta` in prerelease mode)
+onto the new version over OIDC, then reads the registry back with
+`pnpm check:dist-tags --settle 120`. Each package's trusted publisher on
+npmjs.com needs both "Allow npm publish" and "Allow npm dist-tag" ticked.
 
 ### Canary, to the `canary` tag
 
@@ -124,7 +129,7 @@ Snapshot releases: `0.0.0-canary-<timestamp>`, published under the `canary`
 dist-tag. `latest` never moves and real version numbers never change. There is
 no canary branch and none is needed.
 
-1. Branch off `feat/core`, build the change.
+1. Branch off `main`, build the change.
 2. `pnpm changeset`. **Required** — with nothing pending there is nothing to
    snapshot and the run is refused.
 3. Push the branch.

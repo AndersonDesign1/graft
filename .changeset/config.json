@@ -5,7 +5,7 @@
   "fixed": [["@usegraft/*", "create-graft"]],
   "linked": [],
   "access": "public",
-  "baseBranch": "feat/core",
+  "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [],
   "privatePackages": {

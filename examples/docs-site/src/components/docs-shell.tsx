@@ -94,7 +94,7 @@ const DATE = new Intl.DateTimeFormat("en-US", {
  * When the page last changed, and the two ways to change it: edit the source,
  * or report what is wrong. Lives beside the contents on wide screens and at
  * the end of the article when the contents rail is hidden. Edits open
- * against feat/core, the branch every change lands on.
+ * against main, the branch every change lands on.
  */
 function PageMeta({
   slug,
@@ -127,7 +127,7 @@ What is wrong or missing:
           </span>
         </p>
       )}
-      <a href={`${REPO}/edit/feat/core/${docSourcePath(slug)}`} target="_blank" rel="noreferrer">
+      <a href={`${REPO}/edit/main/${docSourcePath(slug)}`} target="_blank" rel="noreferrer">
         <SquarePen {...ICON} />
         Edit this page
         <span className="sr-only"> (opens in a new tab)</span>

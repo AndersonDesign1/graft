@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, feat/core]
+    branches: [main]
   pull_request:
 
 # Read-only by default. No job here writes to the repository, publishes, or
