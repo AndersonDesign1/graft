@@ -282,6 +282,13 @@ Rows are two lines, 56px: the title, then the state or the slug and when it
 changed. The arrow keys, Home and End move between rows and Enter opens one;
 moving never opens an entry by itself.
 
+**Selecting rows** raises the bulk bar at the foot of the list: the count, the
+workspace's verb as the one primary button, then Set a field, Discard changes
+and Delete, and a close button. On a phone the buttons wrap inside the bar;
+none runs off the screen. Set a field opens a dialog with the same field
+controls as the editor; entries it could not save are listed in the dialog,
+with the reason, and stay selected.
+
 **The inspector** holds what is about the entry rather than in it: its status,
 where it is saved, its file and version, what changed, and its published
 versions. Restoring a version saves it as a draft; history never publishes. Tabs are words
