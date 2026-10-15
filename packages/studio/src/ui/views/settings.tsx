@@ -28,11 +28,12 @@ import { CopyButton, Row, Section } from "../components/set-row";
 import { useStudio } from "../lib/studio";
 import { AccountPanel, PeoplePanel } from "./people";
 import { HooksPanel, SitePanel } from "./site";
-import { Pill } from "../components/primitives";
+import { NeedsDatabase, Pill } from "../components/primitives";
 import { ListSkeleton } from "../components/skeletons";
 import type { Theme } from "../lib/theme";
 import { useResource } from "../lib/use-resource";
 import { plural } from "../lib/format";
+import { MOD_KEY } from "../lib/keys";
 
 const THEMES: Array<{ id: Theme; label: string; Icon: IconComponent }> = [
   { id: "system", label: "System", Icon: IconSystem },
@@ -41,8 +42,9 @@ const THEMES: Array<{ id: Theme; label: string; Icon: IconComponent }> = [
 ];
 
 const SHORTCUTS: Array<[string[], string]> = [
-  [["⌘", "K"], "Open the command palette"],
-  [["⌘", "S"], "Save the open document"],
+  [[MOD_KEY, "K"], "Open the command palette"],
+  [[MOD_KEY, "S"], "Save the open document"],
+  [[MOD_KEY, "\\"], "Show or hide an entry's details"],
   [["↑", "↓"], "Move through palette results"],
   [["Enter"], "Run the selected command"],
   [["Esc"], "Close the palette or a dialog"],
@@ -95,6 +97,20 @@ const SECTIONS = [
     sub: "Studio is opt-in: nothing here runs unless you asked for it.",
   },
 ] as const satisfies ReadonlyArray<{ id: string; title: string; sub: string }>;
+
+/**
+ * When the hooks are called, for where this Studio saves. A commit on this
+ * computer reaches no site, so it calls none: the host builds from the push.
+ */
+function hooksSub(storage: "local" | "github" | "database" | undefined): string {
+  if (storage === "local") {
+    return "URLs called when a publish reaches the site: from a hosted Studio, or of content in the database. A commit on this computer calls none; your host builds when you push it.";
+  }
+  if (storage === "github") {
+    return "URLs called after every publish from Studio, so the site rebuilds or refreshes what it cached.";
+  }
+  return SECTION_BY_ID.hooks.sub;
+}
 
 const SECTION_BY_ID = Object.fromEntries(SECTIONS.map((s) => [s.id, s])) as Record<
   (typeof SECTIONS)[number]["id"],
@@ -179,7 +195,8 @@ export function SettingsView({
   const canManageSite = workspace.data
     ? !workspace.data.user || workspace.data.user.scopes.includes("studio:settings")
     : false;
-  const site = useResource<SiteDto>(canManageSite ? "/site" : null);
+  const hasDatabase = workspace.data?.database;
+  const site = useResource<SiteDto>(canManageSite && hasDatabase ? "/site" : null, [hasDatabase]);
   const database = workspace.data?.storage === "database";
   // Your own account, when you signed in with one rather than GitHub or a link.
   const [account, setAccount] = useState<{ email: string; role: string } | null>(null);
@@ -199,9 +216,11 @@ export function SettingsView({
         (s) =>
           (s.id !== "account" || account !== null) &&
           (s.id !== "people" || (accounts && canManagePeople)) &&
-          ((s.id !== "site" && s.id !== "hooks") || canManageSite),
+          ((s.id !== "site" && s.id !== "hooks") || canManageSite) &&
+          // Without a database, Site says why once; there are no hooks to list.
+          (s.id !== "hooks" || hasDatabase !== false),
       ),
-    [account, accounts, canManagePeople, canManageSite],
+    [account, accounts, canManagePeople, canManageSite, hasDatabase],
   );
   const ids = useMemo(() => sections.map((s) => s.id), [sections]);
   const current = useCurrentSection(ids);
@@ -279,12 +298,19 @@ export function SettingsView({
             </Section>
           ) : null}
 
-          {canManageSite ? (
+          {canManageSite && hasDatabase === false ? (
+            <Section id="site" title="Site" sub={SECTION_BY_ID.site.sub}>
+              <NeedsDatabase
+                title="Site settings need a database"
+                does="The site's name, its address and the deploy hooks called after a publish are kept in Postgres."
+              />
+            </Section>
+          ) : canManageSite ? (
             <>
               <Section id="site" title="Site" sub={SECTION_BY_ID.site.sub}>
                 <SitePanel site={site} />
               </Section>
-              <Section id="hooks" title="Deploy hooks" sub={SECTION_BY_ID.hooks.sub}>
+              <Section id="hooks" title="Deploy hooks" sub={hooksSub(workspace.data?.storage)}>
                 <HooksPanel site={site} />
               </Section>
             </>

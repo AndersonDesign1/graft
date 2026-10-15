@@ -163,7 +163,13 @@ can be read-only; nothing writes to it.
 GRAFT_STUDIO=1 graft serve --host 0.0.0.0
 ```
 
-Studio is then at `https://<your-site>/studio`. Set `GRAFT_DEPLOYED_SHA` to the
+Studio is then at `https://<your-site>/studio`. Sign-in needs that https
+address: the session cookie is `Secure`, so a browser drops it on plain http
+anywhere but `localhost`, and Studio says so instead of showing the form. To try
+sign-in without https, open Studio at `http://localhost` on the machine that
+runs it.
+
+Set `GRAFT_DEPLOYED_SHA` to the
 commit the deployment was built from, if your host does not already provide
 one (Vercel, Render and Railway do). Studio uses it to show entries published
 since the build, before the redeploy lands.

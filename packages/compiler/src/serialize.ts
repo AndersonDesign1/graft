@@ -19,6 +19,19 @@ import { GraftError } from "@usegraft/contracts";
 import { resolveContained } from "./paths";
 import matter from "gray-matter";
 
+/**
+ * js-yaml folds a string longer than 80 columns into a `>-` block by default,
+ * so the first save that rewrote a one-line description turned it into three
+ * lines. -1 turns folding off: a one-line string stays on one line.
+ */
+// SAFETY: gray-matter hands these options to js-yaml's safeDump unchanged, and
+// lineWidth is a safeDump option its types do not list.
+const YAML_OPTIONS = { lineWidth: -1 } as matter.GrayMatterOption<string, never>;
+
+function stringify(body: string, data: Record<string, unknown>): string {
+  return matter.stringify(body, data, YAML_OPTIONS);
+}
+
 /** Filesystem refusals that mean "this tree is not writable", not "this write was wrong". */
 const READ_ONLY_CODES = new Set(["EROFS", "EACCES", "EPERM"]);
 
@@ -123,30 +136,59 @@ interface KeyLines {
   lines: string[];
 }
 
+interface ScannedYaml {
+  /** Blank lines and comments before the first key, kept as they are. */
+  preamble: string[];
+  keys: KeyLines[];
+}
+
+/** A comment line at the top level, which ends any value above it. */
+const TOP_LEVEL_COMMENT = /^#/;
+
 /**
  * Split frontmatter YAML into per-key line runs, or null if it holds anything
- * this function does not model (a leading comment, a document marker, an
- * unkeyed line). Null means the caller re-serialises everything, which is
- * correct but lossy — so the parser refuses rather than guesses.
+ * this function does not model (a document marker, an unkeyed line). Null
+ * means the caller re-serialises everything, which is correct but lossy, so
+ * the parser refuses rather than guesses.
  */
-function scanKeys(yaml: string): KeyLines[] | null {
+function scanKeys(yaml: string): ScannedYaml | null {
   const lines = yaml.split(/\r?\n/);
-  const out: KeyLines[] = [];
+  const preamble: string[] = [];
+  const keys: KeyLines[] = [];
   for (const line of lines) {
     const match = TOP_LEVEL_KEY.exec(line);
     if (match?.[1]) {
-      out.push({ key: unquoteKey(match[1]), lines: [line] });
+      keys.push({ key: unquoteKey(match[1]), lines: [line] });
       continue;
     }
-    if (out.length === 0) {
-      // Blank padding before the first key is harmless; anything else is a
-      // construct we would drop on the floor.
-      if (line.trim() === "") continue;
+    if (keys.length === 0) {
+      // Blank padding and comments before the first key belong to nobody.
+      if (line.trim() === "" || TOP_LEVEL_COMMENT.test(line)) {
+        preamble.push(line);
+        continue;
+      }
       return null;
     }
-    out[out.length - 1]?.lines.push(line);
+    keys[keys.length - 1]?.lines.push(line);
   }
-  return out.length > 0 ? out : null;
+  return keys.length > 0 ? { preamble, keys } : null;
+}
+
+/**
+ * How many of a key's last lines are blank or top-level comments: the author's
+ * spacing and notes before the next key, not part of this value. A rewrite of
+ * the value keeps them. Not for a `|+` or `>+` block, whose trailing blank
+ * lines are content.
+ */
+function trailingNotes(lines: readonly string[]): number {
+  if (/[|>][0-9]?\+[0-9]?\s*(#.*)?$/.test(lines[0] ?? "")) return 0;
+  let count = 0;
+  for (let i = lines.length - 1; i > 0; i--) {
+    const line = lines[i] ?? "";
+    if (line.trim() !== "" && !TOP_LEVEL_COMMENT.test(line)) break;
+    count++;
+  }
+  return count;
 }
 
 /**
@@ -158,13 +200,31 @@ function scanKeys(yaml: string): KeyLines[] | null {
  * blank line after the closing `---`, so the block has to be isolated before it
  * can be split into its parts.
  */
-function renderKey(key: string, value: unknown): string[] | null {
-  const dumped = matter.stringify("", { [key]: value });
+function renderKey(key: string, value: unknown, previous?: string): string[] | null {
+  const kept = inQuotesAsBefore(value, previous);
+  if (kept) return [kept];
+  const dumped = stringify("", { [key]: value });
   const block = FRONTMATTER_BLOCK.exec(dumped)?.[1];
   if (!block) return null;
   const inner = BLOCK_PARTS.exec(block)?.[2];
   if (inner === undefined) return null;
   return inner.split(/\r?\n/);
+}
+
+/**
+ * A one-line string, written in the quotes its key used before: an edited
+ * `description: "…"` stays double-quoted rather than taking whatever style
+ * js-yaml picks. A JSON string is a valid YAML double-quoted scalar.
+ */
+function inQuotesAsBefore(value: unknown, previous: string | undefined): string | null {
+  if (typeof value !== "string" || /[\r\n]/.test(value) || !previous) return null;
+  const match = /^((?:[A-Za-z0-9_$-]+|"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'):[ \t]+)(["'])/.exec(
+    previous,
+  );
+  if (!match?.[1]) return null;
+  return match[2] === '"'
+    ? `${match[1]}${JSON.stringify(value)}`
+    : `${match[1]}'${value.replace(/'/g, "''")}'`;
 }
 
 /**
@@ -194,21 +254,26 @@ function patchFrontmatter(
   const scanned = scanKeys(yaml);
   if (!scanned) return null;
 
-  const out: string[] = [];
+  const out: string[] = [...scanned.preamble];
   const kept = new Set<string>();
 
-  for (const entry of scanned) {
-    // A key the caller dropped is a deletion: leave it out.
-    if (!Object.hasOwn(data, entry.key)) continue;
+  for (const entry of scanned.keys) {
+    const notes = entry.lines.slice(entry.lines.length - trailingNotes(entry.lines));
+    // A key the caller dropped is a deletion: leave it out, but not the
+    // comments after it, which may be about the next key.
+    if (!Object.hasOwn(data, entry.key)) {
+      out.push(...notes);
+      continue;
+    }
     kept.add(entry.key);
 
     if (Object.hasOwn(original, entry.key) && sameData(original[entry.key], data[entry.key])) {
       out.push(...entry.lines);
       continue;
     }
-    const rendered = renderKey(entry.key, data[entry.key]);
+    const rendered = renderKey(entry.key, data[entry.key], entry.lines[0]);
     if (!rendered) return null;
-    out.push(...rendered);
+    out.push(...rendered, ...notes);
   }
 
   // Keys the form added land at the end, where a person appending to YAML by
@@ -237,12 +302,12 @@ export function composeDocument(
   data: Record<string, unknown>,
   body: string,
 ): string {
-  if (existingRaw === undefined) return matter.stringify(body, data);
+  if (existingRaw === undefined) return stringify(body, data);
 
   const match = FRONTMATTER_BLOCK.exec(existingRaw);
   // No parseable frontmatter block (a new-style file, or one gray-matter would
   // read differently than this regex): fall back rather than guess.
-  if (!match) return matter.stringify(body, data);
+  if (!match) return stringify(body, data);
 
   const [, block = "", rest = ""] = match;
   const newline = /\r\n/.test(block) ? "\r\n" : "\n";
@@ -251,7 +316,7 @@ export function composeDocument(
   const frontmatter = sameData(original, data)
     ? block
     : patchFrontmatter(block, original, data, newline);
-  if (frontmatter === null) return matter.stringify(body, data);
+  if (frontmatter === null) return stringify(body, data);
 
   // Preserve the author's separator between frontmatter and body. The body is
   // used exactly as given — trimming its trailing newlines and re-adding one

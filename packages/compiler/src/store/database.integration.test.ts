@@ -24,6 +24,13 @@ const TIMEOUT = 30_000;
 const collections = {
   posts: defineCollection({ name: "posts", fields: { title: field.string() } }),
 };
+const linked = {
+  topics: defineCollection({ name: "topics", fields: { title: field.string() } }),
+  notes: defineCollection({
+    name: "notes",
+    fields: { title: field.string(), topic: field.reference({ to: "topics" }) },
+  }),
+};
 const ana = { id: "ana@example.com", name: "Ana" };
 const post = (title: string, body = "Hello.") => `---\ntitle: ${title}\n---\n\n${body}\n`;
 
@@ -103,6 +110,38 @@ describe.skipIf(!runIntegration)("DatabaseStore (integration)", () => {
       store.drafts.publish({ actor: ana, paths: ["posts/other.mdx"] }),
     ).rejects.toMatchObject({ code: "SLUG_NOT_UNIQUE" });
     expect(await liveSlugs()).toEqual(["home"]);
+  });
+
+  it("refuses a reference to a document that isn't live, and one a publish would break", async () => {
+    const linkedStore = new DatabaseStore({ db: handle.db, collections: linked, branchId: BRANCH });
+    const note = (topic: string) => `---\ntitle: Note\ntopic: ${topic}\n---\n`;
+    await linkedStore.write("topics/wool.mdx", "---\ntitle: Wool\n---\n", { actor: ana });
+    await linkedStore.drafts.publish({ actor: ana, paths: ["topics/wool.mdx"] });
+
+    // A draft naming a topic only another draft holds can't go live alone.
+    await linkedStore.write("notes/a.mdx", note("linen"), { actor: ana });
+    await linkedStore.write("topics/linen.mdx", "---\ntitle: Linen\n---\n", { actor: ana });
+    await expect(
+      linkedStore.drafts.publish({ actor: ana, paths: ["notes/a.mdx"] }),
+    ).rejects.toMatchObject({
+      code: "CONTENT_REFERENCE_NOT_FOUND",
+      details: { references: [{ sourcePath: "notes/a.mdx", field: "topic", slug: "linen" }] },
+    });
+    expect(await liveSlugs()).toEqual(["wool"]);
+    // Published together, it resolves.
+    await linkedStore.drafts.publish({ actor: ana, paths: ["notes/a.mdx", "topics/linen.mdx"] });
+    expect(await liveSlugs()).toEqual(["a", "linen", "wool"]);
+
+    // Deleting the topic a live note points at would leave the note pointing at nothing.
+    await linkedStore.write("topics/linen.mdx", null, { actor: ana });
+    await expect(
+      linkedStore.drafts.publish({ actor: ana, paths: ["topics/linen.mdx"] }),
+    ).rejects.toMatchObject({ code: "CONTENT_REFERENCE_NOT_FOUND" });
+    expect(await liveSlugs()).toEqual(["a", "linen", "wool"]);
+    // With the note moved to another topic in the same publish, it goes.
+    await linkedStore.write("notes/a.mdx", note("wool"), { actor: ana });
+    await linkedStore.drafts.publish({ actor: ana, paths: ["topics/linen.mdx", "notes/a.mdx"] });
+    expect(await liveSlugs()).toEqual(["a", "wool"]);
   });
 
   it("refuses a stale save with CONTENT_CONFLICT", async () => {

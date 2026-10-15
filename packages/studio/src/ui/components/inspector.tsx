@@ -12,6 +12,7 @@ import { doneWord } from "../lib/studio";
 import { DiffView } from "./diff-view";
 import { HistoryPanel } from "./history-panel";
 import { IconClose } from "./icons";
+import { shortcut } from "../lib/keys";
 
 const KEY = "graft-studio:inspector";
 
@@ -116,7 +117,7 @@ export function Inspector({
             type="button"
             className="icon-btn inspector-close"
             aria-label="Hide the panel"
-            title="Hide the panel (⌘\)"
+            title={`Hide the panel (${shortcut("\\")})`}
             onClick={onClose}
           >
             <IconClose />
@@ -140,12 +141,6 @@ export function Inspector({
               <dt>File</dt>
               <dd className="inspector-path">{path}</dd>
             </div>
-            {version ? (
-              <div>
-                <dt>Version</dt>
-                <dd className="inspector-sha">{version.slice(0, 7)}</dd>
-              </div>
-            ) : null}
           </dl>
         </TabsPrimitive.Panel>
         <TabsPrimitive.Panel value="changes" className="inspector-body">

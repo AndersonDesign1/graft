@@ -11,7 +11,15 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { DraftChangeDto, DraftsDto, PublishResultDto, WorkspaceDto } from "../../editor-types";
 import { ApiError, api, plainError } from "../lib/api";
-import { actionWord, collectionLabel, doneWord, publishVerb, useStudio } from "../lib/studio";
+import { commitMessageFor } from "../../commit-message";
+import {
+  actionWord,
+  collectionLabel,
+  doneWord,
+  PUBLISH_NEEDS_EDITOR,
+  publishVerb,
+  useStudio,
+} from "../lib/studio";
 import { DiffView } from "./diff-view";
 import { IconCaretDown, IconCheck, IconExternal, IconWarning } from "./icons";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
@@ -52,6 +60,7 @@ export function PublishSheet({
   const confirm = useConfirm();
   const changes = drafts.data?.changes ?? [];
   const action = drafts.data?.publish ?? "publish";
+  const canPublish = drafts.data?.canPublish ?? true;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -165,7 +174,9 @@ export function PublishSheet({
         ) : (
           <>
             <DialogDescription id="publish-consequence" className="sheet-lede">
-              {consequence(action, workspace.data)}
+              {canPublish
+                ? consequence(action, workspace.data)
+                : "Your role saves drafts here. Committing them needs an editor: ask one to commit these, or discard the ones you don't want."}
             </DialogDescription>
 
             <div className="sheet-select">
@@ -297,11 +308,7 @@ export function PublishSheet({
                 <input
                   className="input"
                   value={message}
-                  placeholder={
-                    chosen.length === 1
-                      ? `Update ${chosen[0]?.title}`
-                      : `Update ${chosen.length} entries`
-                  }
+                  placeholder={commitMessageFor(chosen)}
                   onChange={(e) => setMessage(e.target.value)}
                 />
               </label>
@@ -319,11 +326,15 @@ export function PublishSheet({
                   type="button"
                   className="btn"
                   data-variant="primary"
-                  disabled={chosen.length === 0 || unresolved.length > 0 || busy !== null}
+                  disabled={
+                    !canPublish || chosen.length === 0 || unresolved.length > 0 || busy !== null
+                  }
                   title={
-                    unresolved.length > 0
-                      ? "Choose what to do with the changes marked above"
-                      : undefined
+                    !canPublish
+                      ? PUBLISH_NEEDS_EDITOR
+                      : unresolved.length > 0
+                        ? "Choose what to do with the changes marked above"
+                        : undefined
                   }
                   onClick={() => void publish()}
                 >

@@ -61,6 +61,39 @@ export async function gitRaw(cwd: string, args: string[]): Promise<string> {
   return stdout;
 }
 
+/**
+ * When each file under the content folder was last committed, in ms, by its
+ * path relative to that folder. One `git log` pass for the whole tree; a file
+ * that was never committed is absent, and outside a repository the map is
+ * empty.
+ *
+ * A file's mtime is not when it was edited: a clone, a checkout or a copy
+ * sets every file's mtime to that moment, so every untouched entry read
+ * "Edited just now".
+ */
+export async function lastCommitTimes(contentDir: string): Promise<Map<string, number>> {
+  const out = await gitRaw(contentDir, [
+    "log",
+    "--relative",
+    "--name-only",
+    "--format=%x00%ct",
+    "--",
+    ".",
+  ]).catch(() => "");
+  const times = new Map<string, number>();
+  let at = 0;
+  for (const line of out.split("\n")) {
+    if (line.startsWith("\0")) {
+      at = Number(line.slice(1)) * 1000;
+      continue;
+    }
+    const path = line.trim();
+    // Newest first: the first time a path appears is its last commit.
+    if (path && !times.has(path)) times.set(path, at);
+  }
+  return times;
+}
+
 /* ---- status -------------------------------------------------------------- */
 
 export interface PorcelainEntry {
@@ -439,6 +472,18 @@ export function safeContentPath(contentDir: string, path: string): string {
 export interface CommitOptions {
   paths: string[];
   message: string;
+  /**
+   * The person the change is theirs: recorded as the commit's author, while
+   * the committer stays the identity git is configured with, the server.
+   * Omitted on a Studio nobody signs in to, where that identity is the person.
+   */
+  author?: { name: string; email?: string };
+}
+
+/** `Name <email>` for --author, with nothing in it that could end the field. */
+function authorArg(author: { name: string; email?: string }): string {
+  const clean = (text: string) => text.replace(/[<>\n\r]/g, "").trim();
+  return `${clean(author.name) || "Studio"} <${clean(author.email ?? "")}>`;
 }
 
 /**
@@ -520,7 +565,14 @@ export async function commitChanges(
     if (removed.length > 0) {
       await git(contentDir, ["rm", "--cached", "--quiet", "--ignore-unmatch", "--", ...removed]);
     }
-    await git(contentDir, ["commit", "-m", message, "--", ...pathspecs]);
+    await git(contentDir, [
+      "commit",
+      "-m",
+      message,
+      ...(options.author ? [`--author=${authorArg(options.author)}`] : []),
+      "--",
+      ...pathspecs,
+    ]);
   } catch (error) {
     throw new GraftError({
       code: "COMMIT_FAILED",

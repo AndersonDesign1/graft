@@ -12,11 +12,12 @@ import { toast } from "sonner";
 import type { ApprovalList, BranchList, CompilationList, ContentTree } from "../../types";
 import { CollectionMark } from "../components/collection-icon";
 import { IconCompile } from "../components/icons";
-import { Delta, EmptyState, Status } from "../components/primitives";
+import { Delta, EmptyState, NeedsDatabase, Status } from "../components/primitives";
 import { MiniListSkeleton, OverviewSkeleton } from "../components/skeletons";
 import { api, plainError, qs } from "../lib/api";
 import { relativeTime, shortSha, plural } from "../lib/format";
 import type { Route } from "../lib/route";
+import { useStudio } from "../lib/studio";
 import { useResource } from "../lib/use-resource";
 
 interface CompileResult {
@@ -38,9 +39,17 @@ export function OverviewView({
   tree: { data: ContentTree | null; error: string | null; loading: boolean; refresh: () => void };
   navigate: (route: Route) => void;
 }) {
-  const compilations = useResource<CompilationList>(`/compilations${qs({ branch, limit: 10 })}`);
-  const approvals = useResource<ApprovalList>("/approvals");
-  const branches = useResource<BranchList>("/branches");
+  const { workspace } = useStudio();
+  const database = workspace.data?.database;
+  // Without an index, compiling has nowhere to write: Postgres or the static artifact.
+  const indexed = workspace.data?.index !== "none";
+  const onlyWith = (path: string): string | null => (database ? path : null);
+  const compilations = useResource<CompilationList>(
+    onlyWith(`/compilations${qs({ branch, limit: 10 })}`),
+    [database],
+  );
+  const approvals = useResource<ApprovalList>(onlyWith("/approvals"), [database]);
+  const branches = useResource<BranchList>(onlyWith("/branches"), [database]);
   const [compiling, setCompiling] = useState(false);
 
   const summary = tree.data?.summary;
@@ -72,15 +81,35 @@ export function OverviewView({
         <div>
           <h1 className="view-title">Health</h1>
           <p className="view-sub">
-            Content on disk on <code>{branch}</code>, and what the index knows about it.
+            {workspace.data?.index === "none" ? (
+              <>
+                Content on disk on <code>{branch}</code>. There is no index to compare it with: this
+                Studio runs without a database.
+              </>
+            ) : workspace.data?.index === "static" ? (
+              <>
+                Content on disk, and what the static index (<code>.graft/index.db</code>) knows
+                about it.
+              </>
+            ) : (
+              <>
+                Content on disk on <code>{branch}</code>, and what the index knows about it.
+              </>
+            )}
           </p>
         </div>
         <button
           type="button"
           className="btn"
-          disabled={compiling || !canWrite}
+          disabled={compiling || !canWrite || !indexed}
           onClick={() => void compileNow()}
-          title={canWrite ? undefined : "Compiling needs write access"}
+          title={
+            !indexed
+              ? "Compiling needs an index: a database, or the static index"
+              : canWrite
+                ? undefined
+                : "Compiling needs write access"
+          }
         >
           <IconCompile aria-hidden="true" />
           {compiling ? "Compiling…" : "Compile"}
@@ -184,144 +213,155 @@ export function OverviewView({
             </table>
           </section>
 
-          <section className="health-section" aria-labelledby="health-compiles">
-            <div className="section-head">
-              <h2 className="section-title" id="health-compiles">
-                Recent compiles
-              </h2>
-              <a className="link" href="#/dev/history">
-                History
-              </a>
-            </div>
-            <Status
-              loading={compilations.loading && !compilations.data}
-              error={compilations.error}
-              empty={runs.length === 0}
-              skeleton={<MiniListSkeleton rows={3} />}
-            >
-              <p className="muted">Nothing compiled on this branch yet.</p>
-            </Status>
-            {runs.length > 0 ? (
-              <table className="list">
-                <thead>
-                  <tr>
-                    <th scope="col">Commit</th>
-                    <th scope="col">Changes</th>
-                    <th scope="col" data-align="end">
-                      Entries
-                    </th>
-                    <th scope="col" data-align="end">
-                      When
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {runs.slice(0, 5).map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.gitSha ? <code>{shortSha(row.gitSha)}</code> : "Not in Git"}</td>
-                      <td>
-                        <Delta added={row.added} changed={row.changed} removed={row.removed} />
-                      </td>
-                      <td data-align="end" data-numeric="">
-                        {row.docCount}
-                      </td>
-                      <td data-align="end">
-                        <time dateTime={row.createdAt}>{relativeTime(row.createdAt)}</time>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : null}
-          </section>
+          {database ? (
+            <>
+              <section className="health-section" aria-labelledby="health-compiles">
+                <div className="section-head">
+                  <h2 className="section-title" id="health-compiles">
+                    Recent compiles
+                  </h2>
+                  <a className="link" href="#/dev/history">
+                    History
+                  </a>
+                </div>
+                <Status
+                  loading={compilations.loading && !compilations.data}
+                  error={compilations.error}
+                  empty={runs.length === 0}
+                  skeleton={<MiniListSkeleton rows={3} />}
+                >
+                  <p className="muted">Nothing compiled on this branch yet.</p>
+                </Status>
+                {runs.length > 0 ? (
+                  <table className="list">
+                    <thead>
+                      <tr>
+                        <th scope="col">Commit</th>
+                        <th scope="col">Changes</th>
+                        <th scope="col" data-align="end">
+                          Entries
+                        </th>
+                        <th scope="col" data-align="end">
+                          When
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {runs.slice(0, 5).map((row) => (
+                        <tr key={row.id}>
+                          <td>{row.gitSha ? <code>{shortSha(row.gitSha)}</code> : "Not in Git"}</td>
+                          <td>
+                            <Delta added={row.added} changed={row.changed} removed={row.removed} />
+                          </td>
+                          <td data-align="end" data-numeric="">
+                            {row.docCount}
+                          </td>
+                          <td data-align="end">
+                            <time dateTime={row.createdAt}>{relativeTime(row.createdAt)}</time>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : null}
+              </section>
 
-          {approvals.error ? (
-            <section className="health-section" aria-labelledby="health-approvals">
-              <h2 className="section-title" id="health-approvals">
-                Waiting for approval
-              </h2>
-              <Status loading={false} error={approvals.error} />
-            </section>
-          ) : pending > 0 ? (
-            <section className="health-section" aria-labelledby="health-approvals">
-              <div className="section-head">
-                <h2 className="section-title" id="health-approvals">
-                  Waiting for approval
-                </h2>
-                <a className="link" href="#/inbox">
-                  Review
-                </a>
-              </div>
-              <table className="list">
-                <tbody>
-                  {approvals.data?.approvals.slice(0, 4).map((row) => (
-                    <tr
-                      key={row.id}
-                      className="list-row"
-                      onClick={() => navigate({ view: "inbox" })}
-                    >
-                      <td>
-                        <a
-                          className="list-name"
-                          href="#/inbox"
-                          onClick={(event) => event.stopPropagation()}
+              {approvals.error ? (
+                <section className="health-section" aria-labelledby="health-approvals">
+                  <h2 className="section-title" id="health-approvals">
+                    Waiting for approval
+                  </h2>
+                  <Status loading={false} error={approvals.error} />
+                </section>
+              ) : pending > 0 ? (
+                <section className="health-section" aria-labelledby="health-approvals">
+                  <div className="section-head">
+                    <h2 className="section-title" id="health-approvals">
+                      Waiting for approval
+                    </h2>
+                    <a className="link" href="#/inbox">
+                      Review
+                    </a>
+                  </div>
+                  <table className="list">
+                    <tbody>
+                      {approvals.data?.approvals.slice(0, 4).map((row) => (
+                        <tr
+                          key={row.id}
+                          className="list-row"
+                          onClick={() => navigate({ view: "inbox" })}
                         >
-                          <code>{row.functionName}</code>
-                        </a>
-                      </td>
-                      <td className="muted">
-                        {row.requestedByKind}
-                        {row.requestedById ? `: ${row.requestedById}` : ""}
-                      </td>
-                      <td data-align="end">
-                        <time dateTime={row.createdAt}>{relativeTime(row.createdAt)}</time>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          <td>
+                            <a
+                              className="list-name"
+                              href="#/inbox"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <code>{row.functionName}</code>
+                            </a>
+                          </td>
+                          <td className="muted">
+                            {row.requestedByKind}
+                            {row.requestedById ? `: ${row.requestedById}` : ""}
+                          </td>
+                          <td data-align="end">
+                            <time dateTime={row.createdAt}>{relativeTime(row.createdAt)}</time>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              ) : null}
+
+              <section className="health-section" aria-labelledby="health-branches">
+                <div className="section-head">
+                  <h2 className="section-title" id="health-branches">
+                    Branches
+                  </h2>
+                  <a className="link" href="#/dev/branches">
+                    All branches
+                  </a>
+                </div>
+                <Status
+                  loading={branches.loading && !branches.data}
+                  error={branches.error}
+                  empty={(branches.data?.branches.length ?? 0) === 0}
+                  skeleton={<MiniListSkeleton rows={3} />}
+                >
+                  <p className="muted">No branches registered, only the default.</p>
+                </Status>
+                {(branches.data?.branches.length ?? 0) > 0 ? (
+                  <table className="list">
+                    <tbody>
+                      {branches.data?.branches.slice(0, 5).map((row) => (
+                        <tr key={row.name}>
+                          <td>
+                            <code>{row.name}</code>
+                            {row.name === branch ? <span className="muted"> (current)</span> : null}
+                          </td>
+                          <td className="muted">
+                            {row.backend}
+                            {row.parent ? `, from ${row.parent}` : ", root"}
+                          </td>
+                          <td data-align="end" className="muted">
+                            {row.status}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : null}
+              </section>
+            </>
+          ) : database === false ? (
+            <section className="health-section">
+              <NeedsDatabase
+                title="Compile history, approvals and branches need a database"
+                does="Postgres keeps a record of every compile, the requests agents make before a destructive change, and the branches you preview content on."
+              />
             </section>
           ) : null}
-
-          <section className="health-section" aria-labelledby="health-branches">
-            <div className="section-head">
-              <h2 className="section-title" id="health-branches">
-                Branches
-              </h2>
-              <a className="link" href="#/dev/branches">
-                All branches
-              </a>
-            </div>
-            <Status
-              loading={branches.loading && !branches.data}
-              error={branches.error}
-              empty={(branches.data?.branches.length ?? 0) === 0}
-              skeleton={<MiniListSkeleton rows={3} />}
-            >
-              <p className="muted">No branches registered, only the default.</p>
-            </Status>
-            {(branches.data?.branches.length ?? 0) > 0 ? (
-              <table className="list">
-                <tbody>
-                  {branches.data?.branches.slice(0, 5).map((row) => (
-                    <tr key={row.name}>
-                      <td>
-                        <code>{row.name}</code>
-                        {row.name === branch ? <span className="muted"> (current)</span> : null}
-                      </td>
-                      <td className="muted">
-                        {row.backend}
-                        {row.parent ? `, from ${row.parent}` : ", root"}
-                      </td>
-                      <td data-align="end" className="muted">
-                        {row.status}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : null}
-          </section>
         </>
       ) : null}
 

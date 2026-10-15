@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import type { DraftsDto, EntryList, EntryStatus, EntrySummary } from "../../editor-types";
 import type { SchemaFieldDto } from "../../types";
 import { AssetThumb, formatCell } from "../components/fields";
+import { SetFieldDialog } from "../components/set-field-dialog";
 import {
   IconCaretDown,
   IconClose,
@@ -23,15 +24,18 @@ import {
 import { useConfirm } from "../components/ui/confirm";
 import { Menu, MenuContent, MenuItem, MenuSection, MenuTrigger } from "../components/ui/menu";
 import { api, plainError, qs } from "../lib/api";
-import { humanise, labelOf, titleField } from "../lib/fields";
+import { humanise, labelOf, settableFields, titleField } from "../lib/fields";
 import { relativeTime } from "../lib/format";
 import { isTyping, moveRowFocus } from "../lib/row-focus";
 import {
   actionWord,
   collectionLabel,
+  deletionNote,
   doneWord,
+  PUBLISH_NEEDS_EDITOR,
   publishVerb,
   singular,
+  useCanPublish,
   useStudio,
 } from "../lib/studio";
 
@@ -119,6 +123,7 @@ export function CollectionView({ collection }: { collection: string }) {
     (f) => f.type === "asset" || (f.type === "array" && f.items?.type === "asset"),
   );
   const canWrite = workspace.data?.canWrite ?? true;
+  const canPublish = useCanPublish();
   const local = workspace.data?.storage === "local";
 
   const [q, setQ] = useState("");
@@ -135,6 +140,7 @@ export function CollectionView({ collection }: { collection: string }) {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [settingField, setSettingField] = useState(false);
 
   // Reset when the collection changes.
   useEffect(() => {
@@ -251,7 +257,7 @@ export function CollectionView({ collection }: { collection: string }) {
       const ok = await confirm({
         kind: "delete",
         title: `Delete ${chosen.length === 1 ? `“${noun}”` : noun}?`,
-        body: `They stay live until you ${actionWord(drafts.data?.publish)} the deletion.`,
+        body: deletionNote(drafts.data?.publish, true),
         action: `Delete ${what}`,
       });
       if (!ok) return;
@@ -312,6 +318,8 @@ export function CollectionView({ collection }: { collection: string }) {
   const label = collectionLabel(collection);
   const all = list?.counts.all ?? 0;
   const filtered = query !== "" || status !== "all" || Object.keys(where).length > 0;
+  // The Drafts or Published tab alone: say what is empty, not that a search failed.
+  const onlyStatus = query === "" && Object.keys(where).length === 0 && status !== "all";
   const allVisibleSelected = items.length > 0 && items.every((item) => selected.has(item.path));
 
   return (
@@ -607,7 +615,13 @@ export function CollectionView({ collection }: { collection: string }) {
           <div className="listing-empty">
             {filtered ? (
               <>
-                <p className="listing-empty-title">Nothing matches.</p>
+                <p className="listing-empty-title">
+                  {onlyStatus
+                    ? status === "unpublished"
+                      ? `No drafts. Every ${singular(collection)} is ${doneWord(drafts.data?.publish)}.`
+                      : `Nothing ${doneWord(drafts.data?.publish)} yet.`
+                    : "Nothing matches."}
+                </p>
                 <button
                   type="button"
                   className="btn"
@@ -617,7 +631,7 @@ export function CollectionView({ collection }: { collection: string }) {
                     setWhere({});
                   }}
                 >
-                  Clear filters
+                  {onlyStatus ? "Show all" : "Clear filters"}
                 </button>
               </>
             ) : (
@@ -647,6 +661,20 @@ export function CollectionView({ collection }: { collection: string }) {
         ) : null}
       </div>
 
+      <SetFieldDialog
+        collection={collection}
+        entries={items.filter((item) => selected.has(item.path))}
+        fields={fields}
+        open={settingField}
+        onOpenChange={setSettingField}
+        onSaved={(failed) => {
+          // What wasn't saved stays selected, to fix and try again.
+          const keep = new Set(failed);
+          setSelected(new Set(items.filter((i) => keep.has(i.slug)).map((i) => i.path)));
+          drafts.refresh();
+        }}
+      />
+
       {selected.size > 0 ? (
         <div className="bulk" role="toolbar" aria-label="Selected entries">
           <span className="bulk-count" data-numeric="">
@@ -657,11 +685,23 @@ export function CollectionView({ collection }: { collection: string }) {
             className="btn"
             data-size="sm"
             data-variant="primary"
-            disabled={busy || !canWrite}
+            disabled={busy || !canWrite || !canPublish}
             onClick={() => void bulk("publish")}
+            title={canPublish ? undefined : PUBLISH_NEEDS_EDITOR}
           >
             {publishVerb(drafts.data?.publish)}
           </button>
+          {settableFields(fields).length > 0 ? (
+            <button
+              type="button"
+              className="btn"
+              data-size="sm"
+              disabled={busy || !canWrite}
+              onClick={() => setSettingField(true)}
+            >
+              Set a field
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn"

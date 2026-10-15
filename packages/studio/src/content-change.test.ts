@@ -1,8 +1,8 @@
 /**
  * Studio tells the app when a save or compile changed the index.
  *
- * The compile itself needs Postgres, so only `compile` is replaced. The file
- * write and the notifier are the real ones.
+ * The projection needs Postgres, so only `compile` and `compileDocuments` are
+ * replaced. The file write and the notifier are the real ones.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,15 +17,9 @@ const compiled: { changes: ChangeSet } = {
 
 vi.mock("@usegraft/compiler", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@usegraft/compiler")>();
-  return {
-    ...actual,
-    compile: vi.fn(async () => ({
-      count: 1,
-      docs: [],
-      changes: compiled.changes,
-      gitSha: "abc123",
-    })),
-  };
+  const fake = async () => ({ count: 1, docs: [], changes: compiled.changes, gitSha: "abc123" });
+  // A save projects the files it wrote; an operator compile projects the tree.
+  return { ...actual, compile: vi.fn(fake), compileDocuments: vi.fn(fake) };
 });
 
 const { createStudioApiHandler } = await import("./api");
