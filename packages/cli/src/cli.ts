@@ -55,6 +55,8 @@ function printHelp(): void {
     "  serve                    Run the headless Graft runtime over HTTP: POST /api/fn/<name>,",
     "                           POST /api/mcp, GET /healthz (what a self-host container runs)",
     "  studio                   Opt-in Studio UI (edit content, approve/deny, OpenAPI)",
+    "  studio setup-code        Print the code a hosted Studio asks for on its first visit",
+    "  studio invite <email>    Print a sign-in link for a hosted Studio",
     "  content                  List the content tree from the compiled index (Studio parity)",
     "  content import           Load the content files into the database (database-sourced projects)",
     "  compilations             List recent content projection trail rows (Studio parity)",
