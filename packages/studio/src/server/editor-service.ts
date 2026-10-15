@@ -2,8 +2,8 @@
  * What the editor API does, independent of HTTP.
  *
  * Every write goes through the mounted content store. On the filesystem
- * store the index is recompiled afterwards, exactly as the old save did; on
- * a remote store it is not, because a draft must never reach the live site's
+ * store the files it wrote are projected into the index afterwards; on a
+ * remote store they are not, because a draft must never reach the live site's
  * index: production recompiles when the host redeploys the published commit.
  */
 import {
@@ -286,13 +286,17 @@ export class EditorService {
   /* ---- writing --------------------------------------------------------- */
 
   /**
-   * Locally a save is live at once: compile into the index this Studio has,
-   * then tell the app so it drops its cached copy. A remote draft is neither; the host rebuilds on publish.
+   * Locally a save is live at once: project the files it wrote into the
+   * index this Studio has, then tell the app so it drops its cached copy.
+   * Only those files: recompiling the tree made one save of a 2,000-product
+   * catalog take over a second. A remote draft is neither; the host rebuilds
+   * on publish.
    */
-  private async afterWrite(): Promise<ContentChangeNotice | undefined> {
+  private async afterWrite(paths: string[]): Promise<ContentChangeNotice | undefined> {
     if (this.remote) return undefined;
     const result = await compileIndex(this.options, {
       contentDir: this.options.contentDir,
+      paths,
       collections: this.options.collections,
       mdxTrust: this.options.mdxTrust,
       branchId: this.options.branchId,
@@ -313,7 +317,7 @@ export class EditorService {
     version: string | null,
     actor: StoreActor,
   ): Promise<SaveEntryResult> {
-    const refresh = await this.afterWrite();
+    const refresh = await this.afterWrite([path]);
     const result = await this.result(name, slug, path, version, actor);
     return refresh ? { ...result, refresh } : result;
   }
@@ -658,7 +662,7 @@ export class EditorService {
 
   async discard(paths: string[], actor: StoreActor): Promise<ContentChangeNotice | undefined> {
     await this.drafts.discard(actor, paths);
-    return this.afterWrite();
+    return this.afterWrite(paths);
   }
 }
 

@@ -63,6 +63,11 @@ database instead of the sandbox's. Ready when the log prints `graft studio — b
   Studio" (`Your name`, `Choose a password`, `Join`). `select email, role from
   studio_users` lists both.
 
+- **Saves stay fast at scale.** `pnpm bench` in `examples/shop` (after a
+  build) seeds 2,000 products in a temporary copy, starts its own Postgres
+  and Studio, and prints a table of medians. `--count` and `--runs` change
+  the size and the sample.
+
 ## Gotchas
 
 - Studio runs without Postgres. In a static sandbox (`sandbox.sh` with no
