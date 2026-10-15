@@ -304,6 +304,13 @@ view use 16px 600 titles.
 stylesheets is a `--space-*` token (or another token). The only literals are
 1px and 2px hairline nudges. `pnpm check:design` enforces it.
 
+**Without a database** Studio still edits content. A view whose data lives in
+Postgres keeps its title and shows one empty state in its place: the database
+icon, "<What> needs a database", what it would hold, and the steps to add one.
+On a page that also shows content (Health, Settings) it is one such panel for
+everything that needs a database, never one per section. Nothing on screen
+asks the API for what a missing database can't answer.
+
 **State is a mark and a word.** Never a colored pill. The resting state shows
 nothing, so the exceptions are what the eye finds.
 
