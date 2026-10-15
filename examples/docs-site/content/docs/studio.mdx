@@ -115,6 +115,12 @@ save carries the version you started from. If the entry changed somewhere else
 in the meantime (another tab, a teammate, an agent), Studio does not overwrite
 it. It shows you, and you choose to load the newer version or keep yours.
 
+On your machine, a save also updates the index for that entry, so your local
+site shows it straight away. Studio checks and projects only the file it
+saved, which keeps a save fast on a large catalog. A file you change outside
+Studio reaches the index on your next `graft compile`, or at once while
+`graft dev` is running.
+
 ## Publish
 
 Saved changes are drafts until you publish them. The Publish button in the top

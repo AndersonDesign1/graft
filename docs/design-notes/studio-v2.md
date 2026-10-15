@@ -406,11 +406,18 @@ Measured on `node scripts/seed.mjs --count 2000`, local Studio:
 | Local save                   | 1.3 s       |
 
 Lists are fast because `DiskCatalog` caches parsed entries by mtime and size
-and the query runs on the server. A local save is slow because it recompiles
-the whole tree. `projectBranchContent` in `@usegraft/db` diffs the full branch
-and soft-deletes rows it was not given, so projecting one document needs a
-new function rather than a smaller input. That is the first item of unit 8.
-Hosted saves do not compile at all.
+and the query runs on the server. A local save was slow because it recompiled
+the whole tree: `projectBranchContent` in `@usegraft/db` diffs the full branch
+and soft-deletes rows it was not given. A save now calls `compileDocuments`,
+which validates the files it wrote and projects them with `projectDocuments`,
+the same function a database-sourced publish uses. Hosted saves do not
+compile at all.
+
+`pnpm bench` in `examples/shop` reruns these measurements: it seeds a copy of
+the shop, starts Studio against a throwaway Postgres, and prints medians. On
+the container that built unit 8, the same `main` measured slower than the
+table above (local save 1.60 s, `graft compile` 2.86 s), so compare runs from
+one machine. The incremental save measured 105 ms there.
 
 ### Debt left on purpose
 
