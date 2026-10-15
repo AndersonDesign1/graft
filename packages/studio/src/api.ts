@@ -19,8 +19,10 @@ import {
   listBranches,
   listCompilations,
   listPendingApprovals,
+  openStaticIndex,
   readContent,
   resolveBranchScope,
+  type ContentRow,
   type Database,
 } from "@usegraft/db";
 import { EditorComponentSpec, GraftError, type EditorComponentList } from "@usegraft/contracts";
@@ -30,6 +32,8 @@ import { readCollectionDocs } from "./content";
 import { STUDIO_OPENAPI } from "./openapi";
 import { commitChanges, readChanges, readFileDiff } from "./git";
 import { preflightRevert, revertContentTo } from "./revert";
+import { compileIndex } from "./server/compile-index";
+import { needsDatabase, requireDatabase } from "./server/needs-database";
 import { EDITOR_ROUTES } from "./server/editor-routes";
 import { PEOPLE_ROUTES } from "./server/people-routes";
 import { WORKSPACE_ROUTES } from "./server/workspace-routes";
@@ -53,7 +57,19 @@ import type {
 export type StudioFetchHandler = (request: Request) => Promise<Response>;
 
 export interface StudioApiOptions {
-  db: Database;
+  /**
+   * Postgres: the index, and everything else Studio keeps (approvals, the
+   * compile history, branches, accounts, agent tokens, the media library,
+   * site settings). Optional: without it Studio still edits the files, and
+   * the views that need it say so with NEEDS_DATABASE.
+   */
+  db?: Database;
+  /**
+   * The static engine's index (`.graft/index.db`), for a project with
+   * `export const index = "static"`. A save and Compile update it, and
+   * index health reads it. Ignored when `db` is set.
+   */
+  staticIndexPath?: string;
   /**
    * The project's own database, for what belongs to no branch: accounts,
    * the media library, agent tokens, site settings and deploy hooks.
@@ -287,6 +303,7 @@ export function statusFor(error: GraftError): number {
     // The request is fine; this server isn't set up for it yet.
     case "ENV_VAR_MISSING":
     case "MIGRATION_REQUIRED":
+    case "NEEDS_DATABASE":
       return 503;
     case "REMOTE_STORE_FAILED":
       return 502;
@@ -362,14 +379,13 @@ function bySiteOrder(sections: readonly string[] | undefined) {
  * none. Now every on-disk file appears immediately and carries its own state.
  */
 async function buildFileCollection(
-  db: Database,
-  scope: Awaited<ReturnType<typeof resolveBranchScope>>,
+  indexedRows: IndexedRows,
   contentDir: string,
   name: string,
   collection: AnyCollection,
 ): Promise<ContentTreeDoc[]> {
   const disk = readCollectionDocs(contentDir, name, collection);
-  const indexed = await readContent(db, scope, { collection: name });
+  const indexed = await indexedRows(name);
   const bySlug = new Map(indexed.map((row) => [row.slug, row]));
 
   const docs: ContentTreeDoc[] = disk.map((doc) => {
@@ -408,13 +424,51 @@ async function buildFileCollection(
   return docs.sort(bySiteOrder(collection.sections));
 }
 
-async function buildTree(
-  db: Database,
-  collections: Record<string, AnyCollection>,
-  contentDir: string,
+/** One collection's rows in whichever index this Studio reads. */
+type IndexedRows = (
+  collection: string,
+) => Promise<Array<Pick<ContentRow, "slug" | "contentHash" | "sourcePath" | "data" | "updatedAt">>>;
+
+/**
+ * The tree, with each document's state against the index this Studio has:
+ * the branch's Postgres rows, the static artifact, or none at all, where
+ * every document reads as not indexed yet.
+ */
+async function buildTree(options: StudioApiOptions, branch: string): Promise<ContentTree> {
+  const { db, staticIndexPath } = options;
+  if (db) {
+    const scope = await resolveBranchScope(db, branch);
+    return treeFrom(
+      (collection) => readContent(db, scope, { collection }),
+      options,
+      branch,
+      "postgres",
+    );
+  }
+  if (!staticIndexPath) return treeFrom(async () => [], options, branch, "none");
+  // Not compiled yet is a state to show, not an error.
+  const reader = await openStaticIndex(staticIndexPath).catch((error: unknown) => {
+    if (error instanceof GraftError && error.code === "STATIC_INDEX_NOT_FOUND") return null;
+    throw error;
+  });
+  try {
+    return await treeFrom(
+      async (collection) => (reader ? reader.readContent({ collection }) : []),
+      options,
+      branch,
+      "static",
+    );
+  } finally {
+    await reader?.close();
+  }
+}
+
+async function treeFrom(
+  indexedRows: IndexedRows,
+  { collections, contentDir }: StudioApiOptions,
   branch: string,
+  index: ContentTree["index"],
 ): Promise<ContentTree> {
-  const scope = await resolveBranchScope(db, branch);
   const out: ContentTreeCollection[] = [];
 
   for (const [name, collection] of Object.entries(collections)) {
@@ -429,7 +483,7 @@ async function buildTree(
         // are no files to compare against, so state is not meaningful here.
         documents = [];
       } else {
-        documents = await buildFileCollection(db, scope, contentDir, name, collection);
+        documents = await buildFileCollection(indexedRows, contentDir, name, collection);
       }
     } catch (err) {
       // One unparseable document must degrade its own collection, not blank
@@ -458,6 +512,7 @@ async function buildTree(
 
   return {
     branch,
+    index,
     collections: out,
     summary: {
       documents: all.length,
@@ -621,7 +676,9 @@ async function requireCompilation(
   options: StudioApiOptions,
   id: string,
 ): Promise<Awaited<ReturnType<typeof listCompilations>>[number]> {
-  const rows = await listCompilations(options.db, { limit: 500 });
+  const rows = await listCompilations(requireDatabase(options, "The compile history"), {
+    limit: 500,
+  });
   const row = rows.find((candidate) => candidate.id === id);
   if (!row) {
     throw new GraftError({
@@ -648,7 +705,7 @@ const ROUTES: readonly Route[] = [
     scope: "studio:read",
     handle: async ({ options, url, defaultBranch }) => {
       const branch = url.searchParams.get("branch")?.trim() || defaultBranch;
-      return json(await buildTree(options.db, options.collections, options.contentDir, branch));
+      return json(await buildTree(options, branch));
     },
   },
   {
@@ -696,14 +753,14 @@ const ROUTES: readonly Route[] = [
       const payload = (await request.json().catch(() => ({}))) as { branch?: string };
       const branch =
         payload.branch?.trim() || url.searchParams.get("branch")?.trim() || defaultBranch;
-      const result = await compile({
+      const result = await compileIndex(options, {
         contentDir: options.contentDir,
         collections: options.collections,
-        db: options.db,
         mdxTrust: options.mdxTrust,
         branchId: branch,
         source: sourceOf(options),
       });
+      if (!result) throw needsDatabase("The index");
       const refresh = await tellApp(options, branch, result);
       const body: CompileResultDto = {
         branch,
@@ -773,7 +830,7 @@ const ROUTES: readonly Route[] = [
       const branch = url.searchParams.get("branch")?.trim() || undefined;
       const limitRaw = url.searchParams.get("limit");
       const limit = limitRaw ? Number(limitRaw) : undefined;
-      const rows = await listCompilations(options.db, {
+      const rows = await listCompilations(requireDatabase(options, "The compile history"), {
         branchId: branch,
         limit: Number.isFinite(limit) ? limit : undefined,
       });
@@ -797,7 +854,7 @@ const ROUTES: readonly Route[] = [
     path: `${V1}/branches`,
     scope: "studio:read",
     handle: async ({ options }) => {
-      const rows = await listBranches(options.db);
+      const rows = await listBranches(requireDatabase(options, "Branches"));
       const body: BranchList = {
         branches: rows.map((row) => ({
           name: row.name,
@@ -816,7 +873,7 @@ const ROUTES: readonly Route[] = [
     path: `${V1}/approvals`,
     scope: "studio:read",
     handle: async ({ options }) => {
-      const rows = await listPendingApprovals(options.db);
+      const rows = await listPendingApprovals(requireDatabase(options, "Approvals"));
       const body: ApprovalList = {
         approvals: rows.map((row) => ({
           id: row.id,
@@ -849,7 +906,7 @@ const ROUTES: readonly Route[] = [
         });
       }
       const row = await decideApproval(
-        options.db,
+        requireDatabase(options, "Approvals"),
         id,
         payload.decision,
         operator(options, principal),
@@ -909,7 +966,7 @@ const ROUTES: readonly Route[] = [
       const result = await compile({
         contentDir: options.contentDir,
         collections: options.collections,
-        db: options.db,
+        db: requireDatabase(options, "The compile history"),
         mdxTrust: options.mdxTrust,
         branchId: row.branchId,
       });
