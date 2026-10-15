@@ -259,7 +259,13 @@ rule above holds; this section adds what an app needs.
 left, search centred (24rem, with its shortcut), the Commit or Publish button
 for every draft and the account menu right. A 208px sidebar under it on the
 page colour holds navigation only. Below 48rem the sidebar opens as a drawer
-from a menu button and search becomes an icon.
+from a menu button and search becomes an icon. On an entry at that width the
+bar keeps the save state and drops its own Commit button and the title: the
+top bar's button commits this entry with the rest, and the heading below shows
+the title in full.
+
+**Lists.** A list is walked from the keyboard: j and k from anywhere on the
+page (not while typing), and the arrows, Home and End once focus is in it.
 
 **Panes.** A view is one pane, or panes side by side when an entry is open: the
 collection's list (280px), the document, and the inspector (256px). Every pane

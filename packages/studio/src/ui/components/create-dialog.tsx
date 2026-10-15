@@ -30,8 +30,14 @@ export function CreateDialog({
     () => schema.data?.collections.find((c) => c.name === collection)?.fields ?? [],
     [schema.data, collection],
   );
-  const required = fields.filter((field) => !field.optional);
   const headline = titleField(fields);
+  // The title first, as the entry page puts it: the rest in the schema's order.
+  const required = useMemo(() => {
+    const needed = fields.filter((field) => !field.optional);
+    return headline && needed.includes(headline)
+      ? [headline, ...needed.filter((field) => field !== headline)]
+      : needed;
+  }, [fields, headline]);
   const [data, setData] = useState<Record<string, unknown>>({});
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
@@ -41,11 +47,14 @@ export function CreateDialog({
 
   useEffect(() => {
     if (collection) {
-      // A required choice starts on its first option and a required switch
-      // starts off, so the form opens with nothing to correct but the blanks.
+      // A required choice starts on its first option, a required switch
+      // starts off, and a required group starts empty (its own required
+      // fields are asked for inside it), so the form opens with nothing to
+      // correct but the blanks. A group of optional fields used to read
+      // "Links is required." until one of them was filled.
       const start: Record<string, unknown> = {};
       for (const field of required) {
-        if (field.type === "select" || field.type === "boolean")
+        if (field.type === "select" || field.type === "boolean" || field.type === "object")
           start[field.name] = emptyValue(field);
       }
       setData(start);
