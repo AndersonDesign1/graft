@@ -33,7 +33,7 @@
 import { execFileSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createActorResolver, type TrustedIssuer } from "@usegraft/auth";
-import { githubStoreFromEnv, revalidateWebhookFromEnv } from "@usegraft/compiler";
+import { fireDeployHooks, githubStoreFromEnv, revalidateWebhookFromEnv } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { setRequestPeer } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
@@ -418,6 +418,12 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     // claims the two surfaces apply rate limits identically.
     rateLimit: { limit: 60, windowSeconds: 60 },
     onContentChange,
+    // An agent's publish to GitHub calls the deploy hooks, as Studio's does.
+    // A database store calls them itself.
+    onPublished: async (published) => {
+      if (databaseStore) return;
+      await fireDeployHooks(control.db, { event: "publish", ...published });
+    },
   });
 
   // Same-origin unless the operator names origins. A browser client on another

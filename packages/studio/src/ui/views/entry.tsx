@@ -63,7 +63,7 @@ import { StatusLabel } from "./collection";
 type Mode = "form" | "source";
 
 export function EntryView({ collection, slug }: { collection: string; slug: string }) {
-  const { schema, workspace, drafts, navigate, openPublish } = useStudio();
+  const { schema, workspace, drafts, publish, navigate, openPublish } = useStudio();
   const confirm = useConfirm();
   const [inspectorOpen, toggleInspector, setInspectorOpen] = useInspector();
   const fields = useMemo<SchemaFieldDto[]>(
@@ -529,7 +529,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
     : entry.status;
   const others = fields.filter((field) => field !== headline);
   const bodyAsSource = fidelity !== null && !fidelity.lossless;
-  const action = drafts.data?.publish;
+  const action = publish;
   const saveLabel = saveText(
     autosave.state,
     autosave.error,

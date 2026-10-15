@@ -128,6 +128,15 @@ export const registerDraftTools: RegisterTools = (server, deps) => {
           ...(resolve ? { resolve } : {}),
           mode: direct ? "direct" : "review",
         });
+        // A commit to the production branch is a publish the site rebuilds
+        // from: call the deploy hooks, as a database store does on its own.
+        if (!result.changes && result.mode === "direct" && result.commit) {
+          try {
+            await deps.options.onPublished?.({ branch: deps.branchId, paths: result.published });
+          } catch {
+            // The commit landed; a hook that failed is shown in Settings.
+          }
+        }
         // Live already (the database store updated the index): tell the app
         // now, since no rebuild is coming to do it.
         if (!result.changes) return result;

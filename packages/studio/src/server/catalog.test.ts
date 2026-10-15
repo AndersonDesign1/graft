@@ -29,3 +29,12 @@ describe("queryEntries sorting", () => {
     expect(slugs("price", "desc")).toEqual(["newer", "older", "undated"]);
   });
 });
+
+describe("queryEntries counts", () => {
+  it("lists a draft deletion but doesn't count it as one of the entries", () => {
+    const all = [entry("hat"), entry("scarf"), { ...entry("gone"), status: "deleted" as const }];
+    const list = queryEntries("products", all, [], {});
+    expect(list.items).toHaveLength(3);
+    expect(list.counts).toEqual({ all: 2, unpublished: 1 });
+  });
+});

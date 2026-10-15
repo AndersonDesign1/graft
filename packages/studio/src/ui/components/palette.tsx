@@ -58,7 +58,7 @@ export function CommandPalette({
   /** The project's component declarations, for the insert group. */
   components: readonly EditorComponentSpec[];
 }) {
-  const { schema, drafts, workspace, navigate, openPublish, openCreate } = useStudio();
+  const { schema, drafts, publish, workspace, navigate, openPublish, openCreate } = useStudio();
   const user = workspace.data?.user;
   const canManageAgents = workspace.data ? !user || user.scopes.includes("studio:settings") : false;
   const collections = editableCollections(schema.data);
@@ -218,7 +218,7 @@ export function CommandPalette({
                 onSelect={() => go(openPublish)}
               >
                 <IconChanges />
-                <span className="palette-item-label">{publishVerb(drafts.data?.publish)}…</span>
+                <span className="palette-item-label">{publishVerb(publish)}…</span>
                 <span className="palette-item-hint">
                   {unpublished === 0
                     ? "No drafts"

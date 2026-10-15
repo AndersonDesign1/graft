@@ -138,8 +138,10 @@ function Shell({ initialBranch }: { initialBranch: string }) {
     if (developer) setDevOpen(true);
   }, [developer]);
 
-  // The developer views read the content tree; only they pay for it.
-  const tree = useResource<ContentTree>(developer ? `/tree${qs({ branch })}` : null);
+  // The developer views read the content tree; only they pay for it. Read
+  // again after every save, publish, discard or delete, so the counts in
+  // Health and Settings are never from before the last change.
+  const tree = useResource<ContentTree>(developer ? `/tree${qs({ branch })}` : null, [drafts.data]);
   const approvals = useResource<{ approvals: unknown[] }>("/approvals");
 
   // How this project's components present in the canvas.
@@ -167,6 +169,7 @@ function Shell({ initialBranch }: { initialBranch: string }) {
   const state: StudioState = useMemo(
     () => ({
       ...resources,
+      publish: resources.workspace.data?.publish ?? resources.drafts.data?.publish,
       navigate,
       openPublish: () => setPublishOpen(true),
       openCreate: (collection: string) => setCreating(collection),
@@ -177,6 +180,7 @@ function Shell({ initialBranch }: { initialBranch: string }) {
 
   const collections = editableCollections(schema.data);
   const unpublished = drafts.data?.changes.length ?? 0;
+  const publish = state.publish;
   // What the inbox holds: agents asking first, and changes sent for review.
   const pending = (approvals.data?.approvals.length ?? 0) + (drafts.data?.reviews.length ?? 0);
   const user = workspace.data?.user;
@@ -197,7 +201,7 @@ function Shell({ initialBranch }: { initialBranch: string }) {
       </div>
     );
   } else if (route.view === "collection" && route.collection) {
-    main = <CollectionView collection={route.collection} />;
+    main = <CollectionView key={route.collection} collection={route.collection} />;
   } else if (route.view === "overview") {
     main = (
       <OverviewView
@@ -300,24 +304,26 @@ function Shell({ initialBranch }: { initialBranch: string }) {
               </button>
 
               <div className="top-end">
-                <button
-                  type="button"
-                  className="publish"
-                  data-pending={unpublished > 0 || undefined}
-                  onClick={() => setPublishOpen(true)}
-                  disabled={workspace.data ? !workspace.data.canWrite : false}
-                >
-                  {publishVerb(drafts.data?.publish)}
-                  {unpublished > 0 ? (
-                    <span
-                      className="publish-count"
-                      data-numeric=""
-                      aria-label={`${unpublished} ${unpublished === 1 ? "draft" : "drafts"}`}
-                    >
-                      {unpublished}
-                    </span>
-                  ) : null}
-                </button>
+                {publish ? (
+                  <button
+                    type="button"
+                    className="publish"
+                    data-pending={unpublished > 0 || undefined}
+                    onClick={() => setPublishOpen(true)}
+                    disabled={workspace.data ? !workspace.data.canWrite : false}
+                  >
+                    {publishVerb(publish)}
+                    {unpublished > 0 ? (
+                      <span
+                        className="publish-count"
+                        data-numeric=""
+                        aria-label={`${unpublished} ${unpublished === 1 ? "draft" : "drafts"}`}
+                      >
+                        {unpublished}
+                      </span>
+                    ) : null}
+                  </button>
+                ) : null}
                 <Menu>
                   <MenuTrigger className="top-account" aria-label={`${userName}, ${savingTo}`}>
                     <span className="avatar" aria-hidden="true">

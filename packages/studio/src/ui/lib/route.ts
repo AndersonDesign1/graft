@@ -50,7 +50,8 @@ function safeDecode(segment: string): string {
 }
 
 export function parseHash(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(safeDecode);
+  const path = hash.split("?")[0] ?? "";
+  const parts = path.replace(/^#\/?/, "").split("/").filter(Boolean).map(safeDecode);
   const [head, a, b] = parts;
   if (head === "c" && a) {
     return b ? { view: "entry", collection: a, slug: b } : { view: "collection", collection: a };
@@ -108,6 +109,62 @@ export function useRoute(): [Route, (next: Route) => void] {
   }, []);
 
   return [route, navigate];
+}
+
+/**
+ * A list's search, filter and sort, after `?` in the hash
+ * (`#/c/projects?q=react&status=unpublished`), so a reload, the back button
+ * and a shared link come back to the same rows. Defaults are left out.
+ */
+export interface ListState {
+  q: string;
+  status: "all" | "unpublished" | "published";
+  where: Record<string, string>;
+  sort: { key: string; dir: "asc" | "desc" };
+}
+
+const STATUSES: readonly ListState["status"][] = ["all", "unpublished", "published"];
+
+export function listStateFromHash(hash: string): ListState {
+  const at = hash.indexOf("?");
+  const params = new URLSearchParams(at === -1 ? "" : hash.slice(at + 1));
+  const status = params.get("status") ?? "all";
+  const where: Record<string, string> = {};
+  for (const [key, value] of params) {
+    if (key.startsWith("where.") && key.length > 6) where[key.slice(6)] = value;
+  }
+  return {
+    q: params.get("q") ?? "",
+    status: STATUSES.find((known) => known === status) ?? "all",
+    where,
+    sort: {
+      key: params.get("sort") || "site",
+      dir: params.get("dir") === "desc" ? "desc" : "asc",
+    },
+  };
+}
+
+export function listStateToHash(path: string, state: ListState): string {
+  const params = new URLSearchParams();
+  if (state.q) params.set("q", state.q);
+  if (state.status !== "all") params.set("status", state.status);
+  for (const [field, value] of Object.entries(state.where)) params.set(`where.${field}`, value);
+  if (state.sort.key !== "site") params.set("sort", state.sort.key);
+  if (state.sort.dir !== "asc") params.set("dir", state.sort.dir);
+  const query = params.toString();
+  return query ? `${path}?${query}` : path;
+}
+
+/** Record a list's state in the address without a new history entry. */
+export function replaceListState(state: ListState): void {
+  const path = window.location.hash.split("?")[0] || "#/";
+  const next = listStateToHash(path, state);
+  if (next === window.location.hash) return;
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${window.location.pathname}${window.location.search}${next}`,
+  );
 }
 
 /** Branch lives in the query string, not the hash: it scopes everything. */

@@ -7,7 +7,7 @@
  * refresh the count everywhere.
  */
 import { createContext, useContext, type ReactNode } from "react";
-import type { DraftsDto, WorkspaceDto } from "../../editor-types";
+import type { DraftsDto, PublishAction, WorkspaceDto } from "../../editor-types";
 import type { SchemaCollectionDto, SchemaList } from "../../types";
 import type { Route } from "./route";
 import { useResource, type Resource } from "./use-resource";
@@ -16,6 +16,12 @@ export interface StudioState {
   workspace: Resource<WorkspaceDto>;
   drafts: Resource<DraftsDto>;
   schema: Resource<SchemaList>;
+  /**
+   * What Publish does for this person: from the workspace, which answers at
+   * once, before the drafts, which can take a round trip to GitHub. Unknown
+   * until either has loaded, so no button guesses "Publish" and changes.
+   */
+  publish: PublishAction | undefined;
   navigate: (route: Route) => void;
   openPublish: () => void;
   openCreate: (collection: string) => void;
