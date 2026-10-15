@@ -16,6 +16,7 @@ import {
   currentFiles,
   discardDrafts,
   draftHeads,
+  liveDocuments,
   openReviews,
   publishDrafts,
   publishedHistory,
@@ -27,11 +28,13 @@ import {
   type ContentInput,
   type Database,
   type HeadState,
+  type LiveDocument,
   type RevisionActor,
 } from "@usegraft/db";
 import type { MdxTrust } from "@usegraft/mdx-safety";
 import matter from "gray-matter";
 import { validateDocuments, type SourceFile } from "../compile";
+import { brokenReferencesError, findBrokenReferences } from "../references";
 import { gitBlobSha } from "./blob";
 import { assertBaseVersion } from "./conflict";
 import { normalisePath } from "./github/store";
@@ -192,7 +195,7 @@ export class DatabaseStore implements ContentStore {
       };
     }
 
-    const index = this.indexChanges(heads);
+    const index = this.indexChanges(heads, await liveDocuments(this.db, this.branchId));
     const result = await publishDrafts(this.db, {
       branchId: this.branchId,
       drafts: heads.map((head) => ({ path: head.path, version: head.draft?.version ?? null })),
@@ -228,10 +231,12 @@ export class DatabaseStore implements ContentStore {
 
   /**
    * The index rows the drafts produce, checked exactly as a compile checks a
-   * file: the collection, its schema, slug uniqueness among them, and MDX
-   * safety. A draft that would fail `graft compile` never goes live.
+   * file: the collection, its schema, slug uniqueness among them, MDX safety
+   * and references. A draft that would fail `graft compile` never goes live,
+   * and neither does a deletion or a new slug that would make it fail by
+   * leaving a live document pointing at nothing.
    */
-  private indexChanges(heads: HeadState[]): IndexChanges {
+  private indexChanges(heads: HeadState[], live: LiveDocument[]): IndexChanges {
     const writing: SourceFile[] = [];
     const removals: IndexChanges["removals"] = [];
     for (const head of heads) {
@@ -245,9 +250,21 @@ export class DatabaseStore implements ContentStore {
         });
       }
     }
+    const publishing = new Set(heads.map((head) => head.path));
+    const key = (doc: { collection: string; slug: string }) => `${doc.collection}/${doc.slug}`;
+    const staying = live.filter((doc) => !publishing.has(doc.sourcePath));
     const docs = validateDocuments(writing, this.options.collections, {
       mdxTrust: this.options.mdxTrust,
+      references: new Set(staying.map(key)),
     });
+    // Only references this publish breaks: one that was already broken is
+    // not this publish's to refuse.
+    const before = new Set(live.map(key));
+    const after = new Set(docs.map(key));
+    const stranded = findBrokenReferences(staying, this.options.collections, after).filter((ref) =>
+      before.has(`${ref.to}/${ref.slug}`),
+    );
+    if (stranded.length > 0) throw brokenReferencesError(stranded);
     return {
       upserts: docs.map((doc) => ({
         collection: doc.collection,
