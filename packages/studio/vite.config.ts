@@ -31,30 +31,21 @@ export default defineConfig({
     emptyOutDir: true,
     target: "es2022",
     sourcemap: false,
-    // The editor is the heavy dependency and it never changes between Studio
-    // builds. Splitting it out means editing a view invalidates ~40 kB rather
-    // than the whole megabyte, which matters because hashed assets are served
-    // `immutable`.
-    chunkSizeWarningLimit: 1200,
+    // The editors (Milkdown, CodeMirror and their parser stacks) are most of
+    // the bundle. entry.tsx imports them with import(), so they load when an
+    // entry opens and their chunk caches apart from the app: editing a view
+    // invalidates the app's chunk, not the editor's.
+    chunkSizeWarningLimit: 3000,
     rollupOptions: {
       output: {
         // Rolldown (Vite 8) takes the function form only.
         manualChunks(id: string) {
           if (!id.includes("node_modules")) return;
-          // Both editors and their parser stacks. They are the bulk of the
-          // bundle and never change between Studio builds, so they cache
-          // independently of the app.
-          if (
-            id.includes("@codemirror") ||
-            id.includes("@lezer") ||
-            id.includes("@milkdown") ||
-            id.includes("prosemirror") ||
-            id.includes("remark") ||
-            id.includes("micromark") ||
-            id.includes("mdast")
-          ) {
-            return "editor";
-          }
+          // No manual chunk for the editors: naming one pulled modules the
+          // app also needs into it (Vite's preload helper among them), so the
+          // app imported the whole editor chunk statically and it preloaded
+          // with every page. The import() boundary in entry.tsx draws the
+          // split instead.
           if (
             id.includes("@base-ui-components") ||
             id.includes("cmdk") ||

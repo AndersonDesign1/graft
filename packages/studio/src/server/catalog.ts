@@ -178,6 +178,8 @@ export function summarise(
   entries: CatalogEntry[],
   fields: SchemaFieldDto[],
   changes: ReadonlyMap<string, DraftChange>,
+  /** When each unchanged file was last committed; an edited file uses its mtime. */
+  committedAt?: ReadonlyMap<string, number>,
 ): EntrySummary[] {
   const columns = fields.filter((field) => CELL_TYPES.has(field.type));
   return entries.map((entry) => {
@@ -194,10 +196,20 @@ export function summarise(
         columns.map((field) => [field.name, cell(entry.data[field.name])]),
       ),
       ...(image ? { image } : {}),
-      ...(entry.mtimeMs !== undefined ? { updatedAt: new Date(entry.mtimeMs).toISOString() } : {}),
+      ...updatedAt(entry, change, committedAt),
       ...(entry.problem ? { problem: entry.problem } : {}),
     };
   });
+}
+
+/** An entry with a draft was edited when its file was; one without, when it was committed. */
+function updatedAt(
+  entry: CatalogEntry,
+  change: DraftChange | undefined,
+  committedAt: ReadonlyMap<string, number> | undefined,
+): { updatedAt?: string } {
+  const at = (change ? undefined : committedAt?.get(entry.path)) ?? entry.mtimeMs;
+  return at === undefined ? {} : { updatedAt: new Date(at).toISOString() };
 }
 
 export interface EntryQuery {

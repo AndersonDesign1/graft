@@ -26,9 +26,8 @@
  * deliberate GRAFT_MCP_ALLOW_ANONYMOUS=1, which warns.
  * Approval policy comes from graft.config.ts (`approvalPolicy`), not an env var:
  * "human" gates every mutation, "unattended" gates nothing, including destructive
- * functions, and warns on every boot. Binding beyond loopback
- * with no identity configured prints a warning, because MCP will then refuse
- * every caller.
+ * functions, and warns on every boot. Binding beyond loopback with no dev
+ * token or issuer says how callers get in: with a token made in Studio.
  */
 import { execFileSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -497,10 +496,11 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
         "Only do this behind an auth proxy you control.",
     );
   } else if (!loopback && issuers.length === 0 && !devToken) {
-    console.warn(
-      "[graft serve] WARNING: binding beyond loopback with no identity configured — " +
-        "MCP will refuse every caller, because there is nothing to authenticate them against. " +
-        "Set GRAFT_DEV_TOKEN or GRAFT_TRUSTED_ISSUERS.",
+    // Not a warning: tokens made in Studio's Agents page are always accepted,
+    // so an agent can connect as soon as an admin makes it one.
+    console.log(
+      "[graft serve] MCP takes callers with a token made in Studio, under Developer, Agents, " +
+        "and refuses anonymous ones. GRAFT_DEV_TOKEN and GRAFT_TRUSTED_ISSUERS add other ways in.",
     );
   }
   if (issuers.length > 0 && issuers.every((issuer) => issuer.audience === undefined)) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SchemaFieldDto } from "../../types";
 import {
+  settableFields,
   controlOf,
   emptyValue,
   formatMoney,
@@ -30,6 +31,24 @@ describe("labels", () => {
 });
 
 describe("controls", () => {
+  it("keeps a long-limit string on one line when it holds an address or a path", () => {
+    const long = { constraints: { maxLength: 2048 } };
+    expect(controlOf(f({ name: "summary", type: "string", ...long }))).toBe("textarea");
+    for (const name of ["url", "githubUrl", "thumbnail", "cover_image", "website", "email"]) {
+      expect(controlOf(f({ name, type: "string", ...long }))).toBe("text");
+    }
+    expect(
+      controlOf(
+        f({
+          name: "target",
+          type: "string",
+          constraints: { maxLength: 2048, pattern: "^https?://" },
+        }),
+      ),
+    ).toBe("text");
+    expect(controlOf(f({ name: "url", type: "text" }))).toBe("textarea");
+  });
+
   it("picks the control from the declared type", () => {
     expect(controlOf(f({ name: "a", type: "number", format: "money" }))).toBe("money");
     expect(controlOf(f({ name: "a", type: "select" }))).toBe("select");
@@ -53,6 +72,36 @@ describe("controls", () => {
       titleField([f({ name: "price", type: "number" }), f({ name: "title", type: "string" })])
         ?.name,
     ).toBe("title");
+  });
+});
+
+describe("fields one value can be set on, for a selection", () => {
+  it("offers scalar fields, never the title, the slug, lists or groups", () => {
+    const fields = [
+      { name: "title", type: "string", optional: false },
+      { name: "slug", type: "string", optional: true },
+      { name: "status", type: "select", optional: false, options: [{ value: "a" }] },
+      { name: "price", type: "number", format: "money", optional: false },
+      { name: "featured", type: "boolean", optional: true },
+      { name: "category", type: "reference", to: "categories", optional: true },
+      { name: "summary", type: "text", optional: true },
+      { name: "published", type: "datetime", optional: true },
+      { name: "image", type: "asset", optional: true },
+      {
+        name: "tags",
+        type: "array",
+        optional: true,
+        items: { name: "item", type: "string", optional: false },
+      },
+      { name: "seo", type: "object", optional: true, fields: [] },
+    ] satisfies SchemaFieldDto[];
+    expect(settableFields(fields).map((field) => field.name)).toEqual([
+      "status",
+      "price",
+      "featured",
+      "category",
+      "summary",
+    ]);
   });
 });
 

@@ -42,6 +42,7 @@ import {
   MenuTrigger,
 } from "./components/ui/menu";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { MOD_KEY } from "./lib/keys";
 import { SIGNED_OUT_EVENT, qs } from "./lib/api";
 import {
   DEV_VIEWS,
@@ -67,6 +68,7 @@ import { EntryView } from "./views/entry";
 import { HomeView } from "./views/home";
 import { BranchesView, HistoryView } from "./views/operations";
 import { AgentsView } from "./views/agents";
+import { RequiresDatabase } from "./components/primitives";
 import { InboxView } from "./views/inbox";
 import { MediaView } from "./views/media";
 import { OverviewView } from "./views/overview";
@@ -81,10 +83,6 @@ const DEV_NAV: Array<{ view: DevView; label: string; Icon: IconComponent }> = [
   { view: "agents", label: "Agents", Icon: IconAgents },
   { view: "settings", label: "Settings", Icon: IconSettings },
 ];
-
-/** The command key as this keyboard labels it. */
-const MOD_KEY =
-  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
 
 const THEME: Record<Theme, { label: string; Icon: IconComponent }> = {
   system: { label: "Match system", Icon: IconSystem },
@@ -142,7 +140,10 @@ function Shell({ initialBranch }: { initialBranch: string }) {
   // again after every save, publish, discard or delete, so the counts in
   // Health and Settings are never from before the last change.
   const tree = useResource<ContentTree>(developer ? `/tree${qs({ branch })}` : null, [drafts.data]);
-  const approvals = useResource<{ approvals: unknown[] }>("/approvals");
+  const approvals = useResource<{ approvals: unknown[] }>(
+    workspace.data?.database ? "/approvals" : null,
+    [workspace.data?.database],
+  );
 
   // How this project's components present in the canvas.
   const editorComponents = useResource<EditorComponentList>("/editor-components");
@@ -214,11 +215,37 @@ function Shell({ initialBranch }: { initialBranch: string }) {
   } else if (route.view === "schema") main = <SchemaView />;
   else if (route.view === "inbox") main = <InboxView onDecided={approvals.refresh} />;
   else if (route.view === "media") main = <MediaView />;
-  else if (route.view === "agents") main = <AgentsView />;
-  else if (route.view === "branches")
-    main = <BranchesView branch={branch} onSelectBranch={selectBranch} />;
-  else if (route.view === "history") main = <HistoryView branch={branch} />;
-  else if (route.view === "settings") {
+  else if (route.view === "agents") {
+    main = (
+      <RequiresDatabase
+        view="Agents"
+        title="Agent tokens need a database"
+        does="Each agent's token is kept in Postgres, with what it may do and when it was last used."
+      >
+        <AgentsView />
+      </RequiresDatabase>
+    );
+  } else if (route.view === "branches") {
+    main = (
+      <RequiresDatabase
+        view="Branches"
+        title="Branches need a database"
+        does="A branch is an index of its own in Postgres, for previewing changes before they go live. Without one, use Git branches."
+      >
+        <BranchesView branch={branch} onSelectBranch={selectBranch} />
+      </RequiresDatabase>
+    );
+  } else if (route.view === "history") {
+    main = (
+      <RequiresDatabase
+        view="History"
+        title="The compile history needs a database"
+        does="Every compile is recorded in Postgres with the commit it read, which is what lets you see and restore earlier ones. Each entry's own history, from Git, is in its panel."
+      >
+        <HistoryView branch={branch} />
+      </RequiresDatabase>
+    );
+  } else if (route.view === "settings") {
     main = <SettingsView branch={branch} theme={theme} setTheme={setTheme} tree={tree.data} />;
   } else main = <HomeView />;
 

@@ -217,6 +217,11 @@ describe("MCP writes through a GitHub store", () => {
     const { call } = await connect(["content:read"]);
     const refused = await call("publish_drafts", { paths: ["pages/home.mdx"] });
     expect(refused.isError).toBe(true);
-    expect(refused.payload.error).toBe("UNAUTHORIZED");
+    expect(refused.payload).toMatchObject({
+      error: "UNAUTHORIZED",
+      message:
+        "This token can't call publish_drafts: it doesn't carry the \"content:write\" scope.",
+      fix: expect.stringContaining("Write drafts or Publish access in Studio"),
+    });
   });
 });

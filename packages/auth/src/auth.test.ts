@@ -103,6 +103,8 @@ describe("createActorResolver", () => {
     await expect(resolve(requestWith("Bearer graft_at_revoked"))).rejects.toMatchObject({
       code: "TOKEN_INVALID",
       message: expect.stringContaining("revoked"),
+      // Told in terms of where tokens come from, not the resolver's wiring.
+      fix: expect.stringContaining("Studio, under Developer, Agents"),
     });
   });
 

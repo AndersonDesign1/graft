@@ -35,6 +35,38 @@ error's `fix` says what to change.
   anything it reports.
 </AgentPrompt>
 
+## 1.0.0-beta.7
+
+**Postgres projects need `graft db migrate`.** This release adds tables for
+Studio accounts and sessions, the media library, agent tokens, site settings,
+deploy hooks, content kept in the database, and the GitHub mirror. Until you
+migrate, a Studio page that needs one of them answers `MIGRATION_REQUIRED` with
+the fix, and the rest of Studio keeps working.
+
+**What to do:** run `graft db migrate` against each database, then
+`graft harden <role>` again if your app connects as a hardened runtime role.
+A static project has nothing to migrate.
+
+**Embedding `@usegraft/studio/panels` needs `lucide-react`.** Studio's icons
+moved from Phosphor to Lucide, and the panels import it as an optional peer.
+
+**What to do:** if you embed the panels, run `npm i lucide-react` and remove
+`@phosphor-icons/react` if nothing else uses it. `graft studio` and
+`graft serve --studio` need nothing.
+
+## 1.0.0-beta.6
+
+**Drafts made through an invite link move to a new branch name.** On a hosted
+Studio that saves to GitHub, a person who signed in with an invite link now gets
+a draft branch whose name can't collide with a GitHub login. A draft they saved
+before you upgraded stays on GitHub under the old name, and Studio no longer
+shows it.
+
+**What to do:** before upgrading, have invite-link editors publish or discard
+their drafts. A draft left behind is an ordinary branch named
+`graft-studio/drafts/…`: merge it by hand, or delete it. People who sign in with
+GitHub are not affected.
+
 ## 1.0.0-beta.5
 
 **`GET` and `PUT /api/studio/v1/document` are removed, with the `DocumentDto`
@@ -75,11 +107,14 @@ See [Refresh pages when content changes](/docs/next#refresh-pages-when-content-c
 
 **`@usegraft/sdk-next` needs Next.js 15.5.24 or 16.3.3 or newer.** Those are
 the first releases with fixes for the critical Next.js security advisories
-published in 2026. Older 15.x releases are refused by the peer range.
+published in 2026. Anything older on either line, such as 16.3.0, is outside
+the peer range, and installing shows a warning like
+`incorrect peer dependency "next@16.3.0"`. The app may still build. The warning
+is about the advisories, not about Graft's code.
 
-**What to do:** upgrade Next.js. On 15, `npm i next@15` installs the latest
-15.x. Next.js 14 is not supported: it no longer gets security fixes, and those
-advisories are still open on it.
+**What to do:** upgrade Next.js. `npm i next@16` installs the latest 16.x, and
+`npm i next@15` the latest 15.x. Next.js 14 is not supported: it no longer gets
+security fixes, and those advisories are still open on it.
 
 **`graft asset put` refuses a key that already holds a file.** It used to
 replace the stored file, and the store keeps no history, so the old file was

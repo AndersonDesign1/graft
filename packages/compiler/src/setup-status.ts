@@ -73,6 +73,13 @@ export interface SetupStatusInput {
   now?: Date;
 }
 
+/**
+ * Checks that only matter once the site is online: a missing Studio secret.
+ * They show as warnings, and never become `next` while working locally. Once
+ * the secret is set, the owner account it's for is the next step.
+ */
+const FOR_LATER = new Set(["studio-secret"]);
+
 const MIN_POSTGRES = 130000;
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -301,7 +308,7 @@ export async function setupStatus(input: SetupStatusInput): Promise<SetupStatus>
     const secret = env.GRAFT_STUDIO_SECRET;
     if (!secret || secret.length < 32) {
       add({
-        id: "studio",
+        id: "studio-secret",
         state: "warn",
         title: "Studio sign-in",
         detail:
@@ -330,13 +337,21 @@ export async function setupStatus(input: SetupStatusInput): Promise<SetupStatus>
     }
   }
 
-  const failing = checks.find((check) => check.state === "fail");
-  const warning = checks.find((check) => check.state === "warn");
   return {
-    ready: !failing,
+    ready: !checks.some((check) => check.state === "fail"),
     checks,
-    next: failing?.fix ?? warning?.fix ?? null,
+    next: nextStep(checks),
   };
+}
+
+/**
+ * The one thing to do now: the first failure's fix, else the first warning's.
+ * A check about putting the site online is not the next thing to do here.
+ */
+export function nextStep(checks: readonly SetupCheck[]): string | null {
+  const failing = checks.find((check) => check.state === "fail");
+  const warning = checks.find((check) => check.state === "warn" && !FOR_LATER.has(check.id));
+  return failing?.fix ?? warning?.fix ?? null;
 }
 
 /** The checklist as lines for a terminal. */
@@ -346,10 +361,13 @@ export function formatSetupStatus(status: SetupStatus): string {
     (check) => `${mark[check.state]} ${check.title}: ${check.detail}`,
   );
   lines.push("");
+  const later = status.checks.some((check) => check.state === "warn");
   lines.push(
     status.next
       ? `Next: ${status.next}`
-      : "Everything is set up. Run `graft dev` to work on the site, or `graft studio` to edit.",
+      : later
+        ? "Ready to work on this computer: run `graft dev` for the site, or `graft studio` to edit. The ! lines matter when you put the site online."
+        : "Everything is set up. Run `graft dev` to work on the site, or `graft studio` to edit.",
   );
   return lines.join("\n");
 }

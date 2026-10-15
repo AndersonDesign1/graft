@@ -63,10 +63,59 @@ export type Control =
   | "references"
   | "json";
 
+/** The last word of a field's name: "githubUrl" -> "url", "cover_image" -> "image". */
+function lastWord(name: string): string {
+  return (
+    name
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .split(/[\s_-]+/)
+      .pop()
+      ?.toLowerCase() ?? ""
+  );
+}
+
+/** Names whose values are one line however long they may be: addresses and paths. */
+const ONE_LINE_WORDS = new Set([
+  "url",
+  "uri",
+  "href",
+  "link",
+  "website",
+  "homepage",
+  "site",
+  "github",
+  "gitlab",
+  "repo",
+  "repository",
+  "demo",
+  "live",
+  "src",
+  "image",
+  "thumbnail",
+  "icon",
+  "logo",
+  "avatar",
+  "email",
+  "path",
+  "key",
+  "domain",
+]);
+
+/**
+ * A long limit doesn't make a value multi-line: a URL allowed 2,048
+ * characters is still one line, and showing it in a tall textarea read as a
+ * field that wanted prose.
+ */
+function isOneLine(field: SchemaFieldDto): boolean {
+  if (ONE_LINE_WORDS.has(lastWord(field.name))) return true;
+  const pattern = field.constraints?.pattern ?? "";
+  return pattern.startsWith("^https?") || pattern.startsWith("^(https?");
+}
+
 export function controlOf(field: SchemaFieldDto): Control {
   switch (field.type) {
     case "string":
-      return (field.constraints?.maxLength ?? 0) > 200 ? "textarea" : "text";
+      return (field.constraints?.maxLength ?? 0) > 200 && !isOneLine(field) ? "textarea" : "text";
     case "text":
       return "textarea";
     case "number":
@@ -102,6 +151,25 @@ export function controlOf(field: SchemaFieldDto): Control {
 export function titleField(fields: readonly SchemaFieldDto[]): SchemaFieldDto | undefined {
   return fields.find(
     (field) => field.type === "string" && (field.name === "title" || field.name === "name"),
+  );
+}
+
+/** Controls that hold one value, so one value can sensibly go on many entries. */
+const SETTABLE = new Set<Control>([
+  "text",
+  "textarea",
+  "number",
+  "money",
+  "toggle",
+  "select",
+  "reference",
+]);
+
+/** The fields a selection of entries can set at once: one value, not the entry's name. */
+export function settableFields(fields: readonly SchemaFieldDto[]): SchemaFieldDto[] {
+  const headline = titleField(fields);
+  return fields.filter(
+    (field) => field !== headline && field.name !== "slug" && SETTABLE.has(controlOf(field)),
   );
 }
 

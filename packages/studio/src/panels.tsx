@@ -7,6 +7,7 @@
  * stylesheets. The standalone SPA pulls the styles in via `ui/main.tsx`.
  */
 import { StudioApp } from "./ui/app";
+import { ConfirmProvider } from "./ui/components/ui/confirm";
 import { ApprovalQueue } from "./ui/views/inbox";
 import { BranchesView, HistoryView } from "./ui/views/operations";
 
@@ -23,7 +24,12 @@ export function ContentTreePanel({ branch = "main" }: { branch?: string }) {
 }
 
 export function ApprovalQueuePanel() {
-  return <ApprovalQueue />;
+  // Approving asks first, and the question needs its dialog host.
+  return (
+    <ConfirmProvider>
+      <ApprovalQueue />
+    </ConfirmProvider>
+  );
 }
 
 export function BranchListPanel({

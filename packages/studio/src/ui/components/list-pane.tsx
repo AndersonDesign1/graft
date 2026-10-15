@@ -11,6 +11,7 @@ import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { EntryList, EntryStatus } from "../../editor-types";
 import { qs } from "../lib/api";
 import { relativeTime } from "../lib/format";
+import { moveRowFocus } from "../lib/row-focus";
 import { collectionLabel, singular, useStudio } from "../lib/studio";
 import { useResource } from "../lib/use-resource";
 import { IconPlus } from "./icons";
@@ -24,17 +25,7 @@ const STATE_WORD = {
 
 /** Move focus to the next or previous row link in the list. */
 function moveFocus(event: KeyboardEvent<HTMLElement>): void {
-  const links = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>("a.pane-row")];
-  if (links.length === 0) return;
-  const at = links.findIndex((link) => link === document.activeElement);
-  let next: number | undefined;
-  if (event.key === "ArrowDown") next = at + 1;
-  else if (event.key === "ArrowUp") next = at === -1 ? 0 : at - 1;
-  else if (event.key === "Home") next = 0;
-  else if (event.key === "End") next = links.length - 1;
-  if (next === undefined) return;
-  event.preventDefault();
-  links[Math.max(0, Math.min(links.length - 1, next))]?.focus();
+  if (moveRowFocus(event.currentTarget, "a.pane-row", event)) event.preventDefault();
 }
 
 export function ListPane({ collection, selected }: { collection: string; selected: string }) {

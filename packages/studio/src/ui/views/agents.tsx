@@ -53,32 +53,53 @@ export function AgentsView() {
         <p className="notice">
           <IconInfo size={14} />
           <span>
-            This Studio runs on this computer, which has no MCP endpoint. Tokens made here work
-            where the site runs <code>graft serve</code> on the same database.
+            <code>graft studio</code> serves no MCP endpoint, so tokens made here work where{" "}
+            <code>graft serve</code> runs on the same database.
           </span>
         </p>
       ) : null}
 
       <div className="settings-sections">
-        <Section
-          id="connect"
-          title="Connect an agent"
-          sub="Point the agent at the MCP endpoint and send its token as a bearer header."
-        >
-          <div className="set-panel">
-            <Row label="MCP endpoint" hint="Any MCP client connects here.">
-              {agents.data ? (
-                <>
-                  <code className="set-value">{agents.data.endpoints.mcp}</code>
-                  <CopyButton value={agents.data.endpoints.mcp} />
-                </>
-              ) : null}
-            </Row>
-            <Row label="Header" hint="Every request carries the token.">
-              <code className="set-value">Authorization: Bearer graft_at_…</code>
-            </Row>
-          </div>
-        </Section>
+        {agents.data && !agents.data.accepted ? (
+          <Section
+            id="connect"
+            title="Connect an agent"
+            sub="On this computer an agent needs no token. Elsewhere it uses one of these."
+          >
+            <div className="set-panel">
+              <Row label="On this computer" hint="The agent starts Graft's MCP server itself.">
+                <code className="set-value">npx graft mcp</code>
+                <CopyButton value="npx graft mcp" />
+              </Row>
+              <Row
+                label="Where graft serve runs"
+                hint="The MCP endpoint is /api/mcp on that address, and every request carries the token."
+              >
+                <code className="set-value">Authorization: Bearer graft_at_…</code>
+              </Row>
+            </div>
+          </Section>
+        ) : (
+          <Section
+            id="connect"
+            title="Connect an agent"
+            sub="Point the agent at the MCP endpoint and send its token as a bearer header."
+          >
+            <div className="set-panel">
+              <Row label="MCP endpoint" hint="Any MCP client connects here.">
+                {agents.data ? (
+                  <>
+                    <code className="set-value">{agents.data.endpoints.mcp}</code>
+                    <CopyButton value={agents.data.endpoints.mcp} />
+                  </>
+                ) : null}
+              </Row>
+              <Row label="Header" hint="Every request carries the token.">
+                <code className="set-value">Authorization: Bearer graft_at_…</code>
+              </Row>
+            </div>
+          </Section>
+        )}
 
         <Section
           id="tokens"

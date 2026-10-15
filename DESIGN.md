@@ -259,7 +259,13 @@ rule above holds; this section adds what an app needs.
 left, search centred (24rem, with its shortcut), the Commit or Publish button
 for every draft and the account menu right. A 208px sidebar under it on the
 page colour holds navigation only. Below 48rem the sidebar opens as a drawer
-from a menu button and search becomes an icon.
+from a menu button and search becomes an icon. On an entry at that width the
+bar keeps the save state and drops its own Commit button and the title: the
+top bar's button commits this entry with the rest, and the heading below shows
+the title in full.
+
+**Lists.** A list is walked from the keyboard: j and k from anywhere on the
+page (not while typing), and the arrows, Home and End once focus is in it.
 
 **Panes.** A view is one pane, or panes side by side when an entry is open: the
 collection's list (280px), the document, and the inspector (256px). Every pane
@@ -282,6 +288,13 @@ Rows are two lines, 56px: the title, then the state or the slug and when it
 changed. The arrow keys, Home and End move between rows and Enter opens one;
 moving never opens an entry by itself.
 
+**Selecting rows** raises the bulk bar at the foot of the list: the count, the
+workspace's verb as the one primary button, then Set a field, Discard changes
+and Delete, and a close button. On a phone the buttons wrap inside the bar;
+none runs off the screen. Set a field opens a dialog with the same field
+controls as the editor; entries it could not save are listed in the dialog,
+with the reason, and stay selected.
+
 **The inspector** holds what is about the entry rather than in it: its status,
 where it is saved, its file and version, what changed, and its published
 versions. Restoring a version saves it as a draft; history never publishes. Tabs are words
@@ -303,6 +316,13 @@ view use 16px 600 titles.
 **Spacing is the scale.** Every padding, margin and gap in Studio's
 stylesheets is a `--space-*` token (or another token). The only literals are
 1px and 2px hairline nudges. `pnpm check:design` enforces it.
+
+**Without a database** Studio still edits content. A view whose data lives in
+Postgres keeps its title and shows one empty state in its place: the database
+icon, "<What> needs a database", what it would hold, and the steps to add one.
+On a page that also shows content (Health, Settings) it is one such panel for
+everything that needs a database, never one per section. Nothing on screen
+asks the API for what a missing database can't answer.
 
 **State is a mark and a word.** Never a colored pill. The resting state shows
 nothing, so the exceptions are what the eye finds.
@@ -434,8 +454,6 @@ component; do not copy them.
   checks the ones that are.
 - Studio: Settings keeps its own section layout, and Branches and History use
   the older table styles.
-- Studio: the editor chunk (Milkdown and CodeMirror, about 2.7 MB) loads with
-  the app instead of when an entry opens.
 
 ## Verify before you hand off
 

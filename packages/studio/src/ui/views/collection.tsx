@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import type { DraftsDto, EntryList, EntryStatus, EntrySummary } from "../../editor-types";
 import type { SchemaFieldDto } from "../../types";
 import { AssetThumb, formatCell } from "../components/fields";
+import { SetFieldDialog } from "../components/set-field-dialog";
 import {
   IconCaretDown,
   IconClose,
@@ -23,15 +24,19 @@ import {
 import { useConfirm } from "../components/ui/confirm";
 import { Menu, MenuContent, MenuItem, MenuSection, MenuTrigger } from "../components/ui/menu";
 import { api, plainError, qs } from "../lib/api";
-import { humanise, labelOf, titleField } from "../lib/fields";
+import { humanise, labelOf, settableFields, titleField } from "../lib/fields";
 import { relativeTime } from "../lib/format";
+import { isTyping, moveRowFocus } from "../lib/row-focus";
 import { listStateFromHash, replaceListState } from "../lib/route";
 import {
   actionWord,
   collectionLabel,
+  deletionNote,
   doneWord,
+  PUBLISH_NEEDS_EDITOR,
   publishVerb,
   singular,
+  useCanPublish,
   useStudio,
 } from "../lib/studio";
 
@@ -119,6 +124,7 @@ export function CollectionView({ collection }: { collection: string }) {
     (f) => f.type === "asset" || (f.type === "array" && f.items?.type === "asset"),
   );
   const canWrite = workspace.data?.canWrite ?? true;
+  const canPublish = useCanPublish();
   const local = workspace.data?.storage === "local";
 
   // Search, filters and sort start from the address, so a reload or a shared
@@ -136,6 +142,7 @@ export function CollectionView({ collection }: { collection: string }) {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [settingField, setSettingField] = useState(false);
 
   // Debounced search: the server answers fast, but not every keystroke.
   useEffect(() => {
@@ -173,6 +180,20 @@ export function CollectionView({ collection }: { collection: string }) {
     }),
     [collection, query, status, sort, where],
   );
+
+  // j and k move through the rows from anywhere on the page; the arrows,
+  // Home and End once focus is in the table.
+  const table = useRef<HTMLTableElement | null>(null);
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent): void => {
+      if (event.key !== "j" && event.key !== "k") return;
+      if (!table.current || table.current.contains(document.activeElement)) return;
+      if (isTyping(event.target)) return;
+      if (moveRowFocus(table.current, "a.row-title", event)) event.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const seq = useRef(0);
   // The page the last request asked for, so Try again repeats that request:
@@ -247,7 +268,7 @@ export function CollectionView({ collection }: { collection: string }) {
       const ok = await confirm({
         kind: "delete",
         title: `Delete ${chosen.length === 1 ? `“${noun}”` : noun}?`,
-        body: `They stay live until you ${actionWord(drafts.data?.publish)} the deletion.`,
+        body: deletionNote(drafts.data?.publish, true),
         action: `Delete ${what}`,
       });
       if (!ok) return;
@@ -308,6 +329,8 @@ export function CollectionView({ collection }: { collection: string }) {
   const label = collectionLabel(collection);
   const all = list?.counts.all ?? 0;
   const filtered = query !== "" || status !== "all" || Object.keys(where).length > 0;
+  // The Drafts or Published tab alone: say what is empty, not that a search failed.
+  const onlyStatus = query === "" && Object.keys(where).length === 0 && status !== "all";
   const allVisibleSelected = items.length > 0 && items.every((item) => selected.has(item.path));
 
   return (
@@ -494,7 +517,14 @@ export function CollectionView({ collection }: { collection: string }) {
       ) : null}
 
       <div className="table-wrap">
-        <table className="entries" aria-busy={loading}>
+        <table
+          ref={table}
+          className="entries"
+          aria-busy={loading}
+          onKeyDown={(event) => {
+            if (moveRowFocus(event.currentTarget, "a.row-title", event)) event.preventDefault();
+          }}
+        >
           <thead>
             <tr>
               <th className="col-check">
@@ -596,7 +626,13 @@ export function CollectionView({ collection }: { collection: string }) {
           <div className="listing-empty">
             {filtered ? (
               <>
-                <p className="listing-empty-title">Nothing matches.</p>
+                <p className="listing-empty-title">
+                  {onlyStatus
+                    ? status === "unpublished"
+                      ? `No drafts. Every ${singular(collection)} is ${doneWord(drafts.data?.publish)}.`
+                      : `Nothing ${doneWord(drafts.data?.publish)} yet.`
+                    : "Nothing matches."}
+                </p>
                 <button
                   type="button"
                   className="btn"
@@ -606,7 +642,7 @@ export function CollectionView({ collection }: { collection: string }) {
                     setWhere({});
                   }}
                 >
-                  Clear filters
+                  {onlyStatus ? "Show all" : "Clear filters"}
                 </button>
               </>
             ) : (
@@ -636,6 +672,20 @@ export function CollectionView({ collection }: { collection: string }) {
         ) : null}
       </div>
 
+      <SetFieldDialog
+        collection={collection}
+        entries={items.filter((item) => selected.has(item.path))}
+        fields={fields}
+        open={settingField}
+        onOpenChange={setSettingField}
+        onSaved={(failed) => {
+          // What wasn't saved stays selected, to fix and try again.
+          const keep = new Set(failed);
+          setSelected(new Set(items.filter((i) => keep.has(i.slug)).map((i) => i.path)));
+          drafts.refresh();
+        }}
+      />
+
       {selected.size > 0 ? (
         <div className="bulk" role="toolbar" aria-label="Selected entries">
           <span className="bulk-count" data-numeric="">
@@ -646,11 +696,23 @@ export function CollectionView({ collection }: { collection: string }) {
             className="btn"
             data-size="sm"
             data-variant="primary"
-            disabled={busy || !canWrite}
+            disabled={busy || !canWrite || !canPublish}
             onClick={() => void bulk("publish")}
+            title={canPublish ? undefined : PUBLISH_NEEDS_EDITOR}
           >
             {publishVerb(publish)}
           </button>
+          {settableFields(fields).length > 0 ? (
+            <button
+              type="button"
+              className="btn"
+              data-size="sm"
+              disabled={busy || !canWrite}
+              onClick={() => setSettingField(true)}
+            >
+              Set a field
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn"

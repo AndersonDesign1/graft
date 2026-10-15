@@ -17,6 +17,7 @@ import { groupActivity } from "../lib/activity";
 import { api, qs } from "../lib/api";
 import { absoluteTime, plural, relativeTime } from "../lib/format";
 import {
+  useDatabase,
   collectionLabel,
   editableCollections,
   publishVerb,
@@ -31,7 +32,10 @@ export function HomeView() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   // Approvals live in Postgres; a workspace without them answers with an
   // error, which here just means there is nothing to show.
-  const approvals = useResource<{ approvals: unknown[] }>("/approvals");
+  const database = useDatabase();
+  const approvals = useResource<{ approvals: unknown[] }>(database ? "/approvals" : null, [
+    database,
+  ]);
 
   useEffect(() => {
     let cancelled = false;

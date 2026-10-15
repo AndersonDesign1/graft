@@ -8,20 +8,26 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { DraftChangeDto, PublishResultDto, ReviewRequest } from "../../editor-types";
 import type { ApprovalList, PendingApprovalDto } from "../../types";
-import { IconCheck, IconExternal, IconWaiting } from "../components/icons";
+import { IconCheck, IconDatabase, IconExternal, IconWaiting } from "../components/icons";
+import { useConfirm } from "../components/ui/confirm";
 import { api, plainError } from "../lib/api";
+import { describeRequest, inputSummary } from "../lib/approvals";
 import { absoluteTime, plural, relativeTime } from "../lib/format";
-import { useStudio } from "../lib/studio";
+import { useDatabase, useStudio } from "../lib/studio";
 import { useResource } from "../lib/use-resource";
 
 export function InboxView({ onDecided }: { onDecided?: () => void }) {
   const { drafts } = useStudio();
-  // Approvals live in Postgres; a workspace without them answers with an
-  // error, which here only means there are none to show.
-  const approvals = useResource<ApprovalList>("/approvals");
+  // Approvals live in Postgres; without a database there are none to ask for,
+  // and the inbox says why instead of asking.
+  const database = useDatabase();
+  const approvals = useResource<ApprovalList>(database ? "/approvals" : null, [database]);
   const reviews = drafts.data?.reviews ?? [];
   const requests = approvals.data?.approvals ?? [];
-  const loading = (!drafts.data && !drafts.error) || (approvals.loading && !approvals.data);
+  const loading =
+    (!drafts.data && !drafts.error) ||
+    database === undefined ||
+    (database && approvals.loading && !approvals.data);
   const total = reviews.length + requests.length;
 
   return (
@@ -43,11 +49,14 @@ export function InboxView({ onDecided }: { onDecided?: () => void }) {
         <p className="inbox-empty">
           <IconCheck aria-hidden="true" />
           <span>
-            Changes sent for review, and agents asking before they delete or overwrite anything,
-            show up here.
+            {database === false
+              ? "Changes sent for review show up here."
+              : "Changes sent for review, and agents asking before they delete or overwrite anything, show up here."}
           </span>
         </p>
       ) : null}
+
+      {database === false ? <ApprovalQueue /> : null}
 
       {reviews.length > 0 ? (
         <section className="inbox-section" aria-labelledby="inbox-reviews">
@@ -96,8 +105,20 @@ export function InboxView({ onDecided }: { onDecided?: () => void }) {
  * (`ApprovalQueuePanel`), where there is no Studio around it.
  */
 export function ApprovalQueue({ onDecided }: { onDecided?: () => void }) {
-  const approvals = useResource<ApprovalList>("/approvals");
+  const database = useDatabase();
+  const approvals = useResource<ApprovalList>(database ? "/approvals" : null, [database]);
   const requests = approvals.data?.approvals ?? [];
+  if (database === false) {
+    return (
+      <p className="inbox-empty">
+        <IconDatabase aria-hidden="true" />
+        <span>
+          Approvals need a database. An agent's request to delete something is kept in Postgres
+          until someone decides; without one, agents can't ask.
+        </span>
+      </p>
+    );
+  }
   if (approvals.error && !approvals.data) {
     return (
       <p className="notice" data-tone="error">
@@ -230,8 +251,25 @@ function ApprovalRow({
   onDecided: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
+  const action = describeRequest(request.functionName, request.input);
+  // A named action already says what it touches; a bare function shows its inputs.
+  const summary = action.startsWith("Run ") ? inputSummary(request.input) : [];
 
   async function decide(decision: "approved" | "denied"): Promise<void> {
+    // Approving lets an irreversible call run, so it is asked twice; denying
+    // only sends the agent away.
+    if (
+      decision === "approved" &&
+      !(await confirm({
+        kind: "delete",
+        title: `Approve “${action}”?`,
+        body: "The agent can then run it once. What it deletes or overwrites can't be undone from Studio.",
+        action: "Approve",
+      }))
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       await api(`/approvals/${encodeURIComponent(request.id)}/decide`, {
@@ -240,8 +278,8 @@ function ApprovalRow({
       });
       toast.success(
         decision === "approved"
-          ? `Approved ${request.functionName}. The agent can run it now.`
-          : `Denied ${request.functionName}`,
+          ? `Approved: ${action}. The agent can run it now.`
+          : `Denied: ${action}`,
       );
       onDecided();
     } catch (error) {
@@ -261,18 +299,25 @@ function ApprovalRow({
     <li className="inbox-item">
       <IconWaiting className="inbox-icon" data-tone="waiting" aria-hidden="true" />
       <div className="inbox-main">
-        <p className="inbox-title">
-          <code>{request.functionName}</code>
-        </p>
+        <p className="inbox-title">{action}</p>
         <p className="inbox-sub">
-          {who} on {request.branchId},{" "}
+          {who} asks to run <code>{request.functionName}</code> on {request.branchId},{" "}
           <time dateTime={request.createdAt} title={absoluteTime(request.createdAt)}>
             {relativeTime(request.createdAt)}
           </time>
           . Nothing happens until you decide.
         </p>
+        {summary.length > 0 ? (
+          <ul className="inbox-paths" aria-label="What it sends">
+            {summary.map(([key, value]) => (
+              <li key={key}>
+                {key}: <code>{value}</code>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <details className="disclosure">
-          <summary>What it would send</summary>
+          <summary>Everything it would send</summary>
           <pre className="well">{JSON.stringify(request.input, null, 2)}</pre>
         </details>
       </div>
