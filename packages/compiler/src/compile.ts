@@ -22,6 +22,7 @@ import {
   type Database,
 } from "@usegraft/db";
 import { parseDocument, type ProjectedDoc } from "./parse";
+import { brokenReferencesError, findBrokenReferences } from "./references";
 
 /**
  * Where a project's authored content is authoritative.
@@ -77,6 +78,16 @@ export interface ReadDocsOptions {
    * renders. Set "full" only where every author has commit access.
    */
   mdxTrust?: MdxTrust;
+  /**
+   * Refuse a `reference` field whose target doesn't exist, with
+   * CONTENT_REFERENCE_NOT_FOUND. `"files"`: the target must be among the
+   * files being validated, which is right for a whole tree. A set of
+   * `collection/slug` keys: the target may also be one of those, for a
+   * caller validating some documents of a larger whole, such as a publish.
+   * Omitted, references are not checked: a few files alone can't say
+   * whether a target exists. `readDocs` defaults to `"files"`.
+   */
+  references?: "files" | ReadonlySet<string>;
 }
 
 /** One authored file: its path inside the content directory, and its bytes. */
@@ -92,7 +103,10 @@ export function readDocs(
   collections: Record<string, AnyCollection>,
   options: ReadDocsOptions = {},
 ): ProjectedDoc[] {
-  return validateDocuments(readSourceFiles(contentDir), collections, options);
+  return validateDocuments(readSourceFiles(contentDir), collections, {
+    references: "files",
+    ...options,
+  });
 }
 
 /** Every content file under `contentDir`, read once, with its path relative to it. */
@@ -113,9 +127,9 @@ export function readSourceFiles(contentDir: string): SourceFile[] {
 
 /**
  * Validate authored files into normalized docs: the schema, slug uniqueness,
- * and MDX safety. The same checks whether the files came from a checkout or
- * from Postgres in a database-sourced project, so the two sources can never
- * accept different content.
+ * MDX safety and, when asked, references. The same checks whether the files
+ * came from a checkout or from Postgres in a database-sourced project, so the
+ * two sources can never accept different content.
  */
 export function validateDocuments(
   files: Iterable<SourceFile>,
@@ -224,6 +238,15 @@ export function validateDocuments(
     });
   }
 
+  if (options.references !== undefined) {
+    const broken = findBrokenReferences(
+      docs,
+      collections,
+      options.references === "files" ? undefined : options.references,
+    );
+    if (broken.length > 0) throw brokenReferencesError(broken);
+  }
+
   return docs.sort((a, b) =>
     a.collection === b.collection
       ? a.slug.localeCompare(b.slug)
@@ -262,7 +285,7 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
       docs = validateDocuments(
         files.map((file) => ({ sourcePath: file.path, raw: file.raw })),
         options.collections,
-        { mdxTrust: options.mdxTrust },
+        { mdxTrust: options.mdxTrust, references: "files" },
       );
       return docs.map(indexRow);
     },
