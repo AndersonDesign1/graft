@@ -115,7 +115,7 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
         return jsonRpcError(
           401,
           -32001,
-          "Unauthorized: this MCP endpoint requires authentication. Send `Authorization: Bearer <token>` from a trusted issuer.",
+          "This MCP endpoint needs a token. Send `Authorization: Bearer <token>` with one an admin made in Studio, under Developer, Agents, or one from an issuer this deployment trusts.",
         );
       }
     }
