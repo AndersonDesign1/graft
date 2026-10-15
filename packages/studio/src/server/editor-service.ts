@@ -9,6 +9,7 @@
 import {
   FilesystemStore,
   compile,
+  fireDeployHooks,
   notifyContentChange,
   type ContentChangeListener,
   type ContentChangeNotice,
@@ -43,7 +44,7 @@ import type {
 } from "../editor-types";
 import type { SchemaFieldDto } from "../types";
 import { requireCollection } from "../content";
-import { readChanges } from "../git";
+import { git, lastCommitTimes, readChanges } from "../git";
 import {
   DiskCatalog,
   applyOverlay,
@@ -73,6 +74,8 @@ export interface EditorServiceOptions {
   store?: ContentStore;
   /** Told after a local write changed the index, so the app refreshes its cache. */
   onContentChange?: ContentChangeListener;
+  /** Where the deploy hooks are kept: the project's own database. Defaults to `db`. */
+  workspaceDb?: Database;
 }
 
 export class EditorService {
@@ -213,7 +216,7 @@ export class EditorService {
     const entries = await this.listed(name, actor, changes);
     return queryEntries(
       name,
-      summarise(name, entries, fields, changes),
+      summarise(name, entries, fields, changes, await this.commitTimes()),
       fields,
       query,
       collection.sections,
@@ -221,6 +224,19 @@ export class EditorService {
         ? new Map(entries.map((entry) => [entry.path, searchText(entry, fields)]))
         : undefined,
     );
+  }
+
+  private committed: { head: string; times: Map<string, number> } | undefined;
+
+  /** Last commit time per file, read once per HEAD. Local checkouts only. */
+  private async commitTimes(): Promise<ReadonlyMap<string, number> | undefined> {
+    if (this.remote) return undefined;
+    const head = await git(this.options.contentDir, ["rev-parse", "HEAD"]).catch(() => "");
+    if (!head) return undefined;
+    if (this.committed?.head !== head) {
+      this.committed = { head, times: await lastCommitTimes(this.options.contentDir) };
+    }
+    return this.committed.times;
   }
 
   /** Parsed entries by version: a list re-parses only what changed since the last one. */
@@ -624,6 +640,16 @@ export class EditorService {
       ...(this.remote ? { mode: action === "publish" ? "direct" : "review" } : {}),
     });
     const refresh = result.changes ? await this.liveChanged(result.changes) : undefined;
+    // A commit to GitHub's production branch is a publish the site rebuilds
+    // from, so it calls the deploy hooks as a database publish does from its
+    // store. A local commit reaches no site, and calls none.
+    if (this.storage === "github" && result.mode === "direct" && result.commit) {
+      await fireDeployHooks(this.options.workspaceDb ?? this.options.db, {
+        event: "publish",
+        branch: this.options.branchId,
+        paths: result.published,
+      });
+    }
     return {
       // The project's review rule can turn a direct publish into a review.
       action: result.mode === "review" && action === "publish" ? "review" : action,

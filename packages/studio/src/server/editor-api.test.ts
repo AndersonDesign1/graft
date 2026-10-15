@@ -9,6 +9,7 @@ import {
   mkdtempSync,
   readFileSync,
   unlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -35,8 +36,11 @@ vi.mock("@usegraft/compiler", async (importOriginal) => {
     // Projection has its own integration tests; this suite is about which
     // bytes land where.
     compile: vi.fn(async () => ({ count: 0, docs: [], changes: {}, gitSha: null })),
+    fireDeployHooks: vi.fn(async () => []),
   };
 });
+
+const { fireDeployHooks } = await import("@usegraft/compiler");
 
 const { createStudioApiHandler } = await import("../api");
 
@@ -456,11 +460,14 @@ describe("editor API on a local checkout", () => {
     expect(diff.json.bodyChanged).toBe(false);
     expect(diff.json.file).toMatchObject({ added: 1, removed: 1 });
 
+    vi.mocked(fireDeployHooks).mockClear();
     await call(handler, "POST", "/drafts/publish", {
       paths: ["products/wool-hat.mdx"],
       message: "Raise the hat price",
     });
     expect(git(contentDir, "log", "-1", "--format=%s")).toBe("Raise the hat price");
+    // A commit on this computer reaches no site.
+    expect(fireDeployHooks).not.toHaveBeenCalled();
 
     await call(handler, "POST", "/drafts/discard", {
       paths: ["products/old-shirt.mdx", "products/linen-shirt-copy.mdx"],
@@ -468,6 +475,29 @@ describe("editor API on a local checkout", () => {
     expect(existsSync(join(contentDir, "products", "old-shirt.mdx"))).toBe(true);
     expect(existsSync(join(contentDir, "products", "linen-shirt-copy.mdx"))).toBe(false);
     expect((await call<DraftsDto>(handler, "GET", "/drafts")).json.changes).toEqual([]);
+  });
+
+  it("dates an untouched entry by its last commit, not its file's mtime", async () => {
+    const committed = Number(git(contentDir, "log", "-1", "--format=%ct")) * 1000;
+    // A clone or checkout sets every mtime to now; it edits nothing.
+    const later = new Date(committed + 86_400_000);
+    utimesSync(join(contentDir, "products", "linen-shirt.mdx"), later, later);
+    const opened = await call<EntryDto>(handler, "GET", "/entry?collection=products&slug=wool-hat");
+    await call(handler, "PUT", "/entry", {
+      collection: "products",
+      slug: "wool-hat",
+      data: { ...opened.json.data, price: 2900 },
+      body: opened.json.body,
+      baseVersion: opened.json.version,
+    });
+
+    const listed = await call<EntryList>(handler, "GET", "/entries?collection=products");
+    const at = (slug: string) =>
+      Date.parse(listed.json.items.find((item) => item.slug === slug)?.updatedAt ?? "");
+    expect(at("linen-shirt")).toBe(committed);
+    // An entry with a draft was edited when its file was.
+    expect(at("wool-hat")).toBeGreaterThan(committed - 1000);
+    expect(at("wool-hat")).not.toBe(committed);
   });
 
   it("refuses a database collection", async () => {
@@ -643,12 +673,19 @@ describe("editor API on GitHub (hosted)", () => {
     expect(result.json.action).toBe("publish");
     expect(fake.files()["content/products/silk-scarf.mdx"]).toContain("title: Silk Scarf");
     expect(fake.log()[0]).toMatchObject({ message: "Add the scarf", author: { name: "Ana" } });
+    // The production branch moved, so the site's deploy hooks hear about it.
+    expect(fireDeployHooks).toHaveBeenLastCalledWith(expect.anything(), {
+      event: "publish",
+      branch: "main",
+      paths: ["products/silk-scarf.mdx"],
+    });
     // Listed as published straight away, before any redeploy.
     const list = await call<EntryList>(handler, "GET", "/entries?collection=products");
     expect(list.json.items.find((item) => item.slug === "silk-scarf")?.status).toBe("published");
   });
 
   it("submits for review when the person may not publish", async () => {
+    vi.mocked(fireDeployHooks).mockClear();
     const { fake, handler } = hosted("direct", ["studio:read", "studio:write"]);
     const opened = await call<EntryDto>(handler, "GET", "/entry?collection=products&slug=wool-hat");
     await call(handler, "PUT", "/entry", {
@@ -670,6 +707,8 @@ describe("editor API on GitHub (hosted)", () => {
     expect(result.json).toMatchObject({ action: "review", review: { number: 1 } });
     expect(fake.files()["content/products/wool-hat.mdx"]).toContain("title: Wool Hat");
     expect((await call<DraftsDto>(handler, "GET", "/drafts")).json.reviews).toHaveLength(1);
+    // A pull request changes no site yet.
+    expect(fireDeployHooks).not.toHaveBeenCalled();
   });
 
   it("reports a conflict and publishes the editor's choice", async () => {

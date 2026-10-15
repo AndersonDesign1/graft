@@ -111,10 +111,11 @@ function idOf(ctx: RouteContext, what: string): string {
 function keyOf(raw: unknown): string {
   const parsed = AssetRef.shape.key.safeParse(raw);
   if (!parsed.success) {
+    const missing = raw === undefined || raw === null || raw === "";
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
-      message: `"${String(raw)}" is not an asset key.`,
-      fix: 'Use a lowercase path like "products/hat/front.jpg": letters, digits, ., _ and -, with / between parts.',
+      message: missing ? "No asset key was sent." : `"${String(raw)}" is not an asset key.`,
+      fix: 'Send the file\'s key: a lowercase path like "images/cover.jpg", with letters, digits, ., _ and -, and / between parts.',
     });
   }
   return parsed.data;

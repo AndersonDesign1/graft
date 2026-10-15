@@ -42,6 +42,7 @@ import {
   MenuTrigger,
 } from "./components/ui/menu";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { MOD_KEY } from "./lib/keys";
 import { SIGNED_OUT_EVENT, qs } from "./lib/api";
 import {
   DEV_VIEWS,
@@ -81,10 +82,6 @@ const DEV_NAV: Array<{ view: DevView; label: string; Icon: IconComponent }> = [
   { view: "agents", label: "Agents", Icon: IconAgents },
   { view: "settings", label: "Settings", Icon: IconSettings },
 ];
-
-/** The command key as this keyboard labels it. */
-const MOD_KEY =
-  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
 
 const THEME: Record<Theme, { label: string; Icon: IconComponent }> = {
   system: { label: "Match system", Icon: IconSystem },

@@ -49,10 +49,12 @@ import { useAutosave } from "../lib/autosave";
 import { labelOf, problemsFromServer, problemsIn, titleField } from "../lib/fields";
 import { compareRoundTrip, describeFidelity, type FidelityResult } from "../lib/fidelity";
 import { relativeTime } from "../lib/format";
+import { shortcut } from "../lib/keys";
 import { buildForm, composeData, sameValue } from "../lib/schema-form";
 import {
   actionWord,
   collectionLabel,
+  deletionNote,
   doneWord,
   publishVerb,
   singular,
@@ -421,7 +423,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
       body:
         entry.status === "new"
           ? `It was never ${doneWord(drafts.data?.publish)}, so it goes for good.`
-          : `It stays live until you ${actionWord(drafts.data?.publish)} the deletion. Undo is offered for a few seconds after.`,
+          : `${deletionNote(drafts.data?.publish)} Undo is offered for a few seconds after.`,
       action: `Delete ${singular(collection)}`,
     });
     if (!ok) return;
@@ -616,7 +618,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
               </MenuItem>
             </MenuContent>
           </Menu>
-          <Tooltip label={inspectorOpen ? "Hide details (⌘\\)" : "Show details (⌘\\)"}>
+          <Tooltip label={`${inspectorOpen ? "Hide" : "Show"} details (${shortcut("\\")})`}>
             <button
               type="button"
               className="icon-btn"
@@ -645,9 +647,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
           <div className="banner" data-tone="conflict" role="status">
             <IconWarning size={14} />
             <span>
-              You deleted this {singular(collection)}. It stays live until you{" "}
-              {action === "review" ? "submit" : action === "commit" ? "commit" : "publish"} the
-              deletion.
+              You deleted this {singular(collection)}. {deletionNote(action)}
             </span>
             <button
               type="button"

@@ -33,6 +33,7 @@ import { ListSkeleton } from "../components/skeletons";
 import type { Theme } from "../lib/theme";
 import { useResource } from "../lib/use-resource";
 import { plural } from "../lib/format";
+import { MOD_KEY } from "../lib/keys";
 
 const THEMES: Array<{ id: Theme; label: string; Icon: IconComponent }> = [
   { id: "system", label: "System", Icon: IconSystem },
@@ -41,8 +42,9 @@ const THEMES: Array<{ id: Theme; label: string; Icon: IconComponent }> = [
 ];
 
 const SHORTCUTS: Array<[string[], string]> = [
-  [["⌘", "K"], "Open the command palette"],
-  [["⌘", "S"], "Save the open document"],
+  [[MOD_KEY, "K"], "Open the command palette"],
+  [[MOD_KEY, "S"], "Save the open document"],
+  [[MOD_KEY, "\\"], "Show or hide an entry's details"],
   [["↑", "↓"], "Move through palette results"],
   [["Enter"], "Run the selected command"],
   [["Esc"], "Close the palette or a dialog"],
@@ -95,6 +97,20 @@ const SECTIONS = [
     sub: "Studio is opt-in: nothing here runs unless you asked for it.",
   },
 ] as const satisfies ReadonlyArray<{ id: string; title: string; sub: string }>;
+
+/**
+ * When the hooks are called, for where this Studio saves. A commit on this
+ * computer reaches no site, so it calls none: the host builds from the push.
+ */
+function hooksSub(storage: "local" | "github" | "database" | undefined): string {
+  if (storage === "local") {
+    return "URLs called when a publish reaches the site: from a hosted Studio, or of content in the database. A commit on this computer calls none; your host builds when you push it.";
+  }
+  if (storage === "github") {
+    return "URLs called after every publish from Studio, so the site rebuilds or refreshes what it cached.";
+  }
+  return SECTION_BY_ID.hooks.sub;
+}
 
 const SECTION_BY_ID = Object.fromEntries(SECTIONS.map((s) => [s.id, s])) as Record<
   (typeof SECTIONS)[number]["id"],
@@ -284,7 +300,7 @@ export function SettingsView({
               <Section id="site" title="Site" sub={SECTION_BY_ID.site.sub}>
                 <SitePanel site={site} />
               </Section>
-              <Section id="hooks" title="Deploy hooks" sub={SECTION_BY_ID.hooks.sub}>
+              <Section id="hooks" title="Deploy hooks" sub={hooksSub(workspace.data?.storage)}>
                 <HooksPanel site={site} />
               </Section>
             </>

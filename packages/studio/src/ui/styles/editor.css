@@ -2087,8 +2087,7 @@
 }
 
 .inspector-slug,
-.inspector-path,
-.inspector-sha {
+.inspector-path {
   font-family: var(--font-mono);
 }
 
