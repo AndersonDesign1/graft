@@ -218,10 +218,25 @@ jobs:
       # docs describe this one. That is how 1.0.0-beta.1 shipped green with a
       # plain `npm i` still resolving beta.0 on all 21 packages.
       #
-      # This step cannot fix it: OIDC trusted publishing authorises `npm
-      # publish` and nothing else, and the pipeline holds no npm token on
-      # purpose. So it fails the run and prints the `npm dist-tag add` lines
-      # instead — the tag move stays manual, but it stops being invisible.
-      - name: Does `latest` point at what we just published
-        if: ${{ steps.changesets.outputs.published == 'true' }}
-        run: pnpm check:dist-tags
+      # Until npm's 2026-09-30 change, OIDC authorised `npm publish` alone, so
+      # this was a check that failed the run and a human moved the tag with a
+      # passkey after every beta. Trusted-publisher configs now carry an opt-in
+      # "Allow npm dist-tag" permission, ticked on every package, so the same
+      # short-lived credential that published can move the tag. Still no token.
+      #
+      # npm, not pnpm, does the tag write, and OIDC dist-tags need npm 11.21.0
+      # or later. Node 24 bundles an older one, hence the pinned install.
+      #
+      # Also runs on a plain dispatch: if a publish succeeded but this step did
+      # not, re-running the workflow publishes nothing (changesets skips what
+      # the registry has) and finishes the tag move.
+      #
+      # The check runs after the sync on purpose. sync-dist-tags reports what it
+      # tried; check-dist-tags reads the registry back and is the one that says
+      # the release is finished.
+      - name: Point `latest` at what we just published
+        if: ${{ steps.changesets.outputs.published == 'true' || (github.event_name == 'workflow_dispatch' && !inputs.canary) }}
+        run: |
+          npm install --global npm@11.21.0
+          pnpm sync:dist-tags
+          pnpm check:dist-tags
