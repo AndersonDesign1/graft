@@ -13,7 +13,13 @@
 import { unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { createStorage, storageConfigFromEnv, type Storage } from "@usegraft/assets";
-import { compile, compileStatic, notifyContentChange, resolveContained } from "@usegraft/compiler";
+import {
+  compile,
+  compileDocuments,
+  compileStatic,
+  notifyContentChange,
+  resolveContained,
+} from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import {
   createFunctionsHandler,
@@ -180,25 +186,37 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
    * Project the content tree into whichever index this server serves. Static
    * artifacts are opened per operation and closed immediately — a SQLite file
    * open is sub-millisecond, and holding no handle keeps the server as
-   * stateless as the Postgres path.
+   * stateless as the Postgres path. Given the files a tool wrote, the
+   * Postgres index of files in git projects only those: recompiling the tree
+   * made one write to a 2,000-document project take over a second. The
+   * static artifact is rebuilt whole, having no one-document projection yet.
    */
-  const projectContent = async (): Promise<ProjectedContent> => {
+  const projectContent = async (paths?: string[]): Promise<ProjectedContent> => {
     const result =
-      staticIndexPath === undefined
-        ? await compile({
+      staticIndexPath === undefined && paths && options.source !== "database"
+        ? await compileDocuments({
             contentDir,
+            paths,
             collections,
             db: requireDb("compile", ""),
             branchId,
             mdxTrust: options.mdxTrust,
-            ...(options.source ? { source: options.source } : {}),
           })
-        : await compileStatic({
-            contentDir,
-            collections,
-            indexPath: staticIndexPath,
-            mdxTrust: options.mdxTrust,
-          });
+        : staticIndexPath === undefined
+          ? await compile({
+              contentDir,
+              collections,
+              db: requireDb("compile", ""),
+              branchId,
+              mdxTrust: options.mdxTrust,
+              ...(options.source ? { source: options.source } : {}),
+            })
+          : await compileStatic({
+              contentDir,
+              collections,
+              indexPath: staticIndexPath,
+              mdxTrust: options.mdxTrust,
+            });
     // Every caller of projectContent has just written to the tree, so this is
     // the one place the app hears about it.
     const refresh = await notifyContentChange(options.onContentChange, {
@@ -350,7 +368,7 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
       // directory scan, and a symlink in the content tree would point this
       // unlink at a file outside it.
       unlinkSync(resolveContained(contentDir, doc.sourcePath, { label: "document path" }));
-      const result = await projectContent();
+      const result = await projectContent([doc.sourcePath]);
       return {
         deleted: doc.sourcePath,
         branch: branchId,

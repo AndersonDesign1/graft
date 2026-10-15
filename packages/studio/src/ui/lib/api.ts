@@ -97,8 +97,9 @@ export function plainError(error: unknown): string {
     case "REMOTE_STORE_FAILED":
       return "GitHub refused the change. Your draft is safe; ask whoever set up Studio to check its GitHub access.";
     case "UNAUTHORIZED":
-      return error.status === 401 && error.message.includes("scope")
-        ? "Your role can't do that. Ask an admin for access."
+      // A refusal for a missing permission names it; signing out does not.
+      return error.details?.required
+        ? error.message
         : "You're signed out. Sign in again to continue.";
     case "DOCUMENT_NOT_FOUND":
       return "This entry no longer exists. It may have been deleted or renamed.";

@@ -13,19 +13,13 @@
  * every content store), so this module never has to agree with the compiler
  * on hashing.
  */
-import { GraftError, type ChangeSet } from "@usegraft/contracts";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, like, or, sql } from "drizzle-orm";
+import type { ChangeSet } from "@usegraft/contracts";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, like, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Database } from "./client";
 import type { ContentInput } from "./diff";
-import {
-  compilations,
-  contentHeads,
-  contentIndex,
-  contentMirror,
-  contentReviews,
-  contentRevisions,
-} from "./schema";
+import { projectDocumentsIn } from "./project";
+import { contentHeads, contentMirror, contentReviews, contentRevisions } from "./schema";
 
 /** Who wrote a revision. Established by the server, never by the request. */
 export interface RevisionActor {
@@ -378,7 +372,11 @@ export async function publishDrafts(
     }
 
     const published = moving.map((move) => move.path);
-    const changes = await projectEntries(tx, input.branchId, input.index, published);
+    const changes = await projectDocumentsIn(
+      tx,
+      { ...input.index, paths: published },
+      { branchId: input.branchId, gitSha: null },
+    );
     if (published.length === 0) return { ok: true, changes, published } as const;
     // A review is answered once everything in it is live, by whichever
     // route it got there: approved from the inbox, or published directly.
@@ -403,151 +401,6 @@ export async function publishDrafts(
       );
     return { ok: true, changes, published } as const;
   });
-}
-
-/**
- * Apply a few index changes without re-reading the whole branch: what a
- * publish of some documents needs, where a full compile would diff thousands.
- * Records a compilation, like every projection.
- */
-async function projectEntries(
-  tx: Tx,
-  branchId: string,
-  changes: PublishDraftsInput["index"],
-  paths: string[],
-): Promise<ChangeSet> {
-  const result: ChangeSet = { added: [], changed: [], removed: [], unchanged: 0 };
-  const keys = [...changes.upserts, ...changes.removals];
-  const existing =
-    keys.length === 0
-      ? []
-      : await tx
-          .select({
-            collection: contentIndex.collection,
-            slug: contentIndex.slug,
-            contentHash: contentIndex.contentHash,
-            sourcePath: contentIndex.sourcePath,
-            deleted: contentIndex.deleted,
-          })
-          .from(contentIndex)
-          .where(
-            and(
-              eq(contentIndex.branchId, branchId),
-              or(
-                ...keys.map((key) =>
-                  and(eq(contentIndex.collection, key.collection), eq(contentIndex.slug, key.slug)),
-                ),
-              ),
-            ),
-          );
-  const byKey = new Map(existing.map((row) => [`${row.collection}/${row.slug}`, row]));
-
-  // The index is keyed by slug, so a draft claiming a slug another live file
-  // holds would silently replace that file's row. A full compile refuses the
-  // same thing as SLUG_NOT_UNIQUE; so does this, and the throw rolls back.
-  for (const row of changes.upserts) {
-    const prev = byKey.get(`${row.collection}/${row.slug}`);
-    if (prev && !prev.deleted && prev.sourcePath !== row.sourcePath) {
-      throw new GraftError({
-        code: "SLUG_NOT_UNIQUE",
-        message: `Slug "${row.slug}" in collection "${row.collection}" is used by both ${prev.sourcePath} and ${row.sourcePath}`,
-        fix: "Give one a unique `slug` field, or rename the file. Nothing was published.",
-        details: {
-          slug: row.slug,
-          collection: row.collection,
-          files: [prev.sourcePath, row.sourcePath],
-        },
-      });
-    }
-  }
-
-  for (const row of changes.upserts) {
-    const key = `${row.collection}/${row.slug}`;
-    const prev = byKey.get(key);
-    if (!prev || prev.deleted) result.added.push(key);
-    else if (prev.contentHash !== row.contentHash || prev.sourcePath !== row.sourcePath) {
-      result.changed.push(key);
-    } else {
-      result.unchanged += 1;
-      continue;
-    }
-    await tx
-      .insert(contentIndex)
-      .values({ ...row, branchId, deleted: false })
-      .onConflictDoUpdate({
-        target: [contentIndex.branchId, contentIndex.collection, contentIndex.slug],
-        set: {
-          data: sql`excluded.data`,
-          body: sql`excluded.body`,
-          contentHash: sql`excluded.content_hash`,
-          sourcePath: sql`excluded.source_path`,
-          deleted: false,
-          updatedAt: sql`now()`,
-        },
-      });
-  }
-  for (const removal of changes.removals) {
-    const key = `${removal.collection}/${removal.slug}`;
-    const prev = byKey.get(key);
-    if (!prev || prev.deleted) continue;
-    result.removed.push(key);
-    await tx
-      .update(contentIndex)
-      .set({ deleted: true, updatedAt: sql`now()` })
-      .where(
-        and(
-          eq(contentIndex.branchId, branchId),
-          eq(contentIndex.collection, removal.collection),
-          eq(contentIndex.slug, removal.slug),
-        ),
-      );
-  }
-
-  // A published file whose slug changed leaves its old row behind: whatever
-  // a published path no longer produces comes off the live site.
-  const kept = new Set(changes.upserts.map((row) => `${row.collection}/${row.slug}`));
-  const stale =
-    paths.length === 0
-      ? []
-      : await tx
-          .select({ collection: contentIndex.collection, slug: contentIndex.slug })
-          .from(contentIndex)
-          .where(
-            and(
-              eq(contentIndex.branchId, branchId),
-              eq(contentIndex.deleted, false),
-              inArray(contentIndex.sourcePath, paths),
-            ),
-          );
-  for (const row of stale) {
-    const key = `${row.collection}/${row.slug}`;
-    if (kept.has(key)) continue;
-    result.removed.push(key);
-    await tx
-      .update(contentIndex)
-      .set({ deleted: true, updatedAt: sql`now()` })
-      .where(
-        and(
-          eq(contentIndex.branchId, branchId),
-          eq(contentIndex.collection, row.collection),
-          eq(contentIndex.slug, row.slug),
-        ),
-      );
-  }
-
-  const [live] = await tx
-    .select({ n: sql<number>`count(*)::int` })
-    .from(contentIndex)
-    .where(and(eq(contentIndex.branchId, branchId), eq(contentIndex.deleted, false)));
-  await tx.insert(compilations).values({
-    branchId,
-    gitSha: null,
-    docCount: live?.n ?? 0,
-    added: result.added.length,
-    changed: result.changed.length,
-    removed: result.removed.length,
-  });
-  return result;
 }
 
 /** Throw drafts away; the live revisions stand. A never-published entry disappears. */

@@ -50,6 +50,8 @@ Everything you need to write, compile, and read content:
 - Full-text search, with ranking and highlighted snippets
 - Agents over MCP with `graft mcp`, including document resources and prompts
 - Uploading assets with `graft asset put`, once storage credentials are set
+- Editing content in Studio with `graft studio`: each save updates
+  `.graft/index.db` ([Studio](/docs/studio#without-a-database))
 
 ## What only Postgres can do
 
@@ -64,8 +66,9 @@ These features store data that Git cannot rebuild, so they need a database:
 - **The audit log, rate limits, and human approvals** for agent actions
   ([Audit & approvals](/docs/audit-and-approvals))
 - **Preview branches** and `graft merge` ([Branching & previews](/docs/branching-previews))
-- **Studio**, the editing UI, local or hosted for a team, and `graft serve`
-  ([Studio](/docs/studio), [Host Studio for your team](/docs/studio-hosting))
+- **Studio's team features**: accounts and sign-in for a hosted Studio,
+  approvals, the compile history, the media library, agent tokens, and
+  `graft serve` ([Studio](/docs/studio), [Host Studio for your team](/docs/studio-hosting))
 
 If a static project declares one of these, Graft refuses to load the config and
 tells you which declaration needs Postgres:
