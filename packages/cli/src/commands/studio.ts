@@ -9,6 +9,7 @@ import { isLoopbackHost, revalidateWebhookFromEnv } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { databaseStoreFor } from "../content-source";
+import { assertNoStaticBranch } from "./compile";
 import { allowedHostsFor, createNodeListener } from "./serve";
 
 export interface StudioCommandOptions {
@@ -109,113 +110,163 @@ function openBrowser(url: string): void {
 export async function studioCommand(options: StudioCommandOptions): Promise<void> {
   loadProjectEnv(options.cwd);
   const config = await loadConfig(findConfig(options.cwd));
-  const url = requireDatabaseUrl();
   // Built before any connection opens, so a bad GRAFT_REVALIDATE_URL stops the
   // start instead of surfacing on the first write.
   const onContentChange = revalidateWebhookFromEnv();
-
-  const [{ createStudioHandler }, { createDb, resolveBranchHandle, scopeWriteBranch }] =
-    await Promise.all([import("@usegraft/studio"), import("@usegraft/db")]);
 
   const branchName = options.branchId ?? "main";
   // Fail before listen: resolveBranchHandle accepts unregistered overlay ids,
   // including git refs with `@`, and the preview URL must too.
   assertGitPreviewBranch(branchName);
 
+  const { createStudioHandler } = await import("@usegraft/studio");
+  const base = {
+    collections: config.collections,
+    contentDir: config.contentDir,
+    mdxTrust: config.mdxTrust,
+    decider: operatorIdentity,
+    onContentChange,
+  };
+
+  // No database: Studio edits the files, and keeps the static index when the
+  // project has one. A static project never uses one, as with `graft mcp`, so
+  // a DATABASE_URL in a parent .env can't send its index somewhere else.
+  // Content kept in the database has nothing to edit without it.
+  const isStatic = config.index.driver === "static";
+  if (isStatic) assertNoStaticBranch(options.branchId);
+  if (isStatic || (!process.env.DATABASE_URL && config.content.source !== "database")) {
+    const staticIndexPath = config.index.driver === "static" ? config.index.path : undefined;
+    await listenStudio(
+      options,
+      branchName,
+      (authenticate) =>
+        createStudioHandler({
+          ...base,
+          ...(staticIndexPath ? { staticIndexPath } : {}),
+          defaultBranch: branchName,
+          authenticate,
+        }),
+      staticIndexPath
+        ? "  No database: saves update .graft/index.db. Approvals, branches and accounts need one."
+        : "  No DATABASE_URL: saves go to your files, and the index waits for `graft compile`.",
+    );
+    return;
+  }
+
+  const url = requireDatabaseUrl();
+  const { createDb, resolveBranchHandle, scopeWriteBranch } = await import("@usegraft/db");
   const control = createDb(url);
   try {
     const branch = await resolveBranchHandle(control.db, branchName, { databaseUrl: url });
-    const writeBranch = scopeWriteBranch(branch.scope);
-    const store = await databaseStoreFor(config, branch.db, writeBranch);
-    let server: Server | undefined;
     try {
-      const host = options.host ?? process.env.HOST ?? "127.0.0.1";
-      const requestedPort = options.port ?? Number(process.env.GRAFT_STUDIO_PORT ?? 4983);
-      if (!Number.isInteger(requestedPort) || requestedPort < 0 || requestedPort > 65535) {
-        throw new GraftError({
-          code: "INPUT_VALIDATION_FAILED",
-          message: `"${options.port ?? process.env.GRAFT_STUDIO_PORT}" is not a valid port.`,
-          fix: "Pass --port <0-65535> (0 picks a free port).",
-        });
-      }
-
-      const loopback = isLoopback(host);
-      const devToken = process.env.GRAFT_DEV_TOKEN;
-      if (!loopback && !devToken) {
-        console.warn(
-          "[graft studio] WARNING: binding beyond loopback with no GRAFT_DEV_TOKEN — " +
-            "set a bearer token before exposing Studio to a network.",
-        );
-      }
-
-      // `graft studio` is the operator's own tool, so the dev token identifies the
-      // operator rather than an agent — it carries the full operator scope set.
-      // Anything else is refused; this command has no notion of a lesser caller.
-      const authenticate =
-        !loopback && devToken
-          ? (request: Request) => {
-              const header = request.headers.get("authorization") ?? "";
-              if (header !== `Bearer ${devToken}`) return null;
-              return {
-                ...operatorIdentity(),
-                scopes: ["studio:read", "studio:write", "approvals:decide"],
-              };
-            }
-          : !loopback
-            ? () => null
-            : undefined;
-
-      const handler = createStudioHandler({
-        db: branch.db,
-        collections: config.collections,
-        contentDir: config.contentDir,
-        mdxTrust: config.mdxTrust,
-        defaultBranch: writeBranch,
-        ...(store ? { store } : {}),
-        decider: operatorIdentity,
-        authenticate,
-        onContentChange,
-      });
-
-      const listening = createServer(
-        createNodeListener(handler, { allowedHosts: allowedHostsFor(host) }),
+      const writeBranch = scopeWriteBranch(branch.scope);
+      const store = await databaseStoreFor(config, branch.db, writeBranch);
+      await listenStudio(options, branchName, (authenticate) =>
+        createStudioHandler({
+          ...base,
+          db: branch.db,
+          defaultBranch: writeBranch,
+          ...(store ? { store } : {}),
+          authenticate,
+        }),
       );
-      server = listening;
-      await new Promise<void>((resolve, reject) => {
-        listening.once("error", reject);
-        listening.listen(requestedPort, host, () => resolve());
-      });
-      const address = listening.address();
-      const port = typeof address === "object" && address ? address.port : requestedPort;
-      const origin = loopback ? `http://127.0.0.1:${port}` : `http://${host}:${port}`;
-
-      console.log(
-        [
-          `graft studio — branch "${branchName}" (opt-in)`,
-          `  ui         GET  ${origin}/`,
-          `  openapi    GET  ${origin}/api/studio/v1/openapi.json`,
-          `  Edit content, approve/deny — same ops as MCP/CLI.`,
-        ].join("\n"),
-      );
-
-      if (loopback) openBrowser(studioPreviewUrl(port, branchName));
-
-      await new Promise<void>((resolve) => {
-        const stop = (): void => resolve();
-        process.once("SIGINT", stop);
-        process.once("SIGTERM", stop);
-      });
     } finally {
-      const bound = server;
-      if (bound?.listening) {
-        await new Promise<void>((resolve, reject) => {
-          bound.close((err) => (err ? reject(err) : resolve()));
-        });
-      }
       await branch.close();
     }
   } finally {
     await control.close();
+  }
+}
+
+type StudioAuthenticate = Parameters<
+  typeof import("@usegraft/studio").createStudioHandler
+>[0]["authenticate"];
+
+/** Serve a Studio until SIGINT or SIGTERM, on loopback unless told otherwise. */
+async function listenStudio(
+  options: StudioCommandOptions,
+  branchName: string,
+  handlerFor: (
+    authenticate: StudioAuthenticate,
+  ) => ReturnType<typeof import("@usegraft/studio").createStudioHandler>,
+  note?: string,
+): Promise<void> {
+  let server: Server | undefined;
+  try {
+    const host = options.host ?? process.env.HOST ?? "127.0.0.1";
+    const requestedPort = options.port ?? Number(process.env.GRAFT_STUDIO_PORT ?? 4983);
+    if (!Number.isInteger(requestedPort) || requestedPort < 0 || requestedPort > 65535) {
+      throw new GraftError({
+        code: "INPUT_VALIDATION_FAILED",
+        message: `"${options.port ?? process.env.GRAFT_STUDIO_PORT}" is not a valid port.`,
+        fix: "Pass --port <0-65535> (0 picks a free port).",
+      });
+    }
+
+    const loopback = isLoopback(host);
+    const devToken = process.env.GRAFT_DEV_TOKEN;
+    if (!loopback && !devToken) {
+      console.warn(
+        "[graft studio] WARNING: binding beyond loopback with no GRAFT_DEV_TOKEN — " +
+          "set a bearer token before exposing Studio to a network.",
+      );
+    }
+
+    // `graft studio` is the operator's own tool, so the dev token identifies the
+    // operator rather than an agent — it carries the full operator scope set.
+    // Anything else is refused; this command has no notion of a lesser caller.
+    // None of this needs a database: on loopback nobody signs in, and the
+    // token is compared, not looked up.
+    const authenticate: StudioAuthenticate =
+      !loopback && devToken
+        ? (request: Request) => {
+            const header = request.headers.get("authorization") ?? "";
+            if (header !== `Bearer ${devToken}`) return null;
+            return {
+              ...operatorIdentity(),
+              scopes: ["studio:read", "studio:write", "approvals:decide"],
+            };
+          }
+        : !loopback
+          ? () => null
+          : undefined;
+
+    const handler = handlerFor(authenticate);
+    const listening = createServer(
+      createNodeListener(handler, { allowedHosts: allowedHostsFor(host) }),
+    );
+    server = listening;
+    await new Promise<void>((resolve, reject) => {
+      listening.once("error", reject);
+      listening.listen(requestedPort, host, () => resolve());
+    });
+    const address = listening.address();
+    const port = typeof address === "object" && address ? address.port : requestedPort;
+    const origin = loopback ? `http://127.0.0.1:${port}` : `http://${host}:${port}`;
+
+    console.log(
+      [
+        `graft studio — branch "${branchName}" (opt-in)`,
+        `  ui         GET  ${origin}/`,
+        `  openapi    GET  ${origin}/api/studio/v1/openapi.json`,
+        note ?? `  Edit content, approve/deny — same ops as MCP/CLI.`,
+      ].join("\n"),
+    );
+
+    if (loopback) openBrowser(studioPreviewUrl(port, branchName));
+
+    await new Promise<void>((resolve) => {
+      const stop = (): void => resolve();
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+    });
+  } finally {
+    const bound = server;
+    if (bound?.listening) {
+      await new Promise<void>((resolve, reject) => {
+        bound.close((err) => (err ? reject(err) : resolve()));
+      });
+    }
   }
 }
 

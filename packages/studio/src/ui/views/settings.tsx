@@ -28,7 +28,7 @@ import { CopyButton, Row, Section } from "../components/set-row";
 import { useStudio } from "../lib/studio";
 import { AccountPanel, PeoplePanel } from "./people";
 import { HooksPanel, SitePanel } from "./site";
-import { Pill } from "../components/primitives";
+import { NeedsDatabase, Pill } from "../components/primitives";
 import { ListSkeleton } from "../components/skeletons";
 import type { Theme } from "../lib/theme";
 import { useResource } from "../lib/use-resource";
@@ -179,7 +179,8 @@ export function SettingsView({
   const canManageSite = workspace.data
     ? !workspace.data.user || workspace.data.user.scopes.includes("studio:settings")
     : false;
-  const site = useResource<SiteDto>(canManageSite ? "/site" : null);
+  const hasDatabase = workspace.data?.database;
+  const site = useResource<SiteDto>(canManageSite && hasDatabase ? "/site" : null, [hasDatabase]);
   const database = workspace.data?.storage === "database";
   // Your own account, when you signed in with one rather than GitHub or a link.
   const [account, setAccount] = useState<{ email: string; role: string } | null>(null);
@@ -199,9 +200,11 @@ export function SettingsView({
         (s) =>
           (s.id !== "account" || account !== null) &&
           (s.id !== "people" || (accounts && canManagePeople)) &&
-          ((s.id !== "site" && s.id !== "hooks") || canManageSite),
+          ((s.id !== "site" && s.id !== "hooks") || canManageSite) &&
+          // Without a database, Site says why once; there are no hooks to list.
+          (s.id !== "hooks" || hasDatabase !== false),
       ),
-    [account, accounts, canManagePeople, canManageSite],
+    [account, accounts, canManagePeople, canManageSite, hasDatabase],
   );
   const ids = useMemo(() => sections.map((s) => s.id), [sections]);
   const current = useCurrentSection(ids);
@@ -279,7 +282,14 @@ export function SettingsView({
             </Section>
           ) : null}
 
-          {canManageSite ? (
+          {canManageSite && hasDatabase === false ? (
+            <Section id="site" title="Site" sub={SECTION_BY_ID.site.sub}>
+              <NeedsDatabase
+                title="Site settings need a database"
+                does="The site's name, its address and the deploy hooks called after a publish are kept in Postgres."
+              />
+            </Section>
+          ) : canManageSite ? (
             <>
               <Section id="site" title="Site" sub={SECTION_BY_ID.site.sub}>
                 <SitePanel site={site} />

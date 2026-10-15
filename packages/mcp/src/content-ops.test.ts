@@ -17,7 +17,7 @@ import type { Storage } from "@usegraft/assets";
 import { ErrorCodes } from "@usegraft/contracts";
 import { defineCollection, field } from "@usegraft/core";
 import type { ApprovalStore, ChangeSet, Database } from "@usegraft/db";
-import { projectBranchContent } from "@usegraft/db";
+import { projectBranchContent, projectDocuments } from "@usegraft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -32,6 +32,20 @@ vi.mock("@usegraft/db", async (importOriginal) => {
         changed: [],
         removed: [],
         unchanged: rows.length,
+      }),
+    ),
+    // A write checks references against the live index, which these tests keep empty.
+    liveDocuments: vi.fn(async () => []),
+    // A write projects the files it touched; the whole tree only on compile.
+    projectDocuments: vi.fn(
+      async (
+        _db: Database,
+        changes: { upserts: { collection: string; slug: string }[]; paths: string[] },
+      ): Promise<ChangeSet> => ({
+        added: changes.upserts.map((row) => `${row.collection}/${row.slug}`),
+        changed: [],
+        removed: [],
+        unchanged: 0,
       }),
     ),
   };
@@ -154,6 +168,7 @@ async function callTool(name: string, args: Record<string, unknown> = {}) {
 
 beforeEach(async () => {
   vi.mocked(projectBranchContent).mockClear();
+  vi.mocked(projectDocuments).mockClear();
   dir = mkdtempSync(join(tmpdir(), "graft-content-ops-"));
   mkdirSync(join(dir, "pages"));
   writeFileSync(join(dir, "pages", "home.mdx"), "---\ntitle: Home\n---\nWelcome");
@@ -250,6 +265,7 @@ describe("delete_content — the destructive gate over MCP", () => {
     // Nothing happened: file intact, projection never ran.
     expect(existsSync(join(dir, "pages", "home.mdx"))).toBe(true);
     expect(vi.mocked(projectBranchContent)).not.toHaveBeenCalled();
+    expect(vi.mocked(projectDocuments)).not.toHaveBeenCalled();
   });
 
   it("deletes the file and recompiles once the approval is consumed", async () => {
@@ -270,12 +286,13 @@ describe("delete_content — the destructive gate over MCP", () => {
     expect(existsSync(join(dir, "pages", "home.mdx"))).toBe(false);
     expect(existsSync(join(dir, "pages", "keep.mdx"))).toBe(true);
 
-    // The recompile projected the tree WITHOUT the deleted doc.
-    const projected = vi.mocked(projectBranchContent).mock.calls.at(-1)?.[1] as {
-      collection: string;
-      slug: string;
-    }[];
-    expect(projected.map((r) => r.slug)).toEqual(["keep"]);
+    // Only the deleted file was projected: no rows to write, its path to clear.
+    expect(vi.mocked(projectBranchContent)).not.toHaveBeenCalled();
+    expect(vi.mocked(projectDocuments).mock.calls.at(-1)?.[1]).toEqual({
+      upserts: [],
+      removals: [],
+      paths: ["pages/home.mdx"],
+    });
   });
 
   it("refuses a denied approval with the reason", async () => {

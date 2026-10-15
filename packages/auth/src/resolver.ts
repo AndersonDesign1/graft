@@ -61,7 +61,9 @@ export function createActorResolver(options: ActorResolverOptions = {}): ActorRe
       message: options.tokens
         ? "This bearer token isn't one this deployment issued, or it was revoked."
         : "A bearer token was sent, but this deployment has no trusted issuers configured.",
-      fix: "Configure `issuers` (or a dev token) in createActorResolver, or call without an Authorization header if anonymous access is intended.",
+      fix: options.tokens
+        ? "Use a token that is still live: an admin makes and revokes them in Studio, under Developer, Agents. A revoked token stays revoked; make a new one."
+        : "Configure `issuers` (or a dev token) in createActorResolver, or call without an Authorization header if anonymous access is intended.",
     });
   };
 }

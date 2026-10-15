@@ -249,7 +249,7 @@ const handler = createStudioHandler({
 | --- | --- |
 | `contentDir` | Absolute content root. Required for document reads and writes |
 | `projectRoot` | Where `graft/` lives, for the project's editor component declarations. Defaults to the content directory's parent |
-| `mdxTrust` | Governs the whole-tree recompile that follows a save |
+| `mdxTrust` | How much MDX the check that follows a local save accepts, as in `graft compile` |
 | `defaultBranch` | Branch used for compile and the tree default |
 | `decider` | Identity approval decisions are attributed to when `authenticate` is not configured. A value or a function. **Defaults to `{ kind: "human", id: "studio" }`** |
 | `uiBasePath` | URL prefix for the UI. Empty string serves it at `/` |
