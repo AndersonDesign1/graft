@@ -1,7 +1,7 @@
 {
   "name": "@usegraft/sdk-next",
   "version": "1.0.0-beta.7",
-  "description": "Next.js App Router adapter: typed content reads in Server Components, cache-tag invalidation, and real MDX rendering.",
+  "description": "Next.js adapter for the App Router and the Pages Router: typed content reads, cache-tag invalidation, and real MDX rendering.",
   "keywords": [
     "agent",
     "ai",
@@ -12,6 +12,7 @@
     "mcp",
     "mdx",
     "nextjs",
+    "pages-router",
     "react",
     "rsc",
     "typescript"
@@ -34,6 +35,9 @@
     "*": {
       "config": [
         "./dist/next-config.d.ts"
+      ],
+      "mdx": [
+        "./dist/mdx-content.d.ts"
       ]
     }
   },
@@ -46,14 +50,19 @@
       "types": "./dist/next-config.d.ts",
       "import": "./dist/next-config.js",
       "default": "./dist/next-config.js"
+    },
+    "./mdx": {
+      "types": "./dist/mdx-content.d.ts",
+      "import": "./dist/mdx-content.js",
+      "default": "./dist/mdx-content.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/next-config.ts --format esm --dts --clean --external react --external react/jsx-runtime --external next",
-    "dev": "tsup src/index.ts src/next-config.ts --format esm --watch --external react --external react/jsx-runtime --external next",
+    "build": "tsup src/index.ts src/next-config.ts src/mdx-content.tsx --format esm --dts --clean --external react --external react/jsx-runtime --external next",
+    "dev": "tsup src/index.ts src/next-config.ts src/mdx-content.tsx --format esm --watch --external react --external react/jsx-runtime --external next",
     "typecheck": "tsc --noEmit && node scripts/typecheck-guide.mjs",
     "test": "vitest run --passWithNoTests"
   },
@@ -75,8 +84,8 @@
     "react": "^19.2.8"
   },
   "peerDependencies": {
-    "next": "^15.5.24 || ^16.3.3",
-    "react": "^19.0.0"
+    "next": "^14.2.0 || ^15.0.0 || ^16.0.0",
+    "react": "^18.2.0 || ^19.0.0"
   },
   "engines": {
     "node": ">=22.16"

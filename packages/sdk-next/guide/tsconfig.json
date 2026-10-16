@@ -10,7 +10,8 @@
     "paths": {
       "@/*": ["./*"],
       "@usegraft/sdk-next": ["../src/index.ts"],
-      "@usegraft/sdk-next/config": ["../src/next-config.ts"]
+      "@usegraft/sdk-next/config": ["../src/next-config.ts"],
+      "@usegraft/sdk-next/mdx": ["../src/mdx-content.tsx"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],

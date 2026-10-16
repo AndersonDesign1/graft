@@ -93,14 +93,16 @@ jobs:
       - name: Zero-service quickstart gate
         run: pnpm test:quickstart
 
-  # @usegraft/sdk-next declares Next 15 and 16 as peers, and `next/cache`
-  # differs between them: 16 added `updateTag` and made `revalidateTag`'s
-  # profile required. The workspace installs one Next (16), so `verify` alone
-  # proves one of the two. Each leg runs a
+  # @usegraft/sdk-next declares Next 14, 15 and 16 as peers, and they differ
+  # where the adapter touches them: 14 runs the Pages Router on React 18 and
+  # reads an experimental externals key, 16 added `updateTag` and made
+  # `revalidateTag`'s profile required. The workspace installs one Next (16),
+  # so `verify` alone proves one of the three. Each leg runs a
   # real app pinned to one major in the lockfile (packages/sdk-next/compat):
   # it type-checks the Next.js guide's code blocks against that version, builds
   # with `next build`, serves with `next start`, and checks reads, MDX,
-  # dedupe, tagged refresh and `updateContent` in a real Server Action.
+  # dedupe, a Pages Router page and its browser bundle, tagged refresh and
+  # `updateContent` in a real Server Action.
   sdk-next-compat:
     name: sdk-next on Next ${{ matrix.next }}
     runs-on: ubuntu-latest
@@ -108,7 +110,7 @@ jobs:
       # One failing major must not hide the result of the others.
       fail-fast: false
       matrix:
-        next: ["15", "16"]
+        next: ["14", "15", "16"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

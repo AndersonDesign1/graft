@@ -112,9 +112,9 @@ the caller nothing.
 | `tagsFor(branch, collection, slug?)` | The tags a read depends on |
 | `tagsForChanges(branch, changes)` | The tags to refresh after content changes |
 
-In Next.js, tag cached reads and refresh them with `revalidateContent`. On
-Next.js 16, tag reads with `'use cache'` and `cacheTag`. On Next.js 15, wrap
-them in `unstable_cache` with `tags`
+In the Next.js App Router, tag cached reads and refresh them with
+`revalidateContent`. On Next.js 16, tag reads with `'use cache'` and
+`cacheTag`. On Next.js 14 and 15, wrap them in `unstable_cache` with `tags`
 ([how](/docs/next#refresh-pages-when-content-changes)).
 Every other framework sends the tags in a CDN header and purges them at the
 CDN. Unchanged documents are never refreshed, and a change on a preview branch
@@ -123,7 +123,8 @@ never refreshes `main`.
 ## Where the frameworks differ
 
 - **`MdxBody` is Next-only.** It evaluates MDX in a Server Component, which no
-  other adapter here has. Astro and SvelteKit author bodies for `@astrojs/mdx`
+  other adapter here has. The Next.js Pages Router compiles with `prepareMdx`
+  in `getStaticProps` and renders with `MdxContent` instead. Astro and SvelteKit author bodies for `@astrojs/mdx`
   or mdsvex; TanStack Start and React Router render authored source with their
   own pipeline.
 - **No `React.cache` equivalent outside Next.** Call sites own memoization.

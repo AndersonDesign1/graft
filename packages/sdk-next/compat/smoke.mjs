@@ -1,6 +1,6 @@
 /**
  * Build and run a real Next.js app on @usegraft/sdk-next, and check what the
- * adapter promises on that Next. Each folder here (next15, next16)
+ * adapter promises on that Next. Each folder here (next14, next15, next16)
  * pins one major in the lockfile and runs this from its own directory:
  *
  *   pnpm --filter sdk-next-compat-next15 smoke
@@ -12,10 +12,12 @@
  * - the Next.js guide's code type-checks against this Next and React
  * - `withGraft` sets the externals key this Next reads
  * - a page reads a document, renders its MDX, and reads it once per request
+ * - a Pages Router page reads it in getStaticProps and renders it with
+ *   MdxContent, and its browser bundle carries no server code
  * - a tagged read stays cached until the guide's revalidate route refreshes it,
  *   and that route refuses bad input
- * - `updateContent` inside a real Server Action refreshes on Next 16, and on
- *   15 returns FRAMEWORK_VERSION_UNSUPPORTED
+ * - `updateContent` inside a real Server Action refreshes on Next 16, and
+ *   before it returns FRAMEWORK_VERSION_UNSUPPORTED
  */
 import { spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -85,7 +87,7 @@ check(
 );
 
 // 2. The app: shared source, the guide's own revalidate route, a fresh index.
-for (const entry of ["app", "lib", "content", "graft.config.ts"]) {
+for (const entry of ["app", "pages", "lib", "content", "graft.config.ts"]) {
   rmSync(join(appDir, entry), { recursive: true, force: true });
   cpSync(join(compatDir, "app-src", entry), join(appDir, entry), { recursive: true });
 }
@@ -107,10 +109,16 @@ check(
 const serverFiles = JSON.parse(
   readFileSync(join(appDir, ".next/required-server-files.json"), "utf8"),
 );
-const externals = serverFiles.config.serverExternalPackages;
+// Next 15 renamed the setting; 14 reads the experimental one.
+const externalsKey =
+  major >= 15 ? "serverExternalPackages" : "experimental.serverComponentsExternalPackages";
+const externals =
+  major >= 15
+    ? serverFiles.config.serverExternalPackages
+    : serverFiles.config.experimental?.serverComponentsExternalPackages;
 check(
   Array.isArray(externals) && externals.includes("@usegraft/registry"),
-  "withGraft set serverExternalPackages",
+  `withGraft set ${externalsKey}`,
 );
 
 // 5. Serve it and check behavior over HTTP.
@@ -165,6 +173,29 @@ try {
     "two reads in one render return the same object",
   );
   check((await fetch(`${base}/nope`)).status === 404, "a missing slug is a 404");
+
+  const pagesHome = await fetch(`${base}/p/home`);
+  const pagesHtml = await pagesHome.text();
+  check(
+    pagesHome.status === 200 && pagesHtml.includes("<h1>Home</h1>"),
+    "a Pages Router page reads its document in getStaticProps",
+  );
+  check(pagesHtml.includes("<strong>Graft</strong>"), "MdxContent renders the prepared body");
+  check((await fetch(`${base}/p/nope`)).status === 404, "a missing slug is a 404 there too");
+  // Every script the page loads, as the browser downloads them (webpack names
+  // a chunk per page, Turbopack hashes them): what the page imported for
+  // getStaticProps must be gone, and MdxContent must be all that is left.
+  const scripts = [...pagesHtml.matchAll(/src="(\/_next\/static\/[^"]+\.js)"/g)].map((m) => m[1]);
+  const bundles = await Promise.all(
+    scripts.map(async (src) => (await fetch(`${base}${src}`)).text()),
+  );
+  check(scripts.length > 0, `the Pages Router page loads ${scripts.length} scripts`);
+  check(
+    !bundles.some((code) =>
+      /openStaticIndex|node:sqlite|postgres|@mdx-js\/mdx|remark-gfm/.test(code),
+    ),
+    "none of them carries database, index or MDX compiler code",
+  );
 
   const first = await stamp();
   check(

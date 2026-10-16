@@ -1,10 +1,11 @@
 /**
- * Next.js (RSC) adapter over @usegraft/sdk-core.
+ * Next.js adapter over @usegraft/sdk-core, for the App Router and the Pages
+ * Router, on Next.js 14, 15 and 16.
  *
  * `createGraft` wraps the read client with React.cache so repeated reads of the
  * same document within one server render are deduped. Server-only by nature (it
- * holds a database handle) — import from Server Components or route handlers,
- * never client components.
+ * holds a database handle): import it from Server Components, route handlers,
+ * getStaticProps or getServerSideProps, never client components.
  *
  * Caching + invalidation (Phase 4) is the cache-tag contract, not a wrapper:
  * Next 16's `'use cache'` is a compile-time directive an app authors, so this
@@ -21,8 +22,10 @@
  * `updateTag` (Next 16 only) is an import of a missing export on 15.
  */
 import { GraftError } from "@usegraft/contracts";
-import * as nextCache from "next/cache";
-import { cache } from "react";
+// With the extension: the Pages Router on Next.js 14 loads this package with
+// Node's own ESM loader, and next has no exports map to resolve "next/cache".
+import * as nextCache from "next/cache.js";
+import * as React from "react";
 import { createDbClient, type DbClientOptions } from "@usegraft/sdk-core/db";
 import {
   createClient,
@@ -71,6 +74,17 @@ export type GraftOptions<TCollections extends Record<string, AnyCollection>> =
   | ClientOptions<TCollections>
   | DbClientOptions<TCollections>;
 
+type Memo = <A extends unknown[], R>(fn: (...args: A) => R) => (...args: A) => R;
+
+/**
+ * React.cache, where there is one. React 19 and the React that Next.js 14
+ * bundles for the App Router have it; React 18, which the Pages Router runs
+ * on Next.js 14, does not. Without it each read goes to the index, which is
+ * what the Pages Router's data functions expect: they run once per page.
+ */
+const react: { cache?: Memo } = React;
+const memo: Memo = react.cache ?? ((fn) => fn);
+
 export function createGraft<TCollections extends Record<string, AnyCollection>>(
   options: GraftOptions<TCollections>,
 ): Graft<TCollections> {
@@ -78,14 +92,14 @@ export function createGraft<TCollections extends Record<string, AnyCollection>>(
 
   // React.cache keys by argument identity, so the cached core takes only
   // primitives; the generic wrappers restore the per-collection return types.
-  const cachedGet = cache((collection: string, slug: string, branch: string | undefined) =>
+  const cachedGet = memo((collection: string, slug: string, branch: string | undefined) =>
     client.getDocument(
       collection as keyof TCollections & string,
       slug,
       branch === undefined ? undefined : { branch },
     ),
   );
-  const cachedList = cache(
+  const cachedList = memo(
     (
       collection: string,
       branch: string | undefined,
@@ -93,7 +107,7 @@ export function createGraft<TCollections extends Record<string, AnyCollection>>(
       offset: number | undefined,
     ) => client.listDocuments(collection as keyof TCollections & string, { branch, limit, offset }),
   );
-  const cachedSearch = cache(
+  const cachedSearch = memo(
     (collection: string, query: string, branch: string | undefined, limit: number | undefined) =>
       client.searchDocuments(collection as keyof TCollections & string, query, { branch, limit }),
   );

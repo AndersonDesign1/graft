@@ -1,29 +1,27 @@
 ---
 title: Next.js
-description: "Read typed content in Next.js Server Components, render MDX, and refresh only the pages that changed."
+description: "Read typed content in Next.js 14, 15 or 16, with the App Router or the Pages Router, render MDX, and refresh only the pages that changed."
 section: Frameworks
 order: 0
 ---
 
-<p className="kicker">Render Graft content in a Next.js App Router project, from install to cache refresh.</p>
+<p className="kicker">Render Graft content in a Next.js project, from install to cache refresh.</p>
 
-This guide adds Graft to a Next.js App Router project. By the end, your pages
-read typed content in Server Components, render its Markdown with your own
-components, and refresh only the pages whose content changed.
+This guide adds Graft to a Next.js project. By the end, your pages read typed
+content, render its Markdown with your own components, and refresh only the
+pages whose content changed. The steps use the App Router. If your project
+uses the Pages Router, follow them up to the client, then
+[use the Pages Router](#use-the-pages-router).
 
-**Before you start**, you need a Next.js 15 or 16 project using the App
-Router, and a `graft.config.ts` with compiled content. If you have not got
-those yet, run through [Getting started](/docs/getting-started) first. It takes
-about ten minutes.
-
-Graft needs Next.js 15.5.24 or 16.3.3 or newer. Those are the first releases
-with fixes for the critical Next.js security advisories published in 2026.
-Next.js 14 is not supported. It no longer gets security fixes, and those
-advisories are still open on it.
+**Before you start**, you need a Next.js 14.2, 15 or 16 project and a
+`graft.config.ts` with compiled content. If you have not got those yet, run
+through [Getting started](/docs/getting-started) first. It takes about ten
+minutes.
 
 What `@usegraft/sdk-next` gives you:
 
-- **Typed reads in Server Components.** Every result is typed from your schema.
+- **Typed reads.** Every result is typed from your schema, in Server
+  Components, route handlers, `getStaticProps` and `getServerSideProps`.
 - **One read per document per request.** If a layout and a page read the same
   document, Graft reads it once, using `React.cache`.
 - **Markdown rendering on the server.** `<MdxBody />` renders a document's body
@@ -36,6 +34,39 @@ What `@usegraft/sdk-next` gives you:
   the client in lib/graft.ts and render the pages collection at
   app/[slug]/page.tsx.
 </AgentPrompt>
+
+## Check your Next.js version
+
+Graft runs on Next.js 14.2 and later, with the App Router or the Pages Router.
+What differs between versions:
+
+| | Next.js 14.2 | Next.js 15 | Next.js 16 |
+| --- | --- | --- | --- |
+| App Router and Pages Router | Yes | Yes | Yes |
+| `next.config.ts` | No, use `next.config.mjs` | Yes | Yes |
+| The static index in `lib/graft.ts` | Set `"target": "ES2017"` in `tsconfig.json` | Yes | Yes |
+| Cached reads you can refresh | `unstable_cache` | `unstable_cache` | `'use cache'` and `cacheTag` |
+| `revalidateContent` | Yes | Yes | Yes |
+| `updateContent` | No | No | Yes |
+
+<Callout label="Next.js 14 has security advisories that will never be fixed" type="danger">
+  14.2.35 is the last Next.js 14 release, and it no longer gets security
+  fixes. 23 published Next.js advisories affect it. Two are critical: remote
+  code execution through the image optimization API, and remote code execution
+  on servers hosted on Windows. Every one is fixed only in 15 and 16. Graft runs
+  on 14.2 so you can adopt it before you upgrade. Upgrade to 15.5.24 or 16.3.3
+  or later before you rely on it in production.
+</Callout>
+
+Graft does not refuse an older release, but some are not safe to run.
+15.5.24 and 16.3.3 are the first releases with fixes for the critical Next.js
+advisories published in 2026. On any 14 release, or a 15 or 16 release without
+those fixes, `withGraft` prints a warning when Next.js loads your config that
+names the release to upgrade to:
+
+```text
+graft: Next.js 14 no longer gets security fixes, and 14.2.35 has critical advisories that will not be fixed on 14. Graft works with it, but upgrade to 15.5.24 or 16.3.3 or later.
+```
 
 ## Install
 
@@ -69,9 +100,10 @@ bun add @usegraft/sdk-next @usegraft/db
 
 ## Wrap your Next.js config
 
-Wrap your config with `withGraft`. Today it does one thing: it keeps
-`@usegraft/registry` out of the server bundle, because that package reads files
-from disk at runtime. Plain content reads work without it, but the
+Wrap your config with `withGraft`. It keeps `@usegraft/registry` out of the
+server bundle, because that package reads files from disk at runtime, and it
+writes the setting under the name your Next.js version reads. Plain content
+reads work without it, but the
 [MCP route](#serve-functions-and-mcp-from-your-app) needs it, so add it now:
 
 <CodeBlock title="next.config.ts">
@@ -85,6 +117,20 @@ const nextConfig: NextConfig = {
 };
 
 export default withGraft(nextConfig);
+```
+
+</CodeBlock>
+
+Next.js 14 cannot load a TypeScript config. Name the file `next.config.mjs`:
+
+<CodeBlock title="next.config.mjs">
+
+```js
+import { withGraft } from "@usegraft/sdk-next/config";
+
+export default withGraft({
+  // your existing Next.js options
+});
 ```
 
 </CodeBlock>
@@ -137,8 +183,10 @@ below need it.
 
 </Tabs>
 
-Every read goes through `React.cache`. If a layout and a page both read the
-same document during one request, the index is read once.
+In the App Router, every read goes through `React.cache`. If a layout and a
+page both read the same document during one request, the index is read once.
+The Pages Router reads in one data function per page, so there is nothing to
+share.
 
 ## Show a document
 
@@ -222,6 +270,129 @@ export function DocumentBody({ source }: { source: string }) {
   string attributes, like the `Callout` above, are allowed. See
   [MDX safety](/docs/mdx-safety).
 </Callout>
+
+## Use the Pages Router
+
+The Pages Router reads content in `getStaticProps` or `getServerSideProps` and
+renders in a component that also runs in the browser. Two things change from
+the App Router: how a body is rendered, and how pages refresh.
+
+| | App Router | Pages Router |
+| --- | --- | --- |
+| Where you read | Server Components and route handlers | `getStaticProps`, `getServerSideProps` and API routes |
+| Render a body | `<MdxBody source={page.body} />` | `prepareMdx` in `getStaticProps`, then `<MdxContent code={code} />` |
+| Refresh after a change | By tag, with `revalidateContent` | By path, with `res.revalidate` |
+
+### Show a document
+
+`prepareMdx` compiles the body on the server, with the same safety rule as
+`<MdxBody />`, and returns a string. `<MdxContent />` renders that string, in
+the server render and in the browser. Import it from
+`@usegraft/sdk-next/mdx`, which carries no server code, so the page's browser
+bundle stays small:
+
+<CodeBlock title="pages/[slug].tsx">
+
+```tsx
+import type { GetStaticPaths, GetStaticProps } from "next";
+import { prepareMdx } from "@usegraft/sdk-next";
+import { MdxContent } from "@usegraft/sdk-next/mdx";
+import { graft } from "@/lib/graft";
+
+interface Props {
+  title: string;
+  tagline: string | null;
+  code: string;
+}
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const pages = await graft.listContent("pages");
+  return {
+    paths: pages.map((page) => ({ params: { slug: page.slug } })),
+    fallback: "blocking",
+  };
+};
+
+export const getStaticProps: GetStaticProps<Props, { slug: string }> = async ({ params }) => {
+  const page = await graft.getContent("pages", params?.slug ?? "");
+  if (!page) return { notFound: true };
+
+  return {
+    props: {
+      title: page.data.title,
+      tagline: page.data.tagline ?? null,
+      code: await prepareMdx(page.body),
+    },
+  };
+};
+
+export default function Page({ title, tagline, code }: Props) {
+  return (
+    <article>
+      <h1>{title}</h1>
+      {tagline && <p>{tagline}</p>}
+      <MdxContent code={code} />
+    </article>
+  );
+}
+```
+
+</CodeBlock>
+
+Props must be JSON, so pass the fields the page shows rather than the whole
+document: its `updatedAt` is a `Date`, which Next.js refuses to serialize.
+Pass `components` to `<MdxContent />` as you would to
+[`<MdxBody />`](#use-your-own-components-in-markdown). A body that uses
+`import` is refused with `INPUT_VALIDATION_FAILED`, even with
+`trust: "full"`, because the browser has no bundler to resolve it. Pass the
+component in `components` instead.
+
+### Refresh Pages Router pages
+
+<TierBadge tier="postgres" />
+
+The Pages Router caches whole pages, not reads, so a change refreshes the
+pages that show it, by path. Use this route instead of the App Router's in
+[step 2 below](#refresh-pages-when-content-changes), and point
+`GRAFT_REVALIDATE_URL` at it as step 3 describes:
+
+<CodeBlock title="pages/api/revalidate.ts">
+
+```ts
+import type { NextApiRequest, NextApiResponse } from "next";
+
+const isStrings = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string");
+
+// The page that shows each changed document. A key is "collection/slug".
+function pathFor(key: string): string | null {
+  const [collection, slug] = key.split("/");
+  return collection === "pages" && slug ? `/${slug}` : null;
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const secret = process.env.GRAFT_WEBHOOK_SECRET;
+  if (req.method !== "POST" || !secret || req.headers.authorization !== `Bearer ${secret}`) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const changes = req.body?.changes;
+  const keys = [changes?.added, changes?.changed, changes?.removed];
+  if (!keys.every(isStrings)) {
+    return res.status(400).json({ error: "Send { branch, changes }." });
+  }
+
+  const paths = keys.flat().flatMap((key) => pathFor(key) ?? []);
+  await Promise.all(paths.map((path) => res.revalidate(path)));
+  return res.json({ revalidated: paths });
+}
+```
+
+</CodeBlock>
+
+Add a line to `pathFor` for each collection with its own page, and revalidate
+any page that lists a collection when a document in it changes. Step 1 below
+is not needed: the Pages Router has no cached reads to tag.
 
 ## Serve functions and MCP from your app
 
@@ -320,8 +491,9 @@ your checkout, which you push yourself. This section makes Next.js refresh only 
 whose content changed.
 
 It takes two steps. How you cache reads depends on your version. Next.js 16
-uses cached functions. Next.js 15 uses `unstable_cache`. The refresh route is
-the same on both.
+uses cached functions. Next.js 14 and 15 use `unstable_cache`. The refresh
+route is the same on all three. On the Pages Router, use
+[its own route](#refresh-pages-router-pages) instead.
 
 <Steps>
 
@@ -330,7 +502,7 @@ the same on both.
 Cache each read and tag it with `tagsFor`. Use these functions in your pages
 instead of calling `graft` directly.
 
-<Tabs labels="Next.js 16, Next.js 15">
+<Tabs labels="Next.js 16, Next.js 14 and 15">
 
 <Tab>
 
@@ -561,8 +733,8 @@ Either way, the route reads a body shaped like this:
 
 To refresh inside the same request instead, for example from a Server Action
 that saves and then shows the result, use `updateContent(branch, changes)`.
-It needs Next.js 16. On 15 it throws an error that points you back to
-`revalidateContent`.
+It needs Next.js 16. On 14 and 15 it throws `FRAMEWORK_VERSION_UNSUPPORTED`,
+whose fix points you back to `revalidateContent`.
 
 ## Next steps
 

@@ -1,6 +1,6 @@
 # @usegraft/sdk-next
 
-> Next.js App Router adapter: typed content reads in Server Components, cache-tag invalidation, and real MDX rendering.
+> Next.js adapter for the App Router and the Pages Router: typed content reads, cache-tag invalidation, and real MDX rendering.
 
 Part of [Graft](https://github.com/AndersonDesign1/graft), a CMS built so an AI agent is the primary operator.
 
@@ -12,7 +12,7 @@ npm i @usegraft/sdk-next
 
 ## Read content
 
-`createGraft` wraps the read client with `React.cache`, so repeated reads of the same document within one render are deduped. Server-only: it holds a database handle.
+`createGraft` wraps the read client with `React.cache` where React has it, so repeated reads of the same document within one render are deduped. Server-only: it holds a database handle. Use it in Server Components, route handlers, `getStaticProps` and `getServerSideProps`.
 
 ```ts
 // lib/graft.ts
@@ -69,11 +69,28 @@ revalidateContent(branch, changes);
 updateContent(branch, changes);
 ```
 
-Both turn a compile's `ChangeSet` into the exact `revalidateTag` / `updateTag` calls that refresh the changed pages, and no others. A no-op unless your reads were tagged, but always safe to call. On Next.js 16, tag reads with `'use cache'` and `cacheTag`. On Next.js 15, wrap them in `unstable_cache` with `tags: tagsFor(...)`. `updateContent` needs Next.js 16 and throws on older versions. Use `revalidateContent` there.
+Both turn a compile's `ChangeSet` into the exact `revalidateTag` / `updateTag` calls that refresh the changed pages, and no others. A no-op unless your reads were tagged, but always safe to call. On Next.js 16, tag reads with `'use cache'` and `cacheTag`. On Next.js 14 and 15, wrap them in `unstable_cache` with `tags: tagsFor(...)`. The Pages Router refreshes by path instead, with `res.revalidate`. `updateContent` needs Next.js 16 and throws on older versions. Use `revalidateContent` there.
+
+## Use the Pages Router
+
+Read in `getStaticProps`, compile the body there with `prepareMdx`, and render it with `MdxContent` from `@usegraft/sdk-next/mdx`, which carries no server code:
+
+```tsx
+import { prepareMdx } from "@usegraft/sdk-next";
+import { MdxContent } from "@usegraft/sdk-next/mdx";
+
+// in getStaticProps
+const code = await prepareMdx(page.body);
+
+// in the page
+<MdxContent code={code} />;
+```
 
 ## Supported versions
 
-Next.js 15.5.24 and later 15.x, and 16.3.3 and later, with the App Router and React 19. Those are the first releases with the fixes for the critical Next.js advisories published in 2026. CI builds and serves a real app on each major. Next.js 14 is not supported: it no longer gets security fixes, and it has open critical advisories.
+Next.js 14.2 and later 14.x, 15 and 16, with the App Router or the Pages Router, on React 18.2 or 19. CI builds and serves a real app on each major, with an App Router and a Pages Router page.
+
+Next.js 14 no longer gets security fixes. 14.2.35, its last release, is affected by 23 published Next.js advisories, two of them critical remote code execution, and none will be fixed on 14. Graft runs on it so you can adopt Graft before you upgrade, not as a place to stay. 15.5.24 and 16.3.3 are the first releases with fixes for the critical Next.js advisories published in 2026. `withGraft` warns when your app runs a release without them.
 
 ---
 

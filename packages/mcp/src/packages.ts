@@ -47,8 +47,8 @@ export const PACKAGE_KNOWLEDGE = {
   },
   "@usegraft/sdk-next": {
     name: "@usegraft/sdk-next",
-    role: "Next.js adapter: typed reads in Server Components, plus route handlers.",
-    when: "You are on Next.js (App Router).",
+    role: "Next.js adapter: typed reads in the App Router and the Pages Router, plus route handlers.",
+    when: "You are on Next.js 14.2 or later (App Router or Pages Router).",
     tier: "either",
     framework: "next",
     direct: true,
