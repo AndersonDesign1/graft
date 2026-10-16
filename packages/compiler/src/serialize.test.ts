@@ -217,6 +217,73 @@ Body.
     });
   });
 
+  it("keeps the comment after an edited one-line value", () => {
+    // A save dropped `# …` after a value: the note was in the old line, and
+    // the rewritten line was built from the value alone.
+    const raw = `---
+title: "Old \\" # not a comment" # shown in the tab
+tagline: 'It''s # still text'  # two spaces kept
+order: 3 # lower comes first
+slug: a#b # the # in a#b is text
+draft: # set by the editor
+seo: # unchanged
+  noindex: true
+---
+
+Body.
+`;
+    const out = composeDocument(
+      raw,
+      {
+        title: "New",
+        tagline: "Fresh",
+        order: 4,
+        slug: "c#d",
+        draft: true,
+        seo: { noindex: true },
+      },
+      "Body.\n",
+    );
+    expect(out).toBe(`---
+title: "New" # shown in the tab
+tagline: 'Fresh'  # two spaces kept
+order: 4 # lower comes first
+slug: c#d # the # in a#b is text
+draft: true # set by the editor
+seo: # unchanged
+  noindex: true
+---
+
+Body.
+`);
+    expect(matter(out).data).toEqual({
+      title: "New",
+      tagline: "Fresh",
+      order: 4,
+      slug: "c#d",
+      draft: true,
+      seo: { noindex: true },
+    });
+  });
+
+  it("drops a comment when the new value spans lines", () => {
+    const raw = `---
+title: T
+tags: [a] # flow
+note: one # a note
+---
+
+Body.
+`;
+    const out = composeDocument(
+      raw,
+      { title: "T", tags: ["a", "b"], note: { nested: true } },
+      "Body.\n",
+    );
+    expect(matter(out).data).toEqual({ title: "T", tags: ["a", "b"], note: { nested: true } });
+    expect(out).not.toContain("# a note");
+  });
+
   it("never folds a long string, in a new file or a full rewrite", () => {
     const long = "word ".repeat(30).trim();
     for (const out of [
