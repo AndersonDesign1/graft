@@ -12,7 +12,7 @@ import { defineCollection, field } from "@usegraft/core";
 import { openStaticIndex } from "@usegraft/db";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createStudioApiHandler } from "../api";
-import type { EntryDto, WorkspaceDto } from "../editor-types";
+import type { EntryDto, SetFieldResultDto, WorkspaceDto } from "../editor-types";
 import type { ContentTree } from "../types";
 
 const collections = {
@@ -186,5 +186,100 @@ describe("Studio with no index at all", () => {
         "Site settings are kept in Postgres, and this Studio runs without a database.",
       ],
     });
+  });
+});
+
+describe.each([
+  ["on the static index", true],
+  ["with no index at all", false],
+] as const)("References are checked before anything is written, %s", (_label, withIndex) => {
+  const shop = {
+    ...collections,
+    products: defineCollection({
+      name: "products",
+      fields: { title: field.string(), category: field.reference({ to: "categories" }) },
+    }),
+    categories: defineCollection({ name: "categories", fields: { title: field.string() } }),
+  };
+  const product = (title: string, category: string) =>
+    `---\ntitle: ${title}\ncategory: ${category}\n---\n\nAbout ${title}.\n`;
+  const file = (path: string) => join(contentDir, path);
+  const read = (path: string) => readFileSync(file(path), "utf8");
+
+  let handler: Handler;
+  beforeEach(() => {
+    mkdirSync(file("products"), { recursive: true });
+    mkdirSync(file("categories"), { recursive: true });
+    writeFileSync(file("categories/hats.mdx"), "---\ntitle: Hats\n---\n");
+    writeFileSync(file("products/wool-hat.mdx"), product("Wool Hat", "hats"));
+    writeFileSync(file("products/felt-hat.mdx"), product("Felt Hat", "hats"));
+    execFileSync("git", ["add", "."], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "shop"], { cwd: root });
+    handler = createStudioApiHandler({
+      collections: shop,
+      contentDir,
+      staticIndexPath: withIndex ? join(root, ".graft", "index.db") : undefined,
+    });
+  });
+
+  async function setCategory(slug: string, category: string) {
+    const opened = await call<EntryDto>(handler, "GET", `/entry?collection=products&slug=${slug}`);
+    return call<{ error?: string }>(handler, "PUT", "/entry", {
+      collection: "products",
+      slug,
+      data: { ...opened.json.data, category },
+      body: opened.json.body,
+      baseVersion: opened.json.version,
+    });
+  }
+
+  it("refuses a save that points at nothing, and leaves the file", async () => {
+    const before = read("products/wool-hat.mdx");
+    const refused = await setCategory("wool-hat", "no-such");
+    expect([refused.status, refused.json.error]).toEqual([409, "CONTENT_REFERENCE_NOT_FOUND"]);
+    expect(read("products/wool-hat.mdx")).toBe(before);
+  });
+
+  it("refuses a deletion others point at, and leaves the file", async () => {
+    const refused = await call<{ error: string }>(handler, "DELETE", "/entry", {
+      collection: "categories",
+      slug: "hats",
+    });
+    expect([refused.status, refused.json.error]).toEqual([409, "CONTENT_REFERENCE_NOT_FOUND"]);
+    expect(existsSync(file("categories/hats.mdx"))).toBe(true);
+  });
+
+  it("refuses to discard a new entry others point at", async () => {
+    writeFileSync(file("categories/caps.mdx"), "---\ntitle: Caps\n---\n");
+    expect((await setCategory("felt-hat", "caps")).status).toBe(200);
+    const refused = await call<{ error: string }>(handler, "POST", "/drafts/discard", {
+      paths: ["categories/caps.mdx"],
+    });
+    expect([refused.status, refused.json.error]).toEqual([409, "CONTENT_REFERENCE_NOT_FOUND"]);
+    expect(existsSync(file("categories/caps.mdx"))).toBe(true);
+  });
+
+  it("sets nothing when the new value points at nothing", async () => {
+    const before = [read("products/wool-hat.mdx"), read("products/felt-hat.mdx")];
+    const set = await call<SetFieldResultDto>(handler, "POST", "/entries/field", {
+      collection: "products",
+      slugs: ["wool-hat", "felt-hat"],
+      field: "category",
+      value: "no-such",
+    });
+    expect(set.status).toBe(200);
+    expect(set.json.saved).toEqual([]);
+    expect(set.json.failed.map((entry) => [entry.slug, entry.error])).toEqual([
+      ["wool-hat", "CONTENT_REFERENCE_NOT_FOUND"],
+      ["felt-hat", "CONTENT_REFERENCE_NOT_FOUND"],
+    ]);
+    expect([read("products/wool-hat.mdx"), read("products/felt-hat.mdx")]).toEqual(before);
+  });
+
+  it("still saves when a reference elsewhere was already broken", async () => {
+    // Broken outside Studio, by hand or a pull. Not this save's to refuse.
+    writeFileSync(file("products/felt-hat.mdx"), product("Felt Hat", "gone"));
+    const saved = await setCategory("wool-hat", "hats");
+    expect(saved.status).toBe(200);
   });
 });
