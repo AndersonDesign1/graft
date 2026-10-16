@@ -192,4 +192,12 @@ export interface GraftMcpOptions {
    * carries `refresh: { ok: false, … }` instead.
    */
   onContentChange?: ContentChangeListener;
+  /**
+   * Called after publish_drafts put drafts live as a commit the site rebuilds
+   * from (content on GitHub), with the branch and the paths published.
+   * `graft serve` passes the site's deploy hooks. Not called for a database
+   * publish, whose store calls them itself, or for a review. A throw does not
+   * fail the publish.
+   */
+  onPublished?: (published: { branch: string; paths: string[] }) => Promise<void> | void;
 }

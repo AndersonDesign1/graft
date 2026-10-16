@@ -49,7 +49,11 @@ export interface EntryList {
   items: EntrySummary[];
   /** Pass back as `cursor` for the next page; null on the last. */
   nextCursor: string | null;
-  /** Totals for the whole collection, before search and filters. */
+  /**
+   * Totals for the whole collection, before search and filters. `all` counts
+   * the entries there are: a draft deletion is listed, and counted in
+   * `unpublished`, but no longer counted as one of the collection's entries.
+   */
   counts: { all: number; unpublished: number };
   /** Values to filter by, for select, boolean and reference fields. */
   facets: Facet[];

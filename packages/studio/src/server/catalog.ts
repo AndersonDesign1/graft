@@ -339,7 +339,7 @@ export function queryEntries(
     total: sorted.length,
     items: page,
     nextCursor: offset + limit < sorted.length ? String(offset + limit) : null,
-    counts: { all: all.length, unpublished },
+    counts: { all: all.filter((entry) => entry.status !== "deleted").length, unpublished },
     facets,
   };
 }

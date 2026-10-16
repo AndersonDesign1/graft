@@ -98,7 +98,10 @@ configuration.
 - **Sort** by name, last edited or any column.
 - **Select** several entries to publish, discard or delete them together.
 
-The table loads a page at a time as you scroll.
+The table loads a page at a time as you scroll. Search, filters and sort are
+kept in the address, so a reload, the back button or a link you send shows the
+same rows. The count leaves out entries you deleted: they stay in the list,
+marked Deleted, until you publish the deletion.
 
 ### Change a field on many entries
 
@@ -302,7 +305,9 @@ The body names what went live:
 ```
 
 Hooks need https, or http to the same machine. They are called when content is
-in the database. When content is in git, the host builds from the commit.
+in the database, and when an agent's `publish_drafts` commits to your
+production branch on GitHub. A pull request calls none until it is merged,
+when your host builds from the commit.
 
 ## Developer views
 

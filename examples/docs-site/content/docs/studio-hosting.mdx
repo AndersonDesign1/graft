@@ -196,8 +196,9 @@ agent sends the token to `/api/mcp` as `Authorization: Bearer graft_at_…`.
 Revoke it there and the agent is refused from its next request. See
 [Studio, Agents](/docs/studio#agents).
 
-To rebuild or refresh the site after a publish when content is in the
-database, add a deploy hook under **Settings, Deploy hooks**. See
+To rebuild or refresh the site after a publish, add a deploy hook under
+**Settings, Deploy hooks**. It is called after a publish of content in the
+database, and after an agent's commit to the production branch. See
 [Studio, Site and deploy hooks](/docs/studio#site-and-deploy-hooks).
 
 ## Check it works

@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import type { ActivityDto, ActivityEventDto, EntryList } from "../../editor-types";
 import { CollectionMark } from "../components/collection-icon";
 import { IconCheck, IconCommit, IconInbox, IconPlus } from "../components/icons";
+import { groupActivity } from "../lib/activity";
 import { api, qs } from "../lib/api";
 import { absoluteTime, plural, relativeTime } from "../lib/format";
 import {
@@ -26,7 +27,7 @@ import {
 import { useResource } from "../lib/use-resource";
 
 export function HomeView() {
-  const { schema, workspace, drafts, navigate, openPublish, openCreate } = useStudio();
+  const { schema, workspace, drafts, publish, navigate, openPublish, openCreate } = useStudio();
   const collections = editableCollections(schema.data);
   const [counts, setCounts] = useState<Record<string, number>>({});
   // Approvals live in Postgres; a workspace without them answers with an
@@ -56,9 +57,11 @@ export function HomeView() {
   const reviews = drafts.data?.reviews ?? [];
   const pending = approvals.data?.approvals.length ?? 0;
   const waiting = pending + reviews.length;
-  const activity = useResource<ActivityDto>("/activity?limit=12", [drafts.data]);
+  // More events than rows: a run of saves to one entry folds into one row.
+  const activity = useResource<ActivityDto>("/activity?limit=30", [drafts.data]);
+  const recent = groupActivity(activity.data?.events ?? []).slice(0, 12);
   const canWrite = workspace.data?.canWrite ?? true;
-  const action = drafts.data?.publish;
+  const action = publish;
   const verb = publishVerb(action);
   const done = action === "commit" ? "committed" : "published";
   const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
@@ -150,8 +153,8 @@ export function HomeView() {
             Recently {done}
           </h2>
           <ol className="activity">
-            {activity.data.events.map((event) => (
-              <ActivityRow key={event.id} event={event} />
+            {recent.map(({ event, times }) => (
+              <ActivityRow key={event.id} event={event} times={times} />
             ))}
           </ol>
         </section>
@@ -223,8 +226,11 @@ export function HomeView() {
   );
 }
 
-/** One publish: who, what, when. Each document still there links to its entry. */
-function ActivityRow({ event }: { event: ActivityEventDto }) {
+/**
+ * One publish, or a run of the same one: who, what, how many times, when.
+ * Each document still there links to its entry.
+ */
+function ActivityRow({ event, times }: { event: ActivityEventDto; times: number }) {
   return (
     <li className="activity-row">
       <span className="activity-who">
@@ -253,6 +259,7 @@ function ActivityRow({ event }: { event: ActivityEventDto }) {
         ) : (
           (event.message ?? "Changed the content")
         )}
+        {times > 1 ? `, ${times} times` : null}
       </span>
       <time className="activity-when" dateTime={event.at} title={absoluteTime(event.at)}>
         {relativeTime(event.at)}

@@ -27,6 +27,7 @@ import { api, plainError, qs } from "../lib/api";
 import { humanise, labelOf, settableFields, titleField } from "../lib/fields";
 import { relativeTime } from "../lib/format";
 import { isTyping, moveRowFocus } from "../lib/row-focus";
+import { listStateFromHash, replaceListState } from "../lib/route";
 import {
   actionWord,
   collectionLabel,
@@ -114,7 +115,7 @@ const PAGE = 100;
 const MAX_PAGE = 500;
 
 export function CollectionView({ collection }: { collection: string }) {
-  const { schema, workspace, drafts, navigate, openCreate } = useStudio();
+  const { schema, workspace, drafts, publish, navigate, openCreate } = useStudio();
   const confirm = useConfirm();
   const meta = schema.data?.collections.find((c) => c.name === collection);
   const fields = useMemo(() => meta?.fields ?? [], [meta]);
@@ -126,14 +127,15 @@ export function CollectionView({ collection }: { collection: string }) {
   const canPublish = useCanPublish();
   const local = workspace.data?.storage === "local";
 
-  const [q, setQ] = useState("");
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("all");
-  const [where, setWhere] = useState<Record<string, string>>({});
-  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" }>({
-    key: "site",
-    dir: "asc",
-  });
+  // Search, filters and sort start from the address, so a reload or a shared
+  // link shows the same rows. The view is keyed by collection, so another
+  // collection starts from its own address, not this one's state.
+  const [initial] = useState(() => listStateFromHash(window.location.hash));
+  const [q, setQ] = useState(initial.q);
+  const [query, setQuery] = useState(initial.q);
+  const [status, setStatus] = useState<StatusFilter>(initial.status);
+  const [where, setWhere] = useState<Record<string, string>>(initial.where);
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" }>(initial.sort);
   const [list, setList] = useState<EntryList | null>(null);
   const [items, setItems] = useState<EntrySummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,21 +144,30 @@ export function CollectionView({ collection }: { collection: string }) {
   const [busy, setBusy] = useState(false);
   const [settingField, setSettingField] = useState(false);
 
-  // Reset when the collection changes.
-  useEffect(() => {
-    setQ("");
-    setQuery("");
-    setStatus("all");
-    setWhere({});
-    setSort({ key: "site", dir: "asc" });
-    setSelected(new Set());
-  }, [collection]);
-
   // Debounced search: the server answers fast, but not every keystroke.
   useEffect(() => {
     const timer = setTimeout(() => setQuery(q.trim()), 180);
     return () => clearTimeout(timer);
   }, [q]);
+
+  useEffect(() => {
+    replaceListState({ q: query, status, where, sort });
+  }, [query, status, where, sort]);
+
+  // The address changed under the list (its link in the sidebar, or an edit
+  // to the URL): show what it now says, so the two never disagree.
+  useEffect(() => {
+    const onHash = (): void => {
+      const next = listStateFromHash(window.location.hash);
+      setQ(next.q);
+      setQuery(next.q);
+      setStatus(next.status);
+      setWhere(next.where);
+      setSort(next.sort);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   const params = useMemo(
     () => ({
@@ -689,7 +700,7 @@ export function CollectionView({ collection }: { collection: string }) {
             onClick={() => void bulk("publish")}
             title={canPublish ? undefined : PUBLISH_NEEDS_EDITOR}
           >
-            {publishVerb(drafts.data?.publish)}
+            {publishVerb(publish)}
           </button>
           {settableFields(fields).length > 0 ? (
             <button

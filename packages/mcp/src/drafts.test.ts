@@ -13,6 +13,7 @@ import { defineCollection, field } from "@usegraft/core";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it } from "vitest";
+import type { GraftMcpOptions } from "./options";
 import { createGraftMcp } from "./server";
 
 const collections = {
@@ -22,6 +23,7 @@ const collections = {
 async function connect(
   scopes: string[],
   id: string | null = "writer-bot",
+  onPublished?: (published: { branch: string; paths: string[] }) => void,
 ): Promise<{
   fake: GitHubFake;
   dir: string;
@@ -38,7 +40,7 @@ async function connect(
     repo: "acme/site",
     files: { "content/pages/home.mdx": "---\ntitle: Home\n---\nWelcome\n" },
   });
-  const server = createGraftMcp({
+  const options: GraftMcpOptions = {
     contentDir: dir,
     collections,
     db: {} as never,
@@ -51,7 +53,9 @@ async function connect(
       apiUrl: fake.apiUrl,
       fetch: fake.fetch,
     }),
-  });
+  };
+  if (onPublished) options.onPublished = onPublished;
+  const server = createGraftMcp(options);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
   const client = new Client({ name: "test-agent", version: "0.0.0" });
@@ -156,10 +160,13 @@ describe("MCP writes through a GitHub store", () => {
   });
 
   it("opens a pull request unless the credential may publish", async () => {
-    const { fake, call } = await connect(["content:write"]);
+    const heard: unknown[] = [];
+    const { fake, call } = await connect(["content:write"], "writer-bot", (e) => heard.push(e));
     await call("write_content", { collection: "pages", slug: "about", data: { title: "About" } });
     const published = await call("publish_drafts", { paths: ["pages/about.mdx"] });
     expect(published.payload.mode).toBe("review");
+    // A pull request reaches no site yet: no deploy hooks.
+    expect(heard).toEqual([]);
     expect(fake.pulls()).toHaveLength(1);
     expect(fake.files()["content/pages/about.mdx"]).toBeUndefined();
   });
@@ -174,6 +181,27 @@ describe("MCP writes through a GitHub store", () => {
     expect(published.payload.mode).toBe("direct");
     expect(fake.files()["content/pages/about.mdx"]).toContain("title: About");
     expect(fake.log()[0]?.message).toBe("Add about page");
+  });
+
+  it("calls the deploy hooks after a commit to production", async () => {
+    const heard: unknown[] = [];
+    const { call } = await connect(["content:write", "content:publish"], "writer-bot", (e) =>
+      heard.push(e),
+    );
+    await call("write_content", { collection: "pages", slug: "about", data: { title: "About" } });
+    await call("publish_drafts", { paths: ["pages/about.mdx"] });
+    expect(heard).toEqual([{ branch: "main", paths: ["pages/about.mdx"] }]);
+  });
+
+  it("still reports the commit when a deploy hook throws", async () => {
+    const { fake, call } = await connect(["content:write", "content:publish"], "writer-bot", () => {
+      throw new Error("hook down");
+    });
+    await call("write_content", { collection: "pages", slug: "about", data: { title: "About" } });
+    const published = await call("publish_drafts", { paths: ["pages/about.mdx"] });
+    expect(published.isError).toBe(false);
+    expect(published.payload.mode).toBe("direct");
+    expect(fake.files()["content/pages/about.mdx"]).toContain("title: About");
   });
 
   it("discards a draft", async () => {
