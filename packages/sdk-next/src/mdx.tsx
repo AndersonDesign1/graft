@@ -6,10 +6,13 @@
  * the MDX with the project's component map so registry blocks (`Callout`,
  * `Faq`, …) are real JSX — not react-markdown fakes.
  *
- * Server Components only (async evaluate). Pass components from the generated
+ * MdxBody is an async Server Component, for the App Router. The Pages Router
+ * compiles with prepareMdx in getStaticProps and renders with MdxContent from
+ * `@usegraft/sdk-next/mdx`. Pass components from the generated
  * `components/mdx-components.ts` map that `graft add` regenerates.
  */
 import { compile, run } from "@mdx-js/mdx";
+import { GraftError } from "@usegraft/contracts";
 import { assertSafeMdx, type MdxTrust } from "@usegraft/mdx-safety";
 import type { MDXComponents } from "mdx/types";
 import type { ReactElement } from "react";
@@ -45,6 +48,21 @@ export interface MdxBodyProps {
   trust?: MdxTrust;
 }
 
+/** Check a body against its trust rule and compile it to a function body. */
+async function compileMdx(source: string, trust: MdxTrust, development: boolean): Promise<string> {
+  // Checked at render as well as at write, because content can also arrive
+  // through a direct database write with the runtime credential — a path no
+  // write-side guard sees.
+  if (trust !== "full") assertSafeMdx(source);
+  return String(
+    await compile(source, {
+      outputFormat: "function-body",
+      remarkPlugins: [remarkGfm],
+      development,
+    }),
+  );
+}
+
 /**
  * Compile + run an MDX source string and render it with the given components.
  * Empty source renders nothing (valid for body-less docs).
@@ -57,23 +75,39 @@ export async function MdxBody({
   const trimmed = source.trim();
   if (trimmed.length === 0) return null;
 
-  // Checked at render as well as at write, because content can also arrive
-  // through a direct database write with the runtime credential — a path no
-  // write-side guard sees.
-  if (trust !== "full") assertSafeMdx(trimmed);
-
-  const compiled = String(
-    await compile(trimmed, {
-      outputFormat: "function-body",
-      remarkPlugins: [remarkGfm],
-      development: process.env.NODE_ENV !== "production",
-    }),
-  );
-
+  const compiled = await compileMdx(trimmed, trust, process.env.NODE_ENV !== "production");
   const { default: Content } = await run(compiled, {
     ...runtime,
     baseUrl: import.meta.url,
   });
 
   return <Content components={components ?? {}} />;
+}
+
+/**
+ * Compile an MDX body for the Pages Router: call it in getStaticProps or
+ * getServerSideProps, pass the string in props, and render it with
+ * MdxContent from `@usegraft/sdk-next/mdx`. Empty source gives "".
+ *
+ * The same trust rule as MdxBody applies, here on the server. A body that
+ * imports modules is refused: the browser runs the result without a bundler,
+ * so components come through MdxContent's `components` instead.
+ */
+export async function prepareMdx(
+  source: string,
+  options: { trust?: MdxTrust } = {},
+): Promise<string> {
+  const trimmed = source.trim();
+  if (trimmed.length === 0) return "";
+  // Production JSX always: the browser gets react/jsx-runtime, not the dev one.
+  const compiled = await compileMdx(trimmed, options.trust ?? "restricted", false);
+  if (compiled.includes("await import(")) {
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: "This MDX body imports modules, which prepareMdx can't send to the browser.",
+      fix: "Pass the components in MdxContent's components map instead of importing them in the MDX. In the App Router, MdxBody runs imports on the server.",
+      details: { reason: "mdx-import" },
+    });
+  }
+  return compiled;
 }

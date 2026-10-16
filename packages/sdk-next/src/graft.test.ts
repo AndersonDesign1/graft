@@ -129,6 +129,24 @@ describe("on Next 15, whose next/cache has no updateTag", () => {
   });
 });
 
+describe("on React 18, which has no cache (the Pages Router on Next 14)", () => {
+  it("creates the client and reads straight through", async () => {
+    vi.resetModules();
+    // As above: a real namespace reads the missing export as undefined.
+    vi.doMock("react", () => ({ cache: undefined }));
+    const { createGraft: create } = await import("./graft");
+    const pages = defineCollection({ name: "pages", fields: { title: field.string() } });
+    // SAFETY: the index is never read; getDocument is replaced below.
+    const graft = create({ index: {} as never, collections: { pages } });
+    const read = vi.fn(async () => null);
+    graft.client.getDocument = read;
+    await graft.getContent("pages", "home");
+    await graft.getContent("pages", "home");
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(read).toHaveBeenLastCalledWith("pages", "home", undefined);
+  });
+});
+
 describe("createGraft type inference", () => {
   // The no-codegen contract must survive the React.cache wrappers: a schema
   // defined in graft.config.ts types every read in a Server Component. Assert
