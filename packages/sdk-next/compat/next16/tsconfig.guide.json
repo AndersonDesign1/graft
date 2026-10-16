@@ -6,6 +6,7 @@
       "@/*": ["../../guide/*"],
       "@usegraft/sdk-next": ["../../src/index.ts"],
       "@usegraft/sdk-next/config": ["../../src/next-config.ts"],
+      "@usegraft/sdk-next/mdx": ["../../src/mdx-content.tsx"],
       "next": ["./node_modules/next"],
       "next/*": ["./node_modules/next/*"],
       "react": ["./node_modules/@types/react"],

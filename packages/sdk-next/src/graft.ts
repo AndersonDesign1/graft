@@ -22,7 +22,9 @@
  * `updateTag` (Next 16 only) is an import of a missing export on 15.
  */
 import { GraftError } from "@usegraft/contracts";
-import * as nextCache from "next/cache";
+// With the extension: the Pages Router on Next.js 14 loads this package with
+// Node's own ESM loader, and next has no exports map to resolve "next/cache".
+import * as nextCache from "next/cache.js";
 import * as React from "react";
 import { createDbClient, type DbClientOptions } from "@usegraft/sdk-core/db";
 import {
@@ -72,7 +74,7 @@ export type GraftOptions<TCollections extends Record<string, AnyCollection>> =
   | ClientOptions<TCollections>
   | DbClientOptions<TCollections>;
 
-type Memo = <F extends (...args: never[]) => unknown>(fn: F) => F;
+type Memo = <A extends unknown[], R>(fn: (...args: A) => R) => (...args: A) => R;
 
 /**
  * React.cache, where there is one. React 19 and the React that Next.js 14
@@ -80,7 +82,8 @@ type Memo = <F extends (...args: never[]) => unknown>(fn: F) => F;
  * on Next.js 14, does not. Without it each read goes to the index, which is
  * what the Pages Router's data functions expect: they run once per page.
  */
-const memo: Memo = typeof React.cache === "function" ? React.cache : (fn) => fn;
+const react: { cache?: Memo } = React;
+const memo: Memo = react.cache ?? ((fn) => fn);
 
 export function createGraft<TCollections extends Record<string, AnyCollection>>(
   options: GraftOptions<TCollections>,

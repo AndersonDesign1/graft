@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 const revalidateTag = vi.fn();
 const updateTag = vi.fn();
 
-vi.mock("next/cache", () => ({
+vi.mock("next/cache.js", () => ({
   revalidateTag: (tag: string, profile: unknown) => revalidateTag(tag, profile),
   updateTag: (tag: string) => updateTag(tag),
 }));
@@ -94,7 +94,7 @@ describe("on Next 15, whose next/cache has no updateTag", () => {
       void tag;
     });
     vi.resetModules();
-    vi.doMock("next/cache", () => ({
+    vi.doMock("next/cache.js", () => ({
       revalidateTag: legacyRevalidateTag,
       revalidatePath: vi.fn(),
       unstable_cache: vi.fn(),
