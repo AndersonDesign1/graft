@@ -1,0 +1,10 @@
+/*
+ * Crepe's structural CSS, in a layer below the app's own styles.
+ *
+ * It loads with the editor, after parts.css, and several of its rules match
+ * ours exactly in specificity (`.milkdown .milkdown-slash-menu` against
+ * `.rich .milkdown-slash-menu`), so the later file would win and the slash
+ * menu would lose our surface. Styles outside any layer beat those in one,
+ * whatever order they load in.
+ */
+@import "@milkdown/crepe/theme/common/style.css" layer(crepe);

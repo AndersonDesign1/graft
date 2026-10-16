@@ -104,7 +104,13 @@ export function SetFieldDialog({
       setFailed(result.failed);
       if (result.failed.length === 0) onOpenChange(false);
     } catch (error) {
-      toast.error(plainError(error));
+      // The request may have stopped partway, after some entries were saved.
+      // Show the list as it is now, with the selection kept to try again.
+      toast.error(plainError(error), {
+        description: "Some entries may have been saved. The list shows which.",
+      });
+      drafts.refresh();
+      onSaved(entries.map((entry) => entry.slug));
     } finally {
       setBusy(false);
     }

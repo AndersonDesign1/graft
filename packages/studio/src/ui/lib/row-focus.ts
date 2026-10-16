@@ -17,13 +17,20 @@ export function nextRow(key: string, at: number, count: number): number | null {
   return Math.max(0, Math.min(count - 1, next));
 }
 
-/** Typing in a field, a menu or a dialog: j and k are letters there, not moves. */
+const OVERLAY = "[role=dialog], [role=alertdialog], [role=menu], [role=listbox]";
+
+/**
+ * Typing in a field, or anywhere in a dialog or menu: j and k are letters
+ * there, not moves, and a confirm dialog keeps focus. A row's checkbox is
+ * part of the list, so they move from it.
+ */
 export function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
-  return Boolean(
-    target.closest("input, textarea, select, [role=dialog], [role=menu], [role=listbox]"),
-  );
+  if (target instanceof HTMLInputElement && target.type === "checkbox") {
+    return Boolean(target.closest(OVERLAY));
+  }
+  return Boolean(target.closest(`input, textarea, select, ${OVERLAY}`));
 }
 
 /**
@@ -39,7 +46,11 @@ export function moveRowFocus(
   if ((event.key === "j" || event.key === "k") && isTyping(event.target)) return false;
   const rows = [...container.querySelectorAll<HTMLElement>(selector)];
   const active = document.activeElement;
-  const at = rows.findIndex((row) => row === active || row.contains(active));
+  // The row holding focus: its link, or anything else in its table row, such
+  // as the checkbox beside it.
+  const at = rows.findIndex(
+    (row) => row === active || row.contains(active) || Boolean(row.closest("tr")?.contains(active)),
+  );
   const next = nextRow(event.key, at, rows.length);
   if (next === null) return false;
   rows[next]?.focus();
