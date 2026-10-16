@@ -2269,10 +2269,17 @@
   }
 }
 
-/* On a phone the bar keeps what can go wrong: a saved draft says nothing. */
+/*
+ * On a phone the bar keeps what someone needs while typing: that the save
+ * landed. The top bar's button commits this entry with the rest, so the
+ * bar's own copy goes, and so does the title, which the heading below shows
+ * in full where the bar could only cut it short.
+ */
 @media (width < 48rem) {
-  .save[data-state="saved"],
-  .save[data-state="idle"] {
+  .save[data-state="idle"],
+  .entry-bar-publish,
+  .entry-crumbs .crumb[aria-current="page"],
+  .entry-crumbs .crumb-sep {
     display: none;
   }
 }

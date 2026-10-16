@@ -652,7 +652,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
           </Tooltip>
           <button
             type="button"
-            className="btn"
+            className="btn entry-bar-publish"
             data-variant="primary"
             data-size="sm"
             disabled={

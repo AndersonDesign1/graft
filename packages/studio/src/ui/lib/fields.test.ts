@@ -31,6 +31,24 @@ describe("labels", () => {
 });
 
 describe("controls", () => {
+  it("keeps a long-limit string on one line when it holds an address or a path", () => {
+    const long = { constraints: { maxLength: 2048 } };
+    expect(controlOf(f({ name: "summary", type: "string", ...long }))).toBe("textarea");
+    for (const name of ["url", "githubUrl", "thumbnail", "cover_image", "website", "email"]) {
+      expect(controlOf(f({ name, type: "string", ...long }))).toBe("text");
+    }
+    expect(
+      controlOf(
+        f({
+          name: "target",
+          type: "string",
+          constraints: { maxLength: 2048, pattern: "^https?://" },
+        }),
+      ),
+    ).toBe("text");
+    expect(controlOf(f({ name: "url", type: "text" }))).toBe("textarea");
+  });
+
   it("picks the control from the declared type", () => {
     expect(controlOf(f({ name: "a", type: "number", format: "money" }))).toBe("money");
     expect(controlOf(f({ name: "a", type: "select" }))).toBe("select");

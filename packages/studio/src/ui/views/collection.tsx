@@ -26,6 +26,7 @@ import { Menu, MenuContent, MenuItem, MenuSection, MenuTrigger } from "../compon
 import { api, plainError, qs } from "../lib/api";
 import { humanise, labelOf, settableFields, titleField } from "../lib/fields";
 import { relativeTime } from "../lib/format";
+import { isTyping, moveRowFocus } from "../lib/row-focus";
 import {
   actionWord,
   collectionLabel,
@@ -168,6 +169,20 @@ export function CollectionView({ collection }: { collection: string }) {
     }),
     [collection, query, status, sort, where],
   );
+
+  // j and k move through the rows from anywhere on the page; the arrows,
+  // Home and End once focus is in the table.
+  const table = useRef<HTMLTableElement | null>(null);
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent): void => {
+      if (event.key !== "j" && event.key !== "k") return;
+      if (!table.current || table.current.contains(document.activeElement)) return;
+      if (isTyping(event.target)) return;
+      if (moveRowFocus(table.current, "a.row-title", event)) event.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const seq = useRef(0);
   // The page the last request asked for, so Try again repeats that request:
@@ -491,7 +506,14 @@ export function CollectionView({ collection }: { collection: string }) {
       ) : null}
 
       <div className="table-wrap">
-        <table className="entries" aria-busy={loading}>
+        <table
+          ref={table}
+          className="entries"
+          aria-busy={loading}
+          onKeyDown={(event) => {
+            if (moveRowFocus(event.currentTarget, "a.row-title", event)) event.preventDefault();
+          }}
+        >
           <thead>
             <tr>
               <th className="col-check">
