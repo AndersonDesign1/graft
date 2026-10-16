@@ -78,11 +78,12 @@ export function withGraft(
   const major = version ? parse(version)?.[0] : undefined;
   if (major !== undefined && major < 15) {
     // Next.js 14 reads this key; the types installed here are 15's or later,
-    // which no longer declare it, so it is read and written untyped.
-    const current: unknown = Reflect.get(
-      config.experimental ?? {},
-      "serverComponentsExternalPackages",
-    );
+    // which no longer declare it, so it is narrowed by `in` and written by spread.
+    const declared = config.experimental ?? {};
+    const current =
+      "serverComponentsExternalPackages" in declared
+        ? declared.serverComponentsExternalPackages
+        : undefined;
     const existing = Array.isArray(current)
       ? current.filter((name): name is string => typeof name === "string")
       : [];
