@@ -8,7 +8,11 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, sep } from "node:path";
 import { GraftError } from "@usegraft/contracts";
-import matter from "gray-matter";
+import {
+  readFrontmatter,
+  writeFrontmatter,
+  type Frontmatter,
+} from "@usegraft/mdx-safety/frontmatter";
 import type { AnyContentMigration } from "./define";
 
 export interface RunContentMigrationOptions {
@@ -72,9 +76,9 @@ export async function runContentMigration(
 
   for (const { file, sourcePath } of files) {
     const raw = readFileSync(file, "utf8");
-    let parsed: matter.GrayMatterFile<string>;
+    let parsed: Frontmatter;
     try {
-      parsed = matter(raw);
+      parsed = readFrontmatter(raw, sourcePath);
     } catch (error) {
       failures.push({
         sourcePath,
@@ -83,7 +87,7 @@ export async function runContentMigration(
       continue;
     }
 
-    const frontmatter = parsed.data as Record<string, unknown>;
+    const frontmatter = parsed.data;
     // Same slug rule as the compiler: explicit frontmatter slug, else filename.
     const explicitSlug =
       typeof frontmatter.slug === "string" && frontmatter.slug.length > 0
@@ -123,7 +127,7 @@ export async function runContentMigration(
         ...(explicitSlug !== undefined && { slug: explicitSlug }),
         ...next.data,
       };
-      writes.push({ file, raw: matter.stringify(nextBody, nextFrontmatter) });
+      writes.push({ file, raw: writeFrontmatter(nextBody, nextFrontmatter) });
     }
   }
 

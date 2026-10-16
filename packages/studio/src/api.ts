@@ -838,7 +838,9 @@ const ROUTES: readonly Route[] = [
   {
     method: "POST",
     path: `${V1}/changes/commit`,
-    scope: "studio:write",
+    // A commit is a publish on a local checkout: the same right as
+    // POST /drafts/publish, so a contributor can't take this way around it.
+    scope: "studio:publish",
     writesCheckout: true,
     handle: async ({ request, options }) => {
       const payload = (await request.json().catch(() => ({}))) as {
@@ -987,7 +989,8 @@ const ROUTES: readonly Route[] = [
   {
     method: "POST",
     path: COMPILATION_REVERT_PATH,
-    scope: "studio:write",
+    // Rewrites the checkout to an older commit, so it needs publish rights.
+    scope: "studio:publish",
     writesCheckout: true,
     databaseSource: true,
     handle: async ({ options, id }) => {

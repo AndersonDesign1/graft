@@ -25,7 +25,7 @@ import { GraftError, type ChangeSet } from "@usegraft/contracts";
 import type { AnyCollection } from "@usegraft/core";
 import type { Database } from "@usegraft/db";
 import { assertSafeMdx, type MdxTrust } from "@usegraft/mdx-safety";
-import matter from "gray-matter";
+import { readFrontmatter } from "@usegraft/mdx-safety/frontmatter";
 import type {
   ActivityDocumentDto,
   AssetUseDto,
@@ -298,12 +298,12 @@ export class EditorService {
         details: { collection: name, slug },
       });
     }
-    const parsed = matter(file.raw, {});
+    const parsed = readFrontmatter(file.raw, path);
     return {
       collection: name,
       slug,
       path,
-      data: parsed.data as Record<string, unknown>,
+      data: parsed.data,
       body: parsed.content.replace(/^\n/, ""),
       raw: file.raw,
       version,
@@ -386,7 +386,7 @@ export class EditorService {
     let body: string;
     if (typeof input.raw === "string") {
       raw = input.raw;
-      const parsed = matter(raw, {});
+      const parsed = readFrontmatter(raw, path);
       body = parsed.content;
       assertSlugMatches(parsed.data, input.slug);
     } else {
@@ -456,8 +456,8 @@ export class EditorService {
             details: { collection: input.collection, slug },
           });
         }
-        const parsed = matter(file.raw, {});
-        const data = { ...(parsed.data as Record<string, unknown>) };
+        const parsed = readFrontmatter(file.raw, path);
+        const data = { ...parsed.data };
         if (input.value === null) delete data[input.field];
         else data[input.field] = input.value;
         const { version } = await this.put(

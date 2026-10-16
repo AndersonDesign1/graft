@@ -60,6 +60,20 @@ describe("parseDocument", () => {
     }
   });
 
+  it("refuses ---js frontmatter before any of it runs", () => {
+    const flags: Record<string, unknown> = globalThis;
+    const raw = '---js\n(globalThis.__graftParseRan = true, { title: "X" })\n---\nBody';
+    expect(() => parseDocument(raw, page, "pages/x.mdx")).toThrow(
+      expect.objectContaining({
+        code: "INPUT_VALIDATION_FAILED",
+        message:
+          'The frontmatter in pages/x.mdx is written in "js". Graft reads YAML frontmatter, or JSON.',
+        details: { reason: "frontmatter-language", language: "js", sourcePath: "pages/x.mdx" },
+      }),
+    );
+    expect(flags.__graftParseRan).toBeUndefined();
+  });
+
   it("is deterministic — same input yields the same content hash", () => {
     const raw = "---\ntitle: X\n---\nBody";
     expect(parseDocument(raw, page, "pages/x.mdx").contentHash).toBe(
