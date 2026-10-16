@@ -215,7 +215,9 @@ The inbox holds what is waiting on a decision:
   the request. On GitHub, the request is a pull request, and **Open on
   GitHub** takes you to it.
 - **Agents asking first.** A destructive call from an agent waits until a
-  person approves or denies it. Nothing runs until then. See
+  person approves or denies it. Nothing runs until then. The card says what it
+  would do, such as **Delete projects/welup-digital**, and **Approve** asks once
+  more before the agent may run it. See
   [Audit & approvals](/docs/audit-and-approvals).
 
 The sidebar shows how many things are waiting.
@@ -282,7 +284,10 @@ agents can read them.
 
 **Settings, Deploy hooks** lists URLs called with a `POST` after every publish:
 a host's build hook, so a static site rebuilds, or the site's own revalidate
-route, so cached pages refresh. Add a secret if the URL checks one; it is sent
+route, so cached pages refresh. A publish is a commit Studio makes to your
+production branch on GitHub, or a publish of content kept in the database. A
+commit on your own machine reaches no site, so it calls no hook: your host
+builds when you push it. Add a secret if the URL checks one; it is sent
 as `Authorization: Bearer <secret>`. Each hook shows what it answered last, and
 **Send a test** calls it now. A hook that fails never undoes the publish.
 

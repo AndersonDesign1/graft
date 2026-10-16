@@ -29,6 +29,7 @@ import { relativeTime } from "../lib/format";
 import {
   actionWord,
   collectionLabel,
+  deletionNote,
   doneWord,
   PUBLISH_NEEDS_EDITOR,
   publishVerb,
@@ -241,7 +242,7 @@ export function CollectionView({ collection }: { collection: string }) {
       const ok = await confirm({
         kind: "delete",
         title: `Delete ${chosen.length === 1 ? `“${noun}”` : noun}?`,
-        body: `They stay live until you ${actionWord(drafts.data?.publish)} the deletion.`,
+        body: deletionNote(drafts.data?.publish, true),
         action: `Delete ${what}`,
       });
       if (!ok) return;
@@ -302,6 +303,8 @@ export function CollectionView({ collection }: { collection: string }) {
   const label = collectionLabel(collection);
   const all = list?.counts.all ?? 0;
   const filtered = query !== "" || status !== "all" || Object.keys(where).length > 0;
+  // The Drafts or Published tab alone: say what is empty, not that a search failed.
+  const onlyStatus = query === "" && Object.keys(where).length === 0 && status !== "all";
   const allVisibleSelected = items.length > 0 && items.every((item) => selected.has(item.path));
 
   return (
@@ -590,7 +593,13 @@ export function CollectionView({ collection }: { collection: string }) {
           <div className="listing-empty">
             {filtered ? (
               <>
-                <p className="listing-empty-title">Nothing matches.</p>
+                <p className="listing-empty-title">
+                  {onlyStatus
+                    ? status === "unpublished"
+                      ? `No drafts. Every ${singular(collection)} is ${doneWord(drafts.data?.publish)}.`
+                      : `Nothing ${doneWord(drafts.data?.publish)} yet.`
+                    : "Nothing matches."}
+                </p>
                 <button
                   type="button"
                   className="btn"
@@ -600,7 +609,7 @@ export function CollectionView({ collection }: { collection: string }) {
                     setWhere({});
                   }}
                 >
-                  Clear filters
+                  {onlyStatus ? "Show all" : "Clear filters"}
                 </button>
               </>
             ) : (

@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { actionWord, collectionLabel, doneWord, publishVerb, singular } from "./studio";
+import {
+  actionWord,
+  collectionLabel,
+  deletionNote,
+  doneWord,
+  publishVerb,
+  singular,
+} from "./studio";
 import { slugify } from "../../slug";
+
+describe("deletionNote", () => {
+  it("says the file is gone locally, and live elsewhere until published", () => {
+    expect(deletionNote("commit")).toBe(
+      "Its file is removed from this computer now. The deployed site keeps it until you commit the deletion and push.",
+    );
+    expect(deletionNote("commit", true)).toContain("Their files are removed");
+    expect(deletionNote("publish")).toBe("It stays live until you publish the deletion.");
+    expect(deletionNote("review", true)).toBe("They stay live until you submit the deletion.");
+  });
+});
 
 describe("collection words", () => {
   it("names a collection and one of its entries", () => {

@@ -9,7 +9,9 @@ import { toast } from "sonner";
 import type { DraftChangeDto, PublishResultDto, ReviewRequest } from "../../editor-types";
 import type { ApprovalList, PendingApprovalDto } from "../../types";
 import { IconCheck, IconDatabase, IconExternal, IconWaiting } from "../components/icons";
+import { useConfirm } from "../components/ui/confirm";
 import { api, plainError } from "../lib/api";
+import { describeRequest, inputSummary } from "../lib/approvals";
 import { absoluteTime, plural, relativeTime } from "../lib/format";
 import { useDatabase, useStudio } from "../lib/studio";
 import { useResource } from "../lib/use-resource";
@@ -249,8 +251,25 @@ function ApprovalRow({
   onDecided: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
+  const action = describeRequest(request.functionName, request.input);
+  // A named action already says what it touches; a bare function shows its inputs.
+  const summary = action.startsWith("Run ") ? inputSummary(request.input) : [];
 
   async function decide(decision: "approved" | "denied"): Promise<void> {
+    // Approving lets an irreversible call run, so it is asked twice; denying
+    // only sends the agent away.
+    if (
+      decision === "approved" &&
+      !(await confirm({
+        kind: "delete",
+        title: `Approve “${action}”?`,
+        body: "The agent can then run it once. What it deletes or overwrites can't be undone from Studio.",
+        action: "Approve",
+      }))
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       await api(`/approvals/${encodeURIComponent(request.id)}/decide`, {
@@ -259,8 +278,8 @@ function ApprovalRow({
       });
       toast.success(
         decision === "approved"
-          ? `Approved ${request.functionName}. The agent can run it now.`
-          : `Denied ${request.functionName}`,
+          ? `Approved: ${action}. The agent can run it now.`
+          : `Denied: ${action}`,
       );
       onDecided();
     } catch (error) {
@@ -280,18 +299,25 @@ function ApprovalRow({
     <li className="inbox-item">
       <IconWaiting className="inbox-icon" data-tone="waiting" aria-hidden="true" />
       <div className="inbox-main">
-        <p className="inbox-title">
-          <code>{request.functionName}</code>
-        </p>
+        <p className="inbox-title">{action}</p>
         <p className="inbox-sub">
-          {who} on {request.branchId},{" "}
+          {who} asks to run <code>{request.functionName}</code> on {request.branchId},{" "}
           <time dateTime={request.createdAt} title={absoluteTime(request.createdAt)}>
             {relativeTime(request.createdAt)}
           </time>
           . Nothing happens until you decide.
         </p>
+        {summary.length > 0 ? (
+          <ul className="inbox-paths" aria-label="What it sends">
+            {summary.map(([key, value]) => (
+              <li key={key}>
+                {key}: <code>{value}</code>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <details className="disclosure">
-          <summary>What it would send</summary>
+          <summary>Everything it would send</summary>
           <pre className="well">{JSON.stringify(request.input, null, 2)}</pre>
         </details>
       </div>

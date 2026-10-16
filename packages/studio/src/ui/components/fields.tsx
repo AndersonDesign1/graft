@@ -792,7 +792,7 @@ function AssetControl({ value, onChange, disabled, inputId, describedBy }: Input
             id={inputId}
             className="input"
             value={asset.key}
-            placeholder="products/hat/front.jpg"
+            placeholder="images/cover.jpg"
             spellCheck={false}
             disabled={disabled}
             aria-describedby={describedBy}

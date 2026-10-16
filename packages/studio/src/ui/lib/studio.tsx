@@ -84,6 +84,19 @@ export function useDatabase(): boolean | undefined {
   return value ? value.workspace.data?.database : true;
 }
 
+/**
+ * What a deletion means until it is published, for one entry or several. On
+ * this computer the file is gone at once (`graft dev` stops showing it) and
+ * only the deployed site keeps it until the deletion is committed and pushed.
+ */
+export function deletionNote(action: DraftsDto["publish"] | undefined, many = false): string {
+  const it = many ? "They" : "It";
+  if (action === "commit") {
+    return `${many ? "Their files are" : "Its file is"} removed from this computer now. The deployed site keeps ${many ? "them" : "it"} until you commit the deletion and push.`;
+  }
+  return `${it} ${many ? "stay" : "stays"} live until you ${actionWord(action)} the deletion.`;
+}
+
 /** The verb inside a sentence: "until you commit the deletion". */
 export function actionWord(action: DraftsDto["publish"] | undefined): string {
   if (action === "review") return "submit";

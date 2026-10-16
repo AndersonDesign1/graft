@@ -22,6 +22,7 @@ export function service(ctx: RouteContext): EditorService {
       contentDir: ctx.options.contentDir,
       collections: ctx.options.collections,
       ...(ctx.options.db ? { db: ctx.options.db } : {}),
+      ...(ctx.options.workspaceDb ? { workspaceDb: ctx.options.workspaceDb } : {}),
       ...(ctx.options.staticIndexPath ? { staticIndexPath: ctx.options.staticIndexPath } : {}),
       branchId: ctx.defaultBranch,
       mdxTrust: ctx.options.mdxTrust,
