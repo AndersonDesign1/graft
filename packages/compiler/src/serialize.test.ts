@@ -146,18 +146,86 @@ Body.
     expect(out).not.toContain("title: '");
   });
 
-  it("falls back to a full rewrite rather than mangle YAML it cannot model", () => {
-    // A leading comment is not attached to any key; patching around it would
-    // have to guess where it belongs.
-    const withComment = `---
+  it("keeps a leading comment, and a comment between keys, around an edit", () => {
+    // Both used to send the whole block through a full rewrite, which dropped
+    // the comments, re-quoted every string and lost the blank line after ---.
+    const withComments = `---
 # generated — do not edit by hand
 title: T
+
+# shown on cards
+description: "Kept as it was."
 ---
 
 Body.
 `;
-    const out = composeDocument(withComment, { title: "U" }, "Body.\n");
+    const data = matter(withComments).data as Record<string, unknown>;
+    expect(composeDocument(withComments, { ...data, title: "U" }, "Body.\n")).toBe(`---
+# generated — do not edit by hand
+title: U
+
+# shown on cards
+description: "Kept as it was."
+---
+
+Body.
+`);
+  });
+
+  it("falls back to a full rewrite rather than mangle YAML it cannot model", () => {
+    // A second document inside the block is nothing a key-by-key patch models.
+    const twoDocuments = `---
+title: T
+...
+---
+
+Body.
+`;
+    const out = composeDocument(twoDocuments, { title: "U" }, "Body.\n");
     expect(matter(out).data).toEqual({ title: "U" });
+  });
+
+  it("keeps an edited one-line string on one line, in the quotes it had", () => {
+    // Saving a long quoted description rewrote it as a folded `>-` block.
+    const long =
+      "A long one-line description of a project that goes well past eighty characters, as descriptions do.";
+    const raw = `---
+title: Kyrus
+description: "${long}"
+tagline: 'It''s quoted with singles.'
+---
+
+Body.
+`;
+    const out = composeDocument(
+      raw,
+      { title: "Kyrus", description: `${long} "More."`, tagline: "It's still singles." },
+      "Body.\n",
+    );
+    expect(out).toBe(`---
+title: Kyrus
+description: "${long} \\"More.\\""
+tagline: 'It''s still singles.'
+---
+
+Body.
+`);
+    expect(matter(out).data).toEqual({
+      title: "Kyrus",
+      description: `${long} "More."`,
+      tagline: "It's still singles.",
+    });
+  });
+
+  it("never folds a long string, in a new file or a full rewrite", () => {
+    const long = "word ".repeat(30).trim();
+    for (const out of [
+      composeDocument(undefined, { title: "T", description: long }, "Body."),
+      composeDocument("No frontmatter.\n", { title: "T", description: long }, "Body."),
+    ]) {
+      expect(out).toContain(`description: ${long}\n`);
+      expect(out).not.toContain(">-");
+    }
   });
 
   it("detects nested and array changes, not just top-level ones", () => {
