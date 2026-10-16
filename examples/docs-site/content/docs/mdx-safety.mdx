@@ -67,7 +67,7 @@ Three places, and they are checking different things.
 | `graft compile` | Content already in git, so a bad document fails the build rather than a request |
 | MCP `write_content` | Content arriving from someone who is not the operator, refused before it is stored |
 | Studio saves | Same |
-| `MdxBody` at render | Content can also arrive by a direct database write with the runtime credential, which no write-side guard sees |
+| `MdxBody` at render, and `prepareMdx` | Content can also arrive by a direct database write with the runtime credential, which no write-side guard sees |
 
 The compile check is what makes the failure a build-time one. Without it,
 `MdxBody` refusing at render would mean an unchecked tree fails per-request in
@@ -151,11 +151,17 @@ somebody was deliberately turning off, or the reverse.
 
 It refuses constructs that **execute**. It is not an HTML sanitizer.
 
-It does not filter `javascript:` URLs, `style` attributes, `srcdoc`, or the long
-tail of markup that can be abused without running script inline. If you render
-content from people you do not trust at all, put `rehype-sanitize` in the
-pipeline as well. This closes the MDX-specific hole a Markdown sanitizer would
-not even see.
+It does not filter `style` attributes, `srcdoc`, or the long tail of markup that
+can be abused without running script inline. If you render content from people
+you do not trust at all, render it with your own pipeline and `rehype-sanitize`.
+This check closes the MDX-specific hole a Markdown sanitizer would not even see.
+
+One filter does apply to restricted bodies: `MdxBody` and `prepareMdx` drop any
+`href`, `src` or other URL attribute whose scheme is not `http`, `https`,
+`mailto` or `tel`, on Markdown links and on components alike. A
+`[Read more](javascript:…)` link keeps its text and loses the URL. React 19
+blocks `javascript:` URLs on its own, and React 18, which the Pages Router on
+Next.js 14 uses, does not.
 
 ## Writing components that pass
 

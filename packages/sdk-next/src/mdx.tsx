@@ -18,6 +18,7 @@ import type { MDXComponents } from "mdx/types";
 import type { ReactElement } from "react";
 import * as runtime from "react/jsx-runtime";
 import remarkGfm from "remark-gfm";
+import { rehypeSafeUrls } from "./safe-urls";
 
 export type MdxComponents = MDXComponents;
 
@@ -49,18 +50,57 @@ export interface MdxBodyProps {
 }
 
 /** Check a body against its trust rule and compile it to a function body. */
-async function compileMdx(source: string, trust: MdxTrust, development: boolean): Promise<string> {
+async function compileMdx(
+  source: string,
+  options: { trust: MdxTrust; development: boolean; forBrowser?: boolean },
+): Promise<string> {
+  const restricted = options.trust !== "full";
   // Checked at render as well as at write, because content can also arrive
   // through a direct database write with the runtime credential — a path no
   // write-side guard sees.
-  if (trust !== "full") assertSafeMdx(source);
+  if (restricted) assertSafeMdx(source);
   return String(
     await compile(source, {
       outputFormat: "function-body",
-      remarkPlugins: [remarkGfm],
-      development,
+      remarkPlugins: options.forBrowser ? [remarkGfm, remarkRefuseModules] : [remarkGfm],
+      rehypePlugins: restricted ? [rehypeSafeUrls] : [],
+      development: options.development,
     }),
   );
+}
+
+/**
+ * Whether a parsed MDX tree loads a module: `import`, `export … from`,
+ * `import()` or `import.meta`. Read from the syntax tree, so a code span or a
+ * fenced block that only mentions one is prose, not an import.
+ */
+function loadsModules(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(loadsModules);
+  if (!value || typeof value !== "object") return false;
+  if ("type" in value) {
+    const node: { type?: unknown; source?: unknown; meta?: { name?: unknown } } = value;
+    if (node.type === "ImportDeclaration" || node.type === "ImportExpression") return true;
+    if (node.type === "MetaProperty" && node.meta?.name === "import") return true;
+    if (
+      (node.type === "ExportNamedDeclaration" || node.type === "ExportAllDeclaration") &&
+      node.source
+    )
+      return true;
+  }
+  return Object.entries(value).some(([key, child]) => key !== "position" && loadsModules(child));
+}
+
+/** Refuses a body that loads modules, which the browser has no bundler to resolve. */
+function remarkRefuseModules() {
+  return (tree: unknown) => {
+    if (!loadsModules(tree)) return;
+    throw new GraftError({
+      code: "INPUT_VALIDATION_FAILED",
+      message: "This MDX body imports modules, which prepareMdx can't send to the browser.",
+      fix: "Pass the components in MdxContent's components map instead of importing them in the MDX. In the App Router, MdxBody runs imports on the server.",
+      details: { reason: "mdx-import" },
+    });
+  };
 }
 
 /**
@@ -75,7 +115,10 @@ export async function MdxBody({
   const trimmed = source.trim();
   if (trimmed.length === 0) return null;
 
-  const compiled = await compileMdx(trimmed, trust, process.env.NODE_ENV !== "production");
+  const compiled = await compileMdx(trimmed, {
+    trust,
+    development: process.env.NODE_ENV !== "production",
+  });
   const { default: Content } = await run(compiled, {
     ...runtime,
     baseUrl: import.meta.url,
@@ -100,14 +143,9 @@ export async function prepareMdx(
   const trimmed = source.trim();
   if (trimmed.length === 0) return "";
   // Production JSX always: the browser gets react/jsx-runtime, not the dev one.
-  const compiled = await compileMdx(trimmed, options.trust ?? "restricted", false);
-  if (compiled.includes("await import(")) {
-    throw new GraftError({
-      code: "INPUT_VALIDATION_FAILED",
-      message: "This MDX body imports modules, which prepareMdx can't send to the browser.",
-      fix: "Pass the components in MdxContent's components map instead of importing them in the MDX. In the App Router, MdxBody runs imports on the server.",
-      details: { reason: "mdx-import" },
-    });
-  }
-  return compiled;
+  return compileMdx(trimmed, {
+    trust: options.trust ?? "restricted",
+    development: false,
+    forBrowser: true,
+  });
 }
