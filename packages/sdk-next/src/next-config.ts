@@ -77,18 +77,23 @@ export function withGraft(
 
   const major = version ? parse(version)?.[0] : undefined;
   if (major !== undefined && major < 15) {
-    const experimental: Record<string, unknown> = { ...config.experimental };
-    const current = experimental.serverComponentsExternalPackages;
+    // Next.js 14 reads this key; the types installed here are 15's or later,
+    // which no longer declare it, so it is read and written untyped.
+    const current: unknown = Reflect.get(
+      config.experimental ?? {},
+      "serverComponentsExternalPackages",
+    );
     const existing = Array.isArray(current)
       ? current.filter((name): name is string => typeof name === "string")
       : [];
-    experimental.serverComponentsExternalPackages = [
-      ...existing,
-      ...GRAFT_SERVER_EXTERNALS.filter((pkg) => !existing.includes(pkg)),
-    ];
-    // SAFETY: Next.js 14 reads this key; the types installed here are 15's or
-    // later, which no longer declare it. Every other key is the caller's own.
-    return { ...config, experimental: experimental as NextConfig["experimental"] };
+    const experimental = {
+      ...config.experimental,
+      serverComponentsExternalPackages: [
+        ...existing,
+        ...GRAFT_SERVER_EXTERNALS.filter((pkg) => !existing.includes(pkg)),
+      ],
+    };
+    return { ...config, experimental };
   }
 
   const existing = config.serverExternalPackages ?? [];
