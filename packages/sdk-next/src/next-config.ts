@@ -53,7 +53,7 @@ export function nextVersionAdvice(version: string): string | null {
     return `Graft supports Next.js 14.2 and later. This app has ${version}.`;
   }
   if (major === 14) {
-    return `Next.js 14 no longer gets security fixes and has open critical advisories. Graft works with ${version}, but upgrade to 15.5.24 or 16.3.3 or later when you can.`;
+    return `Next.js 14 no longer gets security fixes, and ${version} has critical advisories that will not be fixed on 14. Graft works with it, but upgrade to 15.5.24 or 16.3.3 or later.`;
   }
   const floor = major === 15 || major === 16 ? PATCHED[major] : undefined;
   if (floor && (minor < floor[0] || (minor === floor[0] && patch < floor[1]))) {

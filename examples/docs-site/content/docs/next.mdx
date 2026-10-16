@@ -49,15 +49,23 @@ What differs between versions:
 | `revalidateContent` | Yes | Yes | Yes |
 | `updateContent` | No | No | Yes |
 
+<Callout label="Next.js 14 has security advisories that will never be fixed" type="danger">
+  14.2.35 is the last Next.js 14 release, and it no longer gets security
+  fixes. 23 published Next.js advisories affect it. Two are critical: remote
+  code execution through the image optimization API, and remote code execution
+  on servers hosted on Windows. Every one is fixed only in 15 and 16. Graft runs
+  on 14.2 so you can adopt it before you upgrade. Upgrade to 15.5.24 or 16.3.3
+  or later before you rely on it in production.
+</Callout>
+
 Graft does not refuse an older release, but some are not safe to run.
-Next.js 14 no longer gets security fixes and has open critical advisories.
 15.5.24 and 16.3.3 are the first releases with fixes for the critical Next.js
-advisories published in 2026. On a release without them, `withGraft` prints
-a warning when Next.js loads your config that names the release to upgrade
-to:
+advisories published in 2026. On any 14 release, or a 15 or 16 release without
+those fixes, `withGraft` prints a warning when Next.js loads your config that
+names the release to upgrade to:
 
 ```text
-graft: Next.js 14 no longer gets security fixes and has open critical advisories. Graft works with 14.2.35, but upgrade to 15.5.24 or 16.3.3 or later when you can.
+graft: Next.js 14 no longer gets security fixes, and 14.2.35 has critical advisories that will not be fixed on 14. Graft works with it, but upgrade to 15.5.24 or 16.3.3 or later.
 ```
 
 ## Install
