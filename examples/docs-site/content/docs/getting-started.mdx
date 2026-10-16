@@ -52,8 +52,11 @@ Goal: render a compiled document in a Server Component.
 
 <Step title="Install the Next.js SDK and CLI">
 
-The SDK needs Next.js 15.5.24 or newer on 15, or 16.3.3 or newer on 16. Check
-yours with `npx next --version`, and upgrade first if it is older.
+The SDK runs on Next.js 14.2 and later. Check yours with
+`npx next --version`. Releases before 15.5.24 on 15, or 16.3.3 on 16, and
+every 14 release, have open critical security advisories, so upgrade if you
+can. These steps use the App Router; the [Next.js guide](/docs/next) covers
+the Pages Router.
 
 ```sh
 npm i @usegraft/sdk-next @usegraft/db
@@ -307,7 +310,7 @@ Every framework reads the same index with the same typed calls. Pick your guide:
 
 | Framework | Package | Guide |
 | :--- | :--- | :--- |
-| Next.js (App Router) | `@usegraft/sdk-next` | [Next.js](/docs/next) |
+| Next.js (App Router or Pages Router) | `@usegraft/sdk-next` | [Next.js](/docs/next) |
 | Astro | `@usegraft/sdk-astro` | [Astro](/docs/astro) |
 | SvelteKit | `@usegraft/sdk-sveltekit` | [SvelteKit](/docs/sveltekit) |
 | TanStack Start | `@usegraft/sdk-tanstack-start` | [TanStack Start](/docs/tanstack-start) |
