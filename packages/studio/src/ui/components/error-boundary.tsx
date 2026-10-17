@@ -11,8 +11,11 @@ import { IconWarning } from "./icons";
 
 interface Props {
   children: ReactNode;
-  /** "page" replaces the whole Studio; "view" replaces only the main panel. */
-  scope: "page" | "view";
+  /**
+   * "page" replaces the whole Studio; "view" replaces only the main panel;
+   * "editor" replaces only an entry's editor, so its fields still save.
+   */
+  scope: "page" | "view" | "editor";
 }
 
 interface State {
@@ -33,6 +36,26 @@ export class ErrorBoundary extends Component<Props, State> {
   override render(): ReactNode {
     const { error } = this.state;
     if (!error) return this.props.children;
+    if (this.props.scope === "editor") {
+      // Usually the editor's code: a tab opened before Studio was updated
+      // asks for a file the new version no longer has.
+      return (
+        <div className="notice" data-tone="error" role="alert">
+          <IconWarning size={14} aria-hidden="true" />
+          <span>
+            The editor didn't load. Studio may have been updated since this page opened. The fields
+            above still save. Reload to edit the content.
+          </span>
+          <button
+            type="button"
+            className="btn notice-action"
+            onClick={() => window.location.reload()}
+          >
+            Reload
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="crash" data-scope={this.props.scope} role="alert">
         <IconWarning size={20} aria-hidden="true" />

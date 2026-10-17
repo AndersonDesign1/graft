@@ -23,8 +23,9 @@ import { Crepe } from "@milkdown/crepe";
 // tooltip. Its visual themes (nord/frame/classic) are deliberately not
 // imported: those bring a second palette and typography, and parts.css points
 // the editor at our tokens instead. Imported here, not in main.tsx, so it
-// loads with the editor.
-import "@milkdown/crepe/theme/common/style.css";
+// loads with the editor, and through a cascade layer so loading second
+// doesn't let it win over parts.css.
+import "../styles/crepe.css";
 // From @milkdown/core, the same entry Crepe resolves internally. Importing the
 // re-export at `@milkdown/kit/core` gives a *different* module instance under
 // Vite's dep pre-bundling, and a Slice is identified by object identity — so

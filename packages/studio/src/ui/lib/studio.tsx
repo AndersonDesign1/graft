@@ -91,6 +91,17 @@ export function useDatabase(): boolean | undefined {
 }
 
 /**
+ * Why the workspace didn't load, and a way to ask again: null while it loads,
+ * once it has, and in an embedded panel. A view that waits on it shows this
+ * instead of a skeleton that would never end.
+ */
+export function useWorkspaceError(): { message: string; retry: () => void } | null {
+  const value = useContext(Context);
+  if (!value?.workspace.error || value.workspace.data) return null;
+  return { message: value.workspace.error, retry: value.workspace.refresh };
+}
+
+/**
  * What a deletion means until it is published, for one entry or several. On
  * this computer the file is gone at once (`graft dev` stops showing it) and
  * only the deployed site keeps it until the deletion is committed and pushed.

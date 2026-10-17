@@ -15,7 +15,16 @@
  * made elsewhere (another tab, another editor, an agent over MCP) is reported
  * instead of overwritten, and validation runs before a save rather than after.
  */
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { toast } from "sonner";
 import type {
   EntryDto,
@@ -61,6 +70,7 @@ import {
   useCanPublish,
   useStudio,
 } from "../lib/studio";
+import { ErrorBoundary } from "../components/error-boundary";
 import { StatusLabel } from "./collection";
 
 // Milkdown and CodeMirror are most of Studio's JavaScript. They load when an
@@ -71,6 +81,19 @@ const MdxEditor = lazy(() =>
 const RichEditor = lazy(() =>
   import("../components/rich-editor").then((module) => ({ default: module.RichEditor })),
 );
+
+/**
+ * An editor loaded on demand. Its loading state is the canvas, already the
+ * right shape; if its code can't be fetched, only this slot says so, and the
+ * entry's fields keep working.
+ */
+function EditorSlot({ children }: { children: ReactNode }) {
+  return (
+    <ErrorBoundary scope="editor">
+      <Suspense fallback={<EditorLoading />}>{children}</Suspense>
+    </ErrorBoundary>
+  );
+}
 
 /** Where an editor appears while its code loads: the canvas, already the right shape. */
 function EditorLoading() {
@@ -725,7 +748,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
                   schema the same way.
                 </p>
                 <div className="page-source">
-                  <Suspense fallback={<EditorLoading />}>
+                  <EditorSlot>
                     <MdxEditor
                       value={raw}
                       readOnly={readOnly}
@@ -736,7 +759,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
                         autosave.touch();
                       }}
                     />
-                  </Suspense>
+                  </EditorSlot>
                 </div>
               </>
             ) : (
@@ -784,7 +807,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
                     </p>
                   ) : null}
                   {bodyAsSource ? (
-                    <Suspense fallback={<EditorLoading />}>
+                    <EditorSlot>
                       <MdxEditor
                         value={body}
                         readOnly={readOnly}
@@ -794,9 +817,9 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
                           autosave.touch();
                         }}
                       />
-                    </Suspense>
+                    </EditorSlot>
                   ) : (
-                    <Suspense fallback={<EditorLoading />}>
+                    <EditorSlot>
                       <RichEditor
                         key={`${collection}/${slug}`}
                         value={entry.body}
@@ -809,7 +832,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
                           autosave.touch();
                         }}
                       />
-                    </Suspense>
+                    </EditorSlot>
                   )}
                 </section>
               </>

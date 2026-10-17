@@ -22,7 +22,7 @@ import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { useConfirm } from "../components/ui/confirm";
 import { ApiError, api, plainError, qs } from "../lib/api";
 import { absoluteTime, plural, relativeTime } from "../lib/format";
-import { collectionLabel, useStudio } from "../lib/studio";
+import { collectionLabel, useDatabase, useStudio } from "../lib/studio";
 import { useResource } from "../lib/use-resource";
 
 const IMAGE = /^image\//;
@@ -404,13 +404,18 @@ function AssetDetail({
 }
 
 export function MediaView() {
+  // Without a database the library can't keep uploads, and the panel below
+  // says so; the line above it shouldn't promise otherwise.
+  const database = useDatabase();
   return (
     <div className="view media-view">
       <header className="view-head">
         <div>
           <h1 className="view-title">Media</h1>
           <p className="view-sub">
-            Images and files the site uses. Upload here, then pick them in any image field.
+            {database === false
+              ? "Images and files the site uses."
+              : "Images and files the site uses. Upload here, then pick them in any image field."}
           </p>
         </div>
       </header>
