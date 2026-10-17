@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { defineCollection, field } from "@usegraft/core";
 import { createDb, type DbHandle } from "@usegraft/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { checkRemoval, compile, compileDocuments } from "./compile";
+import { checkChange, checkRemoval, compile, compileDocuments } from "./compile";
 
 // Best-effort load of repo-root .env; skipped without RUN_INTEGRATION=1 + a database.
 try {
@@ -193,6 +193,18 @@ describe.skipIf(!runIntegration)("compile -> content_index (integration)", () =>
       });
       // A note nothing points at can go.
       await expect(checkRemoval({ ...opts, paths: ["notes/a.mdx"] })).resolves.toBeUndefined();
+
+      // Checked before the write: the bytes are judged, and nothing is on disk yet.
+      const unwritten = new Map([["notes/d.mdx", "---\ntitle: D\ntopic: linen\n---\n"]]);
+      await expect(checkChange({ ...opts, changes: unwritten })).rejects.toMatchObject({
+        code: "CONTENT_REFERENCE_NOT_FOUND",
+      });
+      // A topic that is a file but not yet in the index, as after a pull no
+      // compile has followed, is the truth the index is behind.
+      put("topics/linen.mdx", "---\ntitle: Linen\n---\n");
+      await expect(checkChange({ ...opts, changes: unwritten })).resolves.toMatchObject([
+        { collection: "notes", slug: "d" },
+      ]);
 
       const live = (
         await handle.sql`select collection, slug from content_index where branch_id = ${REFS_BRANCH} and not deleted order by collection, slug`

@@ -58,6 +58,18 @@ expression at all, and MDX renders an unknown lowercase tag straight through to
 HTML. An `onerror` with a plain string value still runs in a browser, because
 React writes an unrecognized attribute into the markup as-is.
 
+## Frontmatter is read as YAML or JSON
+
+The block between the opening and closing `---` is data, and Graft reads it as
+YAML, or as JSON when it opens with `---json`. A block that names any other
+language, such as `---js`, is refused with `INPUT_VALIDATION_FAILED` before any
+of it is read. A JavaScript block would run as code on the machine reading the
+file: the Studio server for a contributor's save, the MCP server for an agent's
+write, or CI for a pull request.
+
+This holds whatever `mdxTrust` is set to. Graft writes YAML frontmatter itself,
+so the fix is to rewrite the block as YAML.
+
 ## Where Graft checks
 
 Three places, and they are checking different things.

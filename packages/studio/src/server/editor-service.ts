@@ -8,6 +8,7 @@
  */
 import {
   FilesystemStore,
+  checkChange,
   checkRemoval,
   fireDeployHooks,
   notifyContentChange,
@@ -25,7 +26,7 @@ import { GraftError, type ChangeSet } from "@usegraft/contracts";
 import type { AnyCollection } from "@usegraft/core";
 import type { Database } from "@usegraft/db";
 import { assertSafeMdx, type MdxTrust } from "@usegraft/mdx-safety";
-import matter from "gray-matter";
+import { readFrontmatter } from "@usegraft/mdx-safety/frontmatter";
 import type {
   ActivityDocumentDto,
   AssetUseDto,
@@ -62,7 +63,7 @@ import { commitMessageFor } from "../commit-message";
 import { slugify as slugText } from "../slug";
 import { lineDiff } from "./line-diff";
 import { compileIndex } from "./compile-index";
-import { localDrafts } from "./local-drafts";
+import { discardedPaths, localDrafts } from "./local-drafts";
 import { localHistory, type LocalHistory } from "./local-history";
 
 /** What a save of one entry carries: its fields and body, or its full source. */
@@ -93,6 +94,9 @@ export interface EditorServiceOptions {
   /** Where the deploy hooks are kept: the project's own database. Defaults to `db`. */
   workspaceDb?: Database;
 }
+
+/** The most entries one bulk edit sets a field on: the list's largest page. */
+const MAX_SET_FIELD = 500;
 
 export class EditorService {
   readonly store: ContentStore;
@@ -298,12 +302,12 @@ export class EditorService {
         details: { collection: name, slug },
       });
     }
-    const parsed = matter(file.raw, {});
+    const parsed = readFrontmatter(file.raw, path);
     return {
       collection: name,
       slug,
       path,
-      data: parsed.data as Record<string, unknown>,
+      data: parsed.data,
       body: parsed.content.replace(/^\n/, ""),
       raw: file.raw,
       version,
@@ -329,6 +333,9 @@ export class EditorService {
       collections: this.options.collections,
       mdxTrust: this.options.mdxTrust,
       branchId: this.options.branchId,
+      // Every local write is checked before it lands, so a reference already
+      // broken elsewhere in the tree doesn't refuse this one.
+      references: false,
     });
     // No index at all: the file is the save, and there is nothing to refresh.
     if (!result) return undefined;
@@ -373,12 +380,40 @@ export class EditorService {
     return this.written(input.collection, input.slug, path, version, actor);
   }
 
+  /**
+   * Locally a write is live at once, so it is checked before it lands:
+   * references included, against the index this Studio has, or against the
+   * files when it has none. A refusal leaves every file as it was. Hosted,
+   * a write is a draft, and the publish makes the same check.
+   */
+  private async checkLocal(changes: ReadonlyMap<string, string | null>): Promise<void> {
+    if (this.remote) return;
+    await checkChange({
+      contentDir: this.options.contentDir,
+      collections: this.options.collections,
+      changes,
+      branchId: this.options.branchId,
+      db: this.options.db,
+      mdxTrust: this.options.mdxTrust,
+    });
+  }
+
   /** A save's checks and its write, without the index update that follows. */
   private async put(
     input: SaveInput,
     path: string,
     actor: StoreActor,
   ): Promise<{ version: string | null }> {
+    const raw = await this.prepare(input, path, actor);
+    await this.checkLocal(new Map([[path, raw]]));
+    return this.store.write(path, raw, {
+      actor,
+      ...(input.baseVersion !== undefined ? { baseVersion: input.baseVersion } : {}),
+    });
+  }
+
+  /** The bytes a save would write, checked as a document on its own. */
+  private async prepare(input: SaveInput, path: string, actor: StoreActor): Promise<string> {
     const collection = this.fileCollection(input.collection);
     const existing = await this.store.read(path, actor);
 
@@ -386,7 +421,7 @@ export class EditorService {
     let body: string;
     if (typeof input.raw === "string") {
       raw = input.raw;
-      const parsed = matter(raw, {});
+      const parsed = readFrontmatter(raw, path);
       body = parsed.content;
       assertSlugMatches(parsed.data, input.slug);
     } else {
@@ -403,11 +438,7 @@ export class EditorService {
     }
     assertSafeMdx(body, { label: `${input.collection}/${input.slug}` });
     parseDocument(raw, collection, path);
-
-    return this.store.write(path, raw, {
-      actor,
-      ...(input.baseVersion !== undefined ? { baseVersion: input.baseVersion } : {}),
-    });
+    return raw;
   }
 
   /**
@@ -434,6 +465,15 @@ export class EditorService {
         details: { collection: input.collection, field: input.field, fields: names },
       });
     }
+    const slugs = [...new Set(input.slugs)];
+    if (slugs.length > MAX_SET_FIELD) {
+      throw new GraftError({
+        code: "INPUT_VALIDATION_FAILED",
+        message: `A field can be set on up to ${MAX_SET_FIELD} entries at once, and ${slugs.length} were selected.`,
+        fix: `Select ${MAX_SET_FIELD} or fewer, then do the rest in another round.`,
+        details: { selected: slugs.length, max: MAX_SET_FIELD },
+      });
+    }
     // Paths for every slug from one listing, not one listing per entry.
     const changes = await this.changeMap(actor);
     const paths = new Map(
@@ -444,7 +484,21 @@ export class EditorService {
     );
     const saved: SetFieldResultDto["saved"] = [];
     const failed: SetFieldResultDto["failed"] = [];
-    for (const slug of new Set(input.slugs)) {
+    const fail = (slug: string, error: unknown) => {
+      const known = error instanceof GraftError ? error : null;
+      failed.push({
+        slug,
+        error: known?.code ?? "WRITE_FAILED",
+        message: known?.message ?? (error instanceof Error ? error.message : String(error)),
+        ...(known?.fix ? { fix: known.fix } : {}),
+      });
+    };
+
+    // Each entry checked on its own first, then all of them together, so a
+    // reference the new value breaks refuses the lot before anything is written.
+    const ready: Array<{ slug: string; path: string; raw: string; baseVersion: string | null }> =
+      [];
+    for (const slug of slugs) {
       try {
         const path = paths.get(slug);
         const file = path ? await this.store.read(path, actor) : null;
@@ -456,30 +510,37 @@ export class EditorService {
             details: { collection: input.collection, slug },
           });
         }
-        const parsed = matter(file.raw, {});
-        const data = { ...(parsed.data as Record<string, unknown>) };
+        const parsed = readFrontmatter(file.raw, path);
+        const data = { ...parsed.data };
         if (input.value === null) delete data[input.field];
         else data[input.field] = input.value;
-        const { version } = await this.put(
-          {
-            collection: input.collection,
-            slug,
-            data,
-            body: parsed.content.replace(/^\n/, ""),
-            baseVersion: file.version,
-          },
+        const raw = await this.prepare(
+          { collection: input.collection, slug, data, body: parsed.content.replace(/^\n/, "") },
           path,
           actor,
         );
-        saved.push({ slug, path, version });
+        ready.push({ slug, path, raw, baseVersion: file.version });
       } catch (error) {
-        if (!(error instanceof GraftError)) throw error;
-        failed.push({
-          slug,
-          error: error.code,
-          message: error.message,
-          ...(error.fix ? { fix: error.fix } : {}),
+        fail(slug, error);
+      }
+    }
+    try {
+      await this.checkLocal(new Map(ready.map((entry) => [entry.path, entry.raw])));
+    } catch (error) {
+      for (const entry of ready) fail(entry.slug, error);
+      ready.length = 0;
+    }
+    // A write that fails after others landed is reported with the rest, and
+    // the index still takes the ones that were written.
+    for (const entry of ready) {
+      try {
+        const { version } = await this.store.write(entry.path, entry.raw, {
+          actor,
+          baseVersion: entry.baseVersion,
         });
+        saved.push({ slug: entry.slug, path: entry.path, version });
+      } catch (error) {
+        fail(entry.slug, error);
       }
     }
     const refresh =
@@ -525,6 +586,7 @@ export class EditorService {
     const raw = composeDocument(undefined, input.data, body);
     assertSafeMdx(body, { label: path });
     parseDocument(raw, collection, path);
+    await this.checkLocal(new Map([[path, raw]]));
     const { version } = await this.store.write(path, raw, { actor, baseVersion: null });
     return this.written(input.collection, slug, path, version, actor);
   }
@@ -536,15 +598,16 @@ export class EditorService {
     this.fileCollection(input.collection);
     const path = await this.pathFor(input.collection, input.slug, actor);
     // Locally a deletion is live at once, so one that would leave other
-    // entries pointing at nothing is refused before the file goes. Hosted,
-    // the publish makes the same check. With no database there is no index,
-    // so nothing live points at it.
-    if (!this.remote && this.options.db) {
+    // entries pointing at nothing is refused before the file goes: checked
+    // against the index, or the files when there is none. Hosted, the
+    // publish makes the same check.
+    if (!this.remote) {
       await checkRemoval({
-        db: this.options.db,
+        contentDir: this.options.contentDir,
         branchId: this.options.branchId,
         collections: this.options.collections,
         paths: [path],
+        db: this.options.db,
       });
     }
     await this.store.write(path, null, {
@@ -820,8 +883,20 @@ export class EditorService {
   }
 
   async discard(paths: string[], actor: StoreActor): Promise<ContentChangeNotice | undefined> {
+    if (this.remote) {
+      await this.drafts.discard(actor, paths);
+      return undefined;
+    }
+    // Locally a discard puts files back at once, so it is checked like any
+    // write: each goes back to its committed bytes, or away if it was never
+    // committed, and a new category its products point at can't just vanish.
+    const touched = await discardedPaths(this.options.contentDir, paths);
+    const after = new Map<string, string | null>();
+    for (const path of touched)
+      after.set(path, (await this.drafts.readPublished(path))?.raw ?? null);
+    await this.checkLocal(after);
     await this.drafts.discard(actor, paths);
-    return this.afterWrite(paths);
+    return this.afterWrite(touched);
   }
 }
 

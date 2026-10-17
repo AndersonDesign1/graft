@@ -345,6 +345,9 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
           details: { key, required: "studio:publish", held },
         });
       }
+      // The library row is the upload's record, so with no database nothing
+      // reaches the bucket: a file there with no row could not be found again.
+      const library = db(ctx, "The media library");
       const store = await requireStorage();
       try {
         await store.put(key, bytes, contentType, { ifAbsent: !overwrite });
@@ -361,7 +364,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
       }
       const actor = actorOf(ctx);
       const alt = text(payload.alt, "alt", 500);
-      const row = await recordAsset(db(ctx, "The media library"), {
+      const row = await recordAsset(library, {
         key,
         contentType,
         bytes: bytes.byteLength,
@@ -406,9 +409,11 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
           details: { key, usedIn },
         });
       }
+      // Checked before the bucket is touched, so a refusal deletes nothing.
+      const library = db(ctx, "The media library");
       const store = await requireStorage();
       await store.delete(key);
-      await forgetAsset(db(ctx, "The media library"), key);
+      await forgetAsset(library, key);
       return Response.json({ key, deleted: true });
     },
   },

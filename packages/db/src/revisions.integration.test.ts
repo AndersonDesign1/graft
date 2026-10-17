@@ -163,6 +163,40 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
     expect({ ...compiled }).toEqual({ git_sha: null, doc_count: 1, added: 1 });
   });
 
+  it("builds the index rows from what is live once the lock is held, and a refusal publishes nothing", async () => {
+    const first = doc("First");
+    await save("posts/first.mdx", first);
+    await publishDrafts(handle.db, {
+      branchId: BRANCH,
+      drafts: [{ path: "posts/first.mdx", version: sha(first) }],
+      actor: ana,
+      index: { upserts: [row("first", first)], removals: [] },
+    });
+
+    const second = doc("Second");
+    await save("posts/second.mdx", second);
+    const seen: string[][] = [];
+    const refused = publishDrafts(handle.db, {
+      branchId: BRANCH,
+      drafts: [{ path: "posts/second.mdx", version: sha(second) }],
+      actor: ana,
+      index: (live) => {
+        seen.push(live.map((doc) => `${doc.collection}/${doc.slug}`));
+        throw new Error("refused by the caller's check");
+      },
+    });
+    await expect(refused).rejects.toThrow("refused by the caller's check");
+    // It saw the publish that landed before it.
+    expect(seen).toEqual([["posts/first"]]);
+    // And published nothing: the draft is still a draft.
+    expect((await draftHeads(handle.db, BRANCH)).map((head) => head.path)).toEqual([
+      "posts/second.mdx",
+    ]);
+    expect((await publishedFiles(handle.db, BRANCH)).map((file) => file.path)).toEqual([
+      "posts/first.mdx",
+    ]);
+  });
+
   it("refuses a draft claiming a slug another live document holds, and publishes nothing", async () => {
     await save("posts/home.mdx", doc("Home"));
     await publishDrafts(handle.db, {

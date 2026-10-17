@@ -153,7 +153,10 @@ export interface LiveDocument {
 }
 
 /** Every live document on a branch's index. */
-export async function liveDocuments(db: Database, branchId = "main"): Promise<LiveDocument[]> {
+export async function liveDocuments(
+  db: Pick<Database, "select">,
+  branchId = "main",
+): Promise<LiveDocument[]> {
   return db
     .select({
       collection: contentIndex.collection,

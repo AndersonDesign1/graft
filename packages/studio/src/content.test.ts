@@ -20,6 +20,8 @@ vi.mock("@usegraft/compiler", async (importOriginal) => {
     ...actual,
     // Projection is not under test here; the file bytes are.
     compileDocuments: vi.fn(async () => ({ count: 1, docs: [], changes: {}, gitSha: null })),
+    // Reads the index, which these tests have none of.
+    checkChange: vi.fn(async () => []),
   };
 });
 
