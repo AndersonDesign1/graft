@@ -1,5 +1,141 @@
 # @usegraft/cli
 
+## 1.0.0-beta.8
+
+### Minor Changes
+
+- f1ed5d2: `graft studio` starts without a database. Until now it stopped with
+  `ENV_VAR_MISSING: DATABASE_URL is not set`, so a static project (`export const
+index = "static"`) could not use Studio at all, and a Postgres project could
+  not open it to fix a typo without a running database.
+
+  Without `DATABASE_URL` you can find, edit, create, delete and commit content as
+  before. In a static project each save also updates `.graft/index.db`, and
+  Developer, Health compares the files with it; a static project never uses a
+  database even when one is set, as with `graft mcp`. The views whose data lives
+  in Postgres (approvals, the compile history, branches, people, agents, the
+  media library, site settings) say they need a database and how to add one,
+  and their API routes answer `NEEDS_DATABASE` (HTTP 503) with the same steps.
+
+  For `createStudioHandler`, `db` is now optional, and `staticIndexPath` points a
+  Studio at the static index:
+
+  ```ts
+  createStudioHandler({
+    collections,
+    contentDir,
+    staticIndexPath: ".graft/index.db",
+  });
+  ```
+
+  `GET /workspace` reports `database` and `index` (`"postgres"`, `"static"` or
+  `"none"`), and `GET /tree` reports which index its states are measured
+  against.
+
+  Sign-in is unchanged. A `graft studio` on `127.0.0.1` asks nobody to sign in,
+  with or without a database. Studio accounts and their sessions are kept in
+  Postgres, so they still need one, and `graft serve --studio` still requires
+  `DATABASE_URL`.
+
+### Patch Changes
+
+- b56d6b1: **BREAKING:** `graft compile` now stops on a `field.reference({ to })` that
+  names a document that doesn't exist, with `CONTENT_REFERENCE_NOT_FOUND`.
+  Until now a reference was checked only by `graft check`, so a product whose
+  category had been deleted compiled, and the site found the gap at render
+  time. A project that compiled with a broken reference fails now. Run
+  `graft check` to list every one, then fix them or create the missing
+  documents.
+
+  The error names each file, field and missing slug in `details.references`:
+
+  ```txt
+  Error CONTENT_REFERENCE_NOT_FOUND: 1 reference(s) name a document that doesn't exist: products/wool-hat.mdx "category" points at categories/hats.
+  ```
+
+  Both content sources make the check, because both go through
+  `validateDocuments`. In a database-sourced project, a publish refuses a draft
+  whose reference isn't live, and refuses to publish the deletion (or a new
+  slug) of a document that live documents still point at. Publish them together,
+  changed to point elsewhere.
+
+  A local Studio checks the same way: a save of an entry whose reference isn't
+  in the index is refused, and so is deleting an entry other entries point at,
+  before its file is removed. `checkRemoval` in `@usegraft/compiler` is that
+  second check, and `compileDocuments` makes the first.
+
+  `validateDocuments` takes a new `references` option. `"files"` checks targets
+  among the files given, which is right for a whole tree, and `readDocs` uses it
+  by default. A set of `collection/slug` keys also counts those as existing, for
+  a caller checking part of a larger whole. Without the option, references are
+  not checked. `liveDocuments` in `@usegraft/db` lists a branch's live
+  documents for that set.
+
+- 70321c7: **BREAKING:** frontmatter is read as YAML or JSON only. gray-matter runs a `---js` frontmatter block through `eval`, so a contributor's Studio save, an agent's `write_content`, or a pull request built by `graft compile` could run code on the machine reading it. Every read now goes through `readFrontmatter` from the new `@usegraft/mdx-safety/frontmatter` entry, which refuses any other language with `INPUT_VALIDATION_FAILED` before parsing, whatever `mdxTrust` is. A lint rule stops gray-matter being imported anywhere else.
+
+  **BREAKING:** `POST /api/studio/v1/changes/commit` and `POST /api/studio/v1/compilations/:id/revert` need `studio:publish`. They asked for `studio:write`, so a contributor could commit to the checkout, or roll it back, around the check Studio's Commit button makes.
+
+  Also fixed:
+
+  - `graft studio` with `GRAFT_DEV_TOKEN` gives the operator every admin scope, as its documentation says. Since contributors were stopped from committing locally, the token's missing `studio:publish` stopped the operator committing too.
+  - Without a database, a media upload or delete is refused before the bucket is touched. Both used to change the bucket, then answer `NEEDS_DATABASE`.
+
+- c9868b0: `tools/list` no longer fails with "Cannot read properties of undefined (reading 'push')" when the MCP SDK resolves an older zod than Graft's. The SDK takes any zod from 3.25 on, so a project whose own dependencies bring zod 4.2 to 4.4 handed the SDK a converter that crashed on Graft's schemas. Calling a tool by name still worked, but standard clients list tools first, so none of them could connect. The listing is now converted with the zod that built the schemas, and is otherwise the SDK's own, field for field.
+
+  `serverInfo` reports the Graft release instead of `0.0.0`.
+
+  Token messages speak to whoever holds the token. A revoked or unknown Studio token is told to get a live one from Developer, Agents, not to configure `createActorResolver`. A token missing a scope is told which access level carries it. An anonymous caller is told where tokens come from.
+
+  `graft serve` beyond loopback no longer warns that MCP will refuse every caller: tokens made in Studio always work. It now says how callers get in.
+
+  On `graft studio`, the Agents page no longer shows an MCP endpoint on this computer, which answered 404. It shows `npx graft mcp` for an agent on this machine, and `/api/mcp` wherever `graft serve` runs.
+
+- 9d26068: Studio no longer loops silently when opened over plain http on an address other than localhost. The session cookie is `Secure` there, so the browser dropped it and sign-in landed back on the form with no message. Studio now says sign-in needs https, or localhost, instead of showing a form that can't work, and an invite link stays unused until it can sign someone in.
+
+  `graft doctor` and `setup_status` no longer make a missing `GRAFT_STUDIO_SECRET` the next step: it only matters once the site is online. That check now has its own id, `studio-secret`. With nothing else to do, doctor says the project is ready to work on and that the `!` lines are for going online. Once the secret is set, creating the owner account is still the next step.
+
+  `graft --help` lists `graft studio setup-code` and `graft studio invite`.
+
+- 9571702: Studio's Publish button no longer says "Publish" for a moment before it says Commit or Submit for review. It now reads what it does from the workspace, which answers at once, instead of guessing until the drafts load.
+
+  A collection's search, filters and sort are kept in the address, so a reload, the back button or a shared link shows the same rows. Its count, and Home's, no longer include entries deleted in a draft: they stay listed as Deleted until the deletion is published.
+
+  Home's recent activity folds a run of the same person changing the same entries into one row ("Kyrus, 3 times"). Health and Settings read the content again after every save, publish, discard or delete, so their counts are never from before the last change. Studio has a favicon, so browsers stop asking the server for `/favicon.ico`.
+
+  An agent's `publish_drafts` that commits to the production branch on GitHub now calls the site's deploy hooks under `graft serve`, as a database publish does. `createGraftMcp` takes an `onPublished` callback for this. A hook that fails never fails the publish.
+
+- Updated dependencies [b56d6b1]
+- Updated dependencies [48e07b9]
+- Updated dependencies [70321c7]
+- Updated dependencies [d016963]
+- Updated dependencies [8a5c753]
+- Updated dependencies [c9868b0]
+- Updated dependencies [41c371f]
+- Updated dependencies [36472f3]
+- Updated dependencies [e61014f]
+- Updated dependencies [de7e5d6]
+- Updated dependencies [d06bbc3]
+- Updated dependencies [9d26068]
+- Updated dependencies [118a339]
+- Updated dependencies [9571702]
+- Updated dependencies [41c371f]
+- Updated dependencies [db2d4b6]
+- Updated dependencies [6161f0e]
+- Updated dependencies [22c6e47]
+- Updated dependencies [f1ed5d2]
+  - @usegraft/compiler@1.0.0-beta.8
+  - @usegraft/db@1.0.0-beta.8
+  - @usegraft/mcp@1.0.0-beta.8
+  - @usegraft/studio@1.0.0-beta.8
+  - @usegraft/mdx-safety@1.0.0-beta.8
+  - @usegraft/content-migrations@1.0.0-beta.8
+  - @usegraft/auth@1.0.0-beta.8
+  - @usegraft/content-api@1.0.0-beta.8
+  - @usegraft/core@1.0.0-beta.8
+  - @usegraft/assets@1.0.0-beta.8
+  - @usegraft/contracts@1.0.0-beta.8
+  - @usegraft/registry@1.0.0-beta.8
+
 ## 1.0.0-beta.7
 
 ### Minor Changes
