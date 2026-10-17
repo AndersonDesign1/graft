@@ -252,7 +252,7 @@ seo: # unchanged
 
 Body.
 `);
-    expect(matter(out).data).toEqual({
+    expect(readFrontmatter(out).data).toEqual({
       title: "New",
       tagline: "Fresh",
       order: 4,
@@ -276,7 +276,11 @@ Body.
       { title: "T", tags: ["a", "b"], note: { nested: true } },
       "Body.\n",
     );
-    expect(matter(out).data).toEqual({ title: "T", tags: ["a", "b"], note: { nested: true } });
+    expect(readFrontmatter(out).data).toEqual({
+      title: "T",
+      tags: ["a", "b"],
+      note: { nested: true },
+    });
     expect(out).not.toContain("# a note");
   });
 
