@@ -67,6 +67,9 @@
           },
           {
             "context": "Vercel"
+          },
+          {
+            "context": "sdk-next on Next 14"
           }
         ],
         "strict_required_status_checks_policy": true
