@@ -21,9 +21,13 @@ import {
   useStudio,
 } from "../lib/studio";
 import { DiffView } from "./diff-view";
+import { RetryNotice, Skeleton } from "./primitives";
 import { IconCaretDown, IconCheck, IconExternal, IconWarning } from "./icons";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import { useConfirm } from "./ui/confirm";
+
+/** One empty list for every render, so the selection effect runs when the drafts change, not each time. */
+const NO_CHANGES: DraftChangeDto[] = [];
 
 const KIND_LABEL: Record<DraftChangeDto["kind"], string> = {
   added: "New",
@@ -56,10 +60,9 @@ export function PublishSheet({
   onOpenChange: (open: boolean) => void;
   onDone: () => void;
 }) {
-  const { drafts, workspace, schema, navigate } = useStudio();
+  const { drafts, workspace, schema, navigate, publish: action = "publish" } = useStudio();
   const confirm = useConfirm();
-  const changes = drafts.data?.changes ?? [];
-  const action = drafts.data?.publish ?? "publish";
+  const changes = drafts.data?.changes ?? NO_CHANGES;
   const canPublish = drafts.data?.canPublish ?? true;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -149,6 +152,12 @@ export function PublishSheet({
 
         {done ? (
           <Done result={done} onClose={() => onOpenChange(false)} />
+        ) : !drafts.data ? (
+          drafts.error ? (
+            <RetryNotice message={drafts.error} retry={drafts.refresh} />
+          ) : (
+            <Skeleton rows={3} />
+          )
         ) : changes.length === 0 ? (
           <div className="sheet-empty">
             {(drafts.data?.reviews ?? []).length > 0 ? (

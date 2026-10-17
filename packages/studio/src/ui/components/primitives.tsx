@@ -12,7 +12,7 @@
 import type { ReactNode } from "react";
 import type { DocumentState } from "../../types";
 import { cn } from "../lib/cn";
-import { useDatabase } from "../lib/studio";
+import { useDatabase, useWorkspaceError } from "../lib/studio";
 import { IconCheck, IconDatabase, IconWarning } from "./icons";
 
 /* ---- state vocabulary ---------------------------------------------------- */
@@ -104,6 +104,19 @@ export function Status({
   return null;
 }
 
+/** A request that failed, in plain words, with a way to make it again. */
+export function RetryNotice({ message, retry }: { message: string; retry: () => void }) {
+  return (
+    <p className="notice" data-tone="error">
+      <IconWarning size={14} />
+      <span>{message}</span>
+      <button type="button" className="btn notice-action" onClick={retry}>
+        Try again
+      </button>
+    </p>
+  );
+}
+
 export function Skeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="sk" aria-hidden="true">
@@ -147,8 +160,10 @@ export function NeedsDatabase({ title, does }: { title: string; does: string }) 
       body={
         <>
           {does} This Studio runs without one, so you can edit and commit content, but not this. To
-          add one, set <code>DATABASE_URL</code> in the project's <code>.env</code>, run{" "}
-          <code>graft db migrate</code> and <code>graft compile</code>, then restart Studio.
+          add one, set <code>DATABASE_URL</code> in the project's <code>.env</code>, remove{" "}
+          <code>export const index = "static"</code> from <code>graft.config.ts</code> if it is
+          there, run <code>graft db migrate</code> and <code>graft compile</code>, then restart
+          Studio.
         </>
       }
     />
@@ -172,7 +187,8 @@ export function RequiresDatabase({
   children: ReactNode;
 }) {
   const database = useDatabase();
-  if (database === undefined) return <Skeleton rows={3} />;
+  const failed = useWorkspaceError();
+  if (database === undefined) return failed ? <RetryNotice {...failed} /> : <Skeleton rows={3} />;
   if (database) return <>{children}</>;
   if (!view) return <NeedsDatabase title={title} does={does} />;
   return (

@@ -13,7 +13,8 @@ import { useConfirm } from "../components/ui/confirm";
 import { api, plainError } from "../lib/api";
 import { describeRequest, inputSummary } from "../lib/approvals";
 import { absoluteTime, plural, relativeTime } from "../lib/format";
-import { useDatabase, useStudio } from "../lib/studio";
+import { RetryNotice } from "../components/primitives";
+import { useDatabase, useStudio, useWorkspaceError } from "../lib/studio";
 import { useResource } from "../lib/use-resource";
 
 export function InboxView({ onDecided }: { onDecided?: () => void }) {
@@ -24,9 +25,10 @@ export function InboxView({ onDecided }: { onDecided?: () => void }) {
   const approvals = useResource<ApprovalList>(database ? "/approvals" : null, [database]);
   const reviews = drafts.data?.reviews ?? [];
   const requests = approvals.data?.approvals ?? [];
+  const failed = useWorkspaceError();
   const loading =
     (!drafts.data && !drafts.error) ||
-    database === undefined ||
+    (database === undefined && !failed) ||
     (database && approvals.loading && !approvals.data);
   const total = reviews.length + requests.length;
 
@@ -44,6 +46,8 @@ export function InboxView({ onDecided }: { onDecided?: () => void }) {
           </p>
         </div>
       </header>
+
+      {failed ? <RetryNotice {...failed} /> : null}
 
       {!loading && total === 0 ? (
         <p className="inbox-empty">

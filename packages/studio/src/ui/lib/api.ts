@@ -45,7 +45,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     }
     // GraftError carries an actionable `fix`; surface it, since it is usually
     // more useful to the operator than the message.
-    const detail = [body?.message, body?.fix].filter(Boolean).join(" — ");
+    const detail = [body?.message, body?.fix].filter(Boolean).join(" ");
     throw new ApiError(
       detail || `${res.status} ${res.statusText}`,
       res.status,

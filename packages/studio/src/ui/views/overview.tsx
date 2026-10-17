@@ -53,6 +53,7 @@ export function OverviewView({
   const [compiling, setCompiling] = useState(false);
 
   const summary = tree.data?.summary;
+  const noIndex = tree.data?.index === "none";
   const pending = approvals.data?.approvals.length ?? 0;
   const runs = compilations.data?.compilations ?? [];
 
@@ -129,22 +130,30 @@ export function OverviewView({
               <dt>On disk</dt>
               <dd data-numeric="">{summary?.documents ?? 0}</dd>
             </div>
-            <div className="stat">
-              <dt>In the index</dt>
-              <dd data-numeric="">{summary?.synced ?? 0}</dd>
-            </div>
-            <div className="stat">
-              <dt>Out of date</dt>
-              <dd data-numeric="">{summary?.drifted ?? 0}</dd>
-            </div>
-            <div className="stat">
-              <dt>Not indexed</dt>
-              <dd data-numeric="">{summary?.unindexed ?? 0}</dd>
-            </div>
-            <div className="stat" data-tone={(summary?.orphaned ?? 0) > 0 ? "danger" : undefined}>
-              <dt>File missing</dt>
-              <dd data-numeric="">{summary?.orphaned ?? 0}</dd>
-            </div>
+            {/* With no index there is nothing to be in or out of date with. */}
+            {noIndex ? null : (
+              <>
+                <div className="stat">
+                  <dt>In the index</dt>
+                  <dd data-numeric="">{summary?.synced ?? 0}</dd>
+                </div>
+                <div className="stat">
+                  <dt>Out of date</dt>
+                  <dd data-numeric="">{summary?.drifted ?? 0}</dd>
+                </div>
+                <div className="stat">
+                  <dt>Not indexed</dt>
+                  <dd data-numeric="">{summary?.unindexed ?? 0}</dd>
+                </div>
+                <div
+                  className="stat"
+                  data-tone={(summary?.orphaned ?? 0) > 0 ? "danger" : undefined}
+                >
+                  <dt>File missing</dt>
+                  <dd data-numeric="">{summary?.orphaned ?? 0}</dd>
+                </div>
+              </>
+            )}
             {approvals.data ? (
               <div className="stat" data-tone={pending > 0 ? "waiting" : undefined}>
                 <dt>Waiting for approval</dt>
@@ -196,6 +205,8 @@ export function OverviewView({
                         <span className="row-state" data-status="deleted">
                           {collection.error}
                         </span>
+                      ) : noIndex ? (
+                        <span className="muted">No index</span>
                       ) : collection.authority === "file" && collection.driftCount > 0 ? (
                         <span className="row-state" data-status="changed">
                           {collection.driftCount} out of date

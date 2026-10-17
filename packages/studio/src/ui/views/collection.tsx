@@ -298,14 +298,38 @@ export function CollectionView({ collection }: { collection: string }) {
         }
       } else if (kind === "discard") {
         const paths = chosen.filter((item) => item.status !== "published").map((item) => item.path);
-        await api("/drafts/discard", { method: "POST", body: JSON.stringify({ paths }) });
-        toast.success("Changes discarded");
+        if (paths.length === 0) {
+          toast("Nothing to discard", { description: "The selected entries have no drafts." });
+        } else {
+          await api("/drafts/discard", { method: "POST", body: JSON.stringify({ paths }) });
+          toast.success("Changes discarded");
+        }
       } else {
+        // One at a time, each its own request: one that is refused, such as a
+        // category its products still use, leaves the rest to go ahead, and
+        // the person is told how many went.
+        const refused: Array<{ item: EntrySummary; error: unknown }> = [];
         for (const item of chosen) {
-          await api("/entry", {
-            method: "DELETE",
-            body: JSON.stringify({ collection, slug: item.slug }),
-          });
+          try {
+            await api("/entry", {
+              method: "DELETE",
+              body: JSON.stringify({ collection, slug: item.slug }),
+            });
+          } catch (error) {
+            refused.push({ item, error });
+          }
+        }
+        const first = refused[0];
+        if (first) {
+          toast.error(
+            refused.length === chosen.length
+              ? `Couldn't delete ${chosen.length === 1 ? noun : `any of the ${chosen.length}`}`
+              : `Deleted ${chosen.length - refused.length} of ${chosen.length}`,
+            { description: `${first.item.title}: ${plainError(first.error)}` },
+          );
+          // What wasn't deleted stays selected, to change and try again.
+          setSelected(new Set(refused.map(({ item }) => item.path)));
+          return;
         }
         toast.success(`Deleted ${noun}`, {
           description:
@@ -317,12 +341,13 @@ export function CollectionView({ collection }: { collection: string }) {
         });
       }
       setSelected(new Set());
-      drafts.refresh();
-      await fetchPage();
     } catch (err) {
       toast.error(plainError(err));
     } finally {
       setBusy(false);
+      // Whatever went through is shown, refused or not.
+      drafts.refresh();
+      void fetchPage();
     }
   }
 
