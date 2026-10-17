@@ -598,16 +598,13 @@ export class EditorService {
     this.fileCollection(input.collection);
     const path = await this.pathFor(input.collection, input.slug, actor);
     // Locally a deletion is live at once, so one that would leave other
-    // entries pointing at nothing is refused before the file goes: checked
-    // against the index, or the files when there is none. Hosted, the
-    // publish makes the same check.
+    // entries pointing at nothing is refused before the file goes, checked
+    // against the files. Hosted, the publish makes the same check.
     if (!this.remote) {
       await checkRemoval({
         contentDir: this.options.contentDir,
-        branchId: this.options.branchId,
         collections: this.options.collections,
         paths: [path],
-        db: this.options.db,
       });
     }
     await this.store.write(path, null, {

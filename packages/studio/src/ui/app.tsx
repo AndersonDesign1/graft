@@ -62,7 +62,7 @@ import {
   type StudioState,
 } from "./lib/studio";
 import { useTheme, type Theme } from "./lib/theme";
-import { useResource } from "./lib/use-resource";
+import { useChangesAfterFirst, useResource } from "./lib/use-resource";
 import { CollectionView } from "./views/collection";
 import { EntryView } from "./views/entry";
 import { HomeView } from "./views/home";
@@ -139,7 +139,10 @@ function Shell({ initialBranch }: { initialBranch: string }) {
   // The developer views read the content tree; only they pay for it. Read
   // again after every save, publish, discard or delete, so the counts in
   // Health and Settings are never from before the last change.
-  const tree = useResource<ContentTree>(developer ? `/tree${qs({ branch })}` : null, [drafts.data]);
+  const draftChanges = useChangesAfterFirst(drafts.data);
+  const tree = useResource<ContentTree>(developer ? `/tree${qs({ branch })}` : null, [
+    draftChanges,
+  ]);
   const approvals = useResource<{ approvals: unknown[] }>(
     workspace.data?.database ? "/approvals" : null,
     [workspace.data?.database],

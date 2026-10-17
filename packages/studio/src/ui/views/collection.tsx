@@ -22,12 +22,14 @@ import {
   IconWarning,
 } from "../components/icons";
 import { useConfirm } from "../components/ui/confirm";
+import { ReasonedButton } from "../components/ui/button";
 import { Menu, MenuContent, MenuItem, MenuSection, MenuTrigger } from "../components/ui/menu";
 import { api, plainError, qs } from "../lib/api";
 import { humanise, labelOf, settableFields, titleField } from "../lib/fields";
 import { relativeTime } from "../lib/format";
 import { isTyping, moveRowFocus } from "../lib/row-focus";
 import { listStateFromHash, replaceListState } from "../lib/route";
+import { useChangesAfterFirst } from "../lib/use-resource";
 import {
   actionWord,
   collectionLabel,
@@ -228,16 +230,30 @@ export function CollectionView({ collection }: { collection: string }) {
   // draft leaves the count alone but changes its row.
   // Everything already scrolled into view is fetched again in one request, so
   // a save doesn't drop the rows below the first page.
+  // Not on the drafts' first arrival: the list has just been read for itself.
   const loaded = useRef(0);
   loaded.current = items.length;
-  const draftsSeen = drafts.data;
+  const draftChanges = useChangesAfterFirst(drafts.data);
   useEffect(() => {
-    if (draftsSeen) void fetchPage(undefined, Math.min(MAX_PAGE, Math.max(PAGE, loaded.current)));
+    if (draftChanges > 0) {
+      void fetchPage(undefined, Math.min(MAX_PAGE, Math.max(PAGE, loaded.current)));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftsSeen]);
+  }, [draftChanges]);
 
   // A selection only means something for the rows it was made on.
   useEffect(() => setSelected(new Set()), [params]);
+
+  // Nor for rows the list no longer holds. A refresh reads at most 500, so
+  // after a partial bulk failure far down a long list the count said more
+  // were selected than the next action would touch.
+  useEffect(() => {
+    setSelected((prev) => {
+      const here = new Set(items.map((item) => item.path));
+      const kept = [...prev].filter((path) => here.has(path));
+      return kept.length === prev.size ? prev : new Set(kept);
+    });
+  }, [items]);
 
   // Next page when the end of the table is in view. Not after a failure: the
   // sentinel stays in view, so retrying here would loop; the notice offers it.
@@ -481,6 +497,40 @@ export function CollectionView({ collection }: { collection: string }) {
           );
         })}
 
+        {/* A filter from a link on a field with no menu here (one value in
+            this list, or a field the list doesn't facet) still narrows the
+            rows, so it is shown, and can be taken off. */}
+        {Object.entries(where)
+          .filter(([name]) => !facetFields.some((facet) => facet.field === name))
+          .map(([name, value]) => {
+            const field = fields.find((f) => f.name === name);
+            const label = field ? labelOf(field) : humanise(name);
+            const shown = formatCell(
+              field,
+              value === "true" ? true : value === "false" ? false : value,
+            );
+            return (
+              <button
+                key={name}
+                type="button"
+                className="filter"
+                data-active
+                aria-label={`Remove the filter ${label}: ${shown}`}
+                onClick={() =>
+                  setWhere((prev) => {
+                    const next = { ...prev };
+                    delete next[name];
+                    return next;
+                  })
+                }
+              >
+                {label}
+                <b>: {shown}</b>
+                <IconClose size={14} aria-hidden="true" />
+              </button>
+            );
+          })}
+
         <span className="toolbar-spacer" />
 
         <Menu>
@@ -530,7 +580,13 @@ export function CollectionView({ collection }: { collection: string }) {
       {error ? (
         <p className="notice" data-tone="error">
           <IconWarning size={14} />
-          <span>{error}</span>
+          <span>
+            {error}
+            {/* A failed refresh keeps the rows it had, which may be out of date. */}
+            {items.length > 0 && lastCursor.current === undefined
+              ? " The rows below are from before."
+              : null}
+          </span>
           <button
             type="button"
             className="btn notice-action"
@@ -716,17 +772,15 @@ export function CollectionView({ collection }: { collection: string }) {
           <span className="bulk-count" data-numeric="">
             {selected.size} selected
           </span>
-          <button
-            type="button"
-            className="btn"
-            data-size="sm"
-            data-variant="primary"
-            disabled={busy || !canWrite || !canPublish}
+          <ReasonedButton
+            size="sm"
+            variant="primary"
+            disabled={busy || !canWrite}
+            reason={canPublish ? undefined : PUBLISH_NEEDS_EDITOR}
             onClick={() => void bulk("publish")}
-            title={canPublish ? undefined : PUBLISH_NEEDS_EDITOR}
           >
             {publishVerb(publish)}
-          </button>
+          </ReasonedButton>
           {settableFields(fields).length > 0 ? (
             <button
               type="button"

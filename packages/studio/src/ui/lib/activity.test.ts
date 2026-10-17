@@ -45,6 +45,23 @@ describe("groupActivity", () => {
     expect(groups.map((g) => g.times)).toEqual([1, 1, 1, 1]);
   });
 
+  it("keeps the same change apart when more than an hour separates the saves", () => {
+    const at = (id: string, time: string): ActivityEventDto => ({
+      ...event(id, "Ada", ["kyrus"]),
+      at: time,
+    });
+    const groups = groupActivity([
+      at("4", "2026-10-17T09:30:00.000Z"),
+      at("3", "2026-10-17T09:00:00.000Z"),
+      at("2", "2026-10-13T16:00:00.000Z"),
+      at("1", "2026-10-13T15:10:00.000Z"),
+    ]);
+    expect(groups.map((g) => [g.event.id, g.times])).toEqual([
+      ["4", 2],
+      ["2", 2],
+    ]);
+  });
+
   it("folds events without documents only when their message matches", () => {
     const groups = groupActivity([
       event("3", "Ada", [], "Update projects"),

@@ -38,6 +38,10 @@ export function SetFieldDialog({
   const settable = useMemo(() => settableFields(fields), [fields]);
   const [name, setName] = useState<string>("");
   const [value, setValue] = useState<unknown>(undefined);
+  // Removing a field from every selected entry is its own choice. An empty
+  // value used to mean it, so the dialog opened one Enter away from
+  // deleting an optional field across the whole selection.
+  const [remove, setRemove] = useState(false);
   const [showProblems, setShowProblems] = useState(false);
   const [failed, setFailed] = useState<SetFieldResultDto["failed"]>([]);
   const [busy, setBusy] = useState(false);
@@ -48,6 +52,7 @@ export function SetFieldDialog({
     // A switch has no empty state, so it starts off; an optional choice or
     // text starts empty, which removes it unless a value is given.
     setValue(next && (!next.optional || next.type === "boolean") ? emptyValue(next) : undefined);
+    setRemove(false);
     setShowProblems(false);
   };
 
@@ -67,15 +72,19 @@ export function SetFieldDialog({
     optional: false,
     options: settable.map((candidate) => ({ value: candidate.name, label: labelOf(candidate) })),
   };
-  const problems = useMemo(
-    () => (field ? problemsIn([field], { [field.name]: value }) : new Map<string, string>()),
-    [field, value],
-  );
+  const removable = field?.optional === true && field.type !== "boolean";
+  const removing = removable && remove;
+  const problems = useMemo(() => {
+    if (!field || removing) return new Map<string, string>();
+    const found = problemsIn([field], { [field.name]: value });
+    if (removable && isBlank(value, field.type)) {
+      found.set(field.name, "Give it a value, or choose to remove it.");
+    }
+    return found;
+  }, [field, value, removable, removing]);
   const titles = new Map(entries.map((entry) => [entry.slug, entry.title]));
   const count = entries.length;
   const noun = count === 1 ? singular(collection) : collection;
-  const removing =
-    field?.optional === true && field.type !== "boolean" && isBlank(value, field.type);
   const label = field ? labelOf(field) : "";
 
   async function submit(): Promise<void> {
@@ -140,24 +149,30 @@ export function SetFieldDialog({
               problems={new Map()}
               onChange={(next) => pick(settable.find((candidate) => candidate.name === next))}
             />
-            {field ? (
+            {field && !removing ? (
               <FieldRow
                 key={field.name}
-                field={
-                  field.optional && field.type !== "boolean"
-                    ? {
-                        ...field,
-                        description: [field.description, "Leave it empty to remove it."]
-                          .filter(Boolean)
-                          .join(" "),
-                      }
-                    : field
-                }
+                field={field}
                 value={value}
                 path={field.name}
                 problems={showProblems ? problems : new Map()}
                 onChange={setValue}
               />
+            ) : null}
+            {removable ? (
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={remove}
+                  onChange={(e) => {
+                    setRemove(e.target.checked);
+                    setShowProblems(false);
+                  }}
+                />
+                <span>
+                  Remove {label} from {count === 1 ? "this" : "these"} {noun} instead
+                </span>
+              </label>
             ) : null}
           </div>
           {failed.length > 0 ? (

@@ -1624,6 +1624,11 @@
   margin-top: var(--space-6);
 }
 
+/* Set a field's "remove instead" choice takes its own row. */
+.create-fields > .check {
+  grid-column: 1 / -1;
+}
+
 /* Entries a bulk edit could not save, next to the button that tried. */
 .set-field-failed {
   margin-top: var(--space-5);
@@ -2002,7 +2007,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .publish:active:not(:disabled),
-  .btn:active:not(:disabled),
+  .btn:active:not(:disabled, [aria-disabled="true"]),
   .icon-btn:active,
   .fc-segment:active,
   .fc-add:active {

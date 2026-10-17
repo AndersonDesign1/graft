@@ -28,13 +28,24 @@ function sameChange(a: ActivityEventDto, b: ActivityEventDto): boolean {
   return paths(a) === paths(b);
 }
 
+/**
+ * How far apart two saves can be and still read as one sitting. Without a
+ * bound, the same person editing the same entry on Monday and on Friday
+ * folded into one row dated Friday, and Monday's work vanished from Home.
+ */
+export const SITTING_MS = 60 * 60 * 1000;
+
 /** Fold runs of the same change by the same person, newest first as given. */
 export function groupActivity(events: readonly ActivityEventDto[]): ActivityGroup[] {
   const groups: ActivityGroup[] = [];
+  let previous: ActivityEventDto | undefined;
   for (const event of events) {
     const last = groups.at(-1);
-    if (last && sameChange(last.event, event)) last.times += 1;
+    const near =
+      previous !== undefined && Date.parse(previous.at) - Date.parse(event.at) <= SITTING_MS;
+    if (last && near && sameChange(last.event, event)) last.times += 1;
     else groups.push({ event, times: 1 });
+    previous = event;
   }
   return groups;
 }
