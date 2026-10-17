@@ -17,6 +17,7 @@ import type { ChangeSet } from "@usegraft/contracts";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, like, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Database } from "./client";
+import { liveDocuments, type LiveDocument } from "./content";
 import type { ContentInput } from "./diff";
 import { projectDocumentsIn } from "./project";
 import { contentHeads, contentMirror, contentReviews, contentRevisions } from "./schema";
@@ -318,11 +319,20 @@ export interface PublishDraftsInput {
   actor: RevisionActor;
   /**
    * The index rows the published drafts produce, validated by the caller
-   * against the schema before this runs. Applied in the same transaction, so
-   * the live site never shows a revision that is not the published one.
+   * against the schema. Applied in the same transaction, so the live site
+   * never shows a revision that is not the published one. A caller whose
+   * check depends on the other live documents, as a reference check does,
+   * passes a function of them instead: it runs once the content lock is
+   * held, so it sees every publish that landed first, and a throw from it
+   * publishes nothing.
    */
-  index: { upserts: ContentInput[]; removals: Array<{ collection: string; slug: string }> };
+  index: PublishedIndex | ((live: LiveDocument[]) => PublishedIndex);
   message?: string;
+}
+
+export interface PublishedIndex {
+  upserts: ContentInput[];
+  removals: Array<{ collection: string; slug: string }>;
 }
 
 export type PublishDraftsResult =
@@ -354,6 +364,10 @@ export async function publishDrafts(
     // Checked for every path before anything moves, so a refusal publishes
     // none of them: a set of documents goes live together or not at all.
     if (stale.length > 0) return { ok: false, stale } as const;
+    const index =
+      typeof input.index === "function"
+        ? input.index(await liveDocuments(tx, input.branchId))
+        : input.index;
 
     for (const move of moving) {
       await tx
@@ -374,7 +388,7 @@ export async function publishDrafts(
     const published = moving.map((move) => move.path);
     const changes = await projectDocumentsIn(
       tx,
-      { ...input.index, paths: published },
+      { ...index, paths: published },
       { branchId: input.branchId, gitSha: null },
     );
     if (published.length === 0) return { ok: true, changes, published } as const;

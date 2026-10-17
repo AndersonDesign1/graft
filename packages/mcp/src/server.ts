@@ -15,6 +15,8 @@ import { join } from "node:path";
 import { createStorage, storageConfigFromEnv, type Storage } from "@usegraft/assets";
 import {
   compile,
+  checkChange,
+  checkRemoval,
   compileDocuments,
   compileStatic,
   notifyContentChange,
@@ -216,6 +218,9 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
               collections,
               indexPath: staticIndexPath,
               mdxTrust: options.mdxTrust,
+              // A tool checks its change before writing it, so a reference
+              // already broken elsewhere in the tree doesn't refuse this one.
+              references: paths === undefined,
             });
     // Every caller of projectContent has just written to the tree, so this is
     // the one place the app hears about it.
@@ -225,6 +230,23 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
       changes: result.changes,
     });
     return { ...result, refresh };
+  };
+
+  /**
+   * Check a change before a tool writes it, so a refusal leaves the files as
+   * they were: the checks projectContent makes of what was written,
+   * references included, against the Postgres index, or the files when this
+   * server serves a static one.
+   */
+  const checkContent = async (changes: ReadonlyMap<string, string | null>): Promise<void> => {
+    await checkChange({
+      contentDir,
+      collections,
+      changes,
+      branchId,
+      mdxTrust: options.mdxTrust,
+      db: staticIndexPath === undefined ? requireDb("compile", "") : undefined,
+    });
   };
 
   /** Search whichever index this server serves; the static artifact is opened per call. */
@@ -367,6 +389,15 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
       // Same containment as the read and the write: sourcePath comes from a
       // directory scan, and a symlink in the content tree would point this
       // unlink at a file outside it.
+      // Approved is not the same as safe: a deletion that would leave other
+      // documents pointing at nothing is refused before the file goes.
+      await checkRemoval({
+        contentDir,
+        collections,
+        branchId,
+        paths: [doc.sourcePath],
+        db: staticIndexPath === undefined ? requireDb("delete_content", "") : undefined,
+      });
       unlinkSync(resolveContained(contentDir, doc.sourcePath, { label: "document path" }));
       const result = await projectContent([doc.sourcePath]);
       return {
@@ -439,6 +470,7 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
     requireScope,
     requireDecider,
     projectContent,
+    checkContent,
     searchIndex,
     getScope,
     functions,

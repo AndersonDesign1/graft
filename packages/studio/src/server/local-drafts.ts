@@ -169,6 +169,23 @@ async function renameDestinations(contentDir: string, paths: string[]): Promise<
   return [...new Set(paths.map((path) => renamedFrom.get(path) ?? path))];
 }
 
+/**
+ * Every file discarding `paths` puts back: each path, and the other half of
+ * a rename either one is part of, since discarding a rename restores both.
+ */
+export async function discardedPaths(contentDir: string, paths: string[]): Promise<string[]> {
+  const status = await readChanges(contentDir);
+  const out = new Set(paths);
+  for (const file of status.files) {
+    if (file.status !== "renamed" || !file.from) continue;
+    if (out.has(file.path) || out.has(file.from)) {
+      out.add(file.path);
+      out.add(file.from);
+    }
+  }
+  return [...out];
+}
+
 function defaultMessage(paths: string[]): string {
   const names = paths.map((path) => path.replace(/\.mdx?$/, ""));
   return names.length <= 3 ? `Update ${names.join(", ")}` : `Update ${names.length} documents`;

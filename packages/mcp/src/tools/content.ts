@@ -233,6 +233,7 @@ export const registerContentReadTools: RegisterTools = (server, deps) => {
 export const registerContentWriteTools: RegisterTools = (server, deps) => {
   const {
     branchId,
+    checkContent,
     collections,
     contentDir,
     elicitApproval,
@@ -352,6 +353,8 @@ export const registerContentWriteTools: RegisterTools = (server, deps) => {
           parseDocument(raw, collection, sourcePath);
 
           assertSlugFree(contentDir, name, collection, slug, sourcePath);
+          // References too, before the file is written: a refusal leaves it as it was.
+          await checkContent(new Map([[sourcePath, raw]]));
 
           writeDocumentFile(contentDir, sourcePath, raw);
 

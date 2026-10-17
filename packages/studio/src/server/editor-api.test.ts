@@ -37,14 +37,15 @@ vi.mock("@usegraft/compiler", async (importOriginal) => {
     // Projection has its own integration tests; this suite is about which
     // bytes land where.
     compileDocuments: vi.fn(async () => ({ count: 0, docs: [], changes: {}, gitSha: null })),
-    // Reads the index, which these tests have none of. Its refusal is
-    // covered against Postgres in the compiler's integration tests.
+    // Read the index, which these tests have none of. Their refusals are
+    // covered against Postgres in the integration tests.
     checkRemoval: vi.fn(async () => {}),
+    checkChange: vi.fn(async () => []),
     fireDeployHooks: vi.fn(async () => []),
   };
 });
 
-const { fireDeployHooks } = await import("@usegraft/compiler");
+const { checkChange, fireDeployHooks } = await import("@usegraft/compiler");
 
 const { createStudioApiHandler } = await import("../api");
 
@@ -512,9 +513,11 @@ describe("editor API on a local checkout", () => {
     // Whichever compile the save path uses is the mocked one.
     const compiler: Record<string, unknown> = await import("@usegraft/compiler");
     const projections = () =>
-      Object.values(compiler)
+      ["compile", "compileDocuments", "compileStatic"]
+        .map((name) => compiler[name])
         .filter(vi.isMockFunction)
         .reduce((n, fn) => n + fn.mock.calls.length, 0);
+    vi.mocked(checkChange).mockClear();
     const before = projections();
     const read = (slug: string) =>
       readFileSync(join(contentDir, "products", `${slug}.mdx`), "utf8");
@@ -535,6 +538,12 @@ describe("editor API on a local checkout", () => {
     expect(vi.mocked(compileDocuments).mock.lastCall?.[0]).toMatchObject({
       paths: ["products/linen-shirt.mdx", "products/wool-hat.mdx"],
     });
+    // And one check before any of it was written, of both files together.
+    expect(vi.mocked(checkChange)).toHaveBeenCalledTimes(1);
+    expect([...(vi.mocked(checkChange).mock.lastCall?.[0].changes.keys() ?? [])]).toEqual([
+      "products/linen-shirt.mdx",
+      "products/wool-hat.mdx",
+    ]);
     const drafts = await call<DraftsDto>(handler, "GET", "/drafts");
     expect(drafts.json.changes.map((change) => [change.slug, change.kind])).toEqual([
       ["linen-shirt", "modified"],
