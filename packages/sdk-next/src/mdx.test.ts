@@ -66,4 +66,59 @@ describe("prepareMdx", () => {
   it("gives an empty string for an empty body", async () => {
     expect(await prepareMdx("  \n ")).toBe("");
   });
+
+  it("takes a body that only mentions an import, in code or prose", async () => {
+    const body =
+      'Load it lazily with `await import("./x.js")`.\n\n```js\nconst m = await import("./x.js");\n```';
+    expect(await evaluate(await prepareMdx(body))).toContain("await import");
+  });
+
+  it("refuses import() and import.meta under full trust, which the browser can't run", async () => {
+    for (const body of ['{import("https://example.com/x.js")}', "{import.meta.url}"]) {
+      await expect(prepareMdx(body, { trust: "full" })).rejects.toMatchObject({
+        details: { reason: "mdx-import" },
+      });
+    }
+  });
+});
+
+describe("URLs in restricted MDX", () => {
+  // The element tree prepareMdx's code builds, as JSON: what React would render.
+  async function tree(source: string, trust?: "full"): Promise<string> {
+    const runtime = await import("react/jsx-runtime");
+    const code = await prepareMdx(source, trust ? { trust } : {});
+    const Card = () => null;
+    return JSON.stringify(new Function(code)({ ...runtime }).default({ components: { Card } }));
+  }
+
+  it("drops a link or source that would run script", async () => {
+    const out = await tree(
+      [
+        "[Read more](javascript:alert(document.cookie))",
+        '<a href="javascript:alert(1)">tag</a>',
+        '<a href="java\tscript:alert(1)">tab</a>',
+        '<a href="&#106;avascript:alert(1)">entity</a>',
+        '<img src="data:text/html,<script>alert(1)</script>" alt="x" />',
+        '<Card href="JavaScript:alert(1)" />',
+      ].join("\n\n"),
+    );
+    expect(out.toLowerCase()).not.toContain("script:");
+    expect(out).not.toContain("data:");
+    // The elements themselves stay, without the attribute.
+    expect(out).toContain('"children":"Read more"');
+    expect(out).toContain('"alt":"x"');
+  });
+
+  it("keeps ordinary links", async () => {
+    const out = await tree(
+      '[Docs](https://graft.page/docs) [Home](/home) [Mail](mailto:hi@graft.page) <Card href="#top" />',
+    );
+    for (const href of ["https://graft.page/docs", "/home", "mailto:hi@graft.page", "#top"]) {
+      expect(out).toContain(`"href":"${href}"`);
+    }
+  });
+
+  it("leaves full-trust bodies as written", async () => {
+    expect(await tree("[x](javascript:void(0))", "full")).toContain("javascript:void(0)");
+  });
 });

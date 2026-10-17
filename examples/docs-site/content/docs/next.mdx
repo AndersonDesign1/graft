@@ -343,9 +343,20 @@ Props must be JSON, so pass the fields the page shows rather than the whole
 document: its `updatedAt` is a `Date`, which Next.js refuses to serialize.
 Pass `components` to `<MdxContent />` as you would to
 [`<MdxBody />`](#use-your-own-components-in-markdown). A body that uses
-`import` is refused with `INPUT_VALIDATION_FAILED`, even with
-`trust: "full"`, because the browser has no bundler to resolve it. Pass the
-component in `components` instead.
+`import`, `import()` or `import.meta` is refused with
+`INPUT_VALIDATION_FAILED`, even with `trust: "full"`, because the browser has no
+bundler to resolve it. Pass the component in `components` instead. A body that
+only mentions an import, in a code span or a fenced block, is prose and renders.
+
+<Callout label="MdxContent needs unsafe-eval in a Content Security Policy" type="warning">
+  `<MdxContent />` runs the prepared code with `new Function`, in the server
+  render and again in the browser. A `script-src` without `'unsafe-eval'`, such
+  as the nonce-based policy Next.js suggests, blocks it in the browser, and the
+  body stops working after hydration. Add `'unsafe-eval'` to `script-src` on the
+  pages that use it, or render those pages with the App Router's `<MdxBody />`,
+  which runs only on the server. With `trust: "full"`, a body's expressions run
+  in visitors' browsers as well as on the server.
+</Callout>
 
 ### Refresh Pages Router pages
 

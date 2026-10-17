@@ -55,6 +55,18 @@ answer `UNAUTHORIZED` without `studio:publish`. Studio's screens need no change.
 **What to do:** if your own code calls either route, give its token the
 `studio:publish` scope.
 
+**`graft compile` refuses a reference that points at nothing.** A
+`field.reference` whose slug names no document, such as a product whose category
+was deleted, stops the compile with `CONTENT_REFERENCE_NOT_FOUND`, naming the
+file, the field and the slug. Studio and MCP writes refuse the same thing before
+they write. See [Choices and references](/docs/schema#choices-and-references).
+
+**What to do:** run `graft compile` (or `graft check`). For each reference it
+names, create the missing document or point the field at one that exists.
+
+**If you call `checkRemoval` from `@usegraft/compiler` yourself,** pass
+`contentDir`. With no `db`, it now checks against the files there.
+
 ## 1.0.0-beta.7
 
 **Postgres projects need `graft db migrate`.** This release adds tables for

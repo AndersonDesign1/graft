@@ -7,7 +7,7 @@
  * no projection is stubbed. The Postgres-tier tools must answer NEEDS_DATABASE
  * with an upgrade path rather than crashing on a missing connection.
  */
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineCollection, field } from "@usegraft/core";
@@ -133,5 +133,62 @@ describe("MCP over a static index", () => {
     expect(String(body.fix)).toContain("git");
     // The document must still exist — a refused delete deletes nothing.
     expect(readFileSync(join(contentDir, "pages", "about.mdx"), "utf8")).toContain("About");
+  });
+});
+
+describe("write_content checks references before it writes", () => {
+  const linked = {
+    topics: defineCollection({ name: "topics", fields: { title: field.string() } }),
+    notes: defineCollection({
+      name: "notes",
+      fields: { title: field.string(), topic: field.reference({ to: "topics" }) },
+    }),
+  };
+  let root: string;
+  let notes: string;
+  let agent: Client;
+
+  beforeAll(async () => {
+    root = mkdtempSync(join(tmpdir(), "graft-mcp-static-refs-"));
+    const content = join(root, "content");
+    notes = join(content, "notes");
+    mkdirSync(join(content, "topics"), { recursive: true });
+    mkdirSync(notes, { recursive: true });
+    writeFileSync(join(content, "topics", "wool.mdx"), "---\ntitle: Wool\n---\n");
+    // Broken already, by hand. Not a later write's to refuse.
+    writeFileSync(join(notes, "stale.mdx"), "---\ntitle: Stale\ntopic: gone\n---\n");
+    const server = createGraftMcp({
+      name: "graft-static-refs",
+      contentDir: content,
+      collections: linked,
+      staticIndexPath: join(root, ".graft", "index.db"),
+    });
+    agent = new Client({ name: "test-agent", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), agent.connect(clientTransport)]);
+  });
+
+  afterAll(async () => {
+    await agent?.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it("refuses a note whose topic doesn't exist, and writes nothing", async () => {
+    const result = await agent.callTool({
+      name: "write_content",
+      arguments: { collection: "notes", slug: "a", data: { title: "A", topic: "linen" } },
+    });
+    expect(result.isError).toBe(true);
+    expect(payload(result)).toMatchObject({ error: "CONTENT_REFERENCE_NOT_FOUND" });
+    expect(existsSync(join(notes, "a.mdx"))).toBe(false);
+  });
+
+  it("writes a note whose topic exists, even with another note already broken", async () => {
+    const result = await agent.callTool({
+      name: "write_content",
+      arguments: { collection: "notes", slug: "b", data: { title: "B", topic: "wool" } },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(readFileSync(join(notes, "b.mdx"), "utf8")).toContain("topic: wool");
   });
 });

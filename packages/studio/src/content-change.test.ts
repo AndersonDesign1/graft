@@ -19,7 +19,13 @@ vi.mock("@usegraft/compiler", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@usegraft/compiler")>();
   const fake = async () => ({ count: 1, docs: [], changes: compiled.changes, gitSha: "abc123" });
   // A save projects the files it wrote; an operator compile projects the tree.
-  return { ...actual, compile: vi.fn(fake), compileDocuments: vi.fn(fake) };
+  return {
+    ...actual,
+    compile: vi.fn(fake),
+    compileDocuments: vi.fn(fake),
+    // The check before a save reads the index, which these tests have none of.
+    checkChange: vi.fn(async () => []),
+  };
 });
 
 const { createStudioApiHandler } = await import("./api");

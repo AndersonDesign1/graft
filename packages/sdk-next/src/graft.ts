@@ -12,14 +12,14 @@
  * package can't generate it. Instead it ships the tag helpers (re-exported from
  * sdk-core — `tagsFor`, `documentTag`, `collectionTag`) that an app drops into
  * `cacheTag(...)` inside its own `'use cache'` functions (Next 16), or into
- * `unstable_cache(fn, keys, { tags })` (Next 15), plus the write side:
+ * `unstable_cache(fn, keys, { tags })` (Next 14 and 15), plus the write side:
  * `revalidateContent` / `updateContent`, which turn a compile's `ChangeSet`
  * into the exact `revalidateTag` / `updateTag` calls that refresh only the
  * changed pages. See the example app's llms.txt for the composition.
  *
- * Supports Next 15 and 16. `next/cache` differs between them, so it is read
- * through a namespace and feature-detected at call time: a named import of
- * `updateTag` (Next 16 only) is an import of a missing export on 15.
+ * Supports Next 14, 15 and 16. `next/cache` differs between them, so it is
+ * read through a namespace and feature-detected at call time: a named import
+ * of `updateTag` (Next 16 only) is an import of a missing export before 16.
  */
 import { GraftError } from "@usegraft/contracts";
 // With the extension: the Pages Router on Next.js 14 loads this package with
@@ -183,7 +183,7 @@ export function updateContent(branch: string, changes: ChangeSet): string[] {
     throw new GraftError({
       code: "FRAMEWORK_VERSION_UNSUPPORTED",
       message: "updateContent needs Next.js 16. This version of next/cache has no updateTag.",
-      fix: "Call revalidateContent(branch, changes) instead. It works on Next.js 15 and 16 and refreshes on the next request rather than this one. Or upgrade to Next.js 16.",
+      fix: "Call revalidateContent(branch, changes) instead. It works on Next.js 14, 15 and 16 and refreshes on the next request rather than this one. Or upgrade to Next.js 16.",
       details: { missing: "next/cache updateTag", fallback: "revalidateContent" },
     });
   }

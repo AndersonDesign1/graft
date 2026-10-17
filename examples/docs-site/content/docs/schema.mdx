@@ -141,10 +141,17 @@ The slug has to name a document that exists. `graft compile` stops with
 the file, the field and the missing slug. In a database-sourced project,
 publishing refuses the same thing, and also refuses to publish the deletion of
 a document that live documents still point at. Publish the documents that
-point at it in the same step, changed to point elsewhere. A local Studio refuses
-to delete an entry other entries point at, and says which ones. A reference into a
-collection kept in the database (`db-authoritative`) is not checked, because
-its targets are records, not documents.
+point at it in the same step, changed to point elsewhere.
+
+A local Studio and `write_content` check the same thing before they write, so a
+refused save, bulk edit, delete or discard leaves every file as it was. A save
+is checked against the documents in the index, or a file in the content folder
+the index hasn't caught up with, such as one a `git pull` brought in. A
+reference that was already broken somewhere else doesn't stop an unrelated
+save; `graft compile` still reports it.
+
+A reference into a collection kept in the database (`db-authoritative`) is not
+checked, because its targets are records, not documents.
 
 Both appear in `describe_schema` with their options and target, alongside each
 field's `label` and limits, so an agent and Studio see the same rules the

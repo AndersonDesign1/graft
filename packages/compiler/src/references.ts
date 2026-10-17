@@ -42,6 +42,9 @@ function walk(
 /** What the check reads from a document: where it is, and its fields. */
 export type ReferencingDoc = Pick<ProjectedDoc, "collection" | "slug" | "data" | "sourcePath">;
 
+/** The `collection/slug` keys a reference may resolve to. A Set, or anything that answers `has`. */
+export type ReferenceTargets = Pick<ReadonlySet<string>, "has">;
+
 /**
  * Every reference whose target is not among `docs`, nor among `elsewhere`:
  * the `collection/slug` keys of documents that exist but were not passed,
@@ -50,7 +53,7 @@ export type ReferencingDoc = Pick<ProjectedDoc, "collection" | "slug" | "data" |
 export function findBrokenReferences(
   docs: ReferencingDoc[],
   collections: Record<string, AnyCollection>,
-  elsewhere: ReadonlySet<string> = new Set(),
+  elsewhere: ReferenceTargets = new Set(),
 ): BrokenReference[] {
   const present = new Set(docs.map((doc) => `${doc.collection}/${doc.slug}`));
   const broken: BrokenReference[] = [];
@@ -92,7 +95,7 @@ export function checkChangedDocuments<T extends ReferencingDoc>(
   live: ReferencingDoc[],
   changedPaths: ReadonlySet<string>,
   collections: Record<string, AnyCollection>,
-  validate: (staying: ReadonlySet<string>) => T[],
+  validate: (staying: ReferenceTargets) => T[],
 ): T[] {
   const key = (doc: { collection: string; slug: string }) => `${doc.collection}/${doc.slug}`;
   const staying = live.filter((doc) => !changedPaths.has(doc.sourcePath));

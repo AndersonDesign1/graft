@@ -23,9 +23,15 @@ import {
   type ChangeSet,
   type Database,
 } from "@usegraft/db";
-import { parseDocument, type ProjectedDoc } from "./parse";
+import { parseDocument, SLUG_RE, type ProjectedDoc } from "./parse";
 import { resolveContained } from "./paths";
-import { brokenReferencesError, checkChangedDocuments, findBrokenReferences } from "./references";
+import {
+  brokenReferencesError,
+  checkChangedDocuments,
+  findBrokenReferences,
+  type ReferenceTargets,
+  type ReferencingDoc,
+} from "./references";
 
 /**
  * Where a project's authored content is authoritative.
@@ -90,7 +96,7 @@ export interface ReadDocsOptions {
    * Omitted, references are not checked: a few files alone can't say
    * whether a target exists. `readDocs` defaults to `"files"`.
    */
-  references?: "files" | ReadonlySet<string>;
+  references?: "files" | ReferenceTargets;
 }
 
 /** One authored file: its path inside the content directory, and its bytes. */
@@ -315,50 +321,85 @@ export interface CompileDocumentsOptions {
  * The files pass the same checks as a compile, references included, and
  * the projection records a compilation like a full one. Documents that were not named are
  * left as they are, so drift elsewhere in the tree waits for `graft compile`.
+ * A caller about to write should run `checkChange` first, so a refusal
+ * leaves the files as they were; this checks again what was written.
  */
 export async function compileDocuments(options: CompileDocumentsOptions): Promise<CompileResult> {
-  const files: SourceFile[] = [];
+  const written = new Map<string, string | null>();
   for (const sourcePath of new Set(options.paths)) {
     const full = resolveContained(options.contentDir, sourcePath, { label: "Content path" });
-    if (existsSync(full)) files.push({ sourcePath, raw: readFileSync(full, "utf8") });
+    written.set(sourcePath, existsSync(full) ? readFileSync(full, "utf8") : null);
   }
   const branchId = options.branchId ?? "main";
-  // The files are checked as a compile checks them, references included:
-  // against the documents the rest of the index holds, and so that the rest
-  // is not left pointing at a document these files no longer hold.
-  const docs = checkChangedDocuments(
-    await liveDocuments(options.db, branchId),
-    new Set(options.paths),
-    options.collections,
-    (staying) =>
-      validateDocuments(files, options.collections, {
-        mdxTrust: options.mdxTrust,
-        references: staying,
-      }),
-  );
+  const docs = await checkChange({ ...options, branchId, changes: written });
   const gitSha = options.gitSha !== undefined ? options.gitSha : resolveGitSha(options.contentDir);
   const changes = await projectDocuments(
     options.db,
-    { upserts: docs.map(indexRow), removals: [], paths: [...new Set(options.paths)] },
+    { upserts: docs.map(indexRow), removals: [], paths: [...written.keys()] },
     { branchId, gitSha },
   );
   return { count: docs.length, docs, changes, gitSha };
 }
 
+export interface CheckChangeOptions {
+  contentDir: string;
+  collections: Record<string, AnyCollection>;
+  /** Each file the change writes, with its new bytes, or null for one it deletes. */
+  changes: ReadonlyMap<string, string | null>;
+  /** The index to check against. Omitted, the documents in `contentDir` are read instead. */
+  db?: Database;
+  branchId?: string;
+  mdxTrust?: MdxTrust;
+}
+
+/**
+ * Check a change to a few files before it is written: the checks a compile
+ * makes of those files, references included, and that no document left as
+ * it is ends up pointing at one the change deletes or renames. Throws, so a
+ * refused change writes nothing. Returns the changed files' documents.
+ *
+ * A reference may name a document in the index, or a file in `contentDir`
+ * the index has not caught up with yet, such as one a `git pull` brought in:
+ * the files are the truth, and the index can be behind them.
+ */
+export async function checkChange(options: CheckChangeOptions): Promise<ProjectedDoc[]> {
+  const live = options.db
+    ? await liveDocuments(options.db, options.branchId ?? "main")
+    : treeDocuments(options.contentDir, options.collections);
+  const changed = new Set(options.changes.keys());
+  const files: SourceFile[] = [];
+  for (const [sourcePath, raw] of options.changes) {
+    if (raw !== null) files.push({ sourcePath, raw });
+  }
+  return checkChangedDocuments(live, changed, options.collections, (staying) =>
+    validateDocuments(files, options.collections, {
+      mdxTrust: options.mdxTrust,
+      references: {
+        has: (key) =>
+          staying.has(key) || onDisk(options.contentDir, options.collections, key, changed),
+      },
+    }),
+  );
+}
+
 /**
  * Refuse to remove files while live documents still point at what they
  * hold, before anything is deleted: removing a category its products use
- * would leave a tree `graft compile` refuses. Throws
+ * would leave a tree `graft compile` refuses. Checked against the index, or
+ * against the files in `contentDir` when there is none. Throws
  * CONTENT_REFERENCE_NOT_FOUND naming each reference.
  */
 export async function checkRemoval(options: {
-  db: Database;
+  contentDir: string;
+  db?: Database;
   branchId?: string;
   collections: Record<string, AnyCollection>;
   paths: string[];
 }): Promise<void> {
   const removing = new Set(options.paths);
-  const live = await liveDocuments(options.db, options.branchId ?? "main");
+  const live = options.db
+    ? await liveDocuments(options.db, options.branchId ?? "main")
+    : treeDocuments(options.contentDir, options.collections);
   const gone = new Set(
     live
       .filter((doc) => removing.has(doc.sourcePath))
@@ -380,6 +421,49 @@ export async function checkRemoval(options: {
     message: `${[...gone].join(", ")} can't be deleted while ${stranded.length} reference(s) point at it: ${listed}${more}.`,
     fix: "Point those fields at another document, or delete those entries first. Nothing was deleted.",
     details: { references: stranded.slice(0, 50), total: stranded.length, removing: [...gone] },
+  });
+}
+
+/**
+ * The documents in the tree as they stand, for a check with no index. A
+ * file that doesn't parse is left out: nothing can resolve to it, and it
+ * isn't the change being checked.
+ */
+function treeDocuments(
+  contentDir: string,
+  collections: Record<string, AnyCollection>,
+): ReferencingDoc[] {
+  const docs: ReferencingDoc[] = [];
+  for (const file of readSourceFiles(contentDir)) {
+    const collection = collections[file.sourcePath.split("/")[0] ?? ""];
+    if (!collection || collection.authority === "db-authoritative") continue;
+    try {
+      docs.push(parseDocument(file.raw, collection, file.sourcePath));
+    } catch {
+      // Left out, as above.
+    }
+  }
+  return docs;
+}
+
+/**
+ * Whether `collection/slug` is a file in `contentDir`, other than one the
+ * change rewrites or deletes. The slug comes from a document, so it must
+ * be a slug before any path is built from it.
+ */
+function onDisk(
+  contentDir: string,
+  collections: Record<string, AnyCollection>,
+  key: string,
+  changed: ReadonlySet<string>,
+): boolean {
+  const slash = key.indexOf("/");
+  const collection = key.slice(0, slash);
+  const slug = key.slice(slash + 1);
+  if (!Object.hasOwn(collections, collection) || !SLUG_RE.test(slug)) return false;
+  return [".mdx", ".md"].some((ext) => {
+    const sourcePath = `${collection}/${slug}${ext}`;
+    return !changed.has(sourcePath) && existsSync(join(contentDir, sourcePath));
   });
 }
 
@@ -407,6 +491,13 @@ export interface CompileStaticOptions {
    * `export const mdxTrust` in graft.config.ts.
    */
   mdxTrust?: MdxTrust;
+  /**
+   * Refuse a tree with a reference that points at nothing, as `graft compile`
+   * does. Default true. A caller that checked its own change with
+   * `checkChange` passes false, so a reference already broken elsewhere in
+   * the tree doesn't refuse a save that didn't break it.
+   */
+  references?: boolean;
 }
 
 /**
@@ -415,9 +506,9 @@ export interface CompileStaticOptions {
  * git's job here, so there is no branchId; the artifact records "main".
  */
 export async function compileStatic(options: CompileStaticOptions): Promise<CompileResult> {
-  const docs = readDocs(options.contentDir, options.collections, {
-    mdxTrust: options.mdxTrust,
-  });
+  const checks: ReadDocsOptions = { mdxTrust: options.mdxTrust };
+  if (options.references !== false) checks.references = "files";
+  const docs = validateDocuments(readSourceFiles(options.contentDir), options.collections, checks);
   const gitSha = options.gitSha === undefined ? resolveGitSha(options.contentDir) : options.gitSha;
   const changes = await projectStaticContent(
     docs.map((doc) => ({
