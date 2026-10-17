@@ -30,7 +30,11 @@ describe("the committed compat apps", () => {
 describe("the Next.js releases in the lockfile", () => {
   const versions = [
     ...new Set(
-      [...readFileSync(lockfile, "utf8").matchAll(/^ {2}next@(\d+\.\d+\.\d+)/gm)].map((m) => m[1]),
+      [
+        ...readFileSync(lockfile, "utf8").matchAll(
+          /^ {2}next@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)[:(]/gm,
+        ),
+      ].map((m) => m[1]),
     ),
   ];
 

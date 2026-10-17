@@ -84,9 +84,11 @@ jobs:
           # Denied rather than allow-listed: an allow list turns every new
           # permissive licence into a failed CI run on someone else's PR.
           deny-licenses: AGPL-3.0, AGPL-3.0-only, AGPL-3.0-or-later, GPL-2.0, GPL-3.0, SSPL-1.0
-          # The Next.js advisories on next@14.2.35, which packages/sdk-next/compat/next14
-          # installs to prove the adapter still runs on 14. It is the last 14
-          # release and none of these will be fixed on 14. The app is private,
+          # The 21 Next.js advisories at moderate or above on next@14.2.35, which
+          # packages/sdk-next/compat/next14 installs to prove the adapter still
+          # runs on 14. OSV lists 23; the other two are low, which this check
+          # does not fail on. It is the last 14 release, and none of these will
+          # be fixed on 14. The app is private,
           # never published, and only serves 127.0.0.1 for the length of the smoke.
           # The allowance is by ID, and most of these also affect early 15 and
           # 16 releases, so packages/sdk-next/src/compat.test.ts fails on any
