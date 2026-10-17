@@ -26,29 +26,55 @@ const GRAFT_SERVER_EXTERNALS = ["@usegraft/registry"];
 /** The first releases with the fixes for the critical Next.js advisories of 2026. */
 const PATCHED = { 15: [5, 24], 16: [3, 3] } as const;
 
-/** The version of `next` the app has installed, or undefined when it can't be read. */
+/** The `version` field of a package.json, or undefined. */
+function versionOf(pkg: unknown): string | undefined {
+  return pkg && typeof pkg === "object" && "version" in pkg && typeof pkg.version === "string"
+    ? pkg.version
+    : undefined;
+}
+
+/**
+ * The version of `next` the app has installed, or undefined when it can't be
+ * read. Looked up beside the config first, then from this package, whose
+ * peer is the app's `next`: `next build apps/web` run from a monorepo's root
+ * leaves the working directory where no `next` is installed.
+ */
 export function installedNextVersion(cwd = process.cwd()): string | undefined {
-  try {
-    const pkg: unknown = createRequire(join(cwd, "package.json"))("next/package.json");
-    if (pkg && typeof pkg === "object" && "version" in pkg && typeof pkg.version === "string") {
-      return pkg.version;
+  for (const from of [join(cwd, "package.json"), import.meta.url]) {
+    try {
+      const version = versionOf(createRequire(from)("next/package.json"));
+      if (version) return version;
+    } catch {
+      // Not resolvable from here; try the next place.
     }
-  } catch {
-    // No next installed beside the config: write the current key.
   }
   return undefined;
 }
 
-function parse(version: string): [number, number, number] | undefined {
-  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
-  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : undefined;
+interface Version {
+  major: number;
+  minor: number;
+  patch: number;
+  /** A canary, rc or other prerelease, which comes before the release it names. */
+  prerelease: boolean;
+}
+
+function parse(version: string): Version | undefined {
+  const match = /^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?/.exec(version);
+  if (!match) return undefined;
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+    prerelease: match[4] !== undefined,
+  };
 }
 
 /** What to tell someone running this version, or null when there is nothing to say. */
 export function nextVersionAdvice(version: string): string | null {
   const parsed = parse(version);
   if (!parsed) return null;
-  const [major, minor, patch] = parsed;
+  const { major, minor, patch, prerelease } = parsed;
   if (major < 14 || (major === 14 && minor < 2)) {
     return `Graft supports Next.js 14.2 and later. This app has ${version}.`;
   }
@@ -56,13 +82,25 @@ export function nextVersionAdvice(version: string): string | null {
     return `Next.js 14 no longer gets security fixes, and ${version} has critical advisories that will not be fixed on 14. Graft works with it, but upgrade to 15.5.24 or 16.3.3 or later.`;
   }
   const floor = major === 15 || major === 16 ? PATCHED[major] : undefined;
-  if (floor && (minor < floor[0] || (minor === floor[0] && patch < floor[1]))) {
+  const below =
+    floor &&
+    (minor < floor[0] ||
+      (minor === floor[0] && (patch < floor[1] || (patch === floor[1] && prerelease))));
+  if (floor && below) {
     return `Next.js ${version} has known critical security advisories. Upgrade to ${major}.${floor[0]}.${floor[1]} or later.`;
   }
   return null;
 }
 
 let warned = false;
+
+const strings = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((name): name is string => typeof name === "string") : [];
+
+/** Every package in the lists, once each, then Graft's. */
+function merged(...lists: string[][]): string[] {
+  return [...new Set([...lists.flat(), ...GRAFT_SERVER_EXTERNALS])];
+}
 
 export function withGraft(
   config: NextConfig = {},
@@ -75,34 +113,40 @@ export function withGraft(
     console.warn(`graft: ${advice}`);
   }
 
-  const major = version ? parse(version)?.[0] : undefined;
+  // Both names are read from the app's config and written as the one this
+  // Next.js reads. Left in place, the other is ignored on 14, and on 15 and
+  // later it is moved over `serverExternalPackages`, dropping Graft's entry.
+  // The types installed here are 15's or later, which no longer declare the
+  // experimental name, so it is narrowed by `in`.
+  const { serverExternalPackages: current, experimental, ...rest } = config;
+  const { legacy, others } = splitExperimental(experimental);
+  const major = version ? parse(version)?.major : undefined;
   if (major !== undefined && major < 15) {
-    // Next.js 14 reads this key; the types installed here are 15's or later,
-    // which no longer declare it, so it is narrowed by `in` and written by spread.
-    const declared = config.experimental ?? {};
-    const current =
-      "serverComponentsExternalPackages" in declared
-        ? declared.serverComponentsExternalPackages
-        : undefined;
-    const existing = Array.isArray(current)
-      ? current.filter((name): name is string => typeof name === "string")
-      : [];
-    const experimental = {
-      ...config.experimental,
-      serverComponentsExternalPackages: [
-        ...existing,
-        ...GRAFT_SERVER_EXTERNALS.filter((pkg) => !existing.includes(pkg)),
-      ],
+    return {
+      ...rest,
+      experimental: {
+        ...others,
+        serverComponentsExternalPackages: merged(legacy, strings(current)),
+      },
     };
-    return { ...config, experimental };
   }
+  const next: NextConfig = { ...rest, serverExternalPackages: merged(strings(current), legacy) };
+  if (experimental) next.experimental = others;
+  return next;
+}
 
-  const existing = config.serverExternalPackages ?? [];
-  return {
-    ...config,
-    serverExternalPackages: [
-      ...existing,
-      ...GRAFT_SERVER_EXTERNALS.filter((pkg) => !existing.includes(pkg)),
-    ],
-  };
+interface ExperimentalSplit {
+  /** Next.js 14's externals list, if the app set one. */
+  legacy: string[];
+  /** Every other experimental setting, as the app wrote it. */
+  others: NonNullable<NextConfig["experimental"]>;
+}
+
+/** The legacy externals list out of `experimental`, and everything else in it. */
+function splitExperimental(experimental: NextConfig["experimental"]): ExperimentalSplit {
+  if (!experimental) return { legacy: [], others: {} };
+  if (!("serverComponentsExternalPackages" in experimental))
+    return { legacy: [], others: experimental };
+  const { serverComponentsExternalPackages: legacy, ...others } = experimental;
+  return { legacy: strings(legacy), others };
 }

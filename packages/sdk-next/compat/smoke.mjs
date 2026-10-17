@@ -190,9 +190,11 @@ try {
     scripts.map(async (src) => (await fetch(`${base}${src}`)).text()),
   );
   check(scripts.length > 0, `the Pages Router page loads ${scripts.length} scripts`);
+  // Names a minifier keeps: module specifiers, and the MDX compiler's own
+  // error text, since its identifiers don't survive a production build.
   check(
     !bundles.some((code) =>
-      /openStaticIndex|node:sqlite|postgres|@mdx-js\/mdx|remark-gfm/.test(code),
+      /openStaticIndex|node:sqlite|postgres|@mdx-js\/mdx|remark-gfm|options\.baseUrl/.test(code),
     ),
     "none of them carries database, index or MDX compiler code",
   );
