@@ -35,6 +35,26 @@ error's `fix` says what to change.
   anything it reports.
 </AgentPrompt>
 
+## 1.0.0-beta.8
+
+**Frontmatter written in JavaScript is refused.** A document whose frontmatter
+opens with `---js` or `---javascript` used to have that block run as code
+wherever the file was read, including the Studio server and CI. `graft compile`,
+Studio saves and MCP writes now refuse it with `INPUT_VALIDATION_FAILED`, and
+read YAML or JSON frontmatter only. See
+[MDX safety](/docs/mdx-safety#frontmatter-is-read-as-yaml-or-json).
+
+**What to do:** if a file opens with `---js`, rewrite its frontmatter as YAML.
+
+**Committing and reverting through the Studio API needs `studio:publish`.**
+`POST /changes/commit` and `POST /compilations/:id/revert` asked for
+`studio:write`, so a contributor could commit to the checkout or roll it back
+without the publish right that Studio's own Commit button checks. Both now
+answer `UNAUTHORIZED` without `studio:publish`. Studio's screens need no change.
+
+**What to do:** if your own code calls either route, give its token the
+`studio:publish` scope.
+
 ## 1.0.0-beta.7
 
 **Postgres projects need `graft db migrate`.** This release adds tables for

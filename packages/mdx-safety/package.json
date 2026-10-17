@@ -26,23 +26,35 @@
     "dist"
   ],
   "type": "module",
+  "typesVersions": {
+    "*": {
+      "frontmatter": [
+        "./dist/frontmatter.d.ts"
+      ]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./frontmatter": {
+      "types": "./dist/frontmatter.d.ts",
+      "default": "./dist/frontmatter.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
-    "dev": "tsup src/index.ts --format esm --watch",
+    "build": "tsup src/index.ts src/frontmatter.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts src/frontmatter.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@usegraft/contracts": "workspace:*",
+    "gray-matter": "^4.0.3",
     "remark-gfm": "^4.0.1",
     "remark-mdx": "^3.1.1",
     "remark-parse": "^11.0.0",

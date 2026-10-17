@@ -5,12 +5,13 @@
  * connection.
  */
 import { execFileSync } from "node:child_process";
+import { createServer } from "node:http";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineCollection, field } from "@usegraft/core";
 import { openStaticIndex } from "@usegraft/db";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createStudioApiHandler } from "../api";
 import type { EntryDto, WorkspaceDto } from "../editor-types";
 import type { ContentTree } from "../types";
@@ -186,5 +187,35 @@ describe("Studio with no index at all", () => {
         "Site settings are kept in Postgres, and this Studio runs without a database.",
       ],
     });
+  });
+
+  it("refuses a media upload or delete before anything reaches the bucket", async () => {
+    // A stand-in for the bucket that counts what reaches it.
+    let requests = 0;
+    const bucket = createServer((_request, response) => {
+      requests += 1;
+      response.writeHead(200).end();
+    });
+    await new Promise<void>((resolve) => bucket.listen(0, "127.0.0.1", resolve));
+    const address = bucket.address();
+    const port = address && typeof address === "object" ? address.port : 0;
+    vi.stubEnv("S3_ENDPOINT", `http://127.0.0.1:${port}`);
+    vi.stubEnv("S3_ACCESS_KEY", "test");
+    vi.stubEnv("S3_SECRET_KEY", "test");
+    vi.stubEnv("S3_BUCKET", "test");
+    try {
+      const handler = createStudioApiHandler({ collections, contentDir });
+      const upload = await call<{ error: string }>(handler, "POST", "/assets", {
+        name: "hat.png",
+        base64: Buffer.from("png").toString("base64"),
+      });
+      const removal = await call<{ error: string }>(handler, "DELETE", "/assets?key=hat.png");
+      expect([upload.status, upload.json.error]).toEqual([503, "NEEDS_DATABASE"]);
+      expect([removal.status, removal.json.error]).toEqual([503, "NEEDS_DATABASE"]);
+      expect(requests).toBe(0);
+    } finally {
+      vi.unstubAllEnvs();
+      await new Promise((resolve) => bucket.close(resolve));
+    }
   });
 });

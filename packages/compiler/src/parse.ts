@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { basename } from "node:path";
 import { GraftError } from "@usegraft/contracts";
 import type { AnyCollection } from "@usegraft/core";
-import matter from "gray-matter";
+import { readFrontmatter } from "@usegraft/mdx-safety/frontmatter";
 
 /** Kebab-case: URL-safe, unambiguous in paths, and stable as a primary-key part. */
 /** URL-safe kebab-case: the only shape a slug may take. */
@@ -40,7 +40,7 @@ export function parseDocument(
   collection: AnyCollection,
   sourcePath: string,
 ): ProjectedDoc {
-  const { data: frontmatter, content } = matter(raw);
+  const { data: frontmatter, content } = readFrontmatter(raw, sourcePath);
 
   const result = collection.schema.safeParse(frontmatter);
   if (!result.success) {
