@@ -1,5 +1,84 @@
 # @usegraft/db
 
+## 1.0.0-beta.8
+
+### Minor Changes
+
+- b56d6b1: **BREAKING:** `graft compile` now stops on a `field.reference({ to })` that
+  names a document that doesn't exist, with `CONTENT_REFERENCE_NOT_FOUND`.
+  Until now a reference was checked only by `graft check`, so a product whose
+  category had been deleted compiled, and the site found the gap at render
+  time. A project that compiled with a broken reference fails now. Run
+  `graft check` to list every one, then fix them or create the missing
+  documents.
+
+  The error names each file, field and missing slug in `details.references`:
+
+  ```txt
+  Error CONTENT_REFERENCE_NOT_FOUND: 1 reference(s) name a document that doesn't exist: products/wool-hat.mdx "category" points at categories/hats.
+  ```
+
+  Both content sources make the check, because both go through
+  `validateDocuments`. In a database-sourced project, a publish refuses a draft
+  whose reference isn't live, and refuses to publish the deletion (or a new
+  slug) of a document that live documents still point at. Publish them together,
+  changed to point elsewhere.
+
+  A local Studio checks the same way: a save of an entry whose reference isn't
+  in the index is refused, and so is deleting an entry other entries point at,
+  before its file is removed. `checkRemoval` in `@usegraft/compiler` is that
+  second check, and `compileDocuments` makes the first.
+
+  `validateDocuments` takes a new `references` option. `"files"` checks targets
+  among the files given, which is right for a whole tree, and `readDocs` uses it
+  by default. A set of `collection/slug` keys also counts those as existing, for
+  a caller checking part of a larger whole. Without the option, references are
+  not checked. `liveDocuments` in `@usegraft/db` lists a branch's live
+  documents for that set.
+
+- 36472f3: References are checked before a write, not after it. A local Studio save, bulk edit, delete or discard, and MCP's `write_content` and `delete_content`, used to write or delete the file and then check references while updating the index. A refusal said nothing was saved while the file had changed, and the index no longer matched it. Now a refused write leaves every file as it was.
+
+  - **`checkChange`** in `@usegraft/compiler` checks a change to a few files before it is written: the checks a compile makes of them, references included, and that nothing left as it is points at a document the change deletes or renames. It checks against the Postgres index, or the files when there is none.
+  - **A stale index no longer refuses a good save.** A reference may name a file in the content folder the index hasn't caught up with, such as one a `git pull` brought in.
+  - **On the static index or with none,** deletes and discards are checked too, and a reference already broken somewhere else no longer refuses an unrelated save. `graft compile` still reports it.
+  - **`checkRemoval` takes `contentDir`,** and checks against the files there when it is given no `db`.
+  - **Publishing in a database-sourced project checks references once it holds the content lock.** Two publishes at once, one deleting a category and one pointing a product at it, could each pass against the state before the other. `publishDrafts` in `@usegraft/db` accepts the index rows as a function of the live documents for this.
+  - **A bulk edit is checked as a batch before anything is written,** and sets a field on at most 500 entries at once. A file that fails to write partway is reported with the others, and the ones written still reach the index.
+
+- 41c371f: A local Studio save now updates the index for the file it wrote, instead of
+  recompiling the whole content tree. On a 2,000-product catalog a save took
+  1.6 seconds and now takes about 100 milliseconds.
+
+  The save checks the file with the same rules as `graft compile` (the schema,
+  MDX safety, unique slugs) and records a compilation with the commit it was
+  read at, so the compile history still lists it. Other files are left as they
+  are: a file changed outside Studio reaches the index on the next
+  `graft compile`. One broken file elsewhere in the tree no longer makes every
+  save fail.
+
+  Two functions make this available outside Studio:
+
+  ```ts
+  import { compileDocuments } from "@usegraft/compiler";
+
+  // Read, validate and project two files; a missing one comes off the index.
+  await compileDocuments({
+    contentDir,
+    collections,
+    db,
+    paths: ["products/wool-hat.mdx"],
+  });
+  ```
+
+  `projectDocuments` in `@usegraft/db` is the projection underneath, and it is
+  the one a database-sourced publish already used. It changes only the rows it
+  is given, refuses a slug another live file holds with `SLUG_NOT_UNIQUE`, and
+  removes a row whose file no longer produces it.
+
+### Patch Changes
+
+- @usegraft/contracts@1.0.0-beta.8
+
 ## 1.0.0-beta.7
 
 ### Minor Changes

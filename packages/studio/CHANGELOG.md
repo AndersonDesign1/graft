@@ -1,5 +1,221 @@
 # @usegraft/studio
 
+## 1.0.0-beta.8
+
+### Minor Changes
+
+- 70321c7: **BREAKING:** frontmatter is read as YAML or JSON only. gray-matter runs a `---js` frontmatter block through `eval`, so a contributor's Studio save, an agent's `write_content`, or a pull request built by `graft compile` could run code on the machine reading it. Every read now goes through `readFrontmatter` from the new `@usegraft/mdx-safety/frontmatter` entry, which refuses any other language with `INPUT_VALIDATION_FAILED` before parsing, whatever `mdxTrust` is. A lint rule stops gray-matter being imported anywhere else.
+
+  **BREAKING:** `POST /api/studio/v1/changes/commit` and `POST /api/studio/v1/compilations/:id/revert` need `studio:publish`. They asked for `studio:write`, so a contributor could commit to the checkout, or roll it back, around the check Studio's Commit button makes.
+
+  Also fixed:
+
+  - `graft studio` with `GRAFT_DEV_TOKEN` gives the operator every admin scope, as its documentation says. Since contributors were stopped from committing locally, the token's missing `studio:publish` stopped the operator committing too.
+  - Without a database, a media upload or delete is refused before the bucket is touched. Both used to change the bucket, then answer `NEEDS_DATABASE`.
+
+- 6161f0e: Set one field on many entries at once. Select entries in a collection's list
+  and choose **Set a field**: pick the field and its value with the same
+  control the entry editor uses, and Studio saves each entry as a draft.
+  Nothing goes live until it is published. Entries that can't be saved are
+  listed in the dialog with the reason and stay selected; the rest are saved.
+
+  The API behind it is `POST /api/studio/v1/entries/field`:
+
+  ```json
+  {
+    "collection": "products",
+    "slugs": ["wool-hat", "linen-shirt"],
+    "field": "status",
+    "value": "archived"
+  }
+  ```
+
+  Each entry is validated and written exactly as `PUT /entry` would, against
+  the version read just before the write. `"value": null` removes an optional
+  field. A local Studio updates the index once for the whole batch. The answer
+  lists `saved` entries with their new versions and `failed` entries with their
+  error code, message and fix.
+
+  On a phone, the bulk bar's buttons now wrap instead of running off the screen.
+
+- f1ed5d2: `graft studio` starts without a database. Until now it stopped with
+  `ENV_VAR_MISSING: DATABASE_URL is not set`, so a static project (`export const
+index = "static"`) could not use Studio at all, and a Postgres project could
+  not open it to fix a typo without a running database.
+
+  Without `DATABASE_URL` you can find, edit, create, delete and commit content as
+  before. In a static project each save also updates `.graft/index.db`, and
+  Developer, Health compares the files with it; a static project never uses a
+  database even when one is set, as with `graft mcp`. The views whose data lives
+  in Postgres (approvals, the compile history, branches, people, agents, the
+  media library, site settings) say they need a database and how to add one,
+  and their API routes answer `NEEDS_DATABASE` (HTTP 503) with the same steps.
+
+  For `createStudioHandler`, `db` is now optional, and `staticIndexPath` points a
+  Studio at the static index:
+
+  ```ts
+  createStudioHandler({
+    collections,
+    contentDir,
+    staticIndexPath: ".graft/index.db",
+  });
+  ```
+
+  `GET /workspace` reports `database` and `index` (`"postgres"`, `"static"` or
+  `"none"`), and `GET /tree` reports which index its states are measured
+  against.
+
+  Sign-in is unchanged. A `graft studio` on `127.0.0.1` asks nobody to sign in,
+  with or without a database. Studio accounts and their sessions are kept in
+  Postgres, so they still need one, and `graft serve --studio` still requires
+  `DATABASE_URL`.
+
+### Patch Changes
+
+- 48e07b9: Lists can be walked from the keyboard. In a collection, j and k move through the entries from anywhere on the page (not while typing), and the arrow keys, Home and End once focus is in the list; Enter opens one. The list beside an open entry takes j and k too.
+
+  Forms fit what they hold:
+
+  - A string field that holds an address or a path (`url`, `githubUrl`, `thumbnail`, `email` and the like, or one with an `^https?` pattern) is a one-line input even when its limit is long. A URL allowed 2,048 characters used to open as a tall textarea.
+  - The create dialog asks for the title first, then the rest in the schema's order.
+  - A required group whose fields are all optional starts empty in the create dialog, so it no longer blocks creating an entry with "Links is required." until one of its optional fields is filled.
+
+  On a phone, an entry's bar shows whether the save landed, and drops its own Commit button (the top bar's commits this entry with the rest) and the title, which the heading below shows in full.
+
+- 8a5c753: A contributor on a local Studio can no longer commit. Locally there is no review step, so a commit landed on the checkout at once, whatever the role. The contributor's drafts now wait for an editor: the Commit buttons are off with the reason, and the API refuses with `UNAUTHORIZED` and `details.required: "studio:publish"`.
+
+  A local commit is now authored by the signed-in person instead of whoever runs Studio, who stays the committer. With no message, it names the entries by title (`Update “Wool Hat”`) instead of by path, and the Publish sheet's placeholder shows that message.
+
+  A refusal now speaks to whoever was refused. A person is told their role can't do it and to ask an admin. A token is told the scope it lacks and where to make one that has it. Studio shows these messages instead of "You're signed out".
+
+- c9868b0: `tools/list` no longer fails with "Cannot read properties of undefined (reading 'push')" when the MCP SDK resolves an older zod than Graft's. The SDK takes any zod from 3.25 on, so a project whose own dependencies bring zod 4.2 to 4.4 handed the SDK a converter that crashed on Graft's schemas. Calling a tool by name still worked, but standard clients list tools first, so none of them could connect. The listing is now converted with the zod that built the schemas, and is otherwise the SDK's own, field for field.
+
+  `serverInfo` reports the Graft release instead of `0.0.0`.
+
+  Token messages speak to whoever holds the token. A revoked or unknown Studio token is told to get a live one from Developer, Agents, not to configure `createActorResolver`. A token missing a scope is told which access level carries it. An anonymous caller is told where tokens come from.
+
+  `graft serve` beyond loopback no longer warns that MCP will refuse every caller: tokens made in Studio always work. It now says how callers get in.
+
+  On `graft studio`, the Agents page no longer shows an MCP endpoint on this computer, which answered 404. It shows `npx graft mcp` for an agent on this machine, and `/api/mcp` wherever `graft serve` runs.
+
+- 36472f3: References are checked before a write, not after it. A local Studio save, bulk edit, delete or discard, and MCP's `write_content` and `delete_content`, used to write or delete the file and then check references while updating the index. A refusal said nothing was saved while the file had changed, and the index no longer matched it. Now a refused write leaves every file as it was.
+
+  - **`checkChange`** in `@usegraft/compiler` checks a change to a few files before it is written: the checks a compile makes of them, references included, and that nothing left as it is points at a document the change deletes or renames. It checks against the Postgres index, or the files when there is none.
+  - **A stale index no longer refuses a good save.** A reference may name a file in the content folder the index hasn't caught up with, such as one a `git pull` brought in.
+  - **On the static index or with none,** deletes and discards are checked too, and a reference already broken somewhere else no longer refuses an unrelated save. `graft compile` still reports it.
+  - **`checkRemoval` takes `contentDir`,** and checks against the files there when it is given no `db`.
+  - **Publishing in a database-sourced project checks references once it holds the content lock.** Two publishes at once, one deleting a category and one pointing a product at it, could each pass against the state before the other. `publishDrafts` in `@usegraft/db` accepts the index rows as a function of the live documents for this.
+  - **A bulk edit is checked as a batch before anything is written,** and sets a field on at most 500 entries at once. A file that fails to write partway is reported with the others, and the ones written still reach the index.
+
+- e61014f: A delete or a slug change checks references against the files, not an index that is behind them. After a `git pull` with no compile, a Studio or MCP delete could remove a document a pulled one pointed at, and the next `graft compile` failed. It could also refuse a delete over a document already gone from the files. Ordinary saves still check against the index, which keeps them fast. `checkRemoval` from `@usegraft/compiler` reads only the files: pass `contentDir` and drop `db` and `branchId`.
+
+  Studio fixes from the review:
+
+  - Set a field opens ready to set a value. Removing a field from every selected entry is a separate checkbox, so an empty value no longer removes it on one Enter.
+  - The back link from an entry returns to the list as you left it: search, filters and sort.
+  - A filter that came from a link, on a field with no filter menu, shows as a chip you can remove. It used to narrow the list with nothing on screen saying so.
+  - A disabled Commit button says why on hover, on keyboard focus and to a screen reader, not only in a tooltip that never showed.
+  - Home folds repeated saves into one row only within an hour of each other, so Monday's edits don't vanish under Friday's.
+  - After a partial bulk failure, the selection keeps only rows the list still shows, so its count matches what the next action does.
+  - A refresh that fails says the rows on screen are from before.
+  - Opening a list, or Health and Settings, reads it once, not twice.
+
+- 9d26068: Studio no longer loops silently when opened over plain http on an address other than localhost. The session cookie is `Secure` there, so the browser dropped it and sign-in landed back on the form with no message. Studio now says sign-in needs https, or localhost, instead of showing a form that can't work, and an invite link stays unused until it can sign someone in.
+
+  `graft doctor` and `setup_status` no longer make a missing `GRAFT_STUDIO_SECRET` the next step: it only matters once the site is online. That check now has its own id, `studio-secret`. With nothing else to do, doctor says the project is ready to work on and that the `!` lines are for going online. Once the secret is set, creating the owner account is still the next step.
+
+  `graft --help` lists `graft studio setup-code` and `graft studio invite`.
+
+- 118a339: Studio loads its editors when an entry opens, not with the app. Milkdown and
+  CodeMirror were about 2.7 MB of the 3.3 MB every Studio page downloaded
+  before it could show the home screen or a list. Now the first page loads
+  0.66 MB (201 kB gzipped), and opening an entry adds the editor (1.66 MB, 532
+  kB gzipped); the languages a code block highlights load only when one asks
+  for them. The same split applies to `@usegraft/studio/panels`, whose bundle
+  goes from 4.8 MB to 0.5 MB with the editor in a chunk of its own.
+- 9571702: Studio's Publish button no longer says "Publish" for a moment before it says Commit or Submit for review. It now reads what it does from the workspace, which answers at once, instead of guessing until the drafts load.
+
+  A collection's search, filters and sort are kept in the address, so a reload, the back button or a shared link shows the same rows. Its count, and Home's, no longer include entries deleted in a draft: they stay listed as Deleted until the deletion is published.
+
+  Home's recent activity folds a run of the same person changing the same entries into one row ("Kyrus, 3 times"). Health and Settings read the content again after every save, publish, discard or delete, so their counts are never from before the last change. Studio has a favicon, so browsers stop asking the server for `/favicon.ico`.
+
+  An agent's `publish_drafts` that commits to the production branch on GitHub now calls the site's deploy hooks under `graft serve`, as a database publish does. `createGraftMcp` takes an `onPublished` callback for this. A hook that fails never fails the publish.
+
+- 41c371f: A local Studio save now updates the index for the file it wrote, instead of
+  recompiling the whole content tree. On a 2,000-product catalog a save took
+  1.6 seconds and now takes about 100 milliseconds.
+
+  The save checks the file with the same rules as `graft compile` (the schema,
+  MDX safety, unique slugs) and records a compilation with the commit it was
+  read at, so the compile history still lists it. Other files are left as they
+  are: a file changed outside Studio reaches the index on the next
+  `graft compile`. One broken file elsewhere in the tree no longer makes every
+  save fail.
+
+  Two functions make this available outside Studio:
+
+  ```ts
+  import { compileDocuments } from "@usegraft/compiler";
+
+  // Read, validate and project two files; a missing one comes off the index.
+  await compileDocuments({
+    contentDir,
+    collections,
+    db,
+    paths: ["products/wool-hat.mdx"],
+  });
+  ```
+
+  `projectDocuments` in `@usegraft/db` is the projection underneath, and it is
+  the one a database-sourced publish already used. It changes only the rows it
+  is given, refuses a slug another live file holds with `SLUG_NOT_UNIQUE`, and
+  removes a row whose file no longer produces it.
+
+- db2d4b6: An agent's request in the Inbox is titled with what it would do, such as "Delete projects/welup-digital", instead of the tool's name, and Approve asks once more before the agent may run it. The embedded `ApprovalQueuePanel` brings its own confirmation dialog.
+
+  Deploy hooks are now called after Studio publishes to the production branch on GitHub, as they already were after a publish of content kept in the database. A commit on your own machine reaches no site and still calls none, and Settings now says so.
+
+  Wording that didn't match what happens:
+
+  - Deleting on your own machine says the file is removed now and the deployed site keeps it until you commit and push, instead of "stays live until you commit".
+  - An entry nobody has edited since its last commit is dated by that commit, not by its file's modification time, which a clone or checkout resets.
+  - The empty Drafts tab says there are no drafts instead of "Nothing matches."
+  - Shortcuts in Settings and tooltips show Ctrl off a Mac, as the top bar already did.
+  - The entry's details no longer show a "Version" that was the file's content hash.
+  - An asset field's placeholder and an asset key error no longer name the shop example, and a missing key says it is missing instead of `"null" is not an asset key.`
+
+- 22c6e47: Studio fixes from a review of the last release's UI work.
+
+  - **The editor's menus and inline code look like Studio again.** Since the editor started loading on demand, Milkdown's stylesheet arrived after Studio's and won ties: the slash menu had no background or shadow, and inline code lost its font and fill. It now sits in a cascade layer under Studio's own styles.
+  - **The publish sheet no longer re-renders without end while drafts load.** On a slow GitHub workspace it spun until the drafts answered, and forever if they never did. It shows a placeholder, or the error with Try again, and names the action from the workspace as the top bar does.
+  - **A failed workspace request shows the error and Try again** in Agents, Branches, History, Media and the Inbox, instead of a placeholder that never ends.
+  - **Deleting several entries goes past one that is refused,** says how many were deleted, keeps the refused ones selected, and refreshes the list either way.
+  - **A bulk edit cut off partway refreshes the list** and says some entries may have been saved.
+  - **If the editor's code fails to load, only the editor says so,** with Reload, and the entry's fields keep working.
+  - **Keyboard:** j and k no longer move focus behind a confirm dialog. Arrow keys from a row's checkbox move from that row, not from the first.
+  - **Words:**
+    - Errors read as two plain sentences, with no em dash.
+    - The "add a database" steps include removing `index = "static"`.
+    - Health shows no drift columns when there is no index.
+    - Media doesn't offer uploads without a database.
+    - Discard on entries with no drafts says there is nothing to discard.
+
+- Updated dependencies [b56d6b1]
+- Updated dependencies [70321c7]
+- Updated dependencies [d016963]
+- Updated dependencies [36472f3]
+- Updated dependencies [e61014f]
+- Updated dependencies [de7e5d6]
+- Updated dependencies [9d26068]
+- Updated dependencies [41c371f]
+  - @usegraft/compiler@1.0.0-beta.8
+  - @usegraft/db@1.0.0-beta.8
+  - @usegraft/mdx-safety@1.0.0-beta.8
+  - @usegraft/core@1.0.0-beta.8
+  - @usegraft/assets@1.0.0-beta.8
+  - @usegraft/contracts@1.0.0-beta.8
+
 ## 1.0.0-beta.7
 
 ### Minor Changes
