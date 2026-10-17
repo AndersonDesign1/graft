@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GraftError } from "@usegraft/contracts";
 import { defineCollection, field } from "@usegraft/core";
-import matter from "gray-matter";
+import { readFrontmatter } from "@usegraft/mdx-safety/frontmatter";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { defineContentMigration } from "./define";
 import { runContentMigration } from "./run";
@@ -78,7 +78,7 @@ describe("runContentMigration --apply", () => {
     });
     expect(report.applied).toBe(true);
 
-    const home = matter(readFileSync(join(dir, "pages", "home.mdx"), "utf8"));
+    const home = readFrontmatter(readFileSync(join(dir, "pages", "home.mdx"), "utf8"));
     expect(home.data).toEqual({
       title: "Home",
       order: 1,
@@ -86,7 +86,7 @@ describe("runContentMigration --apply", () => {
     });
     expect(home.content.trim()).toBe("Welcome text");
 
-    const renamed = matter(readFileSync(join(dir, "pages", "renamed.mdx"), "utf8"));
+    const renamed = readFrontmatter(readFileSync(join(dir, "pages", "renamed.mdx"), "utf8"));
     expect(renamed.data.slug).toBe("about");
     expect(renamed.data.description).toBe("About — About text");
   });

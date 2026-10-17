@@ -23,7 +23,7 @@ function cookiesFrom(response: Response): string {
 
 async function signInWithLink(
   handler: ReturnType<typeof createStudioHandler>,
-  role: "viewer" | "editor" = "editor",
+  role: "viewer" | "contributor" | "editor" = "editor",
 ): Promise<string> {
   const { url } = createInviteLink({
     secret,
@@ -141,9 +141,28 @@ describe("hosted Studio sign-in", () => {
     expect(write.status).toBe(401);
     // A person is told about their role; the scope stays in the details.
     expect(await write.json()).toMatchObject({
-      message: "Your role can't save changes.",
-      details: { required: "studio:write" },
+      message: "Your role can't publish.",
+      details: { required: "studio:publish" },
     });
+  });
+
+  it("keeps a contributor from committing or reverting the checkout", async () => {
+    const contributor = await signInWithLink(handler, "contributor");
+    const post = (path: string, body: unknown) =>
+      handler(
+        new Request(`${ORIGIN}/api/studio/v1${path}`, {
+          method: "POST",
+          headers: { cookie: contributor, "content-type": "application/json", origin: ORIGIN },
+          body: JSON.stringify(body),
+        }),
+      );
+    for (const response of [
+      await post("/changes/commit", { paths: ["a.mdx"], message: "x" }),
+      await post("/compilations/c1/revert", {}),
+    ]) {
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({ details: { required: "studio:publish" } });
+    }
   });
 
   it("keeps bearer credentials working beside sessions", async () => {

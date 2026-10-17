@@ -16,7 +16,7 @@ import { existsSync, statSync } from "node:fs";
 import { readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { walkContentFiles, type DraftChange, type StoredFile } from "@usegraft/compiler";
-import matter from "gray-matter";
+import { readFrontmatter } from "@usegraft/mdx-safety/frontmatter";
 import type { CellValue, EntryList, EntryStatus, EntrySummary, Facet } from "../editor-types";
 import type { SchemaFieldDto } from "../types";
 
@@ -37,11 +37,11 @@ export function parseEntry(path: string, raw: string, mtimeMs?: number): Catalog
       .pop()
       ?.replace(/\.mdx?$/, "") ?? path;
   try {
-    // An options object disables gray-matter's process-wide cache, which is
+    // readFrontmatter never uses gray-matter's process-wide cache, which is
     // keyed by the whole file and would otherwise hold every version of every
     // document ever listed.
-    const parsed = matter(raw, {});
-    const data = (parsed.data ?? {}) as Record<string, unknown>;
+    const parsed = readFrontmatter(raw, path);
+    const data = parsed.data;
     return {
       path,
       slug: typeof data.slug === "string" && data.slug ? data.slug : base,
