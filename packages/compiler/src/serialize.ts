@@ -197,14 +197,70 @@ function trailingNotes(lines: readonly string[]): number {
  * can be split into its parts.
  */
 function renderKey(key: string, value: unknown, previous?: string): string[] | null {
-  const kept = inQuotesAsBefore(value, previous);
-  if (kept) return [kept];
+  const line = previous === undefined ? null : readKeyLine(previous);
+  const comment = line ? trailingComment(line) : "";
+  const kept = line ? inQuotesAsBefore(value, line) : null;
+  if (kept) return [kept + comment];
   const dumped = stringify("", { [key]: value });
   const block = FRONTMATTER_BLOCK.exec(dumped)?.[1];
   if (!block) return null;
   const inner = BLOCK_PARTS.exec(block)?.[2];
   if (inner === undefined) return null;
-  return inner.split(/\r?\n/);
+  const lines = inner.split(/\r?\n/);
+  // A comment after a one-line value stays after the new one. A value that
+  // now spans lines has no single place it belongs, so it is dropped.
+  return lines.length === 1 ? [lines[0] + comment] : lines;
+}
+
+/** The first line of a key, split into `key:`, the spacing after it, and the rest. */
+interface KeyLine {
+  key: string;
+  gap: string;
+  rest: string;
+}
+
+function readKeyLine(line: string): KeyLine | null {
+  const match = /^((?:[A-Za-z0-9_$-]+|"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'):)([ \t]*)(.*)$/.exec(line);
+  if (!match?.[1]) return null;
+  return { key: match[1], gap: match[2] ?? "", rest: match[3] ?? "" };
+}
+
+/**
+ * Where a one-line scalar at the start of `rest` ends, or -1 when it is not one
+ * this can read: a flow collection, a block scalar, an anchor, alias or tag.
+ * In a plain scalar `#` starts a comment only after a space or tab.
+ */
+function scalarEnd(rest: string): number {
+  const quote = rest[0];
+  if (quote === '"' || quote === "'") {
+    for (let i = 1; i < rest.length; i++) {
+      if (quote === '"' && rest[i] === "\\") {
+        i++;
+        continue;
+      }
+      if (rest[i] !== quote) continue;
+      if (quote === "'" && rest[i + 1] === "'") {
+        i++;
+        continue;
+      }
+      return i + 1;
+    }
+    return -1;
+  }
+  if (quote === "#") return 0;
+  if (quote !== undefined && "[{|>&*!%@`".includes(quote)) return -1;
+  const comment = /[ \t]#/.exec(rest);
+  return comment ? comment.index : rest.length;
+}
+
+/** The author's ` # note` after a key's one-line value, spacing included, or "". */
+function trailingComment(line: KeyLine): string {
+  const end = scalarEnd(line.rest);
+  if (end < 0) return "";
+  // `title: # note` has no value, so the note follows the colon's own spacing.
+  if (end === 0) return line.rest.startsWith("#") ? line.gap + line.rest : "";
+  const tail = line.rest.slice(end);
+  return /^[ \t]+#/.test(tail) ? tail : "";
 }
 
 /**
@@ -212,15 +268,14 @@ function renderKey(key: string, value: unknown, previous?: string): string[] | n
  * `description: "…"` stays double-quoted rather than taking whatever style
  * js-yaml picks. A JSON string is a valid YAML double-quoted scalar.
  */
-function inQuotesAsBefore(value: unknown, previous: string | undefined): string | null {
-  if (typeof value !== "string" || /[\r\n]/.test(value) || !previous) return null;
-  const match = /^((?:[A-Za-z0-9_$-]+|"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'):[ \t]+)(["'])/.exec(
-    previous,
-  );
-  if (!match?.[1]) return null;
-  return match[2] === '"'
-    ? `${match[1]}${JSON.stringify(value)}`
-    : `${match[1]}'${value.replace(/'/g, "''")}'`;
+function inQuotesAsBefore(value: unknown, line: KeyLine): string | null {
+  if (typeof value !== "string" || /[\r\n]/.test(value) || !line.gap) return null;
+  const quote = line.rest[0];
+  if (quote !== '"' && quote !== "'") return null;
+  const prefix = line.key + line.gap;
+  return quote === '"'
+    ? `${prefix}${JSON.stringify(value)}`
+    : `${prefix}'${value.replace(/'/g, "''")}'`;
 }
 
 /**
