@@ -1,5 +1,20 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+
+/**
+ * How many times `value` has changed since it was first non-null. A view that
+ * reads on mount and again after every change keys on this, so `value`
+ * arriving for the first time is not a change: keyed on `value` itself, a
+ * list and the content tree were each fetched twice on opening.
+ */
+export function useChangesAfterFirst(value: unknown): number {
+  const seen = useRef<{ value: unknown; count: number }>({ value: null, count: 0 });
+  if (value !== seen.current.value) {
+    if (seen.current.value !== null) seen.current.count += 1;
+    seen.current.value = value;
+  }
+  return seen.current.count;
+}
 
 export interface Resource<T> {
   data: T | null;

@@ -37,6 +37,8 @@ import type { SchemaFieldDto } from "../../types";
 import { useConfirm } from "../components/ui/confirm";
 import { Inspector, useInspector } from "../components/inspector";
 import { Tooltip } from "../components/ui/tooltip";
+import { ReasonedButton } from "../components/ui/button";
+import { listHref } from "../lib/route";
 import { FieldRow } from "../components/fields";
 import {
   IconBack,
@@ -589,7 +591,7 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
         <div className="entry-bar">
           <nav className="entry-crumbs" aria-label="Breadcrumb">
             <a
-              href={`#/c/${encodeURIComponent(collection)}`}
+              href={listHref(collection)}
               className="crumb"
               aria-label={collectionLabel(collection)}
             >
@@ -673,25 +675,22 @@ export function EntryView({ collection, slug }: { collection: string; slug: stri
               <IconInspector />
             </button>
           </Tooltip>
-          <button
-            type="button"
-            className="btn entry-bar-publish"
-            data-variant="primary"
-            data-size="sm"
-            disabled={
-              !canWrite || !canPublish || status === "published" || autosave.state === "saving"
-            }
-            onClick={() => void publishThis()}
-            title={
+          <ReasonedButton
+            className="entry-bar-publish"
+            variant="primary"
+            size="sm"
+            disabled={!canWrite || autosave.state === "saving"}
+            reason={
               !canPublish
                 ? PUBLISH_NEEDS_EDITOR
                 : status === "published"
                   ? `No draft to ${actionWord(action)}`
                   : undefined
             }
+            onClick={() => void publishThis()}
           >
             {action === "review" ? "Submit" : publishVerb(action)}
-          </button>
+          </ReasonedButton>
         </div>
 
         {status === "deleted" && !conflict ? (

@@ -633,17 +633,17 @@
   translate: -50% -50%;
 }
 
-.btn:active:not(:disabled) {
+.btn:active:not(:disabled, [aria-disabled="true"]) {
   transform: scale(var(--press-scale));
 }
 
-.btn:disabled {
+.btn:is(:disabled, [aria-disabled="true"]) {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .btn:hover:not(:disabled) {
+  .btn:hover:not(:disabled, [aria-disabled="true"]) {
     background: var(--wash);
   }
 }
@@ -656,7 +656,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .btn[data-variant="primary"]:hover:not(:disabled) {
+  .btn[data-variant="primary"]:hover:not(:disabled, [aria-disabled="true"]) {
     border-color: var(--mark-strong);
     background: var(--mark-strong);
   }
@@ -670,7 +670,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .btn[data-variant="danger"]:hover:not(:disabled) {
+  .btn[data-variant="danger"]:hover:not(:disabled, [aria-disabled="true"]) {
     border-color: var(--danger);
     background: color-mix(in oklch, var(--danger) 88%, var(--ink));
   }
@@ -692,7 +692,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .btn[data-variant="ghost"]:hover:not(:disabled) {
+  .btn[data-variant="ghost"]:hover:not(:disabled, [aria-disabled="true"]) {
     color: var(--ink);
   }
 }

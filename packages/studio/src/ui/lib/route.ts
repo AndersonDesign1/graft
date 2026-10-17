@@ -155,10 +155,25 @@ export function listStateToHash(path: string, state: ListState): string {
   return query ? `${path}?${query}` : path;
 }
 
+/**
+ * Each collection's list as it was last seen, search, filters and sort
+ * included, so the way back from an entry lands on the same rows. The back
+ * link used to go to the bare collection, and a person working through a
+ * filtered list lost the filter at every entry. Held for this tab only.
+ */
+const lastLists = new Map<string, string>();
+
+/** Where the way back to a collection's list goes. */
+export function listHref(collection: string): string {
+  return lastLists.get(collection) ?? toHash({ view: "collection", collection });
+}
+
 /** Record a list's state in the address without a new history entry. */
 export function replaceListState(state: ListState): void {
   const path = window.location.hash.split("?")[0] || "#/";
   const next = listStateToHash(path, state);
+  const here = parseHash(path);
+  if (here.view === "collection" && here.collection) lastLists.set(here.collection, next);
   if (next === window.location.hash) return;
   window.history.replaceState(
     window.history.state,
