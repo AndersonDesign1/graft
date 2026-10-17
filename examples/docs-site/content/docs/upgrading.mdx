@@ -65,7 +65,8 @@ they write. See [Choices and references](/docs/schema#choices-and-references).
 names, create the missing document or point the field at one that exists.
 
 **If you call `checkRemoval` from `@usegraft/compiler` yourself,** pass
-`contentDir`. With no `db`, it now checks against the files there.
+`contentDir` and drop `db` and `branchId`. It checks against the files in
+`contentDir`, which stay right when the index is behind them.
 
 ## 1.0.0-beta.7
 

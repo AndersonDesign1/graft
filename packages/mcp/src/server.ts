@@ -391,13 +391,7 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
       // unlink at a file outside it.
       // Approved is not the same as safe: a deletion that would leave other
       // documents pointing at nothing is refused before the file goes.
-      await checkRemoval({
-        contentDir,
-        collections,
-        branchId,
-        paths: [doc.sourcePath],
-        db: staticIndexPath === undefined ? requireDb("delete_content", "") : undefined,
-      });
+      await checkRemoval({ contentDir, collections, paths: [doc.sourcePath] });
       unlinkSync(resolveContained(contentDir, doc.sourcePath, { label: "document path" }));
       const result = await projectContent([doc.sourcePath]);
       return {

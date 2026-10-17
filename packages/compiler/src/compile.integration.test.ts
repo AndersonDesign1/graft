@@ -206,6 +206,25 @@ describe.skipIf(!runIntegration)("compile -> content_index (integration)", () =>
         { collection: "notes", slug: "d" },
       ]);
 
+      // Taking a document away is checked against the files, not an index
+      // that is behind them. A pulled note points at linen, and the index
+      // knows neither, yet deleting linen would break that note's compile.
+      put("notes/e.mdx", "---\ntitle: E\ntopic: linen\n---\n");
+      const dropLinen = new Map([["topics/linen.mdx", null]]);
+      await expect(checkChange({ ...opts, changes: dropLinen })).rejects.toMatchObject({
+        code: "CONTENT_REFERENCE_NOT_FOUND",
+      });
+      await expect(checkRemoval({ ...opts, paths: ["topics/linen.mdx"] })).rejects.toMatchObject({
+        code: "CONTENT_REFERENCE_NOT_FOUND",
+      });
+      // And the other way: the notes that pointed at wool are gone from the
+      // files, so wool can go, though the index still lists them.
+      rmSync(join(refsDir, "notes/a.mdx"));
+      rmSync(join(refsDir, "notes/b.mdx"));
+      const dropWool = new Map([["topics/wool.mdx", null]]);
+      await expect(checkChange({ ...opts, changes: dropWool })).resolves.toEqual([]);
+      await expect(checkRemoval({ ...opts, paths: ["topics/wool.mdx"] })).resolves.toBeUndefined();
+
       const live = (
         await handle.sql`select collection, slug from content_index where branch_id = ${REFS_BRANCH} and not deleted order by collection, slug`
       ).map((r) => `${r.collection}/${r.slug}`);

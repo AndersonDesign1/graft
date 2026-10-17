@@ -363,10 +363,17 @@ export interface CheckChangeOptions {
  * the files are the truth, and the index can be behind them.
  */
 export async function checkChange(options: CheckChangeOptions): Promise<ProjectedDoc[]> {
-  const live = options.db
-    ? await liveDocuments(options.db, options.branchId ?? "main")
-    : treeDocuments(options.contentDir, options.collections);
   const changed = new Set(options.changes.keys());
+  // The index is the fast way to see what points where, and right for a
+  // save. A change that takes a document away is checked against the files:
+  // an index behind them (a `git pull` not yet compiled) would miss a
+  // document that points at the one going, and refuse over one that no
+  // longer does. Deletes and renames are rare; saves are not.
+  const indexed = options.db ? await liveDocuments(options.db, options.branchId ?? "main") : null;
+  const live =
+    indexed && !takesADocumentAway(indexed, options)
+      ? indexed
+      : treeDocuments(options.contentDir, options.collections);
   const files: SourceFile[] = [];
   for (const [sourcePath, raw] of options.changes) {
     if (raw !== null) files.push({ sourcePath, raw });
@@ -383,23 +390,47 @@ export async function checkChange(options: CheckChangeOptions): Promise<Projecte
 }
 
 /**
- * Refuse to remove files while live documents still point at what they
- * hold, before anything is deleted: removing a category its products use
- * would leave a tree `graft compile` refuses. Checked against the index, or
- * against the files in `contentDir` when there is none. Throws
- * CONTENT_REFERENCE_NOT_FOUND naming each reference.
+ * Whether a change deletes a document, gives one a new slug, or writes a file
+ * the index doesn't hold (so the index can't say what it held before).
+ */
+function takesADocumentAway(
+  indexed: ReferencingDoc[],
+  options: Pick<CheckChangeOptions, "changes" | "collections" | "contentDir">,
+): boolean {
+  const held = new Map(indexed.map((doc) => [doc.sourcePath, `${doc.collection}/${doc.slug}`]));
+  for (const [sourcePath, raw] of options.changes) {
+    const before = held.get(sourcePath);
+    if (before === undefined) {
+      if (existsSync(join(options.contentDir, sourcePath))) return true;
+      continue;
+    }
+    if (raw === null) return true;
+    const collection = options.collections[sourcePath.split("/")[0] ?? ""];
+    if (!collection) continue;
+    try {
+      const after = parseDocument(raw, collection, sourcePath);
+      if (`${after.collection}/${after.slug}` !== before) return true;
+    } catch {
+      // Refused by the validation that follows, whichever documents it uses.
+    }
+  }
+  return false;
+}
+
+/**
+ * Refuse to remove files while documents still point at what they hold,
+ * before anything is deleted: removing a category its products use would
+ * leave a tree `graft compile` refuses. Checked against the files in
+ * `contentDir`, which are the truth even when the index is behind them.
+ * Throws CONTENT_REFERENCE_NOT_FOUND naming each reference.
  */
 export async function checkRemoval(options: {
   contentDir: string;
-  db?: Database;
-  branchId?: string;
   collections: Record<string, AnyCollection>;
   paths: string[];
 }): Promise<void> {
   const removing = new Set(options.paths);
-  const live = options.db
-    ? await liveDocuments(options.db, options.branchId ?? "main")
-    : treeDocuments(options.contentDir, options.collections);
+  const live = treeDocuments(options.contentDir, options.collections);
   const gone = new Set(
     live
       .filter((doc) => removing.has(doc.sourcePath))
