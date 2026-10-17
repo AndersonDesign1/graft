@@ -17,19 +17,15 @@ import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { GraftError } from "@usegraft/contracts";
 import { resolveContained } from "./paths";
-import matter from "gray-matter";
+import { readFrontmatter, writeFrontmatter } from "@usegraft/mdx-safety/frontmatter";
 
 /**
  * js-yaml folds a string longer than 80 columns into a `>-` block by default,
  * so the first save that rewrote a one-line description turned it into three
  * lines. -1 turns folding off: a one-line string stays on one line.
  */
-// SAFETY: gray-matter hands these options to js-yaml's safeDump unchanged, and
-// lineWidth is a safeDump option its types do not list.
-const YAML_OPTIONS = { lineWidth: -1 } as matter.GrayMatterOption<string, never>;
-
 function stringify(body: string, data: Record<string, unknown>): string {
-  return matter.stringify(body, data, YAML_OPTIONS);
+  return writeFrontmatter(body, data, { lineWidth: -1 });
 }
 
 /** Filesystem refusals that mean "this tree is not writable", not "this write was wrong". */
@@ -366,7 +362,7 @@ export function composeDocument(
 
   const [, block = "", rest = ""] = match;
   const newline = /\r\n/.test(block) ? "\r\n" : "\n";
-  const original = matter(existingRaw).data as Record<string, unknown>;
+  const original = readFrontmatter(existingRaw).data;
 
   const frontmatter = sameData(original, data)
     ? block

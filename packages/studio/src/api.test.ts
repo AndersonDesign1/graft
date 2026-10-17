@@ -36,7 +36,7 @@ describe("createStudioApiHandler", () => {
       }),
     );
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({ details: { required: "studio:write" } });
+    expect(await res.json()).toMatchObject({ details: { required: "studio:publish" } });
   });
 
   it("separates deciding approvals from writing content", async () => {

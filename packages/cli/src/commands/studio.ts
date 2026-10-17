@@ -182,6 +182,27 @@ type StudioAuthenticate = Parameters<
   typeof import("@usegraft/studio").createStudioHandler
 >[0]["authenticate"];
 
+/**
+ * Who may use `graft studio`. It is the operator's own tool, so the dev token
+ * identifies the operator rather than an agent, and carries every scope an
+ * admin has. Anything else is refused; this command has no notion of a lesser
+ * caller. On loopback nobody signs in. None of this needs a database: the
+ * token is compared, not looked up.
+ */
+export function operatorAuthenticate(
+  loopback: boolean,
+  devToken: string | undefined,
+  scopes: readonly string[],
+): StudioAuthenticate {
+  if (loopback) return undefined;
+  if (!devToken) return () => null;
+  return (request: Request) => {
+    const header = request.headers.get("authorization") ?? "";
+    if (header !== `Bearer ${devToken}`) return null;
+    return { ...operatorIdentity(), scopes: [...scopes] };
+  };
+}
+
 /** Serve a Studio until SIGINT or SIGTERM, on loopback unless told otherwise. */
 async function listenStudio(
   options: StudioCommandOptions,
@@ -212,26 +233,8 @@ async function listenStudio(
       );
     }
 
-    // `graft studio` is the operator's own tool, so the dev token identifies the
-    // operator rather than an agent — it carries the full operator scope set.
-    // Anything else is refused; this command has no notion of a lesser caller.
-    // None of this needs a database: on loopback nobody signs in, and the
-    // token is compared, not looked up.
-    const authenticate: StudioAuthenticate =
-      !loopback && devToken
-        ? (request: Request) => {
-            const header = request.headers.get("authorization") ?? "";
-            if (header !== `Bearer ${devToken}`) return null;
-            return {
-              ...operatorIdentity(),
-              scopes: ["studio:read", "studio:write", "approvals:decide"],
-            };
-          }
-        : !loopback
-          ? () => null
-          : undefined;
-
-    const handler = handlerFor(authenticate);
+    const { ROLE_SCOPES } = await import("@usegraft/studio");
+    const handler = handlerFor(operatorAuthenticate(loopback, devToken, ROLE_SCOPES.admin));
     const listening = createServer(
       createNodeListener(handler, { allowedHosts: allowedHostsFor(host) }),
     );

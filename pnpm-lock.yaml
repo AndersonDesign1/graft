@@ -512,9 +512,6 @@ importers:
       '@usegraft/mdx-safety':
         specifier: workspace:*
         version: link:../mdx-safety
-      gray-matter:
-        specifier: ^4.0.3
-        version: 4.0.3
 
   packages/content-api:
     dependencies:
@@ -534,9 +531,9 @@ importers:
       '@usegraft/core':
         specifier: workspace:*
         version: link:../core
-      gray-matter:
-        specifier: ^4.0.3
-        version: 4.0.3
+      '@usegraft/mdx-safety':
+        specifier: workspace:*
+        version: link:../mdx-safety
 
   packages/contracts:
     dependencies:
@@ -605,9 +602,6 @@ importers:
       '@usegraft/registry':
         specifier: workspace:*
         version: link:../registry
-      gray-matter:
-        specifier: ^4.0.3
-        version: 4.0.3
       zod:
         specifier: ^4.5.4
         version: 4.5.4
@@ -617,6 +611,9 @@ importers:
       '@usegraft/contracts':
         specifier: workspace:*
         version: link:../contracts
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1(supports-color@7.2.0)
@@ -924,9 +921,6 @@ importers:
       '@usegraft/mdx-safety':
         specifier: workspace:*
         version: link:../mdx-safety
-      gray-matter:
-        specifier: ^4.0.3
-        version: 4.0.3
     devDependencies:
       '@base-ui-components/react':
         specifier: 1.0.0-rc.0

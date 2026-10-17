@@ -31,7 +31,18 @@
     "anti-slop/no-shape-in-symbol-names": "warn",
     "anti-slop/no-unsafe-dictionary-type": "off",
     "anti-slop/no-runtime-typeof": "off",
-    "anti-slop/no-unknown-parameters": "off"
+    "anti-slop/no-unknown-parameters": "off",
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "gray-matter",
+            "message": "Use readFrontmatter or writeFrontmatter from @usegraft/mdx-safety/frontmatter. gray-matter runs ---js frontmatter as code."
+          }
+        ]
+      }
+    ]
   },
   "overrides": [
     {
@@ -40,6 +51,12 @@
         "anti-slop/no-chained-type-assertions": "warn",
         "anti-slop/no-module-mocking": "warn",
         "anti-slop/no-unknown-returns": "warn"
+      }
+    },
+    {
+      "files": ["packages/mdx-safety/src/frontmatter.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
       }
     }
   ]
