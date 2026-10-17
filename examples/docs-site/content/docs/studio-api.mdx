@@ -33,10 +33,10 @@ It describes every route and payload exactly. The tables below are a summary.
 | `POST` | `/compile` | `studio:write` |
 | `GET` | `/changes` | `studio:read` |
 | `GET` | `/changes/diff` | `studio:read` |
-| `POST` | `/changes/commit` | `studio:write` |
+| `POST` | `/changes/commit` | `studio:publish` |
 | `GET` | `/compilations` | `studio:read` |
 | `GET` | `/compilations/:id/revert` | `studio:read` |
-| `POST` | `/compilations/:id/revert` | `studio:write` |
+| `POST` | `/compilations/:id/revert` | `studio:publish` |
 | `GET` | `/branches` | `studio:read` |
 | `GET` | `/approvals` | `studio:read` |
 | `POST` | `/approvals/:id/decide` | `approvals:decide` |

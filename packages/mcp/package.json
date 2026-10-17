@@ -52,7 +52,6 @@
     "@usegraft/db": "workspace:*",
     "@usegraft/mdx-safety": "workspace:*",
     "@usegraft/registry": "workspace:*",
-    "gray-matter": "^4.0.3",
     "zod": "^4.5.4"
   },
   "engines": {

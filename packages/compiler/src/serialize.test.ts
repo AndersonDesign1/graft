@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GraftError } from "@usegraft/contracts";
-import matter from "gray-matter";
+import { readFrontmatter } from "@usegraft/mdx-safety/frontmatter";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The read-only branch has to be driven by a stubbed syscall: chmod does not
@@ -45,11 +45,7 @@ Graft is the open-source CMS.
 
 describe("composeDocument", () => {
   it("leaves the frontmatter bytes untouched when only the body changed", () => {
-    const out = composeDocument(
-      AUTHORED,
-      matter(AUTHORED).data as Record<string, unknown>,
-      "A rewritten body.",
-    );
+    const out = composeDocument(AUTHORED, readFrontmatter(AUTHORED).data, "A rewritten body.");
     // The regression this exists for: gray-matter would quote the description,
     // drop the blank line, and normalise the trailing newline.
     expect(out).toBe(`---
@@ -63,14 +59,14 @@ A rewritten body.
   });
 
   it("is byte-identical when nothing changed at all", () => {
-    const data = matter(AUTHORED).data as Record<string, unknown>;
-    const body = matter(AUTHORED).content.replace(/^\n/, "");
+    const data = readFrontmatter(AUTHORED).data;
+    const body = readFrontmatter(AUTHORED).content.replace(/^\n/, "");
     expect(composeDocument(AUTHORED, data, body)).toBe(AUTHORED);
   });
 
   it("re-serialises when the data genuinely changed — the author asked for it", () => {
     const out = composeDocument(AUTHORED, { title: "Renamed" }, "Body.");
-    expect(matter(out).data).toEqual({ title: "Renamed" });
+    expect(readFrontmatter(out).data).toEqual({ title: "Renamed" });
     expect(out).not.toContain("description:");
   });
 
@@ -88,7 +84,7 @@ order: 0
 
 Body.
 `;
-    const data = matter(raw).data as Record<string, unknown>;
+    const data = readFrontmatter(raw).data;
     const out = composeDocument(raw, { ...data, order: 7 }, "Body.\n");
 
     expect(out).toBe(`---
@@ -118,20 +114,20 @@ order: 1
 
 Body.
 `;
-    const data = matter(raw).data as Record<string, unknown>;
+    const data = readFrontmatter(raw).data;
     const out = composeDocument(raw, { ...data, order: 2 }, "Body.\n");
 
     expect(out).toContain("  alt: >-\n    A branch grafted onto a trunk");
     expect(out).toContain("order: 2");
-    expect(matter(out).data).toEqual({ ...data, order: 2 });
+    expect(readFrontmatter(out).data).toEqual({ ...data, order: 2 });
   });
 
   it("adds a new key without disturbing the existing ones", () => {
-    const data = matter(AUTHORED).data as Record<string, unknown>;
+    const data = readFrontmatter(AUTHORED).data;
     const out = composeDocument(AUTHORED, { ...data, order: 3 }, "Graft is the open-source CMS.\n");
     expect(out).toContain("description: The open-source, self-hostable CMS for agents.");
     expect(out).toContain("order: 3");
-    expect(matter(out).data).toEqual({ ...data, order: 3 });
+    expect(readFrontmatter(out).data).toEqual({ ...data, order: 3 });
   });
 
   it("removes a key the caller dropped", () => {
@@ -159,7 +155,7 @@ description: "Kept as it was."
 
 Body.
 `;
-    const data = matter(withComments).data as Record<string, unknown>;
+    const data = readFrontmatter(withComments).data;
     expect(composeDocument(withComments, { ...data, title: "U" }, "Body.\n")).toBe(`---
 # generated — do not edit by hand
 title: U
@@ -182,7 +178,7 @@ title: T
 Body.
 `;
     const out = composeDocument(twoDocuments, { title: "U" }, "Body.\n");
-    expect(matter(out).data).toEqual({ title: "U" });
+    expect(readFrontmatter(out).data).toEqual({ title: "U" });
   });
 
   it("keeps an edited one-line string on one line, in the quotes it had", () => {
@@ -210,7 +206,7 @@ tagline: 'It''s still singles.'
 
 Body.
 `);
-    expect(matter(out).data).toEqual({
+    expect(readFrontmatter(out).data).toEqual({
       title: "Kyrus",
       description: `${long} "More."`,
       tagline: "It's still singles.",
@@ -239,19 +235,22 @@ seo:
 
 Body.
 `;
-    const data = matter(raw).data as Record<string, unknown>;
+    const data = readFrontmatter(raw).data;
     expect(composeDocument(raw, data, "Body.")).toBe(raw);
 
     const changed = structuredClone(data) as { seo: { keywords: string[] } };
     changed.seo.keywords[1] = "c";
     const out = composeDocument(raw, changed as unknown as Record<string, unknown>, "Body.");
-    expect((matter(out).data as { seo: { keywords: string[] } }).seo.keywords).toEqual(["a", "c"]);
+    expect((readFrontmatter(out).data as { seo: { keywords: string[] } }).seo.keywords).toEqual([
+      "a",
+      "c",
+    ]);
   });
 
   it("writes a fresh file through gray-matter when there is nothing to preserve", () => {
     const out = composeDocument(undefined, { title: "New" }, "Body.");
-    expect(matter(out).data).toEqual({ title: "New" });
-    expect(matter(out).content.trim()).toBe("Body.");
+    expect(readFrontmatter(out).data).toEqual({ title: "New" });
+    expect(readFrontmatter(out).content.trim()).toBe("Body.");
   });
 
   it("preserves an author's no-blank-line and no-trailing-newline style", () => {
@@ -290,7 +289,7 @@ Body.
 
   it("falls back cleanly when the file has no frontmatter block", () => {
     const out = composeDocument("Just a body, no frontmatter.\n", { title: "T" }, "Body.");
-    expect(matter(out).data).toEqual({ title: "T" });
+    expect(readFrontmatter(out).data).toEqual({ title: "T" });
   });
 });
 
