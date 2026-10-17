@@ -16,7 +16,6 @@ import {
   currentFiles,
   discardDrafts,
   draftHeads,
-  liveDocuments,
   openReviews,
   publishDrafts,
   publishedHistory,
@@ -32,7 +31,7 @@ import {
   type RevisionActor,
 } from "@usegraft/db";
 import type { MdxTrust } from "@usegraft/mdx-safety";
-import matter from "gray-matter";
+import { readFrontmatter } from "@usegraft/mdx-safety/frontmatter";
 import { validateDocuments, type SourceFile } from "../compile";
 import { checkChangedDocuments } from "../references";
 import { gitBlobSha } from "./blob";
@@ -195,12 +194,14 @@ export class DatabaseStore implements ContentStore {
       };
     }
 
-    const index = this.indexChanges(heads, await liveDocuments(this.db, this.branchId));
     const result = await publishDrafts(this.db, {
       branchId: this.branchId,
       drafts: heads.map((head) => ({ path: head.path, version: head.draft?.version ?? null })),
       actor: revisionActor(options.actor),
-      index,
+      // Checked against the documents live once the content lock is held, so
+      // two publishes at once can't each pass against the state before the
+      // other: one deleting a category, one pointing a product at it.
+      index: (live) => this.indexChanges(heads, live),
       ...(options.message?.trim() ? { message: options.message.trim() } : {}),
     });
     if (!result.ok) {
@@ -376,7 +377,7 @@ function slugOf(path: string, raw: string): string {
       .pop()
       ?.replace(/\.mdx?$/, "") ?? path;
   try {
-    const data: Record<string, unknown> = matter(raw, {}).data;
+    const { data } = readFrontmatter(raw, path);
     const slug = data.slug;
     return typeof slug === "string" && slug.length > 0 ? slug : base;
   } catch {

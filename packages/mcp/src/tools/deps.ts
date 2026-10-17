@@ -44,6 +44,8 @@ export interface ToolDeps {
    * the files a tool wrote so a Postgres index projects only those.
    */
   projectContent: (paths?: string[]) => Promise<ProjectedContent>;
+  /** Check a change before it is written: each path with its new bytes, or null to delete it. */
+  checkContent: (changes: ReadonlyMap<string, string | null>) => Promise<void>;
   /** Full-text search across the index, Postgres or static. */
   searchIndex: (query: {
     query: string;

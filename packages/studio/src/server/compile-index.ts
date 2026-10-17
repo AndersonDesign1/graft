@@ -31,10 +31,16 @@ export async function compileIndex(
     source?: ContentSource;
     /** The files a save wrote. Omitted, the whole tree is compiled. */
     paths?: string[];
+    /**
+     * False when the caller checked its change before writing: the static
+     * artifact is rebuilt whole, and a reference already broken elsewhere in
+     * the tree must not refuse a save that didn't break it.
+     */
+    references?: boolean;
   },
 ): Promise<CompileResult | null> {
   if (index.db) {
-    const { paths, source, ...rest } = input;
+    const { paths, source, references: _references, ...rest } = input;
     if (paths) return compileDocuments({ ...rest, paths, db: index.db });
     return compile({ ...rest, ...(source ? { source } : {}), db: index.db });
   }
@@ -44,6 +50,7 @@ export async function compileIndex(
       collections: input.collections,
       indexPath: index.staticIndexPath,
       ...(input.mdxTrust ? { mdxTrust: input.mdxTrust } : {}),
+      references: input.references,
     });
   }
   return null;
