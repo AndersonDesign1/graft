@@ -18,8 +18,16 @@ export interface StudioAccount {
   name: string | null;
   role: AccountRole;
   owner: boolean;
+  /** False for an account made by single sign-on that never chose a password. */
+  hasPassword: boolean;
   createdAt: Date;
 }
+
+/**
+ * The stored password of an account that has none, such as one made by a
+ * single sign-on. It is not a hash, so no password matches it.
+ */
+export const NO_PASSWORD_HASH = "none";
 
 export interface StudioInvite {
   id: string;
@@ -40,6 +48,7 @@ function account(row: StudioUserRow): StudioAccount {
     name: row.name,
     role: row.role as AccountRole,
     owner: row.owner,
+    hasPassword: row.passwordHash !== NO_PASSWORD_HASH,
     createdAt: row.createdAt,
   };
 }

@@ -291,7 +291,20 @@ export function PeoplePanel() {
 }
 
 /** Your own account: who you're signed in as, and your password. */
-export function AccountPanel({ email, role }: { email: string; role: string }) {
+/**
+ * Your own account. Someone who signs in only with GitHub, Google or single
+ * sign-on has no password, so there is none to change; an admin can make
+ * them a link to set one.
+ */
+export function AccountPanel({
+  email,
+  role,
+  password,
+}: {
+  email: string;
+  role: string;
+  password: boolean;
+}) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -325,42 +338,44 @@ export function AccountPanel({ email, role }: { email: string; role: string }) {
       <Row label="Signed in as" hint={ROLES.find((r) => r.id === role)?.can}>
         <code className="set-value">{email}</code>
       </Row>
-      <Row
-        label="Password"
-        hint="At least 10 characters. Changing it signs out your other browsers."
-        stack
-      >
-        <form className="people-password" onSubmit={submit}>
-          <input type="email" autoComplete="username" value={email} readOnly hidden />
-          <input
-            className="input"
-            name="current"
-            type="password"
-            placeholder="Current password"
-            aria-label="Current password"
-            autoComplete="current-password"
-            required
-          />
-          <input
-            className="input"
-            name="next"
-            type="password"
-            placeholder="New password"
-            aria-label="New password"
-            autoComplete="new-password"
-            minLength={10}
-            required
-          />
-          <button type="submit" className="btn" disabled={busy}>
-            {busy ? "Changing…" : "Change password"}
-          </button>
-        </form>
-        {problem ? (
-          <p className="notice" data-tone="error" role="alert">
-            {problem}
-          </p>
-        ) : null}
-      </Row>
+      {password ? (
+        <Row
+          label="Password"
+          hint="At least 10 characters. Changing it signs out your other browsers."
+          stack
+        >
+          <form className="people-password" onSubmit={submit}>
+            <input type="email" autoComplete="username" value={email} readOnly hidden />
+            <input
+              className="input"
+              name="current"
+              type="password"
+              placeholder="Current password"
+              aria-label="Current password"
+              autoComplete="current-password"
+              required
+            />
+            <input
+              className="input"
+              name="next"
+              type="password"
+              placeholder="New password"
+              aria-label="New password"
+              autoComplete="new-password"
+              minLength={10}
+              required
+            />
+            <button type="submit" className="btn" disabled={busy}>
+              {busy ? "Changing…" : "Change password"}
+            </button>
+          </form>
+          {problem ? (
+            <p className="notice" data-tone="error" role="alert">
+              {problem}
+            </p>
+          ) : null}
+        </Row>
+      ) : null}
     </div>
   );
 }

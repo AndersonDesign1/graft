@@ -1,7 +1,8 @@
 /**
  * The door to a hosted Studio. One screen: create the owner account on the
- * first visit, otherwise sign in with an account, GitHub, single sign-on or a
- * link, and a reason in plain words when the last attempt did not work.
+ * first visit, otherwise sign in with an account, GitHub, Google, single
+ * sign-on or a link, and a reason in plain words when the last attempt did
+ * not work.
  */
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
@@ -14,6 +15,10 @@ const REASONS: Record<string, string> = {
   github_off: "Signing in with GitHub isn't set up for this Studio. Use the link you were sent.",
   access_unchecked:
     "Studio couldn't check your access with GitHub. Whoever runs the site can see why in its log.",
+  google_not_allowed:
+    "That Google account doesn't have access to this Studio. Ask whoever runs the site to invite you.",
+  google_refused: "Google didn't complete the sign-in. Try again.",
+  google_off: "Signing in with Google isn't set up for this Studio. Sign in another way.",
   oidc_not_allowed:
     "That account doesn't have access to this Studio. Ask whoever runs the site to invite you.",
   oidc_refused:
@@ -33,6 +38,7 @@ const ROLE_WORDS: Record<string, string> = {
 interface SessionInfo {
   methods: {
     github: boolean;
+    google?: boolean;
     /** Single sign-on with an OIDC provider, and the provider's name for the button. */
     oidc?: { name: string | null } | null;
     invite: boolean;
@@ -241,6 +247,17 @@ export function SignIn() {
   const returnTo = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
   const password = Boolean(session?.methods.password);
   const oidc = session?.methods.oidc ?? null;
+  const google = Boolean(session?.methods.google);
+  // The first way to sign in is the primary button, when there's no password form.
+  const lead = password
+    ? null
+    : session?.methods.github
+      ? "github"
+      : google
+        ? "google"
+        : oidc
+          ? "oidc"
+          : null;
 
   return (
     <Card title="Sign in to edit" lede="Drafts you save here stay drafts until they're published.">
@@ -276,7 +293,7 @@ export function SignIn() {
       {session?.methods.github ? (
         <a
           className="btn signin-provider"
-          data-variant={password ? undefined : "primary"}
+          data-variant={lead === "github" ? "primary" : undefined}
           href={`${AUTH}/github?return=${encodeURIComponent(returnTo)}`}
         >
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
@@ -288,10 +305,37 @@ export function SignIn() {
           Continue with GitHub
         </a>
       ) : null}
+      {google ? (
+        <a
+          className="btn signin-provider"
+          data-variant={lead === "google" ? "primary" : undefined}
+          href={`${AUTH}/google?return=${encodeURIComponent(returnTo)}`}
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <path
+              fill="#4285F4"
+              d="M15.68 8.18c0-.57-.05-1.11-.15-1.64H8v3.1h4.3a3.68 3.68 0 0 1-1.6 2.41v2h2.58c1.51-1.39 2.4-3.44 2.4-5.87Z"
+            />
+            <path
+              fill="#34A853"
+              d="M8 16c2.16 0 3.97-.72 5.29-1.94l-2.58-2a4.8 4.8 0 0 1-7.16-2.52H.89v2.07A8 8 0 0 0 8 16Z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M3.55 9.54a4.8 4.8 0 0 1 0-3.08V4.39H.89a8 8 0 0 0 0 7.22l2.66-2.07Z"
+            />
+            <path
+              fill="#EA4335"
+              d="M8 3.18c1.17 0 2.23.4 3.06 1.2l2.29-2.3A7.68 7.68 0 0 0 8 0 8 8 0 0 0 .89 4.39l2.66 2.07A4.77 4.77 0 0 1 8 3.18Z"
+            />
+          </svg>
+          Continue with Google
+        </a>
+      ) : null}
       {oidc ? (
         <a
           className="btn signin-provider"
-          data-variant={password || session?.methods.github ? undefined : "primary"}
+          data-variant={lead === "oidc" ? "primary" : undefined}
           href={`${AUTH}/oidc?return=${encodeURIComponent(returnTo)}`}
         >
           {oidc.name ? `Continue with ${oidc.name}` : "Continue with single sign-on"}
@@ -300,7 +344,7 @@ export function SignIn() {
       <p className="signin-invite">
         {password
           ? "No account? Ask whoever runs the site to invite you. Forgotten your password? An admin can send you a link to set a new one."
-          : `${session?.methods.github ? "No GitHub account? " : ""}Open the sign-in link you were sent, in this browser. Links come from whoever runs the site.`}
+          : `${session?.methods.github || google || oidc ? "Or open" : "Open"} the sign-in link you were sent, in this browser. Links come from whoever runs the site.`}
       </p>
     </Card>
   );

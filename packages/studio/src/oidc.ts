@@ -26,7 +26,24 @@ export interface OidcSignInOptions {
   clientSecret: string;
   /** The provider's name on the sign-in button ("Continue with Acme"). */
   name?: string;
+  /** Other spellings of the issuer its ID tokens may carry. */
+  issuerAliases?: readonly string[];
   fetch?: typeof fetch;
+}
+
+/** Google, as an OpenID Connect provider. */
+export function googleProvider(client: {
+  clientId: string;
+  clientSecret: string;
+  fetch?: typeof fetch;
+}): OidcSignInOptions {
+  return {
+    ...client,
+    issuer: "https://accounts.google.com",
+    name: "Google",
+    // Google's ID tokens name their issuer with or without the scheme.
+    issuerAliases: ["accounts.google.com"],
+  };
 }
 
 /** Who the provider says signed in. */
@@ -183,7 +200,7 @@ async function verifyIdToken(
   nonce: string,
 ): Promise<JWTPayload> {
   const checks = {
-    issuer: metadata.issuer,
+    issuer: [metadata.issuer, ...(options.issuerAliases ?? [])],
     audience: options.clientId,
     requiredClaims: ["sub", "exp", "iat"],
   };

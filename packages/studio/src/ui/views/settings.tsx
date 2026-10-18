@@ -198,14 +198,20 @@ export function SettingsView({
   const hasDatabase = workspace.data?.database;
   const site = useResource<SiteDto>(canManageSite && hasDatabase ? "/site" : null, [hasDatabase]);
   const database = workspace.data?.storage === "database";
-  // Your own account, when you signed in with one rather than GitHub or a link.
-  const [account, setAccount] = useState<{ email: string; role: string } | null>(null);
+  // Your own account, when you signed in as one rather than with a link.
+  const [account, setAccount] = useState<{
+    email: string;
+    role: string;
+    password: boolean;
+  } | null>(null);
   useEffect(() => {
     if (!accounts) return;
     fetch("/api/studio/v1/auth/session", { credentials: "same-origin" })
       .then(
         (res) =>
-          res.json() as Promise<{ user: { email: string; role: string; via: string } | null }>,
+          res.json() as Promise<{
+            user: { email: string; role: string; via: string; password: boolean } | null;
+          }>,
       )
       .then((body) => setAccount(body.user?.via === "account" ? body.user : null))
       .catch(() => setAccount(null));
@@ -288,7 +294,7 @@ export function SettingsView({
 
           {account ? (
             <Section id="account" title="Account" sub={SECTION_BY_ID.account.sub}>
-              <AccountPanel email={account.email} role={account.role} />
+              <AccountPanel email={account.email} role={account.role} password={account.password} />
             </Section>
           ) : null}
 

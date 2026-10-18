@@ -121,7 +121,11 @@ and set:
 | `GRAFT_GITHUB_CLIENT_SECRET` | Its client secret |
 | `GRAFT_STUDIO_URL` | The public origin, such as `https://shop.example.com` |
 
-Without a list, anyone with write access to the repository can sign in. Studio
+Someone you invited in **Settings, People** signs in with GitHub as their
+Studio account, with its role, when the invited email is one of the verified
+addresses on their GitHub account. Their first sign-in uses the invitation.
+
+For anyone else, without a list, write access to the repository decides. Studio
 asks GitHub with its own credential, which needs Metadata read on the
 repository; every fine-grained token and GitHub App has it. If GitHub refuses,
 the sign-in screen says access couldn't be checked and the server log says why.
@@ -132,25 +136,39 @@ To choose who can sign in with GitHub, and with which role, set
 GRAFT_STUDIO_EDITORS="ana@shop.example.com=admin, octocat, ben@shop.example.com=contributor"
 ```
 
-**Single sign-on (OIDC).** People sign in with an OpenID Connect provider
-your team already uses: your app's own Better Auth, Okta, Microsoft Entra ID,
-Google Workspace, Keycloak and others. Register Studio with the provider as a
-web application whose redirect URI is
-`https://<your-site>/api/studio/v1/auth/oidc/callback`, then set:
+**Sign in with Google.** In the Google Cloud console, open APIs & Services,
+Credentials, and create an OAuth client ID of type Web application, with the
+authorized redirect URI
+`https://<your-site>/api/studio/v1/auth/google/callback`. Then set:
+
+| Variable | Value |
+| --- | --- |
+| `GRAFT_GOOGLE_CLIENT_ID` | The OAuth client's ID |
+| `GRAFT_GOOGLE_CLIENT_SECRET` | Its client secret |
+| `GRAFT_STUDIO_URL` | The public origin, such as `https://shop.example.com` |
+
+Google sign-in follows the rules for single sign-on below: invite someone's
+Google email in **Settings, People**, and they press "Continue with Google".
+
+**Single sign-on with another provider (OIDC).** For a provider your team
+already uses: Okta, Microsoft Entra ID, Keycloak, your app's own Better Auth
+and others. Register Studio with the provider as a web application whose
+redirect URI is `https://<your-site>/api/studio/v1/auth/oidc/callback`, then
+set:
 
 | Variable | Value |
 | --- | --- |
 | `GRAFT_OIDC_ISSUER` | The provider's issuer URL, the one its tokens carry in `iss`. Studio reads `<issuer>/.well-known/openid-configuration` |
 | `GRAFT_OIDC_CLIENT_ID` | The client ID the provider gave Studio |
 | `GRAFT_OIDC_CLIENT_SECRET` | Its client secret |
-| `GRAFT_OIDC_NAME` | Optional. The provider's name on the button, as in "Continue with Acme". Default "Continue with single sign-on" |
+| `GRAFT_OIDC_NAME` | Optional. The provider's name on the button, as in "Continue with Okta". Default "Continue with single sign-on" |
 | `GRAFT_STUDIO_URL` | The public origin, such as `https://shop.example.com` |
 
 Set the first three together. Studio refuses to start with only some of them,
 and with an issuer that isn't https (plain http works only on localhost).
 
-The provider says who someone is; Studio decides whether they get in. It
-reads the person's email from the ID token, or from the provider's userinfo
+With Google or another provider, the provider says who someone is; Studio
+decides whether they get in. It reads the person's email from the ID token, or from the provider's userinfo
 endpoint, and only an email the provider marks verified counts. Then:
 
 - Someone with a Studio account under that email signs in as that account,
@@ -159,8 +177,8 @@ endpoint, and only an email the provider marks verified counts. Then:
 - Someone invited from **Settings, People** gets their account on their first
   single sign-on, with the role they were invited with. To add a person, invite
   their email and tell them to press the button; there is no link to pass on
-  and no password to choose. If they want a password later, an admin makes
-  them a link to set one.
+  and no password to choose, and Settings shows them no password to change.
+  If they want one later, an admin makes them a link to set it.
 - Someone without an account or an invitation gets in only if
   `GRAFT_STUDIO_EDITORS` lists their email, with the role it gives.
 - Anyone else is refused, and the sign-in screen says to ask for an invitation.
@@ -214,8 +232,8 @@ This prints a link that signs Ana in. It lasts seven days (`--days` sets 1 to
 30). Send it privately: anyone with the link can use it until it expires.
 Commits from an invited editor carry their name and email. An invite link
 grants the role it was made with on its own: `GRAFT_STUDIO_EDITORS` applies to
-GitHub and single sign-on only, so an invited person does not need to be on
-that list.
+GitHub, Google and single sign-on only, so an invited person does not need
+to be on that list.
 
 ### Roles
 

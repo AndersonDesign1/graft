@@ -31,6 +31,8 @@ interface ProviderSettings {
   /** Sign with the client secret (HS256) instead of the published key. */
   hmac?: boolean;
   metadata?: Record<string, unknown>;
+  /** The provider's issuer. Default: a Better Auth at auth.shop.test. */
+  issuer?: string;
   /** How the client was registered to send its secret. Default: either. */
   registered?: "client_secret_basic" | "client_secret_post";
 }
@@ -41,6 +43,7 @@ interface ProviderSettings {
  * trades the code for tokens when the verifier matches.
  */
 function fakeProvider(settings: ProviderSettings = {}) {
+  const issuer = settings.issuer ?? ISSUER;
   const seen: {
     tokenRequest?: { headers: Headers; body: URLSearchParams };
     tokenRequests: number;
@@ -48,18 +51,18 @@ function fakeProvider(settings: ProviderSettings = {}) {
   let authorization: URLSearchParams | undefined;
   const stub = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
-    if (url === `${ISSUER}/.well-known/openid-configuration`) {
+    if (url === `${issuer}/.well-known/openid-configuration`) {
       return Response.json({
-        issuer: ISSUER,
-        authorization_endpoint: `${ISSUER}/oauth2/authorize`,
-        token_endpoint: `${ISSUER}/oauth2/token`,
-        userinfo_endpoint: `${ISSUER}/oauth2/userinfo`,
-        jwks_uri: `${ISSUER}/jwks`,
+        issuer,
+        authorization_endpoint: `${issuer}/oauth2/authorize`,
+        token_endpoint: `${issuer}/oauth2/token`,
+        userinfo_endpoint: `${issuer}/oauth2/userinfo`,
+        jwks_uri: `${issuer}/jwks`,
         ...settings.metadata,
       });
     }
-    if (url === `${ISSUER}/jwks`) return Response.json({ keys: [jwk] });
-    if (url === `${ISSUER}/oauth2/token`) {
+    if (url === `${issuer}/jwks`) return Response.json({ keys: [jwk] });
+    if (url === `${issuer}/oauth2/token`) {
       const body = new URLSearchParams(String(init?.body));
       seen.tokenRequest = { headers: new Headers(init?.headers), body };
       seen.tokenRequests += 1;
@@ -76,7 +79,7 @@ function fakeProvider(settings: ProviderSettings = {}) {
         return Response.json({ error: "invalid_grant" }, { status: 400 });
       }
       const claims = {
-        iss: ISSUER,
+        iss: issuer,
         aud: "studio",
         sub: "user-1",
         nonce: authorization.get("nonce") ?? undefined,
@@ -89,7 +92,7 @@ function fakeProvider(settings: ProviderSettings = {}) {
         : await jwt.setProtectedHeader({ alg: "ES256", kid: "k1" }).sign(privateKey);
       return Response.json({ id_token: idToken, access_token: "at", token_type: "Bearer" });
     }
-    if (url === `${ISSUER}/oauth2/userinfo`) {
+    if (url === `${issuer}/oauth2/userinfo`) {
       return Response.json(settings.userinfo ?? { sub: "user-1" });
     }
     return new Response("no", { status: 404 });
@@ -122,9 +125,10 @@ async function flow(
   handler: ReturnType<typeof createStudioHandler>,
   provider: ReturnType<typeof fakeProvider>,
   returnTo = "/studio/?branch=preview#/c/products",
+  route: "oidc" | "google" = "oidc",
 ) {
   const start = await handler(
-    new Request(`${ORIGIN}/api/studio/v1/auth/oidc?return=${encodeURIComponent(returnTo)}`, {
+    new Request(`${ORIGIN}/api/studio/v1/auth/${route}?return=${encodeURIComponent(returnTo)}`, {
       redirect: "manual",
     }),
   );
@@ -134,7 +138,7 @@ async function flow(
   return {
     authorize,
     done: await handler(
-      new Request(`${CALLBACK}?code=c&state=${state}&iss=${encodeURIComponent(ISSUER)}`, {
+      new Request(`${ORIGIN}/api/studio/v1/auth/${route}/callback?code=c&state=${state}`, {
         redirect: "manual",
         headers: { cookie: cookiesFrom(start) },
       }),
@@ -431,6 +435,89 @@ describe("Sign in with OIDC", () => {
   });
 });
 
+describe("Sign in with Google", () => {
+  const GOOGLE = "https://accounts.google.com";
+
+  function google(provider: ReturnType<typeof fakeProvider>, editors = "ana@shop.test=editor") {
+    return createStudioHandler({
+      ...base,
+      uiBasePath: "/studio",
+      editors: {
+        secret,
+        editors: parseEditorList(editors),
+        google: { clientId: "studio", clientSecret: "cs", fetch: provider.stub },
+      },
+    });
+  }
+
+  it("signs in through Google, whose ID tokens may drop the scheme from the issuer", async () => {
+    const provider = fakeProvider({
+      issuer: GOOGLE,
+      claims: { iss: "accounts.google.com", email: "ana@shop.test", email_verified: true },
+    });
+    const handler = google(provider);
+    const session = await handler(new Request(`${ORIGIN}/api/studio/v1/auth/session`));
+    expect((await session.json()).methods).toMatchObject({ google: true, oidc: null });
+
+    const { authorize, done } = await flow(handler, provider, "/studio/", "google");
+    expect(authorize.origin).toBe(GOOGLE);
+    expect(authorize.searchParams.get("redirect_uri")).toBe(
+      `${ORIGIN}/api/studio/v1/auth/google/callback`,
+    );
+    expect(done.headers.get("location")).toBe("/studio/");
+    expect(await sessionUser(handler, cookiesFrom(done))).toMatchObject({
+      id: "ana@shop.test",
+      role: "editor",
+      via: "google",
+      password: false,
+    });
+  });
+
+  it("says Google, not single sign-on, when it refuses", async () => {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    const stranger = fakeProvider({
+      issuer: GOOGLE,
+      claims: { email: "eve@else.test", email_verified: true },
+    });
+    const { done } = await flow(google(stranger), stranger, "/studio/", "google");
+    expect(done.headers.get("location")).toBe("/studio/?signin=google_not_allowed");
+
+    const forged = fakeProvider({
+      issuer: GOOGLE,
+      claims: { email: "ana@shop.test", email_verified: true },
+      tamper: (claims) => ({ ...claims, aud: "another-app" }),
+    });
+    const { done: refused } = await flow(google(forged), forged, "/studio/", "google");
+    expect(refused.headers.get("location")).toBe("/studio/?signin=google_refused");
+    expect(String(quiet.mock.calls[0]?.[0])).toContain("Google sign-in failed");
+  });
+
+  it("won't finish a Google sign-in with another provider's state", async () => {
+    const provider = fakeProvider({ claims: { email: "ana@shop.test", email_verified: true } });
+    const both = createStudioHandler({
+      ...base,
+      uiBasePath: "/studio",
+      editors: {
+        secret,
+        editors: parseEditorList("ana@shop.test"),
+        google: { clientId: "studio", clientSecret: "cs", fetch: provider.stub },
+        oidc: { issuer: ISSUER, clientId: "studio", clientSecret: "cs", fetch: provider.stub },
+      },
+    });
+    const start = await both(
+      new Request(`${ORIGIN}/api/studio/v1/auth/oidc`, { redirect: "manual" }),
+    );
+    const state = new URL(start.headers.get("location") as string).searchParams.get("state");
+    const crossed = await both(
+      new Request(`${ORIGIN}/api/studio/v1/auth/google/callback?code=c&state=${state}`, {
+        redirect: "manual",
+        headers: { cookie: cookiesFrom(start) },
+      }),
+    );
+    expect(crossed.headers.get("location")).toBe("/studio/?signin=expired");
+  });
+});
+
 describe("OIDC settings from the environment", () => {
   const env = {
     GRAFT_STUDIO_SECRET: secret,
@@ -447,6 +534,19 @@ describe("OIDC settings from the environment", () => {
       name: "Acme",
     });
     expect(editorAccessFromEnv({ GRAFT_STUDIO_SECRET: secret })?.oidc).toBeUndefined();
+  });
+
+  it("reads Google's client, both halves or neither", () => {
+    expect(
+      editorAccessFromEnv({
+        GRAFT_STUDIO_SECRET: secret,
+        GRAFT_GOOGLE_CLIENT_ID: "g-id",
+        GRAFT_GOOGLE_CLIENT_SECRET: "g-secret",
+      })?.google,
+    ).toEqual({ clientId: "g-id", clientSecret: "g-secret" });
+    expect(() =>
+      editorAccessFromEnv({ GRAFT_STUDIO_SECRET: secret, GRAFT_GOOGLE_CLIENT_ID: "g-id" }),
+    ).toThrow("Only one of GRAFT_GOOGLE_CLIENT_ID and GRAFT_GOOGLE_CLIENT_SECRET is set.");
   });
 
   it("refuses half a setup, naming what is missing", () => {

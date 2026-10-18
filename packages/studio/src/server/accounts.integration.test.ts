@@ -349,7 +349,12 @@ describe.skipIf(!runIntegration)("Studio accounts over HTTP (integration)", () =
       .find((c) => c?.startsWith("graft_studio=acct_"));
     if (!session) throw new Error("expected an account session cookie");
     const who = await call("GET", "/api/studio/v1/auth/session", { cookie: session });
-    expect(who.json.user).toMatchObject({ email: "ana@shop.test", role: "admin", via: "account" });
+    expect(who.json.user).toMatchObject({
+      email: "ana@shop.test",
+      role: "admin",
+      via: "account",
+      password: true,
+    });
     expect((await call("GET", "/api/studio/v1/people", { cookie: session })).status).toBe(200);
 
     // Inviting someone from People is all single sign-on needs: their first
@@ -367,7 +372,12 @@ describe.skipIf(!runIntegration)("Studio accounts over HTTP (integration)", () =
       .map((c) => c.split(";")[0])
       .find((c) => c?.startsWith("graft_studio=acct_"));
     const deeWho = await call("GET", "/api/studio/v1/auth/session", { cookie: deeSession });
-    expect(deeWho.json.user).toMatchObject({ email: "dee@shop.test", role: "viewer" });
+    // No password, so Settings has none to change.
+    expect(deeWho.json.user).toMatchObject({
+      email: "dee@shop.test",
+      role: "viewer",
+      password: false,
+    });
     const team = (await call("GET", "/api/studio/v1/people", { cookie: session }))
       .json as PeopleDto;
     expect(team.people.map((p) => p.email)).toContain("dee@shop.test");
@@ -394,5 +404,81 @@ describe.skipIf(!runIntegration)("Studio accounts over HTTP (integration)", () =
     email = "ben@shop.test";
     const ben = await signIn();
     expect(ben.headers.get("location")).toBe("/studio/?signin=oidc_not_allowed");
+  });
+
+  it("signs someone in with GitHub as their account or their invitation", async (ctx) => {
+    if (!handle) return ctx.skip();
+    const admin = await call("POST", "/api/studio/v1/auth/sign-in", {
+      body: { email: "ana@shop.test", password: "a brand new password" },
+    });
+    expect(admin.status).toBe(200);
+    for (const email of ["frank@shop.test", "gil@shop.test"]) {
+      const invited = await call("POST", "/api/studio/v1/people/invites", {
+        cookie: admin.cookie,
+        body: { email, role: "contributor" },
+      });
+      expect(invited.status).toBe(201);
+    }
+    // Frank's invited address is a second, verified one on his GitHub account;
+    // Gil's is on his account too, but unverified, so it can't stand for him.
+    const github = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/login/oauth/access_token")) return Response.json({ access_token: "t" });
+      if (url.endsWith("/user")) return Response.json({ login: "frank-codes", name: "Frank" });
+      if (url.endsWith("/user/emails")) {
+        return Response.json([
+          { email: "frank@home.test", primary: true, verified: true },
+          { email: "Frank@Shop.test", primary: false, verified: true },
+          { email: "gil@shop.test", primary: false, verified: false },
+        ]);
+      }
+      return new Response("no", { status: 404 });
+    }) as typeof fetch;
+    const viaGitHub = createStudioHandler({
+      db: handle.db,
+      collections: {},
+      contentDir: "/tmp/graft-none",
+      uiBasePath: "/studio",
+      editors: {
+        secret,
+        accounts: { db: handle.db },
+        github: { clientId: "id", clientSecret: "cs", fetch: github },
+      },
+    });
+    async function signIn(): Promise<Response> {
+      const start = await viaGitHub(
+        new Request(`${ORIGIN}/api/studio/v1/auth/github`, { redirect: "manual" }),
+      );
+      const state = new URL(start.headers.get("location") ?? "").searchParams.get("state");
+      const cookie = start.headers.getSetCookie()[0]?.split(";")[0] ?? "";
+      return viaGitHub(
+        new Request(`${ORIGIN}/api/studio/v1/auth/github/callback?code=c&state=${state}`, {
+          redirect: "manual",
+          headers: { cookie },
+        }),
+      );
+    }
+
+    const frank = await signIn();
+    expect(frank.headers.get("location")).toBe("/studio/");
+    const session = frank.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0])
+      .find((c) => c?.startsWith("graft_studio=acct_"));
+    const who = await call("GET", "/api/studio/v1/auth/session", { cookie: session });
+    expect(who.json.user).toMatchObject({
+      email: "frank@shop.test",
+      name: "Frank",
+      role: "contributor",
+      via: "account",
+      password: false,
+    });
+    // Signing in again finds the account the invitation made.
+    expect((await signIn()).headers.get("location")).toBe("/studio/");
+    const team = (await call("GET", "/api/studio/v1/people", { cookie: admin.cookie }))
+      .json as PeopleDto;
+    const open = team.invites.map((i) => i.email);
+    expect(open).not.toContain("frank@shop.test");
+    expect(open).toContain("gil@shop.test");
   });
 });
