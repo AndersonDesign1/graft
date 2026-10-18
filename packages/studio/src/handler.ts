@@ -144,6 +144,7 @@ export function createStudioHandler(options: StudioHandlerOptions): StudioFetchH
                 accounts: {
                   uiBasePath: uiBase,
                   ...(options.editors.publicUrl ? { publicUrl: options.editors.publicUrl } : {}),
+                  autoJoin: options.editors.autoJoin ?? [],
                 },
               }
             : {}),

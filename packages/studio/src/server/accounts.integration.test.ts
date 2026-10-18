@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setupCode } from "../accounts";
 import type { PeopleDto, WorkspaceDto } from "../editor-types";
 import { createStudioHandler } from "../handler";
+import { parseAutoJoin } from "../session";
 
 try {
   const here = fileURLToPath(new URL(".", import.meta.url));
@@ -480,5 +481,96 @@ describe.skipIf(!runIntegration)("Studio accounts over HTTP (integration)", () =
     const open = team.invites.map((i) => i.email);
     expect(open).not.toContain("frank@shop.test");
     expect(open).toContain("gil@shop.test");
+  });
+
+  it("lets a domain join on its own, as accounts People can change or remove", async (ctx) => {
+    if (!handle) return ctx.skip();
+    const issuer = "https://auth.shop.test/api/auth";
+    let email = "hal@corp.test";
+    let nonce = "";
+    const provider = (async (input: string | URL | Request) => {
+      if (String(input).endsWith("/.well-known/openid-configuration")) {
+        return Response.json({
+          issuer,
+          authorization_endpoint: `${issuer}/oauth2/authorize`,
+          token_endpoint: `${issuer}/oauth2/token`,
+        });
+      }
+      const idToken = await new SignJWT({ email, email_verified: true, nonce, name: "Hal" })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuer(issuer)
+        .setAudience("studio")
+        .setSubject(email)
+        .setIssuedAt()
+        .setExpirationTime("10m")
+        .sign(new TextEncoder().encode("cs"));
+      return Response.json({ id_token: idToken });
+    }) as typeof fetch;
+    const joining = createStudioHandler({
+      db: handle.db,
+      collections: {},
+      contentDir: "/tmp/graft-none",
+      uiBasePath: "/studio",
+      editors: {
+        secret,
+        accounts: { db: handle.db },
+        autoJoin: parseAutoJoin("corp.test=editor"),
+        oidc: { issuer, clientId: "studio", clientSecret: "cs", fetch: provider },
+      },
+    });
+    async function signIn(): Promise<Response> {
+      const start = await joining(
+        new Request(`${ORIGIN}/api/studio/v1/auth/oidc`, { redirect: "manual" }),
+      );
+      const authorize = new URL(start.headers.get("location") ?? "");
+      nonce = authorize.searchParams.get("nonce") ?? "";
+      const cookie = start.headers.getSetCookie()[0]?.split(";")[0] ?? "";
+      return joining(
+        new Request(
+          `${ORIGIN}/api/studio/v1/auth/oidc/callback?code=c&state=${authorize.searchParams.get("state")}`,
+          { redirect: "manual", headers: { cookie } },
+        ),
+      );
+    }
+    const session = (response: Response) =>
+      response.headers
+        .getSetCookie()
+        .map((c) => c.split(";")[0])
+        .find((c) => c?.startsWith("graft_studio=acct_"));
+    const admin = await call("POST", "/api/studio/v1/auth/sign-in", {
+      body: { email: "ana@shop.test", password: "a brand new password" },
+    });
+    const peopleAs = async (cookie: string | undefined) =>
+      (
+        await joining(
+          new Request(`${ORIGIN}/api/studio/v1/people`, { headers: { cookie: cookie ?? "" } }),
+        )
+      ).json() as Promise<PeopleDto>;
+
+    const hal = await signIn();
+    expect(hal.headers.get("location")).toBe("/studio/");
+    const who = await call("GET", "/api/studio/v1/auth/session", { cookie: session(hal) });
+    expect(who.json.user).toMatchObject({
+      email: "hal@corp.test",
+      name: "Hal",
+      role: "editor",
+      via: "account",
+      password: false,
+    });
+    const team = await peopleAs(admin.cookie);
+    expect(team.autoJoin).toEqual([{ domain: "corp.test", role: "editor" }]);
+    const halRow = team.people.find((p) => p.email === "hal@corp.test");
+    expect(halRow).toMatchObject({ role: "editor", owner: false });
+
+    // Removed in People: Hal stays out, even though the domain still joins.
+    const removed = await call("DELETE", `/api/studio/v1/people/${halRow?.id}`, {
+      cookie: admin.cookie,
+    });
+    expect(removed.status).toBe(204);
+    expect((await signIn()).headers.get("location")).toBe("/studio/?signin=oidc_not_allowed");
+
+    // Another domain doesn't join.
+    email = "ivy@elsewhere.test";
+    expect((await signIn()).headers.get("location")).toBe("/studio/?signin=oidc_not_allowed");
   });
 });

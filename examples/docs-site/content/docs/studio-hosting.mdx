@@ -179,9 +179,33 @@ endpoint, and only an email the provider marks verified counts. Then:
   their email and tell them to press the button; there is no link to pass on
   and no password to choose, and Settings shows them no password to change.
   If they want one later, an admin makes them a link to set it.
+- Someone whose verified email is at a domain in `GRAFT_STUDIO_AUTO_JOIN`
+  joins on their own, with the domain's role. See below.
 - Someone without an account or an invitation gets in only if
   `GRAFT_STUDIO_EDITORS` lists their email, with the role it gives.
 - Anyone else is refused, and the sign-in screen says to ask for an invitation.
+
+**Let a whole domain join.** To skip inviting everyone at your company, name
+its email domain, with the role new people get:
+
+```sh
+GRAFT_STUDIO_AUTO_JOIN="shop.example.com=contributor, agency.example=viewer"
+```
+
+The first time someone signs in with GitHub, Google or single sign-on and has
+a verified email at one of those domains, Studio makes them an account with
+that role. The role defaults to `contributor`. They show up in **Settings,
+People** like anyone invited, where an admin can change their role or remove
+them, and someone removed stays out. People also lists each domain that joins
+on its own. A few things are refused so the door stays narrow:
+
+- Admin. Nobody joins as an admin on their own; invite admins.
+- Free mail providers such as gmail.com or outlook.com, where anyone can make
+  an address.
+- Joining before the owner exists. The first visit still creates the owner.
+
+GitHub counts any verified address on someone's GitHub account, so a person
+whose work email is a second address there still joins.
 
 Studio uses the authorization code flow with PKCE, and checks the ID token's
 signature, issuer, audience, expiry and nonce. If a sign-in fails, the screen

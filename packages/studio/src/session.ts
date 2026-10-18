@@ -234,6 +234,87 @@ export function parseEditorList(raw: string | undefined): Map<string, StudioRole
   return out;
 }
 
+/** Anyone with a verified email at `domain` joins with `role`, without an invitation. */
+export interface AutoJoinRule {
+  domain: string;
+  role: Exclude<StudioRole, "admin">;
+}
+
+/**
+ * Free mail providers, where anyone can make an address. A rule for one of
+ * them would let in the whole internet.
+ */
+const OPEN_MAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "msn.com",
+  "yahoo.com",
+  "icloud.com",
+  "me.com",
+  "aol.com",
+  "proton.me",
+  "protonmail.com",
+  "gmx.com",
+  "mail.com",
+  "yandex.com",
+]);
+
+/**
+ * `GRAFT_STUDIO_AUTO_JOIN`: email domains whose people join on their own.
+ * Comma-separated domains, each optionally `=role` (default contributor):
+ * `shop.example.com=editor, agency.example=viewer`. Admin is never given
+ * this way: admins are invited.
+ */
+export function parseAutoJoin(raw: string | undefined): AutoJoinRule[] {
+  const rules: AutoJoinRule[] = [];
+  for (const entry of (raw ?? "").split(",")) {
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    const [rawDomain = "", rawRole] = trimmed.split("=").map((part) => part.trim());
+    const domain = rawDomain.replace(/^@/, "").toLowerCase();
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain)) {
+      throw new GraftError({
+        code: "CONFIG_INVALID",
+        message: `GRAFT_STUDIO_AUTO_JOIN has "${rawDomain}", which isn't an email domain.`,
+        fix: 'List domains, each with an optional role: GRAFT_STUDIO_AUTO_JOIN="shop.example.com=contributor".',
+      });
+    }
+    if (OPEN_MAIL_DOMAINS.has(domain)) {
+      throw new GraftError({
+        code: "CONFIG_INVALID",
+        message: `GRAFT_STUDIO_AUTO_JOIN has ${domain}, where anyone can make an address, so anyone could join.`,
+        fix: "Use your organisation's own domain, or invite people one by one in Settings, People.",
+      });
+    }
+    const role = rawRole ?? "contributor";
+    if (!isStudioRole(role) || role === "admin") {
+      throw new GraftError({
+        code: "CONFIG_INVALID",
+        message: `GRAFT_STUDIO_AUTO_JOIN gives ${domain} the role "${role}".`,
+        fix:
+          role === "admin"
+            ? "Nobody joins as an admin on their own. Give the domain viewer, contributor or editor, and invite admins in Settings, People."
+            : "Roles for a domain are viewer, contributor and editor.",
+      });
+    }
+    rules.push({ domain, role });
+  }
+  return rules;
+}
+
+/** The rule a verified email falls under, if any. */
+export function autoJoinRule(
+  rules: readonly AutoJoinRule[],
+  email: string,
+): AutoJoinRule | undefined {
+  const at = email.lastIndexOf("@");
+  const domain = at === -1 ? "" : email.slice(at + 1).toLowerCase();
+  return rules.find((rule) => rule.domain === domain);
+}
+
 /** The Studio role a repository permission earns, when no list is configured. */
 export function roleForRepoPermission(permission: string): StudioRole | null {
   if (permission === "admin") return "admin";
@@ -246,6 +327,7 @@ export const EDITOR_AUTH_ENV = [
   "GRAFT_STUDIO_SECRET",
   "GRAFT_STUDIO_URL",
   "GRAFT_STUDIO_EDITORS",
+  "GRAFT_STUDIO_AUTO_JOIN",
   "GRAFT_GITHUB_CLIENT_ID",
   "GRAFT_GITHUB_CLIENT_SECRET",
   "GRAFT_GOOGLE_CLIENT_ID",
@@ -260,6 +342,7 @@ export interface EditorAccessConfig {
   secret: string;
   publicUrl?: string;
   editors: Map<string, StudioRole>;
+  autoJoin: AutoJoinRule[];
   github?: { clientId: string; clientSecret: string };
   google?: { clientId: string; clientSecret: string };
   oidc?: { issuer: string; clientId: string; clientSecret: string; name?: string };
@@ -360,6 +443,7 @@ export function editorAccessFromEnv(
     secret,
     ...(publicUrl ? { publicUrl } : {}),
     editors: parseEditorList(env.GRAFT_STUDIO_EDITORS),
+    autoJoin: parseAutoJoin(env.GRAFT_STUDIO_AUTO_JOIN),
     ...(clientId && clientSecret ? { github: { clientId, clientSecret } } : {}),
     ...(google ? { google } : {}),
     ...(oidc ? { oidc } : {}),
