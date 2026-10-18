@@ -66,7 +66,8 @@
     "@usegraft/contracts": "workspace:*",
     "@usegraft/core": "workspace:*",
     "@usegraft/db": "workspace:*",
-    "@usegraft/mdx-safety": "workspace:*"
+    "@usegraft/mdx-safety": "workspace:*",
+    "jose": "^6.2.10"
   },
   "devDependencies": {
     "@base-ui-components/react": "1.0.0-rc.0",

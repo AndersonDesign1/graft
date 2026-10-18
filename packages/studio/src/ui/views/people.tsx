@@ -3,7 +3,8 @@
  *
  * People is for admins: who can sign in, as what, and invitations nobody has
  * used yet. An invitation is a link the admin passes on; Studio sends no
- * email, so the link is shown once, with a copy button.
+ * email, so the link is shown once, with a copy button. With single sign-on,
+ * the invitation is enough on its own: the person signs in with the provider.
  */
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -64,7 +65,17 @@ function expires(invite: InviteDto): string {
   return `Invited as ${role}. The link works until ${date}.`;
 }
 
-function InviteForm({ onInvited }: { onInvited: () => void }) {
+/** The single sign-on button's words, when this Studio has single sign-on. */
+function useSingleSignOn(): string | null {
+  const session = useResource<{ methods?: { oidc?: { name: string | null } | null } }>(
+    "/auth/session",
+  );
+  const oidc = session.data?.methods?.oidc;
+  if (!oidc) return null;
+  return oidc.name ? `Continue with ${oidc.name}` : "Continue with single sign-on";
+}
+
+function InviteForm({ onInvited, sso }: { onInvited: () => void; sso: string | null }) {
   const [role, setRole] = useState<StudioRoleName>("editor");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -92,7 +103,11 @@ function InviteForm({ onInvited }: { onInvited: () => void }) {
   return (
     <Row
       label="Invite someone"
-      hint="They get a link to choose a password. Studio doesn't send email, so pass the link on yourself."
+      hint={
+        sso
+          ? `They can press ${sso} on the sign-in screen, or use a link to choose a password. Studio doesn't send email, so tell them yourself.`
+          : "They get a link to choose a password. Studio doesn't send email, so pass the link on yourself."
+      }
       stack
     >
       <form className="people-invite" onSubmit={submit}>
@@ -119,8 +134,9 @@ function InviteForm({ onInvited }: { onInvited: () => void }) {
       {link ? (
         <div className="people-link" role="status">
           <p className="set-row-hint">
-            Send this link to {link.email}, privately. It works once, for 7 days, and this is the
-            only time it's shown.
+            {sso
+              ? `${link.email} can now press ${sso} on the sign-in screen. Or send them this link, privately, to choose a password instead. It works once, for 7 days, and this is the only time it's shown.`
+              : `Send this link to ${link.email}, privately. It works once, for 7 days, and this is the only time it's shown.`}
           </p>
           <div className="people-link-value">
             <code className="set-value">{link.url}</code>
@@ -253,10 +269,11 @@ function InviteRow({ invite, onChanged }: { invite: InviteDto; onChanged: () => 
 
 export function PeoplePanel() {
   const people = useResource<PeopleDto>("/people");
+  const sso = useSingleSignOn();
   const refresh = (): void => void people.refresh();
   return (
     <div className="set-panel">
-      <InviteForm onInvited={refresh} />
+      <InviteForm onInvited={refresh} sso={sso} />
       {people.error ? (
         <Row label="Couldn't load people" hint={people.error} />
       ) : (
@@ -274,7 +291,20 @@ export function PeoplePanel() {
 }
 
 /** Your own account: who you're signed in as, and your password. */
-export function AccountPanel({ email, role }: { email: string; role: string }) {
+/**
+ * Your own account. Someone who signs in only with GitHub, Google or single
+ * sign-on has no password, so there is none to change; an admin can make
+ * them a link to set one.
+ */
+export function AccountPanel({
+  email,
+  role,
+  password,
+}: {
+  email: string;
+  role: string;
+  password: boolean;
+}) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -308,42 +338,44 @@ export function AccountPanel({ email, role }: { email: string; role: string }) {
       <Row label="Signed in as" hint={ROLES.find((r) => r.id === role)?.can}>
         <code className="set-value">{email}</code>
       </Row>
-      <Row
-        label="Password"
-        hint="At least 10 characters. Changing it signs out your other browsers."
-        stack
-      >
-        <form className="people-password" onSubmit={submit}>
-          <input type="email" autoComplete="username" value={email} readOnly hidden />
-          <input
-            className="input"
-            name="current"
-            type="password"
-            placeholder="Current password"
-            aria-label="Current password"
-            autoComplete="current-password"
-            required
-          />
-          <input
-            className="input"
-            name="next"
-            type="password"
-            placeholder="New password"
-            aria-label="New password"
-            autoComplete="new-password"
-            minLength={10}
-            required
-          />
-          <button type="submit" className="btn" disabled={busy}>
-            {busy ? "Changing…" : "Change password"}
-          </button>
-        </form>
-        {problem ? (
-          <p className="notice" data-tone="error" role="alert">
-            {problem}
-          </p>
-        ) : null}
-      </Row>
+      {password ? (
+        <Row
+          label="Password"
+          hint="At least 10 characters. Changing it signs out your other browsers."
+          stack
+        >
+          <form className="people-password" onSubmit={submit}>
+            <input type="email" autoComplete="username" value={email} readOnly hidden />
+            <input
+              className="input"
+              name="current"
+              type="password"
+              placeholder="Current password"
+              aria-label="Current password"
+              autoComplete="current-password"
+              required
+            />
+            <input
+              className="input"
+              name="next"
+              type="password"
+              placeholder="New password"
+              aria-label="New password"
+              autoComplete="new-password"
+              minLength={10}
+              required
+            />
+            <button type="submit" className="btn" disabled={busy}>
+              {busy ? "Changing…" : "Change password"}
+            </button>
+          </form>
+          {problem ? (
+            <p className="notice" data-tone="error" role="alert">
+              {problem}
+            </p>
+          ) : null}
+        </Row>
+      ) : null}
     </div>
   );
 }

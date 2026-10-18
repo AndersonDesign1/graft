@@ -20,6 +20,10 @@ edits a page.
   asks for the owner account on the first visit, then signs people in with an
   email and password. Admins invite people and reset passwords from
   Settings, People.
+- `studio.oidc`: with `GRAFT_OIDC_ISSUER`, `GRAFT_OIDC_CLIENT_ID` and
+  `GRAFT_OIDC_CLIENT_SECRET` set, the sign-in screen offers "Continue with
+  <GRAFT_OIDC_NAME>". A verified email signs in as its Studio account, or with
+  the role `GRAFT_STUDIO_EDITORS` gives it; anyone else is refused.
 
 ## How to get to it (user POV)
 
@@ -75,6 +79,26 @@ database instead of the sandbox's. Ready when the log prints `graft studio — b
   Open it with `agent-browser --session other open "$LINK"`: "Join this
   Studio" (`Your name`, `Choose a password`, `Join`). `select email, role from
   studio_users` lists both.
+
+- **Single sign-on with a real Better Auth.** In a scratch folder outside the
+  repo, `npm install better-auth @better-auth/oauth-provider pg`, and run a
+  Better Auth server on `http://127.0.0.1:4100` with `jwt()` and
+  `oauthProvider({ loginPage, consentPage })`, against a database you create
+  on the sandbox's Postgres. Register Studio with
+  `auth.api.adminCreateOAuthClient` (it needs a signed-in user's `headers`),
+  `redirect_uris: ["http://localhost:4997/api/studio/v1/auth/oidc/callback"]`,
+  `skip_consent: true` and `application_type: "native"`: Better Auth refuses an
+  http loopback redirect from a web client. Use `localhost` for Studio and
+  `127.0.0.1` for the provider, so their cookies don't mix. Start `serve
+  --studio --host localhost --port 4997` with the three `GRAFT_OIDC_*`
+  variables, the issuer `http://127.0.0.1:4100/api/auth`. In a browser, sign in
+  at the provider (`POST /api/auth/sign-in/email`), open
+  `http://localhost:4997/studio/`, and press the button. Someone with a Studio
+  account lands as `via: "account"`, someone on `GRAFT_STUDIO_EDITORS` as
+  `via: "oidc"`. An unverified email lands on `?signin=email_unverified`.
+  Repeat with the client registered for `client_secret_post`, and with
+  `oauthProvider({ disableJwtPlugin: true })` and no `jwt()` (HS256 ID tokens,
+  no `jwks_uri`).
 
 - **Saves stay fast at scale.** `pnpm bench` in `examples/shop` (after a
   build) seeds 2,000 products in a temporary copy, starts its own Postgres

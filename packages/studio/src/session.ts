@@ -47,12 +47,14 @@ export function isStudioRole(value: unknown): value is StudioRole {
 }
 
 export interface EditorIdentity {
-  /** GitHub login, or the email of an account or an invite link. */
+  /** GitHub login, or the email of an account, an invite link, Google or an OIDC sign-in. */
   id: string;
   name?: string;
   email?: string;
   role: StudioRole;
-  via: "github" | "invite" | "account";
+  via: "github" | "invite" | "account" | "google" | "oidc";
+  /** An account's: whether it has a password to change. */
+  password?: boolean;
 }
 
 interface Signed<T> {
@@ -246,6 +248,12 @@ export const EDITOR_AUTH_ENV = [
   "GRAFT_STUDIO_EDITORS",
   "GRAFT_GITHUB_CLIENT_ID",
   "GRAFT_GITHUB_CLIENT_SECRET",
+  "GRAFT_GOOGLE_CLIENT_ID",
+  "GRAFT_GOOGLE_CLIENT_SECRET",
+  "GRAFT_OIDC_ISSUER",
+  "GRAFT_OIDC_CLIENT_ID",
+  "GRAFT_OIDC_CLIENT_SECRET",
+  "GRAFT_OIDC_NAME",
 ] as const;
 
 export interface EditorAccessConfig {
@@ -253,12 +261,79 @@ export interface EditorAccessConfig {
   publicUrl?: string;
   editors: Map<string, StudioRole>;
   github?: { clientId: string; clientSecret: string };
+  google?: { clientId: string; clientSecret: string };
+  oidc?: { issuer: string; clientId: string; clientSecret: string; name?: string };
+}
+
+/** A provider's client ID and secret: both, or neither. */
+function clientFromEnv(
+  env: Record<string, string | undefined>,
+  provider: "GOOGLE",
+  where: string,
+): { clientId: string; clientSecret: string } | undefined {
+  const clientId = env[`GRAFT_${provider}_CLIENT_ID`]?.trim();
+  const clientSecret = env[`GRAFT_${provider}_CLIENT_SECRET`]?.trim();
+  if (Boolean(clientId) !== Boolean(clientSecret)) {
+    throw new GraftError({
+      code: "ENV_VAR_MISSING",
+      message: `Only one of GRAFT_${provider}_CLIENT_ID and GRAFT_${provider}_CLIENT_SECRET is set.`,
+      fix: `Set both from the ${where}, or neither.`,
+    });
+  }
+  return clientId && clientSecret ? { clientId, clientSecret } : undefined;
+}
+
+const OIDC_ENV = ["GRAFT_OIDC_ISSUER", "GRAFT_OIDC_CLIENT_ID", "GRAFT_OIDC_CLIENT_SECRET"] as const;
+
+/**
+ * OIDC sign-in from the environment: all three variables or none. The issuer
+ * is https, or http on this computer for trying a provider out locally.
+ */
+function oidcFromEnv(
+  env: Record<string, string | undefined>,
+): EditorAccessConfig["oidc"] | undefined {
+  const set = OIDC_ENV.filter((name) => env[name]?.trim());
+  if (set.length === 0) return undefined;
+  if (set.length < OIDC_ENV.length) {
+    const missing = OIDC_ENV.filter((name) => !set.includes(name));
+    throw new GraftError({
+      code: "ENV_VAR_MISSING",
+      message: `OIDC sign-in is half set up: ${missing.join(" and ")} ${missing.length === 1 ? "is" : "are"} missing.`,
+      fix: "Set GRAFT_OIDC_ISSUER, GRAFT_OIDC_CLIENT_ID and GRAFT_OIDC_CLIENT_SECRET from the client you registered with your provider, or none of them.",
+      details: { missing },
+    });
+  }
+  const issuer = env.GRAFT_OIDC_ISSUER?.trim() ?? "";
+  let url: URL | null = null;
+  try {
+    url = new URL(issuer);
+  } catch {
+    url = null;
+  }
+  if (
+    !url ||
+    (url.protocol !== "https:" && !(url.protocol === "http:" && isLoopbackHost(url.hostname)))
+  ) {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message: `GRAFT_OIDC_ISSUER is "${issuer}", which isn't an https URL.`,
+      fix: "Set it to your provider's issuer URL, the one its tokens carry in iss, such as https://auth.example.com/api/auth. Plain http works only on localhost.",
+      details: { variable: "GRAFT_OIDC_ISSUER", value: issuer },
+    });
+  }
+  const name = env.GRAFT_OIDC_NAME?.trim();
+  return {
+    issuer,
+    clientId: env.GRAFT_OIDC_CLIENT_ID?.trim() ?? "",
+    clientSecret: env.GRAFT_OIDC_CLIENT_SECRET?.trim() ?? "",
+    ...(name ? { name } : {}),
+  };
 }
 
 /**
  * Sign-in settings from the environment, or undefined when sign-in is off
- * (GRAFT_STUDIO_SECRET unset). Half a GitHub configuration is refused rather
- * than silently ignored: a missing sign-in button is a confusing failure.
+ * (GRAFT_STUDIO_SECRET unset). Half a GitHub or OIDC configuration is refused
+ * rather than silently ignored: a missing sign-in button is a confusing failure.
  */
 export function editorAccessFromEnv(
   env: Record<string, string | undefined> = process.env,
@@ -274,11 +349,19 @@ export function editorAccessFromEnv(
       fix: "Set both from your GitHub OAuth app (Settings > Developer settings > OAuth Apps), or neither to use invite links only.",
     });
   }
+  const google = clientFromEnv(
+    env,
+    "GOOGLE",
+    "Google Cloud console (APIs & Services > Credentials > OAuth client ID, type Web application)",
+  );
   const publicUrl = withoutTrailingSlashes(env.GRAFT_STUDIO_URL?.trim() ?? "") || undefined;
+  const oidc = oidcFromEnv(env);
   return {
     secret,
     ...(publicUrl ? { publicUrl } : {}),
     editors: parseEditorList(env.GRAFT_STUDIO_EDITORS),
     ...(clientId && clientSecret ? { github: { clientId, clientSecret } } : {}),
+    ...(google ? { google } : {}),
+    ...(oidc ? { oidc } : {}),
   };
 }

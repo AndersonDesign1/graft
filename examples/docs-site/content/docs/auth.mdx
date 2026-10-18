@@ -137,6 +137,10 @@ use `betterAuthIssuer({ url })` in place of a plain `{ issuer }`. The Next.js
 example app does this. It is one option, not a requirement: any OpenID Connect
 provider works the same way.
 
+The same provider can sign your team in to a hosted Studio, next to GitHub and
+Google, so people use one login for your app and for Studio. See
+[Host Studio for your team](/docs/studio-hosting#2-let-people-sign-in).
+
 ## Require a permission
 
 Add an `access` rule to a function so only callers with a given scope can run

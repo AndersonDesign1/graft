@@ -1,10 +1,14 @@
 /**
  * Sign-in for a hosted Studio: a Studio account (email and password), GitHub,
- * or an invite link made on the command line.
+ * Google, another OpenID Connect provider, or an invite link made on the
+ * command line.
  *
  * An account's session is a random token whose hash is a row in Postgres, so
  * signing out, removing someone or changing their role takes effect on their
- * next request. GitHub and command-line links still sign a stateless cookie.
+ * next request. GitHub, Google and OIDC sign-ins for someone with an account,
+ * or an open invitation, get that same session. Command-line links, and
+ * sign-ins admitted only by GRAFT_STUDIO_EDITORS or repository access, still
+ * sign a stateless cookie.
  *
  * These routes are the only ones a signed-out browser may reach, so they sit
  * in front of the API's scope table rather than in it. Everything else still
@@ -15,6 +19,7 @@ import { withoutTrailingSlashes } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import {
   acceptInvite,
+  acceptInviteForEmail,
   accountForSignIn,
   countAccounts,
   createOwner,
@@ -25,6 +30,7 @@ import {
   recordSignIn,
   sessionAccount,
   setPassword,
+  NO_PASSWORD_HASH,
   type Database,
   type StudioAccount,
 } from "@usegraft/db";
@@ -39,6 +45,13 @@ import {
   setupCodeMatches,
   verifyPassword,
 } from "./accounts";
+import {
+  finishOidcSignIn,
+  googleProvider,
+  startOidcSignIn,
+  type OidcPerson,
+  type OidcSignInOptions,
+} from "./oidc";
 import { assertSameOrigin, errorResponse, statusFor, type StudioPrincipal } from "./api";
 import {
   OAUTH_COOKIE,
@@ -79,6 +92,14 @@ export interface EditorAuthOptions {
   /** Who may sign in with GitHub, and as what. Empty: decided by `permissionOf`. */
   editors?: ReadonlyMap<string, StudioRole>;
   github?: GitHubSignInOptions;
+  /** Sign in with Google: an OAuth client from the Google Cloud console. */
+  google?: { clientId: string; clientSecret: string; fetch?: typeof fetch };
+  /**
+   * Another OpenID Connect provider (Okta, Entra ID, an app's Better Auth).
+   * Google and it admit someone by their verified email: their Studio
+   * account's role, an open invitation's, else GRAFT_STUDIO_EDITORS's.
+   */
+  oidc?: OidcSignInOptions;
   /** A login's permission on the content repository, from the store's credentials. */
   permissionOf?: (login: string) => Promise<string>;
   /**
@@ -95,6 +116,19 @@ export interface EditorAuthOptions {
      */
     setupWithoutCode?: boolean;
   };
+}
+
+/** The OpenID Connect sign-ins, each at /auth/<id> and /auth/<id>/callback. */
+type OidcProviderId = "google" | "oidc";
+
+/** What the OAuth state cookie holds between leaving for a provider and coming back. */
+interface PendingSignIn {
+  state: string;
+  return: string;
+  /** Which OpenID Connect provider, with its PKCE verifier and nonce. */
+  provider?: OidcProviderId;
+  verifier?: string;
+  nonce?: string;
 }
 
 export interface EditorAuth {
@@ -125,6 +159,10 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
 
   const accounts = options.accounts;
 
+  const oidcProviders = new Map<OidcProviderId, OidcSignInOptions>();
+  if (options.google) oidcProviders.set("google", googleProvider(options.google));
+  if (options.oidc) oidcProviders.set("oidc", options.oidc);
+
   /** Who the session cookie says this is: an account's row, or a signed cookie. */
   async function session(request: Request): Promise<EditorIdentity | null> {
     const raw = readCookie(request, SESSION_COOKIE);
@@ -135,8 +173,8 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     return verify<EditorIdentity>(options.secret, "session", raw);
   }
 
-  /** A new session for an account, answered as JSON with its cookie. */
-  async function accountSignedIn(request: Request, account: StudioAccount): Promise<Response> {
+  /** A new session row for an account, as the cookie that carries it. */
+  async function accountSession(request: Request, account: StudioAccount): Promise<string> {
     if (!accounts) throw accountsOff();
     const { token, hash } = newToken();
     await createSession(accounts.db, {
@@ -144,8 +182,13 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
       userId: account.id,
       expiresAt: new Date(Date.now() + SESSION_TTL_MS),
     });
+    return cookieHeader(request, SESSION_COOKIE, token, SESSION_TTL_MS);
+  }
+
+  /** A new session for an account, answered as JSON with its cookie. */
+  async function accountSignedIn(request: Request, account: StudioAccount): Promise<Response> {
     const headers = new Headers({ "cache-control": "no-store" });
-    headers.append("set-cookie", cookieHeader(request, SESSION_COOKIE, token, SESSION_TTL_MS));
+    headers.append("set-cookie", await accountSession(request, account));
     return Response.json({ user: userJson(accountIdentity(account)) }, { headers });
   }
 
@@ -207,18 +250,142 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     ]);
   }
 
+  /**
+   * The provider was unreachable, or what it sent didn't check out. The screen
+   * says the sign-in didn't complete; the operator gets the reason in the log.
+   */
+  function oidcFailed(
+    request: Request,
+    id: OidcProviderId,
+    error: unknown,
+    returnTo?: string,
+  ): Response {
+    console.error(
+      `graft studio: ${id === "google" ? "Google" : "OIDC"} sign-in failed:`,
+      error instanceof Error ? error.message : error,
+    );
+    return failed(request, `${id}_refused`, returnTo);
+  }
+
   /** Only a path on this origin, so the parameter cannot become an open redirect. */
   function safeReturn(raw: string | null): string {
     if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return ui;
     return raw;
   }
 
-  /** The signed OAuth state cookie set when sign-in started, if it is valid. */
-  function pendingSignIn(request: Request): { state: string; return: string } | null {
-    return verify<{ state: string; return: string }>(
+  /**
+   * The signed OAuth state cookie set when sign-in started, if it is valid.
+   * An OIDC sign-in also keeps its PKCE verifier and nonce there.
+   */
+  function pendingSignIn(request: Request): PendingSignIn | null {
+    return verify<PendingSignIn>(options.secret, "oauth", readCookie(request, OAUTH_COOKIE));
+  }
+
+  /** Leave for the provider, with what the callback must hold up kept in a cookie. */
+  async function oidcStart(request: Request, url: URL, id: OidcProviderId): Promise<Response> {
+    const provider = oidcProviders.get(id);
+    if (!provider) return failed(request, `${id}_off`);
+    const state = randomState();
+    const back = safeReturn(url.searchParams.get("return"));
+    let start: Awaited<ReturnType<typeof startOidcSignIn>>;
+    try {
+      start = await startOidcSignIn(provider, {
+        redirectUri: `${origin(request)}${AUTH}/${id}/callback`,
+        state,
+      });
+    } catch (error) {
+      return oidcFailed(request, id, error, back);
+    }
+    const pending = sign<PendingSignIn>(
       options.secret,
       "oauth",
-      readCookie(request, OAUTH_COOKIE),
+      { state, return: back, provider: id, verifier: start.verifier, nonce: start.nonce },
+      10 * 60_000,
+    );
+    return redirect(start.url, [cookieHeader(request, OAUTH_COOKIE, pending, 10 * 60_000)]);
+  }
+
+  async function oidcCallback(request: Request, url: URL, id: OidcProviderId): Promise<Response> {
+    const provider = oidcProviders.get(id);
+    if (!provider) return failed(request, `${id}_off`);
+    const pending = pendingSignIn(request);
+    const state = url.searchParams.get("state");
+    const code = url.searchParams.get("code");
+    if (
+      !pending?.verifier ||
+      !pending.nonce ||
+      pending.provider !== id ||
+      !state ||
+      pending.state !== state
+    ) {
+      return failed(request, "expired", pending?.return);
+    }
+    const back = pending.return;
+    // The person said no at the provider, or it refused them.
+    if (!code) return failed(request, `${id}_refused`, back);
+    const person = await finishOidcSignIn(provider, {
+      code,
+      redirectUri: `${origin(request)}${AUTH}/${id}/callback`,
+      verifier: pending.verifier,
+      nonce: pending.nonce,
+    });
+    return oidcSignedIn(request, id, person, back);
+  }
+
+  /**
+   * The Studio account verified emails sign in as: one they already have, or
+   * one made now from an open invitation for one of them. Inviting someone
+   * from People is then all it takes to let them in with GitHub, Google or
+   * single sign-on: no link to pass on, no password to choose.
+   */
+  async function accountFor(emails: readonly string[], name: string | undefined) {
+    if (!accounts) return null;
+    for (const email of emails) {
+      const found = await accountForSignIn(accounts.db, email);
+      if (found) return found;
+    }
+    for (const email of emails) {
+      const invited = await acceptInviteForEmail(accounts.db, {
+        email,
+        ...(name ? { name } : {}),
+        // Password sign-in stays refused until an admin sends a link to set one.
+        passwordHash: NO_PASSWORD_HASH,
+      });
+      if (invited.ok) return invited.account;
+    }
+    return null;
+  }
+
+  /** Into Studio as an account, with the account's own revocable session. */
+  async function accountRedirect(request: Request, account: StudioAccount, back: string) {
+    return redirect(safeReturn(back), [
+      await accountSession(request, account),
+      cookieHeader(request, OAUTH_COOKIE, "", 0),
+    ]);
+  }
+
+  /**
+   * A verified email is who someone is. Their Studio account, or an open
+   * invitation, decides their role; otherwise GRAFT_STUDIO_EDITORS does. With
+   * none of these they are refused: the provider vouches for who someone is,
+   * not for whether they belong here.
+   */
+  async function oidcSignedIn(
+    request: Request,
+    id: OidcProviderId,
+    person: OidcPerson,
+    back: string,
+  ): Promise<Response> {
+    if (!person.email || !person.emailVerified) return failed(request, "email_unverified", back);
+    const email = person.email.toLowerCase();
+    const account = await accountFor([email], person.name);
+    if (account) return accountRedirect(request, account, back);
+    const role = editors.get(email);
+    if (!role) return failed(request, `${id}_not_allowed`, back);
+    return signedIn(
+      request,
+      { id: email, email, ...(person.name ? { name: person.name } : {}), role, via: id },
+      safeReturn(back),
     );
   }
 
@@ -262,17 +429,22 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
       email?: string | null;
     };
     if (!user.login) return failed(request, "github_refused", back);
-    let email = user.email ?? undefined;
-    if (!email) {
-      const emails = (await (
-        await doFetch(`${apiUrl}/user/emails`, { headers })
-      )
-        .json()
-        .catch(() => [])) as { email: string; primary: boolean; verified: boolean }[];
-      email = Array.isArray(emails)
-        ? emails.find((entry) => entry.primary && entry.verified)?.email
-        : undefined;
-    }
+    // SAFETY: only entries whose fields check out as below are used.
+    const listed = (await (
+      await doFetch(`${apiUrl}/user/emails`, { headers })
+    )
+      .json()
+      .catch(() => [])) as { email?: unknown; primary?: unknown; verified?: unknown }[];
+    // Verified addresses, the primary first: the ones that can stand for this person.
+    const verified = (Array.isArray(listed) ? listed : [])
+      .filter((entry) => entry.verified === true && typeof entry.email === "string")
+      .sort((a, b) => Number(b.primary === true) - Number(a.primary === true))
+      .map((entry) => String(entry.email).toLowerCase());
+    const email = user.email ?? verified[0];
+
+    // Someone in People signs in as their account, whatever the repository says.
+    const account = await accountFor(verified, user.name ?? undefined);
+    if (account) return accountRedirect(request, account, back);
 
     let role: StudioRole | null;
     try {
@@ -338,6 +510,8 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
               user: identity ? userJson(identity) : null,
               methods: {
                 github: Boolean(options.github),
+                google: Boolean(options.google),
+                oidc: options.oidc ? { name: options.oidc.name ?? null } : null,
                 invite: true,
                 password: Boolean(accounts),
               },
@@ -512,6 +686,20 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
             return failed(request, "github_refused", pendingSignIn(request)?.return);
           }
 
+        case "GET /google":
+        case "GET /oidc":
+          return oidcStart(request, url, oidcRoute(route));
+
+        case "GET /google/callback":
+        case "GET /oidc/callback": {
+          const id = oidcRoute(route);
+          try {
+            return await oidcCallback(request, url, id);
+          } catch (error) {
+            return oidcFailed(request, id, error, pendingSignIn(request)?.return);
+          }
+        }
+
         case "GET /link": {
           const invite = verify<InviteData>(
             options.secret,
@@ -566,7 +754,13 @@ function accountIdentity(account: StudioAccount): EditorIdentity {
     ...(account.name ? { name: account.name } : {}),
     role: account.role,
     via: "account",
+    password: account.hasPassword,
   };
+}
+
+/** Which provider an OpenID Connect route is for. */
+function oidcRoute(route: string): OidcProviderId {
+  return route.startsWith("GET /google") ? "google" : "oidc";
 }
 
 function userJson(identity: EditorIdentity) {
@@ -576,6 +770,8 @@ function userJson(identity: EditorIdentity) {
     email: identity.email ?? null,
     role: identity.role,
     via: identity.via,
+    // Only an account with a password has one to change.
+    password: identity.via === "account" && identity.password !== false,
     scopes: ROLE_SCOPES[identity.role],
   };
 }

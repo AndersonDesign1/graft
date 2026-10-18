@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDb, runMigrations, type DbHandle } from "@usegraft/db";
+import { SignJWT } from "jose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setupCode } from "../accounts";
 import type { PeopleDto, WorkspaceDto } from "../editor-types";
@@ -284,5 +285,200 @@ describe.skipIf(!runIntegration)("Studio accounts over HTTP (integration)", () =
     const out = await call("POST", "/api/studio/v1/auth/sign-out", { cookie: owner });
     expect(out.status).toBe(204);
     expect((await call("GET", "/api/studio/v1/workspace", { cookie: owner })).status).toBe(401);
+  });
+
+  it("signs someone in with OIDC as their account, and not once they're removed", async (ctx) => {
+    if (!handle) return ctx.skip();
+    const issuer = "https://auth.shop.test/api/auth";
+    let email = "ANA@shop.test";
+    let nonce = "";
+    // A provider that signs ID tokens with the client secret, as Better
+    // Auth's does when its JWT plugin is off.
+    const provider = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/.well-known/openid-configuration")) {
+        return Response.json({
+          issuer,
+          authorization_endpoint: `${issuer}/oauth2/authorize`,
+          token_endpoint: `${issuer}/oauth2/token`,
+          jwks_uri: `${issuer}/jwks`,
+        });
+      }
+      const idToken = await new SignJWT({ email, email_verified: true, nonce })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuer(issuer)
+        .setAudience("studio")
+        .setSubject("user-1")
+        .setIssuedAt()
+        .setExpirationTime("10m")
+        .sign(new TextEncoder().encode("cs"));
+      return Response.json({ id_token: idToken });
+    }) as typeof fetch;
+    const sso = createStudioHandler({
+      db: handle.db,
+      collections: {},
+      contentDir: "/tmp/graft-none",
+      uiBasePath: "/studio",
+      editors: {
+        secret,
+        accounts: { db: handle.db },
+        oidc: { issuer, clientId: "studio", clientSecret: "cs", fetch: provider },
+      },
+    });
+    async function signIn(): Promise<Response> {
+      const start = await sso(
+        new Request(`${ORIGIN}/api/studio/v1/auth/oidc`, { redirect: "manual" }),
+      );
+      const authorize = new URL(start.headers.get("location") ?? "");
+      nonce = authorize.searchParams.get("nonce") ?? "";
+      const state = authorize.searchParams.get("state");
+      const cookie = start.headers.getSetCookie()[0]?.split(";")[0] ?? "";
+      return sso(
+        new Request(`${ORIGIN}/api/studio/v1/auth/oidc/callback?code=c&state=${state}`, {
+          redirect: "manual",
+          headers: { cookie },
+        }),
+      );
+    }
+
+    const ana = await signIn();
+    expect(ana.headers.get("location")).toBe("/studio/");
+    const session = ana.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0])
+      .find((c) => c?.startsWith("graft_studio=acct_"));
+    if (!session) throw new Error("expected an account session cookie");
+    const who = await call("GET", "/api/studio/v1/auth/session", { cookie: session });
+    expect(who.json.user).toMatchObject({
+      email: "ana@shop.test",
+      role: "admin",
+      via: "account",
+      password: true,
+    });
+    expect((await call("GET", "/api/studio/v1/people", { cookie: session })).status).toBe(200);
+
+    // Inviting someone from People is all single sign-on needs: their first
+    // sign-in uses the invitation, with no link and no password.
+    const invited = await call("POST", "/api/studio/v1/people/invites", {
+      cookie: session,
+      body: { email: "dee@shop.test", role: "viewer" },
+    });
+    expect(invited.status).toBe(201);
+    email = "dee@shop.test";
+    const dee = await signIn();
+    expect(dee.headers.get("location")).toBe("/studio/");
+    const deeSession = dee.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0])
+      .find((c) => c?.startsWith("graft_studio=acct_"));
+    const deeWho = await call("GET", "/api/studio/v1/auth/session", { cookie: deeSession });
+    // No password, so Settings has none to change.
+    expect(deeWho.json.user).toMatchObject({
+      email: "dee@shop.test",
+      role: "viewer",
+      password: false,
+    });
+    const team = (await call("GET", "/api/studio/v1/people", { cookie: session }))
+      .json as PeopleDto;
+    expect(team.people.map((p) => p.email)).toContain("dee@shop.test");
+    expect(team.invites.map((i) => i.email)).not.toContain("dee@shop.test");
+    // The account has no password: password sign-in stays refused.
+    const noPassword = await call("POST", "/api/studio/v1/auth/sign-in", {
+      body: { email: "dee@shop.test", password: "none" },
+    });
+    expect(noPassword.status).toBe(401);
+    // A reset link for someone who can already sign in still needs its link.
+    const deeRow = team.people.find((p) => p.email === "dee@shop.test");
+    await call("POST", `/api/studio/v1/people/${deeRow?.id}/reset`, { cookie: session, body: {} });
+    await signIn();
+    const after = (await call("GET", "/api/studio/v1/people", { cookie: session }))
+      .json as PeopleDto;
+    expect(after.invites.map((i) => i.email)).toContain("dee@shop.test");
+    email = "ANA@shop.test";
+
+    // It is the account's own session row, so signing out ends it for good.
+    await call("POST", "/api/studio/v1/auth/sign-out", { cookie: session });
+    expect((await call("GET", "/api/studio/v1/workspace", { cookie: session })).status).toBe(401);
+
+    // Ben was removed above: the provider still vouches for him, Studio doesn't.
+    email = "ben@shop.test";
+    const ben = await signIn();
+    expect(ben.headers.get("location")).toBe("/studio/?signin=oidc_not_allowed");
+  });
+
+  it("signs someone in with GitHub as their account or their invitation", async (ctx) => {
+    if (!handle) return ctx.skip();
+    const admin = await call("POST", "/api/studio/v1/auth/sign-in", {
+      body: { email: "ana@shop.test", password: "a brand new password" },
+    });
+    expect(admin.status).toBe(200);
+    for (const email of ["frank@shop.test", "gil@shop.test"]) {
+      const invited = await call("POST", "/api/studio/v1/people/invites", {
+        cookie: admin.cookie,
+        body: { email, role: "contributor" },
+      });
+      expect(invited.status).toBe(201);
+    }
+    // Frank's invited address is a second, verified one on his GitHub account;
+    // Gil's is on his account too, but unverified, so it can't stand for him.
+    const github = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/login/oauth/access_token")) return Response.json({ access_token: "t" });
+      if (url.endsWith("/user")) return Response.json({ login: "frank-codes", name: "Frank" });
+      if (url.endsWith("/user/emails")) {
+        return Response.json([
+          { email: "frank@home.test", primary: true, verified: true },
+          { email: "Frank@Shop.test", primary: false, verified: true },
+          { email: "gil@shop.test", primary: false, verified: false },
+        ]);
+      }
+      return new Response("no", { status: 404 });
+    }) as typeof fetch;
+    const viaGitHub = createStudioHandler({
+      db: handle.db,
+      collections: {},
+      contentDir: "/tmp/graft-none",
+      uiBasePath: "/studio",
+      editors: {
+        secret,
+        accounts: { db: handle.db },
+        github: { clientId: "id", clientSecret: "cs", fetch: github },
+      },
+    });
+    async function signIn(): Promise<Response> {
+      const start = await viaGitHub(
+        new Request(`${ORIGIN}/api/studio/v1/auth/github`, { redirect: "manual" }),
+      );
+      const state = new URL(start.headers.get("location") ?? "").searchParams.get("state");
+      const cookie = start.headers.getSetCookie()[0]?.split(";")[0] ?? "";
+      return viaGitHub(
+        new Request(`${ORIGIN}/api/studio/v1/auth/github/callback?code=c&state=${state}`, {
+          redirect: "manual",
+          headers: { cookie },
+        }),
+      );
+    }
+
+    const frank = await signIn();
+    expect(frank.headers.get("location")).toBe("/studio/");
+    const session = frank.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0])
+      .find((c) => c?.startsWith("graft_studio=acct_"));
+    const who = await call("GET", "/api/studio/v1/auth/session", { cookie: session });
+    expect(who.json.user).toMatchObject({
+      email: "frank@shop.test",
+      name: "Frank",
+      role: "contributor",
+      via: "account",
+      password: false,
+    });
+    // Signing in again finds the account the invitation made.
+    expect((await signIn()).headers.get("location")).toBe("/studio/");
+    const team = (await call("GET", "/api/studio/v1/people", { cookie: admin.cookie }))
+      .json as PeopleDto;
+    const open = team.invites.map((i) => i.email);
+    expect(open).not.toContain("frank@shop.test");
+    expect(open).toContain("gil@shop.test");
   });
 });
