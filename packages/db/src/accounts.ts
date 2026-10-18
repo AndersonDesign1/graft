@@ -6,7 +6,7 @@
  * Session and invite tokens arrive as SHA-256 hashes for the same reason: a
  * copy of these tables signs nobody in.
  */
-import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, sql, type SQL } from "drizzle-orm";
 import type { Database } from "./client";
 import { studioInvites, studioSessions, studioUsers, type StudioUserRow } from "./schema";
 
@@ -406,18 +406,46 @@ export async function revokeInvite(db: Database, id: string): Promise<boolean> {
 export async function acceptInvite(
   db: Database,
   input: { tokenHash: string; name?: string; passwordHash: string },
-): Promise<{ ok: true; account: StudioAccount } | { ok: false; reason: "invalid" }> {
+): Promise<InviteUse> {
+  return useInvite(db, eq(studioInvites.tokenHash, input.tokenHash), input);
+}
+
+/**
+ * Use the newest open invitation for an email, for someone who proved they
+ * own the address another way: a verified email from single sign-on. Only for
+ * an address that can't sign in yet. For someone who can, an invitation is a
+ * password reset, and that still takes its link.
+ */
+export async function acceptInviteForEmail(
+  db: Database,
+  input: { email: string; name?: string; passwordHash: string },
+): Promise<InviteUse> {
+  const forEmail = sql`lower(${studioInvites.email}) = lower(${input.email})`;
+  return useInvite(db, forEmail, input, { newAccountsOnly: true });
+}
+
+type InviteUse = { ok: true; account: StudioAccount } | { ok: false; reason: "invalid" };
+
+async function useInvite(
+  db: Database,
+  which: SQL | undefined,
+  input: { name?: string; passwordHash: string },
+  { newAccountsOnly = false } = {},
+): Promise<InviteUse> {
   return db.transaction(async (tx) => {
     await lockAccounts(tx);
     const [row] = await tx
       .select()
       .from(studioInvites)
-      .where(and(eq(studioInvites.tokenHash, input.tokenHash), open))
+      .where(and(which, open))
+      .orderBy(sql`${studioInvites.createdAt} desc`)
+      .limit(1)
       .for("update");
     if (!row) return { ok: false, reason: "invalid" } as const;
     const [current] = await tx.select().from(studioUsers).where(sameEmail(row.email)).limit(1);
     const name = input.name?.trim() || current?.name || row.name;
     const reset = Boolean(current && !current.disabledAt);
+    if (reset && newAccountsOnly) return { ok: false, reason: "invalid" } as const;
     const [saved] = current
       ? await tx
           .update(studioUsers)

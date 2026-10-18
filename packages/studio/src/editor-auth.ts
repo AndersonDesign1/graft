@@ -17,6 +17,7 @@ import { withoutTrailingSlashes } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import {
   acceptInvite,
+  acceptInviteForEmail,
   accountForSignIn,
   countAccounts,
   createOwner,
@@ -119,6 +120,9 @@ export interface EditorAuth {
   /** The principal a session cookie carries, or null. */
   authenticate(request: Request): Promise<StudioPrincipal | null>;
 }
+
+/** The stored password of an account made by single sign-on: it matches nothing. */
+const NO_PASSWORD = "none";
 
 /** Wrong passwords in a row before an account is locked, and for how long. */
 const SIGN_IN_LIMITS = { maxFailures: 5, lockMs: 15 * 60_000 } as const;
@@ -276,15 +280,36 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
   }
 
   /**
-   * A verified email is who someone is. Their Studio account decides their
-   * role when they have one, and they get its revocable session; otherwise
-   * GRAFT_STUDIO_EDITORS does. With neither, they are refused: the provider
-   * vouches for who someone is, not for whether they belong here.
+   * The Studio account a verified email signs in as: the one it already has,
+   * or one made now from an open invitation for that email. Inviting someone
+   * from People is then all it takes to let them in with single sign-on: no
+   * link to pass on, no password to choose.
+   */
+  async function oidcAccount(email: string, name: string | undefined) {
+    if (!accounts) return null;
+    const found = await accountForSignIn(accounts.db, email);
+    if (found) return found;
+    const invited = await acceptInviteForEmail(accounts.db, {
+      email,
+      ...(name ? { name } : {}),
+      // No password yet, and none that could match: password sign-in stays
+      // refused until an admin sends them a link to set one.
+      passwordHash: NO_PASSWORD,
+    });
+    return invited.ok ? invited.account : null;
+  }
+
+  /**
+   * A verified email is who someone is. Their Studio account, or an open
+   * invitation, decides their role, and they get the account's revocable
+   * session; otherwise GRAFT_STUDIO_EDITORS does. With none of these they are
+   * refused: the provider vouches for who someone is, not for whether they
+   * belong here.
    */
   async function oidcSignedIn(request: Request, person: OidcPerson, back: string) {
     if (!person.email || !person.emailVerified) return failed(request, "email_unverified", back);
     const email = person.email.toLowerCase();
-    const account = accounts ? await accountForSignIn(accounts.db, email) : null;
+    const account = await oidcAccount(email, person.name);
     if (account) {
       return redirect(safeReturn(back), [
         await accountSession(request, account),

@@ -351,6 +351,41 @@ describe.skipIf(!runIntegration)("Studio accounts over HTTP (integration)", () =
     const who = await call("GET", "/api/studio/v1/auth/session", { cookie: session });
     expect(who.json.user).toMatchObject({ email: "ana@shop.test", role: "admin", via: "account" });
     expect((await call("GET", "/api/studio/v1/people", { cookie: session })).status).toBe(200);
+
+    // Inviting someone from People is all single sign-on needs: their first
+    // sign-in uses the invitation, with no link and no password.
+    const invited = await call("POST", "/api/studio/v1/people/invites", {
+      cookie: session,
+      body: { email: "dee@shop.test", role: "viewer" },
+    });
+    expect(invited.status).toBe(201);
+    email = "dee@shop.test";
+    const dee = await signIn();
+    expect(dee.headers.get("location")).toBe("/studio/");
+    const deeSession = dee.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0])
+      .find((c) => c?.startsWith("graft_studio=acct_"));
+    const deeWho = await call("GET", "/api/studio/v1/auth/session", { cookie: deeSession });
+    expect(deeWho.json.user).toMatchObject({ email: "dee@shop.test", role: "viewer" });
+    const team = (await call("GET", "/api/studio/v1/people", { cookie: session }))
+      .json as PeopleDto;
+    expect(team.people.map((p) => p.email)).toContain("dee@shop.test");
+    expect(team.invites.map((i) => i.email)).not.toContain("dee@shop.test");
+    // The account has no password: password sign-in stays refused.
+    const noPassword = await call("POST", "/api/studio/v1/auth/sign-in", {
+      body: { email: "dee@shop.test", password: "none" },
+    });
+    expect(noPassword.status).toBe(401);
+    // A reset link for someone who can already sign in still needs its link.
+    const deeRow = team.people.find((p) => p.email === "dee@shop.test");
+    await call("POST", `/api/studio/v1/people/${deeRow?.id}/reset`, { cookie: session, body: {} });
+    await signIn();
+    const after = (await call("GET", "/api/studio/v1/people", { cookie: session }))
+      .json as PeopleDto;
+    expect(after.invites.map((i) => i.email)).toContain("dee@shop.test");
+    email = "ANA@shop.test";
+
     // It is the account's own session row, so signing out ends it for good.
     await call("POST", "/api/studio/v1/auth/sign-out", { cookie: session });
     expect((await call("GET", "/api/studio/v1/workspace", { cookie: session })).status).toBe(401);

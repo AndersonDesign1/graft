@@ -156,8 +156,13 @@ endpoint, and only an email the provider marks verified counts. Then:
 - Someone with a Studio account under that email signs in as that account,
   with its role. Removing them in **Settings, People** keeps them out, whatever
   the provider says.
-- Someone without an account gets in only if `GRAFT_STUDIO_EDITORS` lists their
-  email, with the role it gives.
+- Someone invited from **Settings, People** gets their account on their first
+  single sign-on, with the role they were invited with. To add a person, invite
+  their email and tell them to press the button; there is no link to pass on
+  and no password to choose. If they want a password later, an admin makes
+  them a link to set one.
+- Someone without an account or an invitation gets in only if
+  `GRAFT_STUDIO_EDITORS` lists their email, with the role it gives.
 - Anyone else is refused, and the sign-in screen says to ask for an invitation.
 
 Studio uses the authorization code flow with PKCE, and checks the ID token's
