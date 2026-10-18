@@ -1960,7 +1960,7 @@
   gap: var(--space-4);
 }
 
-.signin-github,
+.signin-provider,
 .signin-submit {
   justify-content: center;
   height: 2.75rem;

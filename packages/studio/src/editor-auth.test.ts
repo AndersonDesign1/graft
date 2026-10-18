@@ -95,7 +95,7 @@ describe("hosted Studio sign-in", () => {
     const session = await handler(new Request(`${ORIGIN}/api/studio/v1/auth/session`));
     expect(await session.json()).toEqual({
       user: null,
-      methods: { github: false, invite: true, password: false },
+      methods: { github: false, oidc: null, invite: true, password: false },
       setup: null,
     });
   });

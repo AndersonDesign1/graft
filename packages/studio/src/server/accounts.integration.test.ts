@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDb, runMigrations, type DbHandle } from "@usegraft/db";
+import { SignJWT } from "jose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setupCode } from "../accounts";
 import type { PeopleDto, WorkspaceDto } from "../editor-types";
@@ -284,5 +285,79 @@ describe.skipIf(!runIntegration)("Studio accounts over HTTP (integration)", () =
     const out = await call("POST", "/api/studio/v1/auth/sign-out", { cookie: owner });
     expect(out.status).toBe(204);
     expect((await call("GET", "/api/studio/v1/workspace", { cookie: owner })).status).toBe(401);
+  });
+
+  it("signs someone in with OIDC as their account, and not once they're removed", async (ctx) => {
+    if (!handle) return ctx.skip();
+    const issuer = "https://auth.shop.test/api/auth";
+    let email = "ANA@shop.test";
+    let nonce = "";
+    // A provider that signs ID tokens with the client secret, as Better
+    // Auth's does when its JWT plugin is off.
+    const provider = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/.well-known/openid-configuration")) {
+        return Response.json({
+          issuer,
+          authorization_endpoint: `${issuer}/oauth2/authorize`,
+          token_endpoint: `${issuer}/oauth2/token`,
+          jwks_uri: `${issuer}/jwks`,
+        });
+      }
+      const idToken = await new SignJWT({ email, email_verified: true, nonce })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuer(issuer)
+        .setAudience("studio")
+        .setSubject("user-1")
+        .setIssuedAt()
+        .setExpirationTime("10m")
+        .sign(new TextEncoder().encode("cs"));
+      return Response.json({ id_token: idToken });
+    }) as typeof fetch;
+    const sso = createStudioHandler({
+      db: handle.db,
+      collections: {},
+      contentDir: "/tmp/graft-none",
+      uiBasePath: "/studio",
+      editors: {
+        secret,
+        accounts: { db: handle.db },
+        oidc: { issuer, clientId: "studio", clientSecret: "cs", fetch: provider },
+      },
+    });
+    async function signIn(): Promise<Response> {
+      const start = await sso(
+        new Request(`${ORIGIN}/api/studio/v1/auth/oidc`, { redirect: "manual" }),
+      );
+      const authorize = new URL(start.headers.get("location") ?? "");
+      nonce = authorize.searchParams.get("nonce") ?? "";
+      const state = authorize.searchParams.get("state");
+      const cookie = start.headers.getSetCookie()[0]?.split(";")[0] ?? "";
+      return sso(
+        new Request(`${ORIGIN}/api/studio/v1/auth/oidc/callback?code=c&state=${state}`, {
+          redirect: "manual",
+          headers: { cookie },
+        }),
+      );
+    }
+
+    const ana = await signIn();
+    expect(ana.headers.get("location")).toBe("/studio/");
+    const session = ana.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0])
+      .find((c) => c?.startsWith("graft_studio=acct_"));
+    if (!session) throw new Error("expected an account session cookie");
+    const who = await call("GET", "/api/studio/v1/auth/session", { cookie: session });
+    expect(who.json.user).toMatchObject({ email: "ana@shop.test", role: "admin", via: "account" });
+    expect((await call("GET", "/api/studio/v1/people", { cookie: session })).status).toBe(200);
+    // It is the account's own session row, so signing out ends it for good.
+    await call("POST", "/api/studio/v1/auth/sign-out", { cookie: session });
+    expect((await call("GET", "/api/studio/v1/workspace", { cookie: session })).status).toBe(401);
+
+    // Ben was removed above: the provider still vouches for him, Studio doesn't.
+    email = "ben@shop.test";
+    const ben = await signIn();
+    expect(ben.headers.get("location")).toBe("/studio/?signin=oidc_not_allowed");
   });
 });

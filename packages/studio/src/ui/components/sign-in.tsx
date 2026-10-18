@@ -1,7 +1,7 @@
 /**
  * The door to a hosted Studio. One screen: create the owner account on the
- * first visit, otherwise sign in with an account, GitHub or a link, and a
- * reason in plain words when the last attempt did not work.
+ * first visit, otherwise sign in with an account, GitHub, single sign-on or a
+ * link, and a reason in plain words when the last attempt did not work.
  */
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
@@ -14,6 +14,13 @@ const REASONS: Record<string, string> = {
   github_off: "Signing in with GitHub isn't set up for this Studio. Use the link you were sent.",
   access_unchecked:
     "Studio couldn't check your access with GitHub. Whoever runs the site can see why in its log.",
+  oidc_not_allowed:
+    "That account doesn't have access to this Studio. Ask whoever runs the site to invite you.",
+  oidc_refused:
+    "Single sign-on didn't complete. Try again. If it keeps happening, whoever runs the site can see why in its log.",
+  oidc_off: "Single sign-on isn't set up for this Studio. Sign in another way.",
+  email_unverified:
+    "Your sign-on account has no verified email, so Studio can't tell who you are. Verify your email with your provider, then try again.",
 };
 
 const ROLE_WORDS: Record<string, string> = {
@@ -24,7 +31,13 @@ const ROLE_WORDS: Record<string, string> = {
 };
 
 interface SessionInfo {
-  methods: { github: boolean; invite: boolean; password?: boolean };
+  methods: {
+    github: boolean;
+    /** Single sign-on with an OIDC provider, and the provider's name for the button. */
+    oidc?: { name: string | null } | null;
+    invite: boolean;
+    password?: boolean;
+  };
   setup: { needsCode: boolean } | null;
 }
 
@@ -227,6 +240,7 @@ export function SignIn() {
   const search = query.toString();
   const returnTo = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
   const password = Boolean(session?.methods.password);
+  const oidc = session?.methods.oidc ?? null;
 
   return (
     <Card title="Sign in to edit" lede="Drafts you save here stay drafts until they're published.">
@@ -261,7 +275,7 @@ export function SignIn() {
       ) : null}
       {session?.methods.github ? (
         <a
-          className="btn signin-github"
+          className="btn signin-provider"
           data-variant={password ? undefined : "primary"}
           href={`${AUTH}/github?return=${encodeURIComponent(returnTo)}`}
         >
@@ -272,6 +286,15 @@ export function SignIn() {
             />
           </svg>
           Continue with GitHub
+        </a>
+      ) : null}
+      {oidc ? (
+        <a
+          className="btn signin-provider"
+          data-variant={password || session?.methods.github ? undefined : "primary"}
+          href={`${AUTH}/oidc?return=${encodeURIComponent(returnTo)}`}
+        >
+          {oidc.name ? `Continue with ${oidc.name}` : "Continue with single sign-on"}
         </a>
       ) : null}
       <p className="signin-invite">

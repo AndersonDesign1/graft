@@ -60,8 +60,10 @@ on GitHub instead of the content directory. See
 | `GRAFT_STUDIO_PORT` | Port for `graft studio`. Default `4983` |
 | `GRAFT_STUDIO_SECRET` | Turns on sign-in. At least 32 random characters. Signs session cookies and invite links, so changing it signs everyone out |
 | `GRAFT_STUDIO_URL` | Public origin people reach Studio on. GitHub sign-in and `graft studio invite` need it |
-| `GRAFT_STUDIO_EDITORS` | Who may sign in with GitHub, as comma-separated logins or emails, each with an optional `=role` (default `editor`). Unset lets anyone with write access to the repository sign in. Invite links work regardless |
+| `GRAFT_STUDIO_EDITORS` | Who may sign in with GitHub or single sign-on without a Studio account, as comma-separated logins or emails, each with an optional `=role` (default `editor`). Unset lets anyone with write access to the repository sign in with GitHub. Invite links work regardless |
 | `GRAFT_GITHUB_CLIENT_ID` / `GRAFT_GITHUB_CLIENT_SECRET` | A GitHub OAuth app, for "Sign in with GitHub". Set both or neither |
+| `GRAFT_OIDC_ISSUER` / `GRAFT_OIDC_CLIENT_ID` / `GRAFT_OIDC_CLIENT_SECRET` | An OpenID Connect provider, for single sign-on: your app's Better Auth, Okta, Entra ID and others. Set all three or none. See [Host Studio for your team](/docs/studio-hosting#2-let-people-sign-in) |
+| `GRAFT_OIDC_NAME` | The provider's name on the single sign-on button. Optional |
 | `GRAFT_GITHUB_REPO` | `owner/name`. Studio and MCP writes go to draft branches in this repository |
 | `GRAFT_GITHUB_TOKEN` | A fine-grained token with Contents and Pull requests read and write |
 | `GRAFT_GITHUB_APP_ID` / `GRAFT_GITHUB_APP_PRIVATE_KEY` | A GitHub App instead of a token. The key is PEM, literal `\n` accepted |

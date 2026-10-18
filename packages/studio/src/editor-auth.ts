@@ -1,10 +1,12 @@
 /**
  * Sign-in for a hosted Studio: a Studio account (email and password), GitHub,
- * or an invite link made on the command line.
+ * an OpenID Connect provider, or an invite link made on the command line.
  *
  * An account's session is a random token whose hash is a row in Postgres, so
  * signing out, removing someone or changing their role takes effect on their
- * next request. GitHub and command-line links still sign a stateless cookie.
+ * next request. An OIDC sign-in for someone with an account gets that same
+ * session. GitHub, command-line links and OIDC sign-ins admitted by
+ * GRAFT_STUDIO_EDITORS still sign a stateless cookie.
  *
  * These routes are the only ones a signed-out browser may reach, so they sit
  * in front of the API's scope table rather than in it. Everything else still
@@ -39,6 +41,7 @@ import {
   setupCodeMatches,
   verifyPassword,
 } from "./accounts";
+import { finishOidcSignIn, startOidcSignIn, type OidcPerson, type OidcSignInOptions } from "./oidc";
 import { assertSameOrigin, errorResponse, statusFor, type StudioPrincipal } from "./api";
 import {
   OAUTH_COOKIE,
@@ -79,6 +82,11 @@ export interface EditorAuthOptions {
   /** Who may sign in with GitHub, and as what. Empty: decided by `permissionOf`. */
   editors?: ReadonlyMap<string, StudioRole>;
   github?: GitHubSignInOptions;
+  /**
+   * An OpenID Connect provider. Someone it signs in is admitted by their
+   * verified email: their Studio account's role, else GRAFT_STUDIO_EDITORS.
+   */
+  oidc?: OidcSignInOptions;
   /** A login's permission on the content repository, from the store's credentials. */
   permissionOf?: (login: string) => Promise<string>;
   /**
@@ -95,6 +103,14 @@ export interface EditorAuthOptions {
      */
     setupWithoutCode?: boolean;
   };
+}
+
+/** What the OAuth state cookie holds between leaving for a provider and coming back. */
+interface PendingSignIn {
+  state: string;
+  return: string;
+  verifier?: string;
+  nonce?: string;
 }
 
 export interface EditorAuth {
@@ -135,8 +151,8 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     return verify<EditorIdentity>(options.secret, "session", raw);
   }
 
-  /** A new session for an account, answered as JSON with its cookie. */
-  async function accountSignedIn(request: Request, account: StudioAccount): Promise<Response> {
+  /** A new session row for an account, as the cookie that carries it. */
+  async function accountSession(request: Request, account: StudioAccount): Promise<string> {
     if (!accounts) throw accountsOff();
     const { token, hash } = newToken();
     await createSession(accounts.db, {
@@ -144,8 +160,13 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
       userId: account.id,
       expiresAt: new Date(Date.now() + SESSION_TTL_MS),
     });
+    return cookieHeader(request, SESSION_COOKIE, token, SESSION_TTL_MS);
+  }
+
+  /** A new session for an account, answered as JSON with its cookie. */
+  async function accountSignedIn(request: Request, account: StudioAccount): Promise<Response> {
     const headers = new Headers({ "cache-control": "no-store" });
-    headers.append("set-cookie", cookieHeader(request, SESSION_COOKIE, token, SESSION_TTL_MS));
+    headers.append("set-cookie", await accountSession(request, account));
     return Response.json({ user: userJson(accountIdentity(account)) }, { headers });
   }
 
@@ -207,18 +228,75 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     ]);
   }
 
+  /**
+   * The provider was unreachable, or what it sent didn't check out. The screen
+   * says the sign-in didn't complete; the operator gets the reason in the log.
+   */
+  function oidcFailed(request: Request, error: unknown, returnTo?: string): Response {
+    console.error(
+      "graft studio: OIDC sign-in failed:",
+      error instanceof Error ? error.message : error,
+    );
+    return failed(request, "oidc_refused", returnTo);
+  }
+
   /** Only a path on this origin, so the parameter cannot become an open redirect. */
   function safeReturn(raw: string | null): string {
     if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return ui;
     return raw;
   }
 
-  /** The signed OAuth state cookie set when sign-in started, if it is valid. */
-  function pendingSignIn(request: Request): { state: string; return: string } | null {
-    return verify<{ state: string; return: string }>(
-      options.secret,
-      "oauth",
-      readCookie(request, OAUTH_COOKIE),
+  /**
+   * The signed OAuth state cookie set when sign-in started, if it is valid.
+   * An OIDC sign-in also keeps its PKCE verifier and nonce there.
+   */
+  function pendingSignIn(request: Request): PendingSignIn | null {
+    return verify<PendingSignIn>(options.secret, "oauth", readCookie(request, OAUTH_COOKIE));
+  }
+
+  async function oidcCallback(request: Request, url: URL): Promise<Response> {
+    const oidc = options.oidc;
+    if (!oidc) return failed(request, "oidc_off");
+    const pending = pendingSignIn(request);
+    const state = url.searchParams.get("state");
+    const code = url.searchParams.get("code");
+    if (!pending?.verifier || !pending.nonce || !state || pending.state !== state) {
+      return failed(request, "expired", pending?.return);
+    }
+    const back = pending.return;
+    // The person said no at the provider, or it refused them.
+    if (!code) return failed(request, "oidc_refused", back);
+    const person = await finishOidcSignIn(oidc, {
+      code,
+      redirectUri: `${origin(request)}${AUTH}/oidc/callback`,
+      verifier: pending.verifier,
+      nonce: pending.nonce,
+    });
+    return oidcSignedIn(request, person, back);
+  }
+
+  /**
+   * A verified email is who someone is. Their Studio account decides their
+   * role when they have one, and they get its revocable session; otherwise
+   * GRAFT_STUDIO_EDITORS does. With neither, they are refused: the provider
+   * vouches for who someone is, not for whether they belong here.
+   */
+  async function oidcSignedIn(request: Request, person: OidcPerson, back: string) {
+    if (!person.email || !person.emailVerified) return failed(request, "email_unverified", back);
+    const email = person.email.toLowerCase();
+    const account = accounts ? await accountForSignIn(accounts.db, email) : null;
+    if (account) {
+      return redirect(safeReturn(back), [
+        await accountSession(request, account),
+        cookieHeader(request, OAUTH_COOKIE, "", 0),
+      ]);
+    }
+    const role = editors.get(email);
+    if (!role) return failed(request, "oidc_not_allowed", back);
+    return signedIn(
+      request,
+      { id: email, email, ...(person.name ? { name: person.name } : {}), role, via: "oidc" },
+      safeReturn(back),
     );
   }
 
@@ -338,6 +416,7 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
               user: identity ? userJson(identity) : null,
               methods: {
                 github: Boolean(options.github),
+                oidc: options.oidc ? { name: options.oidc.name ?? null } : null,
                 invite: true,
                 password: Boolean(accounts),
               },
@@ -510,6 +589,35 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
             // A network failure talking to GitHub: still go back where the
             // person started, if the sign-in got far enough to record it.
             return failed(request, "github_refused", pendingSignIn(request)?.return);
+          }
+
+        case "GET /oidc": {
+          if (!options.oidc) return failed(request, "oidc_off");
+          const state = randomState();
+          const back = safeReturn(url.searchParams.get("return"));
+          let start: Awaited<ReturnType<typeof startOidcSignIn>>;
+          try {
+            start = await startOidcSignIn(options.oidc, {
+              redirectUri: `${origin(request)}${AUTH}/oidc/callback`,
+              state,
+            });
+          } catch (error) {
+            return oidcFailed(request, error, back);
+          }
+          const pending = sign<PendingSignIn>(
+            options.secret,
+            "oauth",
+            { state, return: back, verifier: start.verifier, nonce: start.nonce },
+            10 * 60_000,
+          );
+          return redirect(start.url, [cookieHeader(request, OAUTH_COOKIE, pending, 10 * 60_000)]);
+        }
+
+        case "GET /oidc/callback":
+          try {
+            return await oidcCallback(request, url);
+          } catch (error) {
+            return oidcFailed(request, error, pendingSignIn(request)?.return);
           }
 
         case "GET /link": {

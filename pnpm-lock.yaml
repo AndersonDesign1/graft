@@ -921,6 +921,9 @@ importers:
       '@usegraft/mdx-safety':
         specifier: workspace:*
         version: link:../mdx-safety
+      jose:
+        specifier: ^6.2.10
+        version: 6.2.10
     devDependencies:
       '@base-ui-components/react':
         specifier: 1.0.0-rc.0

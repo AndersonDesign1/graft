@@ -93,9 +93,10 @@ including `collections` that are always reviewed, or turn it off with
 
 Set `GRAFT_STUDIO_SECRET` to at least 32 random characters
 (`openssl rand -base64 48`). Sign-in is off until it is set. Studio signs
-GitHub sessions and command-line invite links with it, so changing it signs
-out everyone who came in that way and voids those links. Account sessions live
-in your database and are not affected.
+GitHub sessions, single sign-on sessions for people without an account, and
+command-line invite links with it, so changing it signs out everyone who came
+in that way and voids those links. Account sessions live in your database and
+are not affected.
 
 **Studio accounts.** People sign in with an email and a password, kept in your
 database. The first time anyone opens Studio, it asks for the owner account.
@@ -131,6 +132,73 @@ To choose who can sign in with GitHub, and with which role, set
 GRAFT_STUDIO_EDITORS="ana@shop.example.com=admin, octocat, ben@shop.example.com=contributor"
 ```
 
+**Single sign-on (OIDC).** People sign in with an OpenID Connect provider
+your team already uses: your app's own Better Auth, Okta, Microsoft Entra ID,
+Google Workspace, Keycloak and others. Register Studio with the provider as a
+web application whose redirect URI is
+`https://<your-site>/api/studio/v1/auth/oidc/callback`, then set:
+
+| Variable | Value |
+| --- | --- |
+| `GRAFT_OIDC_ISSUER` | The provider's issuer URL, the one its tokens carry in `iss`. Studio reads `<issuer>/.well-known/openid-configuration` |
+| `GRAFT_OIDC_CLIENT_ID` | The client ID the provider gave Studio |
+| `GRAFT_OIDC_CLIENT_SECRET` | Its client secret |
+| `GRAFT_OIDC_NAME` | Optional. The provider's name on the button, as in "Continue with Acme". Default "Continue with single sign-on" |
+| `GRAFT_STUDIO_URL` | The public origin, such as `https://shop.example.com` |
+
+Set the first three together. Studio refuses to start with only some of them,
+and with an issuer that isn't https (plain http works only on localhost).
+
+The provider says who someone is; Studio decides whether they get in. It
+reads the person's email from the ID token, or from the provider's userinfo
+endpoint, and only an email the provider marks verified counts. Then:
+
+- Someone with a Studio account under that email signs in as that account,
+  with its role. Removing them in **Settings, People** keeps them out, whatever
+  the provider says.
+- Someone without an account gets in only if `GRAFT_STUDIO_EDITORS` lists their
+  email, with the role it gives.
+- Anyone else is refused, and the sign-in screen says to ask for an invitation.
+
+Studio uses the authorization code flow with PKCE, and checks the ID token's
+signature, issuer, audience, expiry and nonce. If a sign-in fails, the screen
+says it didn't complete and the server log says why.
+
+To sign in with your app's **Better Auth**, add its OAuth provider plugin
+(Better Auth 1.7 replaced the old OIDC provider plugin with it):
+
+```ts
+import { oauthProvider } from "@better-auth/oauth-provider";
+import { betterAuth } from "better-auth";
+import { jwt } from "better-auth/plugins";
+
+export const auth = betterAuth({
+  // ...your database and sign-in methods, as before
+  disabledPaths: ["/token"],
+  plugins: [jwt(), oauthProvider({ loginPage: "/sign-in", consentPage: "/consent" })],
+});
+```
+
+Register Studio once, as a signed-in user of your app. `skip_consent` spares
+your team a consent screen for your own tool:
+
+```ts
+const studio = await auth.api.adminCreateOAuthClient({
+  headers, // the signed-in user's request headers
+  body: {
+    client_name: "Graft Studio",
+    redirect_uris: ["https://shop.example.com/api/studio/v1/auth/oidc/callback"],
+    skip_consent: true,
+  },
+});
+```
+
+Put `studio.client_id` and `studio.client_secret` in `GRAFT_OIDC_CLIENT_ID`
+and `GRAFT_OIDC_CLIENT_SECRET`. The issuer is your app's Better Auth base URL,
+such as `https://shop.example.com/api/auth`. Better Auth only lets a client
+registered as `application_type: "native"` use an http redirect on localhost,
+so register that way to try it out before Studio is on https.
+
 **Command-line invite links** sign someone in without an account:
 
 ```sh
@@ -141,7 +209,8 @@ This prints a link that signs Ana in. It lasts seven days (`--days` sets 1 to
 30). Send it privately: anyone with the link can use it until it expires.
 Commits from an invited editor carry their name and email. An invite link
 grants the role it was made with on its own: `GRAFT_STUDIO_EDITORS` applies to
-GitHub sign-in only, so an invited person does not need to be on that list.
+GitHub and single sign-on only, so an invited person does not need to be on
+that list.
 
 ### Roles
 
