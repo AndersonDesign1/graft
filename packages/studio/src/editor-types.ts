@@ -162,6 +162,8 @@ export interface InviteDto {
 export interface PeopleDto {
   people: PersonDto[];
   invites: InviteDto[];
+  /** Email domains whose people join on their own (GRAFT_STUDIO_AUTO_JOIN). */
+  autoJoin: { domain: string; role: StudioRoleName }[];
 }
 
 export interface DraftChangeDto {

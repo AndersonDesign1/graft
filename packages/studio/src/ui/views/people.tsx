@@ -3,8 +3,9 @@
  *
  * People is for admins: who can sign in, as what, and invitations nobody has
  * used yet. An invitation is a link the admin passes on; Studio sends no
- * email, so the link is shown once, with a copy button. With single sign-on,
- * the invitation is enough on its own: the person signs in with the provider.
+ * email, so the link is shown once, with a copy button. With GitHub, Google
+ * or single sign-on, the invitation is enough on its own: the person signs in
+ * with one of them. Domains that join on their own are listed too.
  */
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -21,6 +22,10 @@ const ROLES: Array<{ id: StudioRoleName; label: string; can: string }> = [
   { id: "editor", label: "Editor", can: "Drafts and publishes" },
   { id: "admin", label: "Admin", can: "Publishes, approves, invites people and runs the site" },
 ];
+
+function roleLabel(role: StudioRoleName): string {
+  return ROLES.find((r) => r.id === role)?.label ?? role;
+}
 
 function RoleSelect({
   id,
@@ -65,14 +70,24 @@ function expires(invite: InviteDto): string {
   return `Invited as ${role}. The link works until ${date}.`;
 }
 
-/** The single sign-on button's words, when this Studio has single sign-on. */
-function useSingleSignOn(): string | null {
-  const session = useResource<{ methods?: { oidc?: { name: string | null } | null } }>(
-    "/auth/session",
-  );
-  const oidc = session.data?.methods?.oidc;
-  if (!oidc) return null;
-  return oidc.name ? `Continue with ${oidc.name}` : "Continue with single sign-on";
+/**
+ * The ways an invited person can sign in without a password, in words: the
+ * buttons this Studio shows ("GitHub, Google or Okta"). Null without any.
+ */
+function useSignInButtons(): string | null {
+  const session = useResource<{
+    methods?: { github?: boolean; google?: boolean; oidc?: { name: string | null } | null };
+  }>("/auth/session");
+  const methods = session.data?.methods;
+  const names = [
+    ...(methods?.github ? ["GitHub"] : []),
+    ...(methods?.google ? ["Google"] : []),
+    ...(methods?.oidc ? [methods.oidc.name ?? "single sign-on"] : []),
+  ];
+  if (names.length === 0) return null;
+  return names.length === 1
+    ? (names[0] ?? null)
+    : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
 }
 
 function InviteForm({ onInvited, sso }: { onInvited: () => void; sso: string | null }) {
@@ -105,7 +120,7 @@ function InviteForm({ onInvited, sso }: { onInvited: () => void; sso: string | n
       label="Invite someone"
       hint={
         sso
-          ? `They can press ${sso} on the sign-in screen, or use a link to choose a password. Studio doesn't send email, so tell them yourself.`
+          ? `They can sign in with ${sso}, or use a link to choose a password. Studio doesn't send email, so tell them yourself.`
           : "They get a link to choose a password. Studio doesn't send email, so pass the link on yourself."
       }
       stack
@@ -135,7 +150,7 @@ function InviteForm({ onInvited, sso }: { onInvited: () => void; sso: string | n
         <div className="people-link" role="status">
           <p className="set-row-hint">
             {sso
-              ? `${link.email} can now press ${sso} on the sign-in screen. Or send them this link, privately, to choose a password instead. It works once, for 7 days, and this is the only time it's shown.`
+              ? `${link.email} can now sign in with ${sso}. Or send them this link, privately, to choose a password instead. It works once, for 7 days, and this is the only time it's shown.`
               : `Send this link to ${link.email}, privately. It works once, for 7 days, and this is the only time it's shown.`}
           </p>
           <div className="people-link-value">
@@ -269,11 +284,20 @@ function InviteRow({ invite, onChanged }: { invite: InviteDto; onChanged: () => 
 
 export function PeoplePanel() {
   const people = useResource<PeopleDto>("/people");
-  const sso = useSingleSignOn();
+  const sso = useSignInButtons();
   const refresh = (): void => void people.refresh();
   return (
     <div className="set-panel">
       <InviteForm onInvited={refresh} sso={sso} />
+      {people.data?.autoJoin.map((rule) => (
+        <Row
+          key={rule.domain}
+          label={`Anyone at ${rule.domain}`}
+          hint={`Joins on their first sign-in with a verified @${rule.domain} email. Set by GRAFT_STUDIO_AUTO_JOIN where Studio runs.`}
+        >
+          <span>{roleLabel(rule.role)}</span>
+        </Row>
+      ))}
       {people.error ? (
         <Row label="Couldn't load people" hint={people.error} />
       ) : (

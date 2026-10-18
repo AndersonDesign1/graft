@@ -21,6 +21,7 @@ import {
   acceptInvite,
   acceptInviteForEmail,
   accountForSignIn,
+  autoJoinAccount,
   countAccounts,
   createOwner,
   createSession,
@@ -56,6 +57,7 @@ import { assertSameOrigin, errorResponse, statusFor, type StudioPrincipal } from
 import {
   OAUTH_COOKIE,
   ROLE_SCOPES,
+  autoJoinRule,
   SESSION_COOKIE,
   SESSION_TTL_MS,
   cookieHeader,
@@ -64,6 +66,7 @@ import {
   roleForRepoPermission,
   sign,
   verify,
+  type AutoJoinRule,
   type EditorIdentity,
   type InviteData,
   type StudioRole,
@@ -100,6 +103,12 @@ export interface EditorAuthOptions {
    * account's role, an open invitation's, else GRAFT_STUDIO_EDITORS's.
    */
   oidc?: OidcSignInOptions;
+  /**
+   * Email domains whose people join on their own with a role, when they sign
+   * in with GitHub, Google or single sign-on and have no account or
+   * invitation (GRAFT_STUDIO_AUTO_JOIN).
+   */
+  autoJoin?: readonly AutoJoinRule[];
   /** A login's permission on the content repository, from the store's credentials. */
   permissionOf?: (login: string) => Promise<string>;
   /**
@@ -158,6 +167,7 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
   const editors = options.editors ?? new Map<string, StudioRole>();
 
   const accounts = options.accounts;
+  const autoJoin = options.autoJoin ?? [];
 
   const oidcProviders = new Map<OidcProviderId, OidcSignInOptions>();
   if (options.google) oidcProviders.set("google", googleProvider(options.google));
@@ -353,6 +363,35 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
       });
       if (invited.ok) return invited.account;
     }
+    // A domain that joins on its own: an account with the domain's role, so
+    // the person shows up in People and an admin can change or remove them.
+    for (const email of emails) {
+      const rule = autoJoinRule(autoJoin, email);
+      if (!rule) continue;
+      const joined = await autoJoinAccount(accounts.db, {
+        email,
+        ...(name ? { name } : {}),
+        role: rule.role,
+        passwordHash: NO_PASSWORD_HASH,
+      });
+      if (joined) return joined;
+    }
+    return null;
+  }
+
+  /**
+   * Without accounts there is no People to add anyone to, so a domain that
+   * joins on its own is admitted like GRAFT_STUDIO_EDITORS: a signed session
+   * with the domain's role.
+   */
+  function joinedWithoutAccounts(
+    emails: readonly string[],
+  ): { email: string; role: StudioRole } | null {
+    if (accounts) return null;
+    for (const email of emails) {
+      const rule = autoJoinRule(autoJoin, email);
+      if (rule) return { email, role: rule.role };
+    }
     return null;
   }
 
@@ -380,7 +419,7 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     const email = person.email.toLowerCase();
     const account = await accountFor([email], person.name);
     if (account) return accountRedirect(request, account, back);
-    const role = editors.get(email);
+    const role = editors.get(email) ?? joinedWithoutAccounts([email])?.role;
     if (!role) return failed(request, `${id}_not_allowed`, back);
     return signedIn(
       request,
@@ -445,6 +484,20 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     // Someone in People signs in as their account, whatever the repository says.
     const account = await accountFor(verified, user.name ?? undefined);
     if (account) return accountRedirect(request, account, back);
+    const joined = joinedWithoutAccounts(verified);
+    if (joined) {
+      return signedIn(
+        request,
+        {
+          id: user.login,
+          ...(user.name ? { name: user.name } : {}),
+          email: joined.email,
+          role: joined.role,
+          via: "github",
+        },
+        safeReturn(back),
+      );
+    }
 
     let role: StudioRole | null;
     try {

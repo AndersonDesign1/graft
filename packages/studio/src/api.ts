@@ -148,6 +148,8 @@ export interface StudioApiOptions {
     publicUrl?: string;
     /** Where the UI is mounted, so a link opens it. */
     uiBasePath: string;
+    /** Domains whose people join on their own, shown in People. */
+    autoJoin?: readonly { domain: string; role: string }[];
   };
 }
 

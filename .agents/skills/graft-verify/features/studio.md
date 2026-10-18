@@ -24,6 +24,10 @@ edits a page.
   `GRAFT_OIDC_CLIENT_SECRET` set, the sign-in screen offers "Continue with
   <GRAFT_OIDC_NAME>". A verified email signs in as its Studio account, or with
   the role `GRAFT_STUDIO_EDITORS` gives it; anyone else is refused.
+- `studio.auto-join`: with `GRAFT_STUDIO_AUTO_JOIN="shop.test=editor"`, a
+  verified `@shop.test` email signing in with GitHub, Google or single sign-on
+  becomes an account with that role, listed in People with an "Anyone at
+  shop.test" row. Someone removed in People is refused on their next sign-in.
 
 ## How to get to it (user POV)
 

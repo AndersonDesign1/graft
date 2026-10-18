@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { SignJWT, exportJWK, generateKeyPair, type JWTPayload } from "jose";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStudioHandler } from "./handler";
-import { editorAccessFromEnv, parseEditorList } from "./session";
+import { editorAccessFromEnv, parseAutoJoin, parseEditorList } from "./session";
 
 const secret = "s".repeat(40);
 const base = { db: {} as never, collections: {}, contentDir: "/tmp/graft-none" };
@@ -515,6 +515,118 @@ describe("Sign in with Google", () => {
       }),
     );
     expect(crossed.headers.get("location")).toBe("/studio/?signin=expired");
+  });
+});
+
+describe("Auto-join by email domain", () => {
+  it("reads domains with an optional role, contributor by default", () => {
+    expect(parseAutoJoin(" shop.test=editor, @Agency.Example ")).toEqual([
+      { domain: "shop.test", role: "editor" },
+      { domain: "agency.example", role: "contributor" },
+    ]);
+    expect(parseAutoJoin(undefined)).toEqual([]);
+    expect(
+      editorAccessFromEnv({ GRAFT_STUDIO_SECRET: secret, GRAFT_STUDIO_AUTO_JOIN: "shop.test" })
+        ?.autoJoin,
+    ).toEqual([{ domain: "shop.test", role: "contributor" }]);
+  });
+
+  it("refuses admin, open mail providers and things that aren't domains", () => {
+    const refusal = (raw: string) => {
+      try {
+        parseAutoJoin(raw);
+      } catch (error) {
+        const { message, fix } = error as { message: string; fix: string };
+        return `${message} ${fix}`;
+      }
+      return "accepted";
+    };
+    expect(refusal("shop.test=admin")).toMatch(/the role "admin".*Nobody joins as an admin/);
+    expect(refusal("gmail.com")).toMatch(/anyone could join/);
+    expect(refusal("shop.test=owner")).toMatch(/viewer, contributor and editor/);
+    expect(refusal("localhost")).toMatch(/isn't an email domain/);
+    expect(refusal("ana@shop.test")).toMatch(/isn't an email domain/);
+  });
+
+  it("without accounts, admits a verified email at the domain with its role", async () => {
+    const handler = (provider: ReturnType<typeof fakeProvider>) =>
+      createStudioHandler({
+        ...base,
+        uiBasePath: "/studio",
+        editors: {
+          secret,
+          autoJoin: parseAutoJoin("shop.test=viewer"),
+          oidc: { issuer: ISSUER, clientId: "studio", clientSecret: "cs", fetch: provider.stub },
+        },
+      });
+    const colleague = fakeProvider({ claims: { email: "Zoe@Shop.test", email_verified: true } });
+    const joined = handler(colleague);
+    const { done } = await flow(joined, colleague);
+    expect(await sessionUser(joined, cookiesFrom(done))).toMatchObject({
+      id: "zoe@shop.test",
+      role: "viewer",
+      via: "oidc",
+    });
+
+    // Another domain, or the right one unverified, stays out.
+    const outsider = fakeProvider({
+      claims: { email: "zoe@shop.test.evil", email_verified: true },
+    });
+    expect((await flow(handler(outsider), outsider)).done.headers.get("location")).toContain(
+      "signin=oidc_not_allowed",
+    );
+    const unverified = fakeProvider({ claims: { email: "zoe@shop.test", email_verified: false } });
+    expect((await flow(handler(unverified), unverified)).done.headers.get("location")).toContain(
+      "signin=email_unverified",
+    );
+  });
+
+  it("without accounts, admits a GitHub user by a verified address at the domain", async () => {
+    const github = (emails: { email: string; primary: boolean; verified: boolean }[]) =>
+      (async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.endsWith("/login/oauth/access_token")) return Response.json({ access_token: "t" });
+        if (url.endsWith("/user")) return Response.json({ login: "zoe-codes" });
+        if (url.endsWith("/user/emails")) return Response.json(emails);
+        return new Response("no", { status: 404 });
+      }) as typeof fetch;
+    async function signIn(emails: { email: string; primary: boolean; verified: boolean }[]) {
+      const handler = createStudioHandler({
+        ...base,
+        uiBasePath: "/studio",
+        editors: {
+          secret,
+          autoJoin: parseAutoJoin("shop.test=editor"),
+          github: { clientId: "id", clientSecret: "cs", fetch: github(emails) },
+        },
+      });
+      const start = await handler(
+        new Request(`${ORIGIN}/api/studio/v1/auth/github`, { redirect: "manual" }),
+      );
+      const state = new URL(start.headers.get("location") as string).searchParams.get("state");
+      const done = await handler(
+        new Request(`${ORIGIN}/api/studio/v1/auth/github/callback?code=c&state=${state}`, {
+          redirect: "manual",
+          headers: { cookie: cookiesFrom(start) },
+        }),
+      );
+      return { handler, done };
+    }
+    const { handler, done } = await signIn([
+      { email: "zoe@home.test", primary: true, verified: true },
+      { email: "zoe@shop.test", primary: false, verified: true },
+    ]);
+    expect(await sessionUser(handler, cookiesFrom(done))).toMatchObject({
+      id: "zoe-codes",
+      email: "zoe@shop.test",
+      role: "editor",
+      via: "github",
+    });
+    const { done: refused } = await signIn([
+      { email: "zoe@home.test", primary: true, verified: true },
+      { email: "zoe@shop.test", primary: false, verified: false },
+    ]);
+    expect(refused.headers.get("location")).toBe("/studio/?signin=not_allowed");
   });
 });
 

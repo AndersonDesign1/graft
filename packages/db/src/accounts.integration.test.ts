@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   acceptInvite,
   accountForSignIn,
+  autoJoinAccount,
   countAccounts,
   createInvite,
   createOwner,
@@ -52,6 +53,14 @@ describe.skipIf(!runIntegration)("Studio accounts (live)", () => {
   afterAll(async () => {
     await scratch?.drop();
   }, TIMEOUT);
+
+  it("lets nobody auto-join before the owner exists", async (ctx) => {
+    if (!scratch) return ctx.skip();
+    expect(
+      await autoJoinAccount(db, { email: "z@x.test", role: "editor", passwordHash: "none" }),
+    ).toBeNull();
+    expect(await countAccounts(db)).toBe(0);
+  });
 
   it("creates exactly one owner, however many first visits race", async (ctx) => {
     if (!scratch) return ctx.skip();
@@ -226,5 +235,31 @@ describe.skipIf(!runIntegration)("Studio accounts (live)", () => {
     expect(await sessionAccount(db, "s2")).toBeNull();
     expect((await sessionAccount(db, "s4"))?.id).toBe(owner.id);
     expect((await accountForSignIn(db, owner.email))?.passwordHash).toBe("new");
+  });
+
+  it("auto-joins a new email once, and never brings back someone removed", async (ctx) => {
+    if (!scratch) return ctx.skip();
+    const joined = await autoJoinAccount(db, {
+      email: "Joiner@X.test",
+      name: "Jo",
+      role: "contributor",
+      passwordHash: "none",
+    });
+    expect(joined).toMatchObject({
+      email: "Joiner@X.test",
+      role: "contributor",
+      owner: false,
+      hasPassword: false,
+    });
+    // Known already: nothing new, whatever the case.
+    expect(
+      await autoJoinAccount(db, { email: "joiner@x.test", role: "editor", passwordHash: "none" }),
+    ).toBeNull();
+    if (!joined) throw new Error("expected a joined account");
+    expect(await disableAccount(db, joined.id)).toEqual({ ok: true });
+    expect(
+      await autoJoinAccount(db, { email: "joiner@x.test", role: "editor", passwordHash: "none" }),
+    ).toBeNull();
+    expect(await accountForSignIn(db, "joiner@x.test")).toBeNull();
   });
 });

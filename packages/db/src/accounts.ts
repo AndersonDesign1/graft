@@ -108,6 +108,39 @@ export async function createOwner(
   });
 }
 
+/**
+ * An account for someone whose verified email is at a domain that joins on
+ * its own. Null when that email has ever had an account: someone an admin
+ * removed stays removed. Null too before the owner exists, so the first
+ * visit can still claim the Studio.
+ */
+export async function autoJoinAccount(
+  db: Database,
+  input: { email: string; name?: string; role: AccountRole; passwordHash: string },
+): Promise<StudioAccount | null> {
+  return db.transaction(async (tx) => {
+    await lockAccounts(tx);
+    const [anyone] = await tx.select({ id: studioUsers.id }).from(studioUsers).limit(1);
+    if (!anyone) return null;
+    const [known] = await tx
+      .select({ id: studioUsers.id })
+      .from(studioUsers)
+      .where(sameEmail(input.email))
+      .limit(1);
+    if (known) return null;
+    const [row] = await tx
+      .insert(studioUsers)
+      .values({
+        email: input.email,
+        name: input.name ?? null,
+        role: input.role,
+        passwordHash: input.passwordHash,
+      })
+      .returning();
+    return row ? account(row) : null;
+  });
+}
+
 /** The account an email signs in to, with what checking a password needs. */
 export async function accountForSignIn(
   db: Database,

@@ -17,7 +17,7 @@ import {
 import type { Route, RouteContext } from "../api";
 import { requireDatabase } from "./needs-database";
 import { newToken, normaliseEmail } from "../accounts";
-import type { InviteDto, PeopleDto, PersonDto } from "../editor-types";
+import type { InviteDto, PeopleDto, PersonDto, StudioRoleName } from "../editor-types";
 import { INVITE_TTL_MS, isStudioRole, STUDIO_ROLES } from "../session";
 
 const V1 = "/api/studio/v1";
@@ -126,7 +126,7 @@ export const PEOPLE_ROUTES: readonly Route[] = [
     path: `${V1}/people`,
     scope: "studio:people",
     handle: async (ctx) => {
-      accountsOn(ctx);
+      const accounts = accountsOn(ctx);
       const [people, invites] = await Promise.all([
         listAccounts(requireDatabase(ctx.options, "Studio accounts", "workspace")),
         openInvites(requireDatabase(ctx.options, "Studio accounts", "workspace")),
@@ -145,6 +145,10 @@ export const PEOPLE_ROUTES: readonly Route[] = [
           }),
         ),
         invites: invites.map(inviteDto),
+        autoJoin: (accounts.autoJoin ?? []).map((rule) => ({
+          domain: rule.domain,
+          role: rule.role as StudioRoleName,
+        })),
       };
       return Response.json(body);
     },
