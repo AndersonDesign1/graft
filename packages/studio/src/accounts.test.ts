@@ -12,7 +12,9 @@ import {
 } from "./accounts";
 
 describe("account secrets", () => {
-  it("hashes a password so only the same password verifies", async () => {
+  // Four scrypt runs at the real cost: about 400ms here, but over the 5s
+  // default once a busy CI runner shares its CPU with the other test files.
+  it("hashes a password so only the same password verifies", { timeout: 30_000 }, async () => {
     const stored = await hashPassword("correct horse battery");
     expect(stored).toMatch(/^scrypt\$32768\$8\$1\$/);
     expect(await verifyPassword("correct horse battery", stored)).toBe(true);
