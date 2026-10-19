@@ -108,8 +108,9 @@ marked Deleted, until you publish the deletion.
 Select the entries, then choose **Set a field** in the bar at the bottom of the
 list. Pick the field and its value, with the same control the entry editor
 uses, and Studio saves each entry as a draft. Nothing changes on your site
-until you publish (or commit) them. Leave an optional field empty to remove it
-from every selected entry.
+until you publish (or commit) them. To take an optional field off every selected
+entry instead, tick **Remove … from these entries instead**. An empty value
+without that box ticked is refused, so one press of Enter can't wipe a field.
 
 Each entry is checked like any save, so a value the schema refuses is refused
 here too. If some entries can't be saved, the dialog lists them with the
@@ -248,9 +249,11 @@ fields still take a key you type.
 
 ## Give people access
 
-On your own machine Studio asks for no login. A hosted Studio has sign-in, with
-GitHub or an invite link, and four roles: viewer, contributor, editor and
-admin. See [Host Studio for your team](/docs/studio-hosting#roles).
+On your own machine Studio asks for no login. A hosted Studio has sign-in: Studio
+accounts with a password, GitHub, Google, your own single sign-on provider, and
+invite links. An admin adds people in **Settings, People**, or lets a whole email
+domain join on its own. There are four roles: viewer, contributor, editor and
+admin. See [Host Studio for your team](/docs/studio-hosting#2-let-people-sign-in).
 
 The roles name scopes, which is also what bearer tokens carry:
 
@@ -258,7 +261,7 @@ The roles name scopes, which is also what bearer tokens carry:
 | --- | --- |
 | `studio:read` | Browsing content, the schema, history and pending approvals |
 | `studio:write` | Saving drafts, discarding, compiling. Publishing opens a pull request |
-| `studio:publish` | Publishing straight to the production branch |
+| `studio:publish` | Committing on your own machine, and publishing straight to the production branch |
 | `approvals:decide` | Approving and denying |
 | `studio:people` | Inviting people and changing their roles (admins) |
 | `studio:settings` | Agent tokens, the site's address and deploy hooks (admins) |
