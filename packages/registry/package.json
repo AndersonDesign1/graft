@@ -1,6 +1,6 @@
 {
   "name": "@usegraft/registry",
-  "version": "1.0.0-beta.7",
+  "version": "1.0.0-beta.8",
   "description": "The shadcn-style registry behind `graft add`. Primitives are copied into your repository, not imported from ours.",
   "keywords": [
     "agent",

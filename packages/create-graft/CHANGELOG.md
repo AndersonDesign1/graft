@@ -1,5 +1,17 @@
 # create-graft
 
+## 1.0.0-beta.8
+
+### Patch Changes
+
+- Updated dependencies [b56d6b1]
+- Updated dependencies [70321c7]
+- Updated dependencies [c9868b0]
+- Updated dependencies [9d26068]
+- Updated dependencies [9571702]
+- Updated dependencies [f1ed5d2]
+  - @usegraft/cli@1.0.0-beta.8
+
 ## 1.0.0-beta.7
 
 ### Minor Changes

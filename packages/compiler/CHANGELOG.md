@@ -1,5 +1,126 @@
 # @usegraft/compiler
 
+## 1.0.0-beta.8
+
+### Minor Changes
+
+- b56d6b1: **BREAKING:** `graft compile` now stops on a `field.reference({ to })` that
+  names a document that doesn't exist, with `CONTENT_REFERENCE_NOT_FOUND`.
+  Until now a reference was checked only by `graft check`, so a product whose
+  category had been deleted compiled, and the site found the gap at render
+  time. A project that compiled with a broken reference fails now. Run
+  `graft check` to list every one, then fix them or create the missing
+  documents.
+
+  The error names each file, field and missing slug in `details.references`:
+
+  ```txt
+  Error CONTENT_REFERENCE_NOT_FOUND: 1 reference(s) name a document that doesn't exist: products/wool-hat.mdx "category" points at categories/hats.
+  ```
+
+  Both content sources make the check, because both go through
+  `validateDocuments`. In a database-sourced project, a publish refuses a draft
+  whose reference isn't live, and refuses to publish the deletion (or a new
+  slug) of a document that live documents still point at. Publish them together,
+  changed to point elsewhere.
+
+  A local Studio checks the same way: a save of an entry whose reference isn't
+  in the index is refused, and so is deleting an entry other entries point at,
+  before its file is removed. `checkRemoval` in `@usegraft/compiler` is that
+  second check, and `compileDocuments` makes the first.
+
+  `validateDocuments` takes a new `references` option. `"files"` checks targets
+  among the files given, which is right for a whole tree, and `readDocs` uses it
+  by default. A set of `collection/slug` keys also counts those as existing, for
+  a caller checking part of a larger whole. Without the option, references are
+  not checked. `liveDocuments` in `@usegraft/db` lists a branch's live
+  documents for that set.
+
+- 70321c7: **BREAKING:** frontmatter is read as YAML or JSON only. gray-matter runs a `---js` frontmatter block through `eval`, so a contributor's Studio save, an agent's `write_content`, or a pull request built by `graft compile` could run code on the machine reading it. Every read now goes through `readFrontmatter` from the new `@usegraft/mdx-safety/frontmatter` entry, which refuses any other language with `INPUT_VALIDATION_FAILED` before parsing, whatever `mdxTrust` is. A lint rule stops gray-matter being imported anywhere else.
+
+  **BREAKING:** `POST /api/studio/v1/changes/commit` and `POST /api/studio/v1/compilations/:id/revert` need `studio:publish`. They asked for `studio:write`, so a contributor could commit to the checkout, or roll it back, around the check Studio's Commit button makes.
+
+  Also fixed:
+
+  - `graft studio` with `GRAFT_DEV_TOKEN` gives the operator every admin scope, as its documentation says. Since contributors were stopped from committing locally, the token's missing `studio:publish` stopped the operator committing too.
+  - Without a database, a media upload or delete is refused before the bucket is touched. Both used to change the bucket, then answer `NEEDS_DATABASE`.
+
+- 36472f3: References are checked before a write, not after it. A local Studio save, bulk edit, delete or discard, and MCP's `write_content` and `delete_content`, used to write or delete the file and then check references while updating the index. A refusal said nothing was saved while the file had changed, and the index no longer matched it. Now a refused write leaves every file as it was.
+
+  - **`checkChange`** in `@usegraft/compiler` checks a change to a few files before it is written: the checks a compile makes of them, references included, and that nothing left as it is points at a document the change deletes or renames. It checks against the Postgres index, or the files when there is none.
+  - **A stale index no longer refuses a good save.** A reference may name a file in the content folder the index hasn't caught up with, such as one a `git pull` brought in.
+  - **On the static index or with none,** deletes and discards are checked too, and a reference already broken somewhere else no longer refuses an unrelated save. `graft compile` still reports it.
+  - **`checkRemoval` takes `contentDir`,** and checks against the files there when it is given no `db`.
+  - **Publishing in a database-sourced project checks references once it holds the content lock.** Two publishes at once, one deleting a category and one pointing a product at it, could each pass against the state before the other. `publishDrafts` in `@usegraft/db` accepts the index rows as a function of the live documents for this.
+  - **A bulk edit is checked as a batch before anything is written,** and sets a field on at most 500 entries at once. A file that fails to write partway is reported with the others, and the ones written still reach the index.
+
+- e61014f: A delete or a slug change checks references against the files, not an index that is behind them. After a `git pull` with no compile, a Studio or MCP delete could remove a document a pulled one pointed at, and the next `graft compile` failed. It could also refuse a delete over a document already gone from the files. Ordinary saves still check against the index, which keeps them fast. `checkRemoval` from `@usegraft/compiler` reads only the files: pass `contentDir` and drop `db` and `branchId`.
+
+  Studio fixes from the review:
+
+  - Set a field opens ready to set a value. Removing a field from every selected entry is a separate checkbox, so an empty value no longer removes it on one Enter.
+  - The back link from an entry returns to the list as you left it: search, filters and sort.
+  - A filter that came from a link, on a field with no filter menu, shows as a chip you can remove. It used to narrow the list with nothing on screen saying so.
+  - A disabled Commit button says why on hover, on keyboard focus and to a screen reader, not only in a tooltip that never showed.
+  - Home folds repeated saves into one row only within an hour of each other, so Monday's edits don't vanish under Friday's.
+  - After a partial bulk failure, the selection keeps only rows the list still shows, so its count matches what the next action does.
+  - A refresh that fails says the rows on screen are from before.
+  - Opening a list, or Health and Settings, reads it once, not twice.
+
+- 41c371f: A local Studio save now updates the index for the file it wrote, instead of
+  recompiling the whole content tree. On a 2,000-product catalog a save took
+  1.6 seconds and now takes about 100 milliseconds.
+
+  The save checks the file with the same rules as `graft compile` (the schema,
+  MDX safety, unique slugs) and records a compilation with the commit it was
+  read at, so the compile history still lists it. Other files are left as they
+  are: a file changed outside Studio reaches the index on the next
+  `graft compile`. One broken file elsewhere in the tree no longer makes every
+  save fail.
+
+  Two functions make this available outside Studio:
+
+  ```ts
+  import { compileDocuments } from "@usegraft/compiler";
+
+  // Read, validate and project two files; a missing one comes off the index.
+  await compileDocuments({
+    contentDir,
+    collections,
+    db,
+    paths: ["products/wool-hat.mdx"],
+  });
+  ```
+
+  `projectDocuments` in `@usegraft/db` is the projection underneath, and it is
+  the one a database-sourced publish already used. It changes only the rows it
+  is given, refuses a slug another live file holds with `SLUG_NOT_UNIQUE`, and
+  removes a row whose file no longer produces it.
+
+### Patch Changes
+
+- d016963: A save keeps the comment after an edited value. Changing `title: "Old" # shown in the tab` in Studio or over MCP used to write `title: "New"` and lose the note; it now writes `title: "New" # shown in the tab`. This holds for quoted and plain one-line values. A value that becomes a list or a map drops the comment, because it no longer has one line to sit on.
+- de7e5d6: A save no longer turns a one-line string into a folded `>-` block. js-yaml wrapped any string longer than 80 columns, so editing a long `description` rewrote it across three lines. Strings now stay on one line, and an edited one-line string keeps the quotes it had (`"…"` or `'…'`).
+
+  A frontmatter that opens with a comment is now patched key by key like any other, instead of being rewritten whole, which dropped the comment, re-quoted every string and lost the blank line after `---`. Comments and blank lines between keys stay put when the key above them changes.
+
+- 9d26068: Studio no longer loops silently when opened over plain http on an address other than localhost. The session cookie is `Secure` there, so the browser dropped it and sign-in landed back on the form with no message. Studio now says sign-in needs https, or localhost, instead of showing a form that can't work, and an invite link stays unused until it can sign someone in.
+
+  `graft doctor` and `setup_status` no longer make a missing `GRAFT_STUDIO_SECRET` the next step: it only matters once the site is online. That check now has its own id, `studio-secret`. With nothing else to do, doctor says the project is ready to work on and that the `!` lines are for going online. Once the secret is set, creating the owner account is still the next step.
+
+  `graft --help` lists `graft studio setup-code` and `graft studio invite`.
+
+- Updated dependencies [b56d6b1]
+- Updated dependencies [d854102]
+- Updated dependencies [ef9af08]
+- Updated dependencies [70321c7]
+- Updated dependencies [36472f3]
+- Updated dependencies [41c371f]
+  - @usegraft/db@1.0.0-beta.8
+  - @usegraft/mdx-safety@1.0.0-beta.8
+  - @usegraft/core@1.0.0-beta.8
+  - @usegraft/contracts@1.0.0-beta.8
+
 ## 1.0.0-beta.7
 
 ### Minor Changes

@@ -1,5 +1,40 @@
 # @usegraft/sdk-next
 
+## 1.0.0-beta.8
+
+### Minor Changes
+
+- d06bbc3: `@usegraft/sdk-next` runs on Next.js 14.2 and later, and in the Pages Router as well as the App Router. The peer ranges are now `next@^14.2.0 || ^15.0.0 || ^16.0.0` and `react@^18.2.0 || ^19.0.0`.
+
+  - **The Pages Router.** Read in `getStaticProps` or `getServerSideProps` as before. `prepareMdx(body)` compiles a body there, with the same trust rule as `MdxBody`, and `MdxContent` renders the result in the server render and in the browser. It comes from a new entry, `@usegraft/sdk-next/mdx`, that carries no server code. A body that uses `import` is refused with `INPUT_VALIDATION_FAILED`, since the browser has no bundler to resolve it.
+  - **React 18.** `createGraft` uses `React.cache` where React has it, and reads straight through where it does not, as in the Pages Router on Next.js 14.
+  - **Next.js 14.** `withGraft` writes `experimental.serverComponentsExternalPackages` there, the name 14 reads, and `serverExternalPackages` on 15 and later. The adapter imports `next/cache.js`, which Node's own loader can resolve when the Pages Router loads it unbundled.
+  - **Advisories.** Releases with open critical Next.js advisories are no longer refused at install. `withGraft` prints one warning naming the release to upgrade to: any 14, 15 before 15.5.24, or 16 before 16.3.3. Next.js 14 gets no more security fixes. Its last release, 14.2.35, is affected by 23 published advisories, two of them critical remote code execution, and each is fixed only in 15 and 16. Support for 14.2 is there so you can adopt Graft before you upgrade.
+
+  CI now builds and serves a real Next.js 14.2.35 app beside 15 and 16, and on each checks a Pages Router page and that none of the scripts it sends to the browser carries the database, the index or the MDX compiler. The Next.js guide has a version table and a section on the Pages Router.
+
+### Patch Changes
+
+- 334deef: Fixes from a review of the Next.js 14 and Pages Router support.
+
+  - **Unsafe URLs are dropped from restricted MDX.** `MdxBody` and `prepareMdx` remove any URL attribute whose scheme isn't `http`, `https`, `mailto` or `tel`, on Markdown links and on components. A `[Read more](javascript:…)` link rendered as a live link on React 18, which the Pages Router on Next.js 14 uses.
+  - **`prepareMdx` reads imports from the syntax tree.** A code span or fenced block that only mentions `await import(` is no longer refused. Under `trust: "full"`, `import()` and `import.meta` are refused too, instead of compiling to code that always throws.
+  - **`withGraft` merges both externals settings into the one this Next.js reads.** On 15 and later, a leftover `experimental.serverComponentsExternalPackages` no longer replaces `serverExternalPackages` and drops `@usegraft/registry`. On 14, a top-level `serverExternalPackages` is moved where 14 reads it.
+  - **`withGraft` finds Next.js from a monorepo's root.** When no `next` is installed beside the config, it uses the one this package resolves.
+  - **A prerelease of a patched release counts as before it,** so `16.3.3-canary.1` gets the upgrade warning.
+  - The `FRAMEWORK_VERSION_UNSUPPORTED` fix says `revalidateContent` works on Next.js 14, 15 and 16. The Next.js guide says `MdxContent` needs `'unsafe-eval'` in a Content Security Policy.
+
+- Updated dependencies [b56d6b1]
+- Updated dependencies [d854102]
+- Updated dependencies [ef9af08]
+- Updated dependencies [70321c7]
+- Updated dependencies [36472f3]
+- Updated dependencies [41c371f]
+  - @usegraft/db@1.0.0-beta.8
+  - @usegraft/mdx-safety@1.0.0-beta.8
+  - @usegraft/sdk-core@1.0.0-beta.8
+  - @usegraft/contracts@1.0.0-beta.8
+
 ## 1.0.0-beta.7
 
 ### Patch Changes

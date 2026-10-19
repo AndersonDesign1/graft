@@ -1,5 +1,124 @@
 # @usegraft/mcp
 
+## 1.0.0-beta.8
+
+### Patch Changes
+
+- b56d6b1: **BREAKING:** `graft compile` now stops on a `field.reference({ to })` that
+  names a document that doesn't exist, with `CONTENT_REFERENCE_NOT_FOUND`.
+  Until now a reference was checked only by `graft check`, so a product whose
+  category had been deleted compiled, and the site found the gap at render
+  time. A project that compiled with a broken reference fails now. Run
+  `graft check` to list every one, then fix them or create the missing
+  documents.
+
+  The error names each file, field and missing slug in `details.references`:
+
+  ```txt
+  Error CONTENT_REFERENCE_NOT_FOUND: 1 reference(s) name a document that doesn't exist: products/wool-hat.mdx "category" points at categories/hats.
+  ```
+
+  Both content sources make the check, because both go through
+  `validateDocuments`. In a database-sourced project, a publish refuses a draft
+  whose reference isn't live, and refuses to publish the deletion (or a new
+  slug) of a document that live documents still point at. Publish them together,
+  changed to point elsewhere.
+
+  A local Studio checks the same way: a save of an entry whose reference isn't
+  in the index is refused, and so is deleting an entry other entries point at,
+  before its file is removed. `checkRemoval` in `@usegraft/compiler` is that
+  second check, and `compileDocuments` makes the first.
+
+  `validateDocuments` takes a new `references` option. `"files"` checks targets
+  among the files given, which is right for a whole tree, and `readDocs` uses it
+  by default. A set of `collection/slug` keys also counts those as existing, for
+  a caller checking part of a larger whole. Without the option, references are
+  not checked. `liveDocuments` in `@usegraft/db` lists a branch's live
+  documents for that set.
+
+- 70321c7: **BREAKING:** frontmatter is read as YAML or JSON only. gray-matter runs a `---js` frontmatter block through `eval`, so a contributor's Studio save, an agent's `write_content`, or a pull request built by `graft compile` could run code on the machine reading it. Every read now goes through `readFrontmatter` from the new `@usegraft/mdx-safety/frontmatter` entry, which refuses any other language with `INPUT_VALIDATION_FAILED` before parsing, whatever `mdxTrust` is. A lint rule stops gray-matter being imported anywhere else.
+
+  **BREAKING:** `POST /api/studio/v1/changes/commit` and `POST /api/studio/v1/compilations/:id/revert` need `studio:publish`. They asked for `studio:write`, so a contributor could commit to the checkout, or roll it back, around the check Studio's Commit button makes.
+
+  Also fixed:
+
+  - `graft studio` with `GRAFT_DEV_TOKEN` gives the operator every admin scope, as its documentation says. Since contributors were stopped from committing locally, the token's missing `studio:publish` stopped the operator committing too.
+  - Without a database, a media upload or delete is refused before the bucket is touched. Both used to change the bucket, then answer `NEEDS_DATABASE`.
+
+- 5553879: Requires `@modelcontextprotocol/sdk` 1.31 or newer. Older versions could send an OAuth client's credentials to the wrong authorization server, and pulled in `proxy-addr`, `hono` and `ip-address` versions with known advisories.
+- c9868b0: `tools/list` no longer fails with "Cannot read properties of undefined (reading 'push')" when the MCP SDK resolves an older zod than Graft's. The SDK takes any zod from 3.25 on, so a project whose own dependencies bring zod 4.2 to 4.4 handed the SDK a converter that crashed on Graft's schemas. Calling a tool by name still worked, but standard clients list tools first, so none of them could connect. The listing is now converted with the zod that built the schemas, and is otherwise the SDK's own, field for field.
+
+  `serverInfo` reports the Graft release instead of `0.0.0`.
+
+  Token messages speak to whoever holds the token. A revoked or unknown Studio token is told to get a live one from Developer, Agents, not to configure `createActorResolver`. A token missing a scope is told which access level carries it. An anonymous caller is told where tokens come from.
+
+  `graft serve` beyond loopback no longer warns that MCP will refuse every caller: tokens made in Studio always work. It now says how callers get in.
+
+  On `graft studio`, the Agents page no longer shows an MCP endpoint on this computer, which answered 404. It shows `npx graft mcp` for an agent on this machine, and `/api/mcp` wherever `graft serve` runs.
+
+- 41c371f: An agent's `write_content` and `delete_content` now update the index for the
+  file they wrote, instead of recompiling the whole content tree, as a Studio
+  save does. On a 2,000-product catalog a `write_content` call took about 1.5
+  seconds and now takes about 110 milliseconds. The result's `changes` lists
+  that one document. The static index is still rebuilt whole, and content kept
+  in the database is unchanged.
+- 36472f3: References are checked before a write, not after it. A local Studio save, bulk edit, delete or discard, and MCP's `write_content` and `delete_content`, used to write or delete the file and then check references while updating the index. A refusal said nothing was saved while the file had changed, and the index no longer matched it. Now a refused write leaves every file as it was.
+
+  - **`checkChange`** in `@usegraft/compiler` checks a change to a few files before it is written: the checks a compile makes of them, references included, and that nothing left as it is points at a document the change deletes or renames. It checks against the Postgres index, or the files when there is none.
+  - **A stale index no longer refuses a good save.** A reference may name a file in the content folder the index hasn't caught up with, such as one a `git pull` brought in.
+  - **On the static index or with none,** deletes and discards are checked too, and a reference already broken somewhere else no longer refuses an unrelated save. `graft compile` still reports it.
+  - **`checkRemoval` takes `contentDir`,** and checks against the files there when it is given no `db`.
+  - **Publishing in a database-sourced project checks references once it holds the content lock.** Two publishes at once, one deleting a category and one pointing a product at it, could each pass against the state before the other. `publishDrafts` in `@usegraft/db` accepts the index rows as a function of the live documents for this.
+  - **A bulk edit is checked as a batch before anything is written,** and sets a field on at most 500 entries at once. A file that fails to write partway is reported with the others, and the ones written still reach the index.
+
+- e61014f: A delete or a slug change checks references against the files, not an index that is behind them. After a `git pull` with no compile, a Studio or MCP delete could remove a document a pulled one pointed at, and the next `graft compile` failed. It could also refuse a delete over a document already gone from the files. Ordinary saves still check against the index, which keeps them fast. `checkRemoval` from `@usegraft/compiler` reads only the files: pass `contentDir` and drop `db` and `branchId`.
+
+  Studio fixes from the review:
+
+  - Set a field opens ready to set a value. Removing a field from every selected entry is a separate checkbox, so an empty value no longer removes it on one Enter.
+  - The back link from an entry returns to the list as you left it: search, filters and sort.
+  - A filter that came from a link, on a field with no filter menu, shows as a chip you can remove. It used to narrow the list with nothing on screen saying so.
+  - A disabled Commit button says why on hover, on keyboard focus and to a screen reader, not only in a tooltip that never showed.
+  - Home folds repeated saves into one row only within an hour of each other, so Monday's edits don't vanish under Friday's.
+  - After a partial bulk failure, the selection keeps only rows the list still shows, so its count matches what the next action does.
+  - A refresh that fails says the rows on screen are from before.
+  - Opening a list, or Health and Settings, reads it once, not twice.
+
+- d06bbc3: `@usegraft/sdk-next` runs on Next.js 14.2 and later, and in the Pages Router as well as the App Router. The peer ranges are now `next@^14.2.0 || ^15.0.0 || ^16.0.0` and `react@^18.2.0 || ^19.0.0`.
+
+  - **The Pages Router.** Read in `getStaticProps` or `getServerSideProps` as before. `prepareMdx(body)` compiles a body there, with the same trust rule as `MdxBody`, and `MdxContent` renders the result in the server render and in the browser. It comes from a new entry, `@usegraft/sdk-next/mdx`, that carries no server code. A body that uses `import` is refused with `INPUT_VALIDATION_FAILED`, since the browser has no bundler to resolve it.
+  - **React 18.** `createGraft` uses `React.cache` where React has it, and reads straight through where it does not, as in the Pages Router on Next.js 14.
+  - **Next.js 14.** `withGraft` writes `experimental.serverComponentsExternalPackages` there, the name 14 reads, and `serverExternalPackages` on 15 and later. The adapter imports `next/cache.js`, which Node's own loader can resolve when the Pages Router loads it unbundled.
+  - **Advisories.** Releases with open critical Next.js advisories are no longer refused at install. `withGraft` prints one warning naming the release to upgrade to: any 14, 15 before 15.5.24, or 16 before 16.3.3. Next.js 14 gets no more security fixes. Its last release, 14.2.35, is affected by 23 published advisories, two of them critical remote code execution, and each is fixed only in 15 and 16. Support for 14.2 is there so you can adopt Graft before you upgrade.
+
+  CI now builds and serves a real Next.js 14.2.35 app beside 15 and 16, and on each checks a Pages Router page and that none of the scripts it sends to the browser carries the database, the index or the MDX compiler. The Next.js guide has a version table and a section on the Pages Router.
+
+- 9571702: Studio's Publish button no longer says "Publish" for a moment before it says Commit or Submit for review. It now reads what it does from the workspace, which answers at once, instead of guessing until the drafts load.
+
+  A collection's search, filters and sort are kept in the address, so a reload, the back button or a shared link shows the same rows. Its count, and Home's, no longer include entries deleted in a draft: they stay listed as Deleted until the deletion is published.
+
+  Home's recent activity folds a run of the same person changing the same entries into one row ("Kyrus, 3 times"). Health and Settings read the content again after every save, publish, discard or delete, so their counts are never from before the last change. Studio has a favicon, so browsers stop asking the server for `/favicon.ico`.
+
+  An agent's `publish_drafts` that commits to the production branch on GitHub now calls the site's deploy hooks under `graft serve`, as a database publish does. `createGraftMcp` takes an `onPublished` callback for this. A hook that fails never fails the publish.
+
+- Updated dependencies [b56d6b1]
+- Updated dependencies [d854102]
+- Updated dependencies [ef9af08]
+- Updated dependencies [70321c7]
+- Updated dependencies [d016963]
+- Updated dependencies [36472f3]
+- Updated dependencies [e61014f]
+- Updated dependencies [de7e5d6]
+- Updated dependencies [9d26068]
+- Updated dependencies [41c371f]
+  - @usegraft/compiler@1.0.0-beta.8
+  - @usegraft/db@1.0.0-beta.8
+  - @usegraft/mdx-safety@1.0.0-beta.8
+  - @usegraft/core@1.0.0-beta.8
+  - @usegraft/assets@1.0.0-beta.8
+  - @usegraft/contracts@1.0.0-beta.8
+  - @usegraft/registry@1.0.0-beta.8
+
 ## 1.0.0-beta.7
 
 ### Minor Changes
