@@ -45,8 +45,10 @@ const SHORTCUTS: Array<[string[], string]> = [
   [[MOD_KEY, "K"], "Open the command palette"],
   [[MOD_KEY, "S"], "Save the open document"],
   [[MOD_KEY, "\\"], "Show or hide an entry's details"],
+  [["J", "K"], "Move down or up a list of entries"],
+  [["↑", "↓", "Home", "End"], "Move through a list once you are in it"],
   [["↑", "↓"], "Move through palette results"],
-  [["Enter"], "Run the selected command"],
+  [["Enter"], "Open the selected entry, or run the selected command"],
   [["Esc"], "Close the palette or a dialog"],
 ];
 

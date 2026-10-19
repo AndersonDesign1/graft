@@ -68,6 +68,14 @@ names, create the missing document or point the field at one that exists.
 `contentDir` and drop `db` and `branchId`. It checks against the files in
 `contentDir`, which stay right when the index is behind them.
 
+**Contributors can't commit on a local Studio.** On your own machine a commit
+lands on the checkout at once, with no review, so it now needs the editor role.
+A contributor's drafts wait, and the Commit button says why. A local commit is
+also authored by the person signed in, not by whoever runs Studio.
+
+**What to do:** nothing, unless a contributor used to commit locally. Give them
+the editor role, or have an editor commit their drafts.
+
 ## 1.0.0-beta.7
 
 **Postgres projects need `graft db migrate`.** This release adds tables for

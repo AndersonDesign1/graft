@@ -53,6 +53,7 @@ GitHub:
 | `POST` | `/entry` | `studio:write` |
 | `DELETE` | `/entry` | `studio:write` |
 | `POST` | `/entry/duplicate` | `studio:write` |
+| `POST` | `/entries/field` | `studio:write` |
 | `GET` | `/entry/history?path=…` | `studio:read` |
 | `GET` | `/entry/version?path=…&id=…` | `studio:read` |
 | `GET` | `/activity?limit=…` | `studio:read` |
@@ -80,6 +81,18 @@ branch:
 | `POST` | `/site/hooks/:id/test` | `studio:settings` |
 | `DELETE` | `/site/hooks/:id` | `studio:settings` |
 
+People are Studio accounts, kept in the project's database. These routes answer
+`ROUTE_NOT_FOUND` on a Studio without accounts:
+
+| Method | Path | Scope |
+| --- | --- | --- |
+| `GET` | `/people` | `studio:people` |
+| `POST` | `/people/invites` | `studio:people` |
+| `DELETE` | `/people/invites/:id` | `studio:people` |
+| `PUT` | `/people/:id` | `studio:people` |
+| `POST` | `/people/:id/reset` | `studio:people` |
+| `DELETE` | `/people/:id` | `studio:people` |
+
 All paths are prefixed with `/api/studio/v1`. Sign-in lives beside them at
 `/api/studio/v1/auth/*` and needs no scope, because it is how a session starts.
 
@@ -103,6 +116,21 @@ who made it and the first few entries it changed.
 `{ paths, message?, resolve? }`; a caller without `studio:publish` always opens
 a pull request on a hosted Studio.
 
+`POST /entries/field` sets one field on many entries, each saved as a draft:
+`{ collection, slugs, field, value }`, at most 500 slugs. `"value": null`
+removes an optional field. Each entry is validated and written as `PUT /entry`
+would. The answer lists `saved` entries with their new versions and `failed`
+ones with their error code, message and fix; one entry that fails doesn't stop
+the others.
+
+`GET /people` lists who can sign in, open invitations, and `autoJoin`, the email
+domains that join on their own (`GRAFT_STUDIO_AUTO_JOIN`). `POST /people/invites`
+takes `{ email, name?, role? }` (role defaults to `editor`) and returns the
+invitation link once, since only its hash is stored. `PUT /people/:id` takes
+`{ role }`. `POST /people/:id/reset` makes a link to set a new password.
+`DELETE /people/:id` removes someone and ends their sessions. Nobody can remove
+their own access, and the last admin can't be removed or made anything else.
+
 `POST /assets` takes `{ name, base64, key?, alt?, overwrite? }`, at most
 10 MB, and stores the file at `assets/<name>` unless `key` says otherwise. It
 takes images and PDFs, typed by their extension. A key that is taken is refused
@@ -123,8 +151,8 @@ needs only a read scope. `POST` performs it and needs a write scope.
 | Scope | Why it is separate |
 | --- | --- |
 | `studio:read` | Looking at the project |
-| `studio:write` | Changing it: saving drafts, uploading files, compiling, committing, reverting |
-| `studio:publish` | Putting drafts live on a hosted Studio without a review, and deleting files |
+| `studio:write` | Changing it: saving drafts, uploading files, compiling |
+| `studio:publish` | Committing and reverting on your own machine, putting drafts live on a hosted Studio without a review, and deleting files |
 | `approvals:decide` | The human gate. No agent token carries it |
 | `studio:people` | Inviting people and changing their roles. Admins only |
 | `studio:settings` | Agent tokens, the site's address and deploy hooks. Admins only |
