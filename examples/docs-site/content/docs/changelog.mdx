@@ -15,11 +15,346 @@ below covers all of them. Each change names the packages it touched and links to
 its commit. To move a project across a breaking change, follow
 [Upgrading](/docs/upgrading), which says what to change for each one.
 
-There are 11 releases and 95 changes on this page.
+There are 12 releases and 121 changes on this page.
+
+## 1.0.0-beta.8
+
+Released October 19, 2026.
+
+### Breaking changes
+
+- **BREAKING:** `graft compile` now stops on a `field.reference({ to })` that
+  names a document that doesn't exist, with `CONTENT_REFERENCE_NOT_FOUND`.
+  Until now a reference was checked only by `graft check`, so a product whose
+  category had been deleted compiled, and the site found the gap at render
+  time. A project that compiled with a broken reference fails now. Run
+  `graft check` to list every one, then fix them or create the missing
+  documents.
+
+  The error names each file, field and missing slug in `details.references`:
+
+  ```txt
+  Error CONTENT_REFERENCE_NOT_FOUND: 1 reference(s) name a document that doesn't exist: products/wool-hat.mdx "category" points at categories/hats.
+  ```
+
+  Both content sources make the check, because both go through
+  `validateDocuments`. In a database-sourced project, a publish refuses a draft
+  whose reference isn't live, and refuses to publish the deletion (or a new
+  slug) of a document that live documents still point at. Publish them together,
+  changed to point elsewhere.
+
+  A local Studio checks the same way: a save of an entry whose reference isn't
+  in the index is refused, and so is deleting an entry other entries point at,
+  before its file is removed. `checkRemoval` in `@usegraft/compiler` is that
+  second check, and `compileDocuments` makes the first.
+
+  `validateDocuments` takes a new `references` option. `"files"` checks targets
+  among the files given, which is right for a whole tree, and `readDocs` uses it
+  by default. A set of `collection/slug` keys also counts those as existing, for
+  a caller checking part of a larger whole. Without the option, references are
+  not checked. `liveDocuments` in `@usegraft/db` lists a branch's live
+  documents for that set.
+
+  `cli`, `compiler`, `db`, `mcp` · [b56d6b1](https://github.com/AndersonDesign1/graft/commit/b56d6b1)
+
+- **BREAKING:** frontmatter is read as YAML or JSON only. gray-matter runs a `---js` frontmatter block through `eval`, so a contributor's Studio save, an agent's `write_content`, or a pull request built by `graft compile` could run code on the machine reading it. Every read now goes through `readFrontmatter` from the new `@usegraft/mdx-safety/frontmatter` entry, which refuses any other language with `INPUT_VALIDATION_FAILED` before parsing, whatever `mdxTrust` is. A lint rule stops gray-matter being imported anywhere else.
+
+  **BREAKING:** `POST /api/studio/v1/changes/commit` and `POST /api/studio/v1/compilations/:id/revert` need `studio:publish`. They asked for `studio:write`, so a contributor could commit to the checkout, or roll it back, around the check Studio's Commit button makes.
+
+  Also fixed:
+
+  - `graft studio` with `GRAFT_DEV_TOKEN` gives the operator every admin scope, as its documentation says. Since contributors were stopped from committing locally, the token's missing `studio:publish` stopped the operator committing too.
+  - Without a database, a media upload or delete is refused before the bucket is touched. Both used to change the bucket, then answer `NEEDS_DATABASE`.
+
+  `cli`, `compiler`, `content-migrations`, `mcp`, `mdx-safety`, `studio` · [70321c7](https://github.com/AndersonDesign1/graft/commit/70321c7)
+
+### Features
+
+- `graft studio` starts without a database. Until now it stopped with
+  `ENV_VAR_MISSING: DATABASE_URL is not set`, so a static project (`export const
+index = "static"`) could not use Studio at all, and a Postgres project could
+  not open it to fix a typo without a running database.
+
+  Without `DATABASE_URL` you can find, edit, create, delete and commit content as
+  before. In a static project each save also updates `.graft/index.db`, and
+  Developer, Health compares the files with it; a static project never uses a
+  database even when one is set, as with `graft mcp`. The views whose data lives
+  in Postgres (approvals, the compile history, branches, people, agents, the
+  media library, site settings) say they need a database and how to add one,
+  and their API routes answer `NEEDS_DATABASE` (HTTP 503) with the same steps.
+
+  For `createStudioHandler`, `db` is now optional, and `staticIndexPath` points a
+  Studio at the static index:
+
+  ```ts
+  createStudioHandler({
+    collections,
+    contentDir,
+    staticIndexPath: ".graft/index.db",
+  });
+  ```
+
+  `GET /workspace` reports `database` and `index` (`"postgres"`, `"static"` or
+  `"none"`), and `GET /tree` reports which index its states are measured
+  against.
+
+  Sign-in is unchanged. A `graft studio` on `127.0.0.1` asks nobody to sign in,
+  with or without a database. Studio accounts and their sessions are kept in
+  Postgres, so they still need one, and `graft serve --studio` still requires
+  `DATABASE_URL`.
+
+  `cli`, `studio` · [f1ed5d2](https://github.com/AndersonDesign1/graft/commit/f1ed5d2)
+
+- References are checked before a write, not after it. A local Studio save, bulk edit, delete or discard, and MCP's `write_content` and `delete_content`, used to write or delete the file and then check references while updating the index. A refusal said nothing was saved while the file had changed, and the index no longer matched it. Now a refused write leaves every file as it was.
+
+  - **`checkChange`** in `@usegraft/compiler` checks a change to a few files before it is written: the checks a compile makes of them, references included, and that nothing left as it is points at a document the change deletes or renames. It checks against the Postgres index, or the files when there is none.
+  - **A stale index no longer refuses a good save.** A reference may name a file in the content folder the index hasn't caught up with, such as one a `git pull` brought in.
+  - **On the static index or with none,** deletes and discards are checked too, and a reference already broken somewhere else no longer refuses an unrelated save. `graft compile` still reports it.
+  - **`checkRemoval` takes `contentDir`,** and checks against the files there when it is given no `db`.
+  - **Publishing in a database-sourced project checks references once it holds the content lock.** Two publishes at once, one deleting a category and one pointing a product at it, could each pass against the state before the other. `publishDrafts` in `@usegraft/db` accepts the index rows as a function of the live documents for this.
+  - **A bulk edit is checked as a batch before anything is written,** and sets a field on at most 500 entries at once. A file that fails to write partway is reported with the others, and the ones written still reach the index.
+
+  `compiler`, `db`, `mcp`, `studio` · [36472f3](https://github.com/AndersonDesign1/graft/commit/36472f3)
+
+- A delete or a slug change checks references against the files, not an index that is behind them. After a `git pull` with no compile, a Studio or MCP delete could remove a document a pulled one pointed at, and the next `graft compile` failed. It could also refuse a delete over a document already gone from the files. Ordinary saves still check against the index, which keeps them fast. `checkRemoval` from `@usegraft/compiler` reads only the files: pass `contentDir` and drop `db` and `branchId`.
+
+  Studio fixes from the review:
+
+  - Set a field opens ready to set a value. Removing a field from every selected entry is a separate checkbox, so an empty value no longer removes it on one Enter.
+  - The back link from an entry returns to the list as you left it: search, filters and sort.
+  - A filter that came from a link, on a field with no filter menu, shows as a chip you can remove. It used to narrow the list with nothing on screen saying so.
+  - A disabled Commit button says why on hover, on keyboard focus and to a screen reader, not only in a tooltip that never showed.
+  - Home folds repeated saves into one row only within an hour of each other, so Monday's edits don't vanish under Friday's.
+  - After a partial bulk failure, the selection keeps only rows the list still shows, so its count matches what the next action does.
+  - A refresh that fails says the rows on screen are from before.
+  - Opening a list, or Health and Settings, reads it once, not twice.
+
+  `compiler`, `mcp`, `studio` · [e61014f](https://github.com/AndersonDesign1/graft/commit/e61014f)
+
+- A local Studio save now updates the index for the file it wrote, instead of
+  recompiling the whole content tree. On a 2,000-product catalog a save took
+  1.6 seconds and now takes about 100 milliseconds.
+
+  The save checks the file with the same rules as `graft compile` (the schema,
+  MDX safety, unique slugs) and records a compilation with the commit it was
+  read at, so the compile history still lists it. Other files are left as they
+  are: a file changed outside Studio reaches the index on the next
+  `graft compile`. One broken file elsewhere in the tree no longer makes every
+  save fail.
+
+  Two functions make this available outside Studio:
+
+  ```ts
+  import { compileDocuments } from "@usegraft/compiler";
+
+  // Read, validate and project two files; a missing one comes off the index.
+  await compileDocuments({
+    contentDir,
+    collections,
+    db,
+    paths: ["products/wool-hat.mdx"],
+  });
+  ```
+
+  `projectDocuments` in `@usegraft/db` is the projection underneath, and it is
+  the one a database-sourced publish already used. It changes only the rows it
+  is given, refuses a slug another live file holds with `SLUG_NOT_UNIQUE`, and
+  removes a row whose file no longer produces it.
+
+  `compiler`, `db`, `studio` · [41c371f](https://github.com/AndersonDesign1/graft/commit/41c371f)
+
+- `autoJoinAccount` creates a Studio account for an email that has never had one, with a given role. It returns null for an email that has or had an account, so someone an admin removed is not brought back, and null before the owner exists, so the first visit can still claim the Studio.
+
+  `db` · [d854102](https://github.com/AndersonDesign1/graft/commit/d854102)
+
+- `acceptInviteForEmail` uses the newest open Studio invitation for an email, for someone who proved they own the address another way, such as a verified email from GitHub, Google or single sign-on. It only creates or restores an account: for someone who can already sign in, an invitation is a password reset and still takes its link. An account made that way stores `NO_PASSWORD_HASH`, and `StudioAccount.hasPassword` says whether an account has a password.
+
+  `db` · [ef9af08](https://github.com/AndersonDesign1/graft/commit/ef9af08)
+
+- `@usegraft/sdk-next` runs on Next.js 14.2 and later, and in the Pages Router as well as the App Router. The peer ranges are now `next@^14.2.0 || ^15.0.0 || ^16.0.0` and `react@^18.2.0 || ^19.0.0`.
+
+  - **The Pages Router.** Read in `getStaticProps` or `getServerSideProps` as before. `prepareMdx(body)` compiles a body there, with the same trust rule as `MdxBody`, and `MdxContent` renders the result in the server render and in the browser. It comes from a new entry, `@usegraft/sdk-next/mdx`, that carries no server code. A body that uses `import` is refused with `INPUT_VALIDATION_FAILED`, since the browser has no bundler to resolve it.
+  - **React 18.** `createGraft` uses `React.cache` where React has it, and reads straight through where it does not, as in the Pages Router on Next.js 14.
+  - **Next.js 14.** `withGraft` writes `experimental.serverComponentsExternalPackages` there, the name 14 reads, and `serverExternalPackages` on 15 and later. The adapter imports `next/cache.js`, which Node's own loader can resolve when the Pages Router loads it unbundled.
+  - **Advisories.** Releases with open critical Next.js advisories are no longer refused at install. `withGraft` prints one warning naming the release to upgrade to: any 14, 15 before 15.5.24, or 16 before 16.3.3. Next.js 14 gets no more security fixes. Its last release, 14.2.35, is affected by 23 published advisories, two of them critical remote code execution, and each is fixed only in 15 and 16. Support for 14.2 is there so you can adopt Graft before you upgrade.
+
+  CI now builds and serves a real Next.js 14.2.35 app beside 15 and 16, and on each checks a Pages Router page and that none of the scripts it sends to the browser carries the database, the index or the MDX compiler. The Next.js guide has a version table and a section on the Pages Router.
+
+  `mcp`, `sdk-next` · [d06bbc3](https://github.com/AndersonDesign1/graft/commit/d06bbc3)
+
+- `GRAFT_STUDIO_AUTO_JOIN` lets a whole email domain join a hosted Studio without invitations: `GRAFT_STUDIO_AUTO_JOIN="shop.example.com=contributor"`. The first time someone signs in with GitHub, Google or single sign-on and has a verified email at the domain, Studio makes them an account with the domain's role (contributor by default), shown in Settings, People, where an admin can change or remove it. Someone removed stays out. Admin is never given this way, free mail providers such as gmail.com are refused, and nobody joins before the owner exists. People lists the domains that join on their own.
+
+  `studio` · [d854102](https://github.com/AndersonDesign1/graft/commit/d854102)
+
+- A hosted Studio can sign people in with Google, and with any other OpenID Connect provider: Okta, Entra ID, Keycloak, your app's own Better Auth (with `@better-auth/oauth-provider`) and others. Set `GRAFT_GOOGLE_CLIENT_ID` and `GRAFT_GOOGLE_CLIENT_SECRET` for "Continue with Google", or `GRAFT_OIDC_ISSUER`, `GRAFT_OIDC_CLIENT_ID` and `GRAFT_OIDC_CLIENT_SECRET` (and `GRAFT_OIDC_NAME` for the button) for another provider. Studio runs the authorization code flow with PKCE and checks the ID token's signature, issuer, audience, expiry and nonce, and only a verified email counts.
+
+  Settings, People is now the one place to add someone, however they sign in. A person invited there signs in with GitHub, Google or single sign-on as their Studio account, and their first sign-in uses the invitation: no link to pass on, no password to choose. GitHub matches any verified address on the person's account. Someone signed in as an account with no password sees no password to change in Settings.
+
+  `studio` · [ef9af08](https://github.com/AndersonDesign1/graft/commit/ef9af08)
+
+- Set one field on many entries at once. Select entries in a collection's list
+  and choose **Set a field**: pick the field and its value with the same
+  control the entry editor uses, and Studio saves each entry as a draft.
+  Nothing goes live until it is published. Entries that can't be saved are
+  listed in the dialog with the reason and stay selected; the rest are saved.
+
+  The API behind it is `POST /api/studio/v1/entries/field`:
+
+  ```json
+  {
+    "collection": "products",
+    "slugs": ["wool-hat", "linen-shirt"],
+    "field": "status",
+    "value": "archived"
+  }
+  ```
+
+  Each entry is validated and written exactly as `PUT /entry` would, against
+  the version read just before the write. `"value": null` removes an optional
+  field. A local Studio updates the index once for the whole batch. The answer
+  lists `saved` entries with their new versions and `failed` entries with their
+  error code, message and fix.
+
+  On a phone, the bulk bar's buttons now wrap instead of running off the screen.
+
+  `studio` · [6161f0e](https://github.com/AndersonDesign1/graft/commit/6161f0e)
+
+### Fixes
+
+- `tools/list` no longer fails with "Cannot read properties of undefined (reading 'push')" when the MCP SDK resolves an older zod than Graft's. The SDK takes any zod from 3.25 on, so a project whose own dependencies bring zod 4.2 to 4.4 handed the SDK a converter that crashed on Graft's schemas. Calling a tool by name still worked, but standard clients list tools first, so none of them could connect. The listing is now converted with the zod that built the schemas, and is otherwise the SDK's own, field for field.
+
+  `serverInfo` reports the Graft release instead of `0.0.0`.
+
+  Token messages speak to whoever holds the token. A revoked or unknown Studio token is told to get a live one from Developer, Agents, not to configure `createActorResolver`. A token missing a scope is told which access level carries it. An anonymous caller is told where tokens come from.
+
+  `graft serve` beyond loopback no longer warns that MCP will refuse every caller: tokens made in Studio always work. It now says how callers get in.
+
+  On `graft studio`, the Agents page no longer shows an MCP endpoint on this computer, which answered 404. It shows `npx graft mcp` for an agent on this machine, and `/api/mcp` wherever `graft serve` runs.
+
+  `auth`, `cli`, `mcp`, `studio` · [c9868b0](https://github.com/AndersonDesign1/graft/commit/c9868b0)
+
+- Studio no longer loops silently when opened over plain http on an address other than localhost. The session cookie is `Secure` there, so the browser dropped it and sign-in landed back on the form with no message. Studio now says sign-in needs https, or localhost, instead of showing a form that can't work, and an invite link stays unused until it can sign someone in.
+
+  `graft doctor` and `setup_status` no longer make a missing `GRAFT_STUDIO_SECRET` the next step: it only matters once the site is online. That check now has its own id, `studio-secret`. With nothing else to do, doctor says the project is ready to work on and that the `!` lines are for going online. Once the secret is set, creating the owner account is still the next step.
+
+  `graft --help` lists `graft studio setup-code` and `graft studio invite`.
+
+  `cli`, `compiler`, `studio` · [9d26068](https://github.com/AndersonDesign1/graft/commit/9d26068)
+
+- Studio's Publish button no longer says "Publish" for a moment before it says Commit or Submit for review. It now reads what it does from the workspace, which answers at once, instead of guessing until the drafts load.
+
+  A collection's search, filters and sort are kept in the address, so a reload, the back button or a shared link shows the same rows. Its count, and Home's, no longer include entries deleted in a draft: they stay listed as Deleted until the deletion is published.
+
+  Home's recent activity folds a run of the same person changing the same entries into one row ("Kyrus, 3 times"). Health and Settings read the content again after every save, publish, discard or delete, so their counts are never from before the last change. Studio has a favicon, so browsers stop asking the server for `/favicon.ico`.
+
+  An agent's `publish_drafts` that commits to the production branch on GitHub now calls the site's deploy hooks under `graft serve`, as a database publish does. `createGraftMcp` takes an `onPublished` callback for this. A hook that fails never fails the publish.
+
+  `cli`, `mcp`, `studio` · [9571702](https://github.com/AndersonDesign1/graft/commit/9571702)
+
+- A save keeps the comment after an edited value. Changing `title: "Old" # shown in the tab` in Studio or over MCP used to write `title: "New"` and lose the note; it now writes `title: "New" # shown in the tab`. This holds for quoted and plain one-line values. A value that becomes a list or a map drops the comment, because it no longer has one line to sit on.
+
+  `compiler` · [d016963](https://github.com/AndersonDesign1/graft/commit/d016963)
+
+- A save no longer turns a one-line string into a folded `>-` block. js-yaml wrapped any string longer than 80 columns, so editing a long `description` rewrote it across three lines. Strings now stay on one line, and an edited one-line string keeps the quotes it had (`"…"` or `'…'`).
+
+  A frontmatter that opens with a comment is now patched key by key like any other, instead of being rewritten whole, which dropped the comment, re-quoted every string and lost the blank line after `---`. Comments and blank lines between keys stay put when the key above them changes.
+
+  `compiler` · [de7e5d6](https://github.com/AndersonDesign1/graft/commit/de7e5d6)
+
+- Requires `@modelcontextprotocol/sdk` 1.31 or newer. Older versions could send an OAuth client's credentials to the wrong authorization server, and pulled in `proxy-addr`, `hono` and `ip-address` versions with known advisories.
+
+  `mcp` · [5553879](https://github.com/AndersonDesign1/graft/commit/5553879)
+
+- An agent's `write_content` and `delete_content` now update the index for the
+  file they wrote, instead of recompiling the whole content tree, as a Studio
+  save does. On a 2,000-product catalog a `write_content` call took about 1.5
+  seconds and now takes about 110 milliseconds. The result's `changes` lists
+  that one document. The static index is still rebuilt whole, and content kept
+  in the database is unchanged.
+
+  `mcp` · [41c371f](https://github.com/AndersonDesign1/graft/commit/41c371f)
+
+- Fixes from a review of the Next.js 14 and Pages Router support.
+
+  - **Unsafe URLs are dropped from restricted MDX.** `MdxBody` and `prepareMdx` remove any URL attribute whose scheme isn't `http`, `https`, `mailto` or `tel`, on Markdown links and on components. A `[Read more](javascript:…)` link rendered as a live link on React 18, which the Pages Router on Next.js 14 uses.
+  - **`prepareMdx` reads imports from the syntax tree.** A code span or fenced block that only mentions `await import(` is no longer refused. Under `trust: "full"`, `import()` and `import.meta` are refused too, instead of compiling to code that always throws.
+  - **`withGraft` merges both externals settings into the one this Next.js reads.** On 15 and later, a leftover `experimental.serverComponentsExternalPackages` no longer replaces `serverExternalPackages` and drops `@usegraft/registry`. On 14, a top-level `serverExternalPackages` is moved where 14 reads it.
+  - **`withGraft` finds Next.js from a monorepo's root.** When no `next` is installed beside the config, it uses the one this package resolves.
+  - **A prerelease of a patched release counts as before it,** so `16.3.3-canary.1` gets the upgrade warning.
+  - The `FRAMEWORK_VERSION_UNSUPPORTED` fix says `revalidateContent` works on Next.js 14, 15 and 16. The Next.js guide says `MdxContent` needs `'unsafe-eval'` in a Content Security Policy.
+
+  `sdk-next` · [334deef](https://github.com/AndersonDesign1/graft/commit/334deef)
+
+- Lists can be walked from the keyboard. In a collection, j and k move through the entries from anywhere on the page (not while typing), and the arrow keys, Home and End once focus is in the list; Enter opens one. The list beside an open entry takes j and k too.
+
+  Forms fit what they hold:
+
+  - A string field that holds an address or a path (`url`, `githubUrl`, `thumbnail`, `email` and the like, or one with an `^https?` pattern) is a one-line input even when its limit is long. A URL allowed 2,048 characters used to open as a tall textarea.
+  - The create dialog asks for the title first, then the rest in the schema's order.
+  - A required group whose fields are all optional starts empty in the create dialog, so it no longer blocks creating an entry with "Links is required." until one of its optional fields is filled.
+
+  On a phone, an entry's bar shows whether the save landed, and drops its own Commit button (the top bar's commits this entry with the rest) and the title, which the heading below shows in full.
+
+  `studio` · [48e07b9](https://github.com/AndersonDesign1/graft/commit/48e07b9)
+
+- A contributor on a local Studio can no longer commit. Locally there is no review step, so a commit landed on the checkout at once, whatever the role. The contributor's drafts now wait for an editor: the Commit buttons are off with the reason, and the API refuses with `UNAUTHORIZED` and `details.required: "studio:publish"`.
+
+  A local commit is now authored by the signed-in person instead of whoever runs Studio, who stays the committer. With no message, it names the entries by title (`Update “Wool Hat”`) instead of by path, and the Publish sheet's placeholder shows that message.
+
+  A refusal now speaks to whoever was refused. A person is told their role can't do it and to ask an admin. A token is told the scope it lacks and where to make one that has it. Studio shows these messages instead of "You're signed out".
+
+  `studio` · [8a5c753](https://github.com/AndersonDesign1/graft/commit/8a5c753)
+
+- Studio loads its editors when an entry opens, not with the app. Milkdown and
+  CodeMirror were about 2.7 MB of the 3.3 MB every Studio page downloaded
+  before it could show the home screen or a list. Now the first page loads
+  0.66 MB (201 kB gzipped), and opening an entry adds the editor (1.66 MB, 532
+  kB gzipped); the languages a code block highlights load only when one asks
+  for them. The same split applies to `@usegraft/studio/panels`, whose bundle
+  goes from 4.8 MB to 0.5 MB with the editor in a chunk of its own.
+
+  `studio` · [118a339](https://github.com/AndersonDesign1/graft/commit/118a339)
+
+- Settings, Keyboard lists the list shortcuts: J and K move down and up a collection's entries, the arrow keys, Home and End move through a list once it has focus, and Enter opens the selected entry.
+
+  `studio` · [0263253](https://github.com/AndersonDesign1/graft/commit/0263253)
+
+- An agent's request in the Inbox is titled with what it would do, such as "Delete projects/welup-digital", instead of the tool's name, and Approve asks once more before the agent may run it. The embedded `ApprovalQueuePanel` brings its own confirmation dialog.
+
+  Deploy hooks are now called after Studio publishes to the production branch on GitHub, as they already were after a publish of content kept in the database. A commit on your own machine reaches no site and still calls none, and Settings now says so.
+
+  Wording that didn't match what happens:
+
+  - Deleting on your own machine says the file is removed now and the deployed site keeps it until you commit and push, instead of "stays live until you commit".
+  - An entry nobody has edited since its last commit is dated by that commit, not by its file's modification time, which a clone or checkout resets.
+  - The empty Drafts tab says there are no drafts instead of "Nothing matches."
+  - Shortcuts in Settings and tooltips show Ctrl off a Mac, as the top bar already did.
+  - The entry's details no longer show a "Version" that was the file's content hash.
+  - An asset field's placeholder and an asset key error no longer name the shop example, and a missing key says it is missing instead of `"null" is not an asset key.`
+
+  `studio` · [db2d4b6](https://github.com/AndersonDesign1/graft/commit/db2d4b6)
+
+- Studio fixes from a review of the last release's UI work.
+
+  - **The editor's menus and inline code look like Studio again.** Since the editor started loading on demand, Milkdown's stylesheet arrived after Studio's and won ties: the slash menu had no background or shadow, and inline code lost its font and fill. It now sits in a cascade layer under Studio's own styles.
+  - **The publish sheet no longer re-renders without end while drafts load.** On a slow GitHub workspace it spun until the drafts answered, and forever if they never did. It shows a placeholder, or the error with Try again, and names the action from the workspace as the top bar does.
+  - **A failed workspace request shows the error and Try again** in Agents, Branches, History, Media and the Inbox, instead of a placeholder that never ends.
+  - **Deleting several entries goes past one that is refused,** says how many were deleted, keeps the refused ones selected, and refreshes the list either way.
+  - **A bulk edit cut off partway refreshes the list** and says some entries may have been saved.
+  - **If the editor's code fails to load, only the editor says so,** with Reload, and the entry's fields keep working.
+  - **Keyboard:** j and k no longer move focus behind a confirm dialog. Arrow keys from a row's checkbox move from that row, not from the first.
+  - **Words:**
+    - Errors read as two plain sentences, with no em dash.
+    - The "add a database" steps include removing `index = "static"`.
+    - Health shows no drift columns when there is no index.
+    - Media doesn't offer uploads without a database.
+    - Discard on entries with no drafts says there is nothing to discard.
+
+  `studio` · [22c6e47](https://github.com/AndersonDesign1/graft/commit/22c6e47)
 
 ## 1.0.0-beta.7
 
-Released October 12, 2026.
+Released October 13, 2026.
 
 ### Breaking changes
 
