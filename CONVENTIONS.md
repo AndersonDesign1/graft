@@ -120,7 +120,8 @@ merges it.
 
 After the publish, the same job moves `latest` (and `beta` in prerelease mode)
 onto the new version over OIDC, then reads the registry back with
-`pnpm check:dist-tags --settle 120`. Each package's trusted publisher on
+`pnpm check:dist-tags --settle 600`, which waits up to 10 minutes for the
+registry to show the new tags. Each package's trusted publisher on
 npmjs.com needs both "Allow npm publish" and "Allow npm dist-tag" ticked.
 
 ### Canary, to the `canary` tag

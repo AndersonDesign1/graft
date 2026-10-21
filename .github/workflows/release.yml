@@ -234,8 +234,13 @@ jobs:
       # The check runs after the sync on purpose. sync-dist-tags reports what it
       # tried; check-dist-tags reads the registry back and is the one that says
       # the release is finished.
+      #
+      # 600 seconds, not 120: for 1.0.0-beta.8 the registry still showed
+      # @usegraft/db on beta.7 after two minutes, though the move had worked,
+      # and the run went red on a finished release. A tag that is really wrong
+      # still fails, only later.
       - name: Point `latest` at what we just published
         if: ${{ steps.changesets.outputs.published == 'true' || (github.event_name == 'workflow_dispatch' && !inputs.canary) }}
         run: |
           pnpm sync:dist-tags
-          pnpm check:dist-tags --settle 120
+          pnpm check:dist-tags --settle 600
