@@ -45,8 +45,10 @@ const { name: channelName, tags: shouldPoint } = releaseChannel();
 // `--settle <seconds>`: keep re-reading while tags still drift, up to this long.
 // release.yml reads straight after sync-dist-tags writes, and the registry's
 // read side lags its writes. The first OIDC run moved all 22 tags and this
-// check still saw four on the old version seconds later. Without the flag a
-// drift fails at once, which is right for a check run by hand.
+// check still saw four on the old version seconds later. For 1.0.0-beta.8,
+// @usegraft/db still read beta.7 after 120 seconds, though the write had
+// succeeded. Without the flag a drift fails at once, which is right for a
+// check run by hand.
 const settleArg = process.argv.indexOf("--settle");
 const settleSeconds = settleArg === -1 ? 0 : Number(process.argv[settleArg + 1]);
 if (!Number.isFinite(settleSeconds) || settleSeconds < 0) {
