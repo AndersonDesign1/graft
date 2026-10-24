@@ -80,7 +80,7 @@
     "@usegraft/auth": "workspace:*",
     "@usegraft/core": "workspace:*",
     "@usegraft/mcp": "workspace:*",
-    "next": "^16.3.8",
+    "next": "^16.4.2",
     "react": "^19.2.8"
   },
   "peerDependencies": {

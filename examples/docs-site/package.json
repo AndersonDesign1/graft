@@ -30,7 +30,7 @@
     "@usegraft/registry": "workspace:*",
     "@usegraft/sdk-astro": "workspace:*",
     "@usegraft/tokens": "workspace:*",
-    "astro": "^7.2.9",
+    "astro": "~7.3.5",
     "fumadocs-core": "^16.15.4",
     "fumadocs-ui": "^16.15.4",
     "github-slugger": "^2.0.0",
@@ -42,7 +42,7 @@
     "satori": "^0.35.0",
     "sharp": "^0.35.5",
     "shiki": "^4.4.3",
-    "zod": "^4.5.4"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

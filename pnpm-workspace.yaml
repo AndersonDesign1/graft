@@ -11,6 +11,15 @@ packages:
 # and old esbuild copies under drizzle-kit / vitest / tsup, tinypool 2.1.0
 # pinned exactly by oxfmt (two advisories, patched in 2.1.2), and fflate 0.7.3
 # pinned exactly by satori (patched in 0.7.5).
+#
+# The October 2026 audit rows: postcss 8.4.31 pinned exactly by next 15 (four
+# advisories, patched in 8.5.23+), dompurify under @milkdown (patched in
+# 3.4.17), katex 0.16 under micromark-extension-math (patched in 0.18.2;
+# @milkdown/crepe already runs 0.18), zod 4.1 under @vercel/cli-config and
+# 4.5 under better-auth (patched in 4.6.6), undici under unifont (patched in 8.12.2), fast-uri under
+# ajv (patched in 3.1.9) and body-parser under the MCP SDK's Express server
+# (patched in 2.4.0; Graft serves MCP over the web-standard transport, not
+# Express).
 overrides:
   browserslist: 4.28.8
   path-to-regexp@6.1.0: 6.3.0
@@ -21,6 +30,14 @@ overrides:
   esbuild@0.27.7: 0.28.2
   tinypool@2.1.0: 2.1.2
   fflate@0.7.3: 0.7.5
+  postcss@8.4.31: 8.5.31
+  dompurify: 3.4.17
+  katex@0.16.47: 0.18.10
+  zod@4.1.11: 4.6.7
+  zod@4.5.4: 4.6.7
+  undici@8.11.2: 8.12.3
+  fast-uri: 3.1.9
+  body-parser: 2.4.0
 
 # better-auth lists vitest as an optional peer (^2 || ^3 || ^4) for its test
 # helpers. The root's vitest 5 is outside that range, so pnpm installed a
@@ -54,3 +71,6 @@ minimumReleaseAgeExclude:
   - fumadocs-core
   - fumadocs-ui
   - "@fumadocs/*"
+  # body-parser 2.4.0 (published 2026-10-22) is the only fix for a high
+  # advisory. Temporary: remove this line once it is 3 days old (2026-10-25).
+  - body-parser
