@@ -426,7 +426,7 @@ graft fn run <name> [--branch <id>] [--input <json|->] [--approval <id>] [--json
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
-| `--input <json\|->` | The input as a JSON object; - reads it from stdin (default: \\{}). |
+| `--input <json\|->` | The input as a JSON object; - reads it from stdin (default: \{}). |
 | `--approval <id>` | The approval a person granted for this call. |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
 
@@ -476,7 +476,7 @@ graft mcp call <tool> [--branch <id>] [--input <json|->] [--json]
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
-| `--input <json\|->` | The tool's input as a JSON object; - reads it from stdin (default: \\{}). |
+| `--input <json\|->` | The tool's input as a JSON object; - reads it from stdin (default: \{}). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
