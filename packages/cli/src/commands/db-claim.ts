@@ -25,6 +25,8 @@ export interface DbClaimOptions {
   pollMs?: number;
   log?: (line: string) => void;
   askUrl?: () => Promise<string>;
+  /** False never asks for the URL, as if stdin were not a terminal (--no-input). */
+  input?: boolean;
 }
 
 export type DbClaimResult = "saved" | "waiting" | "claimed-elsewhere";
@@ -143,7 +145,7 @@ export async function dbClaimCommand(options: DbClaimOptions): Promise<DbClaimRe
   }
 
   log("✓ Claimed. Claiming changed its password, so the old DATABASE_URL no longer works.");
-  if (options.askUrl || process.stdin.isTTY) {
+  if (options.askUrl || (options.input !== false && process.stdin.isTTY)) {
     return save(await (options.askUrl ?? askOnTerminal)());
   }
   log("Copy the connection string from your Neon project (Dashboard, then Connect) and run:");

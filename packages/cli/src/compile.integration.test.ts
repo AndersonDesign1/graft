@@ -7,6 +7,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDb, type DbHandle } from "@usegraft/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { run } from "./cli";
 import { compileCommand } from "./commands/compile";
 import { initCommand } from "./commands/init";
 
@@ -85,7 +86,7 @@ describe.skipIf(!runIntegration)("graft compile projects a scaffolded project", 
       });
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
       try {
-        await compileCommand({ cwd: projectDir, branchId: BRANCH, json: true });
+        expect(await run(["compile", "--json", "--branch", BRANCH], { cwd: projectDir })).toBe(0);
       } finally {
         error.mockRestore();
         vi.spyOn(console, "log").mockImplementation(() => {});

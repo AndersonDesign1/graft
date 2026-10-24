@@ -231,11 +231,6 @@ export async function checkForUpdate(options: CheckOptions): Promise<UpdateNotic
   return newerVersion(options.current, tags);
 }
 
-/** Color on a terminal that has not asked for none (https://no-color.org). */
-export function useColor(env: NodeJS.ProcessEnv, isTTY: boolean | undefined): boolean {
-  return Boolean(isTTY) && !env.NO_COLOR;
-}
-
 const RESET = "\u001b[0m";
 const BOLD = "\u001b[1m";
 const COLOR = { security: "\u001b[33m", info: "\u001b[36m" } satisfies Record<NoticeLevel, string>;

@@ -19,7 +19,20 @@ export interface AddCommandOptions {
   overwrite?: boolean;
 }
 
-export async function addCommand(options: AddCommandOptions): Promise<void> {
+/** What `graft add` did, or with --dry-run would do. */
+export interface AddResult {
+  items: { name: string; type: string }[];
+  files: { path: string; state: "create" | "overwrite" | "unchanged" }[];
+  /** Files written; empty on a dry run. */
+  written: string[];
+  /** Existing files that differ from the registry's; replaced only with --overwrite. */
+  conflicts: string[];
+  /** npm packages the added items import. */
+  npmDependencies: Record<string, string>;
+  dryRun: boolean;
+}
+
+export async function addCommand(options: AddCommandOptions): Promise<AddResult> {
   if (options.names.length === 0) {
     throw new GraftError({
       code: "REGISTRY_ITEM_NOT_FOUND",
@@ -30,14 +43,22 @@ export async function addCommand(options: AddCommandOptions): Promise<void> {
 
   const projectDir = dirname(findConfig(options.cwd));
   const plan = planAdd(options.names, { targetDir: projectDir });
+  const summary: AddResult = {
+    items: plan.items.map((item) => ({ name: item.name, type: item.type })),
+    files: plan.files.map((file) => ({
+      path: file.relPath,
+      state: file.identical ? "unchanged" : file.exists ? "overwrite" : "create",
+    })),
+    written: [],
+    conflicts: plan.conflicts,
+    npmDependencies: plan.npmDependencies,
+    dryRun: Boolean(options.dryRun),
+  };
 
   console.log(
     `${options.dryRun ? "Would add" : "Adding"} ${plan.items.map((i) => `${i.name} (${i.type})`).join(", ")}:`,
   );
-  for (const file of plan.files) {
-    const state = file.identical ? "unchanged" : file.exists ? "overwrite" : "create";
-    console.log(`  ${state.padEnd(9)} ${file.relPath}`);
-  }
+  for (const file of summary.files) console.log(`  ${file.state.padEnd(9)} ${file.path}`);
   console.log(`  regenerate ${plan.barrel.relPath}`);
   if (plan.mdxMap) console.log(`  regenerate ${plan.mdxMap.relPath}`);
 
@@ -48,7 +69,7 @@ export async function addCommand(options: AddCommandOptions): Promise<void> {
       );
     }
     printFollowups(plan);
-    return;
+    return summary;
   }
 
   const result = applyPlan(plan, { overwrite: options.overwrite });
@@ -62,6 +83,7 @@ export async function addCommand(options: AddCommandOptions): Promise<void> {
   console.log(
     "It's live on your next `graft compile` — no graft.config.ts edit needed (the graft/ barrel wires modules; the MDX map wires blocks).",
   );
+  return { ...summary, written: result.written };
 }
 
 function printFollowups(plan: AddPlan): void {

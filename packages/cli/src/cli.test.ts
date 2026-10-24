@@ -1,10 +1,18 @@
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { COMMAND_HELP, run } from "./cli";
+import { run } from "./cli";
+import { COMMANDS } from "./registry";
 
 let logs: string[];
 let errors: string[];
@@ -39,17 +47,83 @@ describe("run", () => {
     expect(logs.join("\n")).toContain("Usage: graft");
   });
 
-  it("rejects unknown commands with help", async () => {
-    expect(await run(["frobnicate"])).toBe(1);
+  it("rejects an unknown command as a usage error, on stderr only", async () => {
+    expect(await run(["frobnicate"])).toBe(2);
     expect(errors.join("\n")).toContain('unknown command "frobnicate"');
+    expect(logs).toEqual([]);
   });
 
-  // Every command with help, read from the table itself, so a command added
-  // later is covered without editing this list.
-  it.each([...COMMAND_HELP.keys()])(
+  it("suggests the command a typo was meant to be", async () => {
+    expect(await run(["complie"])).toBe(2);
+    expect(errors).toEqual([
+      'graft: unknown command "complie".',
+      "Did you mean `graft compile`? Run `graft --help` to list the commands.",
+    ]);
+  });
+
+  it("suggests the flag a typo was meant to be", async () => {
+    expect(await run(["compile", "--jsno"])).toBe(2);
+    expect(errors.join("\n")).toContain("Did you mean `--json`?");
+  });
+
+  it("refuses a flag the command does not take, instead of ignoring it", async () => {
+    expect(await run(["init", "--apply"])).toBe(2);
+    expect(errors.join("\n")).toContain('unknown option "--apply" for graft init.');
+  });
+
+  it("reports a usage error as one JSON line on stderr under --json", async () => {
+    expect(await run(["compile", "--json", "--bogus"])).toBe(2);
+    expect(logs).toEqual([]);
+    expect(errors).toHaveLength(1);
+    expect(JSON.parse(errors[0] ?? "")).toEqual({
+      error: "USAGE_INVALID",
+      message: 'unknown option "--bogus" for graft compile.',
+      fix: "Run `graft compile --help`.",
+      details: { command: "compile", flag: "--bogus" },
+    });
+  });
+
+  it("names a family's subcommands when one is missing", async () => {
+    expect(await run(["db"])).toBe(2);
+    expect(errors.join("\n")).toContain("Use one of: graft db migrate, graft db claim.");
+  });
+
+  it("graft help <command> is the command's --help", async () => {
+    expect(await run(["help", "branch", "create"])).toBe(0);
+    const viaHelp = logs.join("\n");
+    logs = [];
+    expect(await run(["branch", "create", "--help"])).toBe(0);
+    expect(logs.join("\n")).toBe(viaHelp);
+    expect(viaHelp).toMatch(/^Usage: graft branch create <name> \[--from <parent>\]/);
+  });
+
+  it("graft help exit-codes lists every exit code", async () => {
+    expect(await run(["help", "exit-codes"])).toBe(0);
+    expect(logs.join("\n")).toContain(
+      "   3  A person has to approve the action first. Run `graft approve <id>`, then repeat it",
+    );
+  });
+
+  it("graft commands --json describes every command and its flags", async () => {
+    expect(await run(["commands", "--json"])).toBe(0);
+    expect(logs).toHaveLength(1);
+    const cli = JSON.parse(logs[0] ?? "");
+    expect(cli.commands).toHaveLength(COMMANDS.length);
+    const compile = cli.commands.find((command: { id: string }) => command.id === "compile");
+    expect(compile).toMatchObject({
+      usage: "graft compile [--branch <id>] [--prune-unknown] [--json]",
+      json: true,
+      database: "postgres",
+    });
+    expect(cli.exitCodes.map((exit: { code: number }) => exit.code)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  // Every command, read from the registry itself, so a command added later is
+  // covered without editing this list.
+  it.each(COMMANDS.map((spec) => spec.path.join(" ")))(
     "graft %s --help prints that command's usage and exits 0",
     async (command) => {
-      expect(await run([command, "--help"])).toBe(0);
+      expect(await run([...command.split(" "), "--help"])).toBe(0);
       expect(logs.join("\n")).toMatch(new RegExp(`^Usage: graft ${command}\\b`));
       expect(errors).toEqual([]);
     },
@@ -64,7 +138,7 @@ describe("run", () => {
   });
 
   it("an unknown command with --help still reports the unknown command", async () => {
-    expect(await run(["frobnicate", "--help"])).toBe(1);
+    expect(await run(["frobnicate", "--help"])).toBe(2);
     expect(errors.join("\n")).toContain('unknown command "frobnicate"');
   });
 
@@ -76,37 +150,37 @@ describe("run", () => {
   });
 
   it("rejects an unknown branch subcommand as a usage error", async () => {
-    expect(await run(["branch", "frobnicate"])).toBe(1);
+    expect(await run(["branch", "frobnicate"])).toBe(2);
     expect(errors.join("\n")).toContain('unknown branch subcommand "frobnicate"');
   });
 
   it("branch create requires a name", async () => {
-    expect(await run(["branch", "create"])).toBe(1);
-    expect(errors.join("\n")).toContain("usage: graft branch create <name>");
+    expect(await run(["branch", "create"])).toBe(2);
+    expect(errors.join("\n")).toContain("missing <name> for graft branch create.");
   });
 
   it("branch drop requires a name", async () => {
-    expect(await run(["branch", "drop"])).toBe(1);
-    expect(errors.join("\n")).toContain("usage: graft branch drop <name>");
+    expect(await run(["branch", "drop"])).toBe(2);
+    expect(errors.join("\n")).toContain("missing <name> for graft branch drop.");
   });
 
   it("merge requires a branch argument", async () => {
-    expect(await run(["merge"])).toBe(1);
-    expect(errors.join("\n")).toContain("usage: graft merge <branch>");
+    expect(await run(["merge"])).toBe(2);
+    expect(errors.join("\n")).toContain("missing <branch> for graft merge.");
   });
 
   it("requires a value for --into", async () => {
-    expect(await run(["merge", "preview", "--into"])).toBe(1);
+    expect(await run(["merge", "preview", "--into"])).toBe(2);
     expect(errors.join("\n")).toContain("--into requires a value");
   });
 
   it("requires a value for --from", async () => {
-    expect(await run(["branch", "create", "x", "--from", "--apply"])).toBe(1);
+    expect(await run(["branch", "create", "x", "--from", "--json"])).toBe(2);
     expect(errors.join("\n")).toContain("--from requires a value");
   });
 
   it("requires a value for --backend", async () => {
-    expect(await run(["branch", "create", "x", "--backend"])).toBe(1);
+    expect(await run(["branch", "create", "x", "--backend"])).toBe(2);
     expect(errors.join("\n")).toContain("--backend requires a value");
   });
 
@@ -141,12 +215,12 @@ describe("run", () => {
   }, 30_000);
 
   it("rejects unknown options as usage errors", async () => {
-    expect(await run(["compile", "--frob"])).toBe(1);
-    expect(errors.join("\n")).toContain('unknown option "--frob"');
+    expect(await run(["compile", "--frob"])).toBe(2);
+    expect(errors.join("\n")).toContain('unknown option "--frob" for graft compile.');
   });
 
   it("requires a value for --branch", async () => {
-    expect(await run(["compile", "--branch"])).toBe(1);
+    expect(await run(["compile", "--branch"])).toBe(2);
     expect(errors.join("\n")).toContain("--branch requires a value");
   });
 
@@ -304,5 +378,44 @@ describe("graft compile --json", () => {
     expect(await run(["compile", "--json", "--branch", "preview"], { cwd: jsonProject })).toBe(1);
     expect(logs).toEqual([]);
     expect(errors.join("\n")).toContain("NEEDS_DATABASE");
+  }, 30_000);
+});
+
+const checkProject = resolve(
+  fileURLToPath(new URL(".", import.meta.url)),
+  "../.test-tmp/cli-check",
+);
+
+describe("graft check --json", () => {
+  beforeEach(async () => {
+    rmSync(checkProject, { recursive: true, force: true });
+    expect(await run(["init", checkProject])).toBe(0);
+    logs = [];
+    errors = [];
+  });
+
+  afterEach(() => {
+    rmSync(checkProject, { recursive: true, force: true });
+  });
+
+  it("lists each problem with its code and fix, and exits 1", async () => {
+    writeFileSync(
+      join(checkProject, "content/pages/about.mdx"),
+      "---\ntitle: About\ntagline: 42\n---\nHi.\n",
+    );
+    expect(await run(["check", "--json"], { cwd: checkProject })).toBe(1);
+    expect(logs).toHaveLength(1);
+    const result = JSON.parse(logs[0] ?? "");
+    expect(result.problems).toHaveLength(1);
+    expect(result.problems[0]).toMatchObject({
+      code: "SCHEMA_VALIDATION_FAILED",
+      message: 'pages/about.mdx does not match collection "pages"',
+    });
+    expect(result.problems[0].fix).toContain("tagline");
+  }, 30_000);
+
+  it("prints a clean result on a project with no problems", async () => {
+    expect(await run(["check", "--json"], { cwd: checkProject })).toBe(0);
+    expect(JSON.parse(logs[0] ?? "")).toEqual({ documents: 1, problems: [] });
   }, 30_000);
 });
