@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { connectInProcess } from "@usegraft/mcp";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { run } from "./cli";
+import { formatWrite, retryCommand, shellQuote } from "./commands/tools";
 import { openProjectMcp } from "./project-mcp";
 
 // Inside the package so the scaffolded config's `@usegraft/core` import resolves.
@@ -93,6 +94,16 @@ describe("graft content", () => {
     expect(readFileSync(join(project, "content/pages/about.mdx"), "utf8")).toContain("Who we are.");
   }, 30_000);
 
+  it("leaves a document unchanged when it is read and written back", async () => {
+    const source = join(project, "content/pages/home.mdx");
+    const before = readFileSync(source, "utf8");
+    expect(await cli("content", "get", "pages/home")).toBe(0);
+    const file = join(project, "home.mdx");
+    writeFileSync(file, `${logs[0]}\n`);
+    expect(await cli("content", "write", "pages/home", "--file", file)).toBe(0);
+    expect(readFileSync(source, "utf8")).toBe(before);
+  }, 30_000);
+
   it("refuses data the schema does not accept, with its fix", async () => {
     expect(await cli("content", "write", "pages/bad", "--data", '{"title":1}')).toBe(1);
     expect(errors[0]).toBe(
@@ -125,6 +136,43 @@ describe("graft content", () => {
   it("names the expected shape of a document id", async () => {
     expect(await cli("content", "get", "home")).toBe(2);
     expect(errors[0]).toBe('graft: "home" is not a document id.');
+  });
+});
+
+describe("after a write", () => {
+  it("says when the app was not told to refresh, and not to write again", () => {
+    expect(
+      formatWrite({
+        written: "pages/home.mdx",
+        branch: "main",
+        gitSha: "abc",
+        changes: { added: [], changed: ["pages/home"], removed: [] },
+        refresh: { ok: false, error: "REVALIDATE_FAILED", message: "HTTP 500.", fix: "Check it." },
+      }),
+    ).toEqual([
+      'Wrote pages/home.mdx on branch "main": +0 added, ~1 changed, -0 removed.',
+      "The app was not told to refresh, so it may show the old copy: REVALIDATE_FAILED: HTTP 500.",
+      "  Do not write again: the write succeeded.",
+      "  fix: Check it.",
+    ]);
+  });
+});
+
+describe("the command to repeat after an approval", () => {
+  it("keeps the branch", () => {
+    expect(retryCommand(["content", "delete", "pages/about"], "preview")).toBe(
+      "graft content delete pages/about --branch preview",
+    );
+    expect(retryCommand(["content", "delete", "pages/about"], undefined)).toBe(
+      "graft content delete pages/about",
+    );
+  });
+
+  it("quotes input so a shell reads it back unchanged", () => {
+    expect(
+      retryCommand(["fn", "run", "subscribe", "--input", `{"name":"O'Brien"}`], undefined),
+    ).toBe(`graft fn run subscribe --input '{"name":"O'\\''Brien"}'`);
+    expect(shellQuote("")).toBe("''");
   });
 });
 

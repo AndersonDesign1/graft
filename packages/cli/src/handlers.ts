@@ -228,7 +228,8 @@ const handlers = {
   },
 
   async "content delete"(ctx) {
-    const { asObject, parseDocumentId, rethrowWithRetry } = await import("./commands/tools");
+    const { asObject, parseDocumentId, retryCommand, rethrowWithRetry } =
+      await import("./commands/tools");
     const ref = required(ctx, 0);
     const id = parseDocumentId(ref, "content delete");
     const approval = ctx.flags.string("approval");
@@ -237,7 +238,7 @@ const handlers = {
         const input = approval === undefined ? id : { ...id, approval };
         return asObject(await tools.call("delete_content", input), "delete_content");
       } catch (error) {
-        return rethrowWithRetry(error, `graft content delete ${ref}`);
+        return rethrowWithRetry(error, retryCommand(["content", "delete", ref], branchOf(ctx)));
       }
     });
     if (!ctx.json) console.log(`Deleted ${id.collection}/${id.slug}.`);
@@ -344,7 +345,8 @@ const handlers = {
   },
 
   async "fn run"(ctx) {
-    const { asObject, parseJsonObject, rethrowWithRetry } = await import("./commands/tools");
+    const { asObject, parseJsonObject, retryCommand, rethrowWithRetry } =
+      await import("./commands/tools");
     const name = required(ctx, 0);
     const raw = ctx.flags.string("input");
     const input: RunInput = {
@@ -357,9 +359,10 @@ const handlers = {
       try {
         return asObject(await tools.call("run_function", input), "run_function");
       } catch (error) {
-        const retry =
-          raw === undefined ? `graft fn run ${name}` : `graft fn run ${name} --input '${raw}'`;
-        return rethrowWithRetry(error, retry);
+        // The parsed input, not what was typed: `--input -` read stdin once.
+        const words = ["fn", "run", name];
+        if (raw !== undefined) words.push("--input", JSON.stringify(input.input));
+        return rethrowWithRetry(error, retryCommand(words, branchOf(ctx)));
       }
     });
     if (!ctx.json) console.log(JSON.stringify(answer, null, 2));

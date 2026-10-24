@@ -120,6 +120,20 @@ export function rethrowWithRetry(error: unknown, retry: string): never {
   throw new GraftError(options);
 }
 
+/** A word as a shell reads it back: bare when that is safe, else in single quotes. */
+export function shellQuote(word: string): string {
+  return /^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replaceAll("'", `'\\''`)}'`;
+}
+
+/**
+ * The command to repeat once a person approves: the same words on the same
+ * branch, since an approval is for the call and not for where it runs.
+ */
+export function retryCommand(words: readonly string[], branchId: string | undefined): string {
+  const all = branchId === undefined ? words : [...words, "--branch", branchId];
+  return ["graft", ...all].map(shellQuote).join(" ");
+}
+
 /* ---- content ------------------------------------------------------------- */
 
 export interface ContentListing {
@@ -212,7 +226,10 @@ export function writeInput(options: WriteSource, command: string): WriteInput {
       );
     }
     const { data, content } = readFrontmatter(readText(options.file), options.file);
-    return { data, body: content };
+    // The blank line after the frontmatter is the file's separator, not the
+    // body's: the write keeps the existing file's own, so sending it too would
+    // add a line on every get and write.
+    return { data, body: content.replace(/^\r?\n/, "") };
   }
   if (options.data === undefined) {
     throw new UsageError(
@@ -236,13 +253,25 @@ export function formatWrite(answer: ToolObject): string[] {
       (draft
         ? "."
         : `: +${count("added")} added, ~${count("changed")} changed, -${count("removed")} removed.`),
+    ...formatRefresh(answer.refresh),
   ];
+}
+
+/** The write landed, but the app was not told: say so, and that a retry is wrong. */
+function formatRefresh(refresh: ToolValue | undefined): string[] {
+  if (!isObject(refresh) || refresh.ok !== false) return [];
+  const lines = [
+    `The app was not told to refresh, so it may show the old copy: ${String(refresh.error)}: ${String(refresh.message)}`,
+    "  Do not write again: the write succeeded.",
+  ];
+  if (text(refresh.fix)) lines.push(`  fix: ${String(refresh.fix)}`);
+  return lines;
 }
 
 export interface SetResult {
   collection: string;
   field: string;
-  saved: { slug: string; written: ToolValue }[];
+  saved: { slug: string; written: ToolValue; refresh?: ToolValue }[];
   failed: { slug: string; error: string; message: string; fix?: string }[];
 }
 
@@ -268,7 +297,9 @@ export async function setField(
         await tools.call("write_content", { collection, slug, data, body: text(doc.body) ?? "" }),
         "write_content",
       );
-      result.saved.push({ slug, written: answer.written ?? null });
+      const saved: SetResult["saved"][number] = { slug, written: answer.written ?? null };
+      if (answer.refresh !== undefined) saved.refresh = answer.refresh;
+      result.saved.push(saved);
     } catch (error) {
       if (!(error instanceof GraftError)) throw error;
       const failure: SetResult["failed"][number] = {
@@ -287,6 +318,11 @@ export function formatSet(result: SetResult): string[] {
   const lines = [
     `Set ${result.field} on ${result.saved.length} of ${result.saved.length + result.failed.length} document(s) in ${result.collection}.`,
   ];
+  for (const saved of result.saved) {
+    const refresh = formatRefresh(saved.refresh);
+    if (refresh.length > 0)
+      lines.push(`  ${result.collection}/${saved.slug}: ${refresh.join("\n  ")}`);
+  }
   for (const failure of result.failed) {
     lines.push(`  ${result.collection}/${failure.slug}: ${failure.error}: ${failure.message}`);
     if (failure.fix) lines.push(`    fix: ${failure.fix}`);
