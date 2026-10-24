@@ -1,6 +1,6 @@
 /**
  * Build and run a real Next.js app on @usegraft/sdk-next, and check what the
- * adapter promises on that Next. Each folder here (next14, next15, next16)
+ * adapter promises on that Next. Each folder here (next15, next16)
  * pins one major in the lockfile and runs this from its own directory:
  *
  *   pnpm --filter sdk-next-compat-next15 smoke
@@ -109,16 +109,10 @@ check(
 const serverFiles = JSON.parse(
   readFileSync(join(appDir, ".next/required-server-files.json"), "utf8"),
 );
-// Next 15 renamed the setting; 14 reads the experimental one.
-const externalsKey =
-  major >= 15 ? "serverExternalPackages" : "experimental.serverComponentsExternalPackages";
-const externals =
-  major >= 15
-    ? serverFiles.config.serverExternalPackages
-    : serverFiles.config.experimental?.serverComponentsExternalPackages;
+const externals = serverFiles.config.serverExternalPackages;
 check(
   Array.isArray(externals) && externals.includes("@usegraft/registry"),
-  `withGraft set ${externalsKey}`,
+  "withGraft set serverExternalPackages",
 );
 
 // 5. Serve it and check behavior over HTTP.

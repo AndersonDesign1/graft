@@ -1,6 +1,6 @@
 /**
  * Type-check the Next.js guide's code blocks (guide/) against the Next this
- * package develops on. The compat apps (compat/next14, next15, next16) check
+ * package develops on. The compat apps (compat/next15, next16) check
  * the same blocks against each supported major.
  *
  * The blocks that only exist on Next 16 live in guide/next16/ and are added

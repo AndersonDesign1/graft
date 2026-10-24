@@ -16,16 +16,6 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 const check = process.argv.includes("--check");
 
 const majors = {
-  // The oldest supported: React 18 in the Pages Router, the React canary Next
-  // bundles in the App Router, and the experimental externals key.
-  next14: {
-    next: "14.2.35",
-    react: "18.3.1",
-    types: "18.3.31",
-    typesDom: "18.3.7",
-    port: 3114,
-    ts: "5.9.3",
-  },
   // TypeScript 5 for 15: it writes moduleResolution "node" into a new
   // tsconfig, which TypeScript 6 rejects. Apps on 15 run TypeScript 5.
   next15: {
@@ -78,15 +68,8 @@ for (const [name, v] of Object.entries(majors)) {
   // `paths` applies to every import in the program, so the adapter's own
   // source (mapped by the guide config) also sees this Next.
   const guide = name === "next16" ? "tsconfig.next16.json" : "tsconfig.json";
-  // What next-env.d.ts gives a real app: Next's global types. Next 14's also
-  // reference React's experimental types, which declare cache and async
-  // components; named here so they resolve to this app's React 18 types.
-  files.set(
-    `${name}/guide-env.d.ts`,
-    name === "next14"
-      ? '/// <reference types="next" />\n/// <reference types="react/experimental" />\n'
-      : '/// <reference types="next" />\n',
-  );
+  // What next-env.d.ts gives a real app: Next's global types.
+  files.set(`${name}/guide-env.d.ts`, '/// <reference types="next" />\n');
   const tsGuide = {
     extends: `../../guide/${guide}`,
     include: ["./guide-env.d.ts", "../../guide/**/*.ts", "../../guide/**/*.tsx"],

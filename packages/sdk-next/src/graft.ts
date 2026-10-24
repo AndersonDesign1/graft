@@ -1,6 +1,8 @@
 /**
  * Next.js adapter over @usegraft/sdk-core, for the App Router and the Pages
- * Router, on Next.js 14, 15 and 16.
+ * Router, on Next.js 15 and 16. Next.js 14 is not supported, but the two
+ * things it needs are kept (the React 18 fallback below and withGraft's
+ * experimental externals key), so the Next.js guide can show how to run it.
  *
  * `createGraft` wraps the read client with React.cache so repeated reads of the
  * same document within one server render are deduped. Server-only by nature (it
@@ -12,12 +14,12 @@
  * package can't generate it. Instead it ships the tag helpers (re-exported from
  * sdk-core — `tagsFor`, `documentTag`, `collectionTag`) that an app drops into
  * `cacheTag(...)` inside its own `'use cache'` functions (Next 16), or into
- * `unstable_cache(fn, keys, { tags })` (Next 14 and 15), plus the write side:
+ * `unstable_cache(fn, keys, { tags })` (Next 15), plus the write side:
  * `revalidateContent` / `updateContent`, which turn a compile's `ChangeSet`
  * into the exact `revalidateTag` / `updateTag` calls that refresh only the
  * changed pages. See the example app's llms.txt for the composition.
  *
- * Supports Next 14, 15 and 16. `next/cache` differs between them, so it is
+ * Supports Next 15 and 16. `next/cache` differs between them, so it is
  * read through a namespace and feature-detected at call time: a named import
  * of `updateTag` (Next 16 only) is an import of a missing export before 16.
  */
@@ -77,9 +79,8 @@ export type GraftOptions<TCollections extends Record<string, AnyCollection>> =
 type Memo = <A extends unknown[], R>(fn: (...args: A) => R) => (...args: A) => R;
 
 /**
- * React.cache, where there is one. React 19 and the React that Next.js 14
- * bundles for the App Router have it; React 18, which the Pages Router runs
- * on Next.js 14, does not. Without it each read goes to the index, which is
+ * React.cache, where there is one. React 19 has it; React 18, which the
+ * Pages Router can run on, does not. Without it each read goes to the index, which is
  * what the Pages Router's data functions expect: they run once per page.
  */
 const react: { cache?: Memo } = React;
@@ -183,7 +184,7 @@ export function updateContent(branch: string, changes: ChangeSet): string[] {
     throw new GraftError({
       code: "FRAMEWORK_VERSION_UNSUPPORTED",
       message: "updateContent needs Next.js 16. This version of next/cache has no updateTag.",
-      fix: "Call revalidateContent(branch, changes) instead. It works on Next.js 14, 15 and 16 and refreshes on the next request rather than this one. Or upgrade to Next.js 16.",
+      fix: "Call revalidateContent(branch, changes) instead. It works on Next.js 15 and 16 and refreshes on the next request rather than this one. Or upgrade to Next.js 16.",
       details: { missing: "next/cache updateTag", fallback: "revalidateContent" },
     });
   }

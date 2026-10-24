@@ -7,6 +7,7 @@
  * GraftError printed with its agent-actionable `fix`.
  */
 import { printGraftError } from "./report";
+import { checkForUpdate, formatUpdateNotice, updateCheckDisabled, useColor } from "./update-notice";
 import { VERSION } from "./version";
 
 interface PlannedCommand {
@@ -612,9 +613,48 @@ function parseArgs(rest: string[]): ParsedArgs {
 
 export interface RunOptions {
   cwd?: string;
+  /**
+   * The newer-version notice to print, if any. Defaults to asking npm (at most
+   * once a day); off under CI, VITEST and GRAFT_NO_UPDATE_CHECK. Tests pass
+   * their own so nothing reaches the network.
+   */
+  updateNotice?: () => Promise<string | undefined>;
+}
+
+/** Commands that run until stopped, so the notice prints as soon as it is known. */
+function isLongRunning(command: string, rest: string[]): boolean {
+  if (command === "dev" || command === "serve") return true;
+  return command === "studio" && rest[0] !== "invite" && rest[0] !== "setup-code";
+}
+
+async function defaultUpdateNotice(cwd: string): Promise<string | undefined> {
+  if (updateCheckDisabled(process.env, cwd)) return undefined;
+  const notice = await checkForUpdate({ current: VERSION, env: process.env });
+  return notice && formatUpdateNotice(notice, useColor(process.env, process.stderr.isTTY));
 }
 
 export async function run(argv: string[], options: RunOptions = {}): Promise<number> {
+  const [command, ...rest] = argv;
+  // `graft mcp` talks to its client over stdio, so it prints nothing extra.
+  if (!command || command === "mcp" || command.startsWith("-") || rest.some(isHelpFlag)) {
+    return dispatch(argv, options);
+  }
+  // Started alongside the command, so the registry round trip overlaps its work.
+  const check = options.updateNotice ?? (() => defaultUpdateNotice(options.cwd ?? process.cwd()));
+  const pending = check().catch(() => undefined);
+  const print = (notice: string | undefined): void => {
+    if (notice) console.error(notice);
+  };
+  if (isLongRunning(command, rest)) {
+    void pending.then(print);
+    return dispatch(argv, options);
+  }
+  const code = await dispatch(argv, options);
+  print(await pending);
+  return code;
+}
+
+async function dispatch(argv: string[], options: RunOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
   const [command, ...rest] = argv;
 

@@ -1,6 +1,6 @@
 packages:
   - "packages/*"
-  # Real Next.js 14, 15 and 16 apps that run @usegraft/sdk-next (see its compat/).
+  # Real Next.js 15 and 16 apps that run @usegraft/sdk-next (see its compat/).
   - "packages/sdk-next/compat/*"
   - "examples/*"
   - "deploy/docker/project"

@@ -88,9 +88,9 @@ const code = await prepareMdx(page.body);
 
 ## Supported versions
 
-Next.js 14.2 and later 14.x, 15 and 16, with the App Router or the Pages Router, on React 18.2 or 19. CI builds and serves a real app on each major, with an App Router and a Pages Router page.
+Next.js 15 and 16, with the App Router or the Pages Router, on React 18.2 or 19. CI builds and serves a real app on each major, with an App Router and a Pages Router page. 15.5.24 and 16.3.3 are the first releases with fixes for the critical Next.js advisories published in 2026, and `withGraft` warns when your app runs a release without them.
 
-Next.js 14 no longer gets security fixes. 14.2.35, its last release, is affected by 23 published Next.js advisories, two of them critical remote code execution, and none will be fixed on 14. Graft runs on it so you can adopt Graft before you upgrade, not as a place to stay. 15.5.24 and 16.3.3 are the first releases with fixes for the critical Next.js advisories published in 2026. `withGraft` warns when your app runs a release without them.
+Next.js 14 is not supported. It no longer gets security fixes, and its last release, 14.2.35, has two critical remote code execution advisories that will not be fixed on 14. The adapter still runs on 14.2, and the [Next.js guide](https://graft.page/docs/next#run-graft-on-nextjs-14) shows how, for a project that has to adopt Graft before it can upgrade. CI does not test it.
 
 ---
 
