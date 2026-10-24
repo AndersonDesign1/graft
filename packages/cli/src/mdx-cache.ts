@@ -6,7 +6,7 @@
  * never committed and a checkout cannot ship one. One file per content
  * directory: `$XDG_CACHE_HOME/graft/mdx-safety/<hash of the path>.json`.
  * Entries are keyed on the sha256 of the body, and the whole file is dropped
- * when the scanner or a parser it runs changes version (`mdxScanVersion`).
+ * when the scanner or any package under it changes version (`mdxScanVersion`).
  *
  * Each save keeps only the bodies that run looked at, so the file stays the
  * size of the project. A missing, unreadable or corrupt file is an empty

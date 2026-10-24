@@ -85,7 +85,8 @@ Two later changes took most of what was left, measured the same way on
   executable MDX is a full parse with remark-gfm and remark-mdx, about 750 ms
   of the docs site's check. `graft check` and `graft compile` keep the result
   per body under `$XDG_CACHE_HOME/graft/mdx-safety`, keyed on the sha256 of
-  the body and on the versions of the scanner and every parser it runs. The
+  the body and on the version of every package the scanner runs, down its
+  whole dependency tree. The
   cache lives outside the project, so it is never committed. Studio saves and
   MCP writes never use it, and `MdxBody` still refuses executable bodies at
   render. A repeat `graft check` went from 1656 ms to 302 ms; one with an empty

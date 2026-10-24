@@ -105,8 +105,6 @@ function hasContentFiles(dir: string): boolean {
 }
 
 export async function setupStatus(input: SetupStatusInput): Promise<SetupStatus> {
-  // Loaded here, not at module load: setup status runs on static projects too.
-  const { countAccounts, readJournal, sql } = await import("@usegraft/db");
   const env = input.env ?? process.env;
   const now = input.now ?? new Date();
   const checks: SetupCheck[] = [];
@@ -116,6 +114,9 @@ export async function setupStatus(input: SetupStatusInput): Promise<SetupStatus>
 
   // ---- the database ---------------------------------------------------------
   let connected = false;
+  // The Postgres helpers, loaded only once there is a database to ask, so a
+  // static project's `graft doctor` never loads the Postgres code.
+  let pg: typeof import("@usegraft/db") | undefined;
   if (input.index === "static") {
     add({
       id: "database",
@@ -133,6 +134,8 @@ export async function setupStatus(input: SetupStatusInput): Promise<SetupStatus>
       fix: "Put DATABASE_URL=postgres://… in .env. Any Postgres 13 or newer works. `npm create graft` can make a free one for you.",
     });
   } else {
+    pg = await import("@usegraft/db");
+    const { sql } = pg;
     const url = input.databaseUrl ?? "";
     try {
       const rows = await input.db.execute<{ server_version_num: string }>(
@@ -209,17 +212,17 @@ export async function setupStatus(input: SetupStatusInput): Promise<SetupStatus>
   }
 
   // ---- the schema -----------------------------------------------------------
-  if (input.index === "postgres" && connected && input.db) {
+  if (input.index === "postgres" && connected && input.db && pg) {
     let applied = new Set<number>();
     try {
       const rows = await input.db.execute<{ created_at: string | number | null }>(
-        sql`select created_at from drizzle.__drizzle_migrations`,
+        pg.sql`select created_at from drizzle.__drizzle_migrations`,
       );
       applied = new Set(rows.map((row) => Number(row.created_at)));
     } catch {
       // No ledger yet: nothing applied.
     }
-    const pending = readJournal().filter((entry) => !applied.has(entry.when));
+    const pending = pg.readJournal().filter((entry) => !applied.has(entry.when));
     add(
       pending.length === 0
         ? { id: "schema", state: "pass", title: "Schema", detail: "Up to date." }
@@ -236,9 +239,9 @@ export async function setupStatus(input: SetupStatusInput): Promise<SetupStatus>
   // ---- content --------------------------------------------------------------
   const schemaReady = !checks.some((check) => check.id === "schema" && check.state === "fail");
   if (input.source === "database") {
-    if (connected && input.db && schemaReady) {
+    if (connected && input.db && schemaReady && pg) {
       const rows = await input.db.execute<{ n: number }>(
-        sql`select count(*)::int as n from content_heads where published_id is not null`,
+        pg.sql`select count(*)::int as n from content_heads where published_id is not null`,
       );
       const published = Number(rows[0]?.n ?? 0);
       add(
@@ -288,9 +291,9 @@ export async function setupStatus(input: SetupStatusInput): Promise<SetupStatus>
             fix: "Run `graft compile`.",
           },
     );
-  } else if (connected && input.db && schemaReady) {
+  } else if (connected && input.db && schemaReady && pg) {
     const rows = await input.db.execute<{ n: number }>(
-      sql`select count(*)::int as n from compilations`,
+      pg.sql`select count(*)::int as n from compilations`,
     );
     add(
       Number(rows[0]?.n ?? 0) > 0
@@ -317,8 +320,8 @@ export async function setupStatus(input: SetupStatusInput): Promise<SetupStatus>
           "GRAFT_STUDIO_SECRET is not set. Studio works on this computer, but can't let people sign in online.",
         fix: "Add GRAFT_STUDIO_SECRET to .env: 32 or more random characters, such as the output of `openssl rand -base64 48`.",
       });
-    } else if (connected && input.db && schemaReady) {
-      const people = await countAccounts(input.db);
+    } else if (connected && input.db && schemaReady && pg) {
+      const people = await pg.countAccounts(input.db);
       add(
         people > 0
           ? {

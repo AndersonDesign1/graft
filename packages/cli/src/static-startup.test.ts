@@ -62,6 +62,7 @@ describe("a static project", () => {
     [["--help"]],
     [["compile"]],
     [["check"]],
+    [["doctor"]],
     [["content", "list", "pages"]],
     [["content", "get", "pages/home"]],
     [["content", "search", "fixture"]],

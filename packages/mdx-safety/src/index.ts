@@ -260,4 +260,11 @@ export function assertSafeMdx(source: string, options: AssertSafeMdxOptions = {}
   });
 }
 
-export { mdxScanVersion, scanMdx, type MdxScanCache, type MdxScanResult } from "./scan-cache";
+export {
+  mdxScanPackages,
+  mdxScanVersion,
+  scanMdx,
+  scanVersionOf,
+  type MdxScanCache,
+  type MdxScanResult,
+} from "./scan-cache";

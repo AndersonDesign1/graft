@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { mdxScanVersion, scanMdx, type MdxScanCache, type MdxScanResult } from "./index";
+import {
+  mdxScanPackages,
+  mdxScanVersion,
+  scanMdx,
+  scanVersionOf,
+  type MdxScanCache,
+  type MdxScanResult,
+} from "./index";
 
 function memoryCache(): MdxScanCache & { gets: string[]; sets: string[] } {
   const results = new Map<string, MdxScanResult>();
@@ -48,19 +55,36 @@ describe("scanMdx", () => {
 });
 
 describe("mdxScanVersion", () => {
-  it("names this package and every parser it runs, with versions", () => {
-    const version = mdxScanVersion() ?? "";
-    for (const name of [
-      "@usegraft/mdx-safety",
-      "remark-parse",
-      "remark-gfm",
-      "remark-mdx",
-      "mdast-util-from-markdown",
-      "micromark",
-      "micromark-extension-gfm",
-      "micromark-extension-mdxjs",
-    ]) {
-      expect(version).toMatch(new RegExp(`(^| )${name.replace("/", "\\/")}@\\d`));
-    }
+  it("covers every package the scan runs, down the whole dependency tree", () => {
+    const names = (mdxScanPackages() ?? []).map((id) => id.slice(0, id.lastIndexOf("@")));
+    expect(names[0]).toBe("@usegraft/mdx-safety");
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "remark-parse",
+        "remark-gfm",
+        "remark-mdx",
+        "micromark",
+        "micromark-extension-gfm",
+        "micromark-extension-mdxjs",
+        // Nested a few levels down, and versioned on their own.
+        "micromark-extension-mdx-expression",
+        "micromark-extension-mdx-jsx",
+        "micromark-extension-mdxjs-esm",
+      ]),
+    );
+    expect(mdxScanVersion()).toBe(scanVersionOf(mdxScanPackages() ?? []));
+  });
+
+  it("changes when any package under the scanner changes version, in any order", () => {
+    const packages = [
+      "@usegraft/mdx-safety@1.0.0",
+      "remark-mdx@3.1.1",
+      "micromark-extension-mdx-jsx@3.0.2",
+    ];
+    const nestedBump = [...packages.slice(0, 2), "micromark-extension-mdx-jsx@3.0.3"];
+    expect(scanVersionOf(nestedBump)).not.toBe(scanVersionOf(packages));
+    expect(scanVersionOf([packages[0] ?? "", ...packages.slice(1).reverse()])).toBe(
+      scanVersionOf(packages),
+    );
   });
 });
