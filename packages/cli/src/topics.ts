@@ -47,6 +47,19 @@ export const ENVIRONMENT: readonly EnvVarSpec[] = [
   },
   { name: "GRAFT_DEBUG", summary: "Set to 1 to print the stack trace of an unexpected error" },
   {
+    name: "GRAFT_URL",
+    summary:
+      "A hosted site for commands that take --remote; when set, they use it without the flag. Read from the environment only, never from `.env`",
+  },
+  {
+    name: "GRAFT_TOKEN",
+    summary: "The token for GRAFT_URL, instead of the one `graft login` saved",
+  },
+  {
+    name: "XDG_CONFIG_HOME",
+    summary: "Where `graft login` keeps tokens, under `graft/hosts.json` (default: `~/.config`)",
+  },
+  {
     name: "GRAFT_PROMPT_DISABLED",
     summary: "Set to 1 to never ask a question, as `--no-input` does",
   },

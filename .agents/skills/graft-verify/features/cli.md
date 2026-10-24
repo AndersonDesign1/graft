@@ -99,6 +99,17 @@ Preconditions: `REPO` and `O` from the skill's Launch step, a sandbox from `scri
 - **Never run `--database new` in a test.** It makes a real database on an
   outside service. The unit tests fake that service's answers.
 
+- **A hosted site** (Postgres sandbox, `XDG_CONFIG_HOME` set inside it):
+  start `graft serve --studio --port 3913` on loopback, mint a token with
+  `curl -X POST http://127.0.0.1:3913/api/studio/v1/agents -H 'content-type: application/json' -d '{"name":"cli","access":"write"}'`,
+  stop it, and start it again with `--host 0.0.0.0` so tokens are enforced.
+  `printf %s "$TOK" | $G login http://127.0.0.1:3913 --with-token` prints
+  `Logged in to http://127.0.0.1:3913 as token:cli (...)`, and `hosts.json`
+  is mode 600. From an empty folder, `$G content list --remote` lists the
+  sandbox's documents, `$G content delete pages/x --remote` exits 3,
+  `$G api workspace` prints the token's user, and `GRAFT_TOKEN=bad $G content list --remote`
+  exits 4. Kill the server by its PID.
+
 ## Gotchas
 
 - Anything `graft mcp` prints to stdout breaks the protocol stream, including a

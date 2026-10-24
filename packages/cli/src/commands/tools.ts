@@ -105,7 +105,7 @@ function titleOf(data: ToolValue | undefined): string | undefined {
  * HTTP; from the CLI the retry is the same command with --approval, so its
  * fix says that instead.
  */
-export function rethrowWithRetry(error: unknown, retry: string): never {
+export function rethrowWithRetry(error: unknown, retry: string, remote = false): never {
   if (!(error instanceof GraftError) || error.code !== "DESTRUCTIVE_OP_REQUIRES_APPROVAL") {
     throw error;
   }
@@ -114,7 +114,11 @@ export function rethrowWithRetry(error: unknown, retry: string): never {
   const options: ConstructorParameters<typeof GraftError>[0] = {
     code: error.code,
     message: error.message,
-    fix: `Ask a person to run \`graft approve ${id}\`, then run \`${retry} --approval ${id}\`. The approval works once, for this exact call.`,
+    // On a hosted site the person approves where the site's database is: its
+    // Studio, or graft approve run with the site's DATABASE_URL.
+    fix: remote
+      ? `Ask a person to approve ${id} in the site's Studio (or with \`graft approve ${id}\` and the site's DATABASE_URL), then run \`${retry} --remote --approval ${id}\`. The approval works once, for this exact call.`
+      : `Ask a person to run \`graft approve ${id}\`, then run \`${retry} --approval ${id}\`. The approval works once, for this exact call.`,
   };
   if (error.details) options.details = error.details;
   throw new GraftError(options);

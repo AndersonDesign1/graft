@@ -111,6 +111,66 @@ database, and `graft explain <code>` explains any error code. `graft mcp call`
 runs any other tool by name. The [MCP tools](/docs/mcp-tools#call-a-tool-from-the-terminal)
 page maps each tool to its command.
 
+## Work with a hosted site
+
+The same commands work on a site you host with `graft serve --studio`, through
+its `/api/mcp` endpoint. Make a token in Studio under **Developer, Agents**,
+then save it once:
+
+```sh
+printf %s "$TOKEN" | graft login https://cms.example.com --with-token
+```
+
+`graft login` checks the token with the site, prints who it acts as and what it
+may do, and saves it in `~/.config/graft/hosts.json` (under `XDG_CONFIG_HOME`
+when that is set), readable by you alone. Without `--with-token`, on a terminal,
+it asks for the token without echoing it. A token is never an argument, where it would
+land in your shell history.
+
+Then add `--remote` to a content command:
+
+```sh
+graft content list --remote
+graft content write posts/launch --file launch.mdx --remote
+```
+
+Each prints the site it is using on stderr. In CI, set `GRAFT_URL` and
+`GRAFT_TOKEN` in the environment instead: commands that take `--remote` then
+use the site without the flag, and `--local` brings them back to the folder's
+project. `GRAFT_URL` is never read from `.env`, so a file in some folder cannot
+point a command at a production site.
+
+`graft auth status` checks every saved token against its site, and
+`graft logout` forgets one on this computer. A token keeps working until
+someone revokes it in Studio.
+
+No token can approve an action. A delete over `--remote` exits 3, and a person
+approves it in the site's Studio before you repeat it with
+`--remote --approval <id>`.
+
+### Call the Studio API
+
+`graft api` calls any [Studio API](/docs/studio-api) route on the site with the
+saved token, so you never paste the token into a curl command:
+
+```sh
+graft api workspace
+graft api entries -f collection=posts --paginate
+graft api -X PUT entry --input entry.json
+```
+
+A path is under `/api/studio/v1` unless it starts with `/api/fn` or
+`/api/content/v1`. `-f key=value` sends a string and `-F key=value` sends
+`true`, `false`, `null` or a number as JSON. Fields make the request a POST
+with a JSON body; with `-X GET` or `--paginate` they become the query string.
+`--paginate` follows `nextCursor` and prints every page. `graft api` with no
+path lists the routes.
+
+The answer prints on stdout. A refused request also prints its error and fix
+on stderr and exits 1, or 4 when the token lacks the access. `-X DELETE` needs
+`--yes`. `graft api` never follows a redirect, and never sends the token to
+another site.
+
 ## Read a failure
 
 When a command run with `--json` fails, stderr gets one line of JSON with the

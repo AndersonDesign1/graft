@@ -312,6 +312,11 @@ agent sends the token to `/api/mcp` as `Authorization: Bearer graft_at_…`.
 Revoke it there and the agent is refused from its next request. See
 [Studio, Agents](/docs/studio#agents).
 
+The same token works from a terminal or a CI job. `graft login <url>` saves
+it, then `graft content` commands with `--remote`, and `graft api`, act on the
+hosted site through the same endpoints. See
+[Work with a hosted site](/docs/cli#work-with-a-hosted-site).
+
 To rebuild or refresh the site after a publish, add a deploy hook under
 **Settings, Deploy hooks**. It is called after a publish of content in the
 database, and after an agent's commit to the production branch. See
