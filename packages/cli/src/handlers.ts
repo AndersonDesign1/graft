@@ -233,7 +233,7 @@ const handlers = {
     const ref = required(ctx, 0);
     const id = parseDocumentId(ref, "content delete");
     const approval = ctx.flags.string("approval");
-    const answer = await runTools(ctx, async (tools) => {
+    const answer = await runTools(ctx, async (tools, where) => {
       try {
         const input = approval === undefined ? id : { ...id, approval };
         return asObject(await tools.call("delete_content", input), "delete_content");
@@ -241,7 +241,8 @@ const handlers = {
         return rethrowWithRetry(
           error,
           retryCommand(["content", "delete", ref], branchOf(ctx)),
-          ctx.flags.bool("remote"),
+          // The site the call went to, however it was chosen (--remote or GRAFT_URL).
+          where.remote !== undefined,
         );
       }
     });
@@ -359,7 +360,7 @@ const handlers = {
     };
     const approval = ctx.flags.string("approval");
     if (approval !== undefined) input.approval = approval;
-    const answer = await runTools(ctx, async (tools) => {
+    const answer = await runTools(ctx, async (tools, where) => {
       try {
         return asObject(await tools.call("run_function", input), "run_function");
       } catch (error) {
@@ -369,7 +370,8 @@ const handlers = {
         return rethrowWithRetry(
           error,
           retryCommand(words, branchOf(ctx)),
-          ctx.flags.bool("remote"),
+          // The site the call went to, however it was chosen (--remote or GRAFT_URL).
+          where.remote !== undefined,
         );
       }
     });
@@ -879,9 +881,14 @@ function resolutions(values: readonly string[]): Record<string, "mine" | "theirs
 }
 
 /** Run the project's MCP tools in this process; loaded only by the commands that use them. */
-async function runTools<T>(ctx: CommandContext, fn: (tools: ToolClient) => Promise<T>): Promise<T> {
+/** Run tools where the command points; `fn` also learns where that is. */
+async function runTools<T>(
+  ctx: CommandContext,
+  fn: (tools: ToolClient, where: ToolTarget) => Promise<T>,
+): Promise<T> {
   const { withTools } = await import("./tool-runner");
-  return withTools(await target(ctx), fn);
+  const where = await target(ctx);
+  return withTools(where, (tools) => fn(tools, where));
 }
 
 /** A required argument; the parser has already refused a call without it. */

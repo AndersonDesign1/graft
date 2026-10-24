@@ -7,6 +7,7 @@
  * fix instead of a bare fetch error.
  */
 import { GraftError } from "@usegraft/contracts";
+import { UsageError } from "../args";
 
 export interface SiteRequest {
   origin: string;
@@ -21,7 +22,16 @@ export interface SiteRequest {
 
 export async function siteFetch(request: SiteRequest): Promise<Response> {
   const url = new URL(request.path, request.origin);
-  const headers = new Headers(request.headers);
+  let headers: Headers;
+  try {
+    headers = new Headers(request.headers);
+  } catch (error) {
+    throw new UsageError(
+      `a request header is not valid: ${error instanceof Error ? error.message : String(error)}`,
+      'Write each one as -H "Name: value", with a name of letters, digits and dashes.',
+      { command: "api" },
+    );
+  }
   headers.set("authorization", `Bearer ${request.token}`);
   if (!headers.has("accept")) headers.set("accept", "application/json");
   if (request.body !== undefined && !headers.has("content-type")) {
@@ -70,10 +80,24 @@ export async function whoAmI(origin: string, token: string): Promise<WhoAmI> {
   if (response.status === 401 || response.status === 403) throw refused(origin, response.status);
   if (response.ok) {
     const body: unknown = await response.json().catch(() => undefined);
-    const user =
-      typeof body === "object" && body !== null && "user" in body && typeof body.user === "object"
-        ? body.user
-        : null;
+    // Studio's workspace always names its storage and its user (null where
+    // there is no sign-in). Anything else, such as an HTML page at a mistyped
+    // address, is not Studio, and saving the token for it would be wrong.
+    if (
+      typeof body !== "object" ||
+      body === null ||
+      !("user" in body) ||
+      !("storage" in body) ||
+      typeof body.storage !== "string"
+    ) {
+      throw new GraftError({
+        code: "REMOTE_UNREACHABLE",
+        message: `${origin} answered Studio's workspace route, but not with Studio's answer.`,
+        fix: "Check the address: it is the site's origin, such as https://cms.example.com, where graft serve --studio runs. Nothing was saved.",
+        details: { origin, status: response.status },
+      });
+    }
+    const user = typeof body.user === "object" ? body.user : null;
     const id = user !== null && "id" in user && typeof user.id === "string" ? user.id : null;
     const scopes =
       user !== null && "scopes" in user && Array.isArray(user.scopes)

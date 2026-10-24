@@ -32,6 +32,11 @@ export function apiPath(typed: string): string {
       },
     );
   };
+  // URL parsing drops tabs and line breaks, so a path holding them would be
+  // checked as one thing and sent as another.
+  if ([...typed].some((char) => char.charCodeAt(0) < 0x20 || char.charCodeAt(0) === 0x7f)) {
+    refuse("paths may not contain control characters, such as tabs or line breaks.");
+  }
   if (/^[a-z][a-z0-9+.-]*:/i.test(typed) || typed.startsWith("//")) {
     refuse("it names another site. Paths go to the site you logged in to.");
   }
@@ -69,6 +74,8 @@ export function typedValue(raw: string): Json {
   return raw;
 }
 
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 /** `key=value`, `key[]=value` and `key[sub]=value` into one object. */
 export function buildFields(entries: readonly { key: string; value: Json }[]): {
   [key: string]: Json;
@@ -76,6 +83,15 @@ export function buildFields(entries: readonly { key: string; value: Json }[]): {
   const root: { [key: string]: Json } = {};
   for (const { key, value } of entries) {
     const parts = key.split("[").map((part, i) => (i === 0 ? part : part.replace(/\]$/, "")));
+    // These names reach the object's prototype instead of making a field.
+    const unsafe = parts.find((part) => UNSAFE_KEYS.has(part));
+    if (unsafe !== undefined) {
+      throw new UsageError(
+        `the field name ${key} uses "${unsafe}", which cannot be a field.`,
+        "Rename the field. Send the body with --input <file> if the route needs that exact name.",
+        { command: "api", field: key },
+      );
+    }
     let node: JsonObject = root;
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i] ?? "";
@@ -84,12 +100,13 @@ export function buildFields(entries: readonly { key: string; value: Json }[]): {
       if (last) {
         node[part] = value;
       } else if (next === "") {
-        const list = Array.isArray(node[part]) ? node[part] : [];
+        const existing = Object.hasOwn(node, part) ? node[part] : undefined;
+        const list = Array.isArray(existing) ? existing : [];
         list.push(value);
         node[part] = list;
         break;
       } else {
-        const child = node[part];
+        const child = Object.hasOwn(node, part) ? node[part] : undefined;
         const object =
           typeof child === "object" && child !== null && !Array.isArray(child) ? child : {};
         node[part] = object;
@@ -202,7 +219,11 @@ export async function apiCommand(options: ApiOptions): Promise<ApiOutcome> {
   } else if (hasFields) {
     body = JSON.stringify(fields);
   }
-  if (base.origin !== new URL(options.origin).origin) {
+  // Check the path the request will really go to, as well as the one typed.
+  if (
+    base.origin !== new URL(options.origin).origin ||
+    !ALLOWED.some((prefix) => base.pathname.startsWith(prefix))
+  ) {
     throw new UsageError(
       `graft api cannot call "${options.path}".`,
       "Paths go to the site you logged in to.",
@@ -213,8 +234,9 @@ export async function apiCommand(options: ApiOptions): Promise<ApiOutcome> {
   }
 
   const pages: Json[] = [];
+  const cursors = new Set<string>();
   let url = base;
-  for (let page = 0; page < 1000; page++) {
+  for (;;) {
     const request: Parameters<typeof siteFetch>[0] = {
       origin: options.origin,
       token: options.token,
@@ -240,6 +262,17 @@ export async function apiCommand(options: ApiOptions): Promise<ApiOutcome> {
         ? parsed.nextCursor
         : null;
     if (!options.paginate || typeof next !== "string" || !next) break;
+    // Every page is followed until the last one. A cursor seen before would
+    // loop forever, so it stops the command instead of ending it quietly.
+    if (cursors.has(next)) {
+      throw new GraftError({
+        code: "REMOTE_UNREACHABLE",
+        message: `${options.origin} sent the cursor "${next}" twice, so --paginate stopped after ${pages.length} pages.`,
+        fix: "The pages so far are printed above. Report this to whoever runs the site, or page by hand with -f cursor=<value>.",
+        details: { origin: options.origin, cursor: next, pages: pages.length },
+      });
+    }
+    cursors.add(next);
     url = new URL(url);
     url.searchParams.set("cursor", next);
   }

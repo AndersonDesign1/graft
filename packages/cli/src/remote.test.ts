@@ -54,8 +54,9 @@ beforeAll(async () => {
     }
     const url = new URL(request.url ?? "/", "http://stub");
     if (url.pathname === "/api/studio/v1/workspace") {
-      return json(200, { user: { id: "token:ci", scopes: ["studio:read"] } });
+      return json(200, { storage: "files", user: { id: "token:ci", scopes: ["studio:read"] } });
     }
+    if (url.pathname === "/api/studio/v1/loop") return json(200, { items: [], nextCursor: "same" });
     if (url.pathname === "/api/studio/v1/entries") {
       const cursor = url.searchParams.get("cursor");
       return json(200, cursor ? { items: [2] } : { items: [1], nextCursor: "page-2" });
@@ -188,6 +189,31 @@ describe("graft login", () => {
     expect(seen.map((request) => request.url)).toEqual(["/api/studio/v1/workspace"]);
     expect(JSON.parse(readFileSync(file(), "utf8")).default).toBe(origin);
   });
+
+  it("saves nothing for a site that answers with something other than Studio", async () => {
+    const page = createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "text/html" });
+      response.end("<!doctype html><title>Not Graft</title>");
+    });
+    await new Promise<void>((resolve) => page.listen(0, "127.0.0.1", resolve));
+    const address = page.address();
+    const at = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
+    const stdin = vi
+      .spyOn(process.stdin, Symbol.asyncIterator)
+      .mockImplementation(async function* () {
+        yield Buffer.from(TOKEN);
+      });
+    try {
+      expect(await run(["login", at, "--with-token"])).toBe(1);
+    } finally {
+      stdin.mockRestore();
+      await new Promise((resolve) => page.close(resolve));
+    }
+    expect(errors[0]).toBe(
+      `error REMOTE_UNREACHABLE: ${at} answered Studio's workspace route, but not with Studio's answer.`,
+    );
+    expect(() => statSync(file())).toThrow();
+  });
 });
 
 describe("graft api", () => {
@@ -201,9 +227,34 @@ describe("graft api", () => {
       "a/%2e%2e/b",
       "/api/mcp",
       "/api/other",
+      // A URL drops the line breaks, leaving /api/mcp.
+      "/api/studio/v1/.\n./.\n./mcp",
+      "entries\t",
     ]) {
       expect(() => apiPath(bad)).toThrow();
     }
+  });
+
+  it("refuses field names that would reach the object's prototype", () => {
+    for (const key of ["__proto__[message]", "data[constructor]", "prototype"]) {
+      expect(() => buildFields([{ key, value: "changed" }])).toThrow(/cannot be a field/);
+    }
+    expect(Object.prototype).not.toHaveProperty("message");
+  });
+
+  it("stops --paginate with an error when the site repeats a cursor", async () => {
+    saveLogin();
+    expect(await run(["api", "loop", "--paginate"])).toBe(1);
+    expect(seen).toHaveLength(2);
+    expect(errors[0]).toBe(
+      `error REMOTE_UNREACHABLE: ${origin} sent the cursor "same" twice, so --paginate stopped after 2 pages.`,
+    );
+  });
+
+  it("refuses a header name a request cannot carry, as a usage error", async () => {
+    saveLogin();
+    expect(await run(["api", "workspace", "-H", "bad name: value"])).toBe(2);
+    expect(seen).toEqual([]);
   });
 
   it("types -F values and nests bracketed keys", () => {
