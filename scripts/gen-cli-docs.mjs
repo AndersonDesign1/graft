@@ -66,7 +66,8 @@ function escapeMdx(text) {
  * A table cell: a literal pipe would end the cell, even inside code. Escape
  * backslashes too, so one already in the text cannot combine with the
  * escape added here. A scan rather than a regex replace, for the same reason
- * as escapeMdx.
+ * as escapeMdx. Apply it before escapeMdx, never after: it would double the
+ * backslash escapeMdx puts before `{`, and MDX would run the brace as code.
  */
 function cell(text) {
   let out = "";
@@ -101,7 +102,7 @@ function commandSection(command) {
   if (flags.length > 0) {
     lines.push("", "| Flag | What it does |", "| --- | --- |");
     for (const flag of flags) {
-      lines.push(`| \`${cell(flagName(flag))}\` | ${cell(escapeMdx(flagMeaning(flag)))} |`);
+      lines.push(`| \`${cell(flagName(flag))}\` | ${escapeMdx(cell(flagMeaning(flag)))} |`);
     }
   }
   const facts = [DATABASE[command.database]];
@@ -112,7 +113,7 @@ function commandSection(command) {
   if (command.exitCodes.length > 0) {
     lines.push("", "| Exit code | What it means |", "| --- | --- |");
     for (const exit of command.exitCodes) {
-      lines.push(`| \`${exit.code}\` | ${cell(escapeMdx(`${exit.meaning}.`))} |`);
+      lines.push(`| \`${exit.code}\` | ${escapeMdx(cell(`${exit.meaning}.`))} |`);
     }
   }
   if (command.examples.length > 0) lines.push("", "```sh", ...command.examples, "```");
@@ -160,7 +161,7 @@ Every command exits with one of these, unless its entry above lists its own.
 
 | Exit code | What it means |
 | --- | --- |
-${cli.exitCodes.map((exit) => `| \`${exit.code}\` | ${cell(escapeMdx(`${exit.meaning}.`))} |`).join("\n")}
+${cli.exitCodes.map((exit) => `| \`${exit.code}\` | ${escapeMdx(cell(`${exit.meaning}.`))} |`).join("\n")}
 
 ## Environment variables
 
@@ -169,7 +170,7 @@ These change how the CLI behaves. Your project's own settings are on the
 
 | Variable | What it does |
 | --- | --- |
-${cli.environment.map((env) => `| \`${env.name}\` | ${cell(escapeMdx(`${env.summary}.`))} |`).join("\n")}
+${cli.environment.map((env) => `| \`${env.name}\` | ${escapeMdx(cell(`${env.summary}.`))} |`).join("\n")}
 
 ## Which commands need a database
 
@@ -210,6 +211,16 @@ if (from === -1 || to === -1) {
   process.exit(1);
 }
 const nextReadme = readme.slice(0, from) + table + readme.slice(to + END.length);
+
+// A doubled escape before { or < leaves the character live: MDX reads `\\{`
+// as a backslash and then an expression, and the docs build refuses the page
+// as executable MDX. Stop here, where the cause is, instead.
+if (/\\\\[{<]/.test(page)) {
+  console.error(
+    "gen-cli-docs: the page has a doubled escape before { or <; escape cells before MDX.",
+  );
+  process.exit(1);
+}
 
 const normalize = (text) => text.replace(/\r\n/g, "\n");
 if (check) {
