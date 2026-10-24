@@ -41,26 +41,3 @@ updates:
       # major lands; grouped bumps otherwise pull this in with zizmor-action.
       - dependency-name: "changesets/action"
         update-types: ["version-update:semver-major"]
-
-  # packages/sdk-next/compat/next14 exists to prove @usegraft/sdk-next runs on
-  # Next.js 14, so its `next` must stay on 14. 14.2.35 is the last 14 release
-  # and its advisories have no 14.x fix, so a security update for it can only
-  # be a major bump, which would turn the Next 14 check into a second Next 15
-  # check (and, on pnpm 12, arrive without its lockfile). The entry exists to
-  # hold that ignore rule: version updates stay off here, as for npm
-  # everywhere. The advisories are allowed by ID in security.yml and the docs
-  # warn users.
-  - package-ecosystem: "npm"
-    directory: "/packages/sdk-next/compat/next14"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 0
-    cooldown:
-      default-days: 7
-    commit-message:
-      prefix: "chore"
-    labels:
-      - "dependencies"
-    ignore:
-      - dependency-name: "next"
-        update-types: ["version-update:semver-major"]

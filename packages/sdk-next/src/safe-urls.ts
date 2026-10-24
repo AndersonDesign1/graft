@@ -4,8 +4,8 @@
  * `assertSafeMdx` refuses what runs code when the body is compiled. A URL is
  * different: `[Read more](javascript:alert(document.cookie))` is plain
  * Markdown, compiles to an ordinary link, and runs when a visitor clicks it.
- * React 19 blocks `javascript:` URLs, and React 18, which the Pages Router on
- * Next.js 14 uses, renders them as they are. So under restricted trust a URL
+ * React 19 blocks `javascript:` URLs, and React 18, which the Pages Router
+ * can run on, renders them as they are. So under restricted trust a URL
  * attribute keeps its value only if it is relative or uses http, https,
  * mailto or tel, on Markdown links and on JSX elements and components alike.
  */

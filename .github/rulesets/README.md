@@ -54,10 +54,9 @@ in the repository rather than re-derived in each review.
 **Zero required approvals.** Graft has one maintainer.
 Requiring an approving review would mean nobody can merge anything, because the
 author cannot approve their own pull request. The protection that is actually
-load-bearing here is the ten required status checks — `verify`,
+load-bearing here is the nine required status checks — `verify`,
 `integration`, `container`, `Conventional title`, `Changeset present`,
-`CodeQL`, `Dependency review`, `Workflow audit`, `Vercel`,
-`sdk-next on Next 14` — plus
+`CodeQL`, `Dependency review`, `Workflow audit`, `Vercel` — plus
 `required_review_thread_resolution`, which does bind: an unresolved review
 thread blocks the merge whether or not anyone approved.
 

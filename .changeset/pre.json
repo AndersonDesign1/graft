@@ -29,8 +29,7 @@
     "sdk-next-compat-next15": "0.0.0",
     "sdk-next-compat-next16": "0.0.0",
     "shop": "0.0.0",
-    "create-graft": "1.0.0-beta.6",
-    "sdk-next-compat-next14": "0.0.0"
+    "create-graft": "1.0.0-beta.6"
   },
   "changesets": [
     "approval-policy-to-config",

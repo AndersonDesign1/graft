@@ -11,8 +11,9 @@
  * Next.js 15 named the setting `serverExternalPackages`; 14 reads
  * `experimental.serverComponentsExternalPackages` and warns about the new
  * name. withGraft reads the installed Next.js version and writes the one it
- * understands. It also warns, once, when that version has known security
- * advisories, since the peer range no longer refuses it.
+ * understands, so the unsupported 14 still works for the Next.js guide's
+ * "Run Graft on Next.js 14". It also warns, once, when that version is
+ * unsupported or has known security advisories.
  *
  * Shipped as its own `@usegraft/sdk-next/config` entry: next.config.ts is loaded
  * with require semantics and must not drag the React/MDX runtime surface in.
@@ -22,6 +23,9 @@ import { join } from "node:path";
 import type { NextConfig } from "next";
 
 const GRAFT_SERVER_EXTERNALS = ["@usegraft/registry"];
+
+/** How to run the unsupported Next.js 14, and what it costs. */
+const GUIDE_14 = "https://graft.page/docs/next#run-graft-on-nextjs-14";
 
 /** The first releases with the fixes for the critical Next.js advisories of 2026. */
 const PATCHED = { 15: [5, 24], 16: [3, 3] } as const;
@@ -76,10 +80,10 @@ export function nextVersionAdvice(version: string): string | null {
   if (!parsed) return null;
   const { major, minor, patch, prerelease } = parsed;
   if (major < 14 || (major === 14 && minor < 2)) {
-    return `Graft supports Next.js 14.2 and later. This app has ${version}.`;
+    return `Graft supports Next.js 15 and 16. This app has ${version}.`;
   }
   if (major === 14) {
-    return `Next.js 14 no longer gets security fixes, and ${version} has critical advisories that will not be fixed on 14. Graft works with it, but upgrade to 15.5.24 or 16.3.3 or later.`;
+    return `Graft does not support Next.js 14. It no longer gets security fixes, and ${version} has critical advisories that will not be fixed on 14. Upgrade to 15.5.24 or 16.3.3 or later. Until you can, see ${GUIDE_14}.`;
   }
   const floor = major === 15 || major === 16 ? PATCHED[major] : undefined;
   const below =

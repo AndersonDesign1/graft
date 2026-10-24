@@ -84,7 +84,12 @@ describe("nextVersionAdvice", () => {
       "Next.js 15.5.23 has known critical security advisories. Upgrade to 15.5.24 or later.",
     );
     expect(nextVersionAdvice("16.2.9")).toContain("Upgrade to 16.3.3 or later.");
-    expect(nextVersionAdvice("14.2.35")).toContain("Next.js 14 no longer gets security fixes");
+  });
+
+  it("says 14 is not supported, and points at the guide for running it anyway", () => {
+    expect(nextVersionAdvice("14.2.35")).toBe(
+      "Graft does not support Next.js 14. It no longer gets security fixes, and 14.2.35 has critical advisories that will not be fixed on 14. Upgrade to 15.5.24 or 16.3.3 or later. Until you can, see https://graft.page/docs/next#run-graft-on-nextjs-14.",
+    );
   });
 
   it("counts a prerelease of a patched release as before it", () => {
@@ -95,7 +100,7 @@ describe("nextVersionAdvice", () => {
 
   it("says what is supported below 14.2", () => {
     expect(nextVersionAdvice("14.1.4")).toBe(
-      "Graft supports Next.js 14.2 and later. This app has 14.1.4.",
+      "Graft supports Next.js 15 and 16. This app has 14.1.4.",
     );
   });
 });

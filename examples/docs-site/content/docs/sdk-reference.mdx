@@ -114,7 +114,7 @@ the caller nothing.
 
 In the Next.js App Router, tag cached reads and refresh them with
 `revalidateContent`. On Next.js 16, tag reads with `'use cache'` and
-`cacheTag`. On Next.js 14 and 15, wrap them in `unstable_cache` with `tags`
+`cacheTag`. On Next.js 15, wrap them in `unstable_cache` with `tags`
 ([how](/docs/next#refresh-pages-when-content-changes)).
 Every other framework sends the tags in a CDN header and purges them at the
 CDN. Unchanged documents are never refreshed, and a change on a preview branch
