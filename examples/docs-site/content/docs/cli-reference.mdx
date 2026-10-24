@@ -81,7 +81,7 @@ Uses `DATABASE_URL` when it is set, and works without it. Prints its answer as J
 
 ### `graft add`
 
-Copy an owned primitive (and the primitives it needs) from the registry into graft/, and regenerate the graft/ barrel. graft.config.ts needs no edit.
+Copy an owned primitive (and the primitives it needs) from the registry into graft/, and regenerate the graft/ barrel. graft.config.ts needs no edit. With no item, list the primitives you can add.
 
 ```text
 graft add [item...] [--dry-run] [--overwrite] [--json]
@@ -426,7 +426,7 @@ graft fn run <name> [--branch <id>] [--input <json|->] [--approval <id>] [--json
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
-| `--input <json\|->` | The input as a JSON object; - reads it from stdin (default: \{}). |
+| `--input <json\|->` | The input as a JSON object; - reads it from stdin (default: \\{}). |
 | `--approval <id>` | The approval a person granted for this call. |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
 
@@ -476,7 +476,7 @@ graft mcp call <tool> [--branch <id>] [--input <json|->] [--json]
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
-| `--input <json\|->` | The tool's input as a JSON object; - reads it from stdin (default: \{}). |
+| `--input <json\|->` | The tool's input as a JSON object; - reads it from stdin (default: \\{}). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
@@ -567,7 +567,7 @@ Needs no database.
 
 ### `graft content import`
 
-For a project with content = \{ source: "database" }: make the files under the content directory the live versions in the database. Every file is checked first, and re-running imports only what changed.
+For a project with content = \{ source: "database" }: load the files under the content directory into the database. Every file is checked first. Only documents with nothing published come in: a published document is never overwritten, and a missing file deletes nothing. To change published content, use Studio or graft push.
 
 ```text
 graft content import [--branch <id>] [--dry-run] [--json]

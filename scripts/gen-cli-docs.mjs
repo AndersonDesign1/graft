@@ -62,8 +62,17 @@ function escapeMdx(text) {
   return out;
 }
 
-/** A table cell: a literal pipe would end the cell, even inside code. */
-const cell = (text) => String(text).replace(/\|/g, "\\|");
+/**
+ * A table cell: a literal pipe would end the cell, even inside code. Escape
+ * backslashes too, so one already in the text cannot combine with the
+ * escape added here. A scan rather than a regex replace, for the same reason
+ * as escapeMdx.
+ */
+function cell(text) {
+  let out = "";
+  for (const ch of String(text)) out += ch === "|" || ch === "\\" ? `\\${ch}` : ch;
+  return out;
+}
 
 const DATABASE = {
   always: "Needs `DATABASE_URL`.",
