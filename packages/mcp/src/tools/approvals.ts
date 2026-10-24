@@ -4,7 +4,6 @@
  * A decision is attributed to the identity the connection authenticated as; there is deliberately no way to name a different decider.
  */
 import { GraftError } from "@usegraft/contracts";
-import { decideApproval, listPendingApprovals } from "@usegraft/db";
 import { z } from "zod";
 import { guarded } from "../tool-result";
 import { DESTROYS, READS } from "./annotations";
@@ -27,7 +26,9 @@ export const registerApprovalTools: RegisterTools = (server, deps) => {
     () =>
       guarded(async () => ({
         approvals: (
-          await listPendingApprovals(
+          await (
+            await import("@usegraft/db")
+          ).listPendingApprovals(
             requireDb(
               "list_approvals",
               "Approvals gate destructive operations on operational data, which a static project does not have.",
@@ -62,7 +63,9 @@ export const registerApprovalTools: RegisterTools = (server, deps) => {
     ({ id, decision }) =>
       guarded(async () => {
         requireScope("decide_approval", "approvals:decide");
-        const row = await decideApproval(
+        const row = await (
+          await import("@usegraft/db")
+        ).decideApproval(
           requireDb(
             "decide_approval",
             "Approvals gate destructive operations on operational data, which a static project does not have.",

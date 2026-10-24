@@ -8,15 +8,7 @@
  * when the branch allows), so a day of publishing costs one or two CI runs
  * instead of one per publish.
  */
-import {
-  liveVersions,
-  mirroredVersions,
-  publishedFiles,
-  readHeads,
-  recordMirrored,
-  withMirrorLock,
-  type Database,
-} from "@usegraft/db";
+import type { Database } from "@usegraft/db";
 import type { GitHubStore } from "./store/github/store";
 import type { ReviewRequest } from "./store/types";
 
@@ -54,6 +46,14 @@ export type MirrorResult =
 /** Commit whatever was published since the last run. */
 export async function mirrorToGit(options: MirrorOptions): Promise<MirrorResult> {
   const branch = options.branchId ?? "main";
+  const {
+    liveVersions,
+    mirroredVersions,
+    publishedFiles,
+    readHeads,
+    recordMirrored,
+    withMirrorLock,
+  } = await import("@usegraft/db");
   const result = await withMirrorLock(options.db, branch, async (tx) => {
     const [live, mirrored] = await Promise.all([
       liveVersions(tx, branch),

@@ -10,7 +10,7 @@
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { countAccounts, readJournal, sql, type Database } from "@usegraft/db";
+import type { Database } from "@usegraft/db";
 
 export type CheckState = "pass" | "warn" | "fail";
 
@@ -105,6 +105,8 @@ function hasContentFiles(dir: string): boolean {
 }
 
 export async function setupStatus(input: SetupStatusInput): Promise<SetupStatus> {
+  // Loaded here, not at module load: setup status runs on static projects too.
+  const { countAccounts, readJournal, sql } = await import("@usegraft/db");
   const env = input.env ?? process.env;
   const now = input.now ?? new Date();
   const checks: SetupCheck[] = [];

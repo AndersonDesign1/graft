@@ -27,7 +27,7 @@
  *   put a "denied" in the audit trail that nobody chose.
  */
 import { GraftError } from "@usegraft/contracts";
-import { decideApproval, type Database } from "@usegraft/db";
+import type { Database } from "@usegraft/db";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 export interface ApprovalElicitor {
@@ -121,12 +121,9 @@ export function createApprovalElicitor(options: {
     // requester-cannot-decide enforced in the UPDATE's WHERE. If the operator
     // named here is the caller that filed the request, this throws
     // APPROVAL_SELF_DECISION exactly as `graft approve` would.
-    const row = await decideApproval(
-      options.db(),
-      approvalId,
-      approved ? "approved" : "denied",
-      options.decider,
-    );
+    const row = await (
+      await import("@usegraft/db")
+    ).decideApproval(options.db(), approvalId, approved ? "approved" : "denied", options.decider);
 
     if (!row) {
       throw new GraftError({

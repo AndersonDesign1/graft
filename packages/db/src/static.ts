@@ -17,11 +17,12 @@
  */
 import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
+import type { ContentSearchHit } from "@usegraft/contracts";
 import { GraftError } from "@usegraft/contracts";
 import { diffBranchContent, type ChangeSet, type ContentInput } from "./diff";
 import type { ContentIndexReader } from "./reader";
 import type { ContentRow } from "./schema";
-import { assertSearchQuery, type ContentSearchHit } from "./search";
+import { assertSearchQuery } from "./search-query";
 
 export const STATIC_INDEX_FORMAT_VERSION = 1;
 // Lives in @usegraft/contracts so the CLI can read it without loading this

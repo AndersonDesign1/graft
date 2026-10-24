@@ -3,7 +3,6 @@
  *
  * Postgres-tier: a static project has no branches, so these teach the upgrade.
  */
-import { listBranches, listCompilations } from "@usegraft/db";
 import { z } from "zod";
 import { guarded } from "../tool-result";
 import { READS } from "./annotations";
@@ -26,7 +25,9 @@ export const registerBranchTools: RegisterTools = (server, deps) => {
     () =>
       guarded(async () => ({
         branches: (
-          await listBranches(
+          await (
+            await import("@usegraft/db")
+          ).listBranches(
             requireDb(
               "list_branches",
               "Copy-on-write preview branches are a database feature; in a static project a branch is simply a git branch, and each checkout compiles its own artifact.",
@@ -59,7 +60,9 @@ export const registerBranchTools: RegisterTools = (server, deps) => {
     ({ branch, limit }) =>
       guarded(async () => ({
         compilations: (
-          await listCompilations(
+          await (
+            await import("@usegraft/db")
+          ).listCompilations(
             requireDb(
               "list_compilations",
               "The Postgres index keeps the full projection trail; a static artifact carries only the runs that built it.",

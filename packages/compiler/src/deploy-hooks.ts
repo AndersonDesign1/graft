@@ -8,12 +8,7 @@
  * way, and the record says what went wrong.
  */
 import { GraftError } from "@usegraft/contracts";
-import {
-  listDeployHooks,
-  recordDeployHookDelivery,
-  type Database,
-  type DeployHookRow,
-} from "@usegraft/db";
+import type { Database, DeployHookRow } from "@usegraft/db";
 import { isLoopbackHost } from "./notify";
 import { readStart } from "./read-start";
 
@@ -61,7 +56,7 @@ export async function fireDeployHooks(
 ): Promise<DeployHookDelivery[]> {
   let hooks: DeployHookRow[];
   try {
-    hooks = await listDeployHooks(db);
+    hooks = await (await import("@usegraft/db")).listDeployHooks(db);
   } catch (error) {
     // A database without the table (not migrated yet) has no hooks to call.
     console.warn(`graft: deploy hooks were not read: ${errorText(error)}`);
@@ -88,7 +83,7 @@ async function deliver(
 ): Promise<DeployHookDelivery> {
   const result = await call(hook, event, options);
   try {
-    await recordDeployHookDelivery(db, hook.id, result);
+    await (await import("@usegraft/db")).recordDeployHookDelivery(db, hook.id, result);
   } catch (error) {
     console.warn(
       `graft: the "${hook.name}" deploy hook's result was not recorded: ${errorText(error)}`,

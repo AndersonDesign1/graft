@@ -24,7 +24,7 @@ graft help branch create
 graft help exit-codes
 ```
 
-The help topics are `exit-codes`, `json` and `environment`.
+The help topics are `exit-codes`, `json`, `environment` and `auth`.
 
 An agent can learn the whole CLI in one call. `graft commands --json` prints
 every command with its usage, arguments, flags, whether it takes `--json`,
@@ -163,13 +163,15 @@ A path is under `/api/studio/v1` unless it starts with `/api/fn` or
 `/api/content/v1`. `-f key=value` sends a string and `-F key=value` sends
 `true`, `false`, `null` or a number as JSON. Fields make the request a POST
 with a JSON body; with `-X GET` or `--paginate` they become the query string.
-`--paginate` follows `nextCursor` and prints every page. `graft api` with no
+`--paginate` follows `nextCursor` and prints every page. Add `--slurp` to get
+every page as one JSON array once the last one arrives. `graft api` with no
 path lists the routes.
 
 The answer prints on stdout. A refused request also prints its error and fix
-on stderr and exits 1, or 4 when the token lacks the access. `-X DELETE` needs
-`--yes`. `graft api` never follows a redirect, and never sends the token to
-another site.
+on stderr and exits 1, or 4 when the token lacks the access. `-X DELETE` asks
+before it sends anything on a terminal, and needs `--yes` everywhere else.
+`graft api` never follows a redirect, and never sends the token to another
+site.
 
 ## Read a failure
 

@@ -11,6 +11,7 @@
 import { GraftError } from "@usegraft/contracts";
 import { and, asc, count, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { createDb, type Database } from "./client";
+import { scopeChain, type BranchScope } from "./scope";
 import {
   branches,
   contentIndex,
@@ -23,26 +24,7 @@ import {
 /** Branch names: kebab segments, optionally slash-separated (e.g. `preview/checkout`). */
 const BRANCH_NAME = /^[a-z0-9]+(?:[-/][a-z0-9]+)*$/;
 
-/**
- * How reads scope to a branch. `overlay` carries the ancestor chain (leaf-first)
- * and the branch writes land on; `physical` is a self-contained Postgres — a
- * storage fork whose rows keep the DEFAULT branch id (`main`), because the
- * database itself IS the branch. `branch` is the registry name, kept for
- * labeling; queries against a physical scope always read and write `main`.
- */
-export type BranchScope =
-  | { kind: "overlay"; chain: string[]; writeBranch: string }
-  | { kind: "physical"; branch: string };
-
-/** The branch chain (leaf-first) a scope reads across — one element when there's no overlay. */
-export function scopeChain(scope: BranchScope): string[] {
-  return scope.kind === "overlay" ? scope.chain : ["main"];
-}
-
-/** The branch id writes stamp under this scope (a physical fork keeps the default id). */
-export function scopeWriteBranch(scope: BranchScope): string {
-  return scope.kind === "overlay" ? scope.writeBranch : "main";
-}
+export { scopeChain, scopeWriteBranch, type BranchScope } from "./scope";
 
 export interface BranchMeta {
   name: string;

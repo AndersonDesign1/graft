@@ -139,8 +139,15 @@ export interface ApiOptions {
   input: string | undefined;
   include: boolean;
   paginate: boolean;
-  /** A DELETE goes ahead only with this. */
+  /** With --paginate: print every page as one JSON array once the last arrives. */
+  slurp: boolean;
+  /** A DELETE goes ahead without asking with this. */
   yes: boolean;
+  /**
+   * Ask a person a yes-or-no question. Set only where someone can answer (a
+   * terminal, prompts on); without it a DELETE needs --yes.
+   */
+  confirm?: (question: string) => Promise<boolean>;
 }
 
 export interface ApiOutcome {
@@ -175,12 +182,26 @@ export async function apiCommand(options: ApiOptions): Promise<ApiOutcome> {
   // Fields or a body mean POST, unless --paginate says this is a listing.
   const fallback = !options.paginate && (hasFields || options.input !== undefined) ? "POST" : "GET";
   const method = (options.method ?? fallback).toUpperCase();
+  if (options.slurp && !options.paginate) {
+    throw new UsageError("--slurp collects the pages --paginate fetches.", "Add --paginate.", {
+      command: "api",
+    });
+  }
   if (method === "DELETE" && !options.yes) {
-    throw new UsageError(
-      `graft api -X DELETE changes ${options.origin} and needs --yes.`,
-      "Run it again with --yes once you are sure.",
-      { command: "api", method },
-    );
+    if (!options.confirm) {
+      throw new UsageError(
+        `graft api -X DELETE changes ${options.origin} and needs --yes.`,
+        "Run it again with --yes once you are sure.",
+        { command: "api", method },
+      );
+    }
+    const target = new URL(apiPath(options.path), options.origin);
+    if (!(await options.confirm(`Send DELETE ${target.pathname} to ${options.origin}?`))) {
+      throw new UsageError("DELETE not sent.", "Run it again and answer y, or pass --yes.", {
+        command: "api",
+        method,
+      });
+    }
   }
   if (options.paginate && method !== "GET") {
     throw new UsageError("--paginate works with GET only.", "Drop -X, or drop --paginate.", {
@@ -252,7 +273,11 @@ export async function apiCommand(options: ApiOptions): Promise<ApiOutcome> {
       for (const [name, value] of response.headers) console.log(`${name}: ${value}`);
       console.log("");
     }
-    console.log(typeof parsed === "string" ? parsed : formatJson(parsed));
+    // With --slurp the pages print together at the end; a failed answer
+    // still prints at once, since it is the reason the command stops.
+    if (!options.slurp || !response.ok) {
+      console.log(typeof parsed === "string" ? parsed : formatJson(parsed));
+    }
     pages.push(parsed);
     if (!response.ok) {
       throw failure(response.status, parsed, options.origin);
@@ -276,7 +301,20 @@ export async function apiCommand(options: ApiOptions): Promise<ApiOutcome> {
     url = new URL(url);
     url.searchParams.set("cursor", next);
   }
+  if (options.slurp) console.log(formatJson(pages));
   return { pages, status: 200 };
+}
+
+/** A y/N question on the terminal; anything but y or yes is no. */
+export async function askYesNo(question: string): Promise<boolean> {
+  const { createInterface } = await import("node:readline/promises");
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer = (await rl.question(`${question} [y/N] `)).trim().toLowerCase();
+    return answer === "y" || answer === "yes";
+  } finally {
+    rl.close();
+  }
 }
 
 /** A failed answer as the GraftError it carries, so it prints with its fix and exit code. */

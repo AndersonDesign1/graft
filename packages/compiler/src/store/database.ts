@@ -11,25 +11,7 @@
  */
 import { GraftError } from "@usegraft/contracts";
 import type { AnyCollection } from "@usegraft/core";
-import {
-  createReview,
-  currentFiles,
-  discardDrafts,
-  draftHeads,
-  openReviews,
-  publishDrafts,
-  publishedHistory,
-  readPublishedRevision,
-  recentlyPublished,
-  readHead,
-  readHeads,
-  writeDraft,
-  type ContentInput,
-  type Database,
-  type HeadState,
-  type LiveDocument,
-  type RevisionActor,
-} from "@usegraft/db";
+import type { ContentInput, Database, HeadState, LiveDocument, RevisionActor } from "@usegraft/db";
 import type { MdxTrust } from "@usegraft/mdx-safety";
 import { readFrontmatter } from "@usegraft/mdx-safety/frontmatter";
 import { validateDocuments, type SourceFile } from "../compile";
@@ -52,6 +34,13 @@ import type {
   StoreInfo,
   WriteOptions,
 } from "./types";
+
+/**
+ * The revision functions, loaded on first use. A store is built for every
+ * Studio and MCP session, and loading them at import would cost every static
+ * project the Postgres code too.
+ */
+const revisions = (): Promise<typeof import("@usegraft/db")> => import("@usegraft/db");
 
 export interface DatabaseStoreOptions {
   db: Database;
@@ -84,8 +73,11 @@ export class DatabaseStore implements ContentStore {
       changes: () => this.changes(),
       readPublished: (path) => this.readPublished(path),
       publish: (opts) => this.publish(opts),
-      discard: (_actor, paths) =>
-        discardDrafts(this.db, { branchId: this.branchId, paths: paths.map(normalisePath) }),
+      discard: async (_actor, paths) =>
+        (await revisions()).discardDrafts(this.db, {
+          branchId: this.branchId,
+          paths: paths.map(normalisePath),
+        }),
       reviews: () => this.reviews(),
     };
   }
@@ -100,7 +92,7 @@ export class DatabaseStore implements ContentStore {
 
   /** The draft when there is one (anyone's: drafts are shared), else the live version. */
   async read(path: string, actor?: StoreActor): Promise<StoredFile | null> {
-    const head = await readHead(this.db, this.branchId, normalisePath(path));
+    const head = await (await revisions()).readHead(this.db, this.branchId, normalisePath(path));
     const rev = actor ? (head?.draft ?? head?.published) : head?.published;
     return rev?.raw != null && rev.version ? { raw: rev.raw, version: rev.version } : null;
   }
@@ -112,7 +104,9 @@ export class DatabaseStore implements ContentStore {
   ): Promise<{ version: string | null }> {
     const rel = normalisePath(path);
     const version = raw === null ? null : gitBlobSha(raw);
-    const result = await writeDraft(this.db, {
+    const result = await (
+      await revisions()
+    ).writeDraft(this.db, {
       branchId: this.branchId,
       path: rel,
       raw,
@@ -125,8 +119,8 @@ export class DatabaseStore implements ContentStore {
   }
 
   async entries(prefix: string, actor?: StoreActor): Promise<Array<StoredFile & { path: string }>> {
-    if (actor) return currentFiles(this.db, this.branchId, prefix);
-    const heads = await readHeads(this.db, this.branchId, { prefix });
+    if (actor) return (await revisions()).currentFiles(this.db, this.branchId, prefix);
+    const heads = await (await revisions()).readHeads(this.db, this.branchId, { prefix });
     return heads.flatMap((head) =>
       head.published?.raw != null && head.published.version
         ? [{ path: head.path, raw: head.published.raw, version: head.published.version }]
@@ -137,7 +131,7 @@ export class DatabaseStore implements ContentStore {
   /* ---- drafts ---------------------------------------------------------- */
 
   private async changes(): Promise<DraftChange[]> {
-    const heads = await draftHeads(this.db, this.branchId);
+    const heads = await (await revisions()).draftHeads(this.db, this.branchId);
     return heads.map((head) => ({
       path: head.path,
       kind: kindOf(head),
@@ -149,7 +143,7 @@ export class DatabaseStore implements ContentStore {
   }
 
   private async readPublished(path: string): Promise<StoredFile | null> {
-    const head = await readHead(this.db, this.branchId, normalisePath(path));
+    const head = await (await revisions()).readHead(this.db, this.branchId, normalisePath(path));
     const rev = head?.published;
     return rev?.raw != null && rev.version ? { raw: rev.raw, version: rev.version } : null;
   }
@@ -163,14 +157,18 @@ export class DatabaseStore implements ContentStore {
         fix: "Choose at least one changed document.",
       });
     }
-    const heads = (await readHeads(this.db, this.branchId, { paths })).filter((head) => head.draft);
+    const heads = (await (await revisions()).readHeads(this.db, this.branchId, { paths })).filter(
+      (head) => head.draft,
+    );
     const mode = options.mode ?? this.options.publishMode ?? "direct";
     if (heads.length === 0) {
       return { mode, commit: null, published: [], tookTheirs: [] };
     }
 
     if (mode === "review") {
-      const review = await createReview(this.db, {
+      const review = await (
+        await revisions()
+      ).createReview(this.db, {
         branchId: this.branchId,
         paths: heads.map((head) => head.path),
         title: options.message?.trim() || defaultTitle(heads),
@@ -194,7 +192,9 @@ export class DatabaseStore implements ContentStore {
       };
     }
 
-    const result = await publishDrafts(this.db, {
+    const result = await (
+      await revisions()
+    ).publishDrafts(this.db, {
       branchId: this.branchId,
       drafts: heads.map((head) => ({ path: head.path, version: head.draft?.version ?? null })),
       actor: revisionActor(options.actor),
@@ -277,12 +277,9 @@ export class DatabaseStore implements ContentStore {
   /* ---- history ---------------------------------------------------------- */
 
   async history(path: string, options: { limit?: number } = {}): Promise<HistoryEntry[]> {
-    const rows = await publishedHistory(
-      this.db,
-      this.branchId,
-      normalisePath(path),
-      options.limit ?? 50,
-    );
+    const rows = await (
+      await revisions()
+    ).publishedHistory(this.db, this.branchId, normalisePath(path), options.limit ?? 50);
     return rows.map((row) => ({
       id: row.id,
       at: row.publishedAt.toISOString(),
@@ -294,7 +291,9 @@ export class DatabaseStore implements ContentStore {
   }
 
   async readVersion(path: string, id: string): Promise<StoredFile | null> {
-    const row = await readPublishedRevision(this.db, this.branchId, normalisePath(path), id);
+    const row = await (
+      await revisions()
+    ).readPublishedRevision(this.db, this.branchId, normalisePath(path), id);
     if (row === undefined) throw versionNotFound(path, id);
     return row.raw === null ? null : { raw: row.raw, version: row.version ?? gitBlobSha(row.raw) };
   }
@@ -305,7 +304,7 @@ export class DatabaseStore implements ContentStore {
    */
   async activity(options: { limit?: number } = {}): Promise<ActivityEntry[]> {
     const limit = options.limit ?? 20;
-    const rows = await recentlyPublished(this.db, this.branchId, limit * 10);
+    const rows = await (await revisions()).recentlyPublished(this.db, this.branchId, limit * 10);
     const entries: ActivityEntry[] = [];
     let last: { key: string; entry: ActivityEntry & { paths: string[] } } | undefined;
     for (const row of rows) {
@@ -330,7 +329,7 @@ export class DatabaseStore implements ContentStore {
   }
 
   private async reviews(): Promise<ReviewRequest[]> {
-    const rows = await openReviews(this.db, this.branchId);
+    const rows = await (await revisions()).openReviews(this.db, this.branchId);
     return rows.map((row) => ({
       id: row.id,
       title: row.title,

@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { run } from "./cli";
-import { apiPath, buildFields, typedValue } from "./commands/api";
+import { apiCommand, apiPath, buildFields, typedValue, type ApiOptions } from "./commands/api";
 import { readHosts, redactToken, resolveTarget, writeHosts } from "./remote/hosts";
 
 const TOKEN = "graft_at_test-token-value";
@@ -60,6 +60,9 @@ beforeAll(async () => {
     if (url.pathname === "/api/studio/v1/entries") {
       const cursor = url.searchParams.get("cursor");
       return json(200, cursor ? { items: [2] } : { items: [1], nextCursor: "page-2" });
+    }
+    if (url.pathname === "/api/studio/v1/assets" && request.method === "DELETE") {
+      return json(200, { deleted: true });
     }
     if (url.pathname === "/api/studio/v1/entry" && request.method === "PUT")
       return json(200, { ok: true });
@@ -298,9 +301,59 @@ describe("graft api", () => {
     expect(seen[0]?.authorization).toBe("Bearer graft_at_wrong");
   });
 
-  it("will not DELETE without --yes", async () => {
+  it("will not DELETE without --yes where no one can be asked", async () => {
     saveLogin();
+    // Not a terminal under the test runner, so there is no prompt to answer.
     expect(await run(["api", "-X", "DELETE", "assets"])).toBe(2);
+    expect(errors[0]).toContain("needs --yes");
     expect(seen).toEqual([]);
+  });
+
+  it("prints every page as one array with --slurp", async () => {
+    saveLogin();
+    expect(await run(["api", "entries", "--paginate", "--slurp"])).toBe(0);
+    expect(seen).toHaveLength(2);
+    expect(logs).toEqual(['[{"items":[1],"nextCursor":"page-2"},{"items":[2]}]']);
+  });
+
+  it("refuses --slurp without --paginate", async () => {
+    saveLogin();
+    expect(await run(["api", "entries", "--slurp"])).toBe(2);
+    expect(seen).toEqual([]);
+  });
+
+  describe("a DELETE on a terminal", () => {
+    const options = (answer: boolean, asked: string[]): ApiOptions => ({
+      origin,
+      token: TOKEN,
+      path: "assets",
+      method: "DELETE",
+      rawFields: [],
+      typedFields: [],
+      headers: [],
+      input: undefined,
+      include: false,
+      paginate: false,
+      slurp: false,
+      yes: false,
+      confirm: async (question) => {
+        asked.push(question);
+        return answer;
+      },
+    });
+
+    it("asks first, and sends it on yes", async () => {
+      const asked: string[] = [];
+      await apiCommand(options(true, asked));
+      expect(asked).toEqual([`Send DELETE /api/studio/v1/assets to ${origin}?`]);
+      expect(seen.map((request) => request.method)).toEqual(["DELETE"]);
+    });
+
+    it("sends nothing on no", async () => {
+      await expect(apiCommand(options(false, []))).rejects.toMatchObject({
+        message: "DELETE not sent.",
+      });
+      expect(seen).toEqual([]);
+    });
   });
 });

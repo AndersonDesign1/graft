@@ -958,7 +958,7 @@ Needs no database.
 Call a route on the site in GRAFT_URL, or the one graft login saved. A path is under /api/studio/v1 unless it starts with /api/fn or /api/content/v1. Fields make the request a POST with a JSON body; with -X GET or --paginate they become the query string. Prints the answer; with no path, lists the routes.
 
 ```text
-graft api [path] [--method <method>] [--raw-field <key=value>]... [--field <key=value>]... [--header <name: value>]... [--input <file|->] [--include] [--paginate] [--yes]
+graft api [path] [--method <method>] [--raw-field <key=value>]... [--field <key=value>]... [--header <name: value>]... [--input <file|->] [--include] [--paginate] [--slurp] [--yes] [--no-input]
 ```
 
 | Flag | What it does |
@@ -970,14 +970,17 @@ graft api [path] [--method <method>] [--raw-field <key=value>]... [--field <key=
 | `--input <file\|->` | Send this file as the body; - reads stdin. |
 | `-i, --include` | Print the status line and headers before the body. |
 | `--paginate` | GET every page, following nextCursor, and print each one. |
-| `-y, --yes` | Go ahead with -X DELETE. |
+| `--slurp` | With --paginate, print every page as one JSON array once the last arrives. |
+| `-y, --yes` | Send -X DELETE without asking first. |
+| `--no-input` | Never stop to ask a question. Same as `GRAFT_PROMPT_DISABLED`. |
 
-Needs no database.
+Needs no database. May ask questions on a terminal; `--no-input` never does.
 
 ```sh
 graft api workspace
 graft api entries -X GET -f collection=posts -F limit=20
 graft api entries -f collection=posts --paginate
+graft api entries --paginate --slurp
 graft api -X PUT entry --input entry.json
 ```
 

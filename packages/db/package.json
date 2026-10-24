@@ -34,14 +34,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./static": {
+      "types": "./dist/static-entry.d.ts",
+      "import": "./dist/static-entry.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
-    "dev": "tsup src/index.ts --format esm --watch",
+    "build": "tsup src/index.ts src/static-entry.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts src/static-entry.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "db:generate": "drizzle-kit generate",

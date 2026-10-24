@@ -5,6 +5,7 @@
  */
 import { existsSync } from "node:fs";
 import { relative } from "node:path";
+import type { ReadDocsOptions } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig } from "../config";
 
@@ -35,12 +36,14 @@ export async function checkCommand(options: { cwd: string }): Promise<CheckResul
   }
   const { findBrokenReferences, readSourceFiles, validateDocuments } =
     await import("@usegraft/compiler");
+  const { openMdxCache } = await import("../mdx-cache");
+  const mdxScanCache = await openMdxCache(config.contentDir);
+  // References are left to findBrokenReferences below, which lists every one.
+  const checks: ReadDocsOptions = { mdxTrust: config.mdxTrust };
+  if (mdxScanCache) checks.mdxScanCache = mdxScanCache;
   let docs;
   try {
-    // References are left to findBrokenReferences below, which lists every one.
-    docs = validateDocuments(readSourceFiles(config.contentDir), config.collections, {
-      mdxTrust: config.mdxTrust,
-    });
+    docs = validateDocuments(readSourceFiles(config.contentDir), config.collections, checks);
   } catch (error) {
     if (!(error instanceof GraftError)) throw error;
     // readDocs stops at the first kind of problem; report it like the rest.
@@ -48,6 +51,8 @@ export async function checkCommand(options: { cwd: string }): Promise<CheckResul
     if (error.fix) problem.fix = error.fix;
     if (error.details) problem.details = error.details;
     return { documents: 0, problems: [problem] };
+  } finally {
+    mdxScanCache?.save();
   }
   const where = relative(options.cwd, config.contentDir) || ".";
   const problems = findBrokenReferences(docs, config.collections).map(

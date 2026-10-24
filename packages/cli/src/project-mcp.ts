@@ -56,14 +56,19 @@ export async function openProjectMcp(options: ProjectMcpOptions): Promise<Projec
   // start instead of surfacing on the first write.
   const onContentChange = revalidateWebhookFromEnv();
 
-  const [{ createGraftMcp }, { createDb, resolveBranchHandle, scopeWriteBranch }] =
-    await Promise.all([import("@usegraft/mcp"), import("@usegraft/db")]);
+  // The Postgres side of @usegraft/db loads only with a database to talk to:
+  // a static project's commands never pay for it.
+  const [{ createGraftMcp }, { scopeWriteBranch }, pg] = await Promise.all([
+    import("@usegraft/mcp"),
+    import("@usegraft/db/static"),
+    url !== undefined ? import("@usegraft/db") : undefined,
+  ]);
 
-  const control = url !== undefined ? createDb(url) : undefined;
+  const control = url !== undefined && pg !== undefined ? pg.createDb(url) : undefined;
   const branchName = options.branchId ?? "main";
   const branch =
-    control !== undefined && url !== undefined
-      ? await resolveBranchHandle(control.db, branchName, { databaseUrl: url })
+    control !== undefined && url !== undefined && pg !== undefined
+      ? await pg.resolveBranchHandle(control.db, branchName, { databaseUrl: url })
       : undefined;
   const close = async (): Promise<void> => {
     await branch?.close();

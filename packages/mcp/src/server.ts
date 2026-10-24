@@ -31,7 +31,7 @@ import {
   type GraftFunctionsHandler,
 } from "@usegraft/core";
 import type { BranchScope, ContentSearchHit, Database } from "@usegraft/db";
-import { openStaticIndex, resolveBranchScope, searchContent } from "@usegraft/db";
+import { openStaticIndex } from "@usegraft/db/static";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { documentNotFound, findDoc, findStoredPath, requireCollection } from "./content-hints";
 import type { ProjectedContent, RegisterTools, ToolDeps } from "./tools/deps";
@@ -257,7 +257,8 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
     limit?: number;
   }): Promise<ContentSearchHit[]> => {
     if (staticIndexPath === undefined) {
-      return searchContent(requireDb("search_content", ""), query);
+      const db = requireDb("search_content", "");
+      return (await import("@usegraft/db")).searchContent(db, query);
     }
     const index = await openStaticIndex(staticIndexPath);
     try {
@@ -282,9 +283,15 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
    */
   let scopePromise: Promise<BranchScope> | undefined;
   const getScope = (): Promise<BranchScope> => {
-    scopePromise ??= options.scope
-      ? Promise.resolve(options.scope)
-      : resolveBranchScope(requireDb("Branch scope resolution", ""), branchId);
+    if (scopePromise === undefined) {
+      if (options.scope) scopePromise = Promise.resolve(options.scope);
+      else {
+        // requireDb throws here, synchronously, as it always has; only the
+        // Postgres code that resolves the scope loads on demand.
+        const db = requireDb("Branch scope resolution", "");
+        scopePromise = import("@usegraft/db").then((pg) => pg.resolveBranchScope(db, branchId));
+      }
+    }
     return scopePromise;
   };
 
