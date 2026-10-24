@@ -127,6 +127,23 @@ for the route.
 | `--port` / `--host` | serve, studio | Where to listen. Defaults to this machine only. |
 | `--studio` | serve | Include Studio. `GRAFT_STUDIO=1` does the same. |
 
+## Update notice
+
+When a newer Graft is on npm, `graft` prints a notice on stderr after the
+command finishes. `graft dev`, `graft serve` and `graft studio` print it while
+they run. It names the new version, the version you have, and the
+[upgrade guide](/docs/upgrading). On a beta, the notice is yellow, because beta
+releases often include security fixes. On a stable release it is cyan.
+
+The CLI asks the registry at most once a day and caches the answer in
+`~/.cache/graft/update-check.json` (or under `XDG_CACHE_HOME`). It uses the
+registry in `npm_config_registry` when you set one. A slow or unreachable
+registry never fails or delays a command by more than 1.5 seconds.
+
+The check is off when `GRAFT_NO_UPDATE_CHECK=1` or `CI` is set, and for
+`graft mcp`, `--help` and `--version`. Set `NO_COLOR` to print it without
+color.
+
 ## Which commands need a database
 
 Graft reads `.env` from the current folder or any folder above it.
