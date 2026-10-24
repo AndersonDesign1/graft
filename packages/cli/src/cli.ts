@@ -627,8 +627,8 @@ function isLongRunning(command: string, rest: string[]): boolean {
   return command === "studio" && rest[0] !== "invite" && rest[0] !== "setup-code";
 }
 
-async function defaultUpdateNotice(): Promise<string | undefined> {
-  if (updateCheckDisabled(process.env)) return undefined;
+async function defaultUpdateNotice(cwd: string): Promise<string | undefined> {
+  if (updateCheckDisabled(process.env, cwd)) return undefined;
   const notice = await checkForUpdate({ current: VERSION, env: process.env });
   return notice && formatUpdateNotice(notice, useColor(process.env, process.stderr.isTTY));
 }
@@ -640,7 +640,8 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
     return dispatch(argv, options);
   }
   // Started alongside the command, so the registry round trip overlaps its work.
-  const pending = (options.updateNotice ?? defaultUpdateNotice)().catch(() => undefined);
+  const check = options.updateNotice ?? (() => defaultUpdateNotice(options.cwd ?? process.cwd()));
+  const pending = check().catch(() => undefined);
   const print = (notice: string | undefined): void => {
     if (notice) console.error(notice);
   };

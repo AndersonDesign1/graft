@@ -141,7 +141,8 @@ registry in `npm_config_registry` when you set one. A slow or unreachable
 registry never fails or delays a command by more than 1.5 seconds.
 
 The check is off when `GRAFT_NO_UPDATE_CHECK=1` or `CI` is set, and for
-`graft mcp`, `--help` and `--version`. Set `NO_COLOR` to print it without
+`graft mcp`, `--help` and `--version`. `GRAFT_NO_UPDATE_CHECK=1` works in the
+environment or in the project's `.env`. Set `NO_COLOR` to print it without
 color.
 
 ## Which commands need a database

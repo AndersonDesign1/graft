@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -91,6 +91,20 @@ describe("updateCheckDisabled", () => {
     expect(updateCheckDisabled({ VITEST: "true" })).toBe(true);
     expect(updateCheckDisabled({ GRAFT_NO_UPDATE_CHECK: "1" })).toBe(true);
   });
+
+  it("reads GRAFT_NO_UPDATE_CHECK from the project's .env, without loading the rest", () => {
+    const dir = mkdtempSync(join(tmpdir(), "graft-update-env-"));
+    try {
+      const nested = join(dir, "site", "content");
+      mkdirSync(nested, { recursive: true });
+      expect(updateCheckDisabled({}, nested)).toBe(false);
+      writeFileSync(join(dir, ".env"), "DATABASE_URL=postgres://x\nGRAFT_NO_UPDATE_CHECK=1\n");
+      expect(updateCheckDisabled({}, nested)).toBe(true);
+      expect(process.env.DATABASE_URL).not.toBe("postgres://x");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("checkForUpdate", () => {
@@ -114,6 +128,7 @@ describe("checkForUpdate", () => {
     expect((await checkForUpdate({ ...options, now }))?.latest).toBe("1.0.0-beta.9");
     expect(JSON.parse(readFileSync(cacheFile, "utf8"))).toEqual({
       checkedAt: now,
+      registry: "https://registry.npmjs.org",
       tags: { beta: "1.0.0-beta.9" },
     });
     expect((await checkForUpdate({ ...options, now: now + 60_000 }))?.latest).toBe("1.0.0-beta.9");
@@ -145,6 +160,16 @@ describe("checkForUpdate", () => {
       now,
     });
     expect(notice?.latest).toBe("1.0.0-beta.9");
+  });
+
+  it("asks again when npm_config_registry points somewhere else", async () => {
+    const fetchTags = vi.fn(async () => ({ beta: "1.0.0-beta.9" }));
+    const options = { current: "1.0.0-beta.8", cacheFile, fetchTags, now };
+    await checkForUpdate({ ...options, env: {} });
+    await checkForUpdate({ ...options, env: { npm_config_registry: "https://npm.example.com/" } });
+    expect(fetchTags).toHaveBeenCalledTimes(2);
+    await checkForUpdate({ ...options, env: { npm_config_registry: "https://npm.example.com" } });
+    expect(fetchTags).toHaveBeenCalledTimes(2);
   });
 
   it("never asks the registry for a canary", async () => {

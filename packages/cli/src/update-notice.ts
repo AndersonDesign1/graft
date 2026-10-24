@@ -11,6 +11,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { parseEnv } from "node:util";
+import { findProjectEnvFile } from "./env-file";
 
 const PACKAGE = "@usegraft/cli";
 const UPGRADE_URL = "https://graft.page/docs/upgrading";
@@ -115,9 +117,21 @@ export function newerVersion(current: string, tags: DistTags): UpdateNotice | un
   return { current, latest: best, level: channel === "latest" ? "info" : "security" };
 }
 
-/** True when this run should not ask the registry. */
-export function updateCheckDisabled(env: NodeJS.ProcessEnv): boolean {
-  return Boolean(env.GRAFT_NO_UPDATE_CHECK || env.CI || env.VITEST);
+/**
+ * True when this run should not ask the registry. With `cwd`, a
+ * GRAFT_NO_UPDATE_CHECK in the project's .env counts too: the check starts
+ * before any command loads that file, and it only reads the one key.
+ */
+export function updateCheckDisabled(env: NodeJS.ProcessEnv, cwd?: string): boolean {
+  if (env.GRAFT_NO_UPDATE_CHECK || env.CI || env.VITEST) return true;
+  if (cwd === undefined) return false;
+  const file = findProjectEnvFile(cwd);
+  if (!file) return false;
+  try {
+    return Boolean(parseEnv(readFileSync(file, "utf8")).GRAFT_NO_UPDATE_CHECK);
+  } catch {
+    return false;
+  }
 }
 
 export function defaultCacheFile(env: NodeJS.ProcessEnv): string {
@@ -127,6 +141,8 @@ export function defaultCacheFile(env: NodeJS.ProcessEnv): string {
 
 interface CacheEntry {
   checkedAt: number;
+  /** The registry that gave this answer; another registry's answer is not reused. */
+  registry: string;
   tags: DistTags;
 }
 
@@ -135,6 +151,7 @@ function readCache(file: string): CacheEntry | undefined {
     const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
     if (typeof parsed !== "object" || parsed === null) return undefined;
     if (!("checkedAt" in parsed) || typeof parsed.checkedAt !== "number") return undefined;
+    if (!("registry" in parsed) || typeof parsed.registry !== "string") return undefined;
     if (!("tags" in parsed) || typeof parsed.tags !== "object" || parsed.tags === null) {
       return undefined;
     }
@@ -142,7 +159,7 @@ function readCache(file: string): CacheEntry | undefined {
     for (const [tag, version] of Object.entries(parsed.tags)) {
       if (typeof version === "string") tags[tag] = version;
     }
-    return { checkedAt: parsed.checkedAt, tags };
+    return { checkedAt: parsed.checkedAt, registry: parsed.registry, tags };
   } catch {
     return undefined;
   }
@@ -157,9 +174,14 @@ function writeCache(file: string, entry: CacheEntry): void {
   }
 }
 
-/** Ask the registry in npm_config_registry (npm's own setting) for the dist-tags. */
+/** The registry in npm_config_registry (npm's own setting), without a trailing slash. */
+function registryOf(env: NodeJS.ProcessEnv): string {
+  return (env.npm_config_registry || "https://registry.npmjs.org").replace(/\/+$/, "");
+}
+
+/** Ask the registry for the dist-tags. */
 export async function fetchDistTags(env: NodeJS.ProcessEnv): Promise<DistTags> {
-  const registry = (env.npm_config_registry || "https://registry.npmjs.org").replace(/\/+$/, "");
+  const registry = registryOf(env);
   const response = await fetch(`${registry}/-/package/${encodeURIComponent(PACKAGE)}/dist-tags`, {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     headers: { accept: "application/json" },
@@ -192,9 +214,11 @@ export async function checkForUpdate(options: CheckOptions): Promise<UpdateNotic
   if (!channelOf(options.current)) return undefined;
   const now = options.now ?? Date.now();
   const cacheFile = options.cacheFile ?? defaultCacheFile(options.env);
+  const registry = registryOf(options.env);
   const cached = readCache(cacheFile);
   let tags: DistTags;
-  if (cached && now - cached.checkedAt >= 0 && now - cached.checkedAt < DAY_MS) {
+  const fresh = cached && now - cached.checkedAt >= 0 && now - cached.checkedAt < DAY_MS;
+  if (cached && fresh && cached.registry === registry) {
     tags = cached.tags;
   } else {
     try {
@@ -202,7 +226,7 @@ export async function checkForUpdate(options: CheckOptions): Promise<UpdateNotic
     } catch {
       tags = {};
     }
-    writeCache(cacheFile, { checkedAt: now, tags });
+    writeCache(cacheFile, { checkedAt: now, registry, tags });
   }
   return newerVersion(options.current, tags);
 }

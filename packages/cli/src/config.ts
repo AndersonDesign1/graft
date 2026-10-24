@@ -18,6 +18,7 @@ import {
 } from "@usegraft/compiler";
 import type { MdxTrust } from "@usegraft/mdx-safety";
 import { createJiti } from "jiti";
+import { findProjectEnvFile } from "./env-file";
 
 export const CONFIG_FILENAMES = [
   "graft.config.ts",
@@ -430,20 +431,12 @@ function parseIndexConfig(value: unknown, projectDir: string, configPath: string
  * monorepo case). Existing environment variables win over file values.
  */
 export function loadProjectEnv(startDir: string): void {
-  let dir = resolve(startDir);
-  for (;;) {
-    const candidate = join(dir, ".env");
-    if (existsSync(candidate)) {
-      try {
-        process.loadEnvFile(candidate);
-      } catch {
-        /* unreadable file — rely on the ambient environment */
-      }
-      return;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) return;
-    dir = parent;
+  const file = findProjectEnvFile(startDir);
+  if (!file) return;
+  try {
+    process.loadEnvFile(file);
+  } catch {
+    /* unreadable file — rely on the ambient environment */
   }
 }
 
