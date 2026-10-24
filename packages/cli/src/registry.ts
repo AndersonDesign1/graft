@@ -248,10 +248,11 @@ export const COMMANDS: readonly CommandSpec[] = [
   {
     path: ["add"],
     group: "start",
-    summary: "Copy a ready-made primitive and its dependencies into graft/",
+    summary: "Copy a ready-made primitive and its dependencies into graft/; alone, list them",
     description: [
       "Copy an owned primitive (and the primitives it needs) from the registry into",
       "graft/, and regenerate the graft/ barrel. graft.config.ts needs no edit.",
+      "With no item, list the primitives you can add.",
     ],
     args: [{ name: "item", variadic: true }],
     flags: [DRY_RUN, { ...OVERWRITE, summary: "Replace files that differ from the registry's" }],
@@ -449,9 +450,11 @@ export const COMMANDS: readonly CommandSpec[] = [
     group: "sync",
     summary: "Load the content files into the database, for a database-sourced project",
     description: [
-      'For a project with content = { source: "database" }: make the files under the',
-      "content directory the live versions in the database. Every file is checked first,",
-      "and re-running imports only what changed.",
+      'For a project with content = { source: "database" }: load the files under the',
+      "content directory into the database. Every file is checked first. Only documents",
+      "with nothing published come in: a published document is never overwritten, and",
+      "a missing file deletes nothing. To change published content, use Studio or",
+      "graft push.",
     ],
     flags: [BRANCH, DRY_RUN],
     json: true,

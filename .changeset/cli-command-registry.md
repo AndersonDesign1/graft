@@ -46,6 +46,9 @@ Also new:
   `environment`).
 - `graft commands --json` describes every command, its arguments and flags,
   so an agent can learn the CLI in one call.
+- `graft add` with no item lists the primitives you can add, instead of
+  failing with `REGISTRY_ITEM_NOT_FOUND`. `graft db --help`, `graft ci --help`
+  and the other families print help for every member.
 - `--no-input` on `graft create` and `graft db claim`, or
   `GRAFT_PROMPT_DISABLED=1` for every command, never asks a question.
 - Color follows `NO_COLOR`, `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE` and

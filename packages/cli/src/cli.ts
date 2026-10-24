@@ -49,23 +49,31 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
     return 0;
   }
 
+  // `graft <command> --help` anywhere after the name, answered before the
+  // other arguments are checked: they may be incomplete or wrong, which is
+  // often why someone asks. A family with no command of its own (`graft db
+  // --help`) gets the help for all of its members.
+  const beforeValues = argv.slice(0, endOfFlags(argv));
+  if (beforeValues.some(isHelpFlag)) {
+    const words = leadingWords(beforeValues);
+    for (let length = words.length; length > 0; length--) {
+      const help = commandHelp(words.slice(0, length));
+      if (help !== undefined) {
+        console.log(help);
+        return 0;
+      }
+    }
+  }
+
   // Before any parsing: a usage error should come back as JSON too when that
   // is what the caller reads.
-  const json = argv.slice(0, endOfFlags(argv)).includes("--json");
+  const json = beforeValues.includes("--json");
   let spec: CommandSpec;
   let rest: string[];
   try {
     ({ spec, rest } = resolveCommand(argv));
   } catch (error) {
     return reportFailure(error, json);
-  }
-
-  // `graft <command> --help` anywhere after the name, answered before the
-  // other arguments are checked: they may be incomplete or wrong, which is
-  // often why someone asks.
-  if (rest.slice(0, endOfFlags(rest)).some(isHelpFlag)) {
-    console.log(commandHelp(spec.path));
-    return 0;
   }
 
   // The notice is for a person: never on a protocol stream, never in JSON
@@ -84,6 +92,12 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
   const code = await dispatch(spec, rest, cwd, json);
   print(await pending);
   return code;
+}
+
+/** The words before the first flag: the command's name, and maybe its arguments. */
+function leadingWords(argv: readonly string[]): string[] {
+  const at = argv.findIndex((arg) => arg.startsWith("-"));
+  return at === -1 ? [...argv] : argv.slice(0, at);
 }
 
 /** Arguments after a bare `--` are values, never flags. */

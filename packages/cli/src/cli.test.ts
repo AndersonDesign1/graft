@@ -142,12 +142,21 @@ describe("run", () => {
     expect(errors.join("\n")).toContain('unknown command "frobnicate"');
   });
 
-  it("graft add with no item name fails, listing what's available", async () => {
-    expect(await run(["add"])).toBe(1);
-    const output = errors.join("\n");
-    expect(output).toContain("REGISTRY_ITEM_NOT_FOUND");
-    expect(output).toContain("comments");
+  it("graft add with no item lists what can be added", async () => {
+    expect(await run(["add", "--json"])).toBe(0);
+    const { items } = JSON.parse(logs[0] ?? "");
+    expect(items).toContainEqual(expect.objectContaining({ name: "comments" }));
+    expect(errors).toEqual([]);
   });
+
+  it.each(["db", "asset", "ci", "studio", "branch"])(
+    "graft %s --help shows the whole family, including members with no command of their own",
+    async (family) => {
+      expect(await run([family, "--help"])).toBe(0);
+      expect(logs.join("\n")).toMatch(new RegExp(`^Usage: graft ${family} `));
+      expect(errors).toEqual([]);
+    },
+  );
 
   it("rejects an unknown branch subcommand as a usage error", async () => {
     expect(await run(["branch", "frobnicate"])).toBe(2);

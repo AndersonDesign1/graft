@@ -107,6 +107,16 @@ const handlers = {
   },
 
   async add(ctx) {
+    if (ctx.args.length === 0) {
+      const { listItems } = await import("@usegraft/registry");
+      const items = listItems().map(({ name, type, description }) => ({ name, type, description }));
+      if (!ctx.json) {
+        for (const item of items)
+          console.log(`${item.name.padEnd(20)} ${item.type.padEnd(10)} ${item.description}`);
+        console.log("\nAdd one with `graft add <item>`; --dry-run shows what it writes.");
+      }
+      return { data: { items } };
+    }
     const { addCommand } = await import("./commands/add");
     const result = await addCommand({
       cwd: ctx.cwd,

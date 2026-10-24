@@ -8,8 +8,7 @@
  * (identical files are always skipped, so re-adding is a no-op).
  */
 import { dirname } from "node:path";
-import { GraftError } from "@usegraft/contracts";
-import { type AddPlan, applyPlan, listItemNames, planAdd } from "@usegraft/registry";
+import { type AddPlan, applyPlan, planAdd } from "@usegraft/registry";
 import { findConfig } from "../config";
 
 export interface AddCommandOptions {
@@ -33,14 +32,6 @@ export interface AddResult {
 }
 
 export async function addCommand(options: AddCommandOptions): Promise<AddResult> {
-  if (options.names.length === 0) {
-    throw new GraftError({
-      code: "REGISTRY_ITEM_NOT_FOUND",
-      message: "graft add needs an item name.",
-      fix: `Usage: graft add <item>. Available items: ${listItemNames().join(", ") || "(none bundled)"}.`,
-    });
-  }
-
   const projectDir = dirname(findConfig(options.cwd));
   const plan = planAdd(options.names, { targetDir: projectDir });
   const summary: AddResult = {
