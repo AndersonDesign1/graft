@@ -8,7 +8,8 @@ import { join } from "node:path";
 import { GraftError } from "@usegraft/contracts";
 import { defineCollection, field } from "@usegraft/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { connectInProcess, toolResultToGraftError, type ToolClient } from "./client";
+import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { connectInProcess, remoteError, toolResultToGraftError, type ToolClient } from "./client";
 import { createGraftMcp } from "./server";
 import { fail } from "./tool-result";
 
@@ -95,5 +96,26 @@ describe("toolResultToGraftError", () => {
     });
     expect(error.code).toBe("INPUT_VALIDATION_FAILED");
     expect(error.message).toBe("Input validation error: slug is required");
+  });
+});
+
+describe("remoteError", () => {
+  it("is TOKEN_INVALID when the site refuses the token", () => {
+    const error = remoteError(
+      new StreamableHTTPError(401, "Unauthorized"),
+      "https://cms.example.com",
+    );
+    expect(error).toMatchObject({ code: "TOKEN_INVALID", details: { status: 401 } });
+  });
+
+  it("is REMOTE_UNREACHABLE when the site cannot be reached", () => {
+    const error = remoteError(new TypeError("fetch failed"), "https://cms.example.com");
+    expect(error).toMatchObject({ code: "REMOTE_UNREACHABLE" });
+    expect(error.message).toContain("https://cms.example.com/api/mcp");
+  });
+
+  it("passes a tool's own GraftError through", () => {
+    const original = new GraftError({ code: "DOCUMENT_NOT_FOUND", message: "No such document." });
+    expect(remoteError(original, "https://cms.example.com")).toBe(original);
   });
 });
