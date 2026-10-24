@@ -30,6 +30,8 @@ Skills live in `.agents/skills/` (`.claude/skills` links to it).
 - Every published-package change needs a changeset (`pnpm changeset`).
 - Every error that crosses a package boundary is a `GraftError` with a `fix`.
   After changing one, run `pnpm docs:errors`.
+- CLI commands and flags are declared once, in `packages/cli/src/registry.ts`.
+  After changing one, build the CLI and run `pnpm docs:cli`.
 - `packages/registry/registry/*/graft/` and `examples/*/graft/` are copies on
   purpose. Change both; `pnpm check:registry-drift` checks them.
 
@@ -56,6 +58,7 @@ file is a candidate to move up into a check.
 | No slop patterns in TypeScript                                                                                                | `pnpm lint` (anti-slop plugin)                                                             |
 | Registry copies stay in sync                                                                                                  | `pnpm check:registry-drift`                                                                |
 | The error reference matches the code                                                                                          | `pnpm check:error-docs`                                                                    |
+| The CLI reference and README command table match the command registry                                                         | `pnpm check:cli-docs`                                                                      |
 | Every docs route builds                                                                                                       | `pnpm check:site`                                                                          |
 | Coverage never drops                                                                                                          | `pnpm coverage` floors                                                                     |
 | New dependencies are at least three days old                                                                                  | `minimumReleaseAge` in `pnpm-workspace.yaml`                                               |

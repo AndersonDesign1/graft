@@ -37,6 +37,8 @@ export interface CreateOptions {
   database?: string;
   /** Use the defaults for every question not answered by a flag. */
   yes?: boolean;
+  /** False never asks, as if stdin were not a terminal (--no-input). */
+  input?: boolean;
   install?: boolean;
   /** Overridable for tests: the network, the installer, the terminal. */
   fetch?: typeof fetch;
@@ -141,7 +143,8 @@ export async function createCommand(options: CreateOptions): Promise<CreateResul
     });
   }
 
-  const interactive = !options.yes && Boolean(process.stdin.isTTY) && !options.ask;
+  const interactive =
+    !options.yes && options.input !== false && Boolean(process.stdin.isTTY) && !options.ask;
   const ask =
     options.ask ??
     (interactive ? askOnTerminal : async (_q: string, _c: string[], fallback: string) => fallback);

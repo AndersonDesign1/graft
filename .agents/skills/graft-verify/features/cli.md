@@ -19,6 +19,12 @@ a fix when a file is wrong.
   loads example content.
 - `cli.doctor`: `graft doctor` prints the setup checklist and the next step;
   MCP `setup_status` returns the same.
+- `cli.usage`: a typo or a flag the command does not declare stops it before it
+  runs, names the closest match, and exits 2. `graft help <command>` and
+  `graft <command> --help` print the same text, generated from
+  `packages/cli/src/registry.ts`.
+- `cli.json`: every command that prints data takes `--json`: one JSON object
+  on stdout, messages on stderr, and a failure as one JSON line on stderr.
 
 ## How to get to it (user POV)
 
@@ -41,6 +47,18 @@ Preconditions: `REPO` and `O` from the skill's Launch step, a sandbox from `scri
   a `fix:` line naming `tagline`, a `details:` JSON line, and `exit=1`.
 - **The fix works.** Quote the value (`tagline: "42"`), compile again, expect
   `+1 added`.
+- **A typo is caught, not ignored.** `$O $G complie; echo exit=$?` prints
+  `graft: unknown command "complie".`, then
+  ``Did you mean `graft compile`? Run `graft --help` to list the commands.``,
+  and `exit=2`. `$O $G init --apply` exits 2 with
+  `unknown option "--apply" for graft init.`
+- **JSON for a script.** `$O $G check --json` prints `{"documents":1,"problems":[]}`
+  on stdout. `$O $G compile --json --bogus 2>&1 >/dev/null` prints one JSON line
+  whose `error` is `USAGE_INVALID`, and stdout stays empty. In a Postgres
+  sandbox, `$O $G branch --json` prints `{"branches":[…]}`.
+- **The reference matches the CLI.** After a registry change, `pnpm build`
+  then `pnpm check:cli-docs`; `pnpm docs:cli` rewrites the page and the README
+  table.
 - **Content list** (Postgres sandbox): `$O $G content` prints
   `pages/home  (Hello, Graft)  pages/home.mdx`.
 

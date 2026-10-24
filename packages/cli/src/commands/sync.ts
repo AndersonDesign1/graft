@@ -7,6 +7,7 @@
  * a pull, and a push is refused if someone published over its base since.
  */
 import { join } from "node:path";
+import type { MirrorResult, PullResult, PushResult } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import {
   findConfig,
@@ -57,10 +58,10 @@ async function withDatabase<T>(
   }
 }
 
-export async function pullCommand(options: SyncCommandOptions): Promise<string[]> {
+export async function pullCommand(options: SyncCommandOptions): Promise<PullResult> {
   const config = await databaseProject(options.cwd, "pull");
   const { pullContent } = await import("@usegraft/compiler");
-  const result = await withDatabase((db) =>
+  return withDatabase((db) =>
     pullContent({
       db,
       contentDir: config.contentDir,
@@ -70,6 +71,9 @@ export async function pullCommand(options: SyncCommandOptions): Promise<string[]
       ...(options.force ? { force: true } : {}),
     }),
   );
+}
+
+export function formatPull(result: PullResult): string[] {
   const lines = [
     result.updated.length === 0
       ? "Your files already match what is published."
@@ -90,11 +94,11 @@ export async function pullCommand(options: SyncCommandOptions): Promise<string[]
   return lines;
 }
 
-export async function pushCommand(options: SyncCommandOptions): Promise<string[]> {
+export async function pushCommand(options: SyncCommandOptions): Promise<PushResult> {
   const config = await databaseProject(options.cwd, "push");
   const { pushContent } = await import("@usegraft/compiler");
   const name = operatorName();
-  const result = await withDatabase((db) =>
+  return withDatabase((db) =>
     pushContent({
       db,
       contentDir: config.contentDir,
@@ -108,6 +112,9 @@ export async function pushCommand(options: SyncCommandOptions): Promise<string[]
       ...(options.dryRun ? { dryRun: true } : {}),
     }),
   );
+}
+
+export function formatPush(result: PushResult): string[] {
   if (result.pushed.length === 0) return ["Nothing to push: no file changed since your last pull."];
   const verb = result.dryRun ? "Would publish" : "Published";
   const lines = [`${verb} ${result.pushed.length} file(s):`, ...result.pushed.map((p) => `  ${p}`)];
@@ -122,7 +129,7 @@ export async function pushCommand(options: SyncCommandOptions): Promise<string[]
 export async function mirrorCommand(options: {
   cwd: string;
   branchId?: string;
-}): Promise<string[]> {
+}): Promise<MirrorResult> {
   const config = await databaseProject(options.cwd, "mirror");
   const { githubStoreFromEnv, mirrorToGit } = await import("@usegraft/compiler");
   const github = githubStoreFromEnv({
@@ -136,7 +143,7 @@ export async function mirrorCommand(options: {
       fix: "Set GRAFT_GITHUB_REPO=owner/name and GRAFT_GITHUB_TOKEN (Contents and Pull requests read/write), or the GitHub App variables.",
     });
   }
-  const result = await withDatabase((db) =>
+  return withDatabase((db) =>
     mirrorToGit({
       db,
       github,
@@ -144,6 +151,9 @@ export async function mirrorCommand(options: {
       via: config.content.mirror?.via ?? "commit",
     }),
   );
+}
+
+export function formatMirror(result: MirrorResult): string[] {
   if (result.status === "up-to-date") return ["Git already has everything that is published."];
   if (result.status === "busy") return ["Another mirror is running; it will commit these changes."];
   const lines = [

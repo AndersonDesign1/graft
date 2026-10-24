@@ -8,9 +8,23 @@ import { relative } from "node:path";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig } from "../config";
 
+/** One problem with one file, shaped like the GraftError a compile would throw. */
+export interface CheckProblem {
+  code: string;
+  message: string;
+  fix?: string;
+  details?: Record<string, unknown>;
+}
+
 export interface CheckResult {
   documents: number;
-  problems: string[];
+  problems: CheckProblem[];
+}
+
+export function formatProblem(problem: CheckProblem): string {
+  return problem.fix
+    ? `${problem.code}: ${problem.message}\n  ${problem.fix}`
+    : `${problem.code}: ${problem.message}`;
 }
 
 export async function checkCommand(options: { cwd: string }): Promise<CheckResult> {
@@ -30,12 +44,19 @@ export async function checkCommand(options: { cwd: string }): Promise<CheckResul
   } catch (error) {
     if (!(error instanceof GraftError)) throw error;
     // readDocs stops at the first kind of problem; report it like the rest.
-    return { documents: 0, problems: [`${error.code}: ${error.message}\n  ${error.fix ?? ""}`] };
+    const problem: CheckProblem = { code: error.code, message: error.message };
+    if (error.fix) problem.fix = error.fix;
+    if (error.details) problem.details = error.details;
+    return { documents: 0, problems: [problem] };
   }
   const where = relative(options.cwd, config.contentDir) || ".";
   const problems = findBrokenReferences(docs, config.collections).map(
-    (ref) =>
-      `CONTENT_REFERENCE_NOT_FOUND: ${where}/${ref.sourcePath} field "${ref.field}" points at ${ref.to}/${ref.slug}, which doesn't exist.\n  Create ${ref.to}/${ref.slug}, or change the field to a document that exists.`,
+    (ref): CheckProblem => ({
+      code: "CONTENT_REFERENCE_NOT_FOUND",
+      message: `${where}/${ref.sourcePath} field "${ref.field}" points at ${ref.to}/${ref.slug}, which doesn't exist.`,
+      fix: `Create ${ref.to}/${ref.slug}, or change the field to a document that exists.`,
+      details: { sourcePath: ref.sourcePath, field: ref.field, collection: ref.to, slug: ref.slug },
+    }),
   );
   return { documents: docs.length, problems };
 }

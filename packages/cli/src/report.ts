@@ -1,17 +1,8 @@
 /**
- * CLI-facing rendering of GraftErrors and compile results.
- *
- * Errors keep the same agent-actionable shape the MCP surface returns: the code,
- * the message, and the `fix` — printed instead of JSON-encoded.
+ * CLI-facing rendering of compile results. Errors are printed by output.ts.
  */
 import type { CompileResult } from "@usegraft/compiler";
-import type { ChangeSet, GraftError } from "@usegraft/contracts";
-
-export function printGraftError(error: GraftError): void {
-  console.error(`error ${error.code}: ${error.message}`);
-  if (error.fix) console.error(`  fix: ${error.fix}`);
-  if (error.details) console.error(`  details: ${JSON.stringify(error.details)}`);
-}
+import type { ChangeSet } from "@usegraft/contracts";
 
 export function formatCompileResult(result: CompileResult): string {
   const { added, changed, removed, unchanged } = result.changes;
@@ -31,12 +22,7 @@ export interface CompileJson {
   changes: ChangeSet;
 }
 
-export function formatCompileJson(branch: string, result: CompileResult): string {
+export function compileJson(branch: string, result: CompileResult): CompileJson {
   const { added, changed, removed, unchanged } = result.changes;
-  const output: CompileJson = {
-    branch,
-    gitSha: result.gitSha,
-    changes: { added, changed, removed, unchanged },
-  };
-  return JSON.stringify(output);
+  return { branch, gitSha: result.gitSha, changes: { added, changed, removed, unchanged } };
 }

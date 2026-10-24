@@ -15,7 +15,8 @@ import {
   requireDatabaseUrl,
   type ProjectConfig,
 } from "../config";
-import { formatCompileResult, printGraftError } from "../report";
+import { reportError } from "../output";
+import { formatCompileResult } from "../report";
 import { assertNoStaticBranch } from "./compile";
 
 const DEBOUNCE_MS = 150;
@@ -109,7 +110,7 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
       console.log(formatCompileResult(result));
     } catch (error) {
       // Keep watching: the next save is the retry.
-      if (error instanceof GraftError) printGraftError(error);
+      if (error instanceof GraftError) reportError(error, false);
       else console.error(error);
     } finally {
       compiling = false;

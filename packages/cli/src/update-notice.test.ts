@@ -12,7 +12,6 @@ import {
   formatUpdateNotice,
   newerVersion,
   updateCheckDisabled,
-  useColor,
 } from "./update-notice";
 
 describe("compareVersions", () => {
@@ -230,12 +229,6 @@ describe("formatUpdateNotice", () => {
     expect(info).toContain("\u001b[36m");
     expect(info).not.toContain("security fixes");
   });
-
-  it("uses color only on a terminal without NO_COLOR", () => {
-    expect(useColor({}, true)).toBe(true);
-    expect(useColor({}, false)).toBe(false);
-    expect(useColor({ NO_COLOR: "1" }, true)).toBe(false);
-  });
 });
 
 describe("run prints the notice", () => {
@@ -261,8 +254,14 @@ describe("run prints the notice", () => {
     const order: string[] = [];
     vi.mocked(console.log).mockImplementation(() => order.push("out"));
     vi.mocked(console.error).mockImplementation(() => order.push("notice"));
-    const code = await run(["frobnicate"], { updateNotice: async () => "NOTICE" });
-    expect(code).toBe(1);
+    const dir = mkdtempSync(join(tmpdir(), "graft-notice-"));
+    try {
+      const code = await run(["init", dir], { updateNotice: async () => "NOTICE" });
+      expect(code).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    expect(order[0]).toBe("out");
     expect(order.at(-1)).toBe("notice");
   });
 
@@ -276,11 +275,16 @@ describe("run prints the notice", () => {
   });
 
   it("not when the check fails", async () => {
-    await run(["frobnicate"], {
-      updateNotice: async () => {
-        throw new Error("boom");
-      },
-    });
+    const dir = mkdtempSync(join(tmpdir(), "graft-notice-"));
+    try {
+      await run(["init", dir], {
+        updateNotice: async () => {
+          throw new Error("boom");
+        },
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
     expect(errors.join("\n")).not.toContain("boom");
   });
 });

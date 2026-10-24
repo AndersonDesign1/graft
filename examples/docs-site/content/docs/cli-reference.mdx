@@ -1,165 +1,644 @@
 ---
+# GENERATED FILE. Do not edit.
+# Source: packages/cli/src/registry.ts and topics.ts, read through `graft commands --json`
+# Regenerate: pnpm docs:cli
 title: CLI reference
-description: "Every graft command, what it does, and the flags that matter, grouped by task."
+description: "Every graft command, its arguments and flags, grouped by task. 35 commands."
 section: Reference
 order: 0
 ---
 
 <p className="kicker">Every graft command, grouped by when you use it.</p>
 
-Look up a command here. Run `graft --help` for the list of commands in your
-terminal, or `graft <command> --help` for one command's usage and flags.
-`graft migrate` and `graft merge` only report what they would change until you
-pass `--apply`.
+Look up a command here. In a terminal, `graft --help` lists the commands and
+`graft <command> --help` shows one command's usage and flags. To read graft's
+output from a script or an agent, see [Script the CLI](/docs/cli).
 
-## Set up and write content
+This page is generated from the table the CLI's own help reads, so the two
+always match. `graft migrate` and `graft merge` only report what they would
+change until you pass `--apply`.
 
-| Command | What it does |
-| --- | --- |
-| `graft create [dir]` | Make a new site: a template, a database, Studio, and a Next.js app, installed and with example content. `npm create graft` runs it. Asks three questions, or takes `--template` (blog, docs, shop, portfolio, blank), `--edit` (online, code), `--database` (new, none, or a Postgres URL), `--framework` (next, none), `--yes` and `--no-install`. See [Set up a site for someone](/docs/start). |
-| `graft init [dir]` | Create a Graft project: `graft.config.ts`, `content/`, sample content, and `llms.txt`. Add `--postgres` for the Postgres engine. |
-| `graft doctor` | Check the setup (the database and its version, the schema, content, the index, Studio sign-in) and print the one thing to do next. `--json` for the checklist as data. Exits 1 when something is missing. |
-| `graft compile` | Check every content file against the schema and build the index, once |
-| `graft dev` | Watch `content/` and `graft.config.ts`, and recompile on every change. When content is in the database, it compiles once and watches only `graft.config.ts`. |
-| `graft asset put <file> [key]` | Upload a file to your bucket and print the frontmatter that points to it. Refuses a key that already holds a file. |
-| `graft add [item]` | Copy a ready-made [primitive](/docs/owned-primitives) into `graft/`. With no item, list them. |
+## Set up a project
 
-### Print what a compile changed
+### `graft create`
 
-`graft compile --json` prints one JSON object on stdout and nothing else. The
-summary line goes to stderr. It works on both engines.
+Make a new site: a template, a database, Studio and (by default) a Next.js app, installed and ready. `npm create graft` runs this. It asks a few questions; flags answer them, and --yes takes the defaults for the rest.
 
-```json
-{
-  "branch": "main",
-  "gitSha": "b8eb719a468be404bae9adca4fbea4d90c642411",
-  "changes": {
-    "added": ["posts/launch"],
-    "changed": ["pages/home"],
-    "removed": [],
-    "unchanged": 42
-  }
-}
+```text
+graft create [dir] [--template <name>] [--edit online|code] [--database new|none|<url>] [--framework next|none] [--yes] [--no-install] [--no-input]
 ```
 
-The real output is one line. `added`, `changed`, and `removed` are lists of
-`collection/slug` ids, and `unchanged` is a count.
-`gitSha` is `null` when the content is not in a git repository.
+| Flag | What it does |
+| --- | --- |
+| `--template <name>` | blog, docs, shop, portfolio or blank (default: blog). |
+| `--edit online\|code` | online keeps content in the database, edited in Studio (default); code keeps it as files in git. |
+| `--database new\|none\|<url>` | new makes a free Postgres to claim later; none compiles content to a file (with --edit code); or your own Postgres 13+ URL. |
+| `--framework next\|none` | next for a Next.js site that shows every collection (default); none for only the content. |
+| `-y, --yes` | Use the default for every question a flag did not answer. |
+| `--no-install` | Write the files and stop before installing. |
+| `--no-input` | Never stop to ask a question. Same as `GRAFT_PROMPT_DISABLED`. |
 
-On the static engine, a content change ships with a new deploy, so there is
-nothing to refresh. On the Postgres engine, writes from agents, Studio,
-`graft merge` and `graft migrate` call your app's revalidate route when
-`GRAFT_REVALIDATE_URL` and `GRAFT_WEBHOOK_SECRET` are both set. With the URL
-alone, these commands refuse to start. `graft compile` does not, because a deploy
-compiles before the new version is live. Send its output to the route yourself
-so the app refreshes only the pages that changed. A shell does not read `.env`,
-so export `GRAFT_WEBHOOK_SECRET` in the script's environment first:
+Needs no database. May ask questions on a terminal; `--no-input` never does.
 
 ```sh
-graft compile --json > changes.json || exit 1
-curl --fail -X POST https://example.com/api/revalidate \
-  -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" \
-  -H "content-type: application/json" \
-  --data-binary @changes.json
+graft create my-site --template docs --edit code --database none --yes
 ```
 
-See [Refresh pages when content changes](/docs/next#refresh-pages-when-content-changes)
-for the route.
+### `graft init`
+
+Scaffold a Graft project in dir (default: here). The static engine is the default: no database and no environment variables.
+
+```text
+graft init [dir] [--static] [--postgres] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--static` | Static engine: no database, no env (the default). |
+| `--postgres` | Postgres engine: operational data, typed functions, database branching. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs no database. Prints its answer as JSON with `--json`.
+
+### `graft doctor`
+
+Check this project's setup: the database, its schema, content, the index and Studio sign-in. Prints a checklist and the one thing to do next.
+
+```text
+graft doctor [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Uses `DATABASE_URL` when it is set, and works without it. Prints its answer as JSON with `--json`.
+
+| Exit code | What it means |
+| --- | --- |
+| `0` | Everything is set up. |
+| `1` | Something is missing; the output says what to do next. |
+
+### `graft add`
+
+Copy an owned primitive (and the primitives it needs) from the registry into graft/, and regenerate the graft/ barrel. graft.config.ts needs no edit. With no item, list the primitives you can add.
+
+```text
+graft add [item...] [--dry-run] [--overwrite] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--dry-run` | Show what would change without changing it. |
+| `--overwrite` | Replace files that differ from the registry's. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs no database. Prints its answer as JSON with `--json`.
+
+```sh
+graft add comments --dry-run
+```
+
+## Write and check content
+
+### `graft compile`
+
+Check every content file and build the index, once.
+
+```text
+graft compile [--branch <id>] [--prune-unknown] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--prune-unknown` | Remove index entries in collections the schema no longer has (default: refuse, which protects a shared DATABASE_URL). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+```sh
+graft compile --json > changes.json
+```
+
+### `graft dev`
+
+Watch content/ and graft.config.ts, and compile on every change.
+
+```text
+graft dev [--branch <id>]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Runs until you stop it.
+
+### `graft check`
+
+Check every content file the way a compile or a publish would: the schema, slug uniqueness, MDX safety, and references to documents that don't exist. Needs no database.
+
+```text
+graft check [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs no database. Prints its answer as JSON with `--json`.
+
+| Exit code | What it means |
+| --- | --- |
+| `1` | At least one file has a problem; each is listed. |
+
+### `graft content`
+
+List the documents in the compiled index.
+
+```text
+graft content [--branch <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+### `graft compilations`
+
+List recent compiles and what each one changed.
+
+```text
+graft compilations [--branch <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+### `graft asset put`
+
+Upload a binary to the asset store (S3_* env) and print the frontmatter reference. The key defaults to assets/\<file name>. A key that already holds a file is refused with ASSET_EXISTS, because the store keeps no version history.
+
+```text
+graft asset put <file> [key] [--overwrite] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--overwrite` | Replace the file already stored under the key. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs no database. Prints its answer as JSON with `--json`.
+
+```sh
+graft asset put ./hero.png assets/hero.png
+```
 
 ## Run Graft
 
-| Command | What it does |
-| --- | --- |
-| `graft mcp` | Serve your project to an agent on this machine, over stdio |
-| `graft serve [--port 3903]` | Run Graft's HTTP endpoints: functions, MCP, the Content API, and `/healthz`. Add `--studio` to include Studio. |
-| `graft studio` | Open Studio on this machine, at port 4983 |
-| `graft studio invite <email>` | Print a sign-in link for a hosted Studio. `--role` (viewer, contributor, editor, admin), `--name`, `--days`, `--url`. Needs `GRAFT_STUDIO_SECRET`, and Studio's public address from `--url` or `GRAFT_STUDIO_URL`: https, or plain http on `localhost`, `127.0.0.1` or `[::1]` |
-| `graft studio setup-code` | Print the code a hosted Studio asks for before it creates its owner account. It comes from `GRAFT_STUDIO_SECRET`, so run it with the site's settings |
+### `graft mcp`
 
-## Manage the database (Postgres engine)
+Serve the project MCP over stdio: content and function tools, for .mcp.json and other local agents. On the Postgres engine it needs DATABASE_URL.
 
-| Command | What it does |
+```text
+graft mcp [--branch <id>] [--elicit-approvals]
+```
+
+| Flag | What it does |
 | --- | --- |
-| `graft db migrate` | Create or update the tables Graft needs. Safe to run again. |
-| `graft db claim` | Keep the free database `graft create --database new` made, which is deleted after 72 hours unless claimed. Prints the claim link, waits, then saves the new connection string to `.env` (claiming changes the password). `--url` gives the string without the prompt. |
-| `graft migrate [--apply]` | Run your own [migrations](/docs/migrations). Lists them only, until `--apply`. |
-| `graft harden <role>` | Give an existing database role the limited rights a deployed app needs. See [Hardening](/docs/hardening). |
-| `graft content` | List documents in the compiled index |
-| `graft pull [doc...]` | Write what is published into your files, in a database-sourced project. Keeps files you changed. `--force` takes the published version over a conflict. |
-| `graft push [doc...]` | Publish the files you changed since your last pull, checked as a compile would. Refused if someone published them since. `--dry-run`, `--force`. |
-| `graft mirror` | Commit what was published since the last run to the repository in `GRAFT_GITHUB_REPO` |
-| `graft check` | Check every content file: schema, slugs, MDX safety, references. Needs no database. Exits 1 on a problem. |
-| `graft ci changes` | Print `content-only=true` when only content changed, and write it to `$GITHUB_OUTPUT`. `--base <ref>` |
-| `graft ci skip-build` | Exit 0 when a deploy can be skipped: only content changed and it is already live from the database |
-| `graft ci init` | Write a workflow that runs `graft check` on content changes |
-| `graft content import [--dry-run]` | Load the files under `contentDir` into the database, for a project with `content = { source: "database" }`. Every file is checked first. Only documents with nothing published come in: a published document is never overwritten, and a deleted file deletes nothing. Safe to run again. |
-| `graft compilations` | List recent compiles and what each one changed |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--elicit-approvals` | Ask this terminal's operator to decide a destructive call, instead of failing with an id for graft approve. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine.
+
+### `graft serve`
+
+Run the headless Graft runtime over HTTP: POST /api/fn/\<name>, POST /api/mcp, GET /api/content/v1/*, GET /healthz. This is what a self-hosted container runs.
+
+```text
+graft serve [--branch <id>] [--port <n>] [--host <host>] [--studio]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--port <n>` | Port to listen on (default: 3903). Same as `PORT`. |
+| `--host <host>` | Host to listen on (default: 127.0.0.1, this computer only). Same as `HOST`. |
+| `--studio` | Serve Studio at /studio too. Same as `GRAFT_STUDIO`. |
+
+Needs `DATABASE_URL`. Runs until you stop it.
+
+### `graft studio`
+
+Run Studio: edit content, approve or deny actions, and read the OpenAPI document. Without a database, saves go to your files.
+
+```text
+graft studio [--branch <id>] [--port <n>] [--host <host>]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--port <n>` | Port to listen on (default: 4983). Same as `GRAFT_STUDIO_PORT`. |
+| `--host <host>` | Host to listen on (default: 127.0.0.1, this computer only). Same as `HOST`. |
+
+Uses `DATABASE_URL` when it is set, and works without it. Runs until you stop it.
+
+### `graft studio invite`
+
+Print a sign-in link for someone without a GitHub account. It is signed with GRAFT_STUDIO_SECRET and expires after --days. To give someone an account instead, invite them from Studio's Settings.
+
+```text
+graft studio invite <email> [--role <role>] [--name <name>] [--days <n>] [--url <url>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--role <role>` | viewer, contributor, editor (default) or admin. |
+| `--name <name>` | The name commits are attributed to. |
+| `--days <n>` | How long the link works, 1 to 30 (default: 7). |
+| `--url <url>` | Where Studio is served. Same as `GRAFT_STUDIO_URL`. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs no database. Prints its answer as JSON with `--json`.
+
+### `graft studio setup-code`
+
+Print the code a hosted Studio asks for before it creates the owner account. It comes from GRAFT_STUDIO_SECRET, so run it with the site's settings.
+
+```text
+graft studio setup-code
+```
+
+Needs no database.
+
+## Keep content in the database
+
+### `graft content import`
+
+For a project with content = \{ source: "database" }: load the files under the content directory into the database. Every file is checked first. Only documents with nothing published come in: a published document is never overwritten, and a missing file deletes nothing. To change published content, use Studio or graft push.
+
+```text
+graft content import [--branch <id>] [--dry-run] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--dry-run` | Show what would change without changing it. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+### `graft pull`
+
+For a project with content = \{ source: "database" }: write what is published into the files under the content directory. A file you changed since your last pull is kept for graft push. One changed both here and in the database is left as it is and listed, unless --force takes the published version.
+
+```text
+graft pull [doc...] [--branch <id>] [--only <doc>]... [--force] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--only <doc>` | Only this document, like posts/launch (same as naming it as an argument). Repeat it for more than one. |
+| `--force` | Settle a conflict: pull takes the published version, push publishes yours. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+```sh
+graft pull posts/launch
+```
+
+### `graft push`
+
+Publish the files you changed since your last graft pull, checked as graft compile checks them. Refused, with nothing written, if someone published one of those documents since your pull: pull first. --force publishes over it.
+
+```text
+graft push [doc...] [--branch <id>] [--only <doc>]... [--dry-run] [--force] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--only <doc>` | Only this document, like posts/launch (same as naming it as an argument). Repeat it for more than one. |
+| `--dry-run` | Show what would change without changing it. |
+| `--force` | Settle a conflict: pull takes the published version, push publishes yours. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+### `graft mirror`
+
+Commit everything published since the last run to the GitHub repository in GRAFT_GITHUB_REPO, as one commit. Run it on a schedule, or let graft serve do it when graft.config.ts sets content.mirror.
+
+```text
+graft mirror [--branch <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+## Manage the database
+
+### `graft db migrate`
+
+Apply the Postgres schema migrations that ship with @usegraft/db. This is the first command a Postgres-engine project runs.
+
+```text
+graft db migrate [--dry-run] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--dry-run` | List pending schema migrations without applying them. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+### `graft db claim`
+
+Keep the free database `graft create --database new` made. Prints the link to claim it (a free Neon account), waits until you have, then asks for the new connection string and saves it to .env. Claiming changes the password, so the old DATABASE_URL stops working.
+
+```text
+graft db claim [--url <postgres-url>] [--no-input]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--url <postgres-url>` | The claimed database's connection string, instead of the question. |
+| `--no-input` | Never stop to ask a question. Same as `GRAFT_PROMPT_DISABLED`. |
+
+Needs no database. May ask questions on a terminal; `--no-input` never does.
+
+### `graft migrate`
+
+Show pending content and data migrations. --apply runs them and records each in the ledger. A concurrent --apply on the same branch waits for this one and then skips what it applied.
+
+```text
+graft migrate [--branch <id>] [--apply] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--apply` | Make the change (without it, only report what would change). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+### `graft harden`
+
+Grant an existing Postgres role the runtime privilege set: it can request and consume approvals but never decide them.
+
+```text
+graft harden <role> [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
 
 ## Approve actions
 
-| Command | What it does |
+### `graft approvals`
+
+List actions waiting for a person to approve them.
+
+```text
+graft approvals [--json]
+```
+
+| Flag | What it does |
 | --- | --- |
-| `graft approvals` | List actions waiting for approval |
-| `graft approve <id>` | Approve one. The caller then repeats its call with the id. |
-| `graft deny <id>` | Deny one |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+### `graft approve`
+
+Approve an action; the caller then repeats its call with the id.
+
+```text
+graft approve <approval-id> [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+### `graft deny`
+
+Deny an action.
+
+```text
+graft deny <approval-id> [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
 
 ## Work with preview branches
 
-| Command | What it does |
+### `graft branch`
+
+List branches.
+
+```text
+graft branch [--json]
+```
+
+| Flag | What it does |
 | --- | --- |
-| `graft branch` | List branches |
-| `graft branch create <name>` | Create a preview branch. `--from <parent>` (default `main`), `--backend neon` for a Neon fork. |
-| `graft branch drop <name>` | Delete a branch |
-| `graft merge <name> [--apply]` | Merge a branch into `--into` (default `main`). Reports only, until `--apply`. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
 
-## Flags
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
 
-| Flag | Works with | Meaning |
-| --- | --- | --- |
-| `--branch <name>` | compile, dev, migrate, mcp, serve, studio, content, compilations | Work on a preview branch instead of `main` |
-| `--apply` | migrate, merge | Make the change. Without it, these only report. |
-| `--prune-unknown` | compile | Remove index entries for collections the schema no longer has. Use after renaming or deleting a collection. |
-| `--json` | compile | Print the branch, commit, and change list as JSON on stdout. See [Print what a compile changed](#print-what-a-compile-changed). |
-| `--dry-run` | add, content import, push | Preview what would change without writing it |
-| `--force` | pull, push | Settle conflicts: pull takes the published version, push publishes yours |
-| `--base <ref>` | ci changes, ci skip-build | The ref to compare against. Default: the pull request's base branch, the host's previous deploy where the host names it, or the commit a push started from, else the previous commit. `skip-build` never skips on the previous commit alone |
-| `--overwrite` | add, asset put | Replace files that differ (add), or the file already stored under the key (asset put) |
-| `--port` / `--host` | serve, studio | Where to listen. Defaults to this machine only. |
-| `--studio` | serve | Include Studio. `GRAFT_STUDIO=1` does the same. |
+### `graft branch create`
 
-## Update notice
+Create a preview branch.
 
-When a newer Graft is on npm, `graft` prints a notice on stderr after the
-command finishes. `graft dev`, `graft serve` and `graft studio` print it while
-they run. It names the new version, the version you have, and the
-[upgrade guide](/docs/upgrading). On a beta, the notice is yellow, because beta
-releases often include security fixes. On a stable release it is cyan.
+```text
+graft branch create <name> [--from <parent>] [--backend overlay|neon] [--json]
+```
 
-The CLI asks the registry at most once a day and caches the answer in
-`~/.cache/graft/update-check.json` (or under `XDG_CACHE_HOME`). It uses the
-registry in `npm_config_registry` when you set one. A slow or unreachable
-registry never fails or delays a command by more than 1.5 seconds.
+| Flag | What it does |
+| --- | --- |
+| `--from <parent>` | Branch to fork from (default: main). |
+| `--backend overlay\|neon` | overlay (default) shares the parent's rows; neon forks a physical Neon branch. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
 
-The check is off when `GRAFT_NO_UPDATE_CHECK=1` or `CI` is set, and for
-`graft mcp`, `--help` and `--version`. `GRAFT_NO_UPDATE_CHECK=1` works in the
-environment or in the project's `.env`. Set `NO_COLOR` to print it without
-color.
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+### `graft branch drop`
+
+Delete a branch: purge an overlay's rows, or delete a Neon fork.
+
+```text
+graft branch drop <name> [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+### `graft merge`
+
+Merge a branch: replay its migrations, move its data, recompile.
+
+```text
+graft merge <branch> [--into <target>] [--apply] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--into <target>` | Branch to merge into (default: main). |
+| `--apply` | Make the change (without it, only report what would change). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+## Keep CI cheap
+
+### `graft ci changes`
+
+Print content-only=true when every changed file is content, and write it to $GITHUB_OUTPUT for later steps to read.
+
+```text
+graft ci changes [--base <ref>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--base <ref>` | Git ref to compare against (default: the pull request's base, the host's previous deploy, or the commit a push started from). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs no database. Prints its answer as JSON with `--json`.
+
+### `graft ci skip-build`
+
+Exit 0 when the deploy can be skipped: only content changed, and the site already serves it from the database. Never skips on the previous commit alone.
+
+```text
+graft ci skip-build [--base <ref>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--base <ref>` | Git ref to compare against (default: the pull request's base, the host's previous deploy, or the commit a push started from). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs no database. Prints its answer as JSON with `--json`.
+
+| Exit code | What it means |
+| --- | --- |
+| `0` | Skip the build. |
+| `1` | Build. |
+
+### `graft ci init`
+
+Write a workflow that runs graft check on content changes.
+
+```text
+graft ci init [--overwrite]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--overwrite` | Replace the workflow file if it exists. |
+
+Needs no database.
+
+## Learn the CLI
+
+### `graft help`
+
+Show help for a command or a topic.
+
+```text
+graft help [command-or-topic...]
+```
+
+Needs no database.
+
+```sh
+graft help branch create
+graft help exit-codes
+```
+
+### `graft commands`
+
+List every command; --json describes each one and its flags.
+
+```text
+graft commands [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs no database. Prints its answer as JSON with `--json`.
+
+## Exit codes
+
+Every command exits with one of these, unless its entry above lists its own.
+
+| Exit code | What it means |
+| --- | --- |
+| `0` | It worked. |
+| `1` | It failed; the error says why and what to do. |
+| `2` | The command was called wrong: an unknown command or flag, or a missing argument. Nothing ran. |
+| `3` | A person has to approve the action first. Run `graft approve <id>`, then repeat it. |
+| `4` | The credential is missing, wrong, or lacks the access this needs. |
+
+## Environment variables
+
+These change how the CLI behaves. Your project's own settings are on the
+[Configuration](/docs/configuration) page.
+
+| Variable | What it does |
+| --- | --- |
+| `DATABASE_URL` | The Postgres database. Read from the environment, or from `.env` in this folder or any folder above it. |
+| `GRAFT_DEBUG` | Set to 1 to print the stack trace of an unexpected error. |
+| `GRAFT_PROMPT_DISABLED` | Set to 1 to never ask a question, as `--no-input` does. |
+| `GRAFT_NO_UPDATE_CHECK` | Set to 1 to never check npm for a newer Graft. Also read from `.env`. |
+| `CI` | When set, the update check is off. |
+| `NO_COLOR` | When set, never print color. |
+| `FORCE_COLOR` | When set, print color even when the output is not a terminal. |
+| `CLICOLOR` | Set to 0 to turn color off on a terminal. |
+| `CLICOLOR_FORCE` | Same as `FORCE_COLOR`. |
+| `TERM` | `dumb` turns color off. |
+| `XDG_CACHE_HOME` | Where the update check caches its answer, under `graft/` (default: `~/.cache`). |
+| `npm_config_registry` | The npm registry the update check asks. |
 
 ## Which commands need a database
 
 Graft reads `.env` from the current folder or any folder above it.
 
-- **Static engine:** `graft compile`, `graft dev`, and `graft mcp` need no
-  database. The index is written to `.graft/index.db`.
-- **Postgres engine:** when `graft.config.ts` sets `index = "postgres"`,
-  every command that reads or writes the index needs `DATABASE_URL`, including
-  `graft compile`, `graft dev`, and `graft mcp`. `graft init`, `graft add`,
-  and `graft asset put` never need it.
-- **On either engine,** these always need `DATABASE_URL`: `graft db migrate`,
-  `graft branch`, `graft merge`, `graft serve`, `graft studio`,
-  `graft content`, `graft compilations`, `graft approvals`, `graft approve`,
-  `graft deny`, and `graft harden`. `graft migrate` needs it once the project
-  has migrations.
-
-Studio uses the same operations as the CLI and MCP. See
-[Studio](/docs/studio#do-it-without-studio) for the mapping.
+- **Always need `DATABASE_URL`:** `graft content`, `graft compilations`, `graft serve`, `graft content import`, `graft pull`, `graft push`, `graft mirror`, `graft db migrate`, `graft migrate`, `graft harden`, `graft approvals`, `graft approve`, `graft deny`, `graft branch`, `graft branch create`, `graft branch drop`, `graft merge`.
+- **Need it on the Postgres engine only:** `graft compile`, `graft dev`, `graft mcp`.
+- **Use it when it is set:** `graft doctor`, `graft studio`.
+- **Never need it:** `graft create`, `graft init`, `graft add`, `graft check`, `graft asset put`, `graft studio invite`, `graft studio setup-code`, `graft db claim`, `graft ci changes`, `graft ci skip-build`, `graft ci init`, `graft help`, `graft commands`.

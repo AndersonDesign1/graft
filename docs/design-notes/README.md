@@ -11,5 +11,6 @@ Durable design decisions and spike findings live here, one file per topic.
 | [`approval-hardening.md`](./approval-hardening.md) | Approval gate vs autonomous agents: Postgres role separation, self-decision      |
 | [`packaging.md`](./packaging.md)                   | Phase 7 packaging: `graft serve` (headless runtime), container + deploy topology |
 | [`studio-v2.md`](./studio-v2.md)                   | Studio for editors: audit, hosted writes through GitHub, e-commerce gaps         |
+| [`cli.md`](./cli.md)                               | The graft CLI for scripts and agents: one command table, JSON, exit codes        |
 
 These notes hand off throwaway spikes and research into real package APIs.
