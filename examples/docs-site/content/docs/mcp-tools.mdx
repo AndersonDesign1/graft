@@ -250,6 +250,33 @@ Tools that need Postgres stay listed on a static project and answer
 `list_compilations` refuse for reasons covered in
 [Storage engines](/docs/tiers#agents-on-the-static-engine).
 
+## Call a tool from the terminal
+
+Every tool also runs from the terminal, on the same server `graft mcp` gives
+an agent and with the same checks. `graft mcp tools` lists the tools, and
+`graft mcp call` runs one by name and prints its answer:
+
+```sh
+graft mcp call list_content --input '{"collection":"pages"}'
+```
+
+The tools you reach for most have their own commands. With `--json`, each
+prints exactly what the tool returns.
+
+| Tool | Command |
+| --- | --- |
+| `list_collections`, `list_content` | `graft content list [collection]` |
+| `get_content` | `graft content get <collection>/<slug>` |
+| `search_content` | `graft content search <query>` |
+| `write_content` | `graft content write <collection>/<slug>` |
+| `delete_content` | `graft content delete <collection>/<slug>` |
+| `list_drafts`, `publish_drafts`, `discard_drafts` | `graft drafts`, `graft drafts publish`, `graft drafts discard` |
+| `describe_schema` | `graft schema` |
+| `list_functions`, `describe_function`, `run_function` | `graft fn`, `graft fn describe`, `graft fn run` |
+| `explain_error` | `graft explain <code>` |
+
+See [Script the CLI](/docs/cli#read-and-write-content-from-the-terminal).
+
 ## Next steps
 
 - [Connecting agents](/docs/connecting-agents) covers transports, identity, and setup.

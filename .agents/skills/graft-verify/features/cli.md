@@ -10,7 +10,9 @@ a fix when a file is wrong.
 - `cli.compile`: `graft compile` validates every file and writes the index.
 - `cli.compile-error`: a bad frontmatter field stops the compile with
   `SCHEMA_VALIDATION_FAILED` and a `fix` line.
-- `cli.content`: `graft content` lists the compiled tree (Postgres only today).
+- `cli.content`: `graft content list|get|search|write|set|delete` run the
+  project's MCP tools in-process, on either engine. `--json` is exactly the
+  tool's answer; `graft mcp call <tool>` runs any tool by name.
 - `cli.sync`: in a database-sourced project, `graft pull`, `graft push` and
   `graft mirror` move content between Postgres, the files and GitHub.
 - `cli.check`: `graft check` validates the files with no database.
@@ -59,8 +61,14 @@ Preconditions: `REPO` and `O` from the skill's Launch step, a sandbox from `scri
 - **The reference matches the CLI.** After a registry change, `pnpm build`
   then `pnpm check:cli-docs`; `pnpm docs:cli` rewrites the page and the README
   table.
-- **Content list** (Postgres sandbox): `$O $G content` prints
+- **Content list** (either sandbox): `$O $G content` prints
   `pages/home  (Hello, Graft)  pages/home.mdx`.
+- **Content round trip.** `$O $G content get pages/home > home.mdx`, edit the
+  tagline, then `$O $G content write pages/home --file home.mdx` prints
+  `Wrote pages/home.mdx on branch "main": +0 added, ~1 changed, -0 removed.`
+- **Delete needs a person** (Postgres sandbox): `$O $G content delete pages/about`
+  exits 3 and its `fix` names `graft approve <id>` and the retry with
+  `--approval <id>`; after approving, the retry deletes the file.
 
 - **Pull and push** (database-sourced sandbox, see `studio.md`): `$O --db "$URL" $G pull`
   lists the files it updated. Edit one, `$O --db "$URL" $G push` prints
@@ -96,8 +104,9 @@ Preconditions: `REPO` and `O` from the skill's Launch step, a sandbox from `scri
 - Anything `graft mcp` prints to stdout breaks the protocol stream, including a
   log line from a hook. Log to stderr.
 
-- `graft content` needs `DATABASE_URL` even in a static project and fails with
-  `ENV_VAR_MISSING`. Its help text says it reads "the compiled index".
+- `graft content delete` on the static engine answers `NEEDS_DATABASE`:
+  approvals are a Postgres table. Drive the delete, approve, retry loop in a
+  Postgres sandbox.
 - Node prints `ExperimentalWarning: SQLite is an experimental feature` on
   stderr. It is not a failure.
 - Without `$O`, a command that touches the database reaches whatever the

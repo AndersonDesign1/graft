@@ -11,6 +11,8 @@
  */
 import type { Flags } from "./args";
 import type { SyncCommandOptions } from "./commands/sync";
+import type { ToolTarget } from "./tool-runner";
+import type { ToolClient } from "@usegraft/mcp";
 import { UsageError } from "./args";
 import { commandHelp, commandList, describeCli, rootHelp, topicHelp } from "./help";
 import { VERSION } from "./version";
@@ -151,18 +153,85 @@ const handlers = {
     return { data: result, exitCode: 1 };
   },
 
-  async content(ctx) {
-    const { contentListCommand, formatContentLine } = await import("./commands/content");
-    const { branch, lines } = await contentListCommand({ cwd: ctx.cwd, branchId: branchOf(ctx) });
-    const data = { branch, documents: lines };
-    if (ctx.json) return { data };
-    if (lines.length === 0) {
-      console.log(`No content on branch "${branch}" (run graft compile).`);
-      return { data };
+  content: (ctx) => listDocuments(ctx, undefined),
+  "content list": (ctx) => listDocuments(ctx, ctx.args[0]),
+
+  async "content get"(ctx) {
+    const { asObject, formatDocument, parseDocumentId } = await import("./commands/tools");
+    const id = parseDocumentId(required(ctx, 0), "content get");
+    const doc = await runTools(ctx, async (tools) =>
+      asObject(await tools.call("get_content", id), "get_content"),
+    );
+    if (!ctx.json) console.log(formatDocument(doc));
+    return { data: doc };
+  },
+
+  async "content search"(ctx) {
+    const { asObject, formatSearch } = await import("./commands/tools");
+    const input: SearchInput = { query: ctx.args.join(" ") };
+    const collection = ctx.flags.string("collection");
+    const limit = ctx.flags.number("limit");
+    if (collection !== undefined) input.collection = collection;
+    if (limit !== undefined) input.limit = limit;
+    const answer = await runTools(ctx, async (tools) =>
+      asObject(await tools.call("search_content", input), "search_content"),
+    );
+    if (!ctx.json) for (const line of formatSearch(answer)) console.log(line);
+    return { data: answer };
+  },
+
+  async "content write"(ctx) {
+    const { asObject, formatWrite, parseDocumentId, writeInput } = await import("./commands/tools");
+    const id = parseDocumentId(required(ctx, 0), "content write");
+    const input = writeInput(
+      {
+        file: ctx.flags.string("file"),
+        data: ctx.flags.string("data"),
+        bodyFile: ctx.flags.string("body-file"),
+      },
+      "content write",
+    );
+    const answer = await runTools(ctx, async (tools) =>
+      asObject(await tools.call("write_content", { ...id, ...input }), "write_content"),
+    );
+    if (!ctx.json) for (const line of formatWrite(answer)) console.log(line);
+    return { data: answer };
+  },
+
+  async "content set"(ctx) {
+    const { formatSet, parseJsonValue, setField } = await import("./commands/tools");
+    const field = ctx.flags.string("field");
+    const value = ctx.flags.string("value");
+    if (field === undefined || value === undefined) {
+      throw new UsageError(
+        "graft content set needs --field and --value.",
+        "Name the field and its new value, like --field draft --value false. Run `graft content set --help`.",
+        { command: "content set" },
+      );
     }
-    console.log(`${lines.length} document(s) on branch "${branch}":\n`);
-    for (const line of lines) console.log(formatContentLine(line));
-    return { data };
+    const [collection, ...slugs] = ctx.args;
+    const result = await runTools(ctx, (tools) =>
+      setField(tools, collection ?? "", slugs, field, parseJsonValue(value)),
+    );
+    if (!ctx.json) for (const line of formatSet(result)) console.log(line);
+    return { data: result, exitCode: result.failed.length > 0 ? 1 : 0 };
+  },
+
+  async "content delete"(ctx) {
+    const { asObject, parseDocumentId, rethrowWithRetry } = await import("./commands/tools");
+    const ref = required(ctx, 0);
+    const id = parseDocumentId(ref, "content delete");
+    const approval = ctx.flags.string("approval");
+    const answer = await runTools(ctx, async (tools) => {
+      try {
+        const input = approval === undefined ? id : { ...id, approval };
+        return asObject(await tools.call("delete_content", input), "delete_content");
+      } catch (error) {
+        return rethrowWithRetry(error, `graft content delete ${ref}`);
+      }
+    });
+    if (!ctx.json) console.log(`Deleted ${id.collection}/${id.slug}.`);
+    return { data: answer };
   },
 
   async compilations(ctx) {
@@ -197,6 +266,145 @@ const handlers = {
       ].join("\n"),
     );
     return { data: result };
+  },
+
+  async drafts(ctx) {
+    const { asObject, formatDrafts } = await import("./commands/tools");
+    const answer = await runTools(ctx, async (tools) =>
+      asObject(await tools.call("list_drafts"), "list_drafts"),
+    );
+    if (!ctx.json) for (const line of formatDrafts(answer)) console.log(line);
+    return { data: answer };
+  },
+
+  async "drafts publish"(ctx) {
+    const { asObject } = await import("./commands/tools");
+    const input: PublishInput = { paths: ctx.args };
+    const message = ctx.flags.string("message");
+    if (message !== undefined) input.message = message;
+    const resolve = resolutions(ctx.flags.list("resolve"));
+    if (Object.keys(resolve).length > 0) input.resolve = resolve;
+    const answer = await runTools(ctx, async (tools) =>
+      asObject(await tools.call("publish_drafts", input), "publish_drafts"),
+    );
+    if (!ctx.json) console.log(JSON.stringify(answer, null, 2));
+    return { data: answer };
+  },
+
+  async "drafts discard"(ctx) {
+    const { asObject } = await import("./commands/tools");
+    const answer = await runTools(ctx, async (tools) =>
+      asObject(await tools.call("discard_drafts", { paths: ctx.args }), "discard_drafts"),
+    );
+    if (!ctx.json) console.log(`Discarded ${ctx.args.length} draft(s).`);
+    return { data: answer };
+  },
+
+  /* ---- look into the project -------------------------------------------- */
+
+  async schema(ctx) {
+    const { asObject, formatSchema, schemaFor } = await import("./commands/tools");
+    const only = ctx.args[0];
+    const answer = await runTools(ctx, async (tools) =>
+      asObject(await tools.call("describe_schema"), "describe_schema"),
+    );
+    if (!ctx.json) for (const line of formatSchema(answer, only)) console.log(line);
+    return { data: schemaFor(answer, only) };
+  },
+
+  async fn(ctx) {
+    const { asObject, formatFunctions } = await import("./commands/tools");
+    const answer = await runTools(ctx, async (tools) =>
+      asObject(await tools.call("list_functions"), "list_functions"),
+    );
+    if (!ctx.json) for (const line of formatFunctions(answer)) console.log(line);
+    return { data: answer };
+  },
+
+  async "fn describe"(ctx) {
+    const { asObject } = await import("./commands/tools");
+    const answer = await runTools(ctx, async (tools) =>
+      asObject(
+        await tools.call("describe_function", { name: required(ctx, 0) }),
+        "describe_function",
+      ),
+    );
+    if (!ctx.json) console.log(JSON.stringify(answer, null, 2));
+    return { data: answer };
+  },
+
+  async "fn run"(ctx) {
+    const { asObject, parseJsonObject, rethrowWithRetry } = await import("./commands/tools");
+    const name = required(ctx, 0);
+    const raw = ctx.flags.string("input");
+    const input: RunInput = {
+      name,
+      input: raw === undefined ? {} : parseJsonObject(raw, "--input", "fn run"),
+    };
+    const approval = ctx.flags.string("approval");
+    if (approval !== undefined) input.approval = approval;
+    const answer = await runTools(ctx, async (tools) => {
+      try {
+        return asObject(await tools.call("run_function", input), "run_function");
+      } catch (error) {
+        const retry =
+          raw === undefined ? `graft fn run ${name}` : `graft fn run ${name} --input '${raw}'`;
+        return rethrowWithRetry(error, retry);
+      }
+    });
+    if (!ctx.json) console.log(JSON.stringify(answer, null, 2));
+    return { data: answer };
+  },
+
+  async explain(ctx) {
+    const [{ ERROR_KNOWLEDGE, explainCode }, { closest }] = await Promise.all([
+      import("@usegraft/mcp"),
+      import("./suggest"),
+    ]);
+    const code = required(ctx, 0).toUpperCase();
+    const explanation = explainCode(code);
+    if (!explanation) {
+      const suggestion = closest(code, Object.keys(ERROR_KNOWLEDGE));
+      throw new UsageError(
+        `there is no error code "${code}".`,
+        `${suggestion ? `Did you mean \`${suggestion}\`? ` : ""}The error reference lists every code.`,
+        { command: "explain", code },
+      );
+    }
+    if (!ctx.json) {
+      console.log(
+        [
+          `${explanation.code}: ${explanation.meaning}`,
+          "",
+          "Usually because:",
+          ...explanation.typicalCauses.map((cause) => `  - ${cause}`),
+          "",
+          "How to recover:",
+          `  ${explanation.howToRecover}`,
+        ].join("\n"),
+      );
+    }
+    return { data: explanation };
+  },
+
+  async "mcp tools"(ctx) {
+    const { formatTools } = await import("./commands/tools");
+    const tools = await runTools(ctx, (client) => client.tools());
+    if (!ctx.json) for (const line of formatTools(tools)) console.log(line);
+    return { data: { tools } };
+  },
+
+  async "mcp call"(ctx) {
+    const { asObject, parseJsonObject } = await import("./commands/tools");
+    const tool = required(ctx, 0);
+    const raw = ctx.flags.string("input");
+    const input = raw === undefined ? {} : parseJsonObject(raw, "--input", "mcp call");
+    const answer = await runTools(ctx, async (tools) => {
+      const value = await tools.call(tool, input);
+      return asObject(value, tool);
+    });
+    if (!ctx.json) console.log(JSON.stringify(answer, null, 2));
+    return { data: answer };
   },
 
   /* ---- run Graft --------------------------------------------------------- */
@@ -483,6 +691,67 @@ const handlers = {
 
 /** Every command's handler, by the id registry.ts gives it. */
 export const HANDLERS: ReadonlyMap<string, Handler> = new Map(Object.entries(handlers));
+
+/** search_content's input. */
+type SearchInput = {
+  query: string;
+  collection?: string;
+  limit?: number;
+};
+
+/** publish_drafts' input. */
+type PublishInput = {
+  paths: string[];
+  message?: string;
+  resolve?: Record<string, "mine" | "theirs">;
+};
+
+/** run_function's input. */
+type RunInput = {
+  name: string;
+  input: Record<string, unknown>;
+  approval?: string;
+};
+
+/** Where a tool command runs: the project in this folder, on the branch asked for. */
+function target(ctx: CommandContext): ToolTarget {
+  const branchId = branchOf(ctx);
+  return branchId === undefined ? { cwd: ctx.cwd } : { cwd: ctx.cwd, branchId };
+}
+
+async function listDocuments(
+  ctx: CommandContext,
+  collection: string | undefined,
+): Promise<CommandOutcome> {
+  const { formatContentListing, listContent } = await import("./commands/tools");
+  const listing = await runTools(ctx, (tools) => listContent(tools, collection));
+  if (!ctx.json) for (const line of formatContentListing(listing)) console.log(line);
+  return { data: listing };
+}
+
+/** `--resolve posts/a.mdx=mine` flags as publish_drafts' `resolve` map. */
+function resolutions(values: readonly string[]): Record<string, "mine" | "theirs"> {
+  const resolve: Record<string, "mine" | "theirs"> = {};
+  for (const value of values) {
+    const at = value.lastIndexOf("=");
+    const side = value.slice(at + 1);
+    if (at <= 0 || (side !== "mine" && side !== "theirs")) {
+      throw new UsageError(
+        `--resolve ${value} is not <path>=mine or <path>=theirs.`,
+        "Name the path and the version to keep, like --resolve posts/launch.mdx=mine.",
+        { command: "drafts publish", flag: "--resolve" },
+      );
+    }
+    resolve[value.slice(0, at)] = side;
+  }
+  return resolve;
+}
+
+/** Run the project's MCP tools in this process; loaded only by the commands that use them. */
+async function runTools<T>(ctx: CommandContext, fn: (tools: ToolClient) => Promise<T>): Promise<T> {
+  const { withTools } = await import("./tool-runner");
+  return withTools(target(ctx), fn);
+}
 
 /** A required argument; the parser has already refused a call without it. */
 function required(ctx: CommandContext, index: number): string {

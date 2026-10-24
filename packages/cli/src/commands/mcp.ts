@@ -1,147 +1,24 @@
 /**
  * graft mcp — project MCP over stdio (the local agent install path).
  *
- * Loads graft.config.ts (collections + optional functions), connects
- * DATABASE_URL, and serves createGraftMcp on stdio until the client exits.
- * Register in `.mcp.json` as: `"command": "pnpm", "args": ["exec", "graft", "mcp"]`.
- *
- * Auth for run_function: optional GRAFT_DEV_TOKEN (+ GRAFT_DEV_SCOPES, comma/space
- * separated). The token doubles as the server's default identity — the local
- * agent acts as it without ever seeing the secret (anyone who can spawn this
- * process can already read .env, so this grants nothing new). Hosts that need
- * Better Auth / OIDC use createGraftMcpHandler in the app with
- * createActorResolver — the CLI stays issuer-free (verify-don't-mint only for
- * static dev tokens). See docs/design-notes/agent-mcp.md.
+ * Serves the project's MCP server (project-mcp.ts) on stdio until the client
+ * exits. Register in `.mcp.json` as:
+ * `"command": "pnpm", "args": ["exec", "graft", "mcp"]`.
  */
-import { join } from "node:path";
-import { createActorResolver } from "@usegraft/auth";
-import { revalidateWebhookFromEnv } from "@usegraft/compiler";
-import type { FunctionActor } from "@usegraft/core";
-import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
-import { databaseStoreFor } from "../content-source";
-import { assertNoStaticBranch } from "./compile";
-import { operatorName } from "./approvals";
+import { openProjectMcp, type ProjectMcpOptions } from "../project-mcp";
 
-export interface McpCommandOptions {
-  cwd: string;
-  branchId?: string;
-  /**
-   * Ask this terminal's operator to decide a destructive call in-band, instead
-   * of failing with an id for them to run `graft approve` on.
-   *
-   * Opt-in even here, where the human is by definition present: it changes what
-   * happens when an agent tries something destructive, and that is not a
-   * default worth flipping on someone's behalf.
-   */
-  elicitApprovals?: boolean;
-}
+export type McpCommandOptions = ProjectMcpOptions;
 
 export async function mcpCommand(options: McpCommandOptions): Promise<void> {
-  loadProjectEnv(options.cwd);
-  const config = await loadConfig(findConfig(options.cwd));
-  // Static projects get the same agent surface for authored content — the
-  // Postgres-tier tools answer NEEDS_DATABASE with the upgrade instead of the
-  // server refusing to start. Being agent-native is not a Postgres-tier feature.
-  const isStatic = config.index.driver === "static";
-  if (isStatic) assertNoStaticBranch(options.branchId);
-  const url = isStatic ? undefined : requireDatabaseUrl();
-  // Built before any connection opens, so a bad GRAFT_REVALIDATE_URL stops the
-  // start instead of surfacing on the first write.
-  const onContentChange = revalidateWebhookFromEnv();
-
-  const [{ createGraftMcp, serveStdio }, { createDb, resolveBranchHandle, scopeWriteBranch }] =
-    await Promise.all([import("@usegraft/mcp"), import("@usegraft/db")]);
-
-  const control = url !== undefined ? createDb(url) : undefined;
-  const branchName = options.branchId ?? "main";
-  const branch =
-    control !== undefined && url !== undefined
-      ? await resolveBranchHandle(control.db, branchName, { databaseUrl: url })
-      : undefined;
-
+  const [project, { serveStdio }] = await Promise.all([
+    openProjectMcp(options),
+    import("@usegraft/mcp"),
+  ]);
   try {
-    const devToken = process.env.GRAFT_DEV_TOKEN;
-    const scopes = (process.env.GRAFT_DEV_SCOPES ?? "")
-      .split(/[,\s]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    // `graft mcp` runs on the developer's own machine at their invitation, so
-    // it carries the content scopes its tools need. GRAFT_DEV_SCOPES adds to
-    // this for run_function's access rules; it is not what grants authoring.
-    // Note `approvals:decide` is deliberately absent — the CLI files approvals,
-    // `graft approve` decides them, and those must stay different identities.
-    const cliActor = {
-      kind: "agent",
-      id: "graft-cli",
-      scopes: [...new Set(["content:write", ...scopes])],
-    } as const;
-    const resolveActor = createActorResolver({
-      issuers: [],
-      devTokens: devToken ? { [devToken]: cliActor } : undefined,
-    });
-
-    // stdio is a local process the developer started, so there is no untrusted
-    // caller to authenticate — it is the CLI acting as an agent. Giving it a
-    // stable identity (rather than anonymous) is what lets a destructive op
-    // file an approval that `graft approve` can then decide as the OS user:
-    // two different identities, so separation of duties holds locally too.
-    // A dev token adds scopes on top; it is not what confers identity.
-    const resolveStdioActor = async (request: Request): Promise<FunctionActor> => {
-      const resolved = await resolveActor(request);
-      return resolved.kind === "anonymous" ? cliActor : resolved;
-    };
-
-    // The decider is the OS user, which is exactly who `graft approve` records
-    // — the same person, whether they answered a dialog or a terminal. It is
-    // also necessarily a different identity from the `agent:graft-cli` requester
-    // above, so separation of duties holds here without a special case.
-    const approvalElicitation = options.elicitApprovals
-      ? { decider: { kind: "human", id: operatorName() } }
-      : undefined;
-
-    const store =
-      branch !== undefined
-        ? await databaseStoreFor(config, branch.db, scopeWriteBranch(branch.scope))
-        : undefined;
-    const server = createGraftMcp({
-      name: "graft",
-      ...(store
-        ? {
-            store,
-            source: "database" as const,
-            syncStateFile: join(config.projectDir, ".graft", "sync.json"),
-          }
-        : {}),
-      contentDir: config.contentDir,
-      projectDir: config.projectDir,
-      collections: config.collections,
-      functions: config.functions,
-      mdxTrust: config.mdxTrust,
-      ...(branch !== undefined
-        ? {
-            db: branch.db,
-            branchId: scopeWriteBranch(branch.scope),
-            // The handle's resolved scope makes search_content overlay-aware: an
-            // overlay branch searches its full parent chain, not just its own rows.
-            scope: branch.scope,
-          }
-        : { staticIndexPath: (config.index as { driver: "static"; path: string }).path }),
-      actor: resolveStdioActor,
-      connectionActor: cliActor,
-      // Local agents may upload a file from the project; remote mounts get no
-      // `path` argument at all.
-      localUploadRoot: config.projectDir,
-      defaultAuthorization: devToken,
-      approvalElicitation,
-      onContentChange,
-    });
-
     // Stdio MCP: never write noise to stdout (that's the protocol stream).
     // Errors before connect go to stderr via the CLI runner.
-    await serveStdio(server);
+    await serveStdio(project.server);
   } finally {
-    await branch?.close();
-    await control?.close();
+    await project.close();
   }
 }

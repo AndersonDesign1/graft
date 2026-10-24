@@ -3,7 +3,7 @@
 # Source: packages/cli/src/registry.ts and topics.ts, read through `graft commands --json`
 # Regenerate: pnpm docs:cli
 title: CLI reference
-description: "Every graft command, its arguments and flags, grouped by task. 35 commands."
+description: "Every graft command, its arguments and flags, grouped by task. 51 commands."
 section: Reference
 order: 0
 ---
@@ -155,7 +155,7 @@ Needs no database. Prints its answer as JSON with `--json`.
 
 ### `graft content`
 
-List the documents in the compiled index.
+List every document; the same as graft content list.
 
 ```text
 graft content [--branch <id>] [--json]
@@ -166,7 +166,126 @@ graft content [--branch <id>] [--json]
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
 
-Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+### `graft content list`
+
+List documents with their slug, title and file. Reads the content files, or the database in a project whose content is kept there.
+
+```text
+graft content list [collection] [--branch <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+### `graft content get`
+
+Print one document: its frontmatter, then its body, the way the file reads. With --json, the collection, slug, file path, data and body.
+
+```text
+graft content get <collection/slug> [--branch <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+```sh
+graft content get posts/launch > launch.mdx
+```
+
+### `graft content search`
+
+Search with words, "quoted phrases", or and -exclusions. Searches the compiled index, so results are as fresh as the last compile.
+
+```text
+graft content search <query...> [--branch <id>] [--collection <name>] [--limit <n>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--collection <name>` | Search one collection (default: all). |
+| `--limit <n>` | Most matches to print, best first (default: 20). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+```sh
+graft content search pricing "free tier" --collection pages
+```
+
+### `graft content write`
+
+Write a document from an MDX file (--file), or from frontmatter as JSON (--data) and an optional body (--body-file). It is checked against the collection's schema and compiled, exactly as an agent's write_content is. A project whose content is kept in the database saves it as a draft.
+
+```text
+graft content write <collection/slug> [--branch <id>] [--file <doc.mdx|->] [--data <json>] [--body-file <file|->] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--file <doc.mdx\|->` | The whole document as an MDX file; - reads it from stdin. |
+| `--data <json>` | The frontmatter as a JSON object; - reads it from stdin. |
+| `--body-file <file\|->` | The body, with --data; - reads it from stdin. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+```sh
+graft content get posts/launch > launch.mdx
+graft content write posts/launch --file launch.mdx
+```
+
+### `graft content set`
+
+Set one frontmatter field on each document named, each written as graft content write would. One document that fails does not stop the others. --value null removes the field.
+
+```text
+graft content set <collection> <slug...> [--branch <id>] [--field <name>] [--value <json>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--field <name>` | The frontmatter field to set. |
+| `--value <json>` | The new value as JSON; text that is not JSON is taken as a string. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+| Exit code | What it means |
+| --- | --- |
+| `1` | At least one document was not saved; each is listed. |
+
+```sh
+graft content set posts launch roadmap --field tags --value '["2026"]'
+```
+
+### `graft content delete`
+
+Delete a document. The first run files an approval and exits 3 with its id. After a person runs graft approve \<id>, run it again with --approval \<id>.
+
+```text
+graft content delete <collection/slug> [--branch <id>] [--approval <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--approval <id>` | The approval a person granted for this delete. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
 ### `graft compilations`
 
@@ -200,6 +319,170 @@ Needs no database. Prints its answer as JSON with `--json`.
 
 ```sh
 graft asset put ./hero.png assets/hero.png
+```
+
+### `graft drafts`
+
+List unpublished drafts, for content kept in the database.
+
+```text
+graft drafts [--branch <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+### `graft drafts publish`
+
+Publish drafts by path (from graft drafts). On a site that reviews changes, this asks for a review instead. A path someone else published since is refused with CONTENT_CONFLICT; --resolve \<path>=mine or =theirs settles it.
+
+```text
+graft drafts publish <path...> [--branch <id>] [--message <text>] [--resolve <path>=mine|theirs]... [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--message <text>` | The commit or review title. |
+| `--resolve <path>=mine\|theirs` | Settle a conflict on one path. Repeat it for more than one. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+### `graft drafts discard`
+
+Throw away drafts, back to the published version.
+
+```text
+graft drafts discard <path...> [--branch <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
+
+## Look into the project
+
+### `graft schema`
+
+Print each collection's fields, and the typed functions.
+
+```text
+graft schema [collection] [--branch <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+### `graft fn`
+
+List the typed functions.
+
+```text
+graft fn [--branch <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+### `graft fn describe`
+
+Print one function's input schema and access rules.
+
+```text
+graft fn describe <name> [--branch <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+### `graft fn run`
+
+Run a function through the same checks as POST /api/fn/\<name>: input validation, access rules, rate limits, the audit log, and the approval a destructive function needs (exit 3, then --approval \<id>).
+
+```text
+graft fn run <name> [--branch <id>] [--input <json|->] [--approval <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--input <json\|->` | The input as a JSON object; - reads it from stdin (default: \{}). |
+| `--approval <id>` | The approval a person granted for this call. |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+### `graft explain`
+
+Explain an error code: what it means and how to recover.
+
+```text
+graft explain <code> [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs no database. Prints its answer as JSON with `--json`.
+
+```sh
+graft explain SCHEMA_VALIDATION_FAILED
+```
+
+### `graft mcp tools`
+
+List the MCP tools an agent sees for this project.
+
+```text
+graft mcp tools [--branch <id>] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+### `graft mcp call`
+
+Call any MCP tool by name, as an agent would.
+
+```text
+graft mcp call <tool> [--branch <id>] [--input <json|->] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-b, --branch <id>` | Content branch to work on (default: main). |
+| `--input <json\|->` | The tool's input as a JSON object; - reads it from stdin (default: \{}). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
+
+```sh
+graft mcp call list_content --input '{"collection":"posts"}'
 ```
 
 ## Run Graft
@@ -638,7 +921,7 @@ These change how the CLI behaves. Your project's own settings are on the
 
 Graft reads `.env` from the current folder or any folder above it.
 
-- **Always need `DATABASE_URL`:** `graft content`, `graft compilations`, `graft serve`, `graft content import`, `graft pull`, `graft push`, `graft mirror`, `graft db migrate`, `graft migrate`, `graft harden`, `graft approvals`, `graft approve`, `graft deny`, `graft branch`, `graft branch create`, `graft branch drop`, `graft merge`.
-- **Need it on the Postgres engine only:** `graft compile`, `graft dev`, `graft mcp`.
+- **Always need `DATABASE_URL`:** `graft compilations`, `graft drafts`, `graft drafts publish`, `graft drafts discard`, `graft serve`, `graft content import`, `graft pull`, `graft push`, `graft mirror`, `graft db migrate`, `graft migrate`, `graft harden`, `graft approvals`, `graft approve`, `graft deny`, `graft branch`, `graft branch create`, `graft branch drop`, `graft merge`.
+- **Need it on the Postgres engine only:** `graft compile`, `graft dev`, `graft content`, `graft content list`, `graft content get`, `graft content search`, `graft content write`, `graft content set`, `graft content delete`, `graft schema`, `graft fn`, `graft fn describe`, `graft fn run`, `graft mcp tools`, `graft mcp call`, `graft mcp`.
 - **Use it when it is set:** `graft doctor`, `graft studio`.
-- **Never need it:** `graft create`, `graft init`, `graft add`, `graft check`, `graft asset put`, `graft studio invite`, `graft studio setup-code`, `graft db claim`, `graft ci changes`, `graft ci skip-build`, `graft ci init`, `graft help`, `graft commands`.
+- **Never need it:** `graft create`, `graft init`, `graft add`, `graft check`, `graft asset put`, `graft explain`, `graft studio invite`, `graft studio setup-code`, `graft db claim`, `graft ci changes`, `graft ci skip-build`, `graft ci init`, `graft help`, `graft commands`.

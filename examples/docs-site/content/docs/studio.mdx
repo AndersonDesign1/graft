@@ -322,9 +322,9 @@ settings. The index states are explained in [How Graft works](/docs/the-model).
 
 | In Studio | From the CLI or Git | Over MCP |
 | --- | --- | --- |
-| Find content | `graft content` | `list_content`, `search_content` |
-| Save an entry | Edit the file, then `graft compile` | `write_content` |
-| Delete an entry | Delete the file | `delete_content` |
+| Find content | `graft content list`, `graft content search` | `list_content`, `search_content` |
+| Save an entry | Edit the file, then `graft compile`; or `graft content write` | `write_content` |
+| Delete an entry | Delete the file, or `graft content delete` | `delete_content` |
 | Publish, locally | `git commit` | |
 | Publish, hosted | Merge the draft branch (all of its changes at once) | `publish_drafts` |
 | Discard a draft | `git restore` | `discard_drafts` |
