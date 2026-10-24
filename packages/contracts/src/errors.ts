@@ -56,6 +56,7 @@ export const ErrorCodes = {
   NOT_IMPLEMENTED: "NOT_IMPLEMENTED",
   USAGE_INVALID: "USAGE_INVALID",
   INTERNAL_ERROR: "INTERNAL_ERROR",
+  REMOTE_UNREACHABLE: "REMOTE_UNREACHABLE",
 } as const;
 
 export type ErrorCode = keyof typeof ErrorCodes;

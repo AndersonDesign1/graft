@@ -52,6 +52,7 @@ export const GROUPS = {
   approvals: "Approve actions",
   branches: "Work with preview branches",
   ci: "Keep CI cheap",
+  remote: "Work with a hosted site",
   help: "Learn the CLI",
 } as const;
 
@@ -72,6 +73,8 @@ export interface CommandSpec {
   readonly database: DatabaseNeed;
   /** Can stop to ask a question; takes --no-input. */
   readonly interactive?: boolean;
+  /** Works on a hosted site too; takes --remote and --local. */
+  readonly remote?: boolean;
   /** Runs until stopped, so the update notice prints as soon as it is known. */
   readonly longRunning?: boolean;
   /** False when stdout belongs to a protocol, as with `graft mcp`. */
@@ -308,6 +311,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: "List every document; the same as graft content list",
     flags: [BRANCH],
     json: true,
+    remote: true,
     database: "postgres",
   },
   {
@@ -321,6 +325,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     args: [{ name: "collection" }],
     flags: [BRANCH],
     json: true,
+    remote: true,
     database: "postgres",
   },
   {
@@ -334,6 +339,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     args: [{ name: "collection/slug", required: true }],
     flags: [BRANCH],
     json: true,
+    remote: true,
     database: "postgres",
     examples: ["graft content get posts/launch > launch.mdx"],
   },
@@ -364,6 +370,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       },
     ],
     json: true,
+    remote: true,
     database: "postgres",
     examples: ['graft content search pricing "free tier" --collection pages'],
   },
@@ -403,6 +410,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       },
     ],
     json: true,
+    remote: true,
     database: "postgres",
     examples: [
       "graft content get posts/launch > launch.mdx",
@@ -440,6 +448,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       },
     ],
     json: true,
+    remote: true,
     database: "postgres",
     exitCodes: [{ code: 1, meaning: "At least one document was not saved; each is listed" }],
     examples: ["graft content set posts launch roadmap --field tags --value '[\"2026\"]'"],
@@ -464,6 +473,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       },
     ],
     json: true,
+    remote: true,
     database: "postgres",
   },
   {
@@ -496,6 +506,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: "List unpublished drafts, for content kept in the database",
     flags: [BRANCH],
     json: true,
+    remote: true,
     database: "always",
   },
   {
@@ -527,6 +538,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       },
     ],
     json: true,
+    remote: true,
     database: "always",
   },
   {
@@ -536,6 +548,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     args: [{ name: "path", required: true, variadic: true }],
     flags: [BRANCH],
     json: true,
+    remote: true,
     database: "always",
   },
 
@@ -547,6 +560,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     args: [{ name: "collection" }],
     flags: [BRANCH],
     json: true,
+    remote: true,
     database: "postgres",
   },
   {
@@ -555,6 +569,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: "List the typed functions",
     flags: [BRANCH],
     json: true,
+    remote: true,
     database: "postgres",
   },
   {
@@ -564,6 +579,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     args: [{ name: "name", required: true }],
     flags: [BRANCH],
     json: true,
+    remote: true,
     database: "postgres",
   },
   {
@@ -594,6 +610,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       },
     ],
     json: true,
+    remote: true,
     database: "postgres",
   },
   {
@@ -612,6 +629,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: "List the MCP tools an agent sees for this project",
     flags: [BRANCH],
     json: true,
+    remote: true,
     database: "postgres",
   },
   {
@@ -630,6 +648,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       },
     ],
     json: true,
+    remote: true,
     database: "postgres",
     examples: ['graft mcp call list_content --input \'{"collection":"posts"}\''],
   },
@@ -874,6 +893,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: "List actions waiting for a person to approve them",
     flags: [],
     json: true,
+    remote: true,
     database: "always",
   },
   {
@@ -993,6 +1013,150 @@ export const COMMANDS: readonly CommandSpec[] = [
     database: "never",
   },
 
+  // Work with a hosted site
+  {
+    path: ["login"],
+    group: "remote",
+    summary: "Save a token for a hosted site, for --remote and graft api",
+    description: [
+      "Check a token against a hosted Graft site and save it, so commands that take",
+      "--remote and graft api can use it. Make the token in Studio under Developer,",
+      "Agents. It is read from stdin, or asked for without echoing it, never taken as",
+      "an argument. No token can approve or deny an action.",
+    ],
+    args: [{ name: "url", required: true }],
+    flags: [
+      {
+        name: "with-token",
+        type: "boolean",
+        summary: "Read the token from stdin (the default when stdin is not a terminal)",
+      },
+    ],
+    json: true,
+    database: "never",
+    interactive: true,
+    examples: ['printf %s "$TOKEN" | graft login https://cms.example.com --with-token'],
+  },
+  {
+    path: ["logout"],
+    group: "remote",
+    summary: "Forget a site's token on this computer",
+    description: [
+      "Remove a site's saved token (default: the default site). The token itself keeps",
+      "working until someone revokes it in Studio under Developer, Agents.",
+    ],
+    args: [{ name: "url" }],
+    flags: [],
+    json: true,
+    database: "never",
+  },
+  {
+    path: ["auth", "status"],
+    group: "remote",
+    summary: "Check each saved token against its site",
+    description: [
+      "List every site the CLI can reach, from graft login and GRAFT_URL, and check each",
+      "token against the site. Tokens are shown by their first characters only.",
+    ],
+    flags: [],
+    json: true,
+    database: "never",
+    exitCodes: [
+      { code: 0, meaning: "At least one token works, or --json was given" },
+      { code: 4, meaning: "No token works, or there is none" },
+    ],
+  },
+  {
+    path: ["auth", "token"],
+    group: "remote",
+    summary: "Print a site's saved token, for piping into another tool",
+    args: [{ name: "url" }],
+    flags: [],
+    database: "never",
+  },
+  {
+    path: ["api"],
+    group: "remote",
+    summary: "Call any Studio API route on a hosted site with the saved token",
+    description: [
+      "Call a route on the site in GRAFT_URL, or the one graft login saved. A path is",
+      "under /api/studio/v1 unless it starts with /api/fn or /api/content/v1. Fields",
+      "make the request a POST with a JSON body; with -X GET or --paginate they become",
+      "the query string. Prints the answer; with no path, lists the routes.",
+    ],
+    args: [{ name: "path" }],
+    flags: [
+      {
+        name: "method",
+        short: "X",
+        type: "string",
+        value: "<method>",
+        example: "PUT",
+        summary:
+          "The HTTP method (default: GET, or POST when there are fields or --input, unless --paginate)",
+      },
+      {
+        name: "raw-field",
+        short: "f",
+        type: "string",
+        value: "<key=value>",
+        example: "collection=posts",
+        multiple: true,
+        summary: "A field whose value is sent as a string",
+      },
+      {
+        name: "field",
+        short: "F",
+        type: "string",
+        value: "<key=value>",
+        example: "limit=10",
+        multiple: true,
+        summary:
+          "A field whose value is typed: true, false, null and numbers as JSON, @file and @- as the file's text",
+      },
+      {
+        name: "header",
+        short: "H",
+        type: "string",
+        value: "<name: value>",
+        example: "'accept: application/json'",
+        multiple: true,
+        summary: "An extra request header",
+      },
+      {
+        name: "input",
+        type: "string",
+        value: "<file|->",
+        example: "body.json",
+        summary: "Send this file as the body; - reads stdin",
+      },
+      {
+        name: "include",
+        short: "i",
+        type: "boolean",
+        summary: "Print the status line and headers before the body",
+      },
+      {
+        name: "paginate",
+        type: "boolean",
+        summary: "GET every page, following nextCursor, and print each one",
+      },
+      {
+        name: "yes",
+        short: "y",
+        type: "boolean",
+        summary: "Go ahead with -X DELETE",
+      },
+    ],
+    database: "never",
+    examples: [
+      "graft api workspace",
+      "graft api entries -X GET -f collection=posts -F limit=20",
+      "graft api entries -f collection=posts --paginate",
+      "graft api -X PUT entry --input entry.json",
+    ],
+  },
+
   // Learn the CLI
   {
     path: ["help"],
@@ -1027,6 +1191,16 @@ export const JSON_FLAG: FlagSpec = {
   type: "boolean",
   summary: "Print one JSON object on stdout; messages go to stderr",
 };
+export const REMOTE_FLAG: FlagSpec = {
+  name: "remote",
+  type: "boolean",
+  summary: "Work on the hosted site in GRAFT_URL, or the one graft login saved",
+};
+export const LOCAL_FLAG: FlagSpec = {
+  name: "local",
+  type: "boolean",
+  summary: "Work on the project in this folder, even when GRAFT_URL is set",
+};
 export const NO_INPUT_FLAG: FlagSpec = {
   name: "no-input",
   type: "boolean",
@@ -1045,6 +1219,7 @@ export function flagsOf(spec: CommandSpec): FlagSpec[] {
     ...spec.flags,
     ...(spec.json ? [JSON_FLAG] : []),
     ...(spec.interactive ? [NO_INPUT_FLAG] : []),
+    ...(spec.remote ? [REMOTE_FLAG, LOCAL_FLAG] : []),
     HELP_FLAG,
   ];
 }

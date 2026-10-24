@@ -3,7 +3,7 @@
 # Source: packages/cli/src/registry.ts and topics.ts, read through `graft commands --json`
 # Regenerate: pnpm docs:cli
 title: CLI reference
-description: "Every graft command, its arguments and flags, grouped by task. 51 commands."
+description: "Every graft command, its arguments and flags, grouped by task. 56 commands."
 section: Reference
 order: 0
 ---
@@ -158,13 +158,15 @@ Needs no database. Prints its answer as JSON with `--json`.
 List every document; the same as graft content list.
 
 ```text
-graft content [--branch <id>] [--json]
+graft content [--branch <id>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -173,13 +175,15 @@ Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints i
 List documents with their slug, title and file. Reads the content files, or the database in a project whose content is kept there.
 
 ```text
-graft content list [collection] [--branch <id>] [--json]
+graft content list [collection] [--branch <id>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -188,13 +192,15 @@ Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints i
 Print one document: its frontmatter, then its body, the way the file reads. With --json, the collection, slug, file path, data and body.
 
 ```text
-graft content get <collection/slug> [--branch <id>] [--json]
+graft content get <collection/slug> [--branch <id>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -207,7 +213,7 @@ graft content get posts/launch > launch.mdx
 Search with words, "quoted phrases", or and -exclusions. Searches the compiled index, so results are as fresh as the last compile.
 
 ```text
-graft content search <query...> [--branch <id>] [--collection <name>] [--limit <n>] [--json]
+graft content search <query...> [--branch <id>] [--collection <name>] [--limit <n>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
@@ -216,6 +222,8 @@ graft content search <query...> [--branch <id>] [--collection <name>] [--limit <
 | `--collection <name>` | Search one collection (default: all). |
 | `--limit <n>` | Most matches to print, best first (default: 20). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -228,7 +236,7 @@ graft content search pricing "free tier" --collection pages
 Write a document from an MDX file (--file), or from frontmatter as JSON (--data) and an optional body (--body-file). It is checked against the collection's schema and compiled, exactly as an agent's write_content is. A project whose content is kept in the database saves it as a draft.
 
 ```text
-graft content write <collection/slug> [--branch <id>] [--file <doc.mdx|->] [--data <json>] [--body-file <file|->] [--json]
+graft content write <collection/slug> [--branch <id>] [--file <doc.mdx|->] [--data <json>] [--body-file <file|->] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
@@ -238,6 +246,8 @@ graft content write <collection/slug> [--branch <id>] [--file <doc.mdx|->] [--da
 | `--data <json>` | The frontmatter as a JSON object; - reads it from stdin. |
 | `--body-file <file\|->` | The body, with --data; - reads it from stdin. |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -251,7 +261,7 @@ graft content write posts/launch --file launch.mdx
 Set one frontmatter field on each document named, each written as graft content write would. One document that fails does not stop the others. --value null removes the field.
 
 ```text
-graft content set <collection> <slug...> [--branch <id>] [--field <name>] [--value <json>] [--json]
+graft content set <collection> <slug...> [--branch <id>] [--field <name>] [--value <json>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
@@ -260,6 +270,8 @@ graft content set <collection> <slug...> [--branch <id>] [--field <name>] [--val
 | `--field <name>` | The frontmatter field to set. |
 | `--value <json>` | The new value as JSON; text that is not JSON is taken as a string. |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -276,7 +288,7 @@ graft content set posts launch roadmap --field tags --value '["2026"]'
 Delete a document. The first run files an approval and exits 3 with its id. After a person runs graft approve \<id>, run it again with --approval \<id>.
 
 ```text
-graft content delete <collection/slug> [--branch <id>] [--approval <id>] [--json]
+graft content delete <collection/slug> [--branch <id>] [--approval <id>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
@@ -284,6 +296,8 @@ graft content delete <collection/slug> [--branch <id>] [--approval <id>] [--json
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 | `--approval <id>` | The approval a person granted for this delete. |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -326,13 +340,15 @@ graft asset put ./hero.png assets/hero.png
 List unpublished drafts, for content kept in the database.
 
 ```text
-graft drafts [--branch <id>] [--json]
+graft drafts [--branch <id>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
 
@@ -341,7 +357,7 @@ Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
 Publish drafts by path (from graft drafts). On a site that reviews changes, this asks for a review instead. A path someone else published since is refused with CONTENT_CONFLICT; --resolve \<path>=mine or =theirs settles it.
 
 ```text
-graft drafts publish <path...> [--branch <id>] [--message <text>] [--resolve <path>=mine|theirs]... [--json]
+graft drafts publish <path...> [--branch <id>] [--message <text>] [--resolve <path>=mine|theirs]... [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
@@ -350,6 +366,8 @@ graft drafts publish <path...> [--branch <id>] [--message <text>] [--resolve <pa
 | `--message <text>` | The commit or review title. |
 | `--resolve <path>=mine\|theirs` | Settle a conflict on one path. Repeat it for more than one. |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
 
@@ -358,13 +376,15 @@ Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
 Throw away drafts, back to the published version.
 
 ```text
-graft drafts discard <path...> [--branch <id>] [--json]
+graft drafts discard <path...> [--branch <id>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
 
@@ -375,13 +395,15 @@ Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
 Print each collection's fields, and the typed functions.
 
 ```text
-graft schema [collection] [--branch <id>] [--json]
+graft schema [collection] [--branch <id>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -390,13 +412,15 @@ Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints i
 List the typed functions.
 
 ```text
-graft fn [--branch <id>] [--json]
+graft fn [--branch <id>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -405,13 +429,15 @@ Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints i
 Print one function's input schema and access rules.
 
 ```text
-graft fn describe <name> [--branch <id>] [--json]
+graft fn describe <name> [--branch <id>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -420,7 +446,7 @@ Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints i
 Run a function through the same checks as POST /api/fn/\<name>: input validation, access rules, rate limits, the audit log, and the approval a destructive function needs (exit 3, then --approval \<id>).
 
 ```text
-graft fn run <name> [--branch <id>] [--input <json|->] [--approval <id>] [--json]
+graft fn run <name> [--branch <id>] [--input <json|->] [--approval <id>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
@@ -429,6 +455,8 @@ graft fn run <name> [--branch <id>] [--input <json|->] [--approval <id>] [--json
 | `--input <json\|->` | The input as a JSON object; - reads it from stdin (default: \{}). |
 | `--approval <id>` | The approval a person granted for this call. |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -455,13 +483,15 @@ graft explain SCHEMA_VALIDATION_FAILED
 List the MCP tools an agent sees for this project.
 
 ```text
-graft mcp tools [--branch <id>] [--json]
+graft mcp tools [--branch <id>] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
 | --- | --- |
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -470,7 +500,7 @@ Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints i
 Call any MCP tool by name, as an agent would.
 
 ```text
-graft mcp call <tool> [--branch <id>] [--input <json|->] [--json]
+graft mcp call <tool> [--branch <id>] [--input <json|->] [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
@@ -478,6 +508,8 @@ graft mcp call <tool> [--branch <id>] [--input <json|->] [--json]
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 | `--input <json\|->` | The tool's input as a JSON object; - reads it from stdin (default: \{}). |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Prints its answer as JSON with `--json`.
 
@@ -704,12 +736,14 @@ Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
 List actions waiting for a person to approve them.
 
 ```text
-graft approvals [--json]
+graft approvals [--json] [--remote] [--local]
 ```
 
 | Flag | What it does |
 | --- | --- |
 | `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--remote` | Work on the hosted site in GRAFT_URL, or the one graft login saved. |
+| `--local` | Work on the project in this folder, even when GRAFT_URL is set. |
 
 Needs `DATABASE_URL`. Prints its answer as JSON with `--json`.
 
@@ -854,6 +888,99 @@ graft ci init [--overwrite]
 
 Needs no database.
 
+## Work with a hosted site
+
+### `graft login`
+
+Check a token against a hosted Graft site and save it, so commands that take --remote and graft api can use it. Make the token in Studio under Developer, Agents. It is read from stdin, or asked for without echoing it, never taken as an argument. No token can approve or deny an action.
+
+```text
+graft login <url> [--with-token] [--json] [--no-input]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--with-token` | Read the token from stdin (the default when stdin is not a terminal). |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+| `--no-input` | Never stop to ask a question. Same as `GRAFT_PROMPT_DISABLED`. |
+
+Needs no database. Prints its answer as JSON with `--json`. May ask questions on a terminal; `--no-input` never does.
+
+```sh
+printf %s "$TOKEN" | graft login https://cms.example.com --with-token
+```
+
+### `graft logout`
+
+Remove a site's saved token (default: the default site). The token itself keeps working until someone revokes it in Studio under Developer, Agents.
+
+```text
+graft logout [url] [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs no database. Prints its answer as JSON with `--json`.
+
+### `graft auth status`
+
+List every site the CLI can reach, from graft login and GRAFT_URL, and check each token against the site. Tokens are shown by their first characters only.
+
+```text
+graft auth status [--json]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--json` | Print one JSON object on stdout; messages go to stderr. |
+
+Needs no database. Prints its answer as JSON with `--json`.
+
+| Exit code | What it means |
+| --- | --- |
+| `0` | At least one token works, or --json was given. |
+| `4` | No token works, or there is none. |
+
+### `graft auth token`
+
+Print a site's saved token, for piping into another tool.
+
+```text
+graft auth token [url]
+```
+
+Needs no database.
+
+### `graft api`
+
+Call a route on the site in GRAFT_URL, or the one graft login saved. A path is under /api/studio/v1 unless it starts with /api/fn or /api/content/v1. Fields make the request a POST with a JSON body; with -X GET or --paginate they become the query string. Prints the answer; with no path, lists the routes.
+
+```text
+graft api [path] [--method <method>] [--raw-field <key=value>]... [--field <key=value>]... [--header <name: value>]... [--input <file|->] [--include] [--paginate] [--yes]
+```
+
+| Flag | What it does |
+| --- | --- |
+| `-X, --method <method>` | The HTTP method (default: GET, or POST when there are fields or --input, unless --paginate). |
+| `-f, --raw-field <key=value>` | A field whose value is sent as a string. Repeat it for more than one. |
+| `-F, --field <key=value>` | A field whose value is typed: true, false, null and numbers as JSON, @file and @- as the file's text. Repeat it for more than one. |
+| `-H, --header <name: value>` | An extra request header. Repeat it for more than one. |
+| `--input <file\|->` | Send this file as the body; - reads stdin. |
+| `-i, --include` | Print the status line and headers before the body. |
+| `--paginate` | GET every page, following nextCursor, and print each one. |
+| `-y, --yes` | Go ahead with -X DELETE. |
+
+Needs no database.
+
+```sh
+graft api workspace
+graft api entries -X GET -f collection=posts -F limit=20
+graft api entries -f collection=posts --paginate
+graft api -X PUT entry --input entry.json
+```
+
 ## Learn the CLI
 
 ### `graft help`
@@ -906,6 +1033,9 @@ These change how the CLI behaves. Your project's own settings are on the
 | --- | --- |
 | `DATABASE_URL` | The Postgres database. Read from the environment, or from `.env` in this folder or any folder above it. |
 | `GRAFT_DEBUG` | Set to 1 to print the stack trace of an unexpected error. |
+| `GRAFT_URL` | A hosted site for commands that take --remote; when set, they use it without the flag. Read from the environment only, never from `.env`. |
+| `GRAFT_TOKEN` | The token for GRAFT_URL, instead of the one `graft login` saved. |
+| `XDG_CONFIG_HOME` | Where `graft login` keeps tokens, under `graft/hosts.json` (default: `~/.config`). |
 | `GRAFT_PROMPT_DISABLED` | Set to 1 to never ask a question, as `--no-input` does. |
 | `GRAFT_NO_UPDATE_CHECK` | Set to 1 to never check npm for a newer Graft. Also read from `.env`. |
 | `CI` | When set, the update check is off. |
@@ -924,4 +1054,4 @@ Graft reads `.env` from the current folder or any folder above it.
 - **Always need `DATABASE_URL`:** `graft compilations`, `graft drafts`, `graft drafts publish`, `graft drafts discard`, `graft serve`, `graft content import`, `graft pull`, `graft push`, `graft mirror`, `graft db migrate`, `graft migrate`, `graft harden`, `graft approvals`, `graft approve`, `graft deny`, `graft branch`, `graft branch create`, `graft branch drop`, `graft merge`.
 - **Need it on the Postgres engine only:** `graft compile`, `graft dev`, `graft content`, `graft content list`, `graft content get`, `graft content search`, `graft content write`, `graft content set`, `graft content delete`, `graft schema`, `graft fn`, `graft fn describe`, `graft fn run`, `graft mcp tools`, `graft mcp call`, `graft mcp`.
 - **Use it when it is set:** `graft doctor`, `graft studio`.
-- **Never need it:** `graft create`, `graft init`, `graft add`, `graft check`, `graft asset put`, `graft explain`, `graft studio invite`, `graft studio setup-code`, `graft db claim`, `graft ci changes`, `graft ci skip-build`, `graft ci init`, `graft help`, `graft commands`.
+- **Never need it:** `graft create`, `graft init`, `graft add`, `graft check`, `graft asset put`, `graft explain`, `graft studio invite`, `graft studio setup-code`, `graft db claim`, `graft ci changes`, `graft ci skip-build`, `graft ci init`, `graft login`, `graft logout`, `graft auth status`, `graft auth token`, `graft api`, `graft help`, `graft commands`.

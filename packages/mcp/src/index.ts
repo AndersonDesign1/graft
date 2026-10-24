@@ -27,10 +27,13 @@ export { ERROR_KNOWLEDGE, explainCode, type ErrorExplanation } from "./explain";
 export {
   connectClient,
   connectInProcess,
+  connectRemote,
   isToolObject,
+  remoteError,
   toolResultToGraftError,
   type ToolClient,
   type ToolInfo,
+  type RemoteOptions,
   type ToolObject,
   type ToolValue,
 } from "./client";

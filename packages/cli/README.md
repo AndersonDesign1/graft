@@ -86,6 +86,11 @@ export const index = "postgres";
 | `graft ci changes`        | Print content-only=true when only content changed                              |
 | `graft ci skip-build`     | Exit 0 when a deploy can be skipped                                            |
 | `graft ci init`           | Write a workflow that runs graft check on content changes                      |
+| `graft login`             | Save a token for a hosted site, for --remote and graft api                     |
+| `graft logout`            | Forget a site's token on this computer                                         |
+| `graft auth status`       | Check each saved token against its site                                        |
+| `graft auth token`        | Print a site's saved token, for piping into another tool                       |
+| `graft api`               | Call any Studio API route on a hosted site with the saved token                |
 | `graft help`              | Show help for a command or a topic                                             |
 | `graft commands`          | List every command; --json describes each one and its flags                    |
 

@@ -74,6 +74,33 @@ About a third of `graft check` is still module loading, and another third is
 parsing MDX with micromark. Bundling the MDX parser into the CLI is the next
 thing to measure.
 
+## Content commands are the MCP tools
+
+`graft content`, `graft schema`, `graft drafts`, `graft fn` and `graft mcp call`
+run the project's MCP tools by name, through `ToolClient` from
+`@usegraft/mcp`, rather than calling the compiler themselves. In this folder
+the server runs in the CLI's own process (`project-mcp.ts`, which `graft mcp`
+also uses); with `--remote` it is the hosted site's `/api/mcp`. Either way
+the command and the agent's tool cannot disagree: same validation, scopes,
+compile and approval gate, and `--json` is the tool's answer verbatim.
+
+## A hosted site
+
+- **Choosing the site.** `--local` wins, then `--remote`, then `GRAFT_URL`
+  alone, else the folder's project. `GRAFT_URL` and `GRAFT_TOKEN` come from the
+  real environment only, never `.env`. There is no file that binds a folder to
+  a site: a folder silently pointed at production is how a write lands where
+  nobody meant it to.
+- **Tokens.** `graft login` takes a Studio agent token from stdin or a prompt
+  that does not echo, checks it against `/api/studio/v1/workspace`, and saves
+  it in `hosts.json` (directory 0700, file 0600, written whole and renamed).
+  Output shows a token by its first characters only. No keychain dependency.
+- **The human gate holds.** No agent token carries `approvals:decide`, so a
+  remote delete exits 3 and a person approves it on the site.
+- **`graft api`** reaches `/api/studio/v1`, `/api/fn` and `/api/content/v1` on
+  the logged-in site only: no other origin, no `..`, no redirects followed,
+  and never `/api/mcp`, which `graft mcp call` speaks properly.
+
 ## Left out on purpose
 
 - **No built-in JSON filter.** `jq` already does it, and a second query
@@ -81,4 +108,8 @@ thing to measure.
 - **No automatic JSON when stdout is not a terminal.** CI logs are read by
   people. A program asks for JSON with `--json`.
 - **No secrets as flag values.** They end up in shell history and in `ps`. A
-  test refuses any flag whose name looks like a token, secret, password or key.
+  test refuses any flag that takes a value and whose name looks like a token,
+  secret, password or key.
+- **No browser login yet.** A person's own token, with their role's scopes,
+  would need a Studio route that issues one. Agent tokens cover scripts and CI
+  today.

@@ -27,7 +27,7 @@ describe("the command registry", () => {
   it("never takes a secret as a flag value, where it would land in shell history and ps", () => {
     const secretish = COMMANDS.flatMap((spec) =>
       flagsOf(spec)
-        .filter((flag) => /token|secret|password|key$/i.test(flag.name))
+        .filter((flag) => flag.type !== "boolean" && /token|secret|password|key$/i.test(flag.name))
         .map((flag) => `graft ${commandId(spec)} --${flag.name}`),
     );
     expect(secretish).toEqual([]);

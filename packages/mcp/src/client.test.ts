@@ -3,12 +3,21 @@
  * over a real content directory, called by name.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GraftError } from "@usegraft/contracts";
 import { defineCollection, field } from "@usegraft/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { connectInProcess, toolResultToGraftError, type ToolClient } from "./client";
+import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import {
+  connectInProcess,
+  connectRemote,
+  remoteError,
+  toolResultToGraftError,
+  type ToolClient,
+} from "./client";
+import { createGraftMcpHandler } from "./http";
 import { createGraftMcp } from "./server";
 import { fail } from "./tool-result";
 
@@ -75,6 +84,80 @@ describe("connectInProcess", () => {
   });
 });
 
+describe("connectRemote", () => {
+  const TOKEN = "graft_at_client-test";
+  let server: Server;
+  let origin: string;
+
+  beforeAll(async () => {
+    const handler = createGraftMcpHandler({
+      name: "graft",
+      contentDir: join(dir, "content"),
+      collections,
+      staticIndexPath: join(dir, ".graft", "index.db"),
+      actor: (request) =>
+        request.headers.get("authorization") === `Bearer ${TOKEN}`
+          ? { kind: "agent", id: "client-test", scopes: ["content:write"] }
+          : { kind: "anonymous" },
+    });
+    // A hosted site's /api/mcp, served over real HTTP.
+    server = createServer(async (incoming, outgoing) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of incoming) chunks.push(Buffer.from(chunk));
+      const headers = new Headers();
+      for (const [name, value] of Object.entries(incoming.headers)) {
+        if (typeof value === "string") headers.set(name, value);
+      }
+      const init: RequestInit = { method: incoming.method ?? "GET", headers };
+      if (chunks.length > 0) init.body = Buffer.concat(chunks);
+      const response = await handler(new Request(`http://127.0.0.1${incoming.url ?? "/"}`, init));
+      outgoing.writeHead(response.status, Object.fromEntries(response.headers));
+      outgoing.end(Buffer.from(await response.arrayBuffer()));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    origin = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
+  });
+
+  afterAll(async () => {
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  it("calls a tool on the site with the token", async () => {
+    const remote = await connectRemote({ origin, token: TOKEN });
+    try {
+      expect(await remote.call("get_content", { collection: "pages", slug: "home" })).toMatchObject(
+        { collection: "pages", slug: "home", data: { title: "Home" } },
+      );
+      expect((await remote.tools()).map((tool) => tool.name)).toContain("get_content");
+      await expect(
+        remote.call("get_content", { collection: "pages", slug: "missing" }),
+      ).rejects.toMatchObject({ code: "DOCUMENT_NOT_FOUND" });
+    } finally {
+      await remote.close();
+    }
+  });
+
+  it("is TOKEN_INVALID when the site refuses the token", async () => {
+    await expect(connectRemote({ origin, token: "graft_at_wrong" })).rejects.toMatchObject({
+      code: "TOKEN_INVALID",
+      details: { origin, status: 401 },
+    });
+  });
+
+  it("is REMOTE_UNREACHABLE when nothing answers", async () => {
+    const closed = createServer();
+    await new Promise<void>((resolve) => closed.listen(0, "127.0.0.1", resolve));
+    const address = closed.address();
+    await new Promise((resolve) => closed.close(resolve));
+    const gone = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
+    await expect(connectRemote({ origin: gone, token: TOKEN })).rejects.toMatchObject({
+      code: "REMOTE_UNREACHABLE",
+      details: { origin: gone },
+    });
+  });
+});
+
 describe("toolResultToGraftError", () => {
   it("rebuilds the error fail() sent, field for field", () => {
     const original = new GraftError({
@@ -95,5 +178,26 @@ describe("toolResultToGraftError", () => {
     });
     expect(error.code).toBe("INPUT_VALIDATION_FAILED");
     expect(error.message).toBe("Input validation error: slug is required");
+  });
+});
+
+describe("remoteError", () => {
+  it("is TOKEN_INVALID when the site refuses the token", () => {
+    const error = remoteError(
+      new StreamableHTTPError(401, "Unauthorized"),
+      "https://cms.example.com",
+    );
+    expect(error).toMatchObject({ code: "TOKEN_INVALID", details: { status: 401 } });
+  });
+
+  it("is REMOTE_UNREACHABLE when the site cannot be reached", () => {
+    const error = remoteError(new TypeError("fetch failed"), "https://cms.example.com");
+    expect(error).toMatchObject({ code: "REMOTE_UNREACHABLE" });
+    expect(error.message).toContain("https://cms.example.com/api/mcp");
+  });
+
+  it("passes a tool's own GraftError through", () => {
+    const original = new GraftError({ code: "DOCUMENT_NOT_FOUND", message: "No such document." });
+    expect(remoteError(original, "https://cms.example.com")).toBe(original);
   });
 });

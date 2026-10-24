@@ -119,6 +119,14 @@ runs. [Auth](/docs/auth) covers setting up the providers Graft trusts.
 An agent that holds a user's token can act as that user for a single call by
 passing it as the `authorization` argument to `run_function`.
 
+### Agents that run shell commands
+
+An agent that works in a terminal can use the graft CLI instead of an MCP
+connection. `graft content`, `graft schema` and `graft fn` run the same tools,
+`--json` prints exactly what each tool returns, and `--remote` sends them to a
+hosted site with a token saved by `graft login`. See
+[Script the CLI](/docs/cli).
+
 ### Anonymous agents
 
 Whether an agent without a token is allowed depends on where the server

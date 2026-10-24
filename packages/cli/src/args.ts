@@ -213,11 +213,23 @@ export function parseCommand(spec: CommandSpec, rest: readonly string[]): Parsed
 function unknownFlag(spec: CommandSpec, declared: readonly FlagSpec[], typed: string): UsageError {
   const names = declared.map((flag) => `--${flag.name}`);
   // Only a long flag can be a misspelling of a long flag; `-x` has no near miss.
-  const suggestion = typed.startsWith("--") ? closest(typed, names) : undefined;
+  const hosted = typed === "--remote" || typed === "--local";
+  const suggestion = typed.startsWith("--") && !hosted ? closest(typed, names) : undefined;
   const noJson = typed === "--json" ? `graft ${commandId(spec)} has no JSON output. ` : "";
+  // Name the families, not all seventeen commands: graft content, graft drafts…
+  const families = [
+    ...new Set(
+      COMMANDS.filter((other) => other.remote).map((other) =>
+        other.path[0] === "mcp" ? `graft ${commandId(other)}` : `graft ${other.path[0]}`,
+      ),
+    ),
+  ];
+  const remote = hosted
+    ? `graft ${commandId(spec)} works on the project in this folder only. ${typed} works with: ${families.join(", ")}. `
+    : "";
   return new UsageError(
     `unknown option "${typed}" for graft ${commandId(spec)}.`,
-    `${didYouMean(suggestion)}${noJson}${helpFix(spec)}`,
+    `${didYouMean(suggestion)}${noJson}${remote}${helpFix(spec)}`,
     suggested({ command: commandId(spec), flag: typed }, suggestion),
   );
 }

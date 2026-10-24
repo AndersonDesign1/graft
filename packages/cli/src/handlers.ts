@@ -233,12 +233,17 @@ const handlers = {
     const ref = required(ctx, 0);
     const id = parseDocumentId(ref, "content delete");
     const approval = ctx.flags.string("approval");
-    const answer = await runTools(ctx, async (tools) => {
+    const answer = await runTools(ctx, async (tools, where) => {
       try {
         const input = approval === undefined ? id : { ...id, approval };
         return asObject(await tools.call("delete_content", input), "delete_content");
       } catch (error) {
-        return rethrowWithRetry(error, retryCommand(["content", "delete", ref], branchOf(ctx)));
+        return rethrowWithRetry(
+          error,
+          retryCommand(["content", "delete", ref], branchOf(ctx)),
+          // The site the call went to, however it was chosen (--remote or GRAFT_URL).
+          where.remote !== undefined,
+        );
       }
     });
     if (!ctx.json) console.log(`Deleted ${id.collection}/${id.slug}.`);
@@ -355,14 +360,19 @@ const handlers = {
     };
     const approval = ctx.flags.string("approval");
     if (approval !== undefined) input.approval = approval;
-    const answer = await runTools(ctx, async (tools) => {
+    const answer = await runTools(ctx, async (tools, where) => {
       try {
         return asObject(await tools.call("run_function", input), "run_function");
       } catch (error) {
         // The parsed input, not what was typed: `--input -` read stdin once.
         const words = ["fn", "run", name];
         if (raw !== undefined) words.push("--input", JSON.stringify(input.input));
-        return rethrowWithRetry(error, retryCommand(words, branchOf(ctx)));
+        return rethrowWithRetry(
+          error,
+          retryCommand(words, branchOf(ctx)),
+          // The site the call went to, however it was chosen (--remote or GRAFT_URL).
+          where.remote !== undefined,
+        );
       }
     });
     if (!ctx.json) console.log(JSON.stringify(answer, null, 2));
@@ -566,6 +576,15 @@ const handlers = {
 
   async approvals(ctx) {
     const { approvalsListCommand, formatApproval } = await import("./commands/approvals");
+    const site = await remoteSite(ctx);
+    if (site) {
+      const { withTools } = await import("./tool-runner");
+      const answer = await withTools({ cwd: ctx.cwd, remote: site }, (tools) =>
+        tools.call("list_approvals"),
+      );
+      if (!ctx.json) console.log(JSON.stringify(answer, null, 2));
+      return { data: typeof answer === "object" && answer !== null ? answer : { approvals: [] } };
+    }
     const pending = await approvalsListCommand({ cwd: ctx.cwd });
     const data = { approvals: pending };
     if (ctx.json) return { data };
@@ -677,6 +696,71 @@ const handlers = {
     }
   },
 
+  /* ---- work with a hosted site ----------------------------------------- */
+
+  async login(ctx) {
+    const { formatLogin, loginCommand } = await import("./commands/auth");
+    const result = await loginCommand({
+      url: required(ctx, 0),
+      withToken: ctx.flags.bool("with-token"),
+      noInput: ctx.noInput,
+    });
+    if (!ctx.json) for (const line of formatLogin(result)) console.log(line);
+    return { data: result };
+  },
+
+  async logout(ctx) {
+    const { logoutCommand } = await import("./commands/auth");
+    const result = logoutCommand(ctx.args[0]);
+    if (!ctx.json) {
+      console.log(
+        result.removed
+          ? `Logged out of ${result.origin}. The token keeps working until it is revoked in Studio under Developer, Agents.`
+          : `There was no saved token for ${result.origin}.`,
+      );
+    }
+    return { data: result };
+  },
+
+  async "auth status"(ctx) {
+    const { authStatusCommand, formatAuthStatus } = await import("./commands/auth");
+    const status = await authStatusCommand();
+    if (ctx.json) return { data: status };
+    for (const line of formatAuthStatus(status)) console.log(line);
+    return { data: status, exitCode: status.hosts.some((host) => host.valid) ? 0 : 4 };
+  },
+
+  async "auth token"(ctx) {
+    const { authTokenCommand } = await import("./commands/auth");
+    console.log(authTokenCommand(ctx.args[0]));
+  },
+
+  async api(ctx) {
+    const { apiCommand, apiRoutes } = await import("./commands/api");
+    const site = await apiSite();
+    const path = ctx.args[0];
+    if (path === undefined) {
+      for (const route of await apiRoutes(site.origin, site.token)) {
+        console.log(
+          `${route.method.padEnd(7)} ${route.path}${route.summary ? `  ${route.summary}` : ""}`,
+        );
+      }
+      return;
+    }
+    await apiCommand({
+      ...site,
+      path,
+      method: ctx.flags.string("method"),
+      rawFields: ctx.flags.list("raw-field"),
+      typedFields: ctx.flags.list("field"),
+      headers: ctx.flags.list("header"),
+      input: ctx.flags.string("input"),
+      include: ctx.flags.bool("include"),
+      paginate: ctx.flags.bool("paginate"),
+      yes: ctx.flags.bool("yes"),
+    });
+  },
+
   /* ---- learn the CLI ----------------------------------------------------- */
 
   async help(ctx) {
@@ -726,10 +810,46 @@ type RunInput = {
   approval?: string;
 };
 
-/** Where a tool command runs: the project in this folder, on the branch asked for. */
-function target(ctx: CommandContext): ToolTarget {
+/**
+ * Where a tool command runs: the project in this folder, on the branch asked
+ * for, or a hosted site (--remote, or GRAFT_URL).
+ */
+async function target(ctx: CommandContext): Promise<ToolTarget> {
   const branchId = branchOf(ctx);
+  const site = await remoteSite(ctx);
+  if (site) {
+    if (branchId !== undefined) {
+      throw new UsageError(
+        "--branch works on the project in this folder; a hosted site serves its own branch.",
+        "Drop --branch, or add --local to work on this folder's project.",
+        { flag: "--branch" },
+      );
+    }
+    return { cwd: ctx.cwd, remote: site };
+  }
   return branchId === undefined ? { cwd: ctx.cwd } : { cwd: ctx.cwd, branchId };
+}
+
+/** The hosted site this command was pointed at, if any. */
+async function remoteSite(
+  ctx: CommandContext,
+): Promise<{ origin: string; token: string } | undefined> {
+  const { resolveTarget } = await import("./remote/hosts");
+  const chosen = resolveTarget({
+    remote: ctx.flags.bool("remote"),
+    local: ctx.flags.bool("local"),
+  });
+  if (chosen.kind === "local") return undefined;
+  if (!ctx.json) console.error(`graft: using ${chosen.origin} (from ${chosen.source})`);
+  return { origin: chosen.origin, token: chosen.token };
+}
+
+/** The site `graft api` calls: always a hosted one. */
+async function apiSite(): Promise<{ origin: string; token: string }> {
+  const { resolveTarget } = await import("./remote/hosts");
+  const chosen = resolveTarget({ remote: true, local: false });
+  if (chosen.kind === "local") throw new Error("resolveTarget answered local for --remote.");
+  return { origin: chosen.origin, token: chosen.token };
 }
 
 async function listDocuments(
@@ -761,9 +881,14 @@ function resolutions(values: readonly string[]): Record<string, "mine" | "theirs
 }
 
 /** Run the project's MCP tools in this process; loaded only by the commands that use them. */
-async function runTools<T>(ctx: CommandContext, fn: (tools: ToolClient) => Promise<T>): Promise<T> {
+/** Run tools where the command points; `fn` also learns where that is. */
+async function runTools<T>(
+  ctx: CommandContext,
+  fn: (tools: ToolClient, where: ToolTarget) => Promise<T>,
+): Promise<T> {
   const { withTools } = await import("./tool-runner");
-  return withTools(target(ctx), fn);
+  const where = await target(ctx);
+  return withTools(where, (tools) => fn(tools, where));
 }
 
 /** A required argument; the parser has already refused a call without it. */

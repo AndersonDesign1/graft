@@ -4,12 +4,17 @@
  * The graft CLI's content commands are these tools run by name, so a command
  * and the tool an agent uses cannot drift apart: same validation, same scopes,
  * same answer. `connectInProcess` runs the server in the same process;
- * `connectClient` takes any transport, such as HTTP to a hosted deployment.
+ * `connectRemote` reaches a hosted deployment's /api/mcp with a bearer token;
+ * `connectClient` takes any other transport.
  *
  * A failed call comes back as the GraftError the tool threw (code, message,
  * fix, details), rebuilt from the JSON `fail()` sends.
  */
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -156,4 +161,62 @@ export async function connectInProcess(server: McpServer): Promise<ToolClient> {
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
   return connectClient(clientSide, () => server.close());
+}
+
+export interface RemoteOptions {
+  /** The site's origin, such as https://cms.example.com. */
+  origin: string;
+  /** A bearer token the site accepts, such as one made in Studio under Developer, Agents. */
+  token: string;
+}
+
+/**
+ * What a failed HTTP exchange means for the person at the terminal: a token
+ * the site refused (TOKEN_INVALID), or a site that could not be reached or is
+ * not Graft (REMOTE_UNREACHABLE). A GraftError from a tool passes through.
+ */
+export function remoteError(error: unknown, origin: string): GraftError {
+  if (error instanceof GraftError) return error;
+  const status = error instanceof StreamableHTTPError ? error.code : undefined;
+  const message = error instanceof Error ? error.message : String(error);
+  if (status === 401 || status === 403) {
+    return new GraftError({
+      code: "TOKEN_INVALID",
+      message: `${origin} refused the token (HTTP ${status}).`,
+      fix: `Run \`graft login ${origin}\` with a token made in Studio under Developer, Agents, or set GRAFT_TOKEN. A revoked token stops working at once.`,
+      details: { origin, status },
+    });
+  }
+  return new GraftError({
+    code: "REMOTE_UNREACHABLE",
+    message: `Could not use the MCP endpoint at ${origin}/api/mcp: ${message}`,
+    fix: "Check the address with `graft auth status`, and that the site runs graft serve. Log in again with `graft login <url>` if it moved.",
+    details: status === undefined ? { origin } : { origin, status },
+  });
+}
+
+/**
+ * A client for a hosted deployment's /api/mcp. Redirects are not followed, so
+ * the token is only ever sent to the origin it was given for.
+ */
+export async function connectRemote(options: RemoteOptions): Promise<ToolClient> {
+  const transport = new StreamableHTTPClientTransport(new URL("/api/mcp", options.origin), {
+    requestInit: {
+      headers: { authorization: `Bearer ${options.token}` },
+      redirect: "manual",
+    },
+  });
+  const guard = async <T>(work: () => Promise<T>): Promise<T> => {
+    try {
+      return await work();
+    } catch (error) {
+      throw remoteError(error, options.origin);
+    }
+  };
+  const client = await guard(() => connectClient(transport));
+  return {
+    call: (name, input) => guard(() => client.call(name, input)),
+    tools: () => guard(() => client.tools()),
+    close: () => client.close(),
+  };
 }

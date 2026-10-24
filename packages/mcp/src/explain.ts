@@ -557,6 +557,18 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Run the command again with GRAFT_DEBUG=1 to print the stack trace. If it points into graft.config.ts or your own code, fix it there; otherwise report it with the trace.",
   },
+  REMOTE_UNREACHABLE: {
+    code: "REMOTE_UNREACHABLE",
+    meaning:
+      "The graft CLI could not reach the hosted site it was pointed at, or the site answered with something other than Graft.",
+    typicalCauses: [
+      "A typo in the URL given to graft login or in GRAFT_URL",
+      "The site is down, or this computer has no network",
+      "The site does not run graft serve, so it has no /api/mcp or /api/studio/v1",
+    ],
+    howToRecover:
+      "Check the address with `graft auth status`, open it in a browser, and log in again with `graft login <url>` if it changed. Studio is served by `graft serve --studio`.",
+  },
 };
 
 /** Explanation for a code, or undefined if the code is unknown. */
