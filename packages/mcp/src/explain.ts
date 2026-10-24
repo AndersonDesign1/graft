@@ -534,6 +534,29 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Use the documented alternative (the error's `fix` names it if one exists), or accomplish the task by editing files directly — git is always a valid interface.",
   },
+  USAGE_INVALID: {
+    code: "USAGE_INVALID",
+    meaning:
+      "A graft command was called with an unknown command, flag or subcommand, a missing argument, or a flag without its value. Nothing ran.",
+    typicalCauses: [
+      "A typo in a command or flag name",
+      "A flag that belongs to a different command",
+      "A required argument left out, such as the branch name for graft merge",
+    ],
+    howToRecover:
+      "Read the `fix`, which names the closest match when there is one, then run `graft <command> --help` for the exact usage. `graft commands --json` lists every command and flag. The CLI exits 2 for this error.",
+  },
+  INTERNAL_ERROR: {
+    code: "INTERNAL_ERROR",
+    meaning:
+      "The graft CLI hit an error it does not recognize. It is a bug in Graft or in code the command loaded, not a mistake in how the command was called.",
+    typicalCauses: [
+      "A bug in Graft",
+      "graft.config.ts or a module it imports throwing an ordinary Error",
+    ],
+    howToRecover:
+      "Run the command again with GRAFT_DEBUG=1 to print the stack trace. If it points into graft.config.ts or your own code, fix it there; otherwise report it with the trace.",
+  },
 };
 
 /** Explanation for a code, or undefined if the code is unknown. */

@@ -3,7 +3,7 @@
 # Source: ERROR_KNOWLEDGE in packages/mcp/src/explain.ts
 # Regenerate: node scripts/gen-error-docs.mjs
 title: Error reference
-description: "Every Graft error code, what it means, and how to recover. 47 codes."
+description: "Every Graft error code, what it means, and how to recover. 49 codes."
 section: Reference
 order: 5
 ---
@@ -18,7 +18,7 @@ you can tell whether the fix applies or something else is wrong.
 Agents can read the same entries without leaving their tools: the
 `explain_error` MCP tool returns them for any code.
 
-There are 47 codes, listed alphabetically.
+There are 49 codes, listed alphabetically.
 
 ## Codes
 
@@ -402,6 +402,19 @@ A function invocation's input does not satisfy the function's Zod input schema.
 
 Fix the fields listed in `details.issues` and retry. describe_schema shows each function's exact input fields; an empty body is treated as \{}.
 
+### INTERNAL_ERROR
+
+The graft CLI hit an error it does not recognize. It is a bug in Graft or in code the command loaded, not a mistake in how the command was called.
+
+**Usually because**
+
+- A bug in Graft
+- graft.config.ts or a module it imports throwing an ordinary Error
+
+**How to recover**
+
+Run the command again with GRAFT_DEBUG=1 to print the stack trace. If it points into graft.config.ts or your own code, fix it there; otherwise report it with the trace.
+
 ### INVALID_SLUG
 
 A slug is not URL-safe kebab-case.
@@ -656,3 +669,17 @@ The caller's token does not permit this operation.
 **How to recover**
 
 Obtain a token with the required scope from the project owner; do not retry with the same credentials. If the function is meant to accept anonymous callers, its definition needs `public: true`.
+
+### USAGE_INVALID
+
+A graft command was called with an unknown command, flag or subcommand, a missing argument, or a flag without its value. Nothing ran.
+
+**Usually because**
+
+- A typo in a command or flag name
+- A flag that belongs to a different command
+- A required argument left out, such as the branch name for graft merge
+
+**How to recover**
+
+Read the `fix`, which names the closest match when there is one, then run `graft <command> --help` for the exact usage. `graft commands --json` lists every command and flag. The CLI exits 2 for this error.
