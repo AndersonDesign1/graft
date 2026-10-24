@@ -1,0 +1,177 @@
+---
+title: Script the CLI
+description: "Read graft's output from a script or an agent: JSON on stdout, errors as JSON on stderr, and an exit code that says what kind of failure it was."
+section: Reference
+order: 0.5
+---
+
+<p className="kicker">Run graft from a script or an agent and read exactly what happened.</p>
+
+Every graft command works the same way when a program runs it instead of a
+person. The data goes to stdout, messages go to stderr, and the exit code says
+whether it worked and, if not, what kind of failure it was. This page covers
+those rules. The [CLI reference](/docs/cli-reference) lists every command and
+flag.
+
+## Find a command and its flags
+
+`graft --help` lists the commands by task. `graft <command> --help` shows one
+command's usage, flags and examples, even when the rest of the line is
+incomplete. `graft help <command>` prints the same thing.
+
+```sh
+graft help branch create
+graft help exit-codes
+```
+
+The help topics are `exit-codes`, `json` and `environment`.
+
+An agent can learn the whole CLI in one call. `graft commands --json` prints
+every command with its usage, arguments, flags, whether it takes `--json`,
+and whether it needs a database.
+
+```sh
+graft commands --json
+```
+
+A command only takes the flags it declares. A misspelt or misplaced flag stops
+the command before it does anything, names the closest match, and exits 2:
+
+```text
+graft: unknown option "--jsno" for graft compile.
+Did you mean `--json`? Run `graft compile --help`.
+```
+
+## Get JSON instead of text
+
+Every command that prints data takes `--json`. It then prints one JSON object
+on stdout and nothing else. Progress and messages still print, on stderr, so a
+script can save stdout and a person can still read the log. The object is
+indented on a terminal and on one line when piped or redirected.
+
+```sh
+graft check --json
+```
+
+```json
+{"documents":1,"problems":[]}
+```
+
+Each command's entry in the [CLI reference](/docs/cli-reference) says whether
+it takes `--json`. Commands that run until you stop them (`graft dev`,
+`graft serve`, `graft studio`, `graft mcp`) do not.
+
+## Read a failure
+
+When a command run with `--json` fails, stderr gets one line of JSON with the
+same fields every Graft error has: the `error` code, a `message`, the `fix`
+that names the next step, and `details` when there are any. Stdout stays
+empty.
+
+```json
+{"error":"USAGE_INVALID","message":"unknown option \"--jsno\" for graft compile.","fix":"Did you mean `--json`? Run `graft compile --help`.","details":{"command":"compile","flag":"--jsno","suggestion":"--json"}}
+```
+
+Without `--json`, the same error prints for a person:
+
+```text
+error CONFIG_NOT_FOUND: No graft.config.{ts,js} found in /tmp or any parent directory.
+  fix: cd into a Graft project, or scaffold one here with `graft init`.
+```
+
+The [error reference](/docs/errors) explains every code.
+
+## Act on the exit code
+
+| Exit code | What it means | What to do |
+| --- | --- | --- |
+| `0` | It worked. | Nothing. |
+| `1` | It failed. | Read the error and its `fix`. |
+| `2` | The command was called wrong. Nothing ran. | Fix the command; retrying it as it is fails the same way. |
+| `3` | A person has to approve the action first. | A person runs `graft approve <id>`, then you repeat the action. |
+| `4` | The credential is missing, wrong, or lacks the access this needs. | Fix the credential before retrying. |
+
+`graft doctor`, `graft check` and `graft ci skip-build` use their own codes,
+listed in their reference entries. `graft ci skip-build`, for example, exits 0
+when the deploy can be skipped and 1 when it has to build.
+
+## Print what a compile changed
+
+`graft compile --json` prints the branch, the commit and what changed. The
+summary line goes to stderr. It works on both engines.
+
+```json
+{
+  "branch": "main",
+  "gitSha": "b8eb719a468be404bae9adca4fbea4d90c642411",
+  "changes": {
+    "added": ["posts/launch"],
+    "changed": ["pages/home"],
+    "removed": [],
+    "unchanged": 42
+  }
+}
+```
+
+`added`, `changed`, and `removed` are lists of `collection/slug` ids, and
+`unchanged` is a count. `gitSha` is `null` when the content is not in a git
+repository.
+
+On the static engine, a content change ships with a new deploy, so there is
+nothing to refresh. On the Postgres engine, writes from agents, Studio,
+`graft merge` and `graft migrate` call your app's revalidate route when
+`GRAFT_REVALIDATE_URL` and `GRAFT_WEBHOOK_SECRET` are both set. With the URL
+alone, these commands refuse to start. `graft compile` does not, because a deploy
+compiles before the new version is live. Send its output to the route yourself
+so the app refreshes only the pages that changed. A shell does not read `.env`,
+so export `GRAFT_WEBHOOK_SECRET` in the script's environment first:
+
+```sh
+graft compile --json > changes.json || exit 1
+curl --fail -X POST https://example.com/api/revalidate \
+  -H "Authorization: Bearer $GRAFT_WEBHOOK_SECRET" \
+  -H "content-type: application/json" \
+  --data-binary @changes.json
+```
+
+See [Refresh pages when content changes](/docs/next#refresh-pages-when-content-changes)
+for the route.
+
+## Stop the CLI from asking questions
+
+Only `graft create` and `graft db claim` ask questions, and only on a
+terminal. Pass `--no-input`, or set `GRAFT_PROMPT_DISABLED=1` for every
+command at once, and they never ask. `graft create` then takes the default
+for each question a flag did not answer. `graft db claim` says to run it again
+with `--url`.
+
+## Turn color off or on
+
+graft prints color only to a terminal. `NO_COLOR` turns it off everywhere.
+`TERM=dumb` and `CLICOLOR=0` turn it off too. `FORCE_COLOR` or
+`CLICOLOR_FORCE` turn it on when the output is not a terminal. Set
+`GRAFT_DEBUG=1` to print the stack trace of an unexpected error.
+
+## Update notice
+
+When a newer Graft is on npm, `graft` prints a notice on stderr after the
+command finishes. `graft dev`, `graft serve` and `graft studio` print it while
+they run. It names the new version, the version you have, and the
+[upgrade guide](/docs/upgrading). On a beta, the notice is yellow, because beta
+releases often include security fixes. On a stable release it is cyan.
+
+The CLI asks the registry at most once a day and caches the answer in
+`~/.cache/graft/update-check.json` (or under `XDG_CACHE_HOME`). It uses the
+registry in `npm_config_registry` when you set one. A slow or unreachable
+registry never fails or delays a command by more than 1.5 seconds.
+
+The check is off when `GRAFT_NO_UPDATE_CHECK=1` or `CI` is set, under
+`--json`, and for `graft mcp`, `graft help`, `graft commands`, `--help` and
+`--version`. `GRAFT_NO_UPDATE_CHECK=1` works in the environment or in the
+project's `.env`.
+
+## Next steps
+
+- [CLI reference](/docs/cli-reference): every command and flag.
+- [Error reference](/docs/errors): what each error code means and how to recover.
+- [Connecting agents](/docs/connecting-agents): give an agent the same operations over MCP.

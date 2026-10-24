@@ -79,6 +79,10 @@ jobs:
       # build, so a second hand-written copy would drift invisibly. Needs the
       # build above: it imports the built package.
       - run: pnpm check:error-docs
+      # The CLI reference and the README's command table are generated from
+      # the command registry, the same table `graft --help` reads. Needs the
+      # build above: it runs the built CLI's `graft commands --json`.
+      - run: pnpm check:cli-docs
       # The changelog page is merged from every package's CHANGELOG.md, which
       # only a version PR changes. `pnpm version-packages` regenerates it, so
       # this fails only when a CHANGELOG was edited by hand without it.
