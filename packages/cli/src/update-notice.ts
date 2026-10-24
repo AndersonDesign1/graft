@@ -160,7 +160,7 @@ function writeCache(file: string, entry: CacheEntry): void {
 /** Ask the registry in npm_config_registry (npm's own setting) for the dist-tags. */
 export async function fetchDistTags(env: NodeJS.ProcessEnv): Promise<DistTags> {
   const registry = (env.npm_config_registry || "https://registry.npmjs.org").replace(/\/+$/, "");
-  const response = await fetch(`${registry}/-/package/${PACKAGE.replace("/", "%2f")}/dist-tags`, {
+  const response = await fetch(`${registry}/-/package/${encodeURIComponent(PACKAGE)}/dist-tags`, {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     headers: { accept: "application/json" },
   });

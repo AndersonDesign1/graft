@@ -8,6 +8,7 @@ import {
   checkForUpdate,
   compareVersions,
   defaultCacheFile,
+  fetchDistTags,
   formatUpdateNotice,
   newerVersion,
   updateCheckDisabled,
@@ -156,6 +157,32 @@ describe("checkForUpdate", () => {
     expect(defaultCacheFile({ XDG_CACHE_HOME: "/x" })).toBe(
       join("/x", "graft", "update-check.json"),
     );
+  });
+});
+
+describe("fetchDistTags", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("asks npm_config_registry for the encoded package name and keeps only string tags", async () => {
+    const fetch = vi.fn(async (_url: string) =>
+      Response.json({ beta: "1.0.0-beta.9", latest: "1.0.0-beta.8", bogus: 3 }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const tags = await fetchDistTags({ npm_config_registry: "https://registry.example.com/" });
+    expect(fetch.mock.calls[0]?.[0]).toBe(
+      "https://registry.example.com/-/package/%40usegraft%2Fcli/dist-tags",
+    );
+    expect(tags).toEqual({ beta: "1.0.0-beta.9", latest: "1.0.0-beta.8" });
+  });
+
+  it("throws on a registry error, which checkForUpdate turns into no notice", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("", { status: 503 })),
+    );
+    await expect(fetchDistTags({})).rejects.toThrow("503");
   });
 });
 
