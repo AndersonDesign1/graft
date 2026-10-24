@@ -24,6 +24,16 @@ export {
   type GraftMcpHandlerOptions,
 } from "./http";
 export { ERROR_KNOWLEDGE, explainCode, type ErrorExplanation } from "./explain";
+export {
+  connectClient,
+  connectInProcess,
+  isToolObject,
+  toolResultToGraftError,
+  type ToolClient,
+  type ToolInfo,
+  type ToolObject,
+  type ToolValue,
+} from "./client";
 
 /**
  * Serve an MCP server over stdio (the transport agents' `.mcp.json` entries use).

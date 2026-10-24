@@ -61,6 +61,56 @@ Each command's entry in the [CLI reference](/docs/cli-reference) says whether
 it takes `--json`. Commands that run until you stop them (`graft dev`,
 `graft serve`, `graft studio`, `graft mcp`) do not.
 
+## Read and write content from the terminal
+
+The `graft content` commands run the same tools an agent calls over the Model
+Context Protocol (MCP), the open standard that lets agents use tools. They run
+them in the CLI's own process, so they check the schema, compile, and file
+approvals exactly as the agent's call would, and need no database on the
+static engine.
+
+Print a document as the file it is, change it, and write it back:
+
+```sh
+graft content get pages/home > home.mdx
+graft content write pages/home --file home.mdx
+```
+
+```text
+Wrote pages/home.mdx on branch "main": +0 added, ~1 changed, -0 removed.
+```
+
+`--file -` reads the document from stdin. To write frontmatter alone, pass it
+as JSON with `--data '{"title":"About"}'`, and the body with `--body-file`.
+
+Find documents, and change one field on several at once:
+
+```sh
+graft content search pricing --collection pages
+graft content set pages home about --field tagline --value '"Updated"'
+```
+
+`graft content set` writes each document the way `graft content write` does.
+One that fails is listed with its error and fix, the others are still saved,
+and the command exits 1.
+
+Deleting needs a person. The first run files an approval and exits 3, and its
+`fix` is the exact command to repeat:
+
+```text
+error DESTRUCTIVE_OP_REQUIRES_APPROVAL: "delete_content" is destructive and always requires human approval. An approval request has been filed.
+  fix: Ask a person to run `graft approve f9cb72bb-4b39-48e7-913b-9b9979da310e`, then run `graft content delete pages/about --approval f9cb72bb-4b39-48e7-913b-9b9979da310e`. The approval works once, for this exact call.
+```
+
+Approvals live in Postgres, so on the static engine `graft content delete`
+answers `NEEDS_DATABASE`: delete the file and compile instead.
+
+`graft schema` prints each collection's fields, `graft fn run` runs a typed
+function, `graft drafts` handles drafts where content is kept in the
+database, and `graft explain <code>` explains any error code. `graft mcp call`
+runs any other tool by name. The [MCP tools](/docs/mcp-tools#call-a-tool-from-the-terminal)
+page maps each tool to its command.
+
 ## Read a failure
 
 When a command run with `--json` fails, stderr gets one line of JSON with the
