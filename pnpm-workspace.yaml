@@ -71,6 +71,3 @@ minimumReleaseAgeExclude:
   - fumadocs-core
   - fumadocs-ui
   - "@fumadocs/*"
-  # body-parser 2.4.0 (published 2026-10-22) is the only fix for a high
-  # advisory. Temporary: remove this line once it is 3 days old (2026-10-25).
-  - body-parser
