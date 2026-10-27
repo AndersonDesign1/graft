@@ -19,7 +19,18 @@
       "inputs": ["$TURBO_DEFAULT$", "!.graft/index.db"]
     },
     "test": {
-      "inputs": ["$TURBO_DEFAULT$", "!.graft/index.db"]
+      // `test` also runs two root scripts, which turbo does not hash for this
+      // package on its own. Without them, a change to either test, or to the
+      // module it checks, replayed an old cached pass. Both import only their
+      // sibling module and build their own fixtures.
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!.graft/index.db",
+        "$TURBO_ROOT$/scripts/site-routes.mjs",
+        "$TURBO_ROOT$/scripts/site-routes.test.mjs",
+        "$TURBO_ROOT$/scripts/check-design.mjs",
+        "$TURBO_ROOT$/scripts/check-design.test.mjs"
+      ]
     }
   }
 }
