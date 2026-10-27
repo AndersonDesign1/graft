@@ -215,7 +215,11 @@ describe("GitHubStore: drafts", () => {
       "https://api.github.com",
     );
     expect(trimChar("🚀🚀a🚀", "🚀", "both")).toBe("a");
-    expect(performance.now() - started).toBeLessThan(200);
+    // A backtracking regex on these 200,000 characters is quadratic and takes
+    // several seconds; the linear version takes a few milliseconds. The bound
+    // sits between the two with room for a loaded CI runner: at 200 ms it
+    // failed whenever the machine was busy, which is noise, not a regression.
+    expect(performance.now() - started).toBeLessThan(2_000);
   });
 });
 

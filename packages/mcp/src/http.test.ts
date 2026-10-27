@@ -13,7 +13,7 @@ import type { Database } from "@usegraft/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createGraftMcpHandler, type GraftMcpHandler } from "./http";
+import { createDocsMcpHandler, createGraftMcpHandler, type GraftMcpHandler } from "./http";
 
 const collections = {
   pages: defineCollection({
@@ -343,5 +343,28 @@ describe("tools over HTTP", () => {
     const authed = await call({ authorization: "Bearer s3cret" });
     expect(authed.isError).toBe(false);
     expect(authed.payload.data).toEqual({ wrote: true });
+  });
+});
+
+describe("createDocsMcpHandler", () => {
+  // The public documentation endpoint, mounted with no authentication at all.
+  // What keeps that safe is the tool list, so check it through the real HTTP
+  // handler, not only on the server object it wraps.
+  it("serves the documentation tools over HTTP and none that write", async () => {
+    const docs = createDocsMcpHandler({ contentDir: dir, collections, db: untouchableDb });
+    const client = await connectClient(docs);
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    await client.close();
+    expect(names).toContain("get_content");
+    for (const name of ["write_content", "delete_content", "put_asset", "decide_approval"]) {
+      expect(names).not.toContain(name);
+    }
+  });
+
+  it("answers anything but POST with 405, like the full handler", async () => {
+    const docs = createDocsMcpHandler({ contentDir: dir, collections, db: untouchableDb });
+    const response = await docs(new Request("http://graft.test/mcp"));
+    expect(response.status).toBe(405);
+    expect(response.headers.get("allow")).toBe("POST");
   });
 });

@@ -18,6 +18,7 @@ Skills live in `.agents/skills/` (`.claude/skills` links to it).
 | Say a change works                          | `graft-verify`                          |
 | Touch anything a person sees                | `graft-design`, which reads `DESIGN.md` |
 | Write any words: docs, errors, commits, PRs | `graft-writing`                         |
+| Add, change, review or delete a test        | `graft-testing`                         |
 
 ## Facts that save you an hour
 
@@ -68,4 +69,7 @@ file is a candidate to move up into a check.
 | Studio padding, margins and gaps come from the `--space-*` scale                                                              | `pnpm check:design`                                                                        |
 | No em dashes in docs-site MDX prose, every `CodeBlock` has a title                                                            | `pnpm check:design`                                                                        |
 | Tests never reach live Neon, S3 or GitHub by accident                                                                         | `RUN_LIVE=1` gate on the live suites, and `.agents/skills/graft-verify/scripts/offline.sh` |
+| Tests await events, never sleep for a guessed duration                                                                        | `anti-slop/no-sleep-in-tests`                                                              |
+| A skipped test says why                                                                                                       | `anti-slop/no-unreasoned-test-skip`                                                        |
+| An integration test that needs a scratch database fails in CI instead of skipping                                             | `createScratchDatabase` and the scratch setups throw under `CI`                            |
 | Visual changes are rendered before they are claimed                                                                           | This file and `graft-design` only                                                          |

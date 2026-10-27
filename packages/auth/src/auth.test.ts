@@ -1,6 +1,7 @@
+import { createServer, type Server } from "node:http";
 import { GraftError } from "@usegraft/contracts";
 import { exportJWK, generateKeyPair, SignJWT, type JSONWebKeySet } from "jose";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { betterAuthIssuer, createOidcVerifier, type TrustedIssuer } from "./oidc";
 import { createActorResolver } from "./resolver";
 import { requireScopes } from "./scopes";
@@ -257,7 +258,70 @@ describe("subject claim", () => {
   });
 });
 
+/** What the local issuer's discovery endpoint answers with. */
+interface DiscoveryReply {
+  status: number;
+  body: Record<string, string>;
+}
+
+describe("OIDC discovery", () => {
+  // A local issuer: `/.well-known/openid-configuration` and `/jwks`, answering
+  // with whatever the test sets. The issuer URL is the server's own origin.
+  let server: Server;
+  let issuer: string;
+  let discovery: DiscoveryReply;
+
+  beforeAll(async () => {
+    server = createServer((req, res) => {
+      if (req.url === "/.well-known/openid-configuration") {
+        res.writeHead(discovery.status, { "content-type": "application/json" });
+        res.end(JSON.stringify(discovery.body));
+      } else if (req.url === "/jwks") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(jwks));
+      } else {
+        res.writeHead(404).end();
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (address === null || typeof address === "string") throw new Error("no TCP address");
+    issuer = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  it("finds the issuer's keys through its discovery document", async () => {
+    discovery = { status: 200, body: { jwks_uri: `${issuer}/jwks` } };
+    const verify = createOidcVerifier([{ issuer, audience: AUDIENCE }]);
+    await expect(verify(await mint({ issuer }))).resolves.toMatchObject({ id: "agent-1" });
+  });
+
+  it("refuses every token when discovery fails, rather than skipping the check", async () => {
+    discovery = { status: 404, body: {} };
+    const verify = createOidcVerifier([{ issuer, audience: AUDIENCE }]);
+    await expectTokenInvalid(verify(await mint({ issuer })), "OIDC discovery for issuer");
+  });
+
+  it("refuses every token when discovery names no key set", async () => {
+    discovery = { status: 200, body: {} };
+    const verify = createOidcVerifier([{ issuer, audience: AUDIENCE }]);
+    await expectTokenInvalid(verify(await mint({ issuer })), "publishes no jwks_uri");
+  });
+});
+
 describe("createOidcVerifier", () => {
+  it("refuses a token with no issuer claim", async () => {
+    const noIssuer = await new SignJWT({})
+      .setProtectedHeader({ alg: "RS256", kid: "test" })
+      .setAudience(AUDIENCE)
+      .setSubject("agent-1")
+      .setExpirationTime("5m")
+      .sign(privateKey);
+    const verify = createOidcVerifier([issuerWithInlineJwks()]);
+    await expectTokenInvalid(verify(noIssuer), "no `iss` claim");
+  });
+
   it("verifies directly given a token (unit seam for the MCP handler)", async () => {
     const verify = createOidcVerifier([issuerWithInlineJwks()]);
     const token = await mint({ claims: { scope: "a" } });

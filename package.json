@@ -40,11 +40,14 @@
     "check:changelog": "node scripts/gen-changelog.mjs --check",
     "docs:changelog": "node scripts/gen-changelog.mjs",
     "coverage": "node scripts/coverage.mjs",
+    "mutation": "node scripts/mutation.mjs",
     "coverage:update": "node scripts/coverage.mjs --update"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
     "@oxlint/plugins": "1.79.0",
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/vitest-runner": "^10.1.1",
     "@types/node": "^22.20.1",
     "@typescript/native": "npm:typescript@^7.0.2",
     "@vitest/coverage-v8": "5.0.5",

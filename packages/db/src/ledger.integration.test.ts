@@ -14,8 +14,6 @@ const runIntegration = process.env.RUN_INTEGRATION === "1" && Boolean(process.en
 // default 5s on its own; the sibling integration suites allow a minute.
 const TEST_TIMEOUT = 60_000;
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 describe.skipIf(!runIntegration)("withMigrationLock", () => {
   it(
     "holds the lock through an idle-in-transaction timeout shorter than the work",
@@ -38,7 +36,9 @@ describe.skipIf(!runIntegration)("withMigrationLock", () => {
         const first = withMigrationLock(db, "lock-idle-timeout-test", async () => {
           order.push("first:start");
           firstHolds();
-          await sleep(1_000);
+          // Outlive the 300ms idle timeout on Postgres's own clock, the one
+          // that enforces it, from another connection in the pool.
+          await client`select pg_sleep(1)`;
           order.push("first:end");
         });
         // Raced with the first run, so a run that fails before `work` (a

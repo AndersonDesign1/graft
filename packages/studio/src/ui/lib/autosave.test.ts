@@ -27,7 +27,8 @@ describe("SaveQueue", () => {
     const flushed = queue.settle().then(() => (settled = true));
 
     calls[0]?.resolve();
-    await new Promise((r) => setTimeout(r, 0));
+    // One event-loop turn lets the queue start the second save.
+    await new Promise((r) => setImmediate(r));
     expect(calls).toHaveLength(2);
     expect(settled).toBe(false);
 

@@ -28,7 +28,8 @@ describe("serveStdio", () => {
       resolved = true;
     });
 
-    await new Promise((r) => setTimeout(r, 25));
+    // One event-loop turn: long enough for a premature resolve to land.
+    await new Promise((r) => setImmediate(r));
     expect(resolved).toBe(false); // still serving — the CLI must not exit here
 
     transport?.onclose?.(); // client disconnects

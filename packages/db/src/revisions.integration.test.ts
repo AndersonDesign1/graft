@@ -440,16 +440,22 @@ describe.skipIf(!runIntegration)("database-sourced content (live)", () => {
   });
 
   it("lets one mirror run at a time per branch", async () => {
-    const results = await Promise.all([
-      withMirrorLock(handle.db, BRANCH, async () => {
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        return "first";
-      }),
-      new Promise((resolve) => setTimeout(resolve, 50)).then(() =>
-        withMirrorLock(handle.db, BRANCH, async () => "second"),
-      ),
-    ]);
-    expect(results).toEqual(["first", undefined]);
+    // The first run signals once it holds the lock and then waits to be
+    // released, so the second always arrives while the lock is held. No
+    // timing guess: the order is the test's, not the scheduler's.
+    let entered!: () => void;
+    let release!: () => void;
+    const inside = new Promise<void>((resolve) => (entered = resolve));
+    const released = new Promise<void>((resolve) => (release = resolve));
+    const first = withMirrorLock(handle.db, BRANCH, async () => {
+      entered();
+      await released;
+      return "first";
+    });
+    await inside;
+    const second = await withMirrorLock(handle.db, BRANCH, async () => "second");
+    release();
+    expect([await first, second]).toEqual(["first", undefined]);
     await recordMirrored(handle.db, BRANCH, [{ path: "posts/a.mdx", version: "abc" }], "c0ffee");
     expect(await mirroredVersions(handle.db, BRANCH)).toEqual(new Map([["posts/a.mdx", "abc"]]));
     await handle.sql`delete from content_mirror where branch_id = ${BRANCH}`;
