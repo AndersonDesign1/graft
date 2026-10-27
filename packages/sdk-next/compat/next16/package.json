@@ -2,7 +2,7 @@
   "name": "sdk-next-compat-next16",
   "version": "0.0.0",
   "private": true,
-  "description": "A real Next.js 16.3.8 app that runs @usegraft/sdk-next. See ../smoke.mjs.",
+  "description": "A real Next.js 16.4.2 app that runs @usegraft/sdk-next. See ../smoke.mjs.",
   "type": "module",
   "scripts": {
     "smoke": "node ../smoke.mjs --port 3116"
@@ -11,7 +11,7 @@
     "@usegraft/core": "workspace:*",
     "@usegraft/db": "workspace:*",
     "@usegraft/sdk-next": "workspace:*",
-    "next": "16.3.8",
+    "next": "16.4.2",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

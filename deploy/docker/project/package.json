@@ -11,6 +11,6 @@
     "@usegraft/db": "workspace:*",
     "@usegraft/mcp": "workspace:*",
     "@usegraft/sdk-core": "workspace:*",
-    "zod": "^4.5.4"
+    "zod": "^4.6.7"
   }
 }
