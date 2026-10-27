@@ -1,9 +1,12 @@
 {
   "core": 99,
-  "mcp": 92,
-  "auth": 81,
-  "compiler": 91,
-  "db": 84,
+  "mcp": 94,
+  "auth": 96,
+  "compiler": 93,
+  "db": 85,
   "registry": 96,
-  "studio": 84
+  "studio": 88,
+  "cli": 63,
+  "mdx-safety": 96,
+  "content-api": 93
 }
