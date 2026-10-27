@@ -1,0 +1,25 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  // `.graft/index.db` is committed, because the deployed on-demand routes read
+  // it, and `build` rewrites it from the content on every run. As an input it
+  // made every task here miss the cache: the build changed its own input. It is
+  // derived from files that are still inputs (the content, the config, and the
+  // CLI and compiler through their own hashes), so leaving it out loses
+  // nothing. As a build output, a cache hit restores the same file a build
+  // would have written.
+  "tasks": {
+    "build": {
+      "inputs": ["$TURBO_DEFAULT$", "!.graft/index.db"],
+      // The root list, restated because a package's `outputs` replaces it,
+      // plus the index.
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**", ".vercel/output/**", ".graft/index.db"]
+    },
+    "typecheck": {
+      "inputs": ["$TURBO_DEFAULT$", "!.graft/index.db"]
+    },
+    "test": {
+      "inputs": ["$TURBO_DEFAULT$", "!.graft/index.db"]
+    }
+  }
+}
