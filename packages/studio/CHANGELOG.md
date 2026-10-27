@@ -1,5 +1,21 @@
 # @usegraft/studio
 
+## 1.0.0-beta.9
+
+### Patch Changes
+
+- Updated dependencies [9a17a95]
+- Updated dependencies [42213aa]
+- Updated dependencies [acb4a84]
+- Updated dependencies [42213aa]
+- Updated dependencies [3374aab]
+  - @usegraft/contracts@1.0.0-beta.9
+  - @usegraft/db@1.0.0-beta.9
+  - @usegraft/core@1.0.0-beta.9
+  - @usegraft/compiler@1.0.0-beta.9
+  - @usegraft/mdx-safety@1.0.0-beta.9
+  - @usegraft/assets@1.0.0-beta.9
+
 ## 1.0.0-beta.8
 
 ### Minor Changes

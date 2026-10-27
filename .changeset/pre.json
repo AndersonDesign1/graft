@@ -36,6 +36,12 @@
     "asset-put-refuses-taken-key",
     "bounded-cache-tags",
     "chalk-paper",
+    "cli-api-slurp-help-auth",
+    "cli-command-registry",
+    "cli-content-commands",
+    "cli-faster-static",
+    "cli-remote",
+    "cli-update-notice",
     "command-help",
     "compile-checks-references",
     "compile-json",
@@ -81,6 +87,7 @@
     "mcp-tool-annotations",
     "mcp-tools-list-any-zod",
     "mcp-write-projects-one-document",
+    "mdx-scan-cache",
     "migration-lock",
     "more-framework-adapters",
     "pull-push-mirror",
@@ -95,6 +102,7 @@
     "saves-keep-yaml-style",
     "sdk-next-14-pages-router",
     "sdk-next-15-16",
+    "sdk-next-drop-next-14",
     "sdk-next-review-fixes",
     "sdk-purge-route-jsdoc",
     "sdk-react-empty-search",
@@ -135,6 +143,7 @@
     "studio-without-a-database",
     "studio-workspace-panes",
     "sveltekit-joins-the-release",
-    "unattended-approval-policy"
+    "unattended-approval-policy",
+    "zod-floor-4-6"
   ]
 }

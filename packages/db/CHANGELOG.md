@@ -1,5 +1,18 @@
 # @usegraft/db
 
+## 1.0.0-beta.9
+
+### Minor Changes
+
+- 42213aa: Static projects no longer load the Postgres code. `@usegraft/db/static` is a new entry with the SQLite content index, the content diff, the search query check and branch scopes, and no drizzle-orm or Postgres driver behind it. Core, the compiler and the MCP server load the rest of `@usegraft/db` only inside the functions that talk to Postgres. On a 50-page static site, `graft content get` went from about 950 ms to about 480 ms. Everything in `@usegraft/db/static` is still exported from `@usegraft/db`.
+
+### Patch Changes
+
+- Updated dependencies [9a17a95]
+- Updated dependencies [acb4a84]
+- Updated dependencies [3374aab]
+  - @usegraft/contracts@1.0.0-beta.9
+
 ## 1.0.0-beta.8
 
 ### Minor Changes
