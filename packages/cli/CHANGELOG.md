@@ -1,5 +1,161 @@
 # @usegraft/cli
 
+## 1.0.0-beta.9
+
+### Minor Changes
+
+- 42213aa: `graft api --paginate --slurp` prints every page as one JSON array once the last one arrives. `graft api -X DELETE` now asks before it sends anything when run on a terminal; with `--no-input`, or with no terminal, it still needs `--yes`. `graft help auth` explains `graft login`, saved tokens, `--remote`, `GRAFT_URL` and `GRAFT_TOKEN`.
+- 9a17a95: **BREAKING:** `graft` exits with a code that says what kind of failure it was,
+  and refuses a flag the command does not take.
+
+  Before, every failure exited 1, and a flag meant for another command was
+  silently ignored: `graft init --apply` succeeded and did nothing, which is how
+  a dry run gets mistaken for a real one. Now:
+
+  | Exit code | Meaning                                                                                            |
+  | --------- | -------------------------------------------------------------------------------------------------- |
+  | 0         | It worked                                                                                          |
+  | 1         | It failed; the error says why and what to do                                                       |
+  | 2         | The command was called wrong: an unknown command or flag, or a missing argument. Nothing ran       |
+  | 3         | A person has to approve the action first (`DESTRUCTIVE_OP_REQUIRES_APPROVAL`)                      |
+  | 4         | The credential is missing, wrong, or lacks the access this needs (`UNAUTHORIZED`, `TOKEN_INVALID`) |
+
+  A script that checks for exit code 1 after a usage mistake must check for 2.
+  An unknown command no longer prints the whole help on stdout; it prints the
+  closest command on stderr:
+
+  ```text
+  graft: unknown command "complie".
+  Did you mean `graft compile`? Run `graft --help` to list the commands.
+  ```
+
+  Every command that prints data now takes `--json`: `init`, `doctor`, `add`,
+  `compile`, `check`, `content`, `compilations`, `asset put`, `studio invite`,
+  `content import`, `pull`, `push`, `mirror`, `db migrate`, `migrate`,
+  `harden`, `approvals`, `approve`, `deny`, `branch`, `branch create`,
+  `branch drop`, `merge`, `ci changes` and `ci skip-build`. It prints one JSON
+  object on stdout and sends every message to stderr. The object is indented on
+  a terminal and on one line when piped, so `graft doctor --json` piped to a
+  file is now one line. A command run with `--json` that fails prints one line
+  of JSON on stderr: `{"error", "message", "fix", "details"}`, the shape every
+  Graft error has. `graft check --json` lists each problem with its code and
+  fix.
+
+  Also new:
+
+  - `graft help <command>` and `graft help <topic>` (`exit-codes`, `json`,
+    `environment`).
+  - `graft commands --json` describes every command, its arguments and flags,
+    so an agent can learn the CLI in one call.
+  - `graft add` with no item lists the primitives you can add, instead of
+    failing with `REGISTRY_ITEM_NOT_FOUND`. `graft db --help`, `graft ci --help`
+    and the other families print help for every member.
+  - `--no-input` on `graft create` and `graft db claim`, or
+    `GRAFT_PROMPT_DISABLED=1` for every command, never asks a question.
+  - Color follows `NO_COLOR`, `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE` and
+    `TERM=dumb`.
+  - An unexpected error prints one line instead of a stack trace;
+    `GRAFT_DEBUG=1` prints the trace.
+  - The CLI turns on Node's compile cache, which makes `graft check` about 8%
+    faster on a 48-document project.
+
+  Two error codes are added for these, with entries in the error reference and
+  in `explain_error`: `USAGE_INVALID` and `INTERNAL_ERROR`.
+
+- 1a627ef: Read and write content from the terminal. The new commands run the same MCP
+  tools an agent calls, in the CLI's own process, so they check the schema,
+  compile, and file approvals exactly as the agent's call would. With `--json`,
+  each prints exactly what the tool returns.
+
+  | Command                                                    | Tool                                                  |
+  | ---------------------------------------------------------- | ----------------------------------------------------- |
+  | `graft content list [collection]`                          | `list_collections`, `list_content`                    |
+  | `graft content get <collection>/<slug>`                    | `get_content`, printed as the MDX file                |
+  | `graft content search <query>`                             | `search_content`                                      |
+  | `graft content write <collection>/<slug>`                  | `write_content`, from `--file` or `--data`            |
+  | `graft content set <collection> <slug...> --field --value` | `write_content` for each document                     |
+  | `graft content delete <collection>/<slug>`                 | `delete_content`                                      |
+  | `graft drafts`, `drafts publish`, `drafts discard`         | `list_drafts`, `publish_drafts`, `discard_drafts`     |
+  | `graft schema`                                             | `describe_schema`                                     |
+  | `graft fn`, `fn describe`, `fn run`                        | `list_functions`, `describe_function`, `run_function` |
+  | `graft explain <code>`                                     | `explain_error`                                       |
+  | `graft mcp tools`, `graft mcp call <tool>`                 | any tool, by name                                     |
+
+  `graft content get pages/home > home.mdx` and
+  `graft content write pages/home --file home.mdx` round-trip a document. A
+  delete, or a destructive function, exits 3 and its `fix` names the exact
+  command to repeat with `--approval <id>` once a person has approved it.
+
+  **BREAKING:** `graft content` now lists the documents from the content files
+  (or from the database, where content is kept there) instead of reading the
+  Postgres index. It works on the static engine with no `DATABASE_URL`, and
+  `--json` prints `{ branch, collections: [{ collection, documents }] }`.
+
+  `@usegraft/mcp` exports the client the CLI uses: `connectInProcess(server)`
+  and `connectClient(transport)` return a `ToolClient` that calls tools by name
+  and rejects with the GraftError a tool failed with
+  (`toolResultToGraftError`).
+
+- acb4a84: Work with a hosted site from the terminal. `graft login <url>` checks a token
+  made in Studio under Developer, Agents, and saves it in
+  `~/.config/graft/hosts.json` (mode 600). The token comes from stdin
+  (`--with-token`) or a prompt that does not echo, never from an argument.
+
+  ```sh
+  printf %s "$TOKEN" | graft login https://cms.example.com --with-token
+  graft content list --remote
+  graft api entries -f collection=posts --paginate
+  ```
+
+  - `--remote` on `graft content`, `graft drafts`, `graft schema`, `graft fn`,
+    `graft mcp tools`, `graft mcp call` and `graft approvals` runs the same MCP
+    tools on the site's `/api/mcp`. `GRAFT_URL` and `GRAFT_TOKEN` in the
+    environment do the same without the flag, and `--local` overrides them.
+    Neither is read from `.env`.
+  - `graft api <path>` calls any Studio API route with the saved token: `-X`,
+    `-f`/`-F` fields, `-H`, `--input`, `--include` and `--paginate`. It reaches
+    only the logged-in site, follows no redirects, and needs `--yes` for
+    `-X DELETE`.
+  - `graft auth status` checks each saved token against its site,
+    `graft auth token` prints one for piping, and `graft logout` forgets one.
+  - A refused token exits 4 with `TOKEN_INVALID`; an unreachable site is the new
+    `REMOTE_UNREACHABLE`. No token can approve an action, so a remote delete
+    still exits 3 until a person approves it.
+
+  `@usegraft/mcp` adds `connectRemote({ origin, token })`, a `ToolClient` over
+  HTTP to a hosted `/api/mcp`.
+
+- 1deb1a7: `graft` now tells you when a newer Graft is on npm. After a command finishes, it prints the new version, the version you have, and a link to the upgrade guide on stderr. On a beta the notice is yellow, because beta releases often include security fixes. On a stable release it is cyan.
+
+  The CLI asks the registry at most once a day and caches the answer under `~/.cache/graft` (or `XDG_CACHE_HOME`). It never fails a command, and waits at most 1.5 seconds for the registry. The check is off under `CI`, for `graft mcp`, and when `GRAFT_NO_UPDATE_CHECK=1` is set in the environment or the project's `.env`. `NO_COLOR` turns the color off.
+
+- 42213aa: `graft check` and `graft compile` skip the executable-MDX scan for a body they have already scanned. Results are kept under `$XDG_CACHE_HOME/graft/mdx-safety` (by default `~/.cache/graft/mdx-safety`), outside the project, and are keyed on the body and on the version of every package the scanner runs, down its whole dependency tree. A repeat `graft check` on a 50-page site went from about 1.7 s to about 0.3 s.
+
+  `@usegraft/mdx-safety` adds `scanMdx`, the `MdxScanCache` interface, `mdxScanVersion`, `mdxScanPackages` and `scanVersionOf`, and the compiler's `validateDocuments`, `compile` and `compileStatic` take an optional `mdxScanCache`. Studio saves and MCP writes do not pass one, so they scan every body every time.
+
+### Patch Changes
+
+- 42213aa: Static projects no longer load the Postgres code. `@usegraft/db/static` is a new entry with the SQLite content index, the content diff, the search query check and branch scopes, and no drizzle-orm or Postgres driver behind it. Core, the compiler and the MCP server load the rest of `@usegraft/db` only inside the functions that talk to Postgres. On a 50-page static site, `graft content get` went from about 950 ms to about 480 ms. Everything in `@usegraft/db/static` is still exported from `@usegraft/db`.
+- Updated dependencies [9a17a95]
+- Updated dependencies [1a627ef]
+- Updated dependencies [42213aa]
+- Updated dependencies [acb4a84]
+- Updated dependencies [42213aa]
+- Updated dependencies [1deb1a7]
+- Updated dependencies [3374aab]
+  - @usegraft/contracts@1.0.0-beta.9
+  - @usegraft/mcp@1.0.0-beta.9
+  - @usegraft/db@1.0.0-beta.9
+  - @usegraft/core@1.0.0-beta.9
+  - @usegraft/compiler@1.0.0-beta.9
+  - @usegraft/mdx-safety@1.0.0-beta.9
+  - @usegraft/registry@1.0.0-beta.9
+  - @usegraft/auth@1.0.0-beta.9
+  - @usegraft/content-api@1.0.0-beta.9
+  - @usegraft/content-migrations@1.0.0-beta.9
+  - @usegraft/studio@1.0.0-beta.9
+  - @usegraft/assets@1.0.0-beta.9
+
 ## 1.0.0-beta.8
 
 ### Minor Changes

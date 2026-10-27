@@ -1,5 +1,15 @@
 # @usegraft/registry
 
+## 1.0.0-beta.9
+
+### Patch Changes
+
+- 3374aab: These packages now need zod 4.6.7 or newer. Earlier 4.x releases can run out of memory while validating a very large array or set that has a size limit.
+- Updated dependencies [9a17a95]
+- Updated dependencies [acb4a84]
+- Updated dependencies [3374aab]
+  - @usegraft/contracts@1.0.0-beta.9
+
 ## 1.0.0-beta.8
 
 ### Patch Changes
