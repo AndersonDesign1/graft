@@ -10,6 +10,15 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request makes the run for the old head worthless, so it
+# is cancelled. Pushes to main always finish: each one is a commit that landed,
+# and its result is the record for that commit. They get a group of their own
+# (the run id), because a shared group would still let a newer push replace a
+# run that is waiting to start.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -25,6 +34,9 @@ jobs:
       # bundles FTS5 from there. The flag keeps the toolchain working without
       # raising what we advertise. A no-op on newer Node.
       NODE_OPTIONS: --experimental-strip-types
+      # Turbo writes the hash of every task it runs or replays to .turbo/runs,
+      # which is how scripts/prune-turbo-cache.mjs knows what to keep.
+      TURBO_RUN_SUMMARY: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,6 +59,18 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      # Turbo's cache from this job's last run: this pull request's previous
+      # push, or else main. A task whose inputs did not change is replayed
+      # instead of run, which skips most builds and type checks on a typical
+      # pull request. Each job keeps its own cache (it runs different tasks),
+      # and scripts/prune-turbo-cache.mjs keeps each one the size of one run.
+      - name: Restore the turbo cache
+        id: turbo-cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-verify-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-verify-
       - run: pnpm format:check
       - run: pnpm lint
       # `graft add` copies primitives into a project, so the example's copies
@@ -87,15 +111,32 @@ jobs:
       # only a version PR changes. `pnpm version-packages` regenerates it, so
       # this fails only when a CHANGELOG was edited by hand without it.
       - run: pnpm check:changelog
-      - run: pnpm test
+      # No `pnpm test` here. The integration job runs every test file this
+      # would, plus the ones that need Postgres: each suite skips only when
+      # integration is off, never when it is on. Running both cost a minute a
+      # push for the same result.
+      #
       # P6.1 — cold-agent path must stay green: MCP-only introspection → write → read.
-      # Runs again explicitly so the gate is visible in CI logs (also covered by pnpm test).
+      # Explicit so the gate is visible in CI logs (also covered by the integration job).
       - name: Cold-agent self-teaching gate
         run: pnpm test:cold-agent
       # L1 — the adoption promise: an empty directory to typed reads with no
       # database and no environment. Explicit so a regression is obvious in logs.
       - name: Zero-service quickstart gate
         run: pnpm test:quickstart
+
+      # Saved even when a step failed: turbo caches only tasks that passed,
+      # and the next push can reuse those. Skipped on a re-run of the same
+      # commit, whose cache is already saved.
+      - name: Keep only the turbo cache entries this run used
+        if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
+        run: node scripts/prune-turbo-cache.mjs
+      - name: Save the turbo cache
+        if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-verify-${{ github.sha }}
 
   # @usegraft/sdk-next declares Next 15 and 16 as peers, and they differ
   # where the adapter touches them: 16 added `updateTag` and made
@@ -114,6 +155,8 @@ jobs:
       fail-fast: false
       matrix:
         next: ["15", "16"]
+    env:
+      TURBO_RUN_SUMMARY: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -131,11 +174,32 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      # Turbo's cache from this job's last run; see the note in `verify`.
+      - name: Restore the turbo cache
+        id: turbo-cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-sdk-next-${{ matrix.next }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-sdk-next-${{ matrix.next }}-
 
       # The adapter, everything it imports, and the CLI that compiles the
       # app's index.
       - run: pnpm turbo run build --filter=@usegraft/sdk-next... --filter=@usegraft/cli...
       - run: pnpm --filter sdk-next-compat-next${{ matrix.next }} smoke
+
+      # Saved even when a step failed: turbo caches only tasks that passed,
+      # and the next push can reuse those. Skipped on a re-run of the same
+      # commit, whose cache is already saved.
+      - name: Keep only the turbo cache entries this run used
+        if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
+        run: node scripts/prune-turbo-cache.mjs
+      - name: Save the turbo cache
+        if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-sdk-next-${{ matrix.next }}-${{ github.sha }}
 
   # The integration suite is opt-in (RUN_INTEGRATION=1 + DATABASE_URL) and was
   # therefore never running here — including the only test that proves a
@@ -168,6 +232,7 @@ jobs:
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/graft_test
       BETTER_AUTH_SECRET: build-only-value-never-used-at-runtime
+      TURBO_RUN_SUMMARY: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -185,6 +250,14 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      # Turbo's cache from this job's last run; see the note in `verify`.
+      - name: Restore the turbo cache
+        id: turbo-cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-integration-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-integration-
       - run: pnpm build
 
       # Not `pnpm --filter @usegraft/db db:migrate`: that wrapper passes
@@ -193,21 +266,44 @@ jobs:
       - name: Apply schema
         run: node packages/db/scripts/migrate.mjs
 
-      - name: Integration suite
-        run: pnpm test
-        env:
-          RUN_INTEGRATION: "1"
-
       # Per-package floors, not one repo-wide number — a single figure hides
       # that `core` is above 95% while `studio` is far lower. A ratchet: it
       # stops coverage sliding, and floors are raised when they are earned.
-      # Measured with the integration suites this job just ran: code that only
-      # a live database can exercise (revisions, publishing, mirroring) is
-      # tested there, and a unit-only figure would read it as untested.
-      - name: Coverage floors
+      # Measured with the integration suites: code that only a live database
+      # can exercise (revisions, publishing, mirroring) is tested there, and a
+      # unit-only figure would read it as untested.
+      #
+      # This is also where those packages' tests run: the script fails on a
+      # failing suite as well as on a floor, so running them again without
+      # coverage below would only repeat the same tests.
+      - name: Tests with coverage floors
         run: pnpm coverage
         env:
           RUN_INTEGRATION: "1"
+
+      # Every package without a floor, so each suite runs exactly once. The
+      # list comes from coverage-floors.json, so a package given a floor moves
+      # from this step to the one above with no edit here.
+      - name: Tests for the remaining packages
+        if: ${{ !cancelled() }}
+        run: >-
+          pnpm turbo run test --concurrency=50%
+          $(node -p "Object.keys(require('./scripts/coverage-floors.json')).map((p) => '--filter=!@usegraft/' + p).join(' ')")
+        env:
+          RUN_INTEGRATION: "1"
+
+      # Saved even when a step failed: turbo caches only tasks that passed,
+      # and the next push can reuse those. Skipped on a re-run of the same
+      # commit, whose cache is already saved.
+      - name: Keep only the turbo cache entries this run used
+        if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
+        run: node scripts/prune-turbo-cache.mjs
+      - name: Save the turbo cache
+        if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-integration-${{ github.sha }}
 
   # The container is the "one `docker run`, full backend" claim, and nothing
   # here built it. That is how `prepare` (added in 0d2fe7b) broke the image for

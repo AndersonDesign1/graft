@@ -19,6 +19,13 @@ on:
 permissions:
   contents: read
 
+# Same rule as ci.yml: a newer push to a pull request cancels the older run,
+# and runs on main and the weekly schedule always finish, each in a group of
+# its own.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Interprocedural taint tracking over the whole workspace. The sinks that
   # matter here are the filesystem paths in @usegraft/compiler (path traversal

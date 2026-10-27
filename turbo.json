@@ -47,10 +47,9 @@
       // stale, or absent on a fresh runner, and the check would be reading
       // nothing while the build reported success.
       //
-      // Not a live bug: docs-site currently misses cache on every run, and CI
-      // configures no turbo cache at all. Both of those are circumstances
-      // rather than guarantees, and the declaration is what makes the artifact
-      // turbo's to restore when either changes.
+      // CI keeps turbo's cache between runs (ci.yml), and docs-site hits it
+      // (examples/docs-site/turbo.json), so this declaration is load-bearing:
+      // a cache hit restores the artifact `pnpm check:site` reads.
       "outputs": ["dist/**", ".next/**", "!.next/cache/**", ".vercel/output/**"]
     },
     // The CLI reaches @usegraft/studio only through dynamic `import()`, and
