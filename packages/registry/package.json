@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "@usegraft/contracts": "workspace:*",
-    "zod": "^4.5.4"
+    "zod": "^4.6.7"
   },
   "engines": {
     "node": ">=22.16"

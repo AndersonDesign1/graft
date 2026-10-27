@@ -19,14 +19,14 @@ const majors = {
   // TypeScript 5 for 15: it writes moduleResolution "node" into a new
   // tsconfig, which TypeScript 6 rejects. Apps on 15 run TypeScript 5.
   next15: {
-    next: "15.5.27",
+    next: "15.5.28",
     react: "19.2.8",
     types: "19.2.18",
     typesDom: "19.2.5",
     port: 3115,
     ts: "5.9.3",
   },
-  next16: { next: "16.3.8", react: "19.2.8", types: "19.2.18", typesDom: "19.2.5", port: 3116 },
+  next16: { next: "16.4.2", react: "19.2.8", types: "19.2.18", typesDom: "19.2.5", port: 3116 },
 };
 
 /** Every file this generator owns, by path relative to compat/. */
