@@ -1,17 +1,25 @@
 name: PR
 
-# Two things ci.yml does not check, both about the release path rather than the
-# code. Squash-merge takes the pull request *title* as the commit message, so
-# the title is what actually has to satisfy Conventional Commits. And a change
-# to a published package without a changeset ships silently in whatever release
-# happens next, unversioned and unmentioned in the changelog.
+# Squash-merge takes the pull request *title* as the commit message, so the
+# title is what actually has to satisfy Conventional Commits. ci.yml cannot
+# check that: it never sees the title.
+#
+# The changeset check lives in changeset.yml. It reacts to labels and this
+# reacts to title edits; in one workflow, each re-ran on the other's events.
 
 on:
   pull_request:
-    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
+    # `synchronize` because a required check is recorded per commit: a new head
+    # needs its own result even when the title did not change.
+    types: [opened, edited, reopened, synchronize]
 
 permissions:
   contents: read
+
+# Only the newest event for a pull request matters; an older run is cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   title:
@@ -67,56 +75,3 @@ jobs:
           subjectPatternError: >-
             The subject "{subject}" must start lowercase, and must not end with
             a period.
-
-  changeset:
-    name: Changeset present
-    runs-on: ubuntu-latest
-    # A pull request that genuinely touches nothing publishable says so with
-    # the label, and the reviewer sees that claim rather than a silent skip.
-    #
-    # The changesets version PR is excluded because it CONSUMES changesets —
-    # deleting them is its entire purpose, so it can never satisfy a check that
-    # demands one. This is a required status check on main, which made that
-    # pull request structurally unmergeable: it failed, every time, by design,
-    # and the release could not land until someone noticed why.
-    if: >-
-      !contains(github.event.pull_request.labels.*.name, 'no changeset')
-      && github.actor != 'dependabot[bot]'
-      && !startsWith(github.head_ref, 'changeset-release/')
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # `changeset status --since` needs the base commit to diff against.
-          fetch-depth: 0
-          # This job never pushes.
-          persist-credentials: false
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-
-      - name: Setup Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22.16
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Check for a changeset
-        env:
-          # The base commit this run's merge ref was built on, already in the
-          # full checkout. Diffing against the base branch's tip instead broke
-          # whenever the base moved after the event: the new tip is not an
-          # ancestor of HEAD, and the `--depth=1` fetch of it cut the history
-          # that connects them, so changesets could not find a merge base.
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if pnpm changeset status --since="$BASE_SHA"; then
-            exit 0
-          fi
-          echo ""
-          echo "No changeset found for a change that touches a published package."
-          echo "Run \`pnpm changeset\`, describe the change, and commit the file."
-          echo "If this pull request changes only docs, tests, or CI, add the"
-          echo "\`no changeset\` label instead."
-          exit 1
