@@ -11,18 +11,13 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { GraftError } from "@usegraft/contracts";
-import { findExecutableMdx, UncheckableMdxError, type MdxTrust } from "@usegraft/mdx-safety";
+import { scanMdx, type MdxScanCache, type MdxTrust } from "@usegraft/mdx-safety";
 import { walkContentFiles } from "./content-files";
 import type { AnyCollection } from "@usegraft/core";
-import {
-  projectBranchContent,
-  liveDocuments,
-  projectDocuments,
-  projectPublishedContent,
-  projectStaticContent,
-  type ChangeSet,
-  type Database,
-} from "@usegraft/db";
+// The Postgres functions load on first use (`await import("@usegraft/db")`),
+// so compiling a static project never loads drizzle.
+import type { ChangeSet, Database } from "@usegraft/db";
+import { projectStaticContent } from "@usegraft/db/static";
 import { parseDocument, SLUG_RE, type ProjectedDoc } from "./parse";
 import { resolveContained } from "./paths";
 import {
@@ -69,6 +64,8 @@ export interface CompileOptions {
    * `export const mdxTrust` in graft.config.ts.
    */
   mdxTrust?: MdxTrust;
+  /** As in ReadDocsOptions: past safety-scan results, for file-sourced compiles. */
+  mdxScanCache?: MdxScanCache;
 }
 
 export interface CompileResult {
@@ -97,6 +94,12 @@ export interface ReadDocsOptions {
    * whether a target exists. `readDocs` defaults to `"files"`.
    */
   references?: "files" | ReferenceTargets;
+  /**
+   * Past safety-scan results, so an unchanged body is not parsed again. For
+   * local, developer-run commands (`graft check`, `graft compile`); a write
+   * path that takes content from someone else leaves it out.
+   */
+  mdxScanCache?: MdxScanCache;
 }
 
 /** One authored file: its path inside the content directory, and its bytes. */
@@ -190,22 +193,19 @@ export function validateDocuments(
     // This one exists so the refusal happens at build time on the authored
     // path, instead of per-request in production on the page itself.
     if (mdxTrust !== "full") {
-      try {
-        const found = findExecutableMdx(doc.body);
-        if (found.length > 0) {
-          const first = found[0];
-          executable.push({
-            sourcePath,
-            found: found.length,
-            first: first?.line === undefined ? "" : `line ${first.line}`,
-          });
-        }
-      } catch (error) {
+      const found = scanMdx(doc.body, options.mdxScanCache);
+      if ("uncheckable" in found) {
         // Source the checker cannot parse is refused, not waved through: the
         // renderer's parser is not this one, and the gap between them is
         // exactly where executable source would sit.
-        if (!(error instanceof UncheckableMdxError)) throw error;
-        unreadable.push({ sourcePath, reason: error.message });
+        unreadable.push({ sourcePath, reason: found.uncheckable });
+      } else if (found.length > 0) {
+        const first = found[0];
+        executable.push({
+          sourcePath,
+          found: found.length,
+          first: first?.line === undefined ? "" : `line ${first.line}`,
+        });
       }
     }
 
@@ -280,8 +280,11 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
     knownCollections: Object.keys(options.collections),
     pruneUnknown: options.pruneUnknown,
   };
+  const { projectBranchContent, projectPublishedContent } = await import("@usegraft/db");
   if (!fromDatabase) {
-    const docs = readDocs(options.contentDir, options.collections, { mdxTrust: options.mdxTrust });
+    const checks: ReadDocsOptions = { mdxTrust: options.mdxTrust };
+    if (options.mdxScanCache) checks.mdxScanCache = options.mdxScanCache;
+    const docs = readDocs(options.contentDir, options.collections, checks);
     const changes = await projectBranchContent(options.db, docs.map(indexRow), project);
     return { count: docs.length, docs, changes, gitSha };
   }
@@ -333,6 +336,7 @@ export async function compileDocuments(options: CompileDocumentsOptions): Promis
   const branchId = options.branchId ?? "main";
   const docs = await checkChange({ ...options, branchId, changes: written });
   const gitSha = options.gitSha !== undefined ? options.gitSha : resolveGitSha(options.contentDir);
+  const { projectDocuments } = await import("@usegraft/db");
   const changes = await projectDocuments(
     options.db,
     { upserts: docs.map(indexRow), removals: [], paths: [...written.keys()] },
@@ -369,7 +373,9 @@ export async function checkChange(options: CheckChangeOptions): Promise<Projecte
   // an index behind them (a `git pull` not yet compiled) would miss a
   // document that points at the one going, and refuse over one that no
   // longer does. Deletes and renames are rare; saves are not.
-  const indexed = options.db ? await liveDocuments(options.db, options.branchId ?? "main") : null;
+  const indexed = options.db
+    ? await (await import("@usegraft/db")).liveDocuments(options.db, options.branchId ?? "main")
+    : null;
   const live =
     indexed && !takesADocumentAway(indexed, options)
       ? indexed
@@ -522,6 +528,8 @@ export interface CompileStaticOptions {
    * `export const mdxTrust` in graft.config.ts.
    */
   mdxTrust?: MdxTrust;
+  /** As in ReadDocsOptions: past safety-scan results. */
+  mdxScanCache?: MdxScanCache;
   /**
    * Refuse a tree with a reference that points at nothing, as `graft compile`
    * does. Default true. A caller that checked its own change with
@@ -539,6 +547,7 @@ export interface CompileStaticOptions {
 export async function compileStatic(options: CompileStaticOptions): Promise<CompileResult> {
   const checks: ReadDocsOptions = { mdxTrust: options.mdxTrust };
   if (options.references !== false) checks.references = "files";
+  if (options.mdxScanCache) checks.mdxScanCache = options.mdxScanCache;
   const docs = validateDocuments(readSourceFiles(options.contentDir), options.collections, checks);
   const gitSha = options.gitSha === undefined ? resolveGitSha(options.contentDir) : options.gitSha;
   const changes = await projectStaticContent(

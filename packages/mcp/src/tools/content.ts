@@ -17,7 +17,7 @@ import {
 import { GraftError } from "@usegraft/contracts";
 import type { AnyCollection } from "@usegraft/core";
 import { assertSafeMdx } from "@usegraft/mdx-safety";
-import { assertSearchQuery, scopeChain } from "@usegraft/db";
+import { assertSearchQuery, scopeChain } from "@usegraft/db/static";
 import { z } from "zod";
 import { documentNotFound, findDoc, findStoredPath, requireCollection } from "../content-hints";
 import { assertSlugFree, invokeFunctionWithApproval } from "../tool-helpers";

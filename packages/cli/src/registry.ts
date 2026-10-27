@@ -1142,17 +1142,25 @@ export const COMMANDS: readonly CommandSpec[] = [
         summary: "GET every page, following nextCursor, and print each one",
       },
       {
+        name: "slurp",
+        type: "boolean",
+        summary: "With --paginate, print every page as one JSON array once the last arrives",
+      },
+      {
         name: "yes",
         short: "y",
         type: "boolean",
-        summary: "Go ahead with -X DELETE",
+        summary: "Send -X DELETE without asking first",
       },
     ],
     database: "never",
+    // A DELETE asks before it is sent, on a terminal; --no-input refuses instead.
+    interactive: true,
     examples: [
       "graft api workspace",
       "graft api entries -X GET -f collection=posts -F limit=20",
       "graft api entries -f collection=posts --paginate",
+      "graft api entries --paginate --slurp",
       "graft api -X PUT entry --input entry.json",
     ],
   },

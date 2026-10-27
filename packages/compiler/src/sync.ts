@@ -21,13 +21,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { dirname, join, relative, sep } from "node:path";
 import { GraftError, type ChangeSet } from "@usegraft/contracts";
 import type { AnyCollection } from "@usegraft/core";
-import {
-  importPublished,
-  liveVersions,
-  publishedFiles,
-  type Database,
-  type RevisionActor,
-} from "@usegraft/db";
+import type { Database, RevisionActor } from "@usegraft/db";
 import type { MdxTrust } from "@usegraft/mdx-safety";
 import { compile, validateDocuments } from "./compile";
 import { walkContentFiles } from "./content-files";
@@ -121,6 +115,7 @@ async function compare(
   options: SyncOptions,
 ): Promise<{ entries: SyncEntry[]; local: Map<string, { raw: string; version: string }> }> {
   const branch = options.branchId ?? "main";
+  const { liveVersions } = await import("@usegraft/db");
   const live = await liveVersions(options.db, branch);
   const state = readState(options.stateFile, branch);
   const local = localFiles(options.contentDir);
@@ -171,6 +166,7 @@ export async function pullContent(
   const branch = options.branchId ?? "main";
   const status = await compare(options);
   const entries = selected(status.entries, options.only);
+  const { publishedFiles } = await import("@usegraft/db");
   const live = new Map(
     (await publishedFiles(options.db, branch)).map((file) => [file.path, file.raw]),
   );
@@ -261,6 +257,7 @@ export async function pushContent(options: PushOptions): Promise<PushResult> {
   // Slugs are unique across documents, so check the tree as it will be after
   // the push: what stays live, and what is pushed.
   const pushingPaths = new Set(pushing.map((entry) => entry.path));
+  const { importPublished, publishedFiles } = await import("@usegraft/db");
   const staying = (await publishedFiles(options.db, branch))
     .filter((file) => !pushingPaths.has(file.path))
     .map((file) => ({ sourcePath: file.path, raw: file.raw }));

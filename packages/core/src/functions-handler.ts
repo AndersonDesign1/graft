@@ -18,13 +18,7 @@
  * runtime invariant, locked here before the first mutation function exists.
  */
 import { GraftError, rateIdentity, type ErrorCode } from "@usegraft/contracts";
-import {
-  createDbApprovalStore,
-  createDbAuditStore,
-  type ApprovalStore,
-  type AuditStore,
-  type Database,
-} from "@usegraft/db";
+import type { ApprovalStore, AuditStore, Database } from "@usegraft/db";
 import type { AnyGraftFunction, FunctionActor, RateLimit } from "./function";
 
 export interface FunctionsHandlerOptions {
@@ -196,8 +190,14 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
   let approvalStore: ApprovalStore | undefined;
   const getStores = async (): Promise<{ audit?: AuditStore; approvals: ApprovalStore }> => {
     const db = await getDb();
-    if (options.audit !== false) auditStore ??= options.audit ?? createDbAuditStore(db);
-    approvalStore ??= options.approvals ?? createDbApprovalStore(db);
+    // Loaded only when a store has to be built from the database, so a handler
+    // given its stores never loads the Postgres code.
+    if (options.audit !== false && auditStore === undefined) {
+      auditStore = options.audit ?? (await import("@usegraft/db")).createDbAuditStore(db);
+    }
+    if (approvalStore === undefined) {
+      approvalStore = options.approvals ?? (await import("@usegraft/db")).createDbApprovalStore(db);
+    }
     return { audit: options.audit === false ? undefined : auditStore, approvals: approvalStore };
   };
 

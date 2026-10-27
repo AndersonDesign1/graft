@@ -23,6 +23,20 @@ try {
 }
 ```
 
+## Static index without Postgres
+
+`@usegraft/db/static` is the part of this package a static project needs: the
+SQLite content index (`openStaticIndex`, `projectStaticContent`), the content
+diff, the search query check and branch scopes. It loads no drizzle-orm and no
+Postgres driver, so importing it costs a few milliseconds instead of a few
+hundred. Everything in it is also exported from `@usegraft/db`.
+
+```ts
+import { openStaticIndex } from "@usegraft/db/static";
+
+const index = await openStaticIndex(".graft/index.db");
+```
+
 ## Two credentials, one job each
 
 A deployed app or an autonomous agent should not hold a credential that can approve its own destructive operation. `hardenRuntimeRole` grants a role exactly what serving needs:

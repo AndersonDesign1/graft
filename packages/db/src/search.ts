@@ -12,9 +12,9 @@
  * and returns [] — that is Postgres semantics, not an error.
  */
 import type { ContentSearchHit } from "@usegraft/contracts";
-import { GraftError } from "@usegraft/contracts";
 import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { overlaySubquery } from "./branch";
+import { assertSearchQuery } from "./search-query";
 import type { Database } from "./client";
 import { contentIndex, dataRecords, type ContentRow, type DataRecordRow } from "./schema";
 
@@ -26,21 +26,7 @@ const HEADLINE_OPTIONS = "MaxWords=20, MinWords=8, ShortWord=3, MaxFragments=2";
 
 const DEFAULT_LIMIT = 20;
 
-/**
- * Reject an empty query with the agent-actionable fix. Exported so search
- * surfaces (MCP `search_content`) can gate cheap input errors before paying
- * for branch-scope resolution or a database round-trip.
- */
-export function assertSearchQuery(query: string): void {
-  if (query.trim() === "") {
-    throw new GraftError({
-      code: "INPUT_VALIDATION_FAILED",
-      message: "Search query is empty.",
-      fix: "Pass one or more words to search for. Quoted phrases, `or`, and -exclusions are supported (websearch syntax).",
-      details: { query },
-    });
-  }
-}
+export { assertSearchQuery } from "./search-query";
 
 function toTsQuery(query: string): SQL {
   assertSearchQuery(query);

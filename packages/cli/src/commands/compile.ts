@@ -11,7 +11,7 @@
  * report.ts), so a deploy script can pipe the ChangeSet to the app's
  * revalidate route.
  */
-import type { CompileResult } from "@usegraft/compiler";
+import type { CompileOptions, CompileResult, CompileStaticOptions } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { formatCompileResult } from "../report";
@@ -53,12 +53,21 @@ export async function compileBranch(options: CompileCommandOptions): Promise<Com
     assertNoStaticBranch(options.branchId);
     // No database, no env: validate the tree and rebuild the artifact.
     const { compileStatic } = await import("@usegraft/compiler");
-    const result = await compileStatic({
+    const { openMdxCache } = await import("../mdx-cache");
+    const mdxScanCache = await openMdxCache(config.contentDir);
+    const staticOptions: CompileStaticOptions = {
       contentDir: config.contentDir,
       collections: config.collections,
       mdxTrust: config.mdxTrust,
       indexPath: config.index.path,
-    });
+    };
+    if (mdxScanCache) staticOptions.mdxScanCache = mdxScanCache;
+    let result: CompileResult;
+    try {
+      result = await compileStatic(staticOptions);
+    } finally {
+      mdxScanCache?.save();
+    }
     console.log(formatCompileResult(result));
     return { branch: "main", result };
   }
@@ -79,7 +88,9 @@ export async function compileBranch(options: CompileCommandOptions): Promise<Com
       if (branch.scope.kind === "physical") {
         console.log(`neon branch "${branch.name}" — compiling into its own database`);
       }
-      const result = await compile({
+      const { openMdxCache } = await import("../mdx-cache");
+      const mdxScanCache = await openMdxCache(config.contentDir);
+      const compileOptions: CompileOptions = {
         db: branch.db,
         contentDir: config.contentDir,
         collections: config.collections,
@@ -87,7 +98,14 @@ export async function compileBranch(options: CompileCommandOptions): Promise<Com
         branchId: scopeWriteBranch(branch.scope),
         pruneUnknown: options.pruneUnknown,
         source: config.content.source,
-      });
+      };
+      if (mdxScanCache) compileOptions.mdxScanCache = mdxScanCache;
+      let result: CompileResult;
+      try {
+        result = await compile(compileOptions);
+      } finally {
+        mdxScanCache?.save();
+      }
       console.log(formatCompileResult(result));
       return { branch: branch.name, result };
     } finally {

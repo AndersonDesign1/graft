@@ -10,6 +10,7 @@
  * and a usage error never load the database driver or the compiler.
  */
 import type { Flags } from "./args";
+import type { ApiOptions } from "./commands/api";
 import type { SyncCommandOptions } from "./commands/sync";
 import type { ToolTarget } from "./tool-runner";
 import type { ToolClient } from "@usegraft/mcp";
@@ -736,7 +737,7 @@ const handlers = {
   },
 
   async api(ctx) {
-    const { apiCommand, apiRoutes } = await import("./commands/api");
+    const { apiCommand, apiRoutes, askYesNo } = await import("./commands/api");
     const site = await apiSite();
     const path = ctx.args[0];
     if (path === undefined) {
@@ -747,7 +748,7 @@ const handlers = {
       }
       return;
     }
-    await apiCommand({
+    const options: ApiOptions = {
       ...site,
       path,
       method: ctx.flags.string("method"),
@@ -757,8 +758,14 @@ const handlers = {
       input: ctx.flags.string("input"),
       include: ctx.flags.bool("include"),
       paginate: ctx.flags.bool("paginate"),
+      slurp: ctx.flags.bool("slurp"),
       yes: ctx.flags.bool("yes"),
-    });
+    };
+    // Ask before a DELETE only where a person can answer.
+    if (process.stdin.isTTY && process.stderr.isTTY && !ctx.noInput) {
+      options.confirm = askYesNo;
+    }
+    await apiCommand(options);
   },
 
   /* ---- learn the CLI ----------------------------------------------------- */

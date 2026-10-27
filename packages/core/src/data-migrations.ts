@@ -9,7 +9,7 @@
  * so a migration either fully happened and is recorded, or neither.
  */
 import { GraftError } from "@usegraft/contracts";
-import { and, asc, dataRecords, eq, migrationsApplied, type Database } from "@usegraft/db";
+import type { Database } from "@usegraft/db";
 import type { AnyCollection, DocumentData } from "./collection";
 import { canonicalJson } from "./functions-handler";
 
@@ -91,6 +91,7 @@ export async function runDataMigration(
   const { migration } = options;
   const collection = migration.collection;
   const branchId = options.branchId ?? "main";
+  const { and, asc, dataRecords, eq, migrationsApplied } = await import("@usegraft/db");
 
   const execute = async (tx: MigrationDb): Promise<DataMigrationReport> => {
     const rows = await tx

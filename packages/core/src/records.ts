@@ -8,7 +8,7 @@
  * stamp actor + correlationId — the pre-audit-log breadcrumb trail.
  */
 import { GraftError } from "@usegraft/contracts";
-import { and, dataRecords, desc, eq, searchData, sql } from "@usegraft/db";
+import type { DataRecordRow } from "@usegraft/db";
 import type { AnyCollection, DocumentData } from "./collection";
 import type { FunctionContext } from "./function";
 
@@ -78,6 +78,7 @@ export async function insertRecord<TCollection extends AnyCollection>(
   collection: TCollection,
   data: DocumentData<TCollection>,
 ): Promise<DataRecord<DocumentData<TCollection>>> {
+  const { dataRecords } = await import("@usegraft/db");
   assertDbAuthoritative(collection, "insertRecord");
 
   const parsed = collection.schema.safeParse(data);
@@ -115,6 +116,7 @@ export async function listRecords<TCollection extends AnyCollection>(
   collection: TCollection,
   options: ListRecordsOptions = {},
 ): Promise<DataRecord<DocumentData<TCollection>>[]> {
+  const { and, dataRecords, desc, eq, sql } = await import("@usegraft/db");
   assertDbAuthoritative(collection, "listRecords");
 
   const rows = await ctx.db
@@ -140,7 +142,7 @@ export async function listRecords<TCollection extends AnyCollection>(
 /** Re-validate a stored row on read (one Zod layer, both directions). */
 function parseStoredRow<TCollection extends AnyCollection>(
   collection: TCollection,
-  row: typeof dataRecords.$inferSelect,
+  row: DataRecordRow,
 ): DataRecord<DocumentData<TCollection>> {
   const parsed = collection.schema.safeParse(row.data);
   if (!parsed.success) {
@@ -177,6 +179,7 @@ export async function searchRecords<TCollection extends AnyCollection>(
   query: string,
   options: SearchRecordsOptions = {},
 ): Promise<DataRecordHit<DocumentData<TCollection>>[]> {
+  const { searchData } = await import("@usegraft/db");
   assertDbAuthoritative(collection, "searchRecords");
 
   const hits = await searchData(ctx.db, {
@@ -199,6 +202,7 @@ export async function deleteRecord(
   collection: AnyCollection,
   id: string,
 ): Promise<{ id: string; data: Record<string, unknown> }> {
+  const { and, dataRecords, eq } = await import("@usegraft/db");
   assertDbAuthoritative(collection, "deleteRecord");
 
   const [row] = await ctx.db
@@ -236,6 +240,7 @@ export async function updateRecord<TCollection extends AnyCollection>(
   id: string,
   patch: Partial<DocumentData<TCollection>>,
 ): Promise<DataRecord<DocumentData<TCollection>>> {
+  const { and, dataRecords, eq } = await import("@usegraft/db");
   assertDbAuthoritative(collection, "updateRecord");
 
   // Read, merge and write in ONE transaction, with the row locked.
@@ -311,7 +316,7 @@ export async function updateRecord<TCollection extends AnyCollection>(
   });
 }
 
-function toRecord<TData>(row: typeof dataRecords.$inferSelect, data: TData): DataRecord<TData> {
+function toRecord<TData>(row: DataRecordRow, data: TData): DataRecord<TData> {
   return {
     id: row.id,
     branch: row.branchId,

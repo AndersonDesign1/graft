@@ -259,3 +259,12 @@ export function assertSafeMdx(source: string, options: AssertSafeMdxOptions = {}
     details: { found: found.length, nodes: found.slice(0, 20) },
   });
 }
+
+export {
+  mdxScanPackages,
+  mdxScanVersion,
+  scanMdx,
+  scanVersionOf,
+  type MdxScanCache,
+  type MdxScanResult,
+} from "./scan-cache";
