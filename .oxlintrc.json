@@ -50,7 +50,9 @@
       "rules": {
         "anti-slop/no-chained-type-assertions": "warn",
         "anti-slop/no-module-mocking": "warn",
-        "anti-slop/no-unknown-returns": "warn"
+        "anti-slop/no-unknown-returns": "warn",
+        "anti-slop/no-sleep-in-tests": "error",
+        "anti-slop/no-unreasoned-test-skip": "error"
       }
     },
     {
