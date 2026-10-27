@@ -96,9 +96,13 @@ jobs:
       # only a version PR changes. `pnpm version-packages` regenerates it, so
       # this fails only when a CHANGELOG was edited by hand without it.
       - run: pnpm check:changelog
-      - run: pnpm test
+      # No `pnpm test` here. The integration job runs every test file this
+      # would, plus the ones that need Postgres: each suite skips only when
+      # integration is off, never when it is on. Running both cost a minute a
+      # push for the same result.
+      #
       # P6.1 — cold-agent path must stay green: MCP-only introspection → write → read.
-      # Runs again explicitly so the gate is visible in CI logs (also covered by pnpm test).
+      # Explicit so the gate is visible in CI logs (also covered by the integration job).
       - name: Cold-agent self-teaching gate
         run: pnpm test:cold-agent
       # L1 — the adoption promise: an empty directory to typed reads with no
@@ -202,19 +206,29 @@ jobs:
       - name: Apply schema
         run: node packages/db/scripts/migrate.mjs
 
-      - name: Integration suite
-        run: pnpm test
-        env:
-          RUN_INTEGRATION: "1"
-
       # Per-package floors, not one repo-wide number — a single figure hides
       # that `core` is above 95% while `studio` is far lower. A ratchet: it
       # stops coverage sliding, and floors are raised when they are earned.
-      # Measured with the integration suites this job just ran: code that only
-      # a live database can exercise (revisions, publishing, mirroring) is
-      # tested there, and a unit-only figure would read it as untested.
-      - name: Coverage floors
+      # Measured with the integration suites: code that only a live database
+      # can exercise (revisions, publishing, mirroring) is tested there, and a
+      # unit-only figure would read it as untested.
+      #
+      # This is also where those packages' tests run: the script fails on a
+      # failing suite as well as on a floor, so running them again without
+      # coverage below would only repeat the same tests.
+      - name: Tests with coverage floors
         run: pnpm coverage
+        env:
+          RUN_INTEGRATION: "1"
+
+      # Every package without a floor, so each suite runs exactly once. The
+      # list comes from coverage-floors.json, so a package given a floor moves
+      # from this step to the one above with no edit here.
+      - name: Tests for the remaining packages
+        if: ${{ !cancelled() }}
+        run: >-
+          pnpm turbo run test --concurrency=50%
+          $(node -p "Object.keys(require('./scripts/coverage-floors.json')).map((p) => '--filter=!@usegraft/' + p).join(' ')")
         env:
           RUN_INTEGRATION: "1"
 

@@ -26,6 +26,7 @@ const pnpmBin = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
 const results = [];
 let failed = false;
+const failedSuites = [];
 
 for (const [pkg, floor] of Object.entries(floors)) {
   try {
@@ -44,10 +45,15 @@ for (const [pkg, floor] of Object.entries(floors)) {
       ],
       // Not `shell: true`: passing args through a shell concatenates rather
       // than escapes them. Resolve the platform's binary name instead.
-      { cwd: root, stdio: "ignore" },
+      // The output is shown: CI runs these packages' tests only here.
+      { cwd: root, stdio: "inherit" },
     );
   } catch {
-    // A failing suite is the test job's problem to report, not this one's.
+    // CI runs these packages' tests only through this script, so a failing
+    // suite fails the run here rather than passing on a coverage figure.
+    console.error(`${pkg}: tests failed`);
+    failedSuites.push(pkg);
+    failed = true;
   }
 
   const summary = join(root, "packages", pkg, ".cov", "coverage-summary.json");
@@ -76,9 +82,14 @@ if (update) {
   process.exit(0);
 }
 
-if (failed) {
+if (failedSuites.length > 0) {
+  console.error(`\nTests failed in ${failedSuites.join(", ")}. The output above shows which.`);
+}
+if (results.some((r) => !r.ok)) {
   console.error("\nCoverage fell below a floor. Add tests, or lower the floor deliberately");
   console.error("in scripts/coverage-floors.json and say why in the commit message.");
+}
+if (failed) {
   process.exit(1);
 }
 console.log("\nEvery package is at or above its floor.");
