@@ -15,14 +15,18 @@ export interface ScratchDatabase {
   drop(): Promise<void>;
 }
 
-/** A fresh, migrated database, or null when this role can't create one. */
+/** A fresh, migrated database, or null when this role can't create one (outside CI). */
 export async function createScratchDatabase(url: string): Promise<ScratchDatabase | null> {
   const name = `graft_it_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
   const admin = postgres(url, { ...pgOptions(url), max: 1 });
   try {
     await admin.unsafe(`create database ${name}`);
-  } catch {
+  } catch (error) {
     await admin.end();
+    // Locally, a role without CREATE DATABASE skips the tests that need one.
+    // In CI they would all report "skipped" behind a green check, so a
+    // missing grant fails the run instead.
+    if (process.env.CI) throw error;
     return null;
   }
   const scratch = new URL(url);

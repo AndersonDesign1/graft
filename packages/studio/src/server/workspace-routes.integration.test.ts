@@ -93,7 +93,11 @@ describe.skipIf(!runIntegration)("media, agents and the site over HTTP (integrat
     admin = createDb(url);
     try {
       await admin.sql.unsafe(`create database ${name}`);
-    } catch {
+    } catch (error) {
+      // Locally, a role without CREATE DATABASE skips these tests. In CI every
+      // test here would then report "skipped" behind a green check, so a
+      // missing grant fails the run instead.
+      if (process.env.CI) throw error;
       return; // this role can't create a database: every test skips
     }
     const scratch = new URL(url);

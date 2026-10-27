@@ -8,9 +8,12 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const here = join(process.cwd(), "src", "ui", "styles");
+// This file's own directory, so the test reads the same sheets whichever
+// directory Vitest was started from.
+const here = fileURLToPath(new URL(".", import.meta.url));
 const read = (name: string): string => readFileSync(join(here, name), "utf8");
 
 /** Every layer-3 stylesheet. Both must obey the same rules. */
