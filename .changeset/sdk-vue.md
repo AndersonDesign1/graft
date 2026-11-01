@@ -35,10 +35,10 @@ here than in React 19: Vue renders such a link as it is.
 
 The safe-URL and refuse-imports plugins move from `@usegraft/sdk-next` into
 `@usegraft/mdx-safety`, exported as `rehypeSafeUrls`, `remarkRefuseModules`
-and `isSafeUrl`, so both adapters share one copy. sdk-next behaves as before.
+and `isSafeUrl`, so both adapters share one copy.
 
-Restricted trust now also refuses `innerHTML`, `outerHTML` and
-`dangerouslySetInnerHTML` attributes, in any case. Vue renders
+**BREAKING:** restricted trust now also refuses `innerHTML`, `outerHTML` and
+`dangerouslySetInnerHTML` attributes, in any case, on every framework. Vue renders
 `<div innerHTML="<img src=x onerror=…>">` as raw HTML, so this was a working
 script with no `{}` and no `on…` attribute for the existing checks to see.
 React ignores the string form, which is why it went unnoticed while React was

@@ -35,6 +35,23 @@ error's `fix` says what to change.
   anything it reports.
 </AgentPrompt>
 
+## 1.0.0-beta.10
+
+**Restricted trust refuses `innerHTML`, `outerHTML` and
+`dangerouslySetInnerHTML` attributes.** Vue renders
+`<div innerHTML="<img src=x onerror=…>">` as raw HTML, so a literal value was a
+working script with no `{}` and no `on…` attribute for the existing checks to
+see. The check runs in `graft compile`, MCP `write_content` and Studio saves,
+on every framework, in any letter case. A body that uses one of these
+attributes under the default `mdxTrust = "restricted"` now fails with
+`INPUT_VALIDATION_FAILED`. React ignored the string form, so on a React site
+the attribute rendered nothing anyway.
+
+**What to do:** run `graft compile`. If it names a document, replace the
+attribute with the markup itself, written as Markdown or a component. Content
+that every author commits through code review can set `mdxTrust = "full"`
+instead. See [MDX safety](/docs/mdx-safety#what-is-refused).
+
 ## 1.0.0-beta.9
 
 **A usage mistake exits with code 2, and a flag the command does not take is

@@ -273,7 +273,7 @@ export function assertSafeMdx(source: string, options: AssertSafeMdxOptions = {}
   throw new GraftError({
     code: "INPUT_VALIDATION_FAILED",
     message: `Executable MDX is not accepted${where} — found ${listed}${more}.`,
-    fix: "Write prose, Markdown and components with literal attributes. `{…}` expressions, `import`, `export` and spread attributes are refused because rendering evaluates them as JavaScript on the server. If this content is operator-authored and needs full MDX, commit it to the repository instead, where code review is the control.",
+    fix: "Write prose, Markdown and components with literal attributes. `{…}` expressions, `import`, `export` and spread attributes are refused because rendering evaluates them as JavaScript on the server. `<script>`-like elements, `on…` handlers and `innerHTML`, `outerHTML` or `dangerouslySetInnerHTML` are refused even with a literal value, because the browser runs them: put the markup in the body as Markdown or a component instead. If this content is operator-authored and needs full MDX, commit it to the repository instead, where code review is the control.",
     details: { found: found.length, nodes: found.slice(0, 20) },
   });
 }

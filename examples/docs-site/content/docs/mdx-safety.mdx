@@ -52,11 +52,14 @@ literal string attributes. Everything that evaluates is refused.
 | A spread attribute | `<Foo {...props} />` |
 | An element that can load or run code | `<script>`, `<iframe>`, `<object>`, `<embed>`, `<frame>`, `<frameset>`, `<base>` |
 | An inline event handler | `<img onerror="…" />` |
+| A raw-HTML attribute, in any case | `<div innerHTML="…" />`, `outerHTML`, `dangerouslySetInnerHTML` |
 
-The last two matter more than they look. `<script>alert(1)</script>` contains no
-expression at all, and MDX renders an unknown lowercase tag straight through to
-HTML. An `onerror` with a plain string value still runs in a browser, because
-React writes an unrecognized attribute into the markup as-is.
+The last three matter more than they look. `<script>alert(1)</script>` contains
+no expression at all, and MDX renders an unknown lowercase tag straight through
+to HTML. An `onerror` with a plain string value still runs in a browser, because
+React writes an unrecognized attribute into the markup as-is. And Vue renders a
+literal `innerHTML="<img src=x onerror=…>"` as markup, so that attribute is
+refused even with a plain string value.
 
 ## Frontmatter is read as YAML or JSON
 
