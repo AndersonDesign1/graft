@@ -1,0 +1,26 @@
+{
+  "name": "sdk-nuxt-compat-nuxt5",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A real the Nuxt 5 nightly 5.0.0-2610291341-744179a (Nitro 3) app that runs @usegraft/sdk-nuxt. See ../smoke.mjs.",
+  "type": "module",
+  "scripts": {
+    "smoke": "node ../smoke.mjs --port 3125"
+  },
+  "dependencies": {
+    "@usegraft/core": "workspace:*",
+    "@usegraft/db": "workspace:*",
+    "@usegraft/sdk-nuxt": "workspace:*",
+    "nuxt": "npm:nuxt-nightly@5.0.0-2610291341-744179a",
+    "vue": "3.5.44"
+  },
+  "devDependencies": {
+    "@usegraft/cli": "workspace:*",
+    "vue-tsc": "3.3.13"
+  },
+  "dependenciesMeta": {
+    "@usegraft/sdk-nuxt": {
+      "injected": true
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# Copied from ../app-src by ../smoke.mjs, and what Nuxt builds from them.
+app/
+server/
+content/
+graft.config.ts
+.graft/
+.nuxt/
+.output/
