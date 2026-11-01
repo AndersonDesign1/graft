@@ -1,5 +1,13 @@
 # @usegraft/sdk-sveltekit
 
+## 1.0.0-beta.9
+
+### Patch Changes
+
+- Updated dependencies [42213aa]
+  - @usegraft/db@1.0.0-beta.9
+  - @usegraft/sdk-core@1.0.0-beta.9
+
 ## 1.0.0-beta.8
 
 ### Patch Changes
