@@ -188,6 +188,36 @@ describe("graftHandler on h3 1 (Nuxt 4, nitropack 2)", () => {
     expect(seen[0]).toMatchObject({ method: "GET", body: "" });
   });
 
+  it("keeps the server's origin when the request target starts with //", async () => {
+    const { handler, seen } = recorder();
+    const req = {
+      method: "GET",
+      url: "//evil.test/api/mcp",
+      headers: { host: "site.test" },
+      socket: null,
+      on: () => req,
+    };
+    // SAFETY: the stand-in carries every field h3's createEvent reads.
+    await graftHandler(handler)(h3v1.createEvent(req as never, {} as never));
+
+    expect(seen[0]?.url).toBe("http://site.test//evil.test/api/mcp");
+  });
+
+  it("falls back to localhost when the Host header is not a host", async () => {
+    const { handler, seen } = recorder();
+    const req = {
+      method: "GET",
+      url: "/api/mcp",
+      headers: { host: "not a host" },
+      socket: null,
+      on: () => req,
+    };
+    // SAFETY: the stand-in carries every field h3's createEvent reads.
+    await graftHandler(handler)(h3v1.createEvent(req as never, {} as never));
+
+    expect(seen[0]?.url).toBe("http://localhost/api/mcp");
+  });
+
   it("sends no body for a GET, so the handler can answer 405", async () => {
     const { handler, seen } = recorder();
     const app = h3v1.createApp().use("/api/fn", h3v1.eventHandler(graftHandler(handler)));
@@ -270,6 +300,7 @@ describe("toGraftRequest", () => {
     await expect(toGraftRequest({})).rejects.toMatchObject({
       name: "GraftError",
       code: "FRAMEWORK_VERSION_UNSUPPORTED",
+      message: expect.stringMatching(/`event\.req` \(h3 2\).*`event\.node\.req` \(h3 1\)/),
     });
   });
 });

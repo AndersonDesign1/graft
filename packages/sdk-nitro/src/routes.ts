@@ -135,7 +135,7 @@ async function fromNodeRequest(req: NodeIncoming): Promise<Request> {
   // The full path as the client sent it. A prefix router rewrites `url`.
   const path = req.originalUrl ?? req.url ?? "/";
   const protocol = req.socket?.encrypted ? "https" : "http";
-  const url = new URL(path, `${protocol}://${headers.get("host") ?? "localhost"}`);
+  const url = requestUrl(protocol, headers.get("host"), path);
   const body = PAYLOAD_METHODS.has(method) ? await readBody(req) : undefined;
   // They described the bytes on the wire. The body here may be re-encoded,
   // such as a parsed object serialized back to JSON, so they would be wrong.
@@ -146,6 +146,22 @@ async function fromNodeRequest(req: NodeIncoming): Promise<Request> {
     headers,
     body: body && body.byteLength > 0 ? body : undefined,
   });
+}
+
+/**
+ * The URL from the server's own origin plus the request target, joined as
+ * text. Resolving the target against the origin instead would let a target
+ * such as `//evil.test/x` replace the host the handler sees. A Host header
+ * that is not a valid host falls back to `localhost`, the same as a missing
+ * one, rather than failing the request.
+ */
+function requestUrl(protocol: string, host: string | null, path: string): URL {
+  const target = path.startsWith("/") ? path : `/${path}`;
+  try {
+    return new URL(`${protocol}://${host ?? "localhost"}${target}`);
+  } catch {
+    return new URL(`${protocol}://localhost${target}`);
+  }
 }
 
 /**
