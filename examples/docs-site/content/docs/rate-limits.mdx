@@ -69,7 +69,8 @@ saying how many seconds to wait:
 - **Signed-in callers** are counted by who they are. Two users never share a
   limit, so one cannot lock out the other.
 - **Anonymous callers** are counted by IP address, when Graft knows it.
-  `graft serve` records each connection's address. Inside your own app, Graft
+  `graft serve` records each connection's address, and so does `graftHandler`
+  in a [Nuxt or Nitro](/docs/nitro) app. Inside other frameworks, Graft
   only knows it once you set `trustedProxyHops` (below). Until then, every
   anonymous caller shares one limit, which is strict: one busy caller can use
   it up for everyone.

@@ -115,6 +115,7 @@ place, list, update, and cancel functions).
 | [`@usegraft/sdk-sveltekit`](packages/sdk-sveltekit)           | SvelteKit. Typed reads plus `graftRoute` for `+server.ts`              |
 | [`@usegraft/sdk-tanstack-start`](packages/sdk-tanstack-start) | TanStack Start. Typed reads plus `graftRoute` for server routes        |
 | [`@usegraft/sdk-react-router`](packages/sdk-react-router)     | React Router v7 framework mode. Typed reads plus loader/action mounts  |
+| [`@usegraft/sdk-nitro`](packages/sdk-nitro)                   | Nuxt 4 and 5, Nitro 3. Typed reads plus `graftHandler` for h3 1 and 2  |
 | [`@usegraft/sdk-react`](packages/sdk-react)                   | The browser. Reads over HTTP, plus hooks                               |
 | [`@usegraft/sdk-core`](packages/sdk-core)                     | Anything else. The typed client the others wrap                        |
 
@@ -145,6 +146,7 @@ and your OIDC issuer.
 | `@usegraft/sdk-sveltekit`      | SvelteKit adapter                                                            |
 | `@usegraft/sdk-tanstack-start` | TanStack Start adapter                                                       |
 | `@usegraft/sdk-react-router`   | React Router v7 adapter, framework mode                                      |
+| `@usegraft/sdk-nitro`          | Nitro adapter, for Nuxt 4 and 5 and standalone Nitro                         |
 | `@usegraft/sdk-react`          | Browser client and hooks over the content API                                |
 | `@usegraft/cli`                | The `graft` command                                                          |
 | `@usegraft/mcp`                | The agent surface: content, functions, introspection                         |

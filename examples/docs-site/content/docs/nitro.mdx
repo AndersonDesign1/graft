@@ -1,0 +1,248 @@
+---
+title: Nuxt and Nitro
+description: "Read Graft content in Nuxt or Nitro server routes and serve functions and MCP from the same app, on Nuxt 4, Nuxt 5 and Nitro 3."
+section: Frameworks
+order: 6
+---
+
+<p className="kicker">Read Graft content in Nuxt and Nitro server routes.</p>
+
+This guide adds Graft to a Nuxt or Nitro project. You read content in server
+routes, fetch it from your pages, and can serve Graft's functions and MCP
+endpoint from the same app.
+
+One package covers all of these, because each one runs on Nitro:
+
+- **Nuxt 4** runs nitropack 2 on h3 1.
+- **Nuxt 5** runs Nitro 3 on h3 2.
+- **Nitro 3 on its own** runs on h3 2.
+
+**Before you start**, you need a Nuxt or Nitro project and a `graft.config.ts`
+with compiled content. If you do not have those yet, run through
+[Getting started](/docs/getting-started) first.
+
+<AgentPrompt>
+  Add Graft to this Nuxt app following https://graft.page/docs/nitro.md.
+  Keep the client in server/utils/graft.ts and read pages through a server
+  route.
+</AgentPrompt>
+
+## Install
+
+<Tabs labels="pnpm, npm, bun">
+
+<Tab>
+
+```sh
+pnpm add @usegraft/sdk-nitro @usegraft/db
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+npm i @usegraft/sdk-nitro @usegraft/db
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+bun add @usegraft/sdk-nitro @usegraft/db
+```
+
+</Tab>
+
+</Tabs>
+
+## Create the Graft client
+
+Create the client in `server/utils/`. Nuxt keeps that folder out of the
+browser bundle, and auto-imports what it exports into your server routes.
+In a standalone Nitro app, put the same file in your server's `utils/`.
+
+<CodeBlock title="server/utils/graft.ts">
+
+```ts
+import { openStaticIndex } from "@usegraft/db";
+import { createGraft, type Graft } from "@usegraft/sdk-nitro";
+import { collections } from "../../graft.config";
+
+let graft: Promise<Graft<typeof collections>> | undefined;
+
+// Opened on first use. Nuxt 4 compiles server code to ES2019, which has no
+// top-level await, so `await openStaticIndex(...)` at the top level fails to build.
+export function useGraft(): Promise<Graft<typeof collections>> {
+  graft ??= openStaticIndex(".graft/index.db").then((index) => createGraft({ index, collections }));
+  return graft;
+}
+```
+
+</CodeBlock>
+
+Postgres instead of the static index:
+
+```ts
+import { createDb } from "@usegraft/db";
+
+export const db = createDb(process.env.DATABASE_URL ?? "").db;
+export const useGraft = async () => createGraft({ db, collections });
+```
+
+<Callout label="Keep the client on the server" type="warning">
+  A Nuxt page's `<script setup>` runs on the server for the first paint and in
+  the browser on client-side navigation. Never import the client into a page
+  or component. Read through a server route, as below, or read over HTTP with
+  the [Content API](/docs/content-api).
+</Callout>
+
+## Read a document
+
+Add a server route that reads the document:
+
+<CodeBlock title="server/api/pages/[slug].get.ts">
+
+```ts
+export default defineEventHandler(async (event) => {
+  const graft = await useGraft();
+  const page = await graft.getContent("pages", getRouterParam(event, "slug") ?? "");
+  if (!page) throw createError({ statusCode: 404 });
+  return page;
+});
+```
+
+</CodeBlock>
+
+Then fetch it from the page:
+
+<CodeBlock title="app/pages/[slug].vue">
+
+```vue
+<script setup lang="ts">
+const route = useRoute();
+const { data: page } = await useFetch(`/api/pages/${route.params.slug}`);
+</script>
+
+<template>
+  <h1>{{ page?.data.title }}</h1>
+</template>
+```
+
+</CodeBlock>
+
+`getContent` returns the type your `defineCollection` declared, so a renamed
+field is a build error in the server route rather than `undefined` at runtime.
+
+## Serve functions and MCP from your app
+
+This step is optional. It needs the Postgres engine and three more packages:
+
+```sh
+npm i @usegraft/core @usegraft/auth @usegraft/mcp
+```
+
+`graftHandler` turns a Graft handler into a Nitro event handler. Leave the
+method out of the file name, so a GET reaches the handler and gets its 405 with
+an `Allow` header and a fix.
+
+<CodeBlock title="server/api/fn/[name].ts">
+
+```ts
+import { createFunctionsHandler } from "@usegraft/core";
+import { graftHandler } from "@usegraft/sdk-nitro";
+import { functions } from "../../../graft.config";
+import { db } from "../../utils/graft";
+
+export default defineEventHandler(graftHandler(createFunctionsHandler({ db, functions })));
+```
+
+</CodeBlock>
+
+<CodeBlock title="server/api/mcp.ts">
+
+```ts
+import { createActorResolver } from "@usegraft/auth";
+import { createGraftMcpHandler } from "@usegraft/mcp";
+import { graftHandler } from "@usegraft/sdk-nitro";
+import { collections, functions } from "../../graft.config";
+import { db } from "../utils/graft";
+
+// A dev token never expires, so it is accepted only in development. An unset
+// NODE_ENV counts as production, so a deploy that forgets it stays closed.
+const devToken = process.env.NODE_ENV === "development" ? process.env.GRAFT_DEV_TOKEN : undefined;
+
+const actor = createActorResolver({
+  issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
+    .split(/[,\s]+/)
+    .filter(Boolean)
+    .map((issuer) => ({ issuer })),
+  devTokens: devToken
+    ? { [devToken]: { kind: "human", id: "owner", scopes: ["content:write"] } }
+    : undefined,
+});
+
+export default defineEventHandler(
+  graftHandler(createGraftMcpHandler({ contentDir: "./content", db, collections, functions, actor })),
+);
+```
+
+</CodeBlock>
+
+This endpoint serves content writes and asset uploads. JWT verification runs
+only when `issuers` is passed; the library does not read
+`GRAFT_TRUSTED_ISSUERS` (`graft serve` does). See [Auth](/docs/auth).
+Unauthenticated callers get 401. `allowAnonymous: true` is only for a
+loopback local server, never anything reachable from a network.
+
+`graftHandler` works the same on h3 1 and h3 2, and is typed structurally, so
+this package depends on no Nuxt, Nitro or h3 version. It also handles a page
+that calls its own route with `$fetch` during server rendering. Nuxt 4 skips
+the network for that call and puts the body somewhere a plain stream reader
+would miss.
+
+## Rate limits count the real caller
+
+Graft's rate limits count anonymous callers by the address they connected
+from. Most frameworks hand Graft only the request, so every anonymous caller
+shares one bucket. Nitro hands over the connection too, so `graftHandler`
+records the socket address, and each caller gets its own bucket.
+
+The address comes from the connection, never from a header. A client that
+sends its own `x-forwarded-for` is still counted by where it connected from.
+Behind a proxy or load balancer, every caller connects from the proxy, so
+declare how many proxies you run with `trustedProxyHops`. See
+[Rate limits](/docs/rate-limits).
+
+## Refresh pages when content changes
+
+<TierBadge tier="postgres" />
+
+On the static engine, content changes ship with a new deploy, so there is
+nothing to refresh. On Postgres, content can change while your app is
+running. Nitro has no tag-based data cache, so let your CDN cache pages and
+purge only the ones whose content changed. Send each response with a header
+that lists the content it read:
+
+```ts
+import { tagsFor } from "@usegraft/sdk-nitro";
+
+export default defineEventHandler(async (event) => {
+  const slug = getRouterParam(event, "slug") ?? "";
+  const page = await (await useGraft()).getContent("pages", slug);
+  setResponseHeader(event, "Cache-Tag", tagsFor("main", "pages", slug).join(","));
+  return page;
+});
+```
+
+Then purge `tagsForChanges(branch, changes)` at your CDN from a route Graft
+calls after each write. The [SvelteKit guide](/docs/sveltekit#refresh-pages-when-content-changes)
+walks through that route and the `GRAFT_REVALIDATE_URL` and
+`GRAFT_WEBHOOK_SECRET` it needs. Nothing about it is SvelteKit-specific.
+
+## Next steps
+
+- [Reading content](/docs/reading-content) covers list and search reads.
+- [SDK reference](/docs/sdk-reference) compares route mounts across frameworks.
+- [Connecting agents](/docs/connecting-agents) points an agent at your project.

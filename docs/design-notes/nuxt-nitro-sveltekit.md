@@ -1,6 +1,6 @@
 # Nuxt, Nitro and SvelteKit adapters (research, 2026-11-01)
 
-**Status: plan agreed, nothing built yet.** This note records where each
+**Status: plan agreed. Unit 1 (`@usegraft/sdk-nitro`) is built.** This note records where each
 framework stands today, what a spike proved, and the order to build in.
 
 Each claim is labeled: **verified** (run in the spike below), **registry**
@@ -137,13 +137,25 @@ export default defineEventHandler(graftHandler(createGraftMcpHandler({ … })));
    the h3 1 source).
 3. A `Request` built from `event.node.req` (h3 1 on Node).
 
-Step 3 is what `createNodeListener` in `packages/cli/src/commands/serve.ts`
-already does. Move that conversion into a shared module and use it from
-both, so there is one Node-to-`Request` path rather than two.
+**Built (PR 1).** Two things changed from the plan while building it:
 
-Returning a `Response` from an event handler works on h3 1 and h3 2
-(verified above). The tests mount a real handler on h3 1 and h3 2, the way
-the spike did. This PR also commits this note.
+- The Node-to-`Request` conversion is not shared with `serve.ts` after all. On
+  h3 1 the body is not always in the stream. A middleware that ran h3's
+  `readBody` caches it under `Symbol.for("h3RawBody")`, and nitropack's
+  in-process `$fetch` (a Nuxt page calling its own route during server
+  rendering) puts it on `req.body` with a stream that never emits. The mount
+  reads those first, in h3's own order. `serve.ts` owns its sockets and needs
+  none of that, which leaves about six lines of header copying in common: too
+  little to share across packages.
+- The mount registers the socket address with `setRequestPeer` (`event.req.ip`
+  on h3 2, `event.node.req.socket.remoteAddress` on h3 1, and
+  `event.context.clientAddress` first on either when a preset sets it). Nitro
+  owns the connection, so it is the first in-app adapter that can, and
+  anonymous callers get a rate-limit bucket each.
+
+One build finding for every Nuxt 4 guide: nitropack 2 compiles server code to
+ES2019, so a top-level `await openStaticIndex(...)` fails the build. Open the
+index on first use.
 
 ### 2. `@usegraft/sdk-vue`: the browser client
 
