@@ -311,6 +311,10 @@ function buildServer(options: GraftMcpOptions, register: RegisterTools): McpServ
       gitSha: options.gitSha,
       audit: options.audit,
       approvals: options.approvals,
+      // The arguments arrive already parsed, inside an MCP message that the
+      // transport bounded (`maxBodyBytes` on the HTTP handler), so this
+      // in-process request needs no second, smaller limit of its own.
+      maxBodyBytes: Number.MAX_SAFE_INTEGER,
     });
     return functionsHandler;
   };

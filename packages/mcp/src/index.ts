@@ -20,6 +20,7 @@ export { createDocsMcp, createGraftMcp, type DocsMcpOptions, type GraftMcpOption
 export {
   createDocsMcpHandler,
   createGraftMcpHandler,
+  type DocsMcpHandlerOptions,
   type GraftMcpHandler,
   type GraftMcpHandlerOptions,
 } from "./http";

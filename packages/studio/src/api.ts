@@ -25,7 +25,14 @@ import {
   type ContentRow,
   type Database,
 } from "@usegraft/db";
-import { EditorComponentSpec, GraftError, type EditorComponentList } from "@usegraft/contracts";
+import {
+  bodyLimit,
+  DEFAULT_MAX_BODY_BYTES,
+  EditorComponentSpec,
+  GraftError,
+  type EditorComponentList,
+} from "@usegraft/contracts";
+import { readJson } from "./body";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { readCollectionDocs } from "./content";
@@ -57,6 +64,11 @@ import type {
 export type StudioFetchHandler = (request: Request) => Promise<Response>;
 
 export interface StudioApiOptions {
+  /**
+   * The largest JSON body a Studio route reads, in bytes. Defaults to 1 MiB.
+   * Asset uploads allow at least 14 MiB, so a 10 MB file fits as base64.
+   */
+  maxBodyBytes?: number;
   /**
    * Postgres: the index, and everything else Studio keeps (approvals, the
    * compile history, branches, accounts, agent tokens, the media library,
@@ -312,6 +324,8 @@ export function statusFor(error: GraftError): number {
       return 502;
     case "RATE_LIMITED":
       return 429;
+    case "PAYLOAD_TOO_LARGE":
+      return 413;
     case "SCHEMA_VALIDATION_FAILED":
     case "INPUT_VALIDATION_FAILED":
     case "INVALID_SLUG":
@@ -785,7 +799,9 @@ const ROUTES: readonly Route[] = [
     writesCheckout: true,
     databaseSource: true,
     handle: async ({ request, url, options, defaultBranch }) => {
-      const payload = (await request.json().catch(() => ({}))) as { branch?: string };
+      const payload = ((await readJson(request, options.maxBodyBytes)) ?? {}) as {
+        branch?: string;
+      };
       const branch =
         payload.branch?.trim() || url.searchParams.get("branch")?.trim() || defaultBranch;
       const result = await compileIndex(options, {
@@ -845,7 +861,7 @@ const ROUTES: readonly Route[] = [
     scope: "studio:publish",
     writesCheckout: true,
     handle: async ({ request, options }) => {
-      const payload = (await request.json().catch(() => ({}))) as {
+      const payload = ((await readJson(request, options.maxBodyBytes)) ?? {}) as {
         paths?: unknown;
         message?: unknown;
       };
@@ -934,7 +950,9 @@ const ROUTES: readonly Route[] = [
       // Note there is no `decidedBy` here: the decision is attributed to the
       // identity this Studio was mounted for, so a caller cannot name a decider
       // other than itself and defeat the requester-cannot-decide check.
-      const payload = (await request.json()) as { decision?: string };
+      const payload = ((await readJson(request, options.maxBodyBytes)) ?? {}) as {
+        decision?: string;
+      };
       if (payload.decision !== "approved" && payload.decision !== "denied") {
         throw new GraftError({
           code: "INPUT_VALIDATION_FAILED",
@@ -1063,6 +1081,9 @@ function matchRoute(method: string, pathname: string): { route: Route; id: strin
 /** Implements /api/studio/v1/* from openapi.yaml. */
 export function createStudioApiHandler(options: StudioApiOptions): StudioFetchHandler {
   const defaultBranch = options.defaultBranch ?? "main";
+  // Checked here so a bad limit stops Studio starting, rather than turning
+  // the limit off on the first request.
+  bodyLimit(options.maxBodyBytes, DEFAULT_MAX_BODY_BYTES);
 
   return async (request) => {
     try {
