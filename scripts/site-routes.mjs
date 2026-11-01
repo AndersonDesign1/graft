@@ -63,3 +63,35 @@ export function expectedStaticFiles(authored) {
   }
   return files;
 }
+
+/**
+ * Routes in `.vercel/output/config.json` that can answer a plain request,
+ * which is not all of them.
+ *
+ * The generated config ends with `{"src":"^/.*$","dest":"_render","status":404}`
+ * — a catch-all whose entire job is to serve the 404 page. Matching against the
+ * raw list therefore says every conceivable path resolves, and the first version
+ * of the checker did exactly that: it reported "no dead internal links" while
+ * checking nothing, because every link matched the catch-all. A check that
+ * cannot fail is worse than no check, since it also reports success.
+ *
+ * So three kinds are dropped. `status >= 400` is a route that answers with an
+ * error. `continue: true` only attaches headers and hands the request onward.
+ * And a route with `has` applies only when the request carries a given header
+ * or cookie: the docs' `Accept: text/markdown` rewrite matches every
+ * `/docs/<anything>`, so counting it let `/docs/functions`, a page that never
+ * existed, pass as a live link. A reader following a link sends none of that.
+ *
+ * @param {unknown} configRoutes
+ * @returns {Array<{ src: string }>}
+ */
+export function destinationRoutes(configRoutes) {
+  return (Array.isArray(configRoutes) ? configRoutes : []).filter(
+    (r) =>
+      typeof r.src === "string" &&
+      r.continue !== true &&
+      r.has === undefined &&
+      !(typeof r.status === "number" && r.status >= 400) &&
+      (r.dest !== undefined || r.headers?.Location !== undefined),
+  );
+}
