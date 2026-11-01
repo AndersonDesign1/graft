@@ -1,7 +1,10 @@
+// @vitest-environment node
+// The handle has no DOM in it, and the same-origin test needs a runtime with
+// no `location`, as during server rendering. jsdom would supply one.
 /**
  * Unit: the type-inference pins (the no-codegen contract has to survive a
  * client that reads over HTTP exactly as it survives one that reads Postgres),
- * the two configurations this package refuses, and a round trip through the
+ * the configurations this package refuses, and a round trip through the
  * real content API handler — no network, no database, the actual wire format.
  */
 import { createContentApiHandler } from "@usegraft/content-api";
@@ -124,6 +127,28 @@ describe("createGraft configuration", () => {
     await expect(
       graft.searchContent("docs", "intro", { branch: "preview/redesign" }),
     ).rejects.toThrow(/`branch` cannot be passed to a read/);
+  });
+
+  it("refuses a branch passed through graft.client, which skips the helpers' guard", async () => {
+    const graft = servedGraft();
+    await expect(
+      graft.client.getDocument("docs", "intro", { branch: "preview/redesign" }),
+    ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+  });
+
+  it("builds with a same-origin endpoint where there is no page, failing only a read", async () => {
+    // During server rendering a module that calls createGraft is imported with
+    // no `location`. Building the reader eagerly threw right there.
+    const graft = createGraft({ endpoint: "/api/content/v1", collections: { docs } });
+    await expect(graft.getContent("docs", "intro")).rejects.toMatchObject({
+      code: "CONFIG_INVALID",
+    });
+  });
+
+  it("refuses endpoint and index together, rather than ignoring one", () => {
+    expect(() =>
+      createGraft({ endpoint: "http://cms.test/api/content/v1", index, collections: { docs } }),
+    ).toThrowError(/cannot both be set/);
   });
 
   it("still allows a per-read branch when the handle owns its own index", async () => {

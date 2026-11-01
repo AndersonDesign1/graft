@@ -215,12 +215,15 @@ export function usePost(slug: string) {
 - **Reach the database.** The client only speaks HTTP. It has no option for a
   database connection, so a connection string cannot end up in your bundle.
 - **Choose a branch.** Each Content API endpoint serves one branch, set by the
-  server. Passing `branch` to the client or to a read throws `CONFIG_INVALID`.
+  server. Passing `branch` to the client, to a read, or to `graft.client`
+  throws `CONFIG_INVALID`.
   To read a preview branch, point a second client at the preview deployment's
   endpoint.
 - **Render on the server.** During server rendering the hooks return their
   loading state. Content that must be in the first HTML belongs in your
-  framework's server package.
+  framework's server package. A module that calls `createGraft` with a
+  same-origin endpoint such as `/api/content/v1` can still be imported on the
+  server: the client is built on the first read, and only a read there fails.
 
 ## Next steps
 
