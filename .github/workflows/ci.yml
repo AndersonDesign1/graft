@@ -212,7 +212,9 @@ jobs:
   # it builds with `nuxi build`, type-checks the app and the module's runtime
   # against that Nuxt, serves the output, and checks server-rendered reads, MDX,
   # the content API, the routes that need Postgres, and hydration plus a
-  # client-side navigation in Chromium.
+  # client-side navigation in Chromium. Advisory, like sdk-next-compat: it is not
+  # a required check in .github/rulesets/main.json, because the Nuxt 5 leg runs a
+  # nightly that can break for reasons outside this repo.
   sdk-nuxt-compat:
     name: sdk-nuxt on Nuxt ${{ matrix.nuxt }}
     runs-on: ubuntu-latest

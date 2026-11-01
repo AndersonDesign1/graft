@@ -1,7 +1,8 @@
 /**
  * Which storage engine a Nuxt app reads, from graft.config.ts's `index` export
  * and the runtime config. The same rule `graft compile` uses: `"static"` opens
- * the SQLite artifact, anything else is Postgres. Validated here rather than
+ * the SQLite artifact, `"postgres"` or no `index` export is Postgres, and
+ * anything else is refused with CONFIG_INVALID. Validated here rather than
  * trusted, because the export is user code. No Nuxt imports, so it is tested
  * on its own.
  */

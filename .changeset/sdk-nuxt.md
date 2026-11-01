@@ -2,6 +2,7 @@
 "@usegraft/sdk-nuxt": patch
 "@usegraft/sdk-nitro": patch
 "@usegraft/mcp": patch
+"@usegraft/db": patch
 ---
 
 Add `@usegraft/sdk-nuxt`, the Nuxt module, for Nuxt 4.6 and newer and Nuxt 5.
@@ -23,8 +24,11 @@ the engine `graft.config.ts` names: the static index, or Postgres at
 `NUXT_GRAFT_DATABASE_URL` (falling back to `DATABASE_URL`). `<GraftMdx>` and
 `prepareMdx` render MDX bodies with your Vue components. The `contentApi`,
 `functions` and `mcp` options mount `/api/content/v1`, `/api/fn/:name` and
-`/api/mcp`. A route that needs Postgres on the static engine answers `503` with
-`CONFIG_INVALID` and a fix.
+`/api/mcp`, and follow `approvalPolicy` and `mdxTrust` from `graft.config.ts`
+with the same 60-a-minute backstop `graft serve` sets. JWT callers are checked
+against `NUXT_GRAFT_TRUSTED_ISSUERS` and, when set,
+`NUXT_GRAFT_TRUSTED_AUDIENCE`. A route that needs Postgres on the static engine
+answers `503` with `CONFIG_INVALID` and a fix.
 
 The server code imports from `nuxt/server`, which Nuxt added in 4.6.0, so one
 build runs on Nitro 2 (Nuxt 4) and Nitro 3 (Nuxt 5). CI builds a real Nuxt
@@ -37,3 +41,8 @@ values. Before, that was a type error, though it worked at runtime. A
 `clientAddress` that is not a string is now ignored.
 
 `list_packages` answers `framework: "nuxt"` with `@usegraft/sdk-nuxt`.
+
+`createDbIndexReader` in `@usegraft/db` forgets a failed branch lookup, so a
+reader that lives for the whole server process, as the Nuxt module's does,
+recovers on the next read after a database blip instead of failing every read
+until a restart.

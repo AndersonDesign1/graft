@@ -50,9 +50,9 @@ describe("actorOptions", () => {
       actorOptions({ trustedIssuers: "https://a.test, https://b.test  https://c.test" }),
     ).toEqual({
       issuers: [
-        { issuer: "https://a.test" },
-        { issuer: "https://b.test" },
-        { issuer: "https://c.test" },
+        { issuer: "https://a.test", actorKind: "agent" },
+        { issuer: "https://b.test", actorKind: "agent" },
+        { issuer: "https://c.test", actorKind: "agent" },
       ],
       devTokens: undefined,
     });

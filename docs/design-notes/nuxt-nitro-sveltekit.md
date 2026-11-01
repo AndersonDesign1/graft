@@ -13,8 +13,8 @@ docs or code, not run).
 | Framework          | Current stable                       | Server layer                         | Graft today                     |
 | ------------------ | ------------------------------------ | ------------------------------------ | ------------------------------- |
 | SvelteKit          | `@sveltejs/kit` 3.1.1 (2026-10-29)   | Its own, Web-standard `RequestEvent` | `@usegraft/sdk-sveltekit` ships |
-| Nuxt               | `nuxt` 4.6.3 (2026-10-27)            | `nitropack` 2.13.5 on `h3` 1.15      | `@usegraft/sdk-nitro`           |
-| Nuxt 5             | Not released, no date                | `nitro` 3 on `h3` 2                  | `@usegraft/sdk-nitro`           |
+| Nuxt               | `nuxt` 4.6.3 (2026-10-27)            | `nitropack` 2.13.5 on `h3` 1.15      | `@usegraft/sdk-nuxt`            |
+| Nuxt 5             | Not released, no date                | `nitro` 3 on `h3` 2                  | `@usegraft/sdk-nuxt`            |
 | Nitro (standalone) | `nitro` 3.0.261029-rc (`latest` tag) | `h3` 2.0.8, stable since 2.0.1       | `@usegraft/sdk-nitro`           |
 
 All versions above are **registry**. Notes:

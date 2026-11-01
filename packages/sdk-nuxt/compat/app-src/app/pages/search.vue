@@ -8,7 +8,7 @@ const { data: hits } = await useGraftSearch("pages", query);
 <template>
   <input v-model="query" placeholder="Search" />
   <ul>
-    <li v-for="page in hits?.length ? hits : (pages ?? [])" :key="page.slug">
+    <li v-for="page in query ? (hits ?? []) : (pages ?? [])" :key="page.slug">
       <NuxtLink :to="`/${page.slug}`">{{ page.data.title }}</NuxtLink>
     </li>
   </ul>

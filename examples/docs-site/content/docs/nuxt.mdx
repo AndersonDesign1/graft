@@ -91,7 +91,8 @@ for the slug, so the read follows the route:
 <script setup lang="ts">
 const route = useRoute();
 const slug = () => String(route.params.slug);
-const { data: page } = await useGraftContent("pages", slug);
+const { data: page, error } = await useGraftContent("pages", slug);
+if (error.value) throw error.value;
 if (!page.value) throw createError({ statusCode: 404, statusMessage: "No such page" });
 </script>
 
@@ -105,7 +106,9 @@ if (!page.value) throw createError({ statusCode: 404, statusMessage: "No such pa
 </CodeBlock>
 
 `page.data` has the type your `defineCollection` declared, so a renamed field
-is a type error in the page rather than `undefined` at runtime.
+is a type error in the page rather than `undefined` at runtime. A failed read,
+such as a misconfigured engine, arrives in `error`, so the page shows that
+error instead of a 404.
 
 The read runs on the server for the first paint, and the document travels to
 the browser in the page payload, so the page hydrates without fetching it
@@ -127,7 +130,7 @@ const { data: hits } = await useGraftSearch("pages", query);
 <template>
   <input v-model="query" placeholder="Search" />
   <ul>
-    <li v-for="page in hits?.length ? hits : (pages ?? [])" :key="page.slug">
+    <li v-for="page in query ? (hits ?? []) : (pages ?? [])" :key="page.slug">
       <NuxtLink :to="`/${page.slug}`">{{ page.data.title }}</NuxtLink>
     </li>
   </ul>
@@ -136,7 +139,8 @@ const { data: hits } = await useGraftSearch("pages", query);
 
 </CodeBlock>
 
-A blank search answers an empty list without a request.
+With an empty box the page lists every document. A blank search answers an
+empty list without a request.
 
 The composables check every document against your collections, as every Graft
 client does, so `graft.config.ts` is part of the browser bundle. Keep it free
@@ -236,6 +240,8 @@ environment variable when the server starts:
 | `NUXT_GRAFT_STATIC_INDEX` | The static index file, instead of the path in `graft.config.ts`. |
 | `NUXT_GRAFT_DEV_TOKEN` | A bearer token the functions and MCP routes accept in development only. |
 | `NUXT_GRAFT_TRUSTED_ISSUERS` | JWT issuers those routes trust, comma or space separated. |
+| `NUXT_GRAFT_TRUSTED_AUDIENCE` | The token audience (`aud`) those routes accept. Unset, the audience is not checked. |
+| `NUXT_GRAFT_TRUSTED_ACTOR_KIND` | `agent` (the default) or `human`: how token holders are recorded. |
 
 A misconfigured engine fails the request with `CONFIG_INVALID` and a `fix`
 that names the setting to change. The next request tries again, so you can fix
@@ -271,8 +277,14 @@ export default defineNuxtConfig({
 
 Callers of the functions and MCP routes authenticate with a JWT from one of
 `NUXT_GRAFT_TRUSTED_ISSUERS`, or with `NUXT_GRAFT_DEV_TOKEN` while
-`NODE_ENV` is `development`. An unset `NODE_ENV` counts as production. See
+`NODE_ENV` is `development`. An unset `NODE_ENV` counts as production. Set
+`NUXT_GRAFT_TRUSTED_AUDIENCE` to the audience your provider puts in tokens for
+this app, or a token it signs for another app is accepted too. See
 [Auth](/docs/auth).
+
+Both routes follow `approvalPolicy` in `graft.config.ts`, and MCP writes follow
+`mdxTrust`, as `graft serve` does. Each caller gets 60 calls a minute unless a
+function sets its own `rateLimit`.
 
 With the static engine, both routes answer `503` with `CONFIG_INVALID`, and a
 `fix` that says to switch to Postgres or turn the route off.
@@ -297,5 +309,5 @@ with `@usegraft/sdk-nitro`. See [Nitro](/docs/nitro).
 - [Content API](/docs/content-api) documents the routes the composables read.
 - [Vue](/docs/vue) covers `MdxContent` and the components a body can use.
 - [Schema](/docs/schema) defines the collections your reads are typed from.
-- [Functions](/docs/functions) explains the typed functions the `functions`
-  route serves.
+- [Functions & access](/docs/functions-and-access) explains the typed functions
+  the `functions` route serves.

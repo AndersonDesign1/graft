@@ -21,12 +21,13 @@ export type RequestFetch = (
  */
 export function fetchVia(requestFetch: RequestFetch): typeof globalThis.fetch {
   return async (input, init) => {
-    const url = new URL(input instanceof Request ? input.url : String(input));
+    const request = input instanceof Request ? input : undefined;
+    const url = new URL(request ? request.url : String(input));
     let status = 200;
     let contentType = "application/json";
     const body = await requestFetch(`${url.pathname}${url.search}`, {
-      method: init?.method ?? "GET",
-      headers: init?.headers,
+      method: init?.method ?? request?.method ?? "GET",
+      headers: init?.headers ?? request?.headers,
       responseType: "text",
       ignoreResponseError: true,
       onResponse: ({ response }) => {

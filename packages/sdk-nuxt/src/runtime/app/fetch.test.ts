@@ -35,14 +35,30 @@ describe("fetchVia", () => {
     };
 
     const response = await fetchVia(requestFetch)(
-      new Request("https://site.test/api/content/v1/search?q=x"),
-      {
-        method: "GET",
+      new Request("https://site.test/api/content/v1/search?q=x", {
         headers: { authorization: "Bearer t" },
-      },
+      }),
     );
 
-    expect(seen).toEqual({ method: "GET", headers: { authorization: "Bearer t" } });
+    expect(seen?.method).toBe("GET");
+    expect(new Headers(seen?.headers).get("authorization")).toBe("Bearer t");
     expect(response.status).toBe(200);
+  });
+
+  it("lets init override what the Request carries", async () => {
+    let seen: { method: string; headers?: HeadersInit } | undefined;
+    const requestFetch: RequestFetch = async (_path, options) => {
+      seen = { method: options.method, headers: options.headers };
+      return "[]";
+    };
+
+    await fetchVia(requestFetch)(
+      new Request("https://site.test/api/content/v1/search?q=x", {
+        headers: { authorization: "Bearer request" },
+      }),
+      { method: "GET", headers: { authorization: "Bearer init" } },
+    );
+
+    expect(seen).toEqual({ method: "GET", headers: { authorization: "Bearer init" } });
   });
 });

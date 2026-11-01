@@ -12,10 +12,11 @@ content in server routes, fetch it from your pages, and can serve Graft's
 functions and MCP endpoint from the same app.
 
 <Callout label="On Nuxt 4.6 or newer, use the module" type="note">
-  [`@usegraft/sdk-nuxt`](/docs/nuxt) does everything on this page from one line
-  in `nuxt.config.ts`, and adds server-rendered page composables. Follow this
-  guide on Nitro 3 on its own, on an older Nuxt 4, or when you want to write the
-  routes yourself.
+  [`@usegraft/sdk-nuxt`](/docs/nuxt) sets up the server reads, server-rendered
+  page composables, and the content API, functions and MCP routes from
+  `nuxt.config.ts`. Follow this guide on Nitro 3 on its own, on an older Nuxt 4,
+  or to write the routes yourself. Cache refresh, rate limits behind a proxy and
+  request body limits are covered here either way.
 </Callout>
 
 One package covers all of these, because each one runs on Nitro:

@@ -56,6 +56,10 @@ export interface GraftRuntimeConfig {
   devToken: string;
   /** `NUXT_GRAFT_TRUSTED_ISSUERS`: JWT issuers, comma or space separated. */
   trustedIssuers: string;
+  /** `NUXT_GRAFT_TRUSTED_AUDIENCE`: accepted `aud` values. Empty leaves `aud` unchecked. */
+  trustedAudience: string;
+  /** `NUXT_GRAFT_TRUSTED_ACTOR_KIND`: `"agent"` (the default) or `"human"`. */
+  trustedActorKind: string;
 }
 
 const CONFIG_ALIAS = "#graft/config";
@@ -107,6 +111,8 @@ const graftModule: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
       staticIndex: "",
       devToken: "",
       trustedIssuers: "",
+      trustedAudience: "",
+      trustedActorKind: "",
     };
     // What nuxt.config.ts set wins over the defaults; the env vars win at runtime.
     const runtimeGraft = { ...defaults };

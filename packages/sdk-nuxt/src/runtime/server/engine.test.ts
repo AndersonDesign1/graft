@@ -11,7 +11,7 @@ describe("engineFor", () => {
     });
   });
 
-  it("takes the config's own path, and lets NUXT_GRAFT_STATIC_INDEX override it", () => {
+  it("takes the config's own path, and lets the runtime config's staticIndex override it", () => {
     const index = { driver: "static", path: "build/content.db" };
     expect(engineFor(index, {}, {}, cwd)).toEqual({
       kind: "static",

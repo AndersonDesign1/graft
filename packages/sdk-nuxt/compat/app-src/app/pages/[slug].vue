@@ -1,7 +1,8 @@
 <script setup lang="ts">
 const route = useRoute();
 const slug = () => String(route.params.slug);
-const { data: page } = await useGraftContent("pages", slug);
+const { data: page, error } = await useGraftContent("pages", slug);
+if (error.value) throw error.value;
 if (!page.value) throw createError({ statusCode: 404, statusMessage: "No such page" });
 const { data: mdx } = await useFetch(() => `/api/mdx/${slug()}`);
 </script>

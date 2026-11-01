@@ -4,7 +4,8 @@ import { createFunctionsHandler } from "@usegraft/core";
 import { graftHandler } from "@usegraft/sdk-nitro";
 import { defineEventHandler, useRuntimeConfig } from "nuxt/server";
 import { optionalConfig, useGraftDatabase } from "./graft";
-import { actorOptions, lazyHandler } from "./handler";
+import { actorOptions, lazyHandler, RATE_LIMIT } from "./handler";
+import { approvalPolicyFor } from "./settings";
 
 export default defineEventHandler(
   graftHandler(
@@ -13,6 +14,8 @@ export default defineEventHandler(
         db: await useGraftDatabase("/api/fn"),
         functions: optionalConfig.functions ?? {},
         actor: createActorResolver(actorOptions(useRuntimeConfig().graft)),
+        approvalPolicy: approvalPolicyFor(optionalConfig.approvalPolicy),
+        rateLimit: RATE_LIMIT,
       }),
     ),
   ),

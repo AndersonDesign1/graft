@@ -14,7 +14,8 @@ import type {
   ReaderReadOptions,
   ReaderSearchOptions,
 } from "@usegraft/contracts";
-import { readContent, resolveBranchScope, scopeChain, type BranchScope } from "./branch";
+import { readContent, resolveBranchScope, scopeChain } from "./branch";
+import { memoizeScopes } from "./scope-memo";
 import type { Database } from "./client";
 import { searchContent, type ContentSearchHit } from "./search";
 import type { ContentRow } from "./schema";
@@ -30,18 +31,7 @@ export type {
 
 /** The Postgres-backed reader over an existing Database handle (does not own/close it). */
 export function createDbIndexReader(db: Database): ContentIndexReader {
-  // One in-flight/settled scope resolution per branch, shared by concurrent
-  // reads. A reader is typically request-scoped (sdk-next dedupes via
-  // React.cache); a topology change is picked up by the next reader.
-  const scopeCache = new Map<string, Promise<BranchScope>>();
-  const scopeFor = (branch: string): Promise<BranchScope> => {
-    let cached = scopeCache.get(branch);
-    if (cached === undefined) {
-      cached = resolveBranchScope(db, branch);
-      scopeCache.set(branch, cached);
-    }
-    return cached;
-  };
+  const scopeFor = memoizeScopes((branch) => resolveBranchScope(db, branch));
 
   return {
     async readContent(options) {

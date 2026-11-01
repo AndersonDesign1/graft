@@ -9,6 +9,7 @@
  */
 import { GraftError } from "@usegraft/contracts";
 import type { FetchHandler } from "@usegraft/sdk-nitro";
+import { trustedIssuersFor, type IssuerSettings } from "./settings";
 
 export function lazyHandler(build: () => Promise<FetchHandler>): FetchHandler {
   let built: Promise<FetchHandler> | undefined;
@@ -29,20 +30,21 @@ export function lazyHandler(build: () => Promise<FetchHandler>): FetchHandler {
 }
 
 /** Who is calling, from the runtime config, the same way `graft serve` decides. */
-export function actorOptions(runtime: {
-  readonly devToken?: string;
-  readonly trustedIssuers?: string;
-}) {
+export function actorOptions(runtime: IssuerSettings & { readonly devToken?: string }) {
   // A dev token never expires, so it is accepted only in development. An unset
   // NODE_ENV counts as production, so a deploy that forgets it stays closed.
   const devToken = process.env.NODE_ENV === "development" ? runtime.devToken : undefined;
   return {
-    issuers: (runtime.trustedIssuers ?? "")
-      .split(/[,\s]+/)
-      .filter(Boolean)
-      .map((issuer) => ({ issuer })),
+    issuers: trustedIssuersFor(runtime),
     devTokens: devToken
       ? { [devToken]: { kind: "human" as const, id: "owner", scopes: ["content:write"] } }
       : undefined,
   };
 }
+
+/**
+ * The per-caller backstop `graft serve` gives both writing routes. A
+ * function's own `rateLimit` overrides it, and the same cap applies whether a
+ * function is called over /api/fn or MCP's run_function.
+ */
+export const RATE_LIMIT = { limit: 60, windowSeconds: 60 };

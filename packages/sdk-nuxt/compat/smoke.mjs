@@ -176,6 +176,8 @@ try {
     page.on("console", (message) => {
       if (["warning", "error"].includes(message.type())) logged.push(message.text());
     });
+    // An exception thrown in the page, which never reaches the console.
+    page.on("pageerror", (error) => logged.push(String(error)));
     const contentRequests = [];
     page.on("request", (request) => {
       if (request.url().includes("/api/content/v1/")) contentRequests.push(request.url());

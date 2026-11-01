@@ -3,7 +3,8 @@
  * the read handle `useGraft()` built on it. Auto-imported into `server/`.
  *
  * The engine follows `index` in graft.config.ts, the same rule `graft compile`
- * uses: `"static"` opens the SQLite artifact, anything else is Postgres.
+ * uses: `"static"` opens the SQLite artifact, `"postgres"` (or no `index`
+ * export) is Postgres, and any other value is refused with CONFIG_INVALID.
  * Both are opened on first use. Nuxt 4 compiles server code to ES2019, which
  * has no top-level await, and a failed open is forgotten so the next request
  * tries again.
@@ -28,6 +29,8 @@ export const optionalConfig: {
   readonly index?: unknown;
   readonly functions?: Record<string, AnyGraftFunction>;
   readonly contentDir?: string;
+  readonly approvalPolicy?: unknown;
+  readonly mdxTrust?: unknown;
 } = graftConfig;
 
 /** The one branch a Nuxt app serves. */
