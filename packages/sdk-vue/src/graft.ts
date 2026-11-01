@@ -86,6 +86,14 @@ function readerFor<TCollections extends Record<string, AnyCollection>>(
     return options.index;
   }
 
+  if (options.index !== undefined) {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message: "`endpoint` and `index` cannot both be set.",
+      fix: "Pass `endpoint` to read a content API, or `index` to read through your own ContentIndexReader. With both, one would be silently ignored.",
+    });
+  }
+
   // A content API endpoint *is* a branch: the server pins one and refuses a
   // branch query param, so a `branch` set here would be dropped on the way out
   // and the caller would read main while believing they read a preview.
@@ -98,11 +106,44 @@ function readerFor<TCollections extends Record<string, AnyCollection>>(
     });
   }
 
-  return createContentApiReader({
-    endpoint: options.endpoint,
-    headers: options.headers,
-    fetch: options.fetch,
-  });
+  const endpoint = options.endpoint;
+  return endpointReader(() =>
+    createContentApiReader({ endpoint, headers: options.headers, fetch: options.fetch }),
+  );
+}
+
+type Reader = NonNullable<ClientOptions<Record<string, AnyCollection>>["index"]>;
+
+/**
+ * The content API reader, built on first read rather than when the handle is.
+ *
+ * A same-origin endpoint such as `/api/content/v1` resolves against the page,
+ * and during server rendering there is no page, so building it eagerly made
+ * `createGraft` throw as soon as a server imported the module that calls it.
+ * Built lazily, the module loads anywhere and only a read on the server fails.
+ *
+ * It also refuses a read on any branch but the endpoint's own, which catches a
+ * `branch` passed through `graft.client` as well as through the helpers.
+ */
+function endpointReader(make: () => Reader): Reader {
+  let reader: Reader | undefined;
+  const get = (branch: string | undefined): Reader => {
+    if (branch !== undefined && branch !== "main") {
+      throw new GraftError({
+        code: "CONFIG_INVALID",
+        message: `A read asked for branch "${branch}" from an endpoint-backed handle.`,
+        fix: "Each content API endpoint serves exactly one branch, fixed by the server. Point a second handle at the preview's own endpoint instead of asking this one for a branch.",
+        details: { branch },
+      });
+    }
+    reader ??= make();
+    return reader;
+  };
+  return {
+    readContent: async (options) => get(options.branch).readContent(options),
+    searchContent: async (options) => get(options.branch).searchContent(options),
+    close: async () => reader?.close(),
+  };
 }
 
 /**

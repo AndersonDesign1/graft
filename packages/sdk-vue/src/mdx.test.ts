@@ -60,6 +60,12 @@ describe("prepareMdx + MdxContent", () => {
     });
   });
 
+  it("refuses an innerHTML attribute, which Vue would render as raw HTML", async () => {
+    await expect(
+      prepareMdx('<div innerHTML="<img src=x onerror=alert(1)>">a</div>'),
+    ).rejects.toMatchObject({ code: "INPUT_VALIDATION_FAILED" });
+  });
+
   it("refuses a body that imports modules even under full trust, because the browser has no bundler", async () => {
     await expect(prepareMdx('import X from "x";\n\nHi', { trust: "full" })).rejects.toMatchObject({
       code: "INPUT_VALIDATION_FAILED",

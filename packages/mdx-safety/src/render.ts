@@ -117,7 +117,7 @@ export function remarkRefuseModules() {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
       message: "This MDX body imports modules, which prepareMdx can't send to the browser.",
-      fix: "Pass the components in MdxContent's components map instead of importing them in the MDX. In the Next.js App Router, MdxBody runs imports on the server.",
+      fix: "Pass the components in MdxContent's components map instead of importing them in the MDX. Only a server-only render path, such as MdxBody in the Next.js App Router, can run imports.",
       details: { reason: "mdx-import" },
     });
   };

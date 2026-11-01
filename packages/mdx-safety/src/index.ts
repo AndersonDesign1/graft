@@ -40,7 +40,8 @@ export interface ExecutableNode {
     | "attribute-expression"
     | "attribute-spread"
     | "scripting-element"
-    | "event-handler";
+    | "event-handler"
+    | "raw-html-attribute";
   /** 1-based line, when the parser knew it. */
   line?: number;
   /** The offending source, truncated. */
@@ -54,6 +55,7 @@ const KIND_LABEL: Record<ExecutableNode["kind"], string> = {
   "attribute-spread": "a `{...spread}` attribute",
   "scripting-element": "an element that can load or run code",
   "event-handler": "an inline event-handler attribute",
+  "raw-html-attribute": "an attribute that writes raw HTML",
 };
 
 /**
@@ -75,6 +77,14 @@ const SCRIPTING_ELEMENTS = new Set([
 
 /** `onerror`, `onload`, `onclick`, … — a string value still runs in a browser. */
 const EVENT_HANDLER_RE = /^on[a-z]/i;
+
+/**
+ * Attributes a renderer may treat as raw HTML. Vue sets `innerHTML` from a
+ * plain string, so `<div innerHTML="<img src=x onerror=…>">` renders a working
+ * handler with no `{}` and no `on…` attribute in sight. React ignores the
+ * string form, which is why this was missed while React was the only renderer.
+ */
+const RAW_HTML_ATTRIBUTE_RE = /^(innerhtml|outerhtml|dangerouslysetinnerhtml)$/i;
 
 function snippetOf(value: unknown): string | undefined {
   if (typeof value !== "string" || value.length === 0) return undefined;
@@ -166,6 +176,14 @@ export function findExecutableMdx(source: string): ExecutableNode[] {
         if (typeof attribute.name === "string" && EVENT_HANDLER_RE.test(attribute.name)) {
           found.push({
             kind: "event-handler",
+            line: at(node),
+            snippet: snippetOf(attribute.name),
+          });
+          continue;
+        }
+        if (typeof attribute.name === "string" && RAW_HTML_ATTRIBUTE_RE.test(attribute.name)) {
+          found.push({
+            kind: "raw-html-attribute",
             line: at(node),
             snippet: snippetOf(attribute.name),
           });

@@ -24,6 +24,7 @@ describe("MdxContent hydration", () => {
     const root = document.createElement("div");
     root.innerHTML = await renderToString(app());
     const serverHtml = root.innerHTML;
+    const serverAside = root.querySelector("aside");
     const warn = vi.spyOn(console, "warn");
     const error = vi.spyOn(console, "error");
 
@@ -32,6 +33,8 @@ describe("MdxContent hydration", () => {
     expect(warn).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
     expect(root.innerHTML).toBe(serverHtml);
+    // Hydrated in place: the node the server rendered is the one Vue kept.
+    expect(root.querySelector("aside")).toBe(serverAside);
     expect(root.querySelector("aside em")?.textContent).toBe("it");
   });
 });

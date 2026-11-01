@@ -220,8 +220,10 @@ with `Careful.` in its `<slot />`.
 
   `MdxContent` runs the compiled string with `new Function`. Only pass it a
   string your own server produced, and a page with a Content-Security-Policy
-  needs `'unsafe-eval'` in `script-src`. Pass `{ trust: "full" }` only for
-  bodies from your own repository, matching `mdxTrust` in `graft.config.ts`.
+  needs `'unsafe-eval'` in `script-src`. Pass `prepareMdx(body, { trust: "full" })`
+  only for bodies from your own repository, matching `mdxTrust` in
+  `graft.config.ts`. `MdxContent` takes no trust option: the check happens when
+  `prepareMdx` compiles.
   See [MDX safety](/docs/mdx-safety).
 </Callout>
 

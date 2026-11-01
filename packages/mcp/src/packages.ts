@@ -97,7 +97,7 @@ export const PACKAGE_KNOWLEDGE = {
     name: "@usegraft/sdk-vue",
     role: "Vue client: typed reads over the content API, composables that run them, and MDX rendering for Vue.",
     when: "You need reads in a Vue app's browser code, or you render MDX bodies with Vue components. No database reaches this package.",
-    tier: "postgres",
+    tier: "either",
     framework: "vue",
     direct: true,
   },

@@ -19,14 +19,17 @@
  * a runtime surprise instead of a compile error.
  */
 import {
+  getCurrentInstance,
   hasInjectionContext,
   inject,
+  onMounted,
   onScopeDispose,
   provide,
   shallowRef,
   toValue,
   watch,
   type App,
+  type ComponentInternalInstance,
   type InjectionKey,
   type MaybeRefOrGetter,
   type Plugin,
@@ -76,8 +79,12 @@ function useRead<TArgs, TData>(
   const error = shallowRef<Error>();
   const loading = shallowRef(true);
   let current = 0;
+  let disposed = false;
 
   function run(args: TArgs): void {
+    // A `refresh` kept after the component is gone must not start a read
+    // whose answer would land in refs nothing renders.
+    if (disposed) return;
     const ticket = ++current;
     const known = settle?.(args);
     if (known !== undefined) {
@@ -105,9 +112,26 @@ function useRead<TArgs, TData>(
     );
   }
 
-  watch(source, run, { immediate: true });
+  if (getCurrentInstance()) {
+    // In a component, read once it is mounted. Setup also runs during server
+    // rendering, where an answer could never reach the HTML, so reading there
+    // only sent requests whose results were thrown away. An answer known
+    // without asking (a blank search) is still given at once, on both sides.
+    const known = settle?.(source());
+    if (known !== undefined) {
+      data.value = known;
+      loading.value = false;
+    }
+    onMounted(() => {
+      watch(source, run, { immediate: true });
+    });
+  } else {
+    // Outside a component (a store, a test's effect scope) there is no mount.
+    watch(source, run, { immediate: true });
+  }
   onScopeDispose(() => {
-    current = -1;
+    disposed = true;
+    current += 1;
   }, true);
 
   return { data, error, loading, refresh: () => run(source()) };
@@ -117,7 +141,8 @@ export interface GraftComposables<TCollections extends Record<string, AnyCollect
   /**
    * Point the composables in this component and its children at another
    * handle: a preview branch's endpoint, or a fake in tests. Call it in
-   * `setup`. Without it they read the handle the factory was built with.
+   * `setup`, before the composables that should read it. Without it they read
+   * the handle the factory was built with.
    */
   provideGraft: (graft: Graft<TCollections>) => void;
   /** The same, for a whole app: `app.use(graftPlugin(previewGraft))`. */
@@ -168,10 +193,24 @@ export function createGraftComposables<TCollections extends Record<string, AnyCo
 
   // Outside a component (a store, a plain module) there is nothing to inject
   // from, and the factory's own handle is the answer.
-  const useGraft = (): Graft<TCollections> => (hasInjectionContext() ? inject(key, graft) : graft);
+  // `inject` reads what a component's parents provided, never its own, so a
+  // component that calls provideGraft and then a composable would read the
+  // factory's handle. The handle a component provides for itself is kept here.
+  const ownGraft = new WeakMap<ComponentInternalInstance, Graft<TCollections>>();
+
+  const useGraft = (): Graft<TCollections> => {
+    const instance = getCurrentInstance();
+    const own = instance ? ownGraft.get(instance) : undefined;
+    if (own) return own;
+    return hasInjectionContext() ? inject(key, graft) : graft;
+  };
 
   return {
-    provideGraft: (value) => provide(key, value),
+    provideGraft: (value) => {
+      provide(key, value);
+      const instance = getCurrentInstance();
+      if (instance) ownGraft.set(instance, value);
+    },
     graftPlugin: (value) => ({
       install(app: App) {
         app.provide(key, value);

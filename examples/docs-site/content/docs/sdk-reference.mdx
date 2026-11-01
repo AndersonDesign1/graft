@@ -26,7 +26,7 @@ types all of them.
 | `@usegraft/sdk-tanstack-start` | TanStack Start | `graftRoute` for server routes; build the handle in a server-only module |
 | `@usegraft/sdk-react-router` | React Router v7 | Framework mode; `graftRoute` returns both `action` and `loader` |
 | `@usegraft/sdk-react` | the browser | Reads over HTTP; `createGraftHooks`; no `db` option, by design |
-| `@usegraft/sdk-vue` | Vue | Reads over HTTP; `createGraftComposables`; `prepareMdx` + `MdxContent` for MDX |
+| `@usegraft/sdk-vue` | Vue | Reads over HTTP; `createGraftComposables`; `MdxContent` for MDX, compiled by `prepareMdx` from `@usegraft/sdk-vue/server` |
 
 Every adapter is typed **structurally**, so none of them takes a dependency on
 the framework it adapts and there is no peer version to keep in step.

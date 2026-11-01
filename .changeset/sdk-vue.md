@@ -37,4 +37,15 @@ The safe-URL and refuse-imports plugins move from `@usegraft/sdk-next` into
 `@usegraft/mdx-safety`, exported as `rehypeSafeUrls`, `remarkRefuseModules`
 and `isSafeUrl`, so both adapters share one copy. sdk-next behaves as before.
 
-`list_packages` accepts `framework: "vue"`.
+Restricted trust now also refuses `innerHTML`, `outerHTML` and
+`dangerouslySetInnerHTML` attributes, in any case. Vue renders
+`<div innerHTML="<img src=x onerror=…>">` as raw HTML, so this was a working
+script with no `{}` and no `on…` attribute for the existing checks to see.
+React ignores the string form, which is why it went unnoticed while React was
+the only renderer. The rule lives in `@usegraft/mdx-safety`, so `graft compile`,
+MCP writes and Studio refuse such a body too. A body that used one of these
+attributes under restricted trust now fails with `INPUT_VALIDATION_FAILED`; it
+renders nothing useful in React anyway.
+
+`list_packages` accepts `framework: "vue"`, and lists sdk-vue for static
+projects as well, since the content API serves either index.

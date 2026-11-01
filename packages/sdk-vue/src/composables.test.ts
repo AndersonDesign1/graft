@@ -8,7 +8,18 @@
 import { defineCollection, field } from "@usegraft/core";
 import type { AnyCollection, ClientOptions, Document, SearchHit } from "@usegraft/sdk-core";
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { createApp, effectScope, nextTick, ref, watch, type Ref } from "vue";
+import {
+  createApp,
+  createSSRApp,
+  defineComponent,
+  effectScope,
+  h,
+  nextTick,
+  ref,
+  watch,
+  type Ref,
+} from "vue";
+import { renderToString } from "vue/server-renderer";
 import { createGraftComposables, type ReadState } from "./composables";
 import { createGraft } from "./graft";
 
@@ -203,6 +214,10 @@ describe("useContent", () => {
 
     stop();
     await afterStale(composables, reads, () => reads[0]?.settle([row("intro", "Intro")]));
+    // A refresh kept past disposal starts nothing.
+    const before = reads.length;
+    state.refresh();
+    expect(reads).toHaveLength(before);
 
     expect(state.data.value).toBeUndefined();
     expect(state.loading.value).toBe(true);
@@ -241,6 +256,44 @@ describe("useContentSearch", () => {
     expect(state.data.value?.map((hit) => [hit.slug, hit.snippet])).toEqual([
       ["intro", "<b>Intro</b>"],
     ]);
+  });
+});
+
+describe("in a component", () => {
+  it("sends no read while rendering on the server, and still answers a blank search", async () => {
+    const { reads, searches, graft } = controllable();
+    const { useContent, useContentSearch } = createGraftComposables(graft);
+    const Page = defineComponent({
+      setup() {
+        const page = useContent("docs", "intro");
+        const hits = useContentSearch("docs", "");
+        return () => h("p", `${page.loading.value}:${JSON.stringify(hits.data.value)}`);
+      },
+    });
+
+    const html = await renderToString(createSSRApp(Page));
+
+    expect(html).toBe("<p>true:[]</p>");
+    expect(reads).toEqual([]);
+    expect(searches).toEqual([]);
+  });
+
+  it("lets composables in the same setup read the handle provideGraft gave", async () => {
+    const { graft } = controllable();
+    const { graft: preview } = controllable();
+    const { provideGraft, useGraft } = createGraftComposables(graft);
+    let seen: unknown;
+    const Page = defineComponent({
+      setup() {
+        provideGraft(preview);
+        seen = useGraft();
+        return () => h("p");
+      },
+    });
+
+    await renderToString(createSSRApp(Page));
+
+    expect(seen).toBe(preview);
   });
 });
 

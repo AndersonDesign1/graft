@@ -88,6 +88,7 @@ describe("rehypeSafeUrls", () => {
               name: "Card",
               attributes: [
                 { type: "mdxJsxAttribute", name: "href", value: "javascript:x" },
+                { type: "mdxJsxAttribute", name: "xlink:href", value: "javascript:x" },
                 { type: "mdxJsxAttribute", name: "xlink:href", value: "/fine" },
                 { type: "mdxJsxAttribute", name: "label", value: "javascript:x is only text here" },
               ],

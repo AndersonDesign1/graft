@@ -79,15 +79,15 @@ Three places, and they are checking different things.
 | `graft compile` | Content already in git, so a bad document fails the build rather than a request |
 | MCP `write_content` | Content arriving from someone who is not the operator, refused before it is stored |
 | Studio saves | Same |
-| `MdxBody` at render, and `prepareMdx` | Content can also arrive by a direct database write with the runtime credential, which no write-side guard sees |
+| `MdxBody` at render, and `prepareMdx` (sdk-next and sdk-vue) | Content can also arrive by a direct database write with the runtime credential, which no write-side guard sees |
 
 The compile check is what makes the failure a build-time one. Without it,
 `MdxBody` refusing at render would mean an unchecked tree fails per-request in
 production instead.
 
-<Callout label="Next.js only" type="note">
-  The render-time row is `MdxBody`, which lives in `@usegraft/sdk-next` because
-  it evaluates MDX in a Server Component. **No other adapter has a render-time
+<Callout label="Next.js and Vue only" type="note">
+  The render-time row is `MdxBody` and `prepareMdx` in `@usegraft/sdk-next`,
+  and `prepareMdx` in `@usegraft/sdk-vue`. **No other adapter has a render-time
   check.** Astro, SvelteKit, TanStack Start and React Router hand you the
   authored source and you render it with your own pipeline, which is where that
   responsibility then sits. This documentation site is one of them.

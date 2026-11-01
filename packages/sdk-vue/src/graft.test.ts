@@ -126,6 +126,28 @@ describe("createGraft configuration", () => {
     ).rejects.toThrow(/`branch` cannot be passed to a read/);
   });
 
+  it("refuses a branch passed through graft.client, which skips the helpers' guard", async () => {
+    const graft = servedGraft();
+    await expect(
+      graft.client.getDocument("docs", "intro", { branch: "preview/redesign" }),
+    ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+  });
+
+  it("builds with a same-origin endpoint where there is no page, failing only a read", async () => {
+    // During server rendering a module that calls createGraft is imported with
+    // no `location`. Building the reader eagerly threw right there.
+    const graft = createGraft({ endpoint: "/api/content/v1", collections: { docs } });
+    await expect(graft.getContent("docs", "intro")).rejects.toMatchObject({
+      code: "CONFIG_INVALID",
+    });
+  });
+
+  it("refuses endpoint and index together, rather than ignoring one", () => {
+    expect(() =>
+      createGraft({ endpoint: "http://cms.test/api/content/v1", index, collections: { docs } }),
+    ).toThrowError(/cannot both be set/);
+  });
+
   it("still allows a per-read branch when the handle owns its own index", async () => {
     // An index-backed handle is not pinned by a server, so the guard must not
     // fire there — otherwise it would break the one configuration where a
