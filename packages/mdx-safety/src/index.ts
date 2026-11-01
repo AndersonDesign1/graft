@@ -268,3 +268,5 @@ export {
   type MdxScanCache,
   type MdxScanResult,
 } from "./scan-cache";
+
+export { isSafeUrl, rehypeSafeUrls, remarkRefuseModules } from "./render";
