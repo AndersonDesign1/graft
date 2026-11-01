@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { approvalPolicyFor, mdxTrustFor, runtimeSettings, trustedIssuersFor } from "./settings";
+import { runtimeSettings } from "./runtime-config";
+import { approvalPolicyFor, mdxTrustFor, trustedIssuersFor } from "./settings";
 
 describe("approvalPolicyFor", () => {
   it("defaults to none, takes the three policies, and refuses anything else", () => {
@@ -37,13 +38,20 @@ describe("runtimeSettings", () => {
     expect(settings.databaseUrl).toBe("");
   });
 
-  it("refuses a value that is not text, naming its variable", () => {
-    expect(() => runtimeSettings({ trustedIssuers: { a: 1 } })).toThrowError(
-      expect.objectContaining({
-        code: "CONFIG_INVALID",
-        details: { variable: "NUXT_GRAFT_TRUSTED_ISSUERS", value: { a: 1 } },
-      }),
-    );
+  it("refuses a value that is not text, naming its variable but not the value", () => {
+    const secret = { password: "hunter2" };
+    let thrown: unknown;
+    try {
+      runtimeSettings({ databaseUrl: secret });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({
+      code: "CONFIG_INVALID",
+      details: { variable: "NUXT_GRAFT_DATABASE_URL" },
+    });
+    // The error is answered to the caller, so it never carries the value.
+    expect(JSON.stringify(thrown) + String(thrown)).not.toContain("hunter2");
   });
 });
 

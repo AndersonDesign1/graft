@@ -17,7 +17,7 @@ import { createGraft, type Graft } from "@usegraft/sdk-nitro";
 import * as graftConfig from "#graft/config";
 import { useRuntimeConfig } from "nuxt/server";
 import { engineFor } from "./engine";
-import { runtimeSettings } from "./settings";
+import { runtimeSettings } from "./runtime-config";
 
 type Collections = typeof graftConfig.collections;
 

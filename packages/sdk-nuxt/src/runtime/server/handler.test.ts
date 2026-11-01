@@ -1,6 +1,7 @@
 import { GraftError } from "@usegraft/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { actorOptions, lazyHandler } from "./handler";
+import { actorOptions } from "./actor";
+import { lazyHandler } from "./handler";
 
 const request = () => new Request("http://site.test/api/fn/x", { method: "POST" });
 

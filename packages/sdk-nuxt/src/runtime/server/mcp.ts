@@ -6,7 +6,8 @@ import { graftHandler } from "@usegraft/sdk-nitro";
 import * as graftConfig from "#graft/config";
 import { defineEventHandler, useRuntimeConfig } from "nuxt/server";
 import { optionalConfig, useGraftDatabase } from "./graft";
-import { actorOptions, lazyHandler, RATE_LIMIT } from "./handler";
+import { actorOptions } from "./actor";
+import { lazyHandler, RATE_LIMIT } from "./handler";
 import { approvalPolicyFor, mdxTrustFor } from "./settings";
 
 export default defineEventHandler(
