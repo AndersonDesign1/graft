@@ -1,5 +1,26 @@
 # @usegraft/compiler
 
+## 1.0.0-beta.9
+
+### Minor Changes
+
+- 42213aa: `graft check` and `graft compile` skip the executable-MDX scan for a body they have already scanned. Results are kept under `$XDG_CACHE_HOME/graft/mdx-safety` (by default `~/.cache/graft/mdx-safety`), outside the project, and are keyed on the body and on the version of every package the scanner runs, down its whole dependency tree. A repeat `graft check` on a 50-page site went from about 1.7 s to about 0.3 s.
+
+  `@usegraft/mdx-safety` adds `scanMdx`, the `MdxScanCache` interface, `mdxScanVersion`, `mdxScanPackages` and `scanVersionOf`, and the compiler's `validateDocuments`, `compile` and `compileStatic` take an optional `mdxScanCache`. Studio saves and MCP writes do not pass one, so they scan every body every time.
+
+### Patch Changes
+
+- 42213aa: Static projects no longer load the Postgres code. `@usegraft/db/static` is a new entry with the SQLite content index, the content diff, the search query check and branch scopes, and no drizzle-orm or Postgres driver behind it. Core, the compiler and the MCP server load the rest of `@usegraft/db` only inside the functions that talk to Postgres. On a 50-page static site, `graft content get` went from about 950 ms to about 480 ms. Everything in `@usegraft/db/static` is still exported from `@usegraft/db`.
+- Updated dependencies [9a17a95]
+- Updated dependencies [42213aa]
+- Updated dependencies [acb4a84]
+- Updated dependencies [42213aa]
+- Updated dependencies [3374aab]
+  - @usegraft/contracts@1.0.0-beta.9
+  - @usegraft/db@1.0.0-beta.9
+  - @usegraft/core@1.0.0-beta.9
+  - @usegraft/mdx-safety@1.0.0-beta.9
+
 ## 1.0.0-beta.8
 
 ### Minor Changes

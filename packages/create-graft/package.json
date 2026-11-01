@@ -1,6 +1,6 @@
 {
   "name": "create-graft",
-  "version": "1.0.0-beta.8",
+  "version": "1.0.0-beta.9",
   "description": "Make a new Graft site: `npm create graft`. Asks a few questions, then sets up the content, a database, Studio and a Next.js app.",
   "keywords": [
     "cms",
