@@ -13,7 +13,12 @@
  * process serving this handler must see a writable content tree (dev server or
  * self-host). Reads only need the files + database.
  */
-import { GraftError } from "@usegraft/contracts";
+import {
+  DEFAULT_MAX_BODY_BYTES,
+  DEFAULT_MAX_MCP_BODY_BYTES,
+  GraftError,
+  readBodyText,
+} from "@usegraft/contracts";
 import type { FunctionActor } from "@usegraft/core";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createDocsMcp, createGraftMcp, type DocsMcpOptions, type GraftMcpOptions } from "./server";
@@ -39,6 +44,18 @@ export interface GraftMcpHandlerOptions extends GraftMcpOptions {
    * rather than an open endpoint.
    */
   allowAnonymous?: boolean;
+  /**
+   * The largest request body this endpoint reads, in bytes. Defaults to 32 MiB
+   * (`DEFAULT_MAX_MCP_BODY_BYTES`), which fits a 24 MB file sent to `put_asset`
+   * as base64. A larger body gets a 413 without being read.
+   */
+  maxBodyBytes?: number;
+}
+
+/** Options for the public docs endpoint, which reads no uploads. */
+export interface DocsMcpHandlerOptions extends DocsMcpOptions {
+  /** The largest request body this endpoint reads. Defaults to 1 MiB. */
+  maxBodyBytes?: number;
 }
 
 export type GraftMcpHandler = (request: Request) => Promise<Response>;
@@ -52,8 +69,32 @@ function jsonRpcError(
   return Response.json({ jsonrpc: "2.0", error: { code, message }, id: null }, { status, headers });
 }
 
+/**
+ * The JSON-RPC message in the body, read under `limit`, or the error response
+ * to send instead. The transport would otherwise read the body itself with no
+ * limit, so the parsed message is handed to it as `parsedBody`.
+ */
+async function readMessage(
+  request: Request,
+  limit: number,
+): Promise<{ parsedBody: unknown } | Response> {
+  let text: string;
+  try {
+    text = await readBodyText(request, limit);
+  } catch (error) {
+    if (!(error instanceof GraftError)) throw error;
+    return jsonRpcError(413, -32600, `${error.message} ${error.fix ?? ""}`.trim());
+  }
+  try {
+    return { parsedBody: JSON.parse(text) };
+  } catch {
+    return jsonRpcError(400, -32700, "Parse error: the request body is not valid JSON.");
+  }
+}
+
 export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcpHandler {
-  const { actor: resolveActor, allowAnonymous, ...serverOptions } = options;
+  const { actor: resolveActor, allowAnonymous, maxBodyBytes, ...serverOptions } = options;
+  const bodyLimit = maxBodyBytes ?? DEFAULT_MAX_MCP_BODY_BYTES;
 
   // Fail at construction, not per request: an endpoint that cannot authenticate
   // anyone should never come up at all, and a startup crash is the one signal a
@@ -120,6 +161,11 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
       }
     }
 
+    // Read only once the caller is known, so an unauthenticated request is
+    // refused without its body being read at all.
+    const message = await readMessage(request, bodyLimit);
+    if (message instanceof Response) return message;
+
     // The caller already authenticated to this endpoint — forward their bearer
     // as run_function's default identity so agents never re-send the token as a
     // tool argument (an explicit `authorization` argument still overrides). The
@@ -141,7 +187,7 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
     });
     try {
       await server.connect(transport);
-      return await transport.handleRequest(request);
+      return await transport.handleRequest(request, message);
     } finally {
       // JSON mode returns complete bodies, so closing after handleRequest
       // resolves cannot cut a response short.
@@ -163,7 +209,9 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
  * Mintlify generates one there for every site it hosts, and Cloudflare runs a
  * documentation server separately from its authenticated API server.
  */
-export function createDocsMcpHandler(options: DocsMcpOptions): GraftMcpHandler {
+export function createDocsMcpHandler(options: DocsMcpHandlerOptions): GraftMcpHandler {
+  const { maxBodyBytes, ...docsOptions } = options;
+  const bodyLimit = maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
   return async (request: Request): Promise<Response> => {
     if (request.method !== "POST") {
       return jsonRpcError(405, -32000, "Method not allowed: this server is stateless (POST only)", {
@@ -171,14 +219,17 @@ export function createDocsMcpHandler(options: DocsMcpOptions): GraftMcpHandler {
       });
     }
 
-    const server = createDocsMcp(options);
+    const message = await readMessage(request, bodyLimit);
+    if (message instanceof Response) return message;
+
+    const server = createDocsMcp(docsOptions);
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
     });
     try {
       await server.connect(transport);
-      return await transport.handleRequest(request);
+      return await transport.handleRequest(request, message);
     } finally {
       void server.close().catch(() => undefined);
     }

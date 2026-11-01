@@ -36,6 +36,7 @@ import {
   type DeployHookRow,
 } from "@usegraft/db";
 import type { Route, RouteContext } from "../api";
+import { readJson } from "../body";
 import { requireDatabase } from "./needs-database";
 import type {
   AgentAccess,
@@ -75,7 +76,7 @@ function db(ctx: RouteContext, feature: string): Database {
 }
 
 async function body(request: Request): Promise<Record<string, unknown>> {
-  const parsed: unknown = await request.json().catch(() => null);
+  const parsed = await readJson(request);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",

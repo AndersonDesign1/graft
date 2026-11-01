@@ -122,6 +122,15 @@ describe("createFunctionsHandler", () => {
     expect(data.correlationId).toBe(res.headers.get("x-graft-correlation-id"));
   });
 
+  it("refuses a body over maxBodyBytes with 413 PAYLOAD_TOO_LARGE, before the function runs", async () => {
+    const small = createFunctionsHandler({ functions, db: fakeDb, audit: false, maxBodyBytes: 32 });
+    const res = await small(post("echo", { message: "x".repeat(64) }));
+    expect(res.status).toBe(413);
+    expect(await json(res)).toMatchObject({ error: "PAYLOAD_TOO_LARGE", details: { limit: 32 } });
+    // Under the limit, the same handler serves the call.
+    expect((await small(post("echo", { message: "hi" }))).status).toBe(200);
+  });
+
   it("rejects non-POST with 405 METHOD_NOT_ALLOWED and an Allow header", async () => {
     const res = await handler(new Request("http://localhost/api/fn/echo", { method: "GET" }));
     expect(res.status).toBe(405);
@@ -136,6 +145,14 @@ describe("createFunctionsHandler", () => {
     expect(body.error).toBe("FUNCTION_NOT_FOUND");
     expect(body.fix).toContain("echo");
     expect(body.details.available).toContain("whoami");
+  });
+
+  it("400s a body that is not JSON, the same as a non-object one", async () => {
+    const res = await handler(
+      new Request("http://localhost/api/fn/echo", { method: "POST", body: "{not json" }),
+    );
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ error: "INPUT_VALIDATION_FAILED" });
   });
 
   it("400s a non-object body with INPUT_VALIDATION_FAILED", async () => {

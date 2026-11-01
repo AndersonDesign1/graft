@@ -60,6 +60,19 @@ describe("createStudioApiHandler", () => {
     expect(await res.json()).toMatchObject({ details: { required: "approvals:decide" } });
   });
 
+  it("refuses a JSON body over 1 MiB with 413 PAYLOAD_TOO_LARGE, before touching the database", async () => {
+    const handler = createStudioApiHandler(baseOpts);
+    const res = await handler(
+      new Request("http://localhost/api/studio/v1/approvals/abc/decide", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ decision: "approved", pad: "x".repeat(1024 * 1024) }),
+      }),
+    );
+    expect(res.status).toBe(413);
+    expect(await res.json()).toMatchObject({ error: "PAYLOAD_TOO_LARGE" });
+  });
+
   it("refuses a state-changing request from a foreign origin", async () => {
     // A loopback Studio has no authentication by design, so a page the operator
     // merely visits could POST to 127.0.0.1 and decide their pending approvals.

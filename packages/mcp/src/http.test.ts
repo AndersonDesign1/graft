@@ -131,6 +131,57 @@ describe("actor gate", () => {
     expect(body.error.message).toContain("could not be verified");
   });
 
+  it("refuses a body over maxBodyBytes with 413, as a JSON-RPC error", async () => {
+    const small = createGraftMcpHandler({
+      contentDir: dir,
+      collections,
+      db: untouchableDb,
+      actor: resolver,
+      maxBodyBytes: 16,
+    });
+    const response = await post(small, { authorization: "Bearer s3cret" });
+    expect(response.status).toBe(413);
+    const body = (await response.json()) as { error: { code: number; message: string } };
+    expect(body.error.code).toBe(-32600);
+    expect(body.error.message).toContain("maxBodyBytes");
+  });
+
+  it("refuses an anonymous caller before reading the body at all", async () => {
+    let read = false;
+    // highWaterMark 0: nothing is pulled until something reads the body.
+    const stream = new ReadableStream(
+      {
+        pull() {
+          read = true;
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const response = await gated()(
+      new Request("http://graft.test/api/mcp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: stream,
+        // Node's fetch needs this for a stream body.
+        duplex: "half",
+      }),
+    );
+    expect(response.status).toBe(401);
+    expect(read).toBe(false);
+  });
+
+  it("answers a body that is not JSON with a JSON-RPC parse error", async () => {
+    const response = await gated()(
+      new Request("http://graft.test/api/mcp", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: "Bearer s3cret" },
+        body: "{not json",
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as { error: { code: number } }).error.code).toBe(-32700);
+  });
+
   it("refuses to construct with no way to authenticate anyone", () => {
     // This used to be the DEFAULT: a handler with no resolver served
     // write_content, put_asset, delete_content and decide_approval to whoever
@@ -363,6 +414,20 @@ describe("createDocsMcpHandler", () => {
 
   it("answers anything but POST with 405, like the full handler", async () => {
     const docs = createDocsMcpHandler({ contentDir: dir, collections, db: untouchableDb });
+    const big = await docs(
+      new Request("http://graft.test/mcp", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "ping",
+          id: 1,
+          pad: "x".repeat(1024 * 1024),
+        }),
+      }),
+    );
+    // The public endpoint reads no uploads, so it keeps the 1 MiB JSON ceiling.
+    expect(big.status).toBe(413);
     const response = await docs(new Request("http://graft.test/mcp"));
     expect(response.status).toBe(405);
     expect(response.headers.get("allow")).toBe("POST");

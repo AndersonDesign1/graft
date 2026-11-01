@@ -100,6 +100,44 @@ describe("createNodeListener", () => {
     return `http://127.0.0.1:${port}`;
   }
 
+  it("refuses a body over maxBodyBytes with 413 before the handler sees the request", async () => {
+    let reached = 0;
+    const base = await listen(
+      async (req) => {
+        reached += 1;
+        return new Response(String((await req.arrayBuffer()).byteLength));
+      },
+      { maxBodyBytes: 100 },
+    );
+
+    const declared = await fetch(base, { method: "POST", body: "x".repeat(101) });
+    expect(declared.status).toBe(413);
+    expect(await declared.json()).toMatchObject({
+      error: "PAYLOAD_TOO_LARGE",
+      details: { limit: 100 },
+    });
+
+    // A chunked body declares no length; the count catches it as it arrives.
+    const streamed = await fetch(base, {
+      method: "POST",
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("x".repeat(80)));
+          controller.enqueue(new TextEncoder().encode("x".repeat(80)));
+          controller.close();
+        },
+      }),
+      // Node's fetch needs this for a stream body.
+      duplex: "half",
+    }).catch((error: unknown) => error);
+    if (streamed instanceof Response) expect(streamed.status).toBe(413);
+    expect(reached).toBe(0);
+
+    const fits = await fetch(base, { method: "POST", body: "x".repeat(100) });
+    expect(await fits.text()).toBe("100");
+    expect(reached).toBe(1);
+  });
+
   it("refuses a Host it does not answer to", async () => {
     // The adapter builds the request URL from req.headers.host, so an
     // attacker-chosen Host reaches every handler — and the Studio's shell

@@ -6,6 +6,7 @@
 import type { StoreActor } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import type { Route, RouteContext, StudioApiOptions } from "../api";
+import { readJson } from "../body";
 import type { WorkspaceDto } from "../editor-types";
 import type { SchemaFieldDto } from "../types";
 import type { EntryQuery } from "./catalog";
@@ -70,7 +71,7 @@ function required(value: unknown, name: string, example: string): string {
 }
 
 async function body(ctx: RouteContext): Promise<Record<string, unknown>> {
-  const parsed = (await ctx.request.json().catch(() => null)) as unknown;
+  const parsed = await readJson(ctx.request);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",

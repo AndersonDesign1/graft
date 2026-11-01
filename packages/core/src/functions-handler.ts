@@ -17,7 +17,13 @@
  * route, the self-host container, Vercel Fluid, or a Worker — the Phase 3
  * runtime invariant, locked here before the first mutation function exists.
  */
-import { GraftError, rateIdentity, type ErrorCode } from "@usegraft/contracts";
+import {
+  DEFAULT_MAX_BODY_BYTES,
+  GraftError,
+  rateIdentity,
+  readBodyText,
+  type ErrorCode,
+} from "@usegraft/contracts";
 import type { ApprovalStore, AuditStore, Database } from "@usegraft/db";
 import type { AnyGraftFunction, FunctionActor, RateLimit } from "./function";
 
@@ -93,6 +99,12 @@ export interface FunctionsHandlerOptions {
    * single nginx or one CDN layer, that is 1.
    */
   trustedProxyHops?: number;
+  /**
+   * The largest request body this route reads, in bytes. Defaults to 1 MiB
+   * (`DEFAULT_MAX_BODY_BYTES`). A larger body gets PAYLOAD_TOO_LARGE (413)
+   * without being read, and still counts against the caller's rate limit.
+   */
+  maxBodyBytes?: number;
 }
 
 export type GraftFunctionsHandler = (request: Request) => Promise<Response>;
@@ -109,6 +121,7 @@ const ERROR_STATUS: Partial<Record<ErrorCode, number>> = {
   UNAUTHORIZED: 401,
   TOKEN_INVALID: 401,
   RATE_LIMITED: 429,
+  PAYLOAD_TOO_LARGE: 413,
   DESTRUCTIVE_OP_REQUIRES_APPROVAL: 403,
   APPROVAL_INVALID: 403,
   METHOD_NOT_ALLOWED: 405,
@@ -235,6 +248,7 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
     // in the audit log, whatever the outcome.
     const startedAt = Date.now();
     const ip = rateIdentity(request, options.trustedProxyHops ?? 0);
+    const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
     let actor: FunctionActor | undefined;
     /** Id of this invocation's audit row, reserved before the handler runs. */
     let auditId: string | undefined;
@@ -276,9 +290,12 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
 
       let raw: unknown;
       try {
-        const text = await request.text();
+        const text = await readBodyText(request, maxBodyBytes);
         raw = text.trim() === "" ? {} : JSON.parse(text);
-      } catch {
+      } catch (error) {
+        // Too large is its own answer, 413. Anything else (malformed JSON, a
+        // client gone mid-body) is an unreadable body, answered below.
+        if (error instanceof GraftError) return fail(error);
         raw = undefined;
       }
       if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {

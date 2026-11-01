@@ -33,7 +33,7 @@ import { execFileSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createActorResolver, type TrustedIssuer } from "@usegraft/auth";
 import { fireDeployHooks, githubStoreFromEnv, revalidateWebhookFromEnv } from "@usegraft/compiler";
-import { GraftError } from "@usegraft/contracts";
+import { DEFAULT_MAX_MCP_BODY_BYTES, GraftError, payloadTooLarge } from "@usegraft/contracts";
 import { setRequestPeer } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { databaseStoreFor, startMirrorSchedule } from "../content-source";
@@ -115,6 +115,12 @@ export interface NodeListenerOptions {
    * that already validates Host.
    */
   allowedHosts?: readonly string[];
+  /**
+   * The largest body this adapter buffers, in bytes, before any route sees the
+   * request. Defaults to 32 MiB, the largest any mounted route accepts (MCP);
+   * each route then applies its own, smaller limit.
+   */
+  maxBodyBytes?: number;
 }
 
 /**
@@ -148,6 +154,12 @@ function hostname(host: string): string {
 
 export function createNodeListener(handler: FetchHandler, options: NodeListenerOptions = {}) {
   const allowed = options.allowedHosts?.map(hostname);
+  const limit = options.maxBodyBytes ?? DEFAULT_MAX_MCP_BODY_BYTES;
+  /** 413 as a GraftError, then drop the connection so the rest is never read. */
+  const refuseTooLarge = (res: ServerResponse): void => {
+    res.writeHead(413, { "content-type": "application/json", connection: "close" });
+    res.end(JSON.stringify(payloadTooLarge(limit).toJSON()), () => res.socket?.destroy());
+  };
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     try {
       if (allowed && !allowed.includes(hostname(req.headers.host ?? ""))) {
@@ -161,8 +173,15 @@ export function createNodeListener(handler: FetchHandler, options: NodeListenerO
         );
         return;
       }
+      const declared = Number(req.headers["content-length"]);
+      if (Number.isFinite(declared) && declared > limit) return refuseTooLarge(res);
       const chunks: Buffer[] = [];
-      for await (const chunk of req) chunks.push(chunk as Buffer);
+      let total = 0;
+      for await (const chunk of req) {
+        total += (chunk as Buffer).byteLength;
+        if (total > limit) return refuseTooLarge(res);
+        chunks.push(chunk as Buffer);
+      }
       const body = Buffer.concat(chunks);
 
       const headers = new Headers();
@@ -276,6 +295,11 @@ export interface ServeCommandOptions {
   host?: string;
   /** Mount opt-in Studio at /studio + /api/studio/v1/* */
   studio?: boolean;
+  /**
+   * One body limit for every route, in bytes. Unset, each route keeps its own
+   * default: 1 MiB for functions, 32 MiB for MCP.
+   */
+  maxBodyBytes?: number;
 }
 
 export interface RunningGraftServer {
@@ -382,6 +406,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     // Backstop; per-function rateLimit overrides it.
     rateLimit: { limit: 60, windowSeconds: 60 },
     gitSha,
+    maxBodyBytes: options.maxBodyBytes,
   });
 
   // One store for every writing surface, so a hosted agent's write_content
@@ -402,6 +427,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     ...(store ? { store } : {}),
     ...(databaseStore ? { source: "database" as const } : {}),
     name: "graft-serve",
+    maxBodyBytes: options.maxBodyBytes,
     contentDir: config.contentDir,
     collections: config.collections,
     functions,
@@ -595,7 +621,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
         health,
         studio: studioHandler,
       }),
-      { allowedHosts: allowedHostsFor(host) },
+      { allowedHosts: allowedHostsFor(host), maxBodyBytes: options.maxBodyBytes },
     ),
   );
   await new Promise<void>((resolve, reject) => {

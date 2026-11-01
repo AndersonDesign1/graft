@@ -388,6 +388,18 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
     howToRecover:
       "Wait out the window (the Retry-After header says how long) before retrying, and fix whatever caused the burst — the limit is per caller per function, so backing off actually works.",
   },
+  PAYLOAD_TOO_LARGE: {
+    code: "PAYLOAD_TOO_LARGE",
+    meaning:
+      "The request body is larger than the endpoint accepts. It was refused before Graft read the rest of it, so nothing ran.",
+    typicalCauses: [
+      "A function call or Studio save carrying more than 1 MiB of JSON, the default for those routes",
+      "An MCP `put_asset` with a file over about 24 MB, which is 32 MiB once base64-encoded",
+      "A client sending an unbounded stream to an endpoint",
+    ],
+    howToRecover:
+      "Send a smaller body. For an asset, upload it through a presigned URL instead of base64 over MCP. A deployment that needs larger requests raises `maxBodyBytes` on the handler, or passes `--max-body-bytes` to graft serve.",
+  },
   DESTRUCTIVE_OP_REQUIRES_APPROVAL: {
     code: "DESTRUCTIVE_OP_REQUIRES_APPROVAL",
     meaning:

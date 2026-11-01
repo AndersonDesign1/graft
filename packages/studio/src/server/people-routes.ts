@@ -15,6 +15,7 @@ import {
   type AccessChange,
 } from "@usegraft/db";
 import type { Route, RouteContext } from "../api";
+import { readJson } from "../body";
 import { requireDatabase } from "./needs-database";
 import { newToken, normaliseEmail } from "../accounts";
 import type { InviteDto, PeopleDto, PersonDto, StudioRoleName } from "../editor-types";
@@ -35,7 +36,7 @@ function accountsOn(ctx: RouteContext): NonNullable<RouteContext["options"]["acc
 }
 
 async function body(request: Request): Promise<Record<string, unknown>> {
-  const parsed: unknown = await request.json().catch(() => null);
+  const parsed = await readJson(request);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",

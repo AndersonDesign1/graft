@@ -54,6 +54,7 @@ import {
   type OidcSignInOptions,
 } from "./oidc";
 import { assertSameOrigin, errorResponse, statusFor, type StudioPrincipal } from "./api";
+import { readJson } from "./body";
 import {
   OAUTH_COOKIE,
   ROLE_SCOPES,
@@ -211,7 +212,7 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     try {
       if (!accounts) throw accountsOff();
       assertSameOrigin(request, url);
-      const parsed: unknown = await request.json().catch(() => null);
+      const parsed = await readJson(request);
       const input =
         parsed && typeof parsed === "object" && !Array.isArray(parsed)
           ? (parsed as Record<string, unknown>)
