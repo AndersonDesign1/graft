@@ -76,7 +76,7 @@ It reads the request from `event.req` on h3 2 and builds it from `event.node.req
 
 ## Rate limits count the real caller
 
-Nitro hands the adapter the connection, so `graftHandler` records the caller's socket address for Graft's rate limits. Anonymous callers each get their own limit instead of sharing one. The address comes from the connection, never from a header, so behind a proxy every caller shares the proxy's address. Set `trustedProxyHops` on the handler that rate-limits (`createFunctionsHandler` or `createContentApiHandler`) to count the client behind it.
+Nitro hands the adapter the connection, so `graftHandler` records the caller's socket address for Graft's rate limits. When Nitro exposes that address, anonymous callers each get their own limit; when it doesn't, they share one, as on other frameworks. The address comes from the connection, never from a header, so behind a proxy every caller shares the proxy's address. Set `trustedProxyHops` on the handler that rate-limits (`createFunctionsHandler` or `createContentApiHandler`) to count the client behind it.
 
 ## Cache invalidation
 

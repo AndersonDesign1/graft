@@ -231,7 +231,7 @@ would miss.
 Graft's rate limits count anonymous callers by the address they connected
 from. Most frameworks hand Graft only the request, so every anonymous caller
 shares one bucket. Nitro hands over the connection too, so `graftHandler`
-records the socket address, and each caller gets its own bucket.
+records the socket address, and each caller gets its own bucket. A Nitro host that gives no client address leaves anonymous callers sharing one, as before.
 
 The address comes from the connection, never from a header. A client that
 sends its own `x-forwarded-for` is still counted by where it connected from.
