@@ -28,7 +28,10 @@ Skills live in `.agents/skills/` (`.claude/skills` links to it).
 - Run tests and CLI calls through `.agents/skills/graft-verify/scripts/offline.sh`.
   A cloud session's environment can hold live keys for a real database, Neon
   project, bucket and GitHub token, and integration tests read them.
-- Every published-package change needs a changeset (`pnpm changeset`).
+- Every published-package change needs a changeset (`pnpm changeset`). A
+  breaking one starts with `**BREAKING:**` and needs an entry in
+  `examples/docs-site/content/docs/upgrading.mdx` under the version it will
+  release as; `pnpm check:upgrading` names that version.
 - Every error that crosses a package boundary is a `GraftError` with a `fix`.
   After changing one, run `pnpm docs:errors`.
 - CLI commands and flags are declared once, in `packages/cli/src/registry.ts`.
@@ -60,6 +63,7 @@ file is a candidate to move up into a check.
 | Registry copies stay in sync                                                                                                  | `pnpm check:registry-drift`                                                                |
 | The error reference matches the code                                                                                          | `pnpm check:error-docs`                                                                    |
 | The CLI reference and README command table match the command registry                                                         | `pnpm check:cli-docs`                                                                      |
+| Every breaking change has an Upgrading entry before it ships                                                                  | `pnpm check:upgrading`                                                                     |
 | Static-engine commands never load drizzle-orm or the Postgres driver                                                          | `packages/cli/src/static-startup.test.ts`                                                  |
 | Every docs route builds                                                                                                       | `pnpm check:site`                                                                          |
 | Coverage never drops                                                                                                          | `pnpm coverage` floors                                                                     |

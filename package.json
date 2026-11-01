@@ -38,6 +38,7 @@
     "check:cli-docs": "node scripts/gen-cli-docs.mjs --check",
     "docs:cli": "node scripts/gen-cli-docs.mjs",
     "check:changelog": "node scripts/gen-changelog.mjs --check",
+    "check:upgrading": "node scripts/check-upgrading.mjs",
     "docs:changelog": "node scripts/gen-changelog.mjs",
     "coverage": "node scripts/coverage.mjs",
     "mutation": "node scripts/mutation.mjs",
