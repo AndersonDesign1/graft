@@ -6,7 +6,7 @@
  * live smoke against the example app.
  */
 import { createServer, request, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
+import { type AddressInfo, connect } from "node:net";
 import { getRequestPeer } from "@usegraft/core";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -180,6 +180,37 @@ describe("createNodeListener", () => {
     expect(response.status).toBe(413);
     expect(response.headers.get("connection")).toBe("close");
     expect(pulled).toBeLessThan(4 * 1024 * 1024);
+  });
+
+  it("never reads a GET body, and closes the connection instead of draining it", async () => {
+    let sawBody = false;
+    const base = await listen(async (req) => {
+      sawBody = req.body !== null;
+      return new Response("ok");
+    });
+    const { hostname, port } = new URL(base);
+
+    // fetch refuses a GET body, so speak HTTP directly: a chunked GET that
+    // announces no length and keeps sending.
+    const head = await new Promise<string>((resolve) => {
+      const socket = connect(Number(port), hostname, () => {
+        socket.write(`GET / HTTP/1.1\r\nHost: ${hostname}\r\nTransfer-Encoding: chunked\r\n\r\n`);
+        const chunk = "x".repeat(64 * 1024);
+        for (let i = 0; i < 4; i += 1) socket.write(`${chunk.length.toString(16)}\r\n${chunk}\r\n`);
+      });
+      let received = "";
+      socket.on("data", (data) => {
+        received += data.toString();
+      });
+      // The server destroying the socket can surface as a reset rather than a
+      // clean close; either way, what matters is what arrived before it.
+      socket.on("close", () => resolve(received));
+      socket.on("error", () => resolve(received));
+    });
+
+    expect(sawBody).toBe(false);
+    expect(head).toMatch(/^HTTP\/1\.1 200/);
+    expect(head.toLowerCase()).toContain("connection: close");
   });
 
   it("refuses a Host it does not answer to", async () => {

@@ -398,7 +398,7 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "A client sending an unbounded stream to an endpoint",
     ],
     howToRecover:
-      "Send a smaller body. For a large asset, upload it with `graft asset put <file>`, or pass `path` to `put_asset` on a local stdio server; over HTTP, `put_asset` takes base64, which counts against the limit. A deployment that needs larger requests raises `maxBodyBytes` on the handler, or passes `--max-body-bytes` to graft serve.",
+      "Send a smaller body. For a large asset, upload it with `graft asset put <file>`, or pass `path` to `put_asset` on a local stdio server; over HTTP, `put_asset` takes base64, which counts against the limit. Each endpoint has its own limit: a direct function call or Studio request raises `maxBodyBytes` on that handler, and an MCP message, including `run_function` arguments and HTTP `put_asset`, raises it on the MCP handler. `--max-body-bytes` on graft serve sets all of them.",
   },
   DESTRUCTIVE_OP_REQUIRES_APPROVAL: {
     code: "DESTRUCTIVE_OP_REQUIRES_APPROVAL",

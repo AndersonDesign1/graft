@@ -505,7 +505,7 @@ The request body is larger than the endpoint accepts. It was refused before Graf
 
 **How to recover**
 
-Send a smaller body. For a large asset, upload it with `graft asset put <file>`, or pass `path` to `put_asset` on a local stdio server; over HTTP, `put_asset` takes base64, which counts against the limit. A deployment that needs larger requests raises `maxBodyBytes` on the handler, or passes `--max-body-bytes` to graft serve.
+Send a smaller body. For a large asset, upload it with `graft asset put <file>`, or pass `path` to `put_asset` on a local stdio server; over HTTP, `put_asset` takes base64, which counts against the limit. Each endpoint has its own limit: a direct function call or Studio request raises `maxBodyBytes` on that handler, and an MCP message, including `run_function` arguments and HTTP `put_asset`, raises it on the MCP handler. `--max-body-bytes` on graft serve sets all of them.
 
 ### RATE_LIMITED
 

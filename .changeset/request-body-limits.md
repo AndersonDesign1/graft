@@ -21,7 +21,9 @@ large unauthenticated POST was held in memory before any check on it ran.
 A request that declares a larger `Content-Length` is refused without reading a
 byte, and one that sends no length is cut off as soon as it passes the limit.
 MCP reads the body only after the caller authenticates. A refused function call
-still counts against the caller's rate limit.
+still counts against the caller's rate limit. `run_function` arguments are
+bounded by the MCP limit, not the functions route's, since they arrive inside
+an MCP message.
 
 Raise or lower a limit with `maxBodyBytes` on the handler:
 

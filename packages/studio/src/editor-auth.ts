@@ -16,7 +16,7 @@
  * principal with scopes.
  */
 import { withoutTrailingSlashes } from "@usegraft/compiler";
-import { GraftError } from "@usegraft/contracts";
+import { bodyLimit, DEFAULT_MAX_BODY_BYTES, GraftError } from "@usegraft/contracts";
 import {
   acceptInvite,
   acceptInviteForEmail,
@@ -85,6 +85,8 @@ export interface GitHubSignInOptions {
 
 export interface EditorAuthOptions {
   secret: string;
+  /** The largest JSON body an account route reads, in bytes. Defaults to 1 MiB. */
+  maxBodyBytes?: number;
   /** Where the UI is mounted ("" or "/studio"); sign-in lands there. */
   uiBasePath: string;
   /**
@@ -164,6 +166,7 @@ export function principalFor(identity: EditorIdentity): StudioPrincipal {
 }
 
 export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
+  bodyLimit(options.maxBodyBytes, DEFAULT_MAX_BODY_BYTES);
   const ui = `${options.uiBasePath.replace(/\/$/, "")}/`;
   const editors = options.editors ?? new Map<string, StudioRole>();
 
@@ -212,7 +215,7 @@ export function createEditorAuth(options: EditorAuthOptions): EditorAuth {
     try {
       if (!accounts) throw accountsOff();
       assertSameOrigin(request, url);
-      const parsed = await readJson(request);
+      const parsed = await readJson(request, options.maxBodyBytes);
       const input =
         parsed && typeof parsed === "object" && !Array.isArray(parsed)
           ? (parsed as Record<string, unknown>)

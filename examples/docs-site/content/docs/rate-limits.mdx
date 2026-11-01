@@ -165,6 +165,9 @@ cut off as soon as it passes the limit.
 | `POST /api/mcp` (`createGraftMcpHandler`) | 32 MiB, so `put_asset` fits a 24 MB file as base64 |
 | A public docs MCP (`createDocsMcpHandler`) | 1 MiB |
 
+Arguments to `run_function` arrive inside an MCP message, so the MCP limit
+bounds them, not the functions route's 1 MiB.
+
 The functions route and Studio answer with the `PAYLOAD_TOO_LARGE` error.
 MCP answers in its own protocol: a JSON-RPC error with code `-32600` and a
 message that says how to raise the limit.
@@ -183,8 +186,9 @@ createFunctionsHandler({ functions, db, maxBodyBytes: 4 * 1024 * 1024 });
 
 With `graft serve`, pass `--max-body-bytes` or set `GRAFT_MAX_BODY_BYTES`; the
 flag wins when both are set. It sets one limit for the functions route, MCP,
-Studio and the server itself. The server reads nothing past 32 MiB by default,
-and each route stops reading at its own limit as the bytes arrive. A value that
+Studio and the server itself. The server stops reading a body once it passes
+32 MiB by default, and each route stops at its own limit as the bytes arrive,
+so at most the chunk that crossed the limit is read past it. A value that
 is not a whole number of bytes stops the server with `CONFIG_INVALID`.
 
 ## What is not rate limited
