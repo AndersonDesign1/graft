@@ -8,7 +8,7 @@
  * docs.
  */
 import { z } from "zod";
-import { allPackages } from "../packages";
+import { allPackages, FRAMEWORKS, servesFramework } from "../packages";
 import { guarded } from "../tool-result";
 import { READS } from "./annotations";
 import { listPackagesOutput } from "./outputs";
@@ -27,7 +27,7 @@ export const registerPackageTools: RegisterTools = (server, deps) => {
         "Which @usegraft/* package to install for a given framework or job: what each one is, when you need it, and which tier it requires. Filter by `framework` when the user is on a known one, or by `tier`. Use this before suggesting an install; use list_registry for copy-in primitives instead.",
       inputSchema: {
         framework: z
-          .enum(["next", "astro", "sveltekit", "react-router", "tanstack-start", "react"])
+          .enum(FRAMEWORKS)
           .optional()
           .describe("Only the adapter for this framework, plus the packages every project needs"),
         tier: z
@@ -50,7 +50,9 @@ export const registerPackageTools: RegisterTools = (server, deps) => {
         // to "I am on Astro" is the adapter AND the cli and core every project
         // needs, not the adapter alone.
         if (framework) {
-          packages = packages.filter((p) => p.framework === undefined || p.framework === framework);
+          packages = packages.filter(
+            (p) => p.framework === undefined || servesFramework(p, framework),
+          );
         }
 
         // `either` satisfies both tiers; a static project must not be told to

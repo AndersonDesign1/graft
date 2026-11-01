@@ -69,7 +69,8 @@ saying how many seconds to wait:
 - **Signed-in callers** are counted by who they are. Two users never share a
   limit, so one cannot lock out the other.
 - **Anonymous callers** are counted by IP address, when Graft knows it.
-  `graft serve` records each connection's address. Inside your own app, Graft
+  `graft serve` records each connection's address, and so does `graftHandler`
+  in a [Nuxt or Nitro](/docs/nitro) app. Inside other frameworks, Graft
   only knows it once you set `trustedProxyHops` (below). Until then, every
   anonymous caller shares one limit, which is strict: one busy caller can use
   it up for everyone.
@@ -190,6 +191,14 @@ Studio and the server itself. The server stops reading a body once it passes
 32 MiB by default, and each route stops at its own limit as the bytes arrive,
 so at most the chunk that crossed the limit is read past it. A value that
 is not a whole number of bytes stops the server with `CONFIG_INVALID`.
+
+In Nuxt or Nitro, `graftHandler` from `@usegraft/sdk-nitro` does the same on
+h3 1 under Node: it streams the body to the handler, which stops at its own limit (1 MiB
+for `createFunctionsHandler`), and `graftHandler` stops at 32 MiB, or its own
+`maxBodyBytes`, as the bytes are read. On h3 2, and on h3 1 under a Web
+runtime such as Cloudflare, Deno or Vercel Edge, it hands over the platform's
+request untouched, each handler reads it under its own limit, and
+`maxBodyBytes` has no effect.
 
 ## What is not rate limited
 
