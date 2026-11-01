@@ -66,7 +66,7 @@ jobs:
       # and scripts/prune-turbo-cache.mjs keeps each one the size of one run.
       - name: Restore the turbo cache
         id: turbo-cache
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .turbo/cache
           key: turbo-${{ runner.os }}-verify-${{ github.sha }}
@@ -133,7 +133,7 @@ jobs:
         run: node scripts/prune-turbo-cache.mjs
       - name: Save the turbo cache
         if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .turbo/cache
           key: turbo-${{ runner.os }}-verify-${{ github.sha }}
@@ -177,7 +177,7 @@ jobs:
       # Turbo's cache from this job's last run; see the note in `verify`.
       - name: Restore the turbo cache
         id: turbo-cache
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .turbo/cache
           key: turbo-${{ runner.os }}-sdk-next-${{ matrix.next }}-${{ github.sha }}
@@ -196,7 +196,7 @@ jobs:
         run: node scripts/prune-turbo-cache.mjs
       - name: Save the turbo cache
         if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .turbo/cache
           key: turbo-${{ runner.os }}-sdk-next-${{ matrix.next }}-${{ github.sha }}
@@ -253,7 +253,7 @@ jobs:
       # Turbo's cache from this job's last run; see the note in `verify`.
       - name: Restore the turbo cache
         id: turbo-cache
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .turbo/cache
           key: turbo-${{ runner.os }}-integration-${{ github.sha }}
@@ -300,7 +300,7 @@ jobs:
         run: node scripts/prune-turbo-cache.mjs
       - name: Save the turbo cache
         if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .turbo/cache
           key: turbo-${{ runner.os }}-integration-${{ github.sha }}
