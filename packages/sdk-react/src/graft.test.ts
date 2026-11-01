@@ -1,7 +1,10 @@
+// @vitest-environment node
+// The handle has no DOM in it, and the same-origin test needs a runtime with
+// no `location`, as during server rendering. jsdom would supply one.
 /**
  * Unit: the type-inference pins (the no-codegen contract has to survive a
  * client that reads over HTTP exactly as it survives one that reads Postgres),
- * the two configurations this package refuses, and a round trip through the
+ * the configurations this package refuses, and a round trip through the
  * real content API handler — no network, no database, the actual wire format.
  */
 import { createContentApiHandler } from "@usegraft/content-api";
@@ -124,6 +127,44 @@ describe("createGraft configuration", () => {
     await expect(
       graft.searchContent("docs", "intro", { branch: "preview/redesign" }),
     ).rejects.toThrow(/`branch` cannot be passed to a read/);
+  });
+
+  it("refuses a branch passed through graft.client, which skips the helpers' guard", async () => {
+    const graft = servedGraft();
+    // "main" too: sdk-core fills it in for a read with no branch, so only the
+    // handle can tell it was asked for, and a preview endpoint would answer it.
+    for (const branch of ["preview/redesign", "main"]) {
+      await expect(graft.client.getDocument("docs", "intro", { branch })).rejects.toMatchObject({
+        code: "CONFIG_INVALID",
+      });
+      await expect(graft.client.listDocuments("docs", { branch })).rejects.toMatchObject({
+        code: "CONFIG_INVALID",
+      });
+      await expect(graft.client.searchDocuments("docs", "intro", { branch })).rejects.toMatchObject(
+        { code: "CONFIG_INVALID" },
+      );
+    }
+    expect(await graft.client.getDocument("docs", "intro")).not.toBeNull();
+  });
+
+  it("builds with a same-origin endpoint where there is no page, failing only a read", async () => {
+    // During server rendering a module that calls createGraft is imported with
+    // no `location`. Building the reader eagerly threw right there.
+    const graft = createGraft({ endpoint: "/api/content/v1", collections: { docs } });
+    await expect(graft.getContent("docs", "intro")).rejects.toMatchObject({
+      code: "CONFIG_INVALID",
+    });
+  });
+
+  it("refuses endpoint and index together, rather than ignoring one", () => {
+    expect(() =>
+      createGraft({ endpoint: "http://cms.test/api/content/v1", index, collections: { docs } }),
+    ).toThrowError(
+      expect.objectContaining({
+        code: "CONFIG_INVALID",
+        message: expect.stringMatching(/cannot both be set/),
+      }),
+    );
   });
 
   it("still allows a per-read branch when the handle owns its own index", async () => {

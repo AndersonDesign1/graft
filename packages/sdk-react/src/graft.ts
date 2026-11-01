@@ -1,5 +1,5 @@
 /**
- * The browser read handle — the same `getContent` / `listContent` /
+ * The browser read handle: the same `getContent` / `listContent` /
  * `searchContent` surface every server adapter has, reading over HTTP instead
  * of over a database connection.
  *
@@ -86,6 +86,14 @@ function readerFor<TCollections extends Record<string, AnyCollection>>(
     return options.index;
   }
 
+  if (options.index !== undefined) {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message: "`endpoint` and `index` cannot both be set.",
+      fix: "Pass `endpoint` to read a content API, or `index` to read through your own ContentIndexReader. With both, one would be silently ignored.",
+    });
+  }
+
   // A content API endpoint *is* a branch: the server pins one and refuses a
   // branch query param, so a `branch` set here would be dropped on the way out
   // and the caller would read main while believing they read a preview.
@@ -98,11 +106,33 @@ function readerFor<TCollections extends Record<string, AnyCollection>>(
     });
   }
 
-  return createContentApiReader({
-    endpoint: options.endpoint,
-    headers: options.headers,
-    fetch: options.fetch,
-  });
+  const endpoint = options.endpoint;
+  return endpointReader(() =>
+    createContentApiReader({ endpoint, headers: options.headers, fetch: options.fetch }),
+  );
+}
+
+type Reader = NonNullable<ClientOptions<Record<string, AnyCollection>>["index"]>;
+
+/**
+ * The content API reader, built on first read rather than when the handle is.
+ *
+ * A same-origin endpoint such as `/api/content/v1` resolves against the page,
+ * and during server rendering there is no page, so building it eagerly made
+ * `createGraft` throw as soon as a server imported the module that calls it.
+ * Built lazily, the module loads anywhere and only a read on the server fails.
+ */
+function endpointReader(make: () => Reader): Reader {
+  let reader: Reader | undefined;
+  const get = (): Reader => {
+    reader ??= make();
+    return reader;
+  };
+  return {
+    readContent: async (options) => get().readContent(options),
+    searchContent: async (options) => get().searchContent(options),
+    close: async () => reader?.close(),
+  };
 }
 
 /**
@@ -136,11 +166,33 @@ export function createGraft<TCollections extends Record<string, AnyCollection>>(
     });
   }
 
+  // `graft.client` gets the same guard. sdk-core fills in "main" for a read
+  // with no branch, so the reader cannot tell an explicit `branch: "main"`
+  // from none, and a preview endpoint would answer "main" with its own branch.
+  const guarded: GraftClient<TCollections> = endpointPinned
+    ? {
+        collections: client.collections,
+        branch: client.branch,
+        async getDocument(collection, slug, opts) {
+          assertNoBranch(opts);
+          return client.getDocument(collection, slug, opts);
+        },
+        async listDocuments(collection, opts) {
+          assertNoBranch(opts);
+          return client.listDocuments(collection, opts);
+        },
+        async searchDocuments(collection, query, opts) {
+          assertNoBranch(opts);
+          return client.searchDocuments(collection, query, opts);
+        },
+      }
+    : client;
+
   // `async` so the refusal arrives as a rejection. These are declared to return
   // promises, and a synchronous throw from one is the kind of thing a caller
   // handling errors with `.catch()` never sees.
   return {
-    client,
+    client: guarded,
     async getContent(collection, slug, opts) {
       assertNoBranch(opts);
       return client.getDocument(collection, slug, opts);

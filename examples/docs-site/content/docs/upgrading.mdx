@@ -55,6 +55,16 @@ and Studio saves check every body whatever `mdxTrust` says, so such a body has
 to be committed to the repository. See
 [MDX safety](/docs/mdx-safety#what-is-refused).
 
+**An endpoint-backed `createGraft` in `@usegraft/sdk-react` refuses two
+configurations it used to ignore.** Any `branch` passed through
+`graft.client`, `"main"` included, got the endpoint's own branch back, because
+each content API endpoint serves one branch. Passing both `endpoint` and `index` used `endpoint` and ignored
+`index`. Both now throw `CONFIG_INVALID`.
+
+**What to do:** to read a preview branch, point a second `createGraft` at the
+preview deployment's endpoint instead of passing `branch`. Pass `endpoint` or
+`index`, not both. See [React](/docs/react).
+
 ## 1.0.0-beta.9
 
 **A usage mistake exits with code 2, and a flag the command does not take is
