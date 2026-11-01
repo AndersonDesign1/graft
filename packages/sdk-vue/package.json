@@ -1,0 +1,78 @@
+{
+  "name": "@usegraft/sdk-vue",
+  "version": "1.0.0-beta.9",
+  "description": "Vue client: typed reads over the content API, composables that run them, and MDX rendering for Vue.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "composables",
+    "content-api",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "mdx",
+    "nuxt",
+    "typescript",
+    "vue"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndersonDesign1/graft.git",
+    "directory": "packages/sdk-vue"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "server": [
+        "./dist/server.d.ts"
+      ]
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/server.ts --format esm --dts --clean --external vue --external vue/jsx-runtime",
+    "dev": "tsup src/index.ts src/server.ts --format esm --watch --external vue --external vue/jsx-runtime",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@mdx-js/mdx": "^3.1.1",
+    "@usegraft/content-api": "workspace:*",
+    "@usegraft/contracts": "workspace:*",
+    "@usegraft/mdx-safety": "workspace:*",
+    "@usegraft/sdk-core": "workspace:*",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@usegraft/core": "workspace:*",
+    "jsdom": "^25.0.1",
+    "vue": "^3.5.44"
+  },
+  "peerDependencies": {
+    "vue": ">=3.5.0"
+  },
+  "engines": {
+    "node": ">=22.16"
+  }
+}
