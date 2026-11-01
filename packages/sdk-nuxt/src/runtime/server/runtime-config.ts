@@ -18,6 +18,8 @@ export interface RuntimeSettings {
   readonly databaseUrl: string;
   readonly staticIndex: string;
   readonly devToken: string;
+  /** `NUXT_GRAFT_DEV_SCOPES`: the dev token's scopes, comma or space separated. */
+  readonly devScopes: string;
   /** `NUXT_GRAFT_TRUSTED_ISSUERS`: issuer URLs, comma or space separated. */
   readonly trustedIssuers: string;
   /** `NUXT_GRAFT_TRUSTED_AUDIENCE`: accepted `aud` values. Empty leaves `aud` unchecked. */
@@ -49,6 +51,7 @@ export function runtimeSettings(runtime: unknown): RuntimeSettings {
     databaseUrl: text(runtime, "databaseUrl", "NUXT_GRAFT_DATABASE_URL"),
     staticIndex: text(runtime, "staticIndex", "NUXT_GRAFT_STATIC_INDEX"),
     devToken: text(runtime, "devToken", "NUXT_GRAFT_DEV_TOKEN"),
+    devScopes: text(runtime, "devScopes", "NUXT_GRAFT_DEV_SCOPES"),
     trustedIssuers: text(runtime, "trustedIssuers", "NUXT_GRAFT_TRUSTED_ISSUERS"),
     trustedAudience: text(runtime, "trustedAudience", "NUXT_GRAFT_TRUSTED_AUDIENCE"),
     trustedActorKind: text(runtime, "trustedActorKind", "NUXT_GRAFT_TRUSTED_ACTOR_KIND"),

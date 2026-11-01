@@ -93,4 +93,13 @@ describe("actorOptions", () => {
     vi.stubEnv("NODE_ENV", "");
     expect(actorOptions({ devToken: "secret" }).devTokens).toBeUndefined();
   });
+
+  it("gives the dev token the scopes NUXT_GRAFT_DEV_SCOPES lists, as graft serve does", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    expect(
+      actorOptions({ devToken: "secret", devScopes: "content:write, billing:refund" }).devTokens,
+    ).toEqual({
+      secret: { kind: "human", id: "owner", scopes: ["content:write", "billing:refund"] },
+    });
+  });
 });

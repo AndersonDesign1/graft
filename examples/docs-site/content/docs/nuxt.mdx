@@ -239,6 +239,7 @@ environment variable when the server starts:
 | `NUXT_GRAFT_DATABASE_URL` | The Postgres connection string. Falls back to `DATABASE_URL`. |
 | `NUXT_GRAFT_STATIC_INDEX` | The static index file, instead of the path in `graft.config.ts`. |
 | `NUXT_GRAFT_DEV_TOKEN` | A bearer token the functions and MCP routes accept in development only. |
+| `NUXT_GRAFT_DEV_SCOPES` | The dev token's scopes, comma or space separated. Unset, it gets `content:write`. |
 | `NUXT_GRAFT_TRUSTED_ISSUERS` | JWT issuers those routes trust, comma or space separated. |
 | `NUXT_GRAFT_TRUSTED_AUDIENCE` | The token audience (`aud`) those routes accept. Unset, the audience is not checked. |
 | `NUXT_GRAFT_TRUSTED_ACTOR_KIND` | `agent` (the default) or `human`: how token holders are recorded. |

@@ -65,7 +65,8 @@ body with your own Vue components.
 | `mcp`        | `false`             | Mounts `POST /api/mcp`. Needs Postgres, `@usegraft/auth` and `@usegraft/mcp`       |
 
 Runtime settings take `NUXT_GRAFT_DATABASE_URL`, `NUXT_GRAFT_STATIC_INDEX`,
-`NUXT_GRAFT_DEV_TOKEN` (development only) and `NUXT_GRAFT_TRUSTED_ISSUERS`.
+`NUXT_GRAFT_DEV_TOKEN` (development only, with `NUXT_GRAFT_DEV_SCOPES`) and
+`NUXT_GRAFT_TRUSTED_ISSUERS`.
 
 The full guide is at [graft.page/docs/nuxt](https://graft.page/docs/nuxt).
 

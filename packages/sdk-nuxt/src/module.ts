@@ -54,6 +54,8 @@ export interface GraftRuntimeConfig {
   staticIndex: string;
   /** `NUXT_GRAFT_DEV_TOKEN`: a bearer token accepted in development only. */
   devToken: string;
+  /** `NUXT_GRAFT_DEV_SCOPES`: the dev token's scopes. Empty grants `content:write`. */
+  devScopes: string;
   /** `NUXT_GRAFT_TRUSTED_ISSUERS`: JWT issuers, comma or space separated. */
   trustedIssuers: string;
   /** `NUXT_GRAFT_TRUSTED_AUDIENCE`: accepted `aud` values. Empty leaves `aud` unchecked. */
@@ -110,6 +112,7 @@ const graftModule: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
       databaseUrl: "",
       staticIndex: "",
       devToken: "",
+      devScopes: "",
       trustedIssuers: "",
       trustedAudience: "",
       trustedActorKind: "",

@@ -29,7 +29,8 @@ the engine `graft.config.ts` names: the static index, or Postgres at
 `/api/mcp`, and follow `approvalPolicy` and `mdxTrust` from `graft.config.ts`
 with the same 60-a-minute backstop `graft serve` sets. JWT callers are checked
 against `NUXT_GRAFT_TRUSTED_ISSUERS` and, when set,
-`NUXT_GRAFT_TRUSTED_AUDIENCE`. A route that needs Postgres on the static engine
+`NUXT_GRAFT_TRUSTED_AUDIENCE`. In development, `NUXT_GRAFT_DEV_TOKEN` is accepted with
+the scopes in `NUXT_GRAFT_DEV_SCOPES`. A route that needs Postgres on the static engine
 answers `503` with `CONFIG_INVALID` and a fix.
 
 The server code imports from `nuxt/server`, which Nuxt added in 4.6.0, so one
