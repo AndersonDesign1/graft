@@ -227,9 +227,10 @@ the network for that call and puts the body somewhere a plain stream reader
 would miss.
 
 Each Graft handler refuses a body over its own limit with `413`: 1 MiB for
-functions, 32 MiB for MCP. On h3 1, `graftHandler` streams the body to the
-handler instead of buffering it first, and stops reading at 32 MiB whatever the
-handler does. Pass `maxBodyBytes` to change that ceiling, such as
+functions, 32 MiB for MCP. On h3 1 under Node, `graftHandler` streams the body
+to the handler instead of buffering it first, and stops a body that passes
+32 MiB as the bytes are read. A handler that answers before reading the whole
+body gets the connection closed after its response. Pass `maxBodyBytes` to change that ceiling, such as
 `graftHandler(handler, { maxBodyBytes: 64 * 1024 * 1024 })`. See
 [Request bodies have a size limit](/docs/rate-limits#request-bodies-have-a-size-limit).
 

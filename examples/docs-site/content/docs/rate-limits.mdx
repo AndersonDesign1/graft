@@ -193,10 +193,11 @@ so at most the chunk that crossed the limit is read past it. A value that
 is not a whole number of bytes stops the server with `CONFIG_INVALID`.
 
 In Nuxt or Nitro, `graftHandler` from `@usegraft/sdk-nitro` does the same on
-h3 1: it streams the body to the handler, which stops at its own limit (1 MiB
+h3 1 under Node: it streams the body to the handler, which stops at its own limit (1 MiB
 for `createFunctionsHandler`), and `graftHandler` stops at 32 MiB, or its own
-`maxBodyBytes`, whatever the handler does. On h3 2 it hands over the
-platform's request untouched, each handler reads it under its own limit, and
+`maxBodyBytes`, as the bytes are read. On h3 2, and on h3 1 under a Web
+runtime such as Cloudflare, Deno or Vercel Edge, it hands over the platform's
+request untouched, each handler reads it under its own limit, and
 `maxBodyBytes` has no effect.
 
 ## What is not rate limited

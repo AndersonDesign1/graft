@@ -72,7 +72,7 @@ export default defineEventHandler(
 );
 ```
 
-It reads the request from `event.req` on h3 2 and builds it from `event.node.req` on h3 1. On h3 1 it finds the body where h3 itself would. That includes a page calling its own route with `$fetch` during server rendering, which Nuxt 4 answers without a network hop. On h3 1 the body streams to the handler, so each handler's own size limit applies (1 MiB for functions, 32 MiB for MCP), and anything past 32 MiB is refused with `413` whatever the handler does (`graftHandler(handler, { maxBodyBytes })` changes that ceiling). On h3 2 and Web runtimes the platform's request passes through untouched, each handler reads it under its own limit, and `maxBodyBytes` has no effect.
+It reads the request from `event.req` on h3 2 and builds it from `event.node.req` on h3 1. On h3 1 it finds the body where h3 itself would. That includes a page calling its own route with `$fetch` during server rendering, which Nuxt 4 answers without a network hop. On h3 1 under Node the body streams to the handler, so each handler's own size limit applies (1 MiB for functions, 32 MiB for MCP). `graftHandler` refuses a declared length over 32 MiB with `413` before reading, and stops a body that grows past it as the bytes are read (`graftHandler(handler, { maxBodyBytes })` changes that ceiling). A handler that answers before reading the whole body gets the connection closed after its response. On h3 2, and on h3 1 under a Web runtime such as Cloudflare, Deno or Vercel Edge, the platform's request passes through untouched, each handler reads it under its own limit, and `maxBodyBytes` has no effect.
 
 ## Rate limits count the real caller
 

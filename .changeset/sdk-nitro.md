@@ -28,10 +28,12 @@ way h3 itself does. That matters when a Nuxt 4 page calls its own route with
 the body on `req.body` and a stream that never emits it. Reading only the
 stream sent the MCP handler an empty body.
 
-On h3 1 the body streams to the Graft handler rather than being buffered, so
-each handler's own size limit stops the read, and `graftHandler` refuses
-anything past 32 MiB with `413` `PAYLOAD_TOO_LARGE` either way. Its
-`maxBodyBytes` option changes that ceiling.
+On h3 1 under Node the body streams to the Graft handler rather than being
+buffered, so each handler's own size limit stops the read. `graftHandler`
+refuses a declared length over 32 MiB with `413` `PAYLOAD_TOO_LARGE`, stops a
+body that grows past it as the bytes are read, and closes the connection when a
+handler answers before reading the whole body. Its `maxBodyBytes` option
+changes that ceiling.
 
 This is the first adapter that records the caller's address for rate limits.
 Other frameworks hand Graft only the request, so anonymous callers there share
