@@ -10,7 +10,8 @@ is no page, so a server that imported the module calling `createGraft` threw
 only a read on the server fails.
 
 **BREAKING:** two configurations that were silently wrong now throw
-`CONFIG_INVALID`. A read on another branch through `graft.client`, such as
+`CONFIG_INVALID`. A read with any `branch` through `graft.client`, even
+`"main"`, such as
 `graft.client.getDocument("docs", "intro", { branch: "preview" })`, returned
 the endpoint's own branch. The helpers already refused it. And `endpoint`
 passed with `index` ignored `index`. sdk-vue has carried both fixes since it

@@ -38,9 +38,9 @@ error's `fix` says what to change.
 ## 1.0.0-beta.10
 
 **An endpoint-backed `createGraft` in `@usegraft/sdk-react` refuses two
-configurations it used to ignore.** A `branch` passed through `graft.client`
-got the endpoint's own branch back, because each content API endpoint serves
-one branch. Passing both `endpoint` and `index` used `endpoint` and ignored
+configurations it used to ignore.** Any `branch` passed through
+`graft.client`, `"main"` included, got the endpoint's own branch back, because
+each content API endpoint serves one branch. Passing both `endpoint` and `index` used `endpoint` and ignored
 `index`. Both now throw `CONFIG_INVALID`.
 
 **What to do:** to read a preview branch, point a second `createGraft` at the
