@@ -452,6 +452,7 @@ const handlers = {
       port: ctx.flags.number("port"),
       host: ctx.flags.string("host"),
       studio: ctx.flags.bool("studio"),
+      maxBodyBytes: ctx.flags.number("max-body-bytes"),
     });
   },
 

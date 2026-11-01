@@ -127,7 +127,11 @@ function serveUiAsset(pathname: string, uiBase: string): Response | null {
 export function createStudioHandler(options: StudioHandlerOptions): StudioFetchHandler {
   const uiBase = (options.uiBasePath ?? "").replace(/\/$/, "");
   const editors = options.editors
-    ? createEditorAuth({ ...options.editors, uiBasePath: uiBase })
+    ? createEditorAuth({
+        ...options.editors,
+        uiBasePath: uiBase,
+        maxBodyBytes: options.editors.maxBodyBytes ?? options.maxBodyBytes,
+      })
     : undefined;
   const bearer = options.authenticate;
   const api = createStudioApiHandler(
