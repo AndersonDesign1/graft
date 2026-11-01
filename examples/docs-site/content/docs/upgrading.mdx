@@ -48,9 +48,12 @@ attributes under the default `mdxTrust = "restricted"` now fails with
 the attribute rendered nothing anyway.
 
 **What to do:** run `graft compile`. If it names a document, replace the
-attribute with the markup itself, written as Markdown or a component. Content
-that every author commits through code review can set `mdxTrust = "full"`
-instead. See [MDX safety](/docs/mdx-safety#what-is-refused).
+attribute with the markup itself, written as Markdown or a component. If every
+author commits through code review, `mdxTrust = "full"` lets `graft compile`
+accept the body, with `trust: "full"` at the render site. MCP `write_content`
+and Studio saves check every body whatever `mdxTrust` says, so such a body has
+to be committed to the repository. See
+[MDX safety](/docs/mdx-safety#what-is-refused).
 
 ## 1.0.0-beta.9
 
