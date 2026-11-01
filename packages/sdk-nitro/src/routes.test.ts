@@ -299,6 +299,9 @@ describe("graftHandler body limit on h3 1", () => {
     });
 
     expect(response.status).toBe(413);
+    // The rest of the upload sits on a paused socket; keeping it alive would
+    // leave the next request on it unparsed.
+    expect(response.headers.get("connection")).toBe("close");
     expect(pulled).toBeGreaterThan(0);
     expect(pulled).toBeLessThan(4 * 1024 * 1024);
   });

@@ -69,6 +69,8 @@ export interface NodeIncoming {
   on(event: string, listener: (...args: never[]) => void): void;
   /** Stop reading from the socket, once nobody wants the rest of the body. */
   pause?(): void;
+  /** True once the whole body has arrived. */
+  readonly complete?: boolean;
   [Symbol.asyncIterator](): AsyncIterator<Uint8Array | string>;
 }
 
@@ -115,7 +117,22 @@ export function graftHandler(handler: FetchHandler, options: GraftHandlerOptions
       }
       throw error;
     }
-    return handler(request);
+    const response = await handler(request);
+    // The handler answered without reading the whole body: it refused it as
+    // too large, or never needed it. The rest is still on a paused socket, so
+    // a kept-alive connection would never parse another request. Close it
+    // after this response, as `graft serve` does.
+    const nodeReq = event.req instanceof Request ? undefined : event.node?.req;
+    if (nodeReq && nodeReq.complete === false && !response.headers.has("connection")) {
+      const headers = new Headers(response.headers);
+      headers.set("connection", "close");
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
+    return response;
   };
 }
 
