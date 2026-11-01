@@ -18,14 +18,21 @@ describe("lazyHandler", () => {
     let configured = false;
     const handler = lazyHandler(async () => {
       if (!configured) {
-        throw new GraftError({ code: "CONFIG_INVALID", message: "No database.", fix: "Set one." });
+        throw new GraftError({
+          code: "CONFIG_INVALID",
+          message: "No database.",
+          fix: "Set one.",
+        });
       }
       return async () => new Response("ok");
     });
 
     const refused = await handler(request());
     expect(refused.status).toBe(503);
-    expect(await refused.json()).toMatchObject({ error: "CONFIG_INVALID", fix: "Set one." });
+    expect(await refused.json()).toMatchObject({
+      error: "CONFIG_INVALID",
+      fix: "Set one.",
+    });
 
     configured = true;
     expect(await (await handler(request())).text()).toBe("ok");
@@ -44,10 +51,25 @@ describe("actorOptions", () => {
     vi.unstubAllEnvs();
   });
 
+  it("checks a numeric audience, which Nuxt hands over as a number", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(
+      actorOptions({
+        trustedIssuers: "https://a.test",
+        trustedAudience: 123456,
+      }),
+    ).toEqual({
+      issuers: [{ issuer: "https://a.test", actorKind: "agent", audience: ["123456"] }],
+      devTokens: undefined,
+    });
+  });
+
   it("splits trusted issuers on commas and spaces", () => {
     vi.stubEnv("NODE_ENV", "production");
     expect(
-      actorOptions({ trustedIssuers: "https://a.test, https://b.test  https://c.test" }),
+      actorOptions({
+        trustedIssuers: "https://a.test, https://b.test  https://c.test",
+      }),
     ).toEqual({
       issuers: [
         { issuer: "https://a.test", actorKind: "agent" },

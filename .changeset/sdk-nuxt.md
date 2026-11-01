@@ -3,6 +3,8 @@
 "@usegraft/sdk-nitro": patch
 "@usegraft/mcp": patch
 "@usegraft/db": patch
+"@usegraft/auth": patch
+"@usegraft/cli": patch
 ---
 
 Add `@usegraft/sdk-nuxt`, the Nuxt module, for Nuxt 4.6 and newer and Nuxt 5.
@@ -46,3 +48,7 @@ values. Before, that was a type error, though it worked at runtime. A
 reader that lives for the whole server process, as the Nuxt module's does,
 recovers on the next read after a database blip instead of failing every read
 until a restart.
+
+`@usegraft/auth` exports `trustedIssuersFrom`, the one parser for the trusted
+issuer, audience and actor kind settings. `graft serve` and the Nuxt module
+both use it, so the two read those settings by the same rules.

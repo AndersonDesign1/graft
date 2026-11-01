@@ -11,6 +11,7 @@
  * Later units add: the audit log riding correlationId (P3.4), rate limits, and
  * the human gate for destructive ops.
  */
+export * from "./issuers";
 export * from "./oidc";
 export * from "./resolver";
 export * from "./scopes";

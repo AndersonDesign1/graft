@@ -4,7 +4,7 @@
  * refused rather than defaulted, so a typo cannot pick a weaker policy than
  * the one written down. No Nuxt imports, so it is tested on its own.
  */
-import type { TrustedIssuer } from "@usegraft/auth";
+import { trustedIssuersFrom, type TrustedIssuer } from "@usegraft/auth";
 import { GraftError } from "@usegraft/contracts";
 
 export type ApprovalPolicy = "none" | "human" | "unattended";
@@ -34,42 +34,69 @@ export function mdxTrustFor(value: unknown): MdxTrust {
   });
 }
 
-/** The JWT issuers the functions and MCP routes trust, as `graft serve` reads them. */
-export interface IssuerSettings {
+/**
+ * The module's runtime config, as strings. Nuxt reads each `NUXT_GRAFT_*`
+ * override through `destr`, so a value that looks like a number or a boolean
+ * arrives as one: `NUXT_GRAFT_TRUSTED_AUDIENCE=123456` is the number 123456.
+ * Those are turned back into the text that was written. Anything else (an
+ * object, from a JSON-looking value) is refused, not stringified into
+ * "[object Object]".
+ */
+export interface RuntimeSettings {
+  readonly databaseUrl: string;
+  readonly staticIndex: string;
+  readonly devToken: string;
   /** `NUXT_GRAFT_TRUSTED_ISSUERS`: issuer URLs, comma or space separated. */
-  readonly trustedIssuers?: string;
-  /** `NUXT_GRAFT_TRUSTED_AUDIENCE`: accepted `aud` values. Unset leaves `aud` unchecked. */
-  readonly trustedAudience?: string;
+  readonly trustedIssuers: string;
+  /** `NUXT_GRAFT_TRUSTED_AUDIENCE`: accepted `aud` values. Empty leaves `aud` unchecked. */
+  readonly trustedAudience: string;
   /** `NUXT_GRAFT_TRUSTED_ACTOR_KIND`: `"agent"` (the default) or `"human"`. */
-  readonly trustedActorKind?: string;
+  readonly trustedActorKind: string;
 }
 
-const list = (value: string | undefined): string[] => (value ?? "").split(/[,\s]+/).filter(Boolean);
-
-export function trustedIssuersFor(settings: IssuerSettings): TrustedIssuer[] {
-  const audience = list(settings.trustedAudience);
-  // Set but empty once parsed (","): a typo, not a choice. Treating it as unset
-  // would turn the audience check off.
-  if (settings.trustedAudience?.trim() && audience.length === 0) {
-    throw new GraftError({
-      code: "CONFIG_INVALID",
-      message: `NUXT_GRAFT_TRUSTED_AUDIENCE is "${settings.trustedAudience}", which names no audience.`,
-      fix: "Set NUXT_GRAFT_TRUSTED_AUDIENCE to the audience your provider puts in tokens for this app (comma-separated for several), or unset it.",
-      details: { variable: "NUXT_GRAFT_TRUSTED_AUDIENCE", value: settings.trustedAudience },
-    });
-  }
-  const kind = settings.trustedActorKind?.trim() || "agent";
-  if (kind !== "agent" && kind !== "human") {
-    throw new GraftError({
-      code: "CONFIG_INVALID",
-      message: `NUXT_GRAFT_TRUSTED_ACTOR_KIND is "${kind}"; it must be "agent" or "human".`,
-      fix: "Set NUXT_GRAFT_TRUSTED_ACTOR_KIND=human to record token holders as people, or unset it to record them as agents.",
-      details: { variable: "NUXT_GRAFT_TRUSTED_ACTOR_KIND", value: kind },
-    });
-  }
-  return list(settings.trustedIssuers).map((issuer) => {
-    const trusted: TrustedIssuer = { issuer, actorKind: kind };
-    if (audience.length > 0) trusted.audience = audience;
-    return trusted;
+/** One runtime setting as text, or a GraftError naming its variable. */
+function text(runtime: unknown, key: keyof RuntimeSettings, variable: string): string {
+  const fields: [string, unknown][] =
+    typeof runtime === "object" && runtime !== null ? Object.entries(runtime) : [];
+  const value = fields.find(([name]) => name === key)?.[1];
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  throw new GraftError({
+    code: "CONFIG_INVALID",
+    message: `${variable} (runtimeConfig.graft.${key}) is ${JSON.stringify(value)}, which is not text.`,
+    fix: `Set ${variable} to plain text, such as a URL or a comma-separated list, not JSON.`,
+    details: { variable, value },
   });
+}
+
+export function runtimeSettings(runtime: unknown): RuntimeSettings {
+  return {
+    databaseUrl: text(runtime, "databaseUrl", "NUXT_GRAFT_DATABASE_URL"),
+    staticIndex: text(runtime, "staticIndex", "NUXT_GRAFT_STATIC_INDEX"),
+    devToken: text(runtime, "devToken", "NUXT_GRAFT_DEV_TOKEN"),
+    trustedIssuers: text(runtime, "trustedIssuers", "NUXT_GRAFT_TRUSTED_ISSUERS"),
+    trustedAudience: text(runtime, "trustedAudience", "NUXT_GRAFT_TRUSTED_AUDIENCE"),
+    trustedActorKind: text(runtime, "trustedActorKind", "NUXT_GRAFT_TRUSTED_ACTOR_KIND"),
+  };
+}
+
+/** The JWT issuers the functions and MCP routes trust, as `graft serve` reads them. */
+export function trustedIssuersFor(
+  settings: Pick<RuntimeSettings, "trustedIssuers" | "trustedAudience" | "trustedActorKind">,
+): TrustedIssuer[] {
+  return trustedIssuersFrom(
+    {
+      issuers: settings.trustedIssuers,
+      audience: settings.trustedAudience,
+      actorKind: settings.trustedActorKind,
+    },
+    {
+      code: "CONFIG_INVALID",
+      variables: {
+        audience: "NUXT_GRAFT_TRUSTED_AUDIENCE",
+        actorKind: "NUXT_GRAFT_TRUSTED_ACTOR_KIND",
+      },
+    },
+  );
 }

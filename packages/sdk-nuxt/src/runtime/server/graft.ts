@@ -17,6 +17,7 @@ import { createGraft, type Graft } from "@usegraft/sdk-nitro";
 import * as graftConfig from "#graft/config";
 import { useRuntimeConfig } from "nuxt/server";
 import { engineFor } from "./engine";
+import { runtimeSettings } from "./settings";
 
 type Collections = typeof graftConfig.collections;
 
@@ -53,7 +54,7 @@ function open(): Promise<Opened> {
 }
 
 async function openEngine(): Promise<Opened> {
-  const runtime = useRuntimeConfig().graft;
+  const runtime = runtimeSettings(useRuntimeConfig().graft);
   const engine = engineFor(optionalConfig.index, runtime, process.env, process.cwd());
   const { collections } = graftConfig;
   if (engine.kind === "static") {
