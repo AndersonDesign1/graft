@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkUpgrading, countEntries, sectionFor } from "./check-upgrading.mjs";
+import {
+  breakingChangesets,
+  checkUpgrading,
+  countEntries,
+  headline,
+  sectionFor,
+} from "./check-upgrading.mjs";
 
 const breaking = (id) => ({
   id,
@@ -93,4 +99,28 @@ test("a heading that names two versions is found for either, and ends at the nex
   assert.equal(countEntries(sectionFor(page, "1.0.0-beta.1")), 2);
   assert.equal(countEntries(sectionFor(page, "1.0.0-beta.9")), 1);
   assert.equal(sectionFor(page, "1.0.0-beta.10"), null);
+});
+
+test("a qualified marker counts as breaking, and the headline starts after it", () => {
+  // The shape of studio-plex-foundations.md: non-breaking changes first, then
+  // a qualified marker further down.
+  const qualified = {
+    id: "studio-panels",
+    summary:
+      "Studio gets new panels.\n\n**BREAKING (panels embed only):** if you embed the panels, import the stylesheet. More.",
+    releases: [],
+  };
+  assert.deepEqual(breakingChangesets([qualified, plain("faster")]), [qualified]);
+  assert.equal(headline(qualified), "if you embed the panels, import the stylesheet.");
+  assert.equal(
+    checkUpgrading({ version: "1.0.0-beta.10", changesets: [qualified], mdx: page }).length > 0,
+    true,
+  );
+});
+
+test("bold text that only starts with BREAKING is not a marker", () => {
+  assert.deepEqual(
+    breakingChangesets([{ id: "x", summary: "**BREAKINGLY fast** compiles.", releases: [] }]),
+    [],
+  );
 });

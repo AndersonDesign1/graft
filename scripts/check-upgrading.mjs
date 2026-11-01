@@ -1,7 +1,8 @@
 /**
  * Every breaking change gets an Upgrading entry before it ships.
  *
- * A changeset marks a breaking change with `**BREAKING:**`. The changelog
+ * A changeset marks a breaking change with `**BREAKING:**`, or a qualified
+ * `**BREAKING (panels embed only):**`. The changelog
  * page picks those up by itself, because it is generated from the packages'
  * CHANGELOG.md files. The Upgrading page is written by hand, and it is the page
  * that tells a reader what to change. 1.0.0-beta.9 shipped three breaking
@@ -25,12 +26,13 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(import.meta.dirname, "..");
 const upgradingPath = resolve(root, "examples/docs-site/content/docs/upgrading.mdx");
-const BREAKING = "**BREAKING:**";
+/** `**BREAKING:**`, or with a qualifier: `**BREAKING (panels embed only):**`. */
+const BREAKING = /\*\*BREAKING(?: \([^)\n]*\))?:\*\*/;
 const ENTRY = "**What to do:**";
 
 /** The changesets whose summary marks a breaking change. */
 export function breakingChangesets(changesets) {
-  return changesets.filter((changeset) => changeset.summary.includes(BREAKING));
+  return changesets.filter((changeset) => BREAKING.test(changeset.summary));
 }
 
 /**
@@ -54,13 +56,16 @@ export function countEntries(section) {
   return section.split(ENTRY).length - 1;
 }
 
-/** The first sentence of a changeset's summary, without the marker. */
-function headline(changeset) {
-  const text =
-    changeset.summary
-      .replace(BREAKING, "")
-      .trim()
-      .split(/\n\s*\n/)[0] ?? "";
+/**
+ * The first sentence after the marker, which can sit mid-summary, after the
+ * changes that do not break anything.
+ */
+export function headline(changeset) {
+  const marker = BREAKING.exec(changeset.summary);
+  const afterMarker = marker
+    ? changeset.summary.slice(marker.index + marker[0].length)
+    : changeset.summary;
+  const text = afterMarker.trim().split(/\n\s*\n/)[0] ?? "";
   const oneLine = text.replace(/\s+/g, " ");
   const sentence = /^.+?[.!?](?=\s|$)/.exec(oneLine);
   return sentence ? sentence[0] : oneLine;
