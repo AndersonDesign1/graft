@@ -116,6 +116,14 @@ afterEach(() => {
 });
 
 describe("introspection", () => {
+  it("points a Nuxt project at the Nitro adapter, which serves Nuxt until it has its own", async () => {
+    const { payload } = await callTool("list_packages", { framework: "nuxt" });
+    const adapters = (payload.packages as { name: string; framework?: string }[])
+      .filter((p) => p.framework !== undefined)
+      .map((p) => p.name);
+    expect(adapters).toEqual(["@usegraft/sdk-nitro"]);
+  });
+
   it("lists collections with metadata", async () => {
     const { payload } = await callTool("list_collections");
     expect(payload.branch).toBe("main");
@@ -441,6 +449,29 @@ describe("function tools (P6.2)", () => {
     });
     expect(isError).toBe(false);
     expect(payload.data).toEqual({ wrote: true });
+  });
+
+  it("run_function takes arguments over 1 MiB, since the MCP transport already bounded them", async () => {
+    const server = createGraftMcp({
+      contentDir: dir,
+      collections,
+      functions,
+      db: { __stub: true } as unknown as Database,
+      audit: false,
+    });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client({ name: "large", version: "0.0.0" });
+    await client.connect(clientTransport);
+
+    const message = "x".repeat(2 * 1024 * 1024);
+    const result = (await client.callTool({
+      name: "run_function",
+      arguments: { name: "echo", input: { message } },
+    })) as { isError?: boolean; content: { type: string; text: string }[] };
+
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(result.content[0]?.text ?? "null").data.echoed).toHaveLength(message.length);
   });
 
   it("run_function passes bearer auth into the actor resolver", async () => {

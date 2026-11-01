@@ -243,7 +243,9 @@ const { data: post } = await useAsyncData(`post:${slug}`, () => graft.getContent
 - **Reach the database.** The client only speaks HTTP. It has no option for a
   database connection, so a connection string cannot end up in your bundle.
 - **Choose a branch.** Each Content API endpoint serves one branch, set by the
-  server. Passing `branch` to the client or to a read throws `CONFIG_INVALID`.
+  server. On an endpoint-backed handle, passing `branch` to `createGraft`, to a
+  read, or to a read through `graft.client` throws `CONFIG_INVALID`, even
+  `branch: "main"`. A handle built on your own `index` takes `branch` as usual.
   To read a preview branch, point a second client at the preview deployment's
   endpoint.
 - **Compile MDX.** Compiling stays on the server. `MdxContent` only runs what

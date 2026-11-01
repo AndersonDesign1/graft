@@ -3,7 +3,7 @@
 # Source: ERROR_KNOWLEDGE in packages/mcp/src/explain.ts
 # Regenerate: node scripts/gen-error-docs.mjs
 title: Error reference
-description: "Every Graft error code, what it means, and how to recover. 50 codes."
+description: "Every Graft error code, what it means, and how to recover. 51 codes."
 section: Reference
 order: 5
 ---
@@ -18,7 +18,7 @@ you can tell whether the fix applies or something else is wrong.
 Agents can read the same entries without leaving their tools: the
 `explain_error` MCP tool returns them for any code.
 
-There are 50 codes, listed alphabetically.
+There are 51 codes, listed alphabetically.
 
 ## Codes
 
@@ -331,10 +331,11 @@ An adapter API needs a newer version of the framework than the app has installed
 **Usually because**
 
 - Calling `updateContent` from @usegraft/sdk-next on Next.js 15. It needs `updateTag`, which Next.js added in 16
+- Mounting `graftHandler` from @usegraft/sdk-nitro on an h3 older than 1.15. It reads the request from `event.req` (h3 2) or `event.node.req` (h3 1)
 
 **How to recover**
 
-Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 15 and 16. Or upgrade the framework.
+Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 15 and 16. For `graftHandler` outside Nitro, call the Graft handler with a Web Request directly. Or upgrade the framework.
 
 ### FUNCTION_EXECUTION_FAILED
 
@@ -492,6 +493,20 @@ The capability is planned but not built yet.
 **How to recover**
 
 Use the documented alternative (the error's `fix` names it if one exists), or accomplish the task by editing files directly — git is always a valid interface.
+
+### PAYLOAD_TOO_LARGE
+
+The request body is larger than the endpoint accepts. It was refused before Graft read the rest of it, so the function or tool never ran. A refused function call is still recorded against the caller's rate limit.
+
+**Usually because**
+
+- A function call or Studio save carrying more than 1 MiB of JSON, the default for those routes (Studio asset uploads allow 14 MiB)
+- An MCP `put_asset` with a file over about 24 MB, which is 32 MiB once base64-encoded
+- A client sending an unbounded stream to an endpoint
+
+**How to recover**
+
+Send a smaller body. For a large asset, upload it with `graft asset put <file>`, or pass `path` to `put_asset` on a local stdio server; over HTTP, `put_asset` takes base64, which counts against the limit. Each endpoint has its own limit: a direct function call or Studio request raises `maxBodyBytes` on that handler, and an MCP message, including `run_function` arguments and HTTP `put_asset`, raises it on the MCP handler. `--max-body-bytes` on graft serve sets all of them.
 
 ### RATE_LIMITED
 

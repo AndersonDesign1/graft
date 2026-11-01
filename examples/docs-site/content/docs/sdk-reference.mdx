@@ -25,6 +25,7 @@ types all of them.
 | `@usegraft/sdk-sveltekit` | SvelteKit | `graftRoute` for `+server.ts`; CDN surrogate keys for tags |
 | `@usegraft/sdk-tanstack-start` | TanStack Start | `graftRoute` for server routes; build the handle in a server-only module |
 | `@usegraft/sdk-react-router` | React Router v7 | Framework mode; `graftRoute` returns both `action` and `loader` |
+| `@usegraft/sdk-nitro` | Nuxt 4 and 5, Nitro 3 | `graftHandler` for event handlers on h3 1 and h3 2; records the caller's address for rate limits |
 | `@usegraft/sdk-react` | the browser | Reads over HTTP; `createGraftHooks`; no `db` option, by design |
 | `@usegraft/sdk-vue` | Vue | Reads over HTTP; `createGraftComposables`; `MdxContent` for MDX, compiled by `prepareMdx` from `@usegraft/sdk-vue/server` |
 
@@ -93,6 +94,9 @@ export const ServerRoute = createServerFileRoute("/api/fn/$name").methods({
 // React Router v7: app/routes/api.fn.$name.ts
 export const action = graftRoute(functionsHandler); // POST
 export const loader = graftRoute(functionsHandler); // GET, answers 405
+
+// Nuxt or Nitro: server/api/fn/[name].ts
+export default defineEventHandler(graftHandler(functionsHandler));
 
 // Next: app/api/fn/[name]/route.ts
 export const POST = functionsHandler;

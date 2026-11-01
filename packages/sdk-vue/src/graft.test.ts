@@ -128,9 +128,20 @@ describe("createGraft configuration", () => {
 
   it("refuses a branch passed through graft.client, which skips the helpers' guard", async () => {
     const graft = servedGraft();
-    await expect(
-      graft.client.getDocument("docs", "intro", { branch: "preview/redesign" }),
-    ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+    // "main" too: sdk-core fills it in for a read with no branch, so only the
+    // handle can tell it was asked for, and a preview endpoint would answer it.
+    for (const branch of ["preview/redesign", "main"]) {
+      await expect(graft.client.getDocument("docs", "intro", { branch })).rejects.toMatchObject({
+        code: "CONFIG_INVALID",
+      });
+      await expect(graft.client.listDocuments("docs", { branch })).rejects.toMatchObject({
+        code: "CONFIG_INVALID",
+      });
+      await expect(graft.client.searchDocuments("docs", "intro", { branch })).rejects.toMatchObject(
+        { code: "CONFIG_INVALID" },
+      );
+    }
+    expect(await graft.client.getDocument("docs", "intro")).not.toBeNull();
   });
 
   it("builds with a same-origin endpoint where there is no page, failing only a read", async () => {
@@ -145,7 +156,12 @@ describe("createGraft configuration", () => {
   it("refuses endpoint and index together, rather than ignoring one", () => {
     expect(() =>
       createGraft({ endpoint: "http://cms.test/api/content/v1", index, collections: { docs } }),
-    ).toThrowError(/cannot both be set/);
+    ).toThrowError(
+      expect.objectContaining({
+        code: "CONFIG_INVALID",
+        message: expect.stringMatching(/cannot both be set/),
+      }),
+    );
   });
 
   it("still allows a per-read branch when the handle owns its own index", async () => {

@@ -69,7 +69,8 @@ saying how many seconds to wait:
 - **Signed-in callers** are counted by who they are. Two users never share a
   limit, so one cannot lock out the other.
 - **Anonymous callers** are counted by IP address, when Graft knows it.
-  `graft serve` records each connection's address. Inside your own app, Graft
+  `graft serve` records each connection's address, and so does `graftHandler`
+  in a [Nuxt or Nitro](/docs/nitro) app. Inside other frameworks, Graft
   only knows it once you set `trustedProxyHops` (below). Until then, every
   anonymous caller shares one limit, which is strict: one busy caller can use
   it up for everyone.
@@ -150,6 +151,54 @@ This limit works differently from the function limit, in two ways:
 
 It identifies callers the same way, including the `trustedProxyHops` setting,
 and refuses with `429` before running the query.
+
+## Request bodies have a size limit
+
+Every route that reads a request body stops reading once the body passes a
+limit, and answers with HTTP status `413`. A request that declares a larger
+`Content-Length` is refused without reading a byte. One that sends no length is
+cut off as soon as it passes the limit.
+
+| Route | Default limit |
+| --- | --- |
+| `POST /api/fn/<name>` (`createFunctionsHandler`) | 1 MiB |
+| Studio's API | 1 MiB, and 14 MiB for an asset upload so a 10 MB file fits as base64 |
+| `POST /api/mcp` (`createGraftMcpHandler`) | 32 MiB, so `put_asset` fits a 24 MB file as base64 |
+| A public docs MCP (`createDocsMcpHandler`) | 1 MiB |
+
+Arguments to `run_function` arrive inside an MCP message, so the MCP limit
+bounds them, not the functions route's 1 MiB.
+
+The functions route and Studio answer with the `PAYLOAD_TOO_LARGE` error.
+MCP answers in its own protocol: a JSON-RPC error with code `-32600` and a
+message that says how to raise the limit.
+
+A refused function call still counts against the caller's rate limit. An MCP
+endpoint that requires a token refuses a caller without one before reading the
+body at all. One that accepts anonymous callers (`allowAnonymous: true`, or a
+public docs MCP) reads it under the limit like any other.
+
+To change a limit, pass `maxBodyBytes` to the handler, including
+`createStudioHandler`:
+
+```ts
+createFunctionsHandler({ functions, db, maxBodyBytes: 4 * 1024 * 1024 });
+```
+
+With `graft serve`, pass `--max-body-bytes` or set `GRAFT_MAX_BODY_BYTES`; the
+flag wins when both are set. It sets one limit for the functions route, MCP,
+Studio and the server itself. The server stops reading a body once it passes
+32 MiB by default, and each route stops at its own limit as the bytes arrive,
+so at most the chunk that crossed the limit is read past it. A value that
+is not a whole number of bytes stops the server with `CONFIG_INVALID`.
+
+In Nuxt or Nitro, `graftHandler` from `@usegraft/sdk-nitro` does the same on
+h3 1 under Node: it streams the body to the handler, which stops at its own limit (1 MiB
+for `createFunctionsHandler`), and `graftHandler` stops at 32 MiB, or its own
+`maxBodyBytes`, as the bytes are read. On h3 2, and on h3 1 under a Web
+runtime such as Cloudflare, Deno or Vercel Edge, it hands over the platform's
+request untouched, each handler reads it under its own limit, and
+`maxBodyBytes` has no effect.
 
 ## What is not rate limited
 

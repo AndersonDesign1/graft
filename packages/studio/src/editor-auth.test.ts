@@ -89,6 +89,35 @@ describe("session codec", () => {
 describe("hosted Studio sign-in", () => {
   const handler = createStudioHandler({ ...base, uiBasePath: "/studio", editors: { secret } });
 
+  it("reads an account route's body under maxBodyBytes, before touching the database", async () => {
+    const untouched = new Proxy(
+      {},
+      {
+        get: () => {
+          throw new Error("database touched before the body was checked");
+        },
+      },
+    ) as never;
+    const small = createStudioHandler({
+      ...base,
+      uiBasePath: "/studio",
+      maxBodyBytes: 64,
+      editors: { secret, accounts: { db: untouched } },
+    });
+    const response = await small(
+      new Request(`${ORIGIN}/api/studio/v1/auth/sign-in`, {
+        method: "POST",
+        headers: { origin: ORIGIN, "content-type": "application/json" },
+        body: JSON.stringify({ email: "ana@shop.test", password: "x".repeat(100) }),
+      }),
+    );
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({
+      error: "PAYLOAD_TOO_LARGE",
+      details: { limit: 64 },
+    });
+  });
+
   it("refuses the API to a signed-out browser but answers who is signed in", async () => {
     const api = await handler(new Request(`${ORIGIN}/api/studio/v1/openapi.json`));
     expect(api.status).toBe(401);

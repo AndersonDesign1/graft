@@ -1,0 +1,59 @@
+{
+  "name": "@usegraft/sdk-nitro",
+  "version": "1.0.0-beta.9",
+  "description": "Nitro and Nuxt adapter: typed content reads and event-handler mounts over Graft's stateless handlers, on h3 1 and h3 2.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "graft",
+    "h3",
+    "headless-cms",
+    "mcp",
+    "nitro",
+    "nuxt",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndersonDesign1/graft.git",
+    "directory": "packages/sdk-nitro"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts --format esm --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@usegraft/contracts": "workspace:*",
+    "@usegraft/db": "workspace:*",
+    "@usegraft/sdk-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@usegraft/core": "workspace:*",
+    "h3-v1": "npm:h3@1.15.11",
+    "h3-v2": "npm:h3@2.0.8"
+  },
+  "engines": {
+    "node": ">=22.16"
+  }
+}

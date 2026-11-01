@@ -121,27 +121,16 @@ type Reader = NonNullable<ClientOptions<Record<string, AnyCollection>>["index"]>
  * and during server rendering there is no page, so building it eagerly made
  * `createGraft` throw as soon as a server imported the module that calls it.
  * Built lazily, the module loads anywhere and only a read on the server fails.
- *
- * It also refuses a read on any branch but the endpoint's own, which catches a
- * `branch` passed through `graft.client` as well as through the helpers.
  */
 function endpointReader(make: () => Reader): Reader {
   let reader: Reader | undefined;
-  const get = (branch: string | undefined): Reader => {
-    if (branch !== undefined && branch !== "main") {
-      throw new GraftError({
-        code: "CONFIG_INVALID",
-        message: `A read asked for branch "${branch}" from an endpoint-backed handle.`,
-        fix: "Each content API endpoint serves exactly one branch, fixed by the server. Point a second handle at the preview's own endpoint instead of asking this one for a branch.",
-        details: { branch },
-      });
-    }
+  const get = (): Reader => {
     reader ??= make();
     return reader;
   };
   return {
-    readContent: async (options) => get(options.branch).readContent(options),
-    searchContent: async (options) => get(options.branch).searchContent(options),
+    readContent: async (options) => get().readContent(options),
+    searchContent: async (options) => get().searchContent(options),
     close: async () => reader?.close(),
   };
 }
@@ -177,11 +166,33 @@ export function createGraft<TCollections extends Record<string, AnyCollection>>(
     });
   }
 
+  // `graft.client` gets the same guard. sdk-core fills in "main" for a read
+  // with no branch, so the reader cannot tell an explicit `branch: "main"`
+  // from none, and a preview endpoint would answer "main" with its own branch.
+  const guarded: GraftClient<TCollections> = endpointPinned
+    ? {
+        collections: client.collections,
+        branch: client.branch,
+        async getDocument(collection, slug, opts) {
+          assertNoBranch(opts);
+          return client.getDocument(collection, slug, opts);
+        },
+        async listDocuments(collection, opts) {
+          assertNoBranch(opts);
+          return client.listDocuments(collection, opts);
+        },
+        async searchDocuments(collection, query, opts) {
+          assertNoBranch(opts);
+          return client.searchDocuments(collection, query, opts);
+        },
+      }
+    : client;
+
   // `async` so the refusal arrives as a rejection. These are declared to return
   // promises, and a synchronous throw from one is the kind of thing a caller
   // handling errors with `.catch()` never sees.
   return {
-    client,
+    client: guarded,
     async getContent(collection, slug, opts) {
       assertNoBranch(opts);
       return client.getDocument(collection, slug, opts);
