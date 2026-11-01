@@ -151,6 +151,33 @@ This limit works differently from the function limit, in two ways:
 It identifies callers the same way, including the `trustedProxyHops` setting,
 and refuses with `429` before running the query.
 
+## Request bodies have a size limit
+
+Every route that reads a request body stops reading once the body passes a
+limit, and answers `413` with `PAYLOAD_TOO_LARGE`. A request that declares a
+larger `Content-Length` is refused without reading a byte. One that sends no
+length is cut off as soon as it passes the limit.
+
+| Route | Default limit |
+| --- | --- |
+| `POST /api/fn/<name>` (`createFunctionsHandler`) | 1 MiB |
+| Studio's API | 1 MiB |
+| `POST /api/mcp` (`createGraftMcpHandler`) | 32 MiB, so `put_asset` fits a 24 MB file as base64 |
+| A public docs MCP (`createDocsMcpHandler`) | 1 MiB |
+
+A refused function call still counts against the caller's rate limit, and MCP
+refuses an unauthenticated caller before reading its body at all.
+
+To change a limit, pass `maxBodyBytes` to the handler:
+
+```ts
+createFunctionsHandler({ functions, db, maxBodyBytes: 4 * 1024 * 1024 });
+```
+
+With `graft serve`, pass `--max-body-bytes` or set `GRAFT_MAX_BODY_BYTES`. It
+sets one limit for the functions route, MCP, and the server itself, which reads
+nothing past 32 MiB by default.
+
 ## What is not rate limited
 
 - Reads through the SDKs in your own app. They read the index directly and never

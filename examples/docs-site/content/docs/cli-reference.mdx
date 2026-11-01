@@ -539,7 +539,7 @@ Needs `DATABASE_URL` on the Postgres engine; none on the static engine.
 Run the headless Graft runtime over HTTP: POST /api/fn/\<name>, POST /api/mcp, GET /api/content/v1/*, GET /healthz. This is what a self-hosted container runs.
 
 ```text
-graft serve [--branch <id>] [--port <n>] [--host <host>] [--studio]
+graft serve [--branch <id>] [--port <n>] [--host <host>] [--studio] [--max-body-bytes <n>]
 ```
 
 | Flag | What it does |
@@ -548,6 +548,7 @@ graft serve [--branch <id>] [--port <n>] [--host <host>] [--studio]
 | `--port <n>` | Port to listen on (default: 3903). Same as `PORT`. |
 | `--host <host>` | Host to listen on (default: 127.0.0.1, this computer only). Same as `HOST`. |
 | `--studio` | Serve Studio at /studio too. Same as `GRAFT_STUDIO`. |
+| `--max-body-bytes <n>` | Largest request body any route reads (default: 1 MiB, and 32 MiB for MCP). Same as `GRAFT_MAX_BODY_BYTES`. |
 
 Needs `DATABASE_URL`. Runs until you stop it.
 
