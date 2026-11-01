@@ -62,7 +62,8 @@ describe("PACKAGE_KNOWLEDGE", () => {
     expect(packageForFramework("sveltekit")?.name).toBe("@usegraft/sdk-sveltekit");
     expect(packageForFramework("nitro")?.name).toBe("@usegraft/sdk-nitro");
     expect(packageForFramework("nuxt")?.name).toBe("@usegraft/sdk-nitro");
-    expect(packageForFramework("vue")).toBeUndefined();
+    expect(packageForFramework("vue")?.name).toBe("@usegraft/sdk-vue");
+    expect(packageForFramework("solid")).toBeUndefined();
   });
 
   it("never points a static project at a Postgres-only package", () => {

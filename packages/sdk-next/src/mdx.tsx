@@ -12,13 +12,16 @@
  * `components/mdx-components.ts` map that `graft add` regenerates.
  */
 import { compile, run } from "@mdx-js/mdx";
-import { GraftError } from "@usegraft/contracts";
-import { assertSafeMdx, type MdxTrust } from "@usegraft/mdx-safety";
+import {
+  assertSafeMdx,
+  rehypeSafeUrls,
+  remarkRefuseModules,
+  type MdxTrust,
+} from "@usegraft/mdx-safety";
 import type { MDXComponents } from "mdx/types";
 import type { ReactElement } from "react";
 import * as runtime from "react/jsx-runtime";
 import remarkGfm from "remark-gfm";
-import { rehypeSafeUrls } from "./safe-urls";
 
 export type MdxComponents = MDXComponents;
 
@@ -67,40 +70,6 @@ async function compileMdx(
       development: options.development,
     }),
   );
-}
-
-/**
- * Whether a parsed MDX tree loads a module: `import`, `export … from`,
- * `import()` or `import.meta`. Read from the syntax tree, so a code span or a
- * fenced block that only mentions one is prose, not an import.
- */
-function loadsModules(value: unknown): boolean {
-  if (Array.isArray(value)) return value.some(loadsModules);
-  if (!value || typeof value !== "object") return false;
-  if ("type" in value) {
-    const node: { type?: unknown; source?: unknown; meta?: { name?: unknown } } = value;
-    if (node.type === "ImportDeclaration" || node.type === "ImportExpression") return true;
-    if (node.type === "MetaProperty" && node.meta?.name === "import") return true;
-    if (
-      (node.type === "ExportNamedDeclaration" || node.type === "ExportAllDeclaration") &&
-      node.source
-    )
-      return true;
-  }
-  return Object.entries(value).some(([key, child]) => key !== "position" && loadsModules(child));
-}
-
-/** Refuses a body that loads modules, which the browser has no bundler to resolve. */
-function remarkRefuseModules() {
-  return (tree: unknown) => {
-    if (!loadsModules(tree)) return;
-    throw new GraftError({
-      code: "INPUT_VALIDATION_FAILED",
-      message: "This MDX body imports modules, which prepareMdx can't send to the browser.",
-      fix: "Pass the components in MdxContent's components map instead of importing them in the MDX. In the App Router, MdxBody runs imports on the server.",
-      details: { reason: "mdx-import" },
-    });
-  };
 }
 
 /**

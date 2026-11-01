@@ -25,6 +25,7 @@ export const FRAMEWORKS = [
   "react-router",
   "tanstack-start",
   "react",
+  "vue",
   "nitro",
   "nuxt",
 ] as const;
@@ -119,6 +120,14 @@ export const PACKAGE_KNOWLEDGE = {
     when: "You need reads in the browser — a search box, an editor preview, a widget on an already-rendered page. No database reaches this package.",
     tier: "postgres",
     framework: "react",
+    direct: true,
+  },
+  "@usegraft/sdk-vue": {
+    name: "@usegraft/sdk-vue",
+    role: "Vue client: typed reads over the content API, composables that run them, and MDX rendering for Vue.",
+    when: "You need reads in a Vue app's browser code, or you render MDX bodies with Vue components. No database reaches this package.",
+    tier: "either",
+    framework: "vue",
     direct: true,
   },
   "@usegraft/sdk-core": {

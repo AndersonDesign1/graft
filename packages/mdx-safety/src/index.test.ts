@@ -126,6 +126,19 @@ describe("non-expression execution", () => {
     expect(found[0]?.kind).toBe("event-handler");
   });
 
+  it("refuses attributes a renderer writes as raw HTML, whatever their case", () => {
+    // Vue renders innerHTML from a plain string, so this is a working handler
+    // with no `{}` and no `on…` attribute for the other checks to see.
+    for (const source of [
+      '<div innerHTML="<img src=x onerror=alert(1)>">a</div>',
+      '<p outerHTML="<b>x</b>">b</p>',
+      '<span INNERHTML="<i>y</i>" />',
+      '<div dangerouslySetInnerHTML="<i>z</i>" />',
+    ]) {
+      expect(findExecutableMdx(source)[0]?.kind, source).toBe("raw-html-attribute");
+    }
+  });
+
   it("leaves ordinary components and attributes alone", () => {
     expect(findExecutableMdx('<Callout tone="warn">Careful.</Callout>')).toEqual([]);
     expect(findExecutableMdx('<img src="/hero.png" alt="Hero" />')).toEqual([]);
