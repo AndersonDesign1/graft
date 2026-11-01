@@ -42,8 +42,9 @@ refused.** Before, every failure exited 1, and a flag meant for another command
 was ignored, so `graft init --apply` succeeded and did nothing. Now an unknown
 command or flag, or a missing argument, stops the command before it runs and
 exits 2. An action that waits for a person's approval exits 3, and a missing or
-refused credential exits 4. An unknown command prints the closest match on
-stderr instead of the whole help on stdout:
+refused credential exits 4. An unknown command no longer prints the whole help
+on stdout. It prints a short message on stderr, with the closest command when
+there is one:
 
 ```text
 graft: unknown command "complie".
