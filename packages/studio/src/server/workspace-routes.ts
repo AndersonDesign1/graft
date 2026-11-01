@@ -36,7 +36,7 @@ import {
   type DeployHookRow,
 } from "@usegraft/db";
 import type { Route, RouteContext } from "../api";
-import { readJson } from "../body";
+import { readJson, UPLOAD_BODY_BYTES } from "../body";
 import { requireDatabase } from "./needs-database";
 import type {
   AgentAccess,
@@ -75,8 +75,8 @@ function db(ctx: RouteContext, feature: string): Database {
   return requireDatabase(ctx.options, feature, "workspace");
 }
 
-async function body(request: Request): Promise<Record<string, unknown>> {
-  const parsed = await readJson(request);
+async function body(request: Request, limit?: number): Promise<Record<string, unknown>> {
+  const parsed = await readJson(request, limit);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
@@ -304,7 +304,10 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
     path: `${V1}/assets`,
     scope: "studio:write",
     handle: async (ctx) => {
-      const payload = await body(ctx.request);
+      const payload = await body(
+        ctx.request,
+        Math.max(UPLOAD_BODY_BYTES, ctx.options.maxBodyBytes ?? 0),
+      );
       const name = text(payload.name, "name", 300);
       const key = keyOf(payload.key ?? (name ? defaultKeyFor(name) : undefined));
       if (typeof payload.base64 !== "string" || payload.base64.length === 0) {
@@ -381,7 +384,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
     path: `${V1}/assets/alt`,
     scope: "studio:write",
     handle: async (ctx) => {
-      const payload = await body(ctx.request);
+      const payload = await body(ctx.request, ctx.options.maxBodyBytes);
       const key = keyOf(payload.key);
       const alt = text(payload.alt, "alt", 500);
       if (!(await setAssetAlt(db(ctx, "The media library"), key, alt))) {
@@ -441,7 +444,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
     path: `${V1}/agents`,
     scope: "studio:settings",
     handle: async (ctx) => {
-      const payload = await body(ctx.request);
+      const payload = await body(ctx.request, ctx.options.maxBodyBytes);
       const name = text(payload.name, "name", 80);
       if (!name) {
         throw new GraftError({
@@ -514,7 +517,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
     path: `${V1}/site`,
     scope: "studio:settings",
     handle: async (ctx) => {
-      const payload = await body(ctx.request);
+      const payload = await body(ctx.request, ctx.options.maxBodyBytes);
       const name = text(payload.name, "name", 120);
       const url = text(payload.url, "url", 300);
       if (url) {
@@ -545,7 +548,7 @@ export const WORKSPACE_ROUTES: readonly Route[] = [
     path: `${V1}/site/hooks`,
     scope: "studio:settings",
     handle: async (ctx) => {
-      const payload = await body(ctx.request);
+      const payload = await body(ctx.request, ctx.options.maxBodyBytes);
       const name = text(payload.name, "name", 80);
       const url = text(payload.url, "url", 2000);
       if (!name || !url) {

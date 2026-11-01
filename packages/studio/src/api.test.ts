@@ -61,7 +61,17 @@ describe("createStudioApiHandler", () => {
   });
 
   it("refuses a JSON body over 1 MiB with 413 PAYLOAD_TOO_LARGE, before touching the database", async () => {
-    const handler = createStudioApiHandler(baseOpts);
+    const handler = createStudioApiHandler({
+      ...baseOpts,
+      db: new Proxy(
+        {},
+        {
+          get: () => {
+            throw new Error("database touched before the body was checked");
+          },
+        },
+      ) as never,
+    });
     const res = await handler(
       new Request("http://localhost/api/studio/v1/approvals/abc/decide", {
         method: "POST",
@@ -71,6 +81,34 @@ describe("createStudioApiHandler", () => {
     );
     expect(res.status).toBe(413);
     expect(await res.json()).toMatchObject({ error: "PAYLOAD_TOO_LARGE" });
+  });
+
+  it("lets an asset upload past the 1 MiB JSON limit, so a 10 MB file can arrive as base64", async () => {
+    const handler = createStudioApiHandler(baseOpts);
+    const res = await handler(
+      new Request("http://localhost/api/studio/v1/assets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "hat.jpg", base64: "A".repeat(2 * 1024 * 1024) }),
+      }),
+    );
+    // Past the body limit: it fails later, on this Studio having no media library.
+    expect(res.status).not.toBe(413);
+  });
+
+  it("raises the JSON limit to maxBodyBytes, and refuses one that is not a byte count", async () => {
+    const handler = createStudioApiHandler({ ...baseOpts, maxBodyBytes: 4 * 1024 * 1024 });
+    const res = await handler(
+      new Request("http://localhost/api/studio/v1/approvals/abc/decide", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ decision: "approved", pad: "x".repeat(2 * 1024 * 1024) }),
+      }),
+    );
+    expect(res.status).not.toBe(413);
+    expect(() => createStudioApiHandler({ ...baseOpts, maxBodyBytes: Number.NaN })).toThrow(
+      expect.objectContaining({ code: "CONFIG_INVALID" }),
+    );
   });
 
   it("refuses a state-changing request from a foreign origin", async () => {

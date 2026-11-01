@@ -391,14 +391,14 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
   PAYLOAD_TOO_LARGE: {
     code: "PAYLOAD_TOO_LARGE",
     meaning:
-      "The request body is larger than the endpoint accepts. It was refused before Graft read the rest of it, so nothing ran.",
+      "The request body is larger than the endpoint accepts. It was refused before Graft read the rest of it, so the function or tool never ran. A refused function call is still recorded against the caller's rate limit.",
     typicalCauses: [
-      "A function call or Studio save carrying more than 1 MiB of JSON, the default for those routes",
+      "A function call or Studio save carrying more than 1 MiB of JSON, the default for those routes (Studio asset uploads allow 14 MiB)",
       "An MCP `put_asset` with a file over about 24 MB, which is 32 MiB once base64-encoded",
       "A client sending an unbounded stream to an endpoint",
     ],
     howToRecover:
-      "Send a smaller body. For an asset, upload it through a presigned URL instead of base64 over MCP. A deployment that needs larger requests raises `maxBodyBytes` on the handler, or passes `--max-body-bytes` to graft serve.",
+      "Send a smaller body. For a large asset, upload it with `graft asset put <file>`, or pass `path` to `put_asset` on a local stdio server; over HTTP, `put_asset` takes base64, which counts against the limit. A deployment that needs larger requests raises `maxBodyBytes` on the handler, or passes `--max-body-bytes` to graft serve.",
   },
   DESTRUCTIVE_OP_REQUIRES_APPROVAL: {
     code: "DESTRUCTIVE_OP_REQUIRES_APPROVAL",

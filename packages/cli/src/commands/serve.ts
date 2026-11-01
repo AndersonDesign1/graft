@@ -33,7 +33,12 @@ import { execFileSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createActorResolver, type TrustedIssuer } from "@usegraft/auth";
 import { fireDeployHooks, githubStoreFromEnv, revalidateWebhookFromEnv } from "@usegraft/compiler";
-import { DEFAULT_MAX_MCP_BODY_BYTES, GraftError, payloadTooLarge } from "@usegraft/contracts";
+import {
+  bodyLimit,
+  DEFAULT_MAX_MCP_BODY_BYTES,
+  GraftError,
+  payloadTooLarge,
+} from "@usegraft/contracts";
 import { setRequestPeer } from "@usegraft/core";
 import { findConfig, loadConfig, loadProjectEnv, requireDatabaseUrl } from "../config";
 import { databaseStoreFor, startMirrorSchedule } from "../content-source";
@@ -152,9 +157,56 @@ function hostname(host: string): string {
   return colon === -1 ? trimmed : trimmed.slice(0, colon);
 }
 
+/**
+ * The request body as a Web stream, read only as fast as the route reads it
+ * and cut off with PAYLOAD_TOO_LARGE once it passes `limit`.
+ *
+ * Streamed rather than buffered so each route's own, smaller limit applies as
+ * the bytes arrive: a function call refused at 1 MiB stops the read there,
+ * instead of after this server has buffered up to its 32 MiB ceiling. A route
+ * that stops reading cancels the stream, which pauses the socket; the
+ * connection is closed once the response is out, so the rest is never read.
+ */
+function bodyStream(req: IncomingMessage, limit: number): ReadableStream<Uint8Array> {
+  const chunks = req[Symbol.asyncIterator]();
+  let total = 0;
+  return new ReadableStream<Uint8Array>(
+    {
+      async pull(controller) {
+        const next = await chunks.next();
+        if (next.done) return controller.close();
+        // SAFETY: an IncomingMessage with no encoding set yields Buffers.
+        const chunk = next.value as Buffer;
+        total += chunk.byteLength;
+        if (total > limit) return controller.error(payloadTooLarge(limit));
+        controller.enqueue(new Uint8Array(chunk));
+      },
+      cancel() {
+        req.pause();
+      },
+    },
+    { highWaterMark: 0 },
+  );
+}
+
+/**
+ * The one body limit `graft serve` applies, from `--max-body-bytes` or else
+ * `GRAFT_MAX_BODY_BYTES`. Undefined leaves each route its own default. Checked
+ * before anything starts, so a value that is not a byte count stops the server
+ * instead of disabling the limit.
+ */
+export function maxBodyBytesFrom(
+  flag: number | undefined,
+  env: NodeJS.ProcessEnv,
+): number | undefined {
+  const raw = env.GRAFT_MAX_BODY_BYTES;
+  const value = flag ?? (raw === undefined || raw.trim() === "" ? undefined : Number(raw));
+  return value === undefined ? undefined : bodyLimit(value, value);
+}
+
 export function createNodeListener(handler: FetchHandler, options: NodeListenerOptions = {}) {
   const allowed = options.allowedHosts?.map(hostname);
-  const limit = options.maxBodyBytes ?? DEFAULT_MAX_MCP_BODY_BYTES;
+  const limit = bodyLimit(options.maxBodyBytes, DEFAULT_MAX_MCP_BODY_BYTES);
   /** 413 as a GraftError, then drop the connection so the rest is never read. */
   const refuseTooLarge = (res: ServerResponse): void => {
     res.writeHead(413, { "content-type": "application/json", connection: "close" });
@@ -175,14 +227,6 @@ export function createNodeListener(handler: FetchHandler, options: NodeListenerO
       }
       const declared = Number(req.headers["content-length"]);
       if (Number.isFinite(declared) && declared > limit) return refuseTooLarge(res);
-      const chunks: Buffer[] = [];
-      let total = 0;
-      for await (const chunk of req) {
-        total += (chunk as Buffer).byteLength;
-        if (total > limit) return refuseTooLarge(res);
-        chunks.push(chunk as Buffer);
-      }
-      const body = Buffer.concat(chunks);
 
       const headers = new Headers();
       for (const [key, value] of Object.entries(req.headers)) {
@@ -194,7 +238,9 @@ export function createNodeListener(handler: FetchHandler, options: NodeListenerO
       const request = new Request(`http://${req.headers.host ?? "localhost"}${req.url ?? "/"}`, {
         method,
         headers,
-        body: method === "GET" || method === "HEAD" || body.length === 0 ? undefined : body,
+        body: method === "GET" || method === "HEAD" ? undefined : bodyStream(req, limit),
+        // Node's fetch needs this for a stream body.
+        duplex: "half",
       });
 
       // The real socket peer, registered against the Request object rather than
@@ -213,9 +259,21 @@ export function createNodeListener(handler: FetchHandler, options: NodeListenerO
       // dropped Studio's session cookie when sign-in cleared a second one.
       const cookies = response.headers.getSetCookie();
       if (cookies.length > 0) outHeaders["set-cookie"] = cookies;
+      const payload = Buffer.from(await response.arrayBuffer());
+      // The route answered without reading the whole body (refused it as too
+      // large, or never needed it). Close the connection after the response
+      // rather than read the rest of an upload nobody wants.
+      const unread = !req.complete;
+      if (unread) outHeaders.connection = "close";
       res.writeHead(response.status, outHeaders);
-      res.end(Buffer.from(await response.arrayBuffer()));
+      res.end(payload, () => {
+        if (unread) res.socket?.destroy();
+      });
     } catch (error) {
+      // A route that read the body itself, past this server's limit.
+      if (error instanceof GraftError && error.code === "PAYLOAD_TOO_LARGE") {
+        return refuseTooLarge(res);
+      }
       // The mounted handlers convert their own failures to GraftError JSON;
       // reaching here means the adapter itself broke. Say so, still as JSON.
       res.writeHead(500, { "content-type": "application/json" });
@@ -317,6 +375,7 @@ export interface RunningGraftServer {
 /** Build the runtime and start listening; the caller owns the lifetime. */
 export async function startServe(options: ServeCommandOptions): Promise<RunningGraftServer> {
   loadProjectEnv(options.cwd);
+  const maxBodyBytes = maxBodyBytesFrom(options.maxBodyBytes, process.env);
   const config = await loadConfig(findConfig(options.cwd));
   const url = requireDatabaseUrl();
   // Built before any connection opens, so a bad GRAFT_REVALIDATE_URL stops the
@@ -406,7 +465,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     // Backstop; per-function rateLimit overrides it.
     rateLimit: { limit: 60, windowSeconds: 60 },
     gitSha,
-    maxBodyBytes: options.maxBodyBytes,
+    maxBodyBytes,
   });
 
   // One store for every writing surface, so a hosted agent's write_content
@@ -427,7 +486,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
     ...(store ? { store } : {}),
     ...(databaseStore ? { source: "database" as const } : {}),
     name: "graft-serve",
-    maxBodyBytes: options.maxBodyBytes,
+    maxBodyBytes,
     contentDir: config.contentDir,
     collections: config.collections,
     functions,
@@ -581,6 +640,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
       contentDir: config.contentDir,
       mdxTrust: config.mdxTrust,
       defaultBranch: writeBranch,
+      maxBodyBytes,
       // Saves land in git on GitHub when GRAFT_GITHUB_REPO is set: the only
       // way a hosted Studio on a read-only filesystem can save at all.
       ...(store ? { store } : {}),
@@ -621,7 +681,7 @@ export async function startServe(options: ServeCommandOptions): Promise<RunningG
         health,
         studio: studioHandler,
       }),
-      { allowedHosts: allowedHostsFor(host), maxBodyBytes: options.maxBodyBytes },
+      { allowedHosts: allowedHostsFor(host), maxBodyBytes },
     ),
   );
   await new Promise<void>((resolve, reject) => {

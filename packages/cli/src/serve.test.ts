@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   createNodeListener,
   createServeRouter,
+  maxBodyBytesFrom,
   trustedIssuersFromEnv,
   type FetchHandler,
 } from "./commands/serve";
@@ -78,6 +79,23 @@ describe("createServeRouter", () => {
   });
 });
 
+describe("maxBodyBytesFrom", () => {
+  it("reads GRAFT_MAX_BODY_BYTES, lets the flag win, and leaves defaults when neither is set", () => {
+    expect(maxBodyBytesFrom(undefined, { GRAFT_MAX_BODY_BYTES: "2048" })).toBe(2048);
+    expect(maxBodyBytesFrom(4096, { GRAFT_MAX_BODY_BYTES: "2048" })).toBe(4096);
+    expect(maxBodyBytesFrom(undefined, {})).toBeUndefined();
+    expect(maxBodyBytesFrom(undefined, { GRAFT_MAX_BODY_BYTES: " " })).toBeUndefined();
+  });
+
+  it("refuses a value that is not a byte count, rather than running with no limit", () => {
+    for (const raw of ["lots", "Infinity", "-1", "1.5"]) {
+      expect(() => maxBodyBytesFrom(undefined, { GRAFT_MAX_BODY_BYTES: raw }), raw).toThrow(
+        expect.objectContaining({ code: "CONFIG_INVALID" }),
+      );
+    }
+  });
+});
+
 describe("createNodeListener", () => {
   let server: Server | undefined;
 
@@ -100,7 +118,7 @@ describe("createNodeListener", () => {
     return `http://127.0.0.1:${port}`;
   }
 
-  it("refuses a body over maxBodyBytes with 413 before the handler sees the request", async () => {
+  it("refuses a declared body over maxBodyBytes with 413 before the handler sees it", async () => {
     let reached = 0;
     const base = await listen(
       async (req) => {
@@ -116,8 +134,18 @@ describe("createNodeListener", () => {
       error: "PAYLOAD_TOO_LARGE",
       details: { limit: 100 },
     });
+    expect(reached).toBe(0);
 
-    // A chunked body declares no length; the count catches it as it arrives.
+    const fits = await fetch(base, { method: "POST", body: "x".repeat(100) });
+    expect(await fits.text()).toBe("100");
+  });
+
+  it("cuts off a chunked body with no length at maxBodyBytes, with 413", async () => {
+    const base = await listen(
+      async (req) => new Response(String((await req.arrayBuffer()).byteLength)),
+      { maxBodyBytes: 100 },
+    );
+
     const streamed = await fetch(base, {
       method: "POST",
       body: new ReadableStream({
@@ -129,13 +157,29 @@ describe("createNodeListener", () => {
       }),
       // Node's fetch needs this for a stream body.
       duplex: "half",
-    }).catch((error: unknown) => error);
-    if (streamed instanceof Response) expect(streamed.status).toBe(413);
-    expect(reached).toBe(0);
+    });
 
-    const fits = await fetch(base, { method: "POST", body: "x".repeat(100) });
-    expect(await fits.text()).toBe("100");
-    expect(reached).toBe(1);
+    expect(streamed.status).toBe(413);
+    expect(await streamed.json()).toMatchObject({ error: "PAYLOAD_TOO_LARGE" });
+  });
+
+  it("lets a route refuse at its own smaller limit without the server buffering the rest", async () => {
+    // The route stops after its first 10 bytes. Before streaming, the server
+    // buffered the whole body (up to its own ceiling) before the route saw it.
+    let pulled = 0;
+    const base = await listen(async (req) => {
+      const reader = req.body?.getReader();
+      const first = await reader?.read();
+      pulled += first?.value?.byteLength ?? 0;
+      await reader?.cancel();
+      return Response.json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+    });
+
+    const response = await fetch(base, { method: "POST", body: "x".repeat(4 * 1024 * 1024) });
+
+    expect(response.status).toBe(413);
+    expect(response.headers.get("connection")).toBe("close");
+    expect(pulled).toBeLessThan(4 * 1024 * 1024);
   });
 
   it("refuses a Host it does not answer to", async () => {

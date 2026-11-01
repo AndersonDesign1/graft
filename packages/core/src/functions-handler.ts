@@ -18,6 +18,7 @@
  * runtime invariant, locked here before the first mutation function exists.
  */
 import {
+  bodyLimit,
   DEFAULT_MAX_BODY_BYTES,
   GraftError,
   rateIdentity,
@@ -173,6 +174,7 @@ const APPROVAL_FIX: Record<string, string> = {
 };
 
 export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftFunctionsHandler {
+  const maxBodyBytes = bodyLimit(options.maxBodyBytes, DEFAULT_MAX_BODY_BYTES);
   const byName = new Map<string, AnyGraftFunction>();
   for (const fn of Object.values(options.functions)) byName.set(fn.name, fn);
   const branch = options.branch ?? "main";
@@ -248,7 +250,6 @@ export function createFunctionsHandler(options: FunctionsHandlerOptions): GraftF
     // in the audit log, whatever the outcome.
     const startedAt = Date.now();
     const ip = rateIdentity(request, options.trustedProxyHops ?? 0);
-    const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
     let actor: FunctionActor | undefined;
     /** Id of this invocation's audit row, reserved before the handler runs. */
     let auditId: string | undefined;

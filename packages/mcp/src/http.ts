@@ -14,6 +14,7 @@
  * self-host). Reads only need the files + database.
  */
 import {
+  bodyLimit,
   DEFAULT_MAX_BODY_BYTES,
   DEFAULT_MAX_MCP_BODY_BYTES,
   GraftError,
@@ -94,7 +95,7 @@ async function readMessage(
 
 export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcpHandler {
   const { actor: resolveActor, allowAnonymous, maxBodyBytes, ...serverOptions } = options;
-  const bodyLimit = maxBodyBytes ?? DEFAULT_MAX_MCP_BODY_BYTES;
+  const limit = bodyLimit(maxBodyBytes, DEFAULT_MAX_MCP_BODY_BYTES);
 
   // Fail at construction, not per request: an endpoint that cannot authenticate
   // anyone should never come up at all, and a startup crash is the one signal a
@@ -163,7 +164,7 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
 
     // Read only once the caller is known, so an unauthenticated request is
     // refused without its body being read at all.
-    const message = await readMessage(request, bodyLimit);
+    const message = await readMessage(request, limit);
     if (message instanceof Response) return message;
 
     // The caller already authenticated to this endpoint — forward their bearer
@@ -211,7 +212,7 @@ export function createGraftMcpHandler(options: GraftMcpHandlerOptions): GraftMcp
  */
 export function createDocsMcpHandler(options: DocsMcpHandlerOptions): GraftMcpHandler {
   const { maxBodyBytes, ...docsOptions } = options;
-  const bodyLimit = maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+  const limit = bodyLimit(maxBodyBytes, DEFAULT_MAX_BODY_BYTES);
   return async (request: Request): Promise<Response> => {
     if (request.method !== "POST") {
       return jsonRpcError(405, -32000, "Method not allowed: this server is stateless (POST only)", {
@@ -219,7 +220,7 @@ export function createDocsMcpHandler(options: DocsMcpHandlerOptions): GraftMcpHa
       });
     }
 
-    const message = await readMessage(request, bodyLimit);
+    const message = await readMessage(request, limit);
     if (message instanceof Response) return message;
 
     const server = createDocsMcp(docsOptions);

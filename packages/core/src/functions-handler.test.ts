@@ -123,12 +123,39 @@ describe("createFunctionsHandler", () => {
   });
 
   it("refuses a body over maxBodyBytes with 413 PAYLOAD_TOO_LARGE, before the function runs", async () => {
-    const small = createFunctionsHandler({ functions, db: fakeDb, audit: false, maxBodyBytes: 32 });
-    const res = await small(post("echo", { message: "x".repeat(64) }));
+    let calls = 0;
+    const tracked = defineFunction({
+      name: "tracked",
+      kind: "query",
+      input: { message: field.string() },
+      handler: ({ input }) => {
+        calls += 1;
+        return { echoed: input.message };
+      },
+    });
+    const small = createFunctionsHandler({
+      functions: { tracked },
+      db: fakeDb,
+      audit: false,
+      maxBodyBytes: 32,
+    });
+
+    const res = await small(post("tracked", { message: "x".repeat(64) }));
     expect(res.status).toBe(413);
     expect(await json(res)).toMatchObject({ error: "PAYLOAD_TOO_LARGE", details: { limit: 32 } });
+    expect(calls).toBe(0);
+
     // Under the limit, the same handler serves the call.
-    expect((await small(post("echo", { message: "hi" }))).status).toBe(200);
+    expect((await small(post("tracked", { message: "hi" }))).status).toBe(200);
+    expect(calls).toBe(1);
+  });
+
+  it("refuses to build with a limit that is not a byte count", () => {
+    for (const maxBodyBytes of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+      expect(() => createFunctionsHandler({ functions, db: fakeDb, maxBodyBytes })).toThrow(
+        expect.objectContaining({ code: "CONFIG_INVALID" }),
+      );
+    }
   });
 
   it("rejects non-POST with 405 METHOD_NOT_ALLOWED and an Allow header", async () => {

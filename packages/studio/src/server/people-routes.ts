@@ -35,8 +35,8 @@ function accountsOn(ctx: RouteContext): NonNullable<RouteContext["options"]["acc
   return accounts;
 }
 
-async function body(request: Request): Promise<Record<string, unknown>> {
-  const parsed = await readJson(request);
+async function body(request: Request, limit?: number): Promise<Record<string, unknown>> {
+  const parsed = await readJson(request, limit);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
@@ -162,7 +162,7 @@ export const PEOPLE_ROUTES: readonly Route[] = [
     scope: "studio:people",
     handle: async (ctx) => {
       const accounts = accountsOn(ctx);
-      const input = await body(ctx.request);
+      const input = await body(ctx.request, ctx.options.maxBodyBytes);
       const email = normaliseEmail(input.email);
       const name = typeof input.name === "string" ? input.name.trim().slice(0, 200) : "";
       const { token, hash } = newToken();
@@ -242,7 +242,7 @@ export const PEOPLE_ROUTES: readonly Route[] = [
     scope: "studio:people",
     handle: async (ctx) => {
       accountsOn(ctx);
-      const input = await body(ctx.request);
+      const input = await body(ctx.request, ctx.options.maxBodyBytes);
       const id = idOf(ctx);
       refused(
         await setAccountRole(

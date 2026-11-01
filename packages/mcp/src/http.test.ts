@@ -146,6 +146,18 @@ describe("actor gate", () => {
     expect(body.error.message).toContain("maxBodyBytes");
   });
 
+  it("refuses to build with a limit that is not a byte count", () => {
+    expect(() =>
+      createGraftMcpHandler({
+        contentDir: dir,
+        collections,
+        db: untouchableDb,
+        actor: resolver,
+        maxBodyBytes: Number.NaN,
+      }),
+    ).toThrow(expect.objectContaining({ code: "CONFIG_INVALID" }));
+  });
+
   it("refuses an anonymous caller before reading the body at all", async () => {
     let read = false;
     // highWaterMark 0: nothing is pulled until something reads the body.

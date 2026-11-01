@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readBodyBytes, readBodyText } from "./body";
+import { bodyLimit, readBodyBytes, readBodyText } from "./body";
 
 /** A body that arrives in `count` chunks of `size` bytes, recording how far it was read. */
 function chunked(count: number, size: number) {
@@ -64,6 +64,24 @@ describe("readBodyText", () => {
   it("names the knob that raises the limit in the fix", async () => {
     await expect(readBodyText(post("x".repeat(11)), 10)).rejects.toMatchObject({
       fix: expect.stringContaining("maxBodyBytes"),
+    });
+  });
+});
+
+describe("bodyLimit", () => {
+  it("refuses a limit that would make every comparison false, and so disable the check", () => {
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, -1, 1.5]) {
+      expect(() => bodyLimit(value, 10), String(value)).toThrow(
+        expect.objectContaining({ code: "CONFIG_INVALID" }),
+      );
+    }
+    expect(bodyLimit(undefined, 10)).toBe(10);
+    expect(bodyLimit(0, 10)).toBe(0);
+  });
+
+  it("is checked by the readers too, so a bad limit never reads an unbounded body", async () => {
+    await expect(readBodyText(post("x"), Number.NaN)).rejects.toMatchObject({
+      code: "CONFIG_INVALID",
     });
   });
 });

@@ -22,6 +22,24 @@ export const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
  */
 export const DEFAULT_MAX_MCP_BODY_BYTES = 32 * 1024 * 1024;
 
+/**
+ * A configured limit, checked once where a handler is built. `NaN`,
+ * `Infinity` or a negative number would make every comparison against it
+ * false, which is the same as having no limit at all, so they are refused.
+ */
+export function bodyLimit(value: number | undefined, fallback: number): number {
+  const limit = value ?? fallback;
+  if (!Number.isSafeInteger(limit) || limit < 0) {
+    throw new GraftError({
+      code: "CONFIG_INVALID",
+      message: `maxBodyBytes must be a whole number of bytes, 0 or more. Got ${String(value)}.`,
+      fix: "Pass a byte count such as 1048576 (1 MiB), or leave it unset for the default.",
+      details: { maxBodyBytes: value },
+    });
+  }
+  return limit;
+}
+
 /** The error every surface returns for a body over its limit. Serve it as 413. */
 export function payloadTooLarge(limit: number): GraftError {
   return new GraftError({
@@ -37,6 +55,7 @@ export function payloadTooLarge(limit: number): GraftError {
  * `limit`. A request with no body gives an empty array.
  */
 export async function readBodyBytes(request: Request, limit: number): Promise<Uint8Array> {
+  bodyLimit(limit, limit);
   const declared = Number(request.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > limit) throw payloadTooLarge(limit);
   if (request.body === null) return new Uint8Array(0);

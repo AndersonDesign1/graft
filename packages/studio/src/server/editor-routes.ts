@@ -71,7 +71,7 @@ function required(value: unknown, name: string, example: string): string {
 }
 
 async function body(ctx: RouteContext): Promise<Record<string, unknown>> {
-  const parsed = await readJson(ctx.request);
+  const parsed = await readJson(ctx.request, ctx.options.maxBodyBytes);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new GraftError({
       code: "INPUT_VALIDATION_FAILED",
