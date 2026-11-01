@@ -1,15 +1,22 @@
 ---
-title: Nuxt and Nitro
-description: "Read Graft content in Nuxt or Nitro server routes and serve functions and MCP from the same app, on Nuxt 4, Nuxt 5 and Nitro 3."
+title: Nitro
+description: "Read Graft content in Nitro server routes and serve functions and MCP from the same app, on Nitro 3, or in a Nuxt app that mounts its own routes."
 section: Frameworks
-order: 6
+order: 7
 ---
 
-<p className="kicker">Read Graft content in Nuxt and Nitro server routes.</p>
+<p className="kicker">Read Graft content in Nitro server routes.</p>
 
-This guide adds Graft to a Nuxt or Nitro project. You read content in server
-routes, fetch it from your pages, and can serve Graft's functions and MCP
-endpoint from the same app.
+This guide adds Graft to a Nitro project with `@usegraft/sdk-nitro`. You read
+content in server routes, fetch it from your pages, and can serve Graft's
+functions and MCP endpoint from the same app.
+
+<Callout label="On Nuxt 4.6 or newer, use the module" type="note">
+  [`@usegraft/sdk-nuxt`](/docs/nuxt) does everything on this page from one line
+  in `nuxt.config.ts`, and adds server-rendered page composables. Follow this
+  guide on Nitro 3 on its own, on an older Nuxt 4, or when you want to write the
+  routes yourself.
+</Callout>
 
 One package covers all of these, because each one runs on Nitro:
 

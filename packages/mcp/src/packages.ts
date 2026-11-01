@@ -41,11 +41,6 @@ export interface PackageGuide {
   tier: PackageTier;
   /** The framework this adapter serves, for the "I am on X" question. */
   framework?: Framework;
-  /**
-   * Other frameworks this adapter serves until they get their own. sdk-nitro
-   * covers Nuxt because Nuxt runs on Nitro.
-   */
-  alsoFor?: readonly Framework[];
   /** True for packages you install directly; false for ones pulled in as deps. */
   direct: boolean;
 }
@@ -108,10 +103,17 @@ export const PACKAGE_KNOWLEDGE = {
   "@usegraft/sdk-nitro": {
     name: "@usegraft/sdk-nitro",
     role: "Nitro adapter: typed reads in server routes, plus `graftHandler` for event handlers on h3 1 and h3 2.",
-    when: "You are on Nuxt 4 or 5, or a standalone Nitro 3 app.",
+    when: "You are on a standalone Nitro 3 app, or a Nuxt app that mounts its own routes instead of using @usegraft/sdk-nuxt.",
     tier: "either",
     framework: "nitro",
-    alsoFor: ["nuxt"],
+    direct: true,
+  },
+  "@usegraft/sdk-nuxt": {
+    name: "@usegraft/sdk-nuxt",
+    role: "Nuxt module: a server-only `useGraft()`, server-rendered page composables, `<GraftMdx>`, and the content API, functions and MCP routes.",
+    when: "You are on Nuxt 4.6+ or Nuxt 5. Add it to `modules` in nuxt.config.ts.",
+    tier: "either",
+    framework: "nuxt",
     direct: true,
   },
   "@usegraft/sdk-react": {
@@ -243,12 +245,7 @@ export function allPackages(): PackageGuide[] {
   return Object.values(PACKAGE_KNOWLEDGE);
 }
 
-/** Whether a package is the adapter for a framework. */
-export function servesFramework(guide: PackageGuide, framework: string): boolean {
-  return guide.framework === framework || (guide.alsoFor?.some((f) => f === framework) ?? false);
-}
-
 /** Adapter for a framework, when one exists. */
 export function packageForFramework(framework: string): PackageGuide | undefined {
-  return allPackages().find((p) => servesFramework(p, framework));
+  return allPackages().find((p) => p.framework === framework);
 }

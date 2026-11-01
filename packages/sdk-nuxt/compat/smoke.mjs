@@ -168,7 +168,7 @@ try {
   }
 
   // 5. In a browser: hydration, then a client-side navigation.
-  const { chromium } = createRequire(import.meta.url)("playwright");
+  const { chromium } = createRequire(join(appDir, "package.json"))("playwright");
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();

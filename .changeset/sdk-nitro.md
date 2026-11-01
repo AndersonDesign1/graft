@@ -45,6 +45,5 @@ Server code on Nuxt 4 compiles to ES2019, which has no top-level await, so
 `await openStaticIndex(...)` at the top of a module fails to build. The README
 and the new docs page open the index on first use instead.
 
-`list_packages` now accepts `framework: "nitro"` and `framework: "nuxt"`, and
-answers both with this package. Its entries gain an optional `alsoFor` list
-naming the other frameworks an adapter serves.
+`list_packages` now accepts `framework: "nitro"` and answers it with this
+package.

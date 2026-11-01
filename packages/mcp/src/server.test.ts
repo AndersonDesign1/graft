@@ -116,12 +116,12 @@ afterEach(() => {
 });
 
 describe("introspection", () => {
-  it("points a Nuxt project at the Nitro adapter, which serves Nuxt until it has its own", async () => {
+  it("points a Nuxt project at the Nuxt module, and only at it", async () => {
     const { payload } = await callTool("list_packages", { framework: "nuxt" });
     const adapters = (payload.packages as { name: string; framework?: string }[])
       .filter((p) => p.framework !== undefined)
       .map((p) => p.name);
-    expect(adapters).toEqual(["@usegraft/sdk-nitro"]);
+    expect(adapters).toEqual(["@usegraft/sdk-nuxt"]);
   });
 
   it("lists collections with metadata", async () => {

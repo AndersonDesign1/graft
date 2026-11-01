@@ -72,22 +72,22 @@ artifact by default, and the whole unit suite runs against it.
 
 ## Find the code
 
-| Path                                                                                                     | What lives there                                             |
-| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `packages/contracts`                                                                                     | Error codes and the introspection types every package shares |
-| `packages/core`                                                                                          | `defineCollection`, `defineFunction`, the function runtime   |
-| `packages/db`                                                                                            | Postgres client, migrations, the static SQLite index         |
-| `packages/compiler`                                                                                      | Authored MDX to a projected index, plus the ChangeSet        |
-| `packages/sdk-core`                                                                                      | The typed read client every framework SDK wraps              |
-| `packages/content-api`                                                                                   | Read-only HTTP transport for the authored-content index      |
-| `packages/sdk-next`, `sdk-astro`, `sdk-sveltekit`, `sdk-tanstack-start`, `sdk-react-router`, `sdk-nitro` | Framework adapters                                           |
-| `packages/cli`                                                                                           | `graft init`, `compile`, `serve`, `mcp`, `add`, and the rest |
-| `packages/mcp`                                                                                           | The agent surface, over stdio and Streamable HTTP            |
-| `packages/studio`                                                                                        | The optional human editor and approval queue                 |
-| `packages/registry`                                                                                      | Owned primitives that `graft add` copies into a project      |
-| `examples/docs-site`                                                                                     | The documentation site, which runs on Graft                  |
-| `examples/landing-page`                                                                                  | The commerce and functions demo                              |
-| `docs/adr`                                                                                               | Decisions that are settled, with the premise each rests on   |
+| Path                                                                                                                 | What lives there                                             |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `packages/contracts`                                                                                                 | Error codes and the introspection types every package shares |
+| `packages/core`                                                                                                      | `defineCollection`, `defineFunction`, the function runtime   |
+| `packages/db`                                                                                                        | Postgres client, migrations, the static SQLite index         |
+| `packages/compiler`                                                                                                  | Authored MDX to a projected index, plus the ChangeSet        |
+| `packages/sdk-core`                                                                                                  | The typed read client every framework SDK wraps              |
+| `packages/content-api`                                                                                               | Read-only HTTP transport for the authored-content index      |
+| `packages/sdk-next`, `sdk-astro`, `sdk-sveltekit`, `sdk-tanstack-start`, `sdk-react-router`, `sdk-nitro`, `sdk-nuxt` | Framework adapters                                           |
+| `packages/cli`                                                                                                       | `graft init`, `compile`, `serve`, `mcp`, `add`, and the rest |
+| `packages/mcp`                                                                                                       | The agent surface, over stdio and Streamable HTTP            |
+| `packages/studio`                                                                                                    | The optional human editor and approval queue                 |
+| `packages/registry`                                                                                                  | Owned primitives that `graft add` copies into a project      |
+| `examples/docs-site`                                                                                                 | The documentation site, which runs on Graft                  |
+| `examples/landing-page`                                                                                              | The commerce and functions demo                              |
+| `docs/adr`                                                                                                           | Decisions that are settled, with the premise each rests on   |
 
 Cross-package imports use the package name, never a relative path across a
 package boundary.

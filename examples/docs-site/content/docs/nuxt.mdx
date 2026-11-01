@@ -1,0 +1,301 @@
+---
+title: Nuxt
+description: "Add Graft to a Nuxt 4.6+ or Nuxt 5 app with one module: server-rendered content in pages, typed reads in server routes, MDX, and the content API, functions and MCP routes."
+section: Frameworks
+order: 6
+---
+
+<p className="kicker">Add Graft to a Nuxt app with one module.</p>
+
+This guide adds Graft to a Nuxt app with `@usegraft/sdk-nuxt`, a Nuxt module.
+Once it is in `nuxt.config.ts` you get:
+
+- **Page composables**: `useGraftContent`, `useGraftList` and `useGraftSearch`.
+  They read on the server for the first paint, and in the browser when the
+  visitor navigates.
+- **`useGraft()`** in server routes: the typed read handle, over the static
+  index or Postgres.
+- **`<GraftMdx>`** and `prepareMdx`, to render a document's MDX body with your
+  own Vue components.
+- The **content API**, **functions** and **MCP** routes, each turned on by one
+  option.
+
+Each one is auto-imported, so you write no imports from Graft in your pages or
+server routes.
+
+**Before you start**, you need a Nuxt 4.6 or newer (or Nuxt 5) app and a
+`graft.config.ts` with compiled content. If you do not have those yet, run
+through [Getting started](/docs/getting-started) first.
+
+<AgentPrompt>
+  Add Graft to this Nuxt app following https://graft.page/docs/nuxt.md. Add
+  @usegraft/sdk-nuxt to modules, turn on the content API, and read pages with
+  useGraftContent.
+</AgentPrompt>
+
+## Install the module
+
+<Tabs labels="pnpm, npm, bun">
+
+<Tab>
+
+```sh
+pnpm add @usegraft/sdk-nuxt
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+npm i @usegraft/sdk-nuxt
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+bun add @usegraft/sdk-nuxt
+```
+
+</Tab>
+
+</Tabs>
+
+Then add it to `modules`, and turn on the content API, which the page
+composables read through:
+
+<CodeBlock title="nuxt.config.ts">
+
+```ts
+export default defineNuxtConfig({
+  modules: ["@usegraft/sdk-nuxt"],
+  graft: { contentApi: true },
+});
+```
+
+</CodeBlock>
+
+The module reads `graft.config.ts` from the Nuxt root. Set `graft.config` to a
+path relative to the root if yours lives somewhere else.
+
+## Read content in a page
+
+`useGraftContent` reads one document by collection and slug. Pass a getter
+for the slug, so the read follows the route:
+
+<CodeBlock title="app/pages/[slug].vue">
+
+```vue
+<script setup lang="ts">
+const route = useRoute();
+const slug = () => String(route.params.slug);
+const { data: page } = await useGraftContent("pages", slug);
+if (!page.value) throw createError({ statusCode: 404, statusMessage: "No such page" });
+</script>
+
+<template>
+  <main v-if="page">
+    <h1>{{ page.data.title }}</h1>
+  </main>
+</template>
+```
+
+</CodeBlock>
+
+`page.data` has the type your `defineCollection` declared, so a renamed field
+is a type error in the page rather than `undefined` at runtime.
+
+The read runs on the server for the first paint, and the document travels to
+the browser in the page payload, so the page hydrates without fetching it
+again. When the visitor follows a link to another slug, the same code reads
+the next document over HTTP.
+
+`useGraftList` and `useGraftSearch` work the same way. Each returns Nuxt's
+`AsyncData`, so `data`, `status`, `error` and `refresh` are all there:
+
+<CodeBlock title="app/pages/index.vue">
+
+```vue
+<script setup lang="ts">
+const { data: pages } = await useGraftList("pages");
+const query = ref("");
+const { data: hits } = await useGraftSearch("pages", query);
+</script>
+
+<template>
+  <input v-model="query" placeholder="Search" />
+  <ul>
+    <li v-for="page in hits?.length ? hits : (pages ?? [])" :key="page.slug">
+      <NuxtLink :to="`/${page.slug}`">{{ page.data.title }}</NuxtLink>
+    </li>
+  </ul>
+</template>
+```
+
+</CodeBlock>
+
+A blank search answers an empty list without a request.
+
+The composables check every document against your collections, as every Graft
+client does, so `graft.config.ts` is part of the browser bundle. Keep it free
+of server-only imports, such as a database client.
+
+## Read content in a server route
+
+In `server/`, `useGraft()` returns the typed read handle. It reads the storage
+engine directly, without going through the content API:
+
+<CodeBlock title="server/api/title/[slug].get.ts">
+
+```ts
+import { defineEventHandler, getRouterParam } from "nuxt/server";
+
+export default defineEventHandler(async (event) => {
+  const graft = await useGraft();
+  const page = await graft.getContent("pages", getRouterParam(event, "slug") ?? "");
+  return { title: page?.data.title ?? null };
+});
+```
+
+</CodeBlock>
+
+<Callout label="Keep useGraft on the server" type="warning">
+  A page's `<script setup>` runs on the server for the first paint and in the
+  browser after it. `useGraft()` is only auto-imported into `server/`, so use
+  it in server routes and server utils, and use the composables above in pages.
+</Callout>
+
+## Render MDX with Vue components
+
+A document's `body` is its MDX source as written. Compile it in a server route
+with `prepareMdx`, then render the result in the page with `<GraftMdx>`:
+
+<CodeBlock title="server/api/mdx/[slug].get.ts">
+
+```ts
+import { createError, defineEventHandler, getRouterParam } from "nuxt/server";
+
+export default defineEventHandler(async (event) => {
+  const graft = await useGraft();
+  const page = await graft.getContent("pages", getRouterParam(event, "slug") ?? "");
+  if (!page) throw createError({ statusCode: 404 });
+  return { code: await prepareMdx(page.body) };
+});
+```
+
+</CodeBlock>
+
+<CodeBlock title="app/pages/[slug].vue">
+
+```vue
+<script setup lang="ts">
+const route = useRoute();
+const { data: mdx } = await useFetch(() => `/api/mdx/${route.params.slug}`);
+</script>
+
+<template>
+  <GraftMdx v-if="mdx" :code="mdx.code" />
+</template>
+```
+
+</CodeBlock>
+
+The compiler stays on the server, and `<GraftMdx>` renders its output on the
+server and again when the page hydrates. Pass the components a body uses as
+`:components="{ Callout }"`. A component receives the content between its tags
+as its default slot. `prepareMdx` refuses the same constructs the
+[Vue guide](/docs/vue#render-mdx-with-vue-components) lists, and `<GraftMdx>`
+runs the compiled string with `new Function`, so a page with a
+Content-Security-Policy needs `'unsafe-eval'` in `script-src`. See
+[MDX safety](/docs/mdx-safety).
+
+## Choose where content is read from
+
+The module reads the engine `graft.config.ts` names, the same way
+`graft compile` does:
+
+| `index` in graft.config.ts | What the module opens |
+| --- | --- |
+| `"static"` | The SQLite file `graft compile` writes, `.graft/index.db` |
+| `"postgres"`, or no `index` export | Postgres, at `NUXT_GRAFT_DATABASE_URL`, else `DATABASE_URL` |
+
+Paths are relative to the directory the server runs in. That is the project
+root, in development and when you start the build with
+`node .output/server/index.mjs`. With the static engine, run `graft compile`
+before `nuxi build`, and deploy `.graft/index.db` beside the server, or point
+`NUXT_GRAFT_STATIC_INDEX` at it.
+
+Each runtime setting is under `runtimeConfig.graft`, and each one reads its
+environment variable when the server starts:
+
+| Variable | What it sets |
+| --- | --- |
+| `NUXT_GRAFT_DATABASE_URL` | The Postgres connection string. Falls back to `DATABASE_URL`. |
+| `NUXT_GRAFT_STATIC_INDEX` | The static index file, instead of the path in `graft.config.ts`. |
+| `NUXT_GRAFT_DEV_TOKEN` | A bearer token the functions and MCP routes accept in development only. |
+| `NUXT_GRAFT_TRUSTED_ISSUERS` | JWT issuers those routes trust, comma or space separated. |
+
+A misconfigured engine fails the request with `CONFIG_INVALID` and a `fix`
+that names the setting to change. The next request tries again, so you can fix
+the environment without a rebuild.
+
+## Serve functions and MCP from your app
+
+These routes write data, so they need the Postgres engine, and three more
+packages:
+
+```sh
+npm i @usegraft/core @usegraft/auth @usegraft/mcp
+```
+
+Turn on the routes you want:
+
+<CodeBlock title="nuxt.config.ts">
+
+```ts
+export default defineNuxtConfig({
+  modules: ["@usegraft/sdk-nuxt"],
+  graft: { contentApi: true, functions: true, mcp: true },
+});
+```
+
+</CodeBlock>
+
+| Option | Route |
+| --- | --- |
+| `contentApi` | `GET /api/content/v1/*`, the read-only [Content API](/docs/content-api) |
+| `functions` | `POST /api/fn/:name`, your typed functions |
+| `mcp` | `POST /api/mcp`, MCP over Streamable HTTP |
+
+Callers of the functions and MCP routes authenticate with a JWT from one of
+`NUXT_GRAFT_TRUSTED_ISSUERS`, or with `NUXT_GRAFT_DEV_TOKEN` while
+`NODE_ENV` is `development`. An unset `NODE_ENV` counts as production. See
+[Auth](/docs/auth).
+
+With the static engine, both routes answer `503` with `CONFIG_INVALID`, and a
+`fix` that says to switch to Postgres or turn the route off.
+
+The content API route has no rate limit. During server rendering every page
+view reads it from the server itself, with no address to tell visitors apart,
+so one shared limit would throttle the whole site. Put a rate limiter in front
+of it on a public deploy. See [Rate limits](/docs/rate-limits).
+
+## Supported versions
+
+The module supports Nuxt 4.6 and newer, and Nuxt 5. It uses `nuxt/server`,
+which Nuxt added in 4.6.0, so the same server code runs on both majors. CI
+builds a real Nuxt 4 app and a real Nuxt 5 nightly app on every pull request,
+type-checks each one, serves it, and drives it in Chromium.
+
+On an older Nuxt 4, or a standalone Nitro app, mount Graft's handlers yourself
+with `@usegraft/sdk-nitro`. See [Nitro](/docs/nitro).
+
+## Next steps
+
+- [Content API](/docs/content-api) documents the routes the composables read.
+- [Vue](/docs/vue) covers `MdxContent` and the components a body can use.
+- [Schema](/docs/schema) defines the collections your reads are typed from.
+- [Functions](/docs/functions) explains the typed functions the `functions`
+  route serves.
