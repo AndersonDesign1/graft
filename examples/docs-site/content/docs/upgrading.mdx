@@ -37,6 +37,34 @@ error's `fix` says what to change.
 
 ## 1.0.0-beta.9
 
+**A usage mistake exits with code 2, and a flag the command does not take is
+refused.** Before, every failure exited 1, and a flag meant for another command
+was ignored, so `graft init --apply` succeeded and did nothing. Now an unknown
+command or flag, or a missing argument, stops the command before it runs and
+exits 2. An action that waits for a person's approval exits 3, and a missing or
+refused credential exits 4. An unknown command prints the closest match on
+stderr instead of the whole help on stdout:
+
+```text
+graft: unknown command "complie".
+Did you mean `graft compile`? Run `graft --help` to list the commands.
+```
+
+**What to do:** if a script reads exit code 1 as "called wrong", check for 2
+instead. If a script passes a flag the command does not take, remove it. The
+command now stops instead of ignoring it. See
+[Act on the exit code](/docs/cli#act-on-the-exit-code) for every code.
+
+**`graft content` lists your content files, not the Postgres index.** It used to
+read the index, so it needed `DATABASE_URL` and showed what the last
+`graft compile` wrote. It now lists the documents in your content files (or in
+the database, for a project that keeps its content there), including files you
+have not compiled yet. It works on the static engine with no database. Each
+document's line keeps its format, and the header no longer names the branch.
+
+**What to do:** nothing, unless you used `graft content` to see what the index
+holds. To see what each compile changed, run `graft compilations`.
+
 **`@usegraft/sdk-next` no longer supports Next.js 14.** Its peer range is
 `next@^15.0.0 || ^16.0.0`, and CI no longer tests 14. Next.js 14 gets no
 security fixes, and its last release has two critical remote code execution
