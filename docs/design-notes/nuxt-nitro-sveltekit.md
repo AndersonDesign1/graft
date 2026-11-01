@@ -12,9 +12,9 @@ docs or code, not run).
 | Framework          | Current stable                       | Server layer                         | Graft today                     |
 | ------------------ | ------------------------------------ | ------------------------------------ | ------------------------------- |
 | SvelteKit          | `@sveltejs/kit` 3.1.1 (2026-10-29)   | Its own, Web-standard `RequestEvent` | `@usegraft/sdk-sveltekit` ships |
-| Nuxt               | `nuxt` 4.6.3 (2026-10-27)            | `nitropack` 2.13.5 on `h3` 1.15      | Nothing                         |
-| Nuxt 5             | Not released, no date                | `nitro` 3 on `h3` 2                  | Nothing                         |
-| Nitro (standalone) | `nitro` 3.0.261029-rc (`latest` tag) | `h3` 2.0.8, stable since 2.0.1       | Nothing                         |
+| Nuxt               | `nuxt` 4.6.3 (2026-10-27)            | `nitropack` 2.13.5 on `h3` 1.15      | `@usegraft/sdk-nitro`           |
+| Nuxt 5             | Not released, no date                | `nitro` 3 on `h3` 2                  | `@usegraft/sdk-nitro`           |
+| Nitro (standalone) | `nitro` 3.0.261029-rc (`latest` tag) | `h3` 2.0.8, stable since 2.0.1       | `@usegraft/sdk-nitro`           |
 
 All versions above are **registry**. Notes:
 
@@ -151,7 +151,9 @@ export default defineEventHandler(graftHandler(createGraftMcpHandler({ … })));
   on h3 2, `event.node.req.socket.remoteAddress` on h3 1, and
   `event.context.clientAddress` first on either when a preset sets it). Nitro
   owns the connection, so it is the first in-app adapter that can, and
-  anonymous callers get a rate-limit bucket each.
+  anonymous callers get a rate-limit bucket each when Nitro sees the client's
+  socket. Behind a proxy every caller shares the proxy's address until
+  `trustedProxyHops` is set on the rate-limiting handler.
 
 One build finding for every Nuxt 4 guide: nitropack 2 compiles server code to
 ES2019, so a top-level `await openStaticIndex(...)` fails the build. Open the

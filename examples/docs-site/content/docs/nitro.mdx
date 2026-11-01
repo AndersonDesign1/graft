@@ -75,7 +75,13 @@ let graft: Promise<Graft<typeof collections>> | undefined;
 // Opened on first use. Nuxt 4 compiles server code to ES2019, which has no
 // top-level await, so `await openStaticIndex(...)` at the top level fails to build.
 export function useGraft(): Promise<Graft<typeof collections>> {
-  graft ??= openStaticIndex(".graft/index.db").then((index) => createGraft({ index, collections }));
+  graft ??= openStaticIndex(".graft/index.db")
+    .then((index) => createGraft({ index, collections }))
+    .catch((error: unknown) => {
+      // Forget a failed open, so the next request tries again.
+      graft = undefined;
+      throw error;
+    });
   return graft;
 }
 ```
@@ -86,6 +92,8 @@ Postgres instead of the static index:
 
 ```ts
 import { createDb } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-nitro";
+import { collections } from "../../graft.config";
 
 export const db = createDb(process.env.DATABASE_URL ?? "").db;
 export const useGraft = async () => createGraft({ db, collections });
@@ -143,6 +151,30 @@ This step is optional. It needs the Postgres engine and three more packages:
 npm i @usegraft/core @usegraft/auth @usegraft/mcp
 ```
 
+Both routes identify callers the same way, so put the resolver in one file:
+
+<CodeBlock title="server/utils/actor.ts">
+
+```ts
+import { createActorResolver } from "@usegraft/auth";
+
+// A dev token never expires, so it is accepted only in development. An unset
+// NODE_ENV counts as production, so a deploy that forgets it stays closed.
+const devToken = process.env.NODE_ENV === "development" ? process.env.GRAFT_DEV_TOKEN : undefined;
+
+export const actor = createActorResolver({
+  issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
+    .split(/[,\s]+/)
+    .filter(Boolean)
+    .map((issuer) => ({ issuer })),
+  devTokens: devToken
+    ? { [devToken]: { kind: "human", id: "owner", scopes: ["content:write"] } }
+    : undefined,
+});
+```
+
+</CodeBlock>
+
 `graftHandler` turns a Graft handler into a Nitro event handler. Leave the
 method out of the file name, so a GET reaches the handler and gets its 405 with
 an `Allow` header and a fix.
@@ -153,9 +185,10 @@ an `Allow` header and a fix.
 import { createFunctionsHandler } from "@usegraft/core";
 import { graftHandler } from "@usegraft/sdk-nitro";
 import { functions } from "../../../graft.config";
+import { actor } from "../../utils/actor";
 import { db } from "../../utils/graft";
 
-export default defineEventHandler(graftHandler(createFunctionsHandler({ db, functions })));
+export default defineEventHandler(graftHandler(createFunctionsHandler({ db, functions, actor })));
 ```
 
 </CodeBlock>
@@ -163,28 +196,19 @@ export default defineEventHandler(graftHandler(createFunctionsHandler({ db, func
 <CodeBlock title="server/api/mcp.ts">
 
 ```ts
-import { createActorResolver } from "@usegraft/auth";
+import { resolve } from "node:path";
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftHandler } from "@usegraft/sdk-nitro";
 import { collections, functions } from "../../graft.config";
+import { actor } from "../utils/actor";
 import { db } from "../utils/graft";
 
-// A dev token never expires, so it is accepted only in development. An unset
-// NODE_ENV counts as production, so a deploy that forgets it stays closed.
-const devToken = process.env.NODE_ENV === "development" ? process.env.GRAFT_DEV_TOKEN : undefined;
-
-const actor = createActorResolver({
-  issuers: (process.env.GRAFT_TRUSTED_ISSUERS ?? "")
-    .split(/[,\s]+/)
-    .filter(Boolean)
-    .map((issuer) => ({ issuer })),
-  devTokens: devToken
-    ? { [devToken]: { kind: "human", id: "owner", scopes: ["content:write"] } }
-    : undefined,
-});
+// An absolute path. The server runs from the project root, in development and
+// with `node .output/server/index.mjs`.
+const contentDir = resolve(process.cwd(), "content");
 
 export default defineEventHandler(
-  graftHandler(createGraftMcpHandler({ contentDir: "./content", db, collections, functions, actor })),
+  graftHandler(createGraftMcpHandler({ contentDir, db, collections, functions, actor })),
 );
 ```
 
@@ -211,8 +235,10 @@ records the socket address, and each caller gets its own bucket.
 
 The address comes from the connection, never from a header. A client that
 sends its own `x-forwarded-for` is still counted by where it connected from.
-Behind a proxy or load balancer, every caller connects from the proxy, so
-declare how many proxies you run with `trustedProxyHops`. See
+That also means that behind a proxy or load balancer, every caller connects
+from the proxy and shares its bucket. Declare how many proxies you run with
+`trustedProxyHops` on the handler that rate-limits: `createFunctionsHandler`
+or `createContentApiHandler`. `graftHandler` itself has no such option. See
 [Rate limits](/docs/rate-limits).
 
 ## Refresh pages when content changes
@@ -236,10 +262,12 @@ export default defineEventHandler(async (event) => {
 });
 ```
 
-Then purge `tagsForChanges(branch, changes)` at your CDN from a route Graft
-calls after each write. The [SvelteKit guide](/docs/sveltekit#refresh-pages-when-content-changes)
-walks through that route and the `GRAFT_REVALIDATE_URL` and
-`GRAFT_WEBHOOK_SECRET` it needs. Nothing about it is SvelteKit-specific.
+Then purge `tagsForChanges(branch, changes)` at your CDN when content changes.
+Writes through the MCP endpoint your app mounts call `onContentChange`, so pass
+it to `createGraftMcpHandler` and purge there. Writes from `graft serve`,
+`graft studio` and the CLI call a route instead, set by `GRAFT_REVALIDATE_URL`
+and `GRAFT_WEBHOOK_SECRET`. The [SvelteKit guide](/docs/sveltekit#refresh-pages-when-content-changes)
+walks through that route. Nothing about it is SvelteKit-specific.
 
 ## Next steps
 

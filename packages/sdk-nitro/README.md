@@ -31,7 +31,13 @@ import { collections } from "../../graft.config";
 let graft: Promise<Graft<typeof collections>> | undefined;
 
 export function useGraft(): Promise<Graft<typeof collections>> {
-  graft ??= openStaticIndex(".graft/index.db").then((index) => createGraft({ index, collections }));
+  graft ??= openStaticIndex(".graft/index.db")
+    .then((index) => createGraft({ index, collections }))
+    .catch((error: unknown) => {
+      // Forget a failed open, so the next request tries again.
+      graft = undefined;
+      throw error;
+    });
   return graft;
 }
 ```
@@ -55,11 +61,14 @@ A Nuxt page's `<script setup>` also runs in the browser, so pages fetch through 
 
 ```ts
 // server/api/mcp.ts
+import { resolve } from "node:path";
 import { createGraftMcpHandler } from "@usegraft/mcp";
 import { graftHandler } from "@usegraft/sdk-nitro";
 
+const contentDir = resolve(process.cwd(), "content");
+
 export default defineEventHandler(
-  graftHandler(createGraftMcpHandler({ db, collections, functions, actor })),
+  graftHandler(createGraftMcpHandler({ contentDir, db, collections, functions, actor })),
 );
 ```
 
@@ -67,7 +76,7 @@ It reads the request from `event.req` on h3 2 and builds it from `event.node.req
 
 ## Rate limits count the real caller
 
-Nitro hands the adapter the connection, so `graftHandler` records the caller's socket address for Graft's rate limits. Anonymous callers each get their own limit instead of sharing one. The address never comes from a header. Behind a proxy, set `trustedProxyHops` on the handler.
+Nitro hands the adapter the connection, so `graftHandler` records the caller's socket address for Graft's rate limits. Anonymous callers each get their own limit instead of sharing one. The address comes from the connection, never from a header, so behind a proxy every caller shares the proxy's address. Set `trustedProxyHops` on the handler that rate-limits (`createFunctionsHandler` or `createContentApiHandler`) to count the client behind it.
 
 ## Cache invalidation
 
