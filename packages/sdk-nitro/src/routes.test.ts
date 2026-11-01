@@ -229,6 +229,112 @@ describe("graftHandler on h3 1 (Nuxt 4, nitropack 2)", () => {
   });
 });
 
+describe("graftHandler body limit on h3 1", () => {
+  async function h3v1Server(handler: FetchHandler, maxBodyBytes: number): Promise<string> {
+    const app = h3v1.createApp();
+    app.use("/api/fn", h3v1.eventHandler(graftHandler(handler, { maxBodyBytes })));
+    return listen(h3v1.toNodeListener(app));
+  }
+
+  it("refuses a declared body over maxBodyBytes with 413 before the handler runs", async () => {
+    let reached = 0;
+    const base = await h3v1Server(async () => {
+      reached += 1;
+      return new Response("ran");
+    }, 100);
+
+    const response = await fetch(`${base}/api/fn/x`, { method: "POST", body: "x".repeat(101) });
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({
+      error: "PAYLOAD_TOO_LARGE",
+      details: { limit: 100 },
+    });
+    expect(reached).toBe(0);
+    const fits = await fetch(`${base}/api/fn/x`, { method: "POST", body: "x".repeat(100) });
+    expect(await fits.text()).toBe("ran");
+  });
+
+  it("errors a chunked body with no length once it passes maxBodyBytes", async () => {
+    const base = await h3v1Server(async (request) => {
+      const failure = await request.arrayBuffer().then(
+        () => null,
+        (error: unknown) => error,
+      );
+      return Response.json({ failed: failure instanceof Error ? failure.message : null });
+    }, 100);
+
+    const response = await fetch(`${base}/api/fn/x`, {
+      method: "POST",
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("x".repeat(80)));
+          controller.enqueue(new TextEncoder().encode("x".repeat(80)));
+          controller.close();
+        },
+      }),
+      // Node's fetch needs this for a stream body.
+      duplex: "half",
+    });
+
+    expect(await response.json()).toEqual({ failed: expect.stringMatching(/100 bytes/) });
+  });
+
+  it("streams the body to the handler, so one that stops early never pulls the rest", async () => {
+    let pulled = 0;
+    const base = await h3v1Server(
+      async (request) => {
+        const reader = request.body?.getReader();
+        const first = await reader?.read();
+        pulled += first?.value?.byteLength ?? 0;
+        await reader?.cancel();
+        return new Response("stopped", { status: 413 });
+      },
+      32 * 1024 * 1024,
+    );
+
+    const response = await fetch(`${base}/api/fn/x`, {
+      method: "POST",
+      body: "x".repeat(4 * 1024 * 1024),
+    });
+
+    expect(response.status).toBe(413);
+    expect(pulled).toBeGreaterThan(0);
+    expect(pulled).toBeLessThan(4 * 1024 * 1024);
+  });
+
+  it("refuses an in-process body over maxBodyBytes, though it never touched a socket", async () => {
+    let reached = 0;
+    const req = {
+      method: "POST",
+      url: "/api/fn/x",
+      headers: { host: "localhost", "content-type": "application/json" },
+      body: { message: "x".repeat(200) },
+      socket: null,
+      on: () => req,
+    };
+    // SAFETY: the stand-in carries every field h3's createEvent reads.
+    const event = h3v1.createEvent(req as never, {} as never);
+
+    const response = await graftHandler(
+      async () => {
+        reached += 1;
+        return new Response("ran");
+      },
+      { maxBodyBytes: 100 },
+    )(event);
+
+    expect(response.status).toBe(413);
+    expect(reached).toBe(0);
+  });
+
+  it("refuses a limit that is not a byte count when it is built, instead of reading without one", () => {
+    expect(() => graftHandler(async () => new Response(), { maxBodyBytes: Number.NaN })).toThrow(
+      expect.objectContaining({ code: "CONFIG_INVALID" }),
+    );
+  });
+});
+
 describe("graftHandler on h3 2 (Nitro 3, Nuxt 5)", () => {
   it("passes event.req through, registers the socket peer, and streams the response back", async () => {
     const { handler, seen } = recorder();

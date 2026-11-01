@@ -226,6 +226,13 @@ that calls its own route with `$fetch` during server rendering. Nuxt 4 skips
 the network for that call and puts the body somewhere a plain stream reader
 would miss.
 
+Each Graft handler refuses a body over its own limit with `413`: 1 MiB for
+functions, 32 MiB for MCP. On h3 1, `graftHandler` streams the body to the
+handler instead of buffering it first, and stops reading at 32 MiB whatever the
+handler does. Pass `maxBodyBytes` to change that ceiling, such as
+`graftHandler(handler, { maxBodyBytes: 64 * 1024 * 1024 })`. See
+[Request bodies have a size limit](/docs/rate-limits#request-bodies-have-a-size-limit).
+
 ## Rate limits count the real caller
 
 Graft's rate limits count anonymous callers by the address they connected

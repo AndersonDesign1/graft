@@ -19,7 +19,14 @@
  * anonymous callers get a rate-limit bucket each instead of sharing
  * "unknown". The address comes from the server, never from a header.
  */
-import { GraftError, setRequestPeer } from "@usegraft/contracts";
+import {
+  bodyLimit,
+  DEFAULT_MAX_MCP_BODY_BYTES,
+  GraftError,
+  payloadTooLarge,
+  readBodyBytes,
+  setRequestPeer,
+} from "@usegraft/contracts";
 
 export type FetchHandler = (request: Request) => Promise<Response>;
 
@@ -60,6 +67,9 @@ export interface NodeIncoming {
   readonly rawBody?: RawBody;
   readonly body?: RawBody;
   on(event: string, listener: (...args: never[]) => void): void;
+  /** Stop reading from the socket, once nobody wants the rest of the body. */
+  pause?(): void;
+  [Symbol.asyncIterator](): AsyncIterator<Uint8Array | string>;
 }
 
 /** The Request h3 2 hands a handler: a Web `Request` plus what the server knew. */
@@ -81,9 +91,32 @@ export interface NitroEvent {
   readonly context?: { readonly clientAddress?: string } | undefined;
 }
 
+export interface GraftHandlerOptions {
+  /**
+   * The most body bytes the h3 1 path reads before refusing with 413, in
+   * bytes. Defaults to 32 MiB, the MCP handler's limit, so each Graft handler
+   * still applies its own smaller limit as the bytes arrive. h3 2 and Web
+   * runtimes hand over the platform's Request, which each handler reads under
+   * its own limit.
+   */
+  maxBodyBytes?: number;
+}
+
 /** A Nitro event handler over a Graft handler. Works on h3 1 and h3 2. */
-export function graftHandler(handler: FetchHandler) {
-  return async (event: NitroEvent): Promise<Response> => handler(await toGraftRequest(event));
+export function graftHandler(handler: FetchHandler, options: GraftHandlerOptions = {}) {
+  const limit = bodyLimit(options.maxBodyBytes, DEFAULT_MAX_MCP_BODY_BYTES);
+  return async (event: NitroEvent): Promise<Response> => {
+    let request: Request;
+    try {
+      request = await toGraftRequest(event, { maxBodyBytes: limit });
+    } catch (error) {
+      if (error instanceof GraftError && error.code === "PAYLOAD_TOO_LARGE") {
+        return Response.json(error.toJSON(), { status: 413, headers: { connection: "close" } });
+      }
+      throw error;
+    }
+    return handler(request);
+  };
 }
 
 /**
@@ -91,7 +124,10 @@ export function graftHandler(handler: FetchHandler) {
  * the peer. Exported for apps that need the Request before deciding which
  * Graft handler to call.
  */
-export async function toGraftRequest(event: NitroEvent): Promise<Request> {
+export async function toGraftRequest(
+  event: NitroEvent,
+  options: GraftHandlerOptions = {},
+): Promise<Request> {
   // h3 2. Check this first: Nitro 3 also keeps a compatibility `event.node`.
   if (event.req instanceof Request) {
     const peer = clientAddress(event) ?? nonEmpty(event.req.ip);
@@ -108,7 +144,8 @@ export async function toGraftRequest(event: NitroEvent): Promise<Request> {
   // h3 1 on Node.
   const nodeReq = event.node?.req;
   if (nodeReq) {
-    const request = await fromNodeRequest(nodeReq);
+    const limit = bodyLimit(options.maxBodyBytes, DEFAULT_MAX_MCP_BODY_BYTES);
+    const request = await fromNodeRequest(nodeReq, limit);
     const peer = clientAddress(event) ?? nodeReq.socket?.remoteAddress;
     if (peer) setRequestPeer(request, peer);
     return request;
@@ -124,7 +161,10 @@ export async function toGraftRequest(event: NitroEvent): Promise<Request> {
 /** Methods h3 reads a body for. Matches h3 1's own list. */
 const PAYLOAD_METHODS = new Set(["PATCH", "POST", "PUT", "DELETE"]);
 
-async function fromNodeRequest(req: NodeIncoming): Promise<Request> {
+/** `RequestInit` as Node's fetch takes it: a stream body needs `duplex`. */
+type NodeRequestInit = RequestInit & { duplex?: "half" };
+
+async function fromNodeRequest(req: NodeIncoming, limit: number): Promise<Request> {
   const method = (req.method ?? "GET").toUpperCase();
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
@@ -136,16 +176,19 @@ async function fromNodeRequest(req: NodeIncoming): Promise<Request> {
   const path = req.originalUrl ?? req.url ?? "/";
   const protocol = req.socket?.encrypted ? "https" : "http";
   const url = requestUrl(protocol, headers.get("host"), path);
-  const body = PAYLOAD_METHODS.has(method) ? await readBody(req) : undefined;
+  const body = PAYLOAD_METHODS.has(method) ? await readBody(req, limit) : undefined;
   // They described the bytes on the wire. The body here may be re-encoded,
   // such as a parsed object serialized back to JSON, so they would be wrong.
   headers.delete("content-length");
   headers.delete("transfer-encoding");
-  return new Request(url, {
-    method,
-    headers,
-    body: body && body.byteLength > 0 ? body : undefined,
-  });
+  const init: NodeRequestInit = { method, headers };
+  if (body instanceof ReadableStream) {
+    init.body = body;
+    init.duplex = "half";
+  } else if (body && body.byteLength > 0) {
+    init.body = body;
+  }
+  return new Request(url, init);
 }
 
 /**
@@ -174,11 +217,47 @@ function requestUrl(protocol: string, host: string | null, path: string): URL {
  * h3's `readBody` leaves it cached on the request. Reading only the stream
  * would turn both into an empty body.
  */
-async function readBody(req: NodeIncoming): Promise<Uint8Array | undefined> {
+async function readBody(
+  req: NodeIncoming,
+  limit: number,
+): Promise<Uint8Array | ReadableStream<Uint8Array> | undefined> {
   const cached = cachedBody(req);
-  if (cached !== undefined) return toBytes(await cached);
+  if (cached !== undefined) {
+    const bytes = await toBytes(await cached, limit);
+    if (bytes && bytes.byteLength > limit) throw payloadTooLarge(limit);
+    return bytes;
+  }
   if (!hasStreamedBody(req)) return undefined;
-  return collect(req);
+  const declared = Number.parseInt(firstHeader(req.headers["content-length"]) ?? "", 10);
+  if (declared > limit) throw payloadTooLarge(limit);
+  return streamOf(req, limit);
+}
+
+/**
+ * The socket's body as a stream the Graft handler pulls from, so a handler
+ * that refuses at its own smaller limit stops the read there instead of this
+ * adapter buffering everything first. It errors once the body passes `limit`.
+ */
+function streamOf(req: NodeIncoming, limit: number): ReadableStream<Uint8Array> {
+  const chunks = req[Symbol.asyncIterator]();
+  let total = 0;
+  return new ReadableStream<Uint8Array>(
+    {
+      async pull(controller) {
+        const next = await chunks.next();
+        if (next.done) return controller.close();
+        const chunk =
+          typeof next.value === "string" ? new TextEncoder().encode(next.value) : next.value;
+        total += chunk.byteLength;
+        if (total > limit) return controller.error(payloadTooLarge(limit));
+        controller.enqueue(new Uint8Array(chunk));
+      },
+      cancel() {
+        req.pause?.();
+      },
+    },
+    { highWaterMark: 0 },
+  );
 }
 
 function cachedBody(req: NodeIncoming): RawBody | Promise<RawBody> {
@@ -191,25 +270,32 @@ function hasStreamedBody(req: NodeIncoming): boolean {
   return (firstHeader(req.headers["transfer-encoding"]) ?? "").includes("chunked");
 }
 
-function collect(req: NodeReadable | NodeIncoming): Promise<Uint8Array> {
+/** A cached Node stream, read to the end unless it passes `limit`. */
+function collect(req: NodeReadable, limit: number): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const chunks: Uint8Array[] = [];
+    let total = 0;
     req.on("data", (chunk: Uint8Array | string) => {
-      chunks.push(typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk);
+      const bytes = typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;
+      total += bytes.byteLength;
+      if (total > limit) reject(payloadTooLarge(limit));
+      else chunks.push(bytes);
     });
     req.on("end", () => resolve(concat(chunks)));
     req.on("error", (error: Error) => reject(error));
   });
 }
 
-async function toBytes(value: RawBody): Promise<Uint8Array | undefined> {
+async function toBytes(value: RawBody, limit: number): Promise<Uint8Array | undefined> {
   if (value === undefined || value === null) return undefined;
   if (value instanceof Uint8Array) return value;
   if (typeof value === "string") return new TextEncoder().encode(value);
   if (value instanceof URLSearchParams) return new TextEncoder().encode(value.toString());
-  if (value instanceof ReadableStream)
-    return new Uint8Array(await new Response(value).arrayBuffer());
-  if (isNodeReadable(value)) return collect(value);
+  if (value instanceof ReadableStream) {
+    const init: NodeRequestInit = { method: "POST", body: value, duplex: "half" };
+    return readBodyBytes(new Request("http://localhost", init), limit);
+  }
+  if (isNodeReadable(value)) return collect(value, limit);
   // A parsed JSON body, as nitropack's in-process fetch passes it.
   return new TextEncoder().encode(JSON.stringify(value));
 }

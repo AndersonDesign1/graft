@@ -192,6 +192,11 @@ Studio and the server itself. The server stops reading a body once it passes
 so at most the chunk that crossed the limit is read past it. A value that
 is not a whole number of bytes stops the server with `CONFIG_INVALID`.
 
+In Nuxt or Nitro, `graftHandler` from `@usegraft/sdk-nitro` does the same on
+h3 1: it streams the body to the handler and stops at 32 MiB, or at its own
+`maxBodyBytes`. On h3 2 it hands over the platform's request untouched, and
+each handler reads it under its own limit.
+
 ## What is not rate limited
 
 - Reads through the SDKs in your own app. They read the index directly and never
