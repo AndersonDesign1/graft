@@ -17,6 +17,21 @@
 /** Which index a package needs. `either` works on both tiers. */
 export type PackageTier = "static" | "postgres" | "either";
 
+/** Every framework an adapter can claim. `list_packages` filters on these. */
+export const FRAMEWORKS = [
+  "next",
+  "astro",
+  "sveltekit",
+  "react-router",
+  "tanstack-start",
+  "react",
+  "vue",
+  "nitro",
+  "nuxt",
+] as const;
+
+export type Framework = (typeof FRAMEWORKS)[number];
+
 export interface PackageGuide {
   name: string;
   /** One line: what it is. */
@@ -25,7 +40,12 @@ export interface PackageGuide {
   when: string;
   tier: PackageTier;
   /** The framework this adapter serves, for the "I am on X" question. */
-  framework?: "next" | "astro" | "sveltekit" | "react-router" | "tanstack-start" | "react";
+  framework?: Framework;
+  /**
+   * Other frameworks this adapter serves until they get their own. sdk-nitro
+   * covers Nuxt because Nuxt runs on Nitro.
+   */
+  alsoFor?: readonly Framework[];
   /** True for packages you install directly; false for ones pulled in as deps. */
   direct: boolean;
 }
@@ -85,12 +105,29 @@ export const PACKAGE_KNOWLEDGE = {
     framework: "tanstack-start",
     direct: true,
   },
+  "@usegraft/sdk-nitro": {
+    name: "@usegraft/sdk-nitro",
+    role: "Nitro adapter: typed reads in server routes, plus `graftHandler` for event handlers on h3 1 and h3 2.",
+    when: "You are on Nuxt 4 or 5, or a standalone Nitro 3 app.",
+    tier: "either",
+    framework: "nitro",
+    alsoFor: ["nuxt"],
+    direct: true,
+  },
   "@usegraft/sdk-react": {
     name: "@usegraft/sdk-react",
     role: "Browser client: typed reads over the content API, with a provider and hooks.",
     when: "You need reads in the browser — a search box, an editor preview, a widget on an already-rendered page. No database reaches this package.",
     tier: "postgres",
     framework: "react",
+    direct: true,
+  },
+  "@usegraft/sdk-vue": {
+    name: "@usegraft/sdk-vue",
+    role: "Vue client: typed reads over the content API, composables that run them, and MDX rendering for Vue.",
+    when: "You need reads in a Vue app's browser code, or you render MDX bodies with Vue components. No database reaches this package.",
+    tier: "either",
+    framework: "vue",
     direct: true,
   },
   "@usegraft/sdk-core": {
@@ -206,7 +243,12 @@ export function allPackages(): PackageGuide[] {
   return Object.values(PACKAGE_KNOWLEDGE);
 }
 
+/** Whether a package is the adapter for a framework. */
+export function servesFramework(guide: PackageGuide, framework: string): boolean {
+  return guide.framework === framework || (guide.alsoFor?.some((f) => f === framework) ?? false);
+}
+
 /** Adapter for a framework, when one exists. */
 export function packageForFramework(framework: string): PackageGuide | undefined {
-  return allPackages().find((p) => p.framework === framework);
+  return allPackages().find((p) => servesFramework(p, framework));
 }

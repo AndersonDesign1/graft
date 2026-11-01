@@ -1,0 +1,259 @@
+---
+title: Vue
+description: "Read Graft content from Vue with composables that call the Content API, and render MDX bodies with your own Vue components."
+section: Frameworks
+order: 7
+---
+
+<p className="kicker">Read Graft content from Vue code, and render MDX with Vue components.</p>
+
+`@usegraft/sdk-vue` gives you Vue composables that read content over HTTP, and a
+component that renders MDX bodies with your own Vue components. Use it when:
+
+- your Vue app runs in the browser, such as a single-page app built with Vite,
+- you load content after the page is on screen, such as a live search box, or
+- you render MDX bodies with Vue components like a `<Callout>`.
+
+The composables call Graft's [Content API](/docs/content-api), so something has
+to serve it: `graft serve`, or the Content API handler mounted in your own
+backend. The browser never receives a database connection or the index file.
+
+**Before you start**, you need a `graft.config.ts` and a running Content API.
+By the end of this page you have a typed client, a component that shows one
+document, a search box, and an MDX body rendered with Vue components.
+
+<AgentPrompt>
+  Add Graft content to this Vue app following
+  https://graft.page/docs/vue.md. Use createGraftComposables with the Content
+  API endpoint at /api/content/v1.
+</AgentPrompt>
+
+## Install
+
+<Tabs labels="npm, pnpm, bun">
+
+<Tab>
+
+```sh
+npm i @usegraft/sdk-vue
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+pnpm add @usegraft/sdk-vue
+```
+
+</Tab>
+
+<Tab>
+
+```sh
+bun add @usegraft/sdk-vue
+```
+
+</Tab>
+
+</Tabs>
+
+It needs Vue 3.5 or newer.
+
+## Create the client and composables
+
+Create the client once, pointed at your Content API, and build the composables
+from it:
+
+<CodeBlock title="src/graft.ts">
+
+```ts
+import { createGraft, createGraftComposables } from "@usegraft/sdk-vue";
+import { collections } from "../graft.config";
+
+export const graft = createGraft({
+  endpoint: "https://cms.example.com/api/content/v1",
+  collections,
+});
+
+export const { useContent, useContentList, useContentSearch } = createGraftComposables(graft);
+```
+
+</CodeBlock>
+
+The composables are typed from your own `graft.config.ts`, so
+`post.data.title` is checked at compile time. There is no code generation step
+and no schema to download.
+
+They read from this client by default. To point part of your app somewhere
+else, such as a preview deployment's endpoint or a fake client in tests, call
+`provideGraft(other)` in a component's `setup`, or install
+`graftPlugin(other)` on the app.
+
+## Show one document
+
+`useContent` reads a document by collection and slug. It returns `data`,
+`error` and `loading` as refs, and a `refresh` function to try again.
+
+The slug can be a plain string, a ref or a getter. Pass a getter and the read
+follows it, so this component reads again when the route changes:
+
+<CodeBlock title="src/BlogPost.vue">
+
+```vue
+<script setup lang="ts">
+import { useRoute } from "vue-router";
+import { useContent } from "./graft";
+
+const route = useRoute();
+const { data: post, loading, error, refresh } = useContent("posts", () => String(route.params.slug));
+</script>
+
+<template>
+  <p v-if="loading">Loading…</p>
+  <p v-else-if="error">Could not load this post. <button @click="refresh">Try again</button></p>
+  <p v-else-if="!post">Post not found.</p>
+  <article v-else>
+    <h1>{{ post.data.title }}</h1>
+  </article>
+</template>
+```
+
+</CodeBlock>
+
+`data` is `null` when the collection has no document with that slug, so a
+missing post is not an error. When the slug changes, `data` clears in the same
+tick, so the page never shows the old post under the new address. An answer
+that arrives after the slug changed, or after the component is gone, is
+dropped.
+
+## Add a search box
+
+`useContentSearch` runs a full-text search in one collection, best match first.
+Pass the input's ref straight in. An empty query returns no results and sends no
+request:
+
+<CodeBlock title="src/SearchBox.vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+import { useContentSearch } from "./graft";
+
+const query = ref("");
+const { data: hits, loading, error } = useContentSearch("docs", query, { limit: 10 });
+</script>
+
+<template>
+  <input v-model="query" type="search" />
+  <p v-if="loading">Searching…</p>
+  <p v-else-if="error">Search failed.</p>
+  <ul>
+    <li v-for="hit in hits ?? []" :key="hit.slug">
+      <a :href="`/docs/${hit.slug}`">{{ hit.data.title }}</a>
+    </li>
+  </ul>
+</template>
+```
+
+</CodeBlock>
+
+Each change to a non-blank query sends one request. For a busy endpoint,
+debounce the input before you pass it on.
+
+Each hit also has a `snippet` with each match wrapped in `<b>…</b>`. The rest of
+the snippet is your content, so do not render it with `v-html` unless you trust
+everyone who can write content.
+
+## Render MDX with Vue components
+
+A document's `body` is its MDX source as written. Rendering it takes two steps:
+compile it on your server with `prepareMdx`, then render the result in the page
+with `MdxContent`. The compiler stays on the server, and the page only runs its
+output, so the same component renders on the server and hydrates in the browser.
+
+Compile in a server route. `prepareMdx` comes from its own entry,
+`@usegraft/sdk-vue/server`, so the compiler never reaches the browser bundle:
+
+<CodeBlock title="server/mdx.ts">
+
+```ts
+import { prepareMdx } from "@usegraft/sdk-vue/server";
+
+// In any server route: read the document, compile its body, send the string.
+export async function compiledBody(body: string): Promise<{ code: string }> {
+  return { code: await prepareMdx(body) };
+}
+```
+
+</CodeBlock>
+
+Then render it, passing every component the body uses:
+
+<CodeBlock title="src/PostBody.vue">
+
+```vue
+<script setup lang="ts">
+import { MdxContent } from "@usegraft/sdk-vue";
+import Callout from "./Callout.vue";
+
+defineProps<{ code: string }>();
+</script>
+
+<template>
+  <MdxContent :code="code" :components="{ Callout }" />
+</template>
+```
+
+</CodeBlock>
+
+A component receives the content between its tags as its default slot, so
+`<Callout tone="warn">Careful.</Callout>` in the body renders `Callout.vue`
+with `Careful.` in its `<slot />`.
+
+<Callout label="What prepareMdx refuses" type="warning">
+  By default `prepareMdx` checks the body against the restricted rule before it
+  compiles. It refuses `{expressions}`, `import`, `export`, `<script>` and other
+  elements that run code, and `on…` event handlers. It also drops links and
+  sources that use `javascript:` or any scheme other than http, https, mailto
+  and tel. Vue renders a `javascript:` link as it is, so this matters.
+
+  `MdxContent` runs the compiled string with `new Function`. Only pass it a
+  string your own server produced, and a page with a Content-Security-Policy
+  needs `'unsafe-eval'` in `script-src`. Pass `prepareMdx(body, { trust: "full" })`
+  only for bodies from your own repository, matching `mdxTrust` in
+  `graft.config.ts`. `MdxContent` takes no trust option: the check happens when
+  `prepareMdx` compiles.
+  See [MDX safety](/docs/mdx-safety).
+</Callout>
+
+## Use Nuxt's data fetching instead
+
+The composables keep the latest result in refs, and nothing more. During server
+rendering they return their loading state, so the first HTML has no content.
+In Nuxt, fetch with `useAsyncData` instead. It runs on the server, puts the
+result into the page, and has the same methods to call:
+
+```ts
+const { data: post } = await useAsyncData(`post:${slug}`, () => graft.getContent("posts", slug));
+```
+
+## What the browser cannot do
+
+- **Reach the database.** The client only speaks HTTP. It has no option for a
+  database connection, so a connection string cannot end up in your bundle.
+- **Choose a branch.** Each Content API endpoint serves one branch, set by the
+  server. On an endpoint-backed handle, passing `branch` to `createGraft`, to a
+  read, or to a read through `graft.client` throws `CONFIG_INVALID`, even
+  `branch: "main"`. A handle built on your own `index` takes `branch` as usual.
+  To read a preview branch, point a second client at the preview deployment's
+  endpoint.
+- **Compile MDX.** Compiling stays on the server. `MdxContent` only runs what
+  `prepareMdx` produced.
+
+## Next steps
+
+- [Content API](/docs/content-api) shows how to serve the endpoint, with
+  `graft serve` or mounted in your own backend.
+- [MDX safety](/docs/mdx-safety) explains the trust levels.
+- [SDK reference](/docs/sdk-reference) lists every method on the client.

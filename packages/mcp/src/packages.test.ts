@@ -47,8 +47,10 @@ describe("PACKAGE_KNOWLEDGE", () => {
     // return whichever came first, which is a coin toss dressed as advice.
     const byFramework = new Map<string, string[]>();
     for (const guide of allPackages()) {
-      if (!guide.framework) continue;
-      byFramework.set(guide.framework, [...(byFramework.get(guide.framework) ?? []), guide.name]);
+      for (const framework of [guide.framework, ...(guide.alsoFor ?? [])]) {
+        if (!framework) continue;
+        byFramework.set(framework, [...(byFramework.get(framework) ?? []), guide.name]);
+      }
     }
     for (const [framework, names] of byFramework) {
       expect(names, `${framework} has more than one adapter`).toHaveLength(1);
@@ -58,7 +60,10 @@ describe("PACKAGE_KNOWLEDGE", () => {
   it("answers the question it exists for", () => {
     expect(packageForFramework("next")?.name).toBe("@usegraft/sdk-next");
     expect(packageForFramework("sveltekit")?.name).toBe("@usegraft/sdk-sveltekit");
-    expect(packageForFramework("vue")).toBeUndefined();
+    expect(packageForFramework("nitro")?.name).toBe("@usegraft/sdk-nitro");
+    expect(packageForFramework("nuxt")?.name).toBe("@usegraft/sdk-nitro");
+    expect(packageForFramework("vue")?.name).toBe("@usegraft/sdk-vue");
+    expect(packageForFramework("solid")).toBeUndefined();
   });
 
   it("never points a static project at a Postgres-only package", () => {

@@ -285,9 +285,10 @@ export const ERROR_KNOWLEDGE: Record<ErrorCode, ErrorExplanation> = {
       "An adapter API needs a newer version of the framework than the app has installed. The rest of the adapter still works.",
     typicalCauses: [
       "Calling `updateContent` from @usegraft/sdk-next on Next.js 15. It needs `updateTag`, which Next.js added in 16",
+      "Mounting `graftHandler` from @usegraft/sdk-nitro on an h3 older than 1.15. It reads the request from `event.req` (h3 2) or `event.node.req` (h3 1)",
     ],
     howToRecover:
-      "Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 15 and 16. Or upgrade the framework.",
+      "Use the fallback the error's `fix` names. For `updateContent` that is `revalidateContent(branch, changes)`, which works on Next.js 15 and 16. For `graftHandler` outside Nitro, call the Graft handler with a Web Request directly. Or upgrade the framework.",
   },
   CONTENT_SOURCE_MISMATCH: {
     code: "CONTENT_SOURCE_MISMATCH",

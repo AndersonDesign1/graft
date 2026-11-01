@@ -115,11 +115,13 @@ place, list, update, and cancel functions).
 | [`@usegraft/sdk-sveltekit`](packages/sdk-sveltekit)           | SvelteKit. Typed reads plus `graftRoute` for `+server.ts`              |
 | [`@usegraft/sdk-tanstack-start`](packages/sdk-tanstack-start) | TanStack Start. Typed reads plus `graftRoute` for server routes        |
 | [`@usegraft/sdk-react-router`](packages/sdk-react-router)     | React Router v7 framework mode. Typed reads plus loader/action mounts  |
+| [`@usegraft/sdk-nitro`](packages/sdk-nitro)                   | Nuxt 4 and 5, Nitro 3. Typed reads plus `graftHandler` for h3 1 and 2  |
 | [`@usegraft/sdk-react`](packages/sdk-react)                   | The browser. Reads over HTTP, plus hooks                               |
+| [`@usegraft/sdk-vue`](packages/sdk-vue)                       | Vue. Reads over HTTP, composables, and MDX rendering                   |
 | [`@usegraft/sdk-core`](packages/sdk-core)                     | Anything else. The typed client the others wrap                        |
 
 Every adapter is typed structurally, so none of them depends on the framework it
-adapts. `sdk-react` is the one that does not read a database: it reads a
+adapts. `sdk-react` and `sdk-vue` are the ones that do not read a database: they read a
 [`@usegraft/content-api`](packages/content-api) endpoint over HTTP, because a
 Postgres handle in a browser bundle is a database URL in a browser bundle.
 
@@ -145,7 +147,9 @@ and your OIDC issuer.
 | `@usegraft/sdk-sveltekit`      | SvelteKit adapter                                                            |
 | `@usegraft/sdk-tanstack-start` | TanStack Start adapter                                                       |
 | `@usegraft/sdk-react-router`   | React Router v7 adapter, framework mode                                      |
+| `@usegraft/sdk-nitro`          | Nitro adapter, for Nuxt 4 and 5 and standalone Nitro                         |
 | `@usegraft/sdk-react`          | Browser client and hooks over the content API                                |
+| `@usegraft/sdk-vue`            | Vue client, composables and MDX rendering over the content API               |
 | `@usegraft/cli`                | The `graft` command                                                          |
 | `@usegraft/mcp`                | The agent surface: content, functions, introspection                         |
 | `@usegraft/studio`             | The optional editing UI and approval queue                                   |

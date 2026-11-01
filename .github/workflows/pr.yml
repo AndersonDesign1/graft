@@ -59,10 +59,12 @@ jobs:
             sdk-astro
             sdk-core
             sdk-next
+            sdk-nitro
             sdk-react
             sdk-react-router
             sdk-sveltekit
             sdk-tanstack-start
+            sdk-vue
             studio
             tokens
             docs-site

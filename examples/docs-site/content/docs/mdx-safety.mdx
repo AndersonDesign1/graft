@@ -52,11 +52,14 @@ literal string attributes. Everything that evaluates is refused.
 | A spread attribute | `<Foo {...props} />` |
 | An element that can load or run code | `<script>`, `<iframe>`, `<object>`, `<embed>`, `<frame>`, `<frameset>`, `<base>` |
 | An inline event handler | `<img onerror="…" />` |
+| A raw-HTML attribute, in any case | `<div innerHTML="…" />`, `outerHTML`, `dangerouslySetInnerHTML` |
 
-The last two matter more than they look. `<script>alert(1)</script>` contains no
-expression at all, and MDX renders an unknown lowercase tag straight through to
-HTML. An `onerror` with a plain string value still runs in a browser, because
-React writes an unrecognized attribute into the markup as-is.
+The last three matter more than they look. `<script>alert(1)</script>` contains
+no expression at all, and MDX renders an unknown lowercase tag straight through
+to HTML. An `onerror` with a plain string value still runs in a browser, because
+React writes an unrecognized attribute into the markup as-is. And Vue renders a
+literal `innerHTML="<img src=x onerror=…>"` as markup, so that attribute is
+refused even with a plain string value.
 
 ## Frontmatter is read as YAML or JSON
 
@@ -79,15 +82,15 @@ Three places, and they are checking different things.
 | `graft compile` | Content already in git, so a bad document fails the build rather than a request |
 | MCP `write_content` | Content arriving from someone who is not the operator, refused before it is stored |
 | Studio saves | Same |
-| `MdxBody` at render, and `prepareMdx` | Content can also arrive by a direct database write with the runtime credential, which no write-side guard sees |
+| `MdxBody` at render, and `prepareMdx` (sdk-next and sdk-vue) | Content can also arrive by a direct database write with the runtime credential, which no write-side guard sees |
 
 The compile check is what makes the failure a build-time one. Without it,
 `MdxBody` refusing at render would mean an unchecked tree fails per-request in
 production instead.
 
-<Callout label="Next.js only" type="note">
-  The render-time row is `MdxBody`, which lives in `@usegraft/sdk-next` because
-  it evaluates MDX in a Server Component. **No other adapter has a render-time
+<Callout label="Next.js and Vue only" type="note">
+  The render-time row is `MdxBody` and `prepareMdx` in `@usegraft/sdk-next`,
+  and `prepareMdx` in `@usegraft/sdk-vue`. **No other adapter has a render-time
   check.** Astro, SvelteKit, TanStack Start and React Router hand you the
   authored source and you render it with your own pipeline, which is where that
   responsibility then sits. This documentation site is one of them.
@@ -168,12 +171,13 @@ can be abused without running script inline. If you render content from people
 you do not trust at all, render it with your own pipeline and `rehype-sanitize`.
 This check closes the MDX-specific hole a Markdown sanitizer would not even see.
 
-One filter does apply to restricted bodies: `MdxBody` and `prepareMdx` drop any
+One filter does apply to restricted bodies: `MdxBody`, and `prepareMdx` in both
+`@usegraft/sdk-next` and `@usegraft/sdk-vue`, drop any
 `href`, `src` or other URL attribute whose scheme is not `http`, `https`,
 `mailto` or `tel`, on Markdown links and on components alike. A
 `[Read more](javascript:…)` link keeps its text and loses the URL. React 19
-blocks `javascript:` URLs on its own, and React 18, which the Pages Router
-can run on, does not.
+blocks `javascript:` URLs on its own. React 18, which the Pages Router can run
+on, does not, and neither does Vue.
 
 ## Writing components that pass
 

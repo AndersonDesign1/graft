@@ -28,7 +28,7 @@ assertSafeMdx(body, { label: "pages/home" });
 const found = findExecutableMdx(body);
 ```
 
-Prose, GFM and components with literal attributes are unaffected. Expressions, `import`, `export`, expression-valued attributes and `{...spread}` attributes are refused.
+Prose, GFM and components with literal attributes pass. Expressions, `import`, `export`, expression-valued attributes and `{...spread}` attributes are refused. So are elements that load or run code (`<script>`, `<iframe>` and the like), inline event handlers such as `onerror="…"`, and the raw-HTML attributes `innerHTML`, `outerHTML` and `dangerouslySetInnerHTML` in any case, even with a literal value: Vue renders `innerHTML="…"` as markup.
 
 Source the checker cannot parse throws `UncheckableMdxError` rather than passing. That is deliberate: the renderer's parser is not this one, and the gap between two independently configured parsers is exactly where executable source would hide.
 
