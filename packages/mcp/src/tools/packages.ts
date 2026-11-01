@@ -27,7 +27,7 @@ export const registerPackageTools: RegisterTools = (server, deps) => {
         "Which @usegraft/* package to install for a given framework or job: what each one is, when you need it, and which tier it requires. Filter by `framework` when the user is on a known one, or by `tier`. Use this before suggesting an install; use list_registry for copy-in primitives instead.",
       inputSchema: {
         framework: z
-          .enum(["next", "astro", "sveltekit", "react-router", "tanstack-start", "react"])
+          .enum(["next", "astro", "sveltekit", "react-router", "tanstack-start", "react", "vue"])
           .optional()
           .describe("Only the adapter for this framework, plus the packages every project needs"),
         tier: z

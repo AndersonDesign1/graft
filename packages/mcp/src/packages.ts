@@ -25,7 +25,7 @@ export interface PackageGuide {
   when: string;
   tier: PackageTier;
   /** The framework this adapter serves, for the "I am on X" question. */
-  framework?: "next" | "astro" | "sveltekit" | "react-router" | "tanstack-start" | "react";
+  framework?: "next" | "astro" | "sveltekit" | "react-router" | "tanstack-start" | "react" | "vue";
   /** True for packages you install directly; false for ones pulled in as deps. */
   direct: boolean;
 }
@@ -91,6 +91,14 @@ export const PACKAGE_KNOWLEDGE = {
     when: "You need reads in the browser — a search box, an editor preview, a widget on an already-rendered page. No database reaches this package.",
     tier: "postgres",
     framework: "react",
+    direct: true,
+  },
+  "@usegraft/sdk-vue": {
+    name: "@usegraft/sdk-vue",
+    role: "Vue client: typed reads over the content API, composables that run them, and MDX rendering for Vue.",
+    when: "You need reads in a Vue app's browser code, or you render MDX bodies with Vue components. No database reaches this package.",
+    tier: "postgres",
+    framework: "vue",
     direct: true,
   },
   "@usegraft/sdk-core": {

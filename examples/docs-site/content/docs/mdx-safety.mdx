@@ -168,12 +168,13 @@ can be abused without running script inline. If you render content from people
 you do not trust at all, render it with your own pipeline and `rehype-sanitize`.
 This check closes the MDX-specific hole a Markdown sanitizer would not even see.
 
-One filter does apply to restricted bodies: `MdxBody` and `prepareMdx` drop any
+One filter does apply to restricted bodies: `MdxBody`, and `prepareMdx` in both
+`@usegraft/sdk-next` and `@usegraft/sdk-vue`, drop any
 `href`, `src` or other URL attribute whose scheme is not `http`, `https`,
 `mailto` or `tel`, on Markdown links and on components alike. A
 `[Read more](javascript:…)` link keeps its text and loses the URL. React 19
-blocks `javascript:` URLs on its own, and React 18, which the Pages Router
-can run on, does not.
+blocks `javascript:` URLs on its own. React 18, which the Pages Router can run
+on, does not, and neither does Vue.
 
 ## Writing components that pass
 

@@ -26,6 +26,7 @@ types all of them.
 | `@usegraft/sdk-tanstack-start` | TanStack Start | `graftRoute` for server routes; build the handle in a server-only module |
 | `@usegraft/sdk-react-router` | React Router v7 | Framework mode; `graftRoute` returns both `action` and `loader` |
 | `@usegraft/sdk-react` | the browser | Reads over HTTP; `createGraftHooks`; no `db` option, by design |
+| `@usegraft/sdk-vue` | Vue | Reads over HTTP; `createGraftComposables`; `prepareMdx` + `MdxContent` for MDX |
 
 Every adapter is typed **structurally**, so none of them takes a dependency on
 the framework it adapts and there is no peer version to keep in step.
@@ -123,7 +124,8 @@ never refreshes `main`.
 ## Where the frameworks differ
 
 - **`MdxBody` is Next-only.** It evaluates MDX in a Server Component, which no
-  other adapter here has. The Next.js Pages Router compiles with `prepareMdx`
+  other adapter here has. `@usegraft/sdk-vue` renders MDX the Pages Router way:
+  `prepareMdx` on the server, `MdxContent` on the page. The Next.js Pages Router compiles with `prepareMdx`
   in `getStaticProps` and renders with `MdxContent` instead. Astro and SvelteKit author bodies for `@astrojs/mdx`
   or mdsvex; TanStack Start and React Router render authored source with their
   own pipeline.
