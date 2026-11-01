@@ -2,15 +2,16 @@
 
 Durable design decisions and spike findings live here, one file per topic.
 
-| Note                                               | Topic                                                                            |
-| -------------------------------------------------- | -------------------------------------------------------------------------------- |
-| [`branching.md`](./branching.md)                   | Copy-on-write Postgres branching: Neon CoW default + self-host overlay fallback  |
-| [`content-projection.md`](./content-projection.md) | Authored content → Postgres index (atomic, deterministic projection)             |
-| [`registry.md`](./registry.md)                     | Owned primitives + `graft add` wiring (barrel, not plugins)                      |
-| [`agent-mcp.md`](./agent-mcp.md)                   | Project MCP: install UX, function tools, safety defaults, non-goals              |
-| [`approval-hardening.md`](./approval-hardening.md) | Approval gate vs autonomous agents: Postgres role separation, self-decision      |
-| [`packaging.md`](./packaging.md)                   | Phase 7 packaging: `graft serve` (headless runtime), container + deploy topology |
-| [`studio-v2.md`](./studio-v2.md)                   | Studio for editors: audit, hosted writes through GitHub, e-commerce gaps         |
-| [`cli.md`](./cli.md)                               | The graft CLI for scripts and agents: one command table, JSON, exit codes        |
+| Note                                                   | Topic                                                                              |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| [`branching.md`](./branching.md)                       | Copy-on-write Postgres branching: Neon CoW default + self-host overlay fallback    |
+| [`content-projection.md`](./content-projection.md)     | Authored content → Postgres index (atomic, deterministic projection)               |
+| [`registry.md`](./registry.md)                         | Owned primitives + `graft add` wiring (barrel, not plugins)                        |
+| [`agent-mcp.md`](./agent-mcp.md)                       | Project MCP: install UX, function tools, safety defaults, non-goals                |
+| [`approval-hardening.md`](./approval-hardening.md)     | Approval gate vs autonomous agents: Postgres role separation, self-decision        |
+| [`packaging.md`](./packaging.md)                       | Phase 7 packaging: `graft serve` (headless runtime), container + deploy topology   |
+| [`studio-v2.md`](./studio-v2.md)                       | Studio for editors: audit, hosted writes through GitHub, e-commerce gaps           |
+| [`cli.md`](./cli.md)                                   | The graft CLI for scripts and agents: one command table, JSON, exit codes          |
+| [`nuxt-nitro-sveltekit.md`](./nuxt-nitro-sveltekit.md) | Nuxt, Nitro, Vue and SvelteKit adapters: spike findings and the agreed build order |
 
 These notes hand off throwaway spikes and research into real package APIs.
