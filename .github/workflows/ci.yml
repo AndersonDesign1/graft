@@ -111,6 +111,11 @@ jobs:
       # only a version PR changes. `pnpm version-packages` regenerates it, so
       # this fails only when a CHANGELOG was edited by hand without it.
       - run: pnpm check:changelog
+      # The changelog writes itself; the Upgrading page does not. A changeset
+      # marked **BREAKING:** needs a "What to do" entry under the version it
+      # will release as, or the release ships a break with no instructions.
+      # 1.0.0-beta.9 shipped three breaking changes with one entry.
+      - run: pnpm check:upgrading
       # No `pnpm test` here. The integration job runs every test file this
       # would, plus the ones that need Postgres: each suite skips only when
       # integration is off, never when it is on. Running both cost a minute a

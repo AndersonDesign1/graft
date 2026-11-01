@@ -38,6 +38,11 @@ Every change to a published package (`@usegraft/*`) has one in
   it was wrong, what is true now.
 - Include the new config or code the reader needs, in a fenced block.
 - Changesets become the public changelog page. Write them to be read there.
+- A breaking changeset also needs its own entry on the Upgrading page
+  (`examples/docs-site/content/docs/upgrading.mdx`), under a `## <version>`
+  heading for the version it will release as: what changed, why, then
+  `**What to do:**`. Run `pnpm check:upgrading`. It names the version and
+  each breaking changeset that still needs an entry, and CI runs it too.
 
 ## Pull requests
 
