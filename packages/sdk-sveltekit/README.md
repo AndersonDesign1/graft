@@ -83,7 +83,27 @@ The parameter is typed structurally as `{ request: Request }`, so this package n
 
 ## MDX
 
-Bodies come back as authored source. Render them with mdsvex or your own pipeline rather than a runtime evaluator, which is why this package ships no `MdxBody` equivalent.
+Bodies come back as authored source. `prepareMdx` turns one into a tree in a server `load`, and `MdxContent` renders it with your Svelte components:
+
+```ts
+// src/routes/[slug]/+page.server.ts
+import { prepareMdx } from "@usegraft/sdk-sveltekit/server";
+// …
+return { page, body: prepareMdx(page.body) };
+```
+
+```svelte
+<!-- src/routes/[slug]/+page.svelte -->
+<script lang="ts">
+  import { MdxContent } from "@usegraft/sdk-sveltekit/mdx";
+  import Callout from "#lib/Callout.svelte";
+  let { data } = $props();
+</script>
+
+<MdxContent tree={data.body} components={{ Callout }} />
+```
+
+The body is never evaluated. Unlike `MdxBody` in `@usegraft/sdk-next`, `{expressions}`, `import`, `export` and spread attributes are refused under every trust level, along with `<script>`-like elements and `on…` handlers.
 
 ## Cache invalidation
 

@@ -31,23 +31,50 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./mdx": {
+      "types": "./dist/mdx/index.d.ts",
+      "svelte": "./dist/mdx/index.js",
+      "import": "./dist/mdx/index.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
-    "dev": "tsup src/index.ts --format esm --watch",
+    "build": "tsup src/index.ts src/server.ts --format esm --dts --clean && node scripts/copy-svelte.mjs",
+    "dev": "tsup src/index.ts src/server.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@usegraft/contracts": "workspace:*",
     "@usegraft/db": "workspace:*",
-    "@usegraft/sdk-core": "workspace:*"
+    "@usegraft/mdx-safety": "workspace:*",
+    "@usegraft/sdk-core": "workspace:*",
+    "mdast-util-mdx-jsx": "^3.2.0",
+    "property-information": "^7.1.0",
+    "remark-gfm": "^4.0.1",
+    "remark-mdx": "^3.1.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "unified": "^11.0.5"
   },
   "devDependencies": {
-    "@usegraft/core": "workspace:*"
+    "@usegraft/core": "workspace:*",
+    "svelte": "5.57.3"
+  },
+  "peerDependencies": {
+    "svelte": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=22.16"

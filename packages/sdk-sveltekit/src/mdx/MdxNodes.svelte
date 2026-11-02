@@ -1,0 +1,13 @@
+<!--
+  One level of a prepared tree, rendering itself for each node's children.
+  Kept on single lines: whitespace between these tags would become text in
+  the page, and inside <pre> it would show.
+-->
+<script>
+  import MdxNodes from "./MdxNodes.svelte";
+
+  /** @type {{ nodes: import("../server.js").MdxTree, components: Record<string, import("svelte").Component<any>> }} */
+  let { nodes, components } = $props();
+</script>
+
+{#each nodes as node}{#if node.type === "text"}{node.value}{:else if node.type === "element"}{#if node.children.length > 0}<svelte:element this={node.tag} {...node.props}><MdxNodes nodes={node.children} {components} /></svelte:element>{:else}<svelte:element this={node.tag} {...node.props} />{/if}{:else if Object.hasOwn(components, node.name)}{@const Custom = components[node.name]}<Custom {...node.props}><MdxNodes nodes={node.children} {components} /></Custom>{:else}<MdxNodes nodes={node.children} {components} />{/if}{/each}

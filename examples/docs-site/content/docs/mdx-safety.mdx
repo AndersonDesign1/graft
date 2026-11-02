@@ -88,10 +88,12 @@ The compile check is what makes the failure a build-time one. Without it,
 `MdxBody` refusing at render would mean an unchecked tree fails per-request in
 production instead.
 
-<Callout label="Next.js and Vue only" type="note">
+<Callout label="Next.js, Vue and SvelteKit only" type="note">
   The render-time row is `MdxBody` and `prepareMdx` in `@usegraft/sdk-next`,
-  and `prepareMdx` in `@usegraft/sdk-vue`. **No other adapter has a render-time
-  check.** Astro, SvelteKit, TanStack Start and React Router hand you the
+  `prepareMdx` in `@usegraft/sdk-vue`, and `prepareMdx` in
+  `@usegraft/sdk-sveltekit`, which refuses executable MDX under every trust
+  level because its renderer never evaluates the body. **No other adapter has a
+  render-time check.** Astro, TanStack Start and React Router hand you the
   authored source and you render it with your own pipeline, which is where that
   responsibility then sits. This documentation site is one of them.
 

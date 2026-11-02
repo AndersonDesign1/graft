@@ -271,6 +271,13 @@ that maps element names to an allowlisted component map. It never evaluates
 the body, so `{expr}` and `import` stay refused under every trust level. Say
 that difference from `MdxBody` in the docs.
 
+Built: `prepareMdx` in `@usegraft/sdk-sveltekit/server` returns a JSON tree
+of text, element and component nodes, and `MdxContent` in
+`@usegraft/sdk-sveltekit/mdx` renders it. The components ship as Svelte source,
+compiled by the app's own Svelte. The compat apps render a body with Markdown,
+a GFM table, a component from the app and a dropped script URL, on SvelteKit
+2 and 3, and hydrate it with a clean console.
+
 ### Later: a Nitro module that runs `graft serve` anywhere Nitro deploys
 
 `graft serve` binds the runtime to `node:http`, so a headless deploy today

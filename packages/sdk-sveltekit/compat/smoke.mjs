@@ -18,6 +18,8 @@
  * - `listContent` and `searchContent` read in a `load` beside it
  * - `graftRoute` hands a handler SvelteKit's Request with method, headers and body
  * - the content API, mounted with `graftRoute`, answers
+ * - MdxContent renders the body prepareMdx prepared: Markdown, a GFM table,
+ *   a component from the app, and links with script URLs dropped
  * - the browser bundle carries no server code
  * - in Chromium: the page hydrates without a warning, and a client-side
  *   navigation runs the next `load` on the server
@@ -119,8 +121,8 @@ const clientCode = readdirSync(clientDir, { recursive: true })
   .map((file) => readFileSync(join(clientDir, String(file)), "utf8"))
   .join("\n");
 check(
-  clientCode.length > 0 && !/node:sqlite|openStaticIndex|content_index/.test(clientCode),
-  "the browser bundle carries no server code",
+  clientCode.length > 0 && !/node:sqlite|openStaticIndex|content_index|micromark/.test(clientCode),
+  "the browser bundle carries no server code, the MDX parser included",
 );
 
 // 4. Serve it and check behavior over HTTP.
@@ -147,6 +149,9 @@ function stop() {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** HTML without the comment markers Svelte puts inside elements for hydration. */
+const withoutComments = (markup) => markup.replace(/<!--[\s\S]*?-->/g, "");
+
 try {
   let ready = false;
   for (let i = 0; i < 60 && !ready; i++) {
@@ -167,6 +172,23 @@ try {
     (home.headers.get("cache-tag") ?? "").includes("graft:main:pages:home"),
     "the guide's Cache-Tag header carries the document's tags",
   );
+
+  // The MDX body, prepared on the server and rendered by MdxContent.
+  // Only the rendered body: the page data SvelteKit embeds after it holds the
+  // raw source, script URL included, as text.
+  const body = withoutComments(
+    html.slice(html.indexOf('<div class="body">'), html.indexOf('<a id="to-about"')),
+  );
+  check(body.includes("<strong>Graft</strong>"), "MdxContent renders the body on the server");
+  check(
+    body.includes('href="https://graft.page"') && !body.includes("javascript:"),
+    "a safe link keeps its href, and a script URL is dropped",
+  );
+  check(
+    /<aside class="callout callout-tip">[\s\S]*<em>Markdown<\/em>[\s\S]*<\/aside>/.test(body),
+    "a component from the app renders, with the Markdown inside it",
+  );
+  check(/<table>[\s\S]*<td>static<\/td>/.test(body), "a GFM table renders");
 
   check((await fetch(`${base}/nope`)).status === 404, "a missing slug is a 404");
 
@@ -226,6 +248,10 @@ try {
     check(
       dataRequests.some((url) => url.includes("/about/__data.json")),
       "the navigation ran the next load on the server",
+    );
+    check(
+      withoutComments(await page.innerHTML("main")).includes("<em>this</em>"),
+      "MdxContent renders the next body in the browser",
     );
     check(
       logged.length === 0,

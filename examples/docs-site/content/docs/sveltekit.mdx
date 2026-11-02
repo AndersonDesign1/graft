@@ -116,6 +116,59 @@ export const load: PageServerLoad = async ({ params }) => {
 
 </CodeBlock>
 
+## Render MDX with Svelte components
+
+A document's `body` is its MDX source as written. Turn it into a tree with
+`prepareMdx` in the same `load`, and render the tree with `<MdxContent>`:
+
+<CodeBlock title="src/routes/[slug]/+page.server.ts">
+
+```ts
+import { error } from "@sveltejs/kit";
+import { prepareMdx } from "@usegraft/sdk-sveltekit/server";
+import { graft } from "$lib/server/graft";
+import type { PageServerLoad } from "./$types";
+
+export const load: PageServerLoad = async ({ params }) => {
+  const page = await graft.getContent("pages", params.slug);
+  if (!page) error(404);
+  return { page, body: prepareMdx(page.body) };
+};
+```
+
+</CodeBlock>
+
+<CodeBlock title="src/routes/[slug]/+page.svelte">
+
+```svelte
+<script lang="ts">
+  import { MdxContent } from "@usegraft/sdk-sveltekit/mdx";
+  import Callout from "$lib/Callout.svelte";
+  import type { PageProps } from "./$types";
+
+  let { data }: PageProps = $props();
+</script>
+
+<h1>{data.page.data.title}</h1>
+<MdxContent tree={data.body} components={{ Callout }} />
+```
+
+</CodeBlock>
+
+The tree is plain data, so it reaches the page in SvelteKit's own page data
+and renders the same on the server and when the page hydrates. A component
+receives the content between its tags as its `children` snippet. One the body
+names that `components` lacks renders its content without the wrapper. The
+parser stays on the server: `@usegraft/sdk-sveltekit/server` is for `load`
+functions and `+server.ts` routes only.
+
+Svelte has no JSX runtime, so this renderer never evaluates the body. That
+makes it stricter than `MdxBody` in Next.js: `{expressions}`, `import`,
+`export` and spread attributes are refused with `INPUT_VALIDATION_FAILED`
+under every trust level, along with `<script>`-like elements and `on…`
+handlers. Links with a script URL are dropped unless you pass
+`{ trust: "full" }`. See [MDX safety](/docs/mdx-safety).
+
 ## Serve functions and MCP from your app
 
 This step is optional: it needs the Postgres engine and three more packages:
