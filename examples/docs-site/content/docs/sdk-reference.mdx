@@ -25,12 +25,15 @@ types all of them.
 | `@usegraft/sdk-sveltekit` | SvelteKit | `graftRoute` for `+server.ts`; CDN surrogate keys for tags |
 | `@usegraft/sdk-tanstack-start` | TanStack Start | `graftRoute` for server routes; build the handle in a server-only module |
 | `@usegraft/sdk-react-router` | React Router v7 | Framework mode; `graftRoute` returns both `action` and `loader` |
-| `@usegraft/sdk-nitro` | Nuxt 4 and 5, Nitro 3 | `graftHandler` for event handlers on h3 1 and h3 2; records the caller's address for rate limits |
+| `@usegraft/sdk-nuxt` | Nuxt 4.6+ and 5 | A module: `useGraftContent`, `useGraftList` and `useGraftSearch` for pages, `useGraft()` in `server/`, `<GraftMdx>`, and the content API, functions and MCP routes |
+| `@usegraft/sdk-nitro` | Nitro 3, and Nuxt apps that mount their own routes | `graftHandler` for event handlers on h3 1 and h3 2; records the caller's address for rate limits |
 | `@usegraft/sdk-react` | the browser | Reads over HTTP; `createGraftHooks`; no `db` option, by design |
 | `@usegraft/sdk-vue` | Vue | Reads over HTTP; `createGraftComposables`; `MdxContent` for MDX, compiled by `prepareMdx` from `@usegraft/sdk-vue/server` |
 
 Every adapter is typed **structurally**, so none of them takes a dependency on
-the framework it adapts and there is no peer version to keep in step.
+the framework it adapts and there is no peer version to keep in step. The
+exception is `@usegraft/sdk-nuxt`: a Nuxt module builds on `@nuxt/kit`, and
+supports Nuxt 4.6 and newer.
 
 ## The read API
 

@@ -1,6 +1,7 @@
 # Nuxt, Nitro and SvelteKit adapters (research, 2026-11-01)
 
-**Status: plan agreed. Unit 1 (`@usegraft/sdk-nitro`) is built.** This note records where each
+**Status: plan agreed. Units 1 to 3 are built: `@usegraft/sdk-nitro`, `@usegraft/sdk-vue`
+and `@usegraft/sdk-nuxt`.** This note records where each
 framework stands today, what a spike proved, and the order to build in.
 
 Each claim is labeled: **verified** (run in the spike below), **registry**
@@ -12,8 +13,8 @@ docs or code, not run).
 | Framework          | Current stable                       | Server layer                         | Graft today                     |
 | ------------------ | ------------------------------------ | ------------------------------------ | ------------------------------- |
 | SvelteKit          | `@sveltejs/kit` 3.1.1 (2026-10-29)   | Its own, Web-standard `RequestEvent` | `@usegraft/sdk-sveltekit` ships |
-| Nuxt               | `nuxt` 4.6.3 (2026-10-27)            | `nitropack` 2.13.5 on `h3` 1.15      | `@usegraft/sdk-nitro`           |
-| Nuxt 5             | Not released, no date                | `nitro` 3 on `h3` 2                  | `@usegraft/sdk-nitro`           |
+| Nuxt               | `nuxt` 4.6.3 (2026-10-27)            | `nitropack` 2.13.5 on `h3` 1.15      | `@usegraft/sdk-nuxt`            |
+| Nuxt 5             | Not released, no date                | `nitro` 3 on `h3` 2                  | `@usegraft/sdk-nuxt`            |
 | Nitro (standalone) | `nitro` 3.0.261029-rc (`latest` tag) | `h3` 2.0.8, stable since 2.0.1       | `@usegraft/sdk-nitro`           |
 
 All versions above are **registry**. Notes:
@@ -207,6 +208,36 @@ The module uses only `@nuxt/kit` calls that exist in Nuxt 4 and 5
 (`addServerHandler`, `addServerImportsDir`, `addImports`, `addComponent`),
 inferred. Two compat apps prove it: one on Nuxt 4 and one on the Nuxt 5
 prerelease, added as soon as one is published.
+
+What building it found (verified in the compat apps under `packages/sdk-nuxt/compat`):
+
+- **The server code imports from `nuxt/server`, so the module needs Nuxt 4.6.**
+  Nuxt 5 does not auto-import h3 helpers into server code unless
+  `experimental.nitroAutoImports` is on, and an import from `#imports` puts
+  the file on Nitro 3's v2 compatibility path. `nuxt/server` is Nuxt's
+  portable server API, on both majors, but only from Nuxt 4.6.0.
+- **The runtime ships as JavaScript, with the TypeScript source for types.**
+  Nitro 2 does not compile TypeScript from `node_modules`, and Nitro resolves
+  an extensionless import to a `.ts` file before a `.js` one. So
+  `dist/runtime/*.js` is what bundles load, and each has a `.d.ts` that
+  re-exports `dist/types/*.ts`, which the app's own typecheck reads against its
+  own Nuxt. That is how `useGraftContent` returns Nuxt's real `AsyncData`.
+- **Graft's packages are bundled, not traced.** Nitro 2 reads
+  `externals.inline`, Nitro 3 reads `noExternals`; the module sets both. The
+  MDX compiler stays external (`traceDeps` on Nitro 3), because Nuxt aliases
+  `estree-walker` to a stub in the server bundle.
+- **Re-exports, not bare specifiers.** `<GraftMdx>` and `prepareMdx` are
+  registered from the module's own runtime files. A path Nuxt writes into
+  generated types skips a package's `exports` map, and under pnpm the app
+  cannot resolve `@usegraft/sdk-vue` from its own root.
+- **The composables read the content API through Nuxt's request fetch,** which
+  answers a same-origin path in-process during server rendering. A page view
+  costs no network hop, and the content API route has no rate limit, because
+  every in-process read would share one bucket.
+- **Nuxt 5 pin.** The compat app pins the Nuxt 5 nightly of 2026-10-29, the
+  newest past the three-day release-age rule when this was built. It resolves
+  Nitro `3.0.260903-beta`, not the RC. Move the pin forward with
+  `nuxt-nightly@5x` once a newer nightly is three days old.
 
 ### 4. SvelteKit 3 compat app
 

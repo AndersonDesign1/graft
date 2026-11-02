@@ -2,7 +2,7 @@
 title: Vue
 description: "Read Graft content from Vue with composables that call the Content API, and render MDX bodies with your own Vue components."
 section: Frameworks
-order: 7
+order: 8
 ---
 
 <p className="kicker">Read Graft content from Vue code, and render MDX with Vue components.</p>
@@ -231,12 +231,9 @@ with `Careful.` in its `<slot />`.
 
 The composables keep the latest result in refs, and nothing more. During server
 rendering they return their loading state, so the first HTML has no content.
-In Nuxt, fetch with `useAsyncData` instead. It runs on the server, puts the
-result into the page, and has the same methods to call:
-
-```ts
-const { data: post } = await useAsyncData(`post:${slug}`, () => graft.getContent("posts", slug));
-```
+In Nuxt, use `@usegraft/sdk-nuxt` instead. Its `useGraftContent`,
+`useGraftList` and `useGraftSearch` read on the server, put the result into the
+page, and register `MdxContent` as `<GraftMdx>`. See [Nuxt](/docs/nuxt).
 
 ## What the browser cannot do
 

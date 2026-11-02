@@ -74,11 +74,19 @@ export interface NodeIncoming {
   [Symbol.asyncIterator](): AsyncIterator<Uint8Array | string>;
 }
 
+/**
+ * An event's context, read only for `clientAddress`. A record of unknown
+ * values rather than `{ clientAddress?: string }`, so Nuxt's portable
+ * `RequestEvent` (from `nuxt/server`), whose context is typed that way, is
+ * accepted too. The address is checked to be a string before use.
+ */
+export type EventContext = { readonly [key: string]: unknown };
+
 /** The Request h3 2 hands a handler: a Web `Request` plus what the server knew. */
 export interface ServerRequest extends Request {
   /** The socket address, set by the server adapter (srvx). */
   readonly ip?: string;
-  readonly context?: { readonly clientAddress?: string };
+  readonly context?: EventContext;
 }
 
 /**
@@ -90,7 +98,7 @@ export interface NitroEvent {
   readonly req?: ServerRequest | NodeIncoming;
   readonly web?: { readonly request?: Request } | undefined;
   readonly node?: { readonly req: NodeIncoming } | undefined;
-  readonly context?: { readonly clientAddress?: string } | undefined;
+  readonly context?: EventContext | undefined;
 }
 
 export interface GraftHandlerOptions {
@@ -345,6 +353,6 @@ function clientAddress(event: NitroEvent): string | undefined {
   return event.req instanceof Request ? nonEmpty(event.req.context?.clientAddress) : undefined;
 }
 
-function nonEmpty(value: string | undefined): string | undefined {
-  return value ? value : undefined;
+function nonEmpty(value: unknown): string | undefined {
+  return typeof value === "string" && value !== "" ? value : undefined;
 }

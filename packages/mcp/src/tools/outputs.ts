@@ -97,7 +97,6 @@ export const listPackagesOutput = {
       when: z.string(),
       tier: z.enum(["static", "postgres", "either"]),
       framework: z.string().optional(),
-      alsoFor: z.array(z.string()).optional(),
       direct: z.boolean(),
     }),
   ),

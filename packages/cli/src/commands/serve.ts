@@ -31,7 +31,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createActorResolver, type TrustedIssuer } from "@usegraft/auth";
+import { createActorResolver, trustedIssuersFrom, type TrustedIssuer } from "@usegraft/auth";
 import { fireDeployHooks, githubStoreFromEnv, revalidateWebhookFromEnv } from "@usegraft/compiler";
 import {
   bodyLimit,
@@ -318,32 +318,17 @@ function listFromEnv(raw: string | undefined): string[] {
  * Issuers that need different settings each belong in an embedded resolver.
  */
 export function trustedIssuersFromEnv(env: NodeJS.ProcessEnv = process.env): TrustedIssuer[] {
-  const issuers = listFromEnv(env.GRAFT_TRUSTED_ISSUERS);
-  const audience = listFromEnv(env.GRAFT_TRUSTED_AUDIENCE);
-  // Set but empty once parsed (",", " , "): a typo, not a choice. Treating it
-  // as unset would turn the audience check off without the warning unset gets.
-  if (env.GRAFT_TRUSTED_AUDIENCE?.trim() && audience.length === 0) {
-    throw new GraftError({
+  return trustedIssuersFrom(
+    {
+      issuers: env.GRAFT_TRUSTED_ISSUERS,
+      audience: env.GRAFT_TRUSTED_AUDIENCE,
+      actorKind: env.GRAFT_TRUSTED_ACTOR_KIND,
+    },
+    {
       code: "INPUT_VALIDATION_FAILED",
-      message: `GRAFT_TRUSTED_AUDIENCE is "${env.GRAFT_TRUSTED_AUDIENCE}", which names no audience.`,
-      fix: "Set GRAFT_TRUSTED_AUDIENCE to the audience your provider puts in tokens for this API (comma-separated for several), or unset it.",
-      details: { variable: "GRAFT_TRUSTED_AUDIENCE", value: env.GRAFT_TRUSTED_AUDIENCE },
-    });
-  }
-  const kind = env.GRAFT_TRUSTED_ACTOR_KIND?.trim() || "agent";
-  if (kind !== "agent" && kind !== "human") {
-    throw new GraftError({
-      code: "INPUT_VALIDATION_FAILED",
-      message: `GRAFT_TRUSTED_ACTOR_KIND is "${kind}"; it must be "agent" or "human".`,
-      fix: "Set GRAFT_TRUSTED_ACTOR_KIND=human to record token holders as people, or unset it to record them as agents.",
-      details: { variable: "GRAFT_TRUSTED_ACTOR_KIND", value: kind },
-    });
-  }
-  return issuers.map((issuer) => {
-    const trusted: TrustedIssuer = { issuer, actorKind: kind };
-    if (audience.length > 0) trusted.audience = audience;
-    return trusted;
-  });
+      variables: { audience: "GRAFT_TRUSTED_AUDIENCE", actorKind: "GRAFT_TRUSTED_ACTOR_KIND" },
+    },
+  );
 }
 
 export interface ServeCommandOptions {

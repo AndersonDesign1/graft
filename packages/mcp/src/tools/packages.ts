@@ -8,7 +8,7 @@
  * docs.
  */
 import { z } from "zod";
-import { allPackages, FRAMEWORKS, servesFramework } from "../packages";
+import { allPackages, FRAMEWORKS } from "../packages";
 import { guarded } from "../tool-result";
 import { READS } from "./annotations";
 import { listPackagesOutput } from "./outputs";
@@ -50,9 +50,7 @@ export const registerPackageTools: RegisterTools = (server, deps) => {
         // to "I am on Astro" is the adapter AND the cli and core every project
         // needs, not the adapter alone.
         if (framework) {
-          packages = packages.filter(
-            (p) => p.framework === undefined || servesFramework(p, framework),
-          );
+          packages = packages.filter((p) => p.framework === undefined || p.framework === framework);
         }
 
         // `either` satisfies both tiers; a static project must not be told to

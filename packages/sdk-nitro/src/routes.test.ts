@@ -405,6 +405,23 @@ describe("toGraftRequest", () => {
     expect(getRequestPeer(resolved)).toBe("198.51.100.4");
   });
 
+  it("takes Nuxt's portable event, whose context holds unknown values, and ignores a non-string address", async () => {
+    // The shape `nuxt/server`'s defineEventHandler hands a handler. Typed here
+    // as Nuxt types it, so this test also fails to compile if NitroEvent
+    // narrows `context` again.
+    const portable: {
+      readonly req: Request;
+      readonly context: { params?: Record<string, string | undefined>; [key: string]: unknown };
+    } = {
+      req: new Request("http://site.test/api/mcp", { method: "POST" }),
+      context: { clientAddress: 42 },
+    };
+    const resolved = await toGraftRequest(portable);
+
+    expect(resolved).toBe(portable.req);
+    expect(getRequestPeer(resolved)).toBeUndefined();
+  });
+
   it("refuses an event that carries no request, naming the h3 versions it reads", async () => {
     await expect(toGraftRequest({})).rejects.toMatchObject({
       name: "GraftError",

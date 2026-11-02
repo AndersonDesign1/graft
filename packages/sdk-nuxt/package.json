@@ -1,0 +1,82 @@
+{
+  "name": "@usegraft/sdk-nuxt",
+  "version": "1.0.0-beta.9",
+  "description": "Nuxt module: typed server reads, server-rendered content composables, and the content API, functions and MCP routes, on Nuxt 4 and Nuxt 5.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cms",
+    "graft",
+    "headless-cms",
+    "mcp",
+    "nuxt",
+    "nuxt-module",
+    "typescript",
+    "vue"
+  ],
+  "homepage": "https://github.com/AndersonDesign1/graft#readme",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndersonDesign1/graft.git",
+    "directory": "packages/sdk-nuxt"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/module.js",
+  "module": "./dist/module.js",
+  "types": "./dist/module.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/module.d.ts",
+      "import": "./dist/module.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/module.ts --format esm --dts --clean --external @nuxt/kit && node scripts/copy-runtime.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@nuxt/kit": "^4.6.3",
+    "@usegraft/content-api": "workspace:*",
+    "@usegraft/contracts": "workspace:*",
+    "@usegraft/db": "workspace:*",
+    "@usegraft/sdk-nitro": "workspace:*",
+    "@usegraft/sdk-vue": "workspace:*"
+  },
+  "devDependencies": {
+    "@nuxt/schema": "^4.6.3",
+    "@usegraft/auth": "workspace:*",
+    "@usegraft/core": "workspace:*",
+    "@usegraft/mcp": "workspace:*",
+    "esbuild": "0.28.2",
+    "vue": "^3.5.44"
+  },
+  "peerDependencies": {
+    "@usegraft/auth": "workspace:*",
+    "@usegraft/core": "workspace:*",
+    "@usegraft/mcp": "workspace:*",
+    "nuxt": "^4.6.0 || >=5.0.0-0",
+    "vue": ">=3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "@usegraft/auth": {
+      "optional": true
+    },
+    "@usegraft/core": {
+      "optional": true
+    },
+    "@usegraft/mcp": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22.16"
+  }
+}

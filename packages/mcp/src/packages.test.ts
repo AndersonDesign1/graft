@@ -47,10 +47,8 @@ describe("PACKAGE_KNOWLEDGE", () => {
     // return whichever came first, which is a coin toss dressed as advice.
     const byFramework = new Map<string, string[]>();
     for (const guide of allPackages()) {
-      for (const framework of [guide.framework, ...(guide.alsoFor ?? [])]) {
-        if (!framework) continue;
-        byFramework.set(framework, [...(byFramework.get(framework) ?? []), guide.name]);
-      }
+      if (!guide.framework) continue;
+      byFramework.set(guide.framework, [...(byFramework.get(guide.framework) ?? []), guide.name]);
     }
     for (const [framework, names] of byFramework) {
       expect(names, `${framework} has more than one adapter`).toHaveLength(1);
@@ -61,7 +59,7 @@ describe("PACKAGE_KNOWLEDGE", () => {
     expect(packageForFramework("next")?.name).toBe("@usegraft/sdk-next");
     expect(packageForFramework("sveltekit")?.name).toBe("@usegraft/sdk-sveltekit");
     expect(packageForFramework("nitro")?.name).toBe("@usegraft/sdk-nitro");
-    expect(packageForFramework("nuxt")?.name).toBe("@usegraft/sdk-nitro");
+    expect(packageForFramework("nuxt")?.name).toBe("@usegraft/sdk-nuxt");
     expect(packageForFramework("vue")?.name).toBe("@usegraft/sdk-vue");
     expect(packageForFramework("solid")).toBeUndefined();
   });

@@ -206,6 +206,71 @@ jobs:
           path: .turbo/cache
           key: turbo-${{ runner.os }}-sdk-next-${{ matrix.next }}-${{ github.sha }}
 
+  # @usegraft/sdk-nuxt supports Nuxt 4 (nitropack 2 on h3 1) and Nuxt 5 (Nitro 3
+  # on h3 2), which differ everywhere a module touches the server build. Each leg
+  # runs a real app pinned to one major in the lockfile (packages/sdk-nuxt/compat):
+  # it builds with `nuxi build`, type-checks the app and the module's runtime
+  # against that Nuxt, serves the output, and checks server-rendered reads, MDX,
+  # the content API, the routes that need Postgres, and hydration plus a
+  # client-side navigation in Chromium. Advisory, like sdk-next-compat: it is not
+  # a required check in .github/rulesets/main.json, because the Nuxt 5 leg runs a
+  # nightly that can break for reasons outside this repo.
+  sdk-nuxt-compat:
+    name: sdk-nuxt on Nuxt ${{ matrix.nuxt }}
+    runs-on: ubuntu-latest
+    strategy:
+      # One failing major must not hide the result of the other.
+      fail-fast: false
+      matrix:
+        nuxt: ["4", "5"]
+    env:
+      TURBO_RUN_SUMMARY: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this job pushes, and a persisted token in .git/config
+          # is one careless artifact upload away from being published.
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.16
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      # Turbo's cache from this job's last run; see the note in `verify`.
+      - name: Restore the turbo cache
+        id: turbo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-sdk-nuxt-${{ matrix.nuxt }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-sdk-nuxt-${{ matrix.nuxt }}-
+
+      # The module, everything it imports, and the CLI that compiles the app's
+      # index.
+      - run: pnpm turbo run build --filter=@usegraft/sdk-nuxt... --filter=@usegraft/cli...
+      # The browser the smoke drives, for the Playwright version the app pins.
+      - run: pnpm --filter sdk-nuxt-compat-nuxt${{ matrix.nuxt }} exec playwright install --with-deps chromium
+      - run: pnpm --filter sdk-nuxt-compat-nuxt${{ matrix.nuxt }} smoke
+
+      # Saved even when a step failed: turbo caches only tasks that passed,
+      # and the next push can reuse those. Skipped on a re-run of the same
+      # commit, whose cache is already saved.
+      - name: Keep only the turbo cache entries this run used
+        if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
+        run: node scripts/prune-turbo-cache.mjs
+      - name: Save the turbo cache
+        if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-sdk-nuxt-${{ matrix.nuxt }}-${{ github.sha }}
+
   # The integration suite is opt-in (RUN_INTEGRATION=1 + DATABASE_URL) and was
   # therefore never running here — including the only test that proves a
   # requester cannot approve their own destructive operation. A throwaway
