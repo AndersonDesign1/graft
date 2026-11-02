@@ -1,7 +1,7 @@
 /**
  * The files `graft create` writes: the schema and example content from a
  * template, an AGENTS.md for whoever opens the folder next, and, for a Next.js
- * or Nuxt site, a small app that lists and renders every collection.
+ * Nuxt or SvelteKit site, a small app that lists and renders every collection.
  *
  * Pure: it returns paths and contents, and the command writes them. That is
  * what lets the tests check every template compiles without a disk or a
@@ -10,7 +10,7 @@
 import { barrelSource } from "@usegraft/registry";
 import { templateFor, type TemplateName } from "./templates";
 
-export type Framework = "next" | "nuxt" | "none";
+export type Framework = "next" | "nuxt" | "sveltekit" | "none";
 
 export interface ScaffoldOptions {
   /** The package name, from the folder. */
@@ -30,6 +30,16 @@ const REACT_VERSION = "^19.0.0";
 // `nuxt/server`, which the Graft module's server code imports, arrived in 4.6.0.
 const NUXT_VERSION = "^4.6.0";
 const VUE_VERSION = "^3.5.0";
+// SvelteKit 3, which removed `$lib` (the site imports `#lib/…`) and needs
+// TypeScript 6 and Node 22.17.
+const SVELTEKIT_DEV_DEPENDENCIES = {
+  "@sveltejs/adapter-node": "^6.0.0",
+  "@sveltejs/kit": "^3.1.0",
+  "@sveltejs/vite-plugin-svelte": "^7.0.0",
+  svelte: "^5.57.0",
+  typescript: "^6.0.0",
+  vite: "^8.0.0",
+};
 
 function configSource(options: ScaffoldOptions): string {
   const template = templateFor(options.template);
@@ -74,6 +84,9 @@ function siteLine(framework: Framework): string {
   if (framework === "nuxt") {
     return "- `app/`: the Nuxt site. `@usegraft/sdk-nuxt` in `nuxt.config.ts` reads the content, and `server/api/mdx/` compiles each body.\n";
   }
+  if (framework === "sveltekit") {
+    return "- `src/`: the SvelteKit site. `src/lib/server/` reads the content and prepares each body; `src/routes/` renders it.\n";
+  }
   return "";
 }
 
@@ -116,9 +129,19 @@ function gitignore(options: ScaffoldOptions): string {
     ".graft/",
     ...(options.framework === "next" ? [".next/", "next-env.d.ts"] : []),
     ...(options.framework === "nuxt" ? [".nuxt/", ".output/"] : []),
+    ...(options.framework === "sveltekit" ? [".svelte-kit/", "build/"] : []),
     "",
   ].join("\n");
 }
+
+/** A SvelteKit 3 site on Postgres declares the variable its server reads. */
+const SVELTEKIT_ENV = `// The environment variables the server reads, from .env in development.
+import { defineEnvVars } from "@sveltejs/kit/env";
+
+export const variables = defineEnvVars({
+  DATABASE_URL: { description: "The Postgres connection string, in .env (npx graft doctor explains)." },
+});
+`;
 
 /** The stylesheet every generated site starts with: plain CSS, light and dark. */
 const SITE_CSS = `:root {
@@ -214,6 +237,8 @@ interface FrameworkPackage {
   scripts: Record<string, string>;
   dependencies: Record<string, string>;
   devDependencies: Record<string, string>;
+  /** Node subpath imports, for a framework that resolves its own aliases through them. */
+  imports?: Record<string, string>;
 }
 
 function frameworkPackage(options: ScaffoldOptions): FrameworkPackage {
@@ -250,6 +275,18 @@ function frameworkPackage(options: ScaffoldOptions): FrameworkPackage {
       devDependencies: {},
     };
   }
+  if (options.framework === "sveltekit") {
+    return {
+      scripts: {
+        dev: "graft compile && vite dev --port 3000",
+        build: "graft compile && vite build",
+        start: "node build",
+      },
+      dependencies: { "@usegraft/sdk-sveltekit": graft },
+      devDependencies: SVELTEKIT_DEV_DEPENDENCIES,
+      imports: { "#lib/*": "./src/lib/*" },
+    };
+  }
   return {
     scripts: { dev: "graft dev", build: "graft compile" },
     dependencies: {},
@@ -265,6 +302,8 @@ function packageJson(options: ScaffoldOptions): string {
     version: "0.1.0",
     private: true,
     type: "module",
+    // JSON.stringify leaves the key out when a framework has none.
+    imports: site.imports,
     scripts: { ...site.scripts, studio: "graft studio", doctor: "graft doctor" },
     dependencies: {
       "@usegraft/core": graft,
@@ -707,6 +746,252 @@ export default defineEventHandler(async (event) => {
   };
 }
 
+function sveltekitFiles(options: ScaffoldOptions) {
+  const template = templateFor(options.template);
+  const listed = template.collectionNames.filter((name) => name !== "pages");
+  const featured = template.featured;
+
+  const reader =
+    options.index === "static"
+      ? `import { openStaticIndex } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-sveltekit";
+import { collections } from "../../../graft.config";
+
+/** Reads the content index that \`graft compile\` writes to .graft/index.db. */
+export const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});`
+      : `// SvelteKit 3 reads only the variables src/env.ts declares, and refuses to
+// start without DATABASE_URL.
+import { DATABASE_URL } from "$app/env/private";
+import { createDb } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-sveltekit";
+import { collections } from "../../../graft.config";
+
+/** Reads the content index in Postgres, where a publish in Studio lands. */
+export const graft = createGraft({ db: createDb(DATABASE_URL).db, collections });`;
+
+  const site = `/**
+ * What the pages need from the content: the collections the site lists, and
+ * each document as an entry with a title and a short line. Safe in the
+ * browser: it reads nothing.
+ */
+import { collections } from "../../graft.config";
+
+export type CollectionName = keyof typeof collections & string;
+
+/** The collections the site lists, in navigation order. */
+export const LISTED: CollectionName[] = ${JSON.stringify(listed)};
+
+export const FEATURED: CollectionName | null = ${featured ? JSON.stringify(featured) : "null"};
+
+export interface Entry {
+  slug: string;
+  title: string;
+  /** The short line under the title: a summary, description or tagline. */
+  line: string | null;
+}
+
+export function isCollection(name: string): name is CollectionName {
+  return Object.hasOwn(collections, name);
+}
+
+export function label(collection: string): string {
+  return collection.charAt(0).toUpperCase() + collection.slice(1);
+}
+`;
+
+  const serverSite = `/**
+ * Reading entries, on the server only: \`src/lib/server/\` never reaches the
+ * browser.
+ */
+import { prepareMdx, type MdxTree } from "@usegraft/sdk-sveltekit/server";
+import type { CollectionName, Entry } from "#lib/site.ts";
+import { graft } from "./graft.ts";
+
+function entry(doc: { slug: string; data: object }): Entry & { data: Record<string, unknown> } {
+  const data = doc.data as Record<string, unknown>;
+  const line = [data.summary, data.description, data.tagline].find(
+    (value): value is string => typeof value === "string" && value.length > 0,
+  );
+  return {
+    slug: doc.slug,
+    title: typeof data.title === "string" ? data.title : doc.slug,
+    line: line ?? null,
+    data,
+  };
+}
+
+/** Newest first when entries have a date, in order when they have one, else by title. */
+function byReadingOrder(a: ReturnType<typeof entry>, b: ReturnType<typeof entry>): number {
+  const date = (e: ReturnType<typeof entry>) =>
+    e.data.date instanceof Date ? e.data.date.getTime() : Date.parse(String(e.data.date ?? ""));
+  if (!Number.isNaN(date(a)) && !Number.isNaN(date(b))) return date(b) - date(a);
+  if (typeof a.data.order === "number" && typeof b.data.order === "number") return a.data.order - b.data.order;
+  if (typeof a.data.year === "number" && typeof b.data.year === "number") return b.data.year - a.data.year;
+  return a.title.localeCompare(b.title);
+}
+
+/** A collection's entries in reading order, with only what a list shows. */
+export async function entries(collection: CollectionName): Promise<Entry[]> {
+  const docs = await graft.listContent(collection);
+  return docs
+    .map(entry)
+    .sort(byReadingOrder)
+    .map(({ slug, title, line }) => ({ slug, title, line }));
+}
+
+/** One entry with its body prepared for MdxContent, or null when there is none. */
+export async function findEntry(
+  collection: CollectionName,
+  slug: string,
+): Promise<(Entry & { body: MdxTree }) | null> {
+  const doc = await graft.getContent(collection, slug);
+  if (!doc) return null;
+  const { title, line } = entry(doc);
+  return { slug, title, line, body: prepareMdx(doc.body, { label: \`\${collection}/\${slug}\` }) };
+}
+`;
+
+  return {
+    "vite.config.ts": `import adapter from "@sveltejs/adapter-node";
+import { sveltekit } from "@sveltejs/kit/vite";
+import { defineConfig } from "vite";
+
+export default defineConfig({ plugins: [sveltekit({ adapter: adapter() })] });
+`,
+    "tsconfig.json": `${JSON.stringify(
+      {
+        extends: "$app/tsconfig",
+        include: ["src", "*"],
+        compilerOptions: { strict: true, noEmit: true, skipLibCheck: true },
+      },
+      null,
+      2,
+    )}\n`,
+    "src/app.html": `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    %sveltekit.head%
+  </head>
+  <body>
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>
+`,
+    "src/app.css": SITE_CSS,
+    "src/lib/site.ts": site,
+    "src/lib/server/graft.ts": `${reader}\n`,
+    "src/lib/server/site.ts": serverSite,
+    "src/routes/+layout.svelte": `<script lang="ts">
+  import type { Snippet } from "svelte";
+  import { LISTED, label } from "#lib/site.ts";
+  import "../app.css";
+
+  let { children }: { children: Snippet } = $props();
+</script>
+
+<svelte:head><title>${options.name}</title></svelte:head>
+
+<div class="site">
+  <nav class="nav">
+    <a href="/">${options.name}</a>
+    {#each LISTED as collection (collection)}
+      <a href="/{collection}">{label(collection)}</a>
+    {/each}
+  </nav>
+  <main>{@render children()}</main>
+</div>
+`,
+    "src/routes/+page.server.ts": `import { FEATURED } from "#lib/site.ts";
+import { entries, findEntry } from "#lib/server/site.ts";
+import type { PageServerLoad } from "./$types";
+
+export const load: PageServerLoad = async () => ({
+  home: await findEntry("pages", "home"),
+  featured: FEATURED ? await entries(FEATURED) : [],
+});
+`,
+    "src/routes/+page.svelte": `<script lang="ts">
+  import { MdxContent } from "@usegraft/sdk-sveltekit/mdx";
+  import { FEATURED } from "#lib/site.ts";
+  import type { PageProps } from "./$types";
+
+  let { data }: PageProps = $props();
+</script>
+
+<h1>{data.home?.title ?? "Welcome"}</h1>
+{#if data.home?.line}<p class="line">{data.home.line}</p>{/if}
+{#if data.home}<MdxContent tree={data.home.body} />{/if}
+{#if data.featured.length > 0}
+  <ul class="list">
+    {#each data.featured as item (item.slug)}
+      <li>
+        <a href="/{FEATURED}/{item.slug}">{item.title}</a>
+        {#if item.line}<p>{item.line}</p>{/if}
+      </li>
+    {/each}
+  </ul>
+{/if}
+`,
+    "src/routes/[collection]/+page.server.ts": `import { error } from "@sveltejs/kit";
+import { isCollection } from "#lib/site.ts";
+import { entries } from "#lib/server/site.ts";
+import type { PageServerLoad } from "./$types";
+
+export const load: PageServerLoad = async ({ params }) => {
+  if (!isCollection(params.collection)) error(404, "No such collection");
+  return { collection: params.collection, items: await entries(params.collection) };
+};
+`,
+    "src/routes/[collection]/+page.svelte": `<script lang="ts">
+  import { label } from "#lib/site.ts";
+  import type { PageProps } from "./$types";
+
+  let { data }: PageProps = $props();
+</script>
+
+<h1>{label(data.collection)}</h1>
+<ul class="list">
+  {#each data.items as item (item.slug)}
+    <li>
+      <a href="/{data.collection}/{item.slug}">{item.title}</a>
+      {#if item.line}<p>{item.line}</p>{/if}
+    </li>
+  {/each}
+</ul>
+`,
+    "src/routes/[collection]/[slug]/+page.server.ts": `import { error } from "@sveltejs/kit";
+import { isCollection } from "#lib/site.ts";
+import { findEntry } from "#lib/server/site.ts";
+import type { PageServerLoad } from "./$types";
+
+export const load: PageServerLoad = async ({ params }) => {
+  if (!isCollection(params.collection)) error(404, "No such collection");
+  const item = await findEntry(params.collection, params.slug);
+  if (!item) error(404, "No such page");
+  return { item };
+};
+`,
+    "src/routes/[collection]/[slug]/+page.svelte": `<script lang="ts">
+  import { MdxContent } from "@usegraft/sdk-sveltekit/mdx";
+  import type { PageProps } from "./$types";
+
+  let { data }: PageProps = $props();
+</script>
+
+<article>
+  <h1>{data.item.title}</h1>
+  {#if data.item.line}<p class="line">{data.item.line}</p>{/if}
+  <MdxContent tree={data.item.body} />
+</article>
+`,
+  };
+}
+
 /** Every file a new site starts with, by path relative to its folder. */
 export function scaffoldFiles(options: ScaffoldOptions): Record<string, string> {
   const template = templateFor(options.template);
@@ -722,5 +1007,9 @@ export function scaffoldFiles(options: ScaffoldOptions): Record<string, string> 
   }
   if (options.framework === "next") Object.assign(files, nextFiles(options));
   if (options.framework === "nuxt") Object.assign(files, nuxtFiles(options));
+  if (options.framework === "sveltekit") {
+    Object.assign(files, sveltekitFiles(options));
+    if (options.index === "postgres") files["src/env.ts"] = SVELTEKIT_ENV;
+  }
   return files;
 }

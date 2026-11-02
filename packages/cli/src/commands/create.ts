@@ -63,10 +63,17 @@ export interface CreateResult {
 
 const DEFAULTS = { template: "blog", framework: "next", edit: "online", database: "new" } as const;
 
+const FRAMEWORKS = ["next", "nuxt", "sveltekit", "none"] as const satisfies readonly Framework[];
+
+function isFramework(name: string): name is Framework {
+  return FRAMEWORKS.some((framework) => framework === name);
+}
+
 /** How the "Wrote a … site" line names each framework. */
 const FRAMEWORK_LABEL: Record<Framework, string> = {
   next: " with Next.js",
   nuxt: " with Nuxt",
+  sveltekit: " with SvelteKit",
   none: "",
 };
 
@@ -210,12 +217,11 @@ export async function createCommand(options: CreateOptions): Promise<CreateResul
   const framework =
     options.framework ??
     (await ask(
-      "Make the website too? next: a Next.js site that shows every collection. nuxt: the same site in Nuxt. none: just the content, for a site you already have.",
-      ["next", "nuxt", "none"],
+      "Make the website too? next: a Next.js site that shows every collection. nuxt or sveltekit: the same site in Nuxt or SvelteKit. none: just the content, for a site you already have.",
+      ["next", "nuxt", "sveltekit", "none"],
       DEFAULTS.framework,
     ));
-  if (framework !== "next" && framework !== "nuxt" && framework !== "none")
-    refuse("framework", framework, ["next", "nuxt", "none"]);
+  if (!isFramework(framework)) refuse("framework", framework, [...FRAMEWORKS]);
 
   const source = edit === "online" ? "database" : "git";
   const index = database === "none" ? "static" : "postgres";

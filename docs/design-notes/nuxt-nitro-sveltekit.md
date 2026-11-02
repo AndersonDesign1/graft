@@ -1,8 +1,9 @@
 # Nuxt, Nitro and SvelteKit adapters (research, 2026-11-01)
 
-**Status: plan agreed. Units 1 to 4 and 6 are built: `@usegraft/sdk-nitro`,
-`@usegraft/sdk-vue`, `@usegraft/sdk-nuxt`, the SvelteKit 2 and 3 compat apps,
-and the Svelte MDX renderer. Unit 5 has `nuxt` in main; `sveltekit` follows.** This note records where each
+**Status: units 1 to 6 are built: `@usegraft/sdk-nitro`, `@usegraft/sdk-vue`,
+`@usegraft/sdk-nuxt`, the SvelteKit 2 and 3 compat apps, `graft create
+--framework nuxt|sveltekit`, and the Svelte MDX renderer. The Nitro
+`graft serve` module waits for Nitro 3 to leave RC.** This note records where each
 framework stands today, what a spike proved, and the order to build in.
 
 Each claim is labeled: **verified** (run in the spike below), **registry**
@@ -263,10 +264,15 @@ The flag accepted `next|none` (`packages/cli/src/registry.ts`,
 `packages/cli/src/create/scaffold.ts`). The plan adds `sveltekit` and `nuxt`,
 each a site that shows every collection, like the Next.js one.
 
-`nuxt` is built: the flag now accepts `next|nuxt|none`. Each template's generated site was built with `nuxi build`
+`nuxt` and `sveltekit` are built: the flag now accepts
+`next|nuxt|sveltekit|none`. Each template's generated site was built with `nuxi build`
 inside the Nuxt 4 compat app, type-checked, served and driven in Chromium.
-`sveltekit` waits for unit 6: the generated site renders every body as MDX,
-and Svelte has no renderer until then, so it moves after the renderer.
+`sveltekit` came after unit 6, because its site renders every body as MDX.
+It generates a SvelteKit 3 site (**verified**): each template's site passed
+`svelte-check`, built, served and navigated in Chromium inside the SvelteKit 3
+compat app. Building it found that SvelteKit 3 also replaced
+`$env/static/private`: a Postgres site declares `DATABASE_URL` in
+`src/env.ts` with `defineEnvVars` and imports it from `$app/env/private`.
 
 ### 6. Svelte MDX renderer
 
