@@ -63,6 +63,13 @@ export interface CreateResult {
 
 const DEFAULTS = { template: "blog", framework: "next", edit: "online", database: "new" } as const;
 
+/** How the "Wrote a … site" line names each framework. */
+const FRAMEWORK_LABEL: Record<Framework, string> = {
+  next: " with Next.js",
+  nuxt: " with Nuxt",
+  none: "",
+};
+
 /** The folder's name as an npm package name: lowercase, no leading dot or dash. */
 export function packageName(dir: string): string {
   const name = basename(dir)
@@ -203,12 +210,12 @@ export async function createCommand(options: CreateOptions): Promise<CreateResul
   const framework =
     options.framework ??
     (await ask(
-      "Make the website too? next: a Next.js site that shows every collection. none: just the content, for a site you already have.",
-      ["next", "none"],
+      "Make the website too? next: a Next.js site that shows every collection. nuxt: the same site in Nuxt. none: just the content, for a site you already have.",
+      ["next", "nuxt", "none"],
       DEFAULTS.framework,
     ));
-  if (framework !== "next" && framework !== "none")
-    refuse("framework", framework, ["next", "none"]);
+  if (framework !== "next" && framework !== "nuxt" && framework !== "none")
+    refuse("framework", framework, ["next", "nuxt", "none"]);
 
   const source = edit === "online" ? "database" : "git";
   const index = database === "none" ? "static" : "postgres";
@@ -252,7 +259,7 @@ export async function createCommand(options: CreateOptions): Promise<CreateResul
     writeFileSync(target, body, path === ".env" ? { mode: 0o600 } : undefined);
   }
   log(
-    `✓ Wrote a ${template} site${framework === "next" ? " with Next.js" : ""} in ${projectDir} (${Object.keys(files).length} files)`,
+    `✓ Wrote a ${template} site${FRAMEWORK_LABEL[framework]} in ${projectDir} (${Object.keys(files).length} files)`,
   );
 
   // ---- the schema, before anything needs it ------------------------------
@@ -288,7 +295,7 @@ export async function createCommand(options: CreateOptions): Promise<CreateResul
 
   const run = (script: string) => (pm === "npm" ? `npm run ${script}` : `${pm} ${script}`);
   next.push(
-    framework === "next" ? `${run("dev")}   (the site, at http://localhost:3000)` : run("dev"),
+    framework === "none" ? run("dev") : `${run("dev")}   (the site, at http://localhost:3000)`,
   );
   next.push(`${run("studio")}   (Studio, the editor, at http://localhost:4983)`);
   const where = options.dir === "." ? "" : `cd ${options.dir}`;

@@ -188,10 +188,10 @@ export const COMMANDS: readonly CommandSpec[] = [
       {
         name: "framework",
         type: "string",
-        value: "next|none",
+        value: "next|nuxt|none",
         example: "next",
         summary:
-          "next for a Next.js site that shows every collection (default); none for only the content",
+          "next for a Next.js site that shows every collection (default); nuxt for the same site in Nuxt; none for only the content",
       },
       {
         name: "yes",
