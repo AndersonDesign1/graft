@@ -83,7 +83,8 @@ export const graft = createGraft({ db, collections });
 
   It also replaced `$env/static/private`. Declare `DATABASE_URL` in
   `src/env.ts` with `defineEnvVars` from `@sveltejs/kit/env`, and import it
-  from `$app/env/private`. `graft create --framework sveltekit` writes both.
+  from `$app/env/private`. `graft create --framework sveltekit` writes both
+  for a site on Postgres.
 </Callout>
 
 Static index instead of Postgres:

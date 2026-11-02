@@ -35,3 +35,19 @@ describe("the SvelteKit site", () => {
     expect(sources).not.toContain("$lib");
   });
 });
+
+describe("AGENTS.md", () => {
+  it("says a static site compiles content once, and a Postgres site reads it live", () => {
+    for (const framework of ["next", "nuxt", "sveltekit"] as const) {
+      const staticSite = scaffoldFiles({ ...base, framework })["AGENTS.md"];
+      expect(staticSite, framework).toContain(
+        "run `npx graft compile` after editing a content file",
+      );
+      expect(staticSite, framework).not.toContain("recompiling");
+      const live = scaffoldFiles({ ...base, framework, source: "database", index: "postgres" })[
+        "AGENTS.md"
+      ];
+      expect(live, framework).toContain("a publish in Studio shows on the next page load");
+    }
+  });
+});

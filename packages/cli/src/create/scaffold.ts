@@ -90,6 +90,16 @@ function siteLine(framework: Framework): string {
   return "";
 }
 
+/** What `npm run dev` does, as AGENTS.md says it. */
+function devLine(options: ScaffoldOptions): string {
+  if (options.framework === "none") return "recompile content as it changes";
+  // The site's dev script compiles once, at start. A static site reads the
+  // file that compile writes; a Postgres site reads what Studio publishes.
+  return options.index === "static"
+    ? "the site at http://localhost:3000. It compiles content once at start: run `npx graft compile` after editing a content file"
+    : "the site at http://localhost:3000, reading content from the database, so a publish in Studio shows on the next page load";
+}
+
 function agentsMd(options: ScaffoldOptions): string {
   const template = templateFor(options.template);
   const online = options.source === "database";
@@ -107,7 +117,7 @@ anything: https://graft.page/start.md
 ${siteLine(options.framework)}
 ## Commands
 
-- \`${run("dev")}\`: ${options.framework === "none" ? "recompile content as it changes" : "the site at http://localhost:3000, recompiling content as it changes"}.
+- \`${run("dev")}\`: ${devLine(options)}.
 - \`${run("studio")}\`: Studio, the editor, at http://localhost:4983.
 - \`npx graft doctor\`: what is set up and the one thing to do next.
 - \`npx graft check\`: check every content file against the schema.
