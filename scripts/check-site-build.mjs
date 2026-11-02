@@ -22,7 +22,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { authoredRoutesFromIndex, expectedStaticFiles } from "./site-routes.mjs";
+import { authoredRoutesFromIndex, destinationRoutes, expectedStaticFiles } from "./site-routes.mjs";
 
 const SITE = "examples/docs-site";
 const OUT = join(SITE, ".vercel", "output");
@@ -116,27 +116,7 @@ try {
   config = { routes: [] };
 }
 
-/**
- * Routes that can actually answer a request, which is not all of them.
- *
- * The generated config ends with `{"src":"^/.*$","dest":"_render","status":404}`
- * — a catch-all whose entire job is to serve the 404 page. Matching against the
- * raw list therefore says every conceivable path resolves, and the first version
- * of this file did exactly that: it reported "no dead internal links" while
- * checking nothing, because every link matched the catch-all. A check that
- * cannot fail is worse than no check, since it also reports success.
- *
- * So two kinds are dropped. `status >= 400` is a route that answers with an
- * error, and `continue: true` is a route that only attaches headers and hands
- * the request onward — neither is a destination.
- */
-const routes = (Array.isArray(config.routes) ? config.routes : []).filter(
-  (r) =>
-    typeof r.src === "string" &&
-    r.continue !== true &&
-    !(typeof r.status === "number" && r.status >= 400) &&
-    (r.dest !== undefined || r.headers?.Location !== undefined),
-);
+const routes = destinationRoutes(config.routes);
 
 const routed = (path) =>
   routes.some((r) => {

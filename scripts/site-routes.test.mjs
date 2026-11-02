@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { authoredRoutesFromIndex, expectedStaticFiles } from "./site-routes.mjs";
+import { authoredRoutesFromIndex, destinationRoutes, expectedStaticFiles } from "./site-routes.mjs";
 
 const dir = mkdtempSync(join(tmpdir(), "graft-site-routes-"));
 const dbPath = join(dir, "index.db");
@@ -89,5 +89,32 @@ describe("expectedStaticFiles", () => {
       () => expectedStaticFiles({ docs: ["guides/install/quickstart"], pages: [] }),
       /not kebab-case/,
     );
+  });
+});
+
+describe("destinationRoutes", () => {
+  // The routes the docs site's build writes, trimmed to the ones that matter.
+  const config = [
+    { src: "^/docs/([a-z0-9-]+)/?$", headers: { Vary: "Accept" }, continue: true },
+    {
+      src: "^/docs/([a-z0-9-]+)/?$",
+      has: [{ type: "header", key: "accept", value: ".*text/markdown.*" }],
+      dest: "/docs/$1.md",
+      check: true,
+    },
+    { src: "^/docs$", headers: { Location: "/docs/what-is-graft" }, status: 301 },
+    { src: "^/api/search/?$", dest: "_render" },
+    { src: "^/.*$", dest: "_render", status: 404 },
+  ];
+  const routed = (path) => destinationRoutes(config).some((r) => new RegExp(r.src).test(path));
+
+  it("keeps redirects and function routes", () => {
+    assert.equal(routed("/docs"), true);
+    assert.equal(routed("/api/search"), true);
+  });
+
+  it("never vouches for a docs slug through the markdown rewrite or the 404 catch-all", () => {
+    assert.equal(routed("/docs/functions"), false);
+    assert.equal(routed("/anything"), false);
   });
 });
