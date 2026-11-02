@@ -207,7 +207,8 @@ try {
   const unsafeMain = unsafe.slice(unsafe.indexOf("<main>"), unsafe.indexOf("</main>"));
   check(
     unsafeMain.includes('<p class="kept">Safe text.</p>') &&
-      !/<script|onclick|<b>raw/.test(unsafeMain),
+      // Case-insensitive, so <SCRIPT> or onClick would fail the check too.
+      !["<script", "onclick", "<b>raw"].some((piece) => unsafeMain.toLowerCase().includes(piece)),
     "a hand-built tree renders without its script, handler or raw HTML",
   );
 
