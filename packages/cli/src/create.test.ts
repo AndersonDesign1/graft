@@ -44,7 +44,7 @@ function fakeFetch(answers: Array<{ status: number; body: unknown }>): typeof fe
 
 describe("graft create, with the content in git and no database", () => {
   for (const template of TEMPLATE_NAMES) {
-    for (const framework of ["next", "none"] as const) {
+    for (const framework of ["next", "nuxt", "none"] as const) {
       it(`makes a ${template} site (${framework}) whose content compiles`, async () => {
         const dir = join(root, `${template}-${framework}`);
         const installs: string[] = [];
@@ -65,6 +65,9 @@ describe("graft create, with the content in git and no database", () => {
         expect(result.files.includes("app/[collection]/[slug]/page.tsx")).toBe(
           framework === "next",
         );
+        expect(result.files.includes("app/pages/[collection]/[slug].vue")).toBe(
+          framework === "nuxt",
+        );
 
         const config = readFileSync(join(dir, "graft.config.ts"), "utf8");
         expect(config).toContain('export const index = "static"');
@@ -72,6 +75,8 @@ describe("graft create, with the content in git and no database", () => {
         const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
         expect(pkg.dependencies["@usegraft/core"]).toMatch(/^\d/);
         expect(Boolean(pkg.dependencies.next)).toBe(framework === "next");
+        expect(Boolean(pkg.dependencies.nuxt)).toBe(framework === "nuxt");
+        expect(Boolean(pkg.dependencies["@usegraft/sdk-nuxt"])).toBe(framework === "nuxt");
 
         // Compiled during create: the index exists and doctor has nothing to add.
         expect(existsSync(join(dir, ".graft", "index.db"))).toBe(true);
