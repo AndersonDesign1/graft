@@ -5,7 +5,6 @@
   "description": "A real SvelteKit 3.1.1 app that runs @usegraft/sdk-sveltekit. See ../smoke.mjs.",
   "type": "module",
   "imports": {
-    "#lib": "./src/lib",
     "#lib/*": "./src/lib/*"
   },
   "scripts": {

@@ -133,8 +133,16 @@ const server = spawn("node build", {
 });
 
 function stop() {
-  if (process.platform === "win32") spawnSync(`taskkill /pid ${server.pid} /T /F`, { shell: true });
-  else process.kill(-server.pid, "SIGTERM");
+  if (process.platform === "win32") {
+    spawnSync(`taskkill /pid ${server.pid} /T /F`, { shell: true });
+    return;
+  }
+  try {
+    process.kill(-server.pid, "SIGTERM");
+  } catch (error) {
+    // Already gone: the server died on its own, and the checks above say why.
+    if (error?.code !== "ESRCH") throw error;
+  }
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

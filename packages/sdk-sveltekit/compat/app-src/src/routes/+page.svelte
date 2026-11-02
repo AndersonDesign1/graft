@@ -6,7 +6,7 @@
 
 <ul>
   {#each data.pages as page (page.slug)}
-    <li><a href="/{page.slug}">{page.data.title}</a></li>
+    <li><a href="/{page.slug}">{page.title}</a></li>
   {/each}
 </ul>
 <p>hits:{data.hits.join(",")}</p>

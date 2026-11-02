@@ -72,7 +72,7 @@ export const graft = createGraft({ db, collections });
 
 <Callout label="On SvelteKit 3, import with #lib" type="note">
   SvelteKit 3 removed `$lib`. Map `#lib` in `package.json` instead, with
-  `"imports": { "#lib": "./src/lib", "#lib/*": "./src/lib/*" }`, and write
+  `"imports": { "#lib/*": "./src/lib/*" }`, and write
   each `$lib/server/graft` import on this page as `#lib/server/graft.ts`. The
   file stays in `src/lib/server/`, which SvelteKit still keeps out of the
   browser.
@@ -274,10 +274,10 @@ your CDN expects.
 
 ## Supported versions
 
-The adapter supports SvelteKit 2 and SvelteKit 3. CI builds a real SvelteKit 2
-app and a real SvelteKit 3 app on every pull request, type-checks the client,
-the reads and `graftRoute` from this page against each one, serves the build,
-and drives it in Chromium.
+The adapter supports SvelteKit 2 and SvelteKit 3. SvelteKit 3 needs Node 22.17
+or newer. CI builds a real SvelteKit 2 app and a real SvelteKit 3 app on every
+pull request, type-checks the static-index client, the reads and `graftRoute`
+against each one, serves the build, and drives it in Chromium.
 
 `graftRoute` takes any event with a `request`, so the adapter does not depend
 on `@sveltejs/kit` and needs no change between majors.
