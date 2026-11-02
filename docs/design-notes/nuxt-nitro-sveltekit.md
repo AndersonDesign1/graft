@@ -1,7 +1,7 @@
 # Nuxt, Nitro and SvelteKit adapters (research, 2026-11-01)
 
-**Status: plan agreed. Units 1 to 3 are built: `@usegraft/sdk-nitro`, `@usegraft/sdk-vue`
-and `@usegraft/sdk-nuxt`.** This note records where each
+**Status: plan agreed. Units 1 to 4 are built: `@usegraft/sdk-nitro`, `@usegraft/sdk-vue`,
+`@usegraft/sdk-nuxt`, and the SvelteKit 2 and 3 compat apps.** This note records where each
 framework stands today, what a spike proved, and the order to build in.
 
 Each claim is labeled: **verified** (run in the spike below), **registry**
@@ -244,6 +244,17 @@ What building it found (verified in the compat apps under `packages/sdk-nuxt/com
 A compat app pinned to SvelteKit 3, like `packages/sdk-next/compat`, so a
 SvelteKit release that breaks the mount fails CI instead of a user. The
 README and docs page then say SvelteKit 3 is supported.
+
+Built as `packages/sdk-sveltekit/compat`, with a SvelteKit 2 app beside the
+SvelteKit 3 one. Building it found what the type-only spike could not
+(**verified**):
+
+- SvelteKit 3 removed `$lib`. Imports go through a package.json subpath
+  import, `#lib/*`, and TypeScript only resolves those with the file extension
+  written, so the guide's `$lib/server/graft` becomes `#lib/server/graft.ts`.
+- SvelteKit 3 refuses a `svelte.config.js`; its options go to the
+  `sveltekit()` Vite plugin, and its tsconfig extends `$app/tsconfig`.
+- `graftRoute` and the read API needed no change on either major.
 
 ### 5. `graft create --framework sveltekit|nuxt`
 

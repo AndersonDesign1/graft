@@ -14,6 +14,8 @@ npm i @usegraft/sdk-sveltekit
 
 Build the handle in `$lib/server/`, so SvelteKit's server-only enforcement guards it. This client holds a database handle and must never reach the browser.
 
+On SvelteKit 3, which removed `$lib`, map `"#lib/*": "./src/lib/*"` under `imports` in `package.json` and import `#lib/server/graft.ts` instead. The adapter supports SvelteKit 2 and 3 (which needs Node 22.17 or newer), and CI runs a real app on each.
+
 ```ts
 // src/lib/server/graft.ts
 import { DATABASE_URL } from "$env/static/private";

@@ -1,0 +1,35 @@
+{
+  "name": "sdk-sveltekit-compat-kit3",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A real SvelteKit 3.1.1 app that runs @usegraft/sdk-sveltekit. See ../smoke.mjs.",
+  "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  },
+  "scripts": {
+    "smoke": "node ../smoke.mjs --port 3133"
+  },
+  "dependencies": {
+    "@usegraft/content-api": "workspace:*",
+    "@usegraft/core": "workspace:*",
+    "@usegraft/db": "workspace:*",
+    "@usegraft/sdk-sveltekit": "workspace:*"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-node": "6.0.1",
+    "@sveltejs/kit": "3.1.1",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@usegraft/cli": "workspace:*",
+    "playwright": "1.63.0",
+    "svelte": "5.57.3",
+    "svelte-check": "4.7.7",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "vite": "8.3.5"
+  },
+  "dependenciesMeta": {
+    "@usegraft/sdk-sveltekit": {
+      "injected": true
+    }
+  }
+}

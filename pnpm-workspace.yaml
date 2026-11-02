@@ -4,6 +4,8 @@ packages:
   - "packages/sdk-next/compat/*"
   # Real Nuxt 4 and Nuxt 5 apps that run @usegraft/sdk-nuxt (see its compat/).
   - "packages/sdk-nuxt/compat/*"
+  # Real SvelteKit 2 and 3 apps that run @usegraft/sdk-sveltekit (see its compat/).
+  - "packages/sdk-sveltekit/compat/*"
   - "examples/*"
   - "deploy/docker/project"
 
