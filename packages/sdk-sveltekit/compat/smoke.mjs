@@ -203,6 +203,14 @@ try {
   );
   check(/<table>[\s\S]*<td>static<\/td>/.test(body), "a GFM table renders");
 
+  const unsafe = withoutComments(await (await fetch(`${base}/unsafe`)).text());
+  const unsafeMain = unsafe.slice(unsafe.indexOf("<main>"), unsafe.indexOf("</main>"));
+  check(
+    unsafeMain.includes('<p class="kept">Safe text.</p>') &&
+      !/<script|onclick|<b>raw/.test(unsafeMain),
+    "a hand-built tree renders without its script, handler or raw HTML",
+  );
+
   check((await fetch(`${base}/nope`)).status === 404, "a missing slug is a 404");
 
   const index = await (await fetch(`${base}/`)).text();

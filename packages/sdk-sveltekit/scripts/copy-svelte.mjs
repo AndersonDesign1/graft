@@ -3,4 +3,7 @@
 import { cpSync, mkdirSync } from "node:fs";
 
 mkdirSync("dist/mdx", { recursive: true });
-cpSync("src/mdx", "dist/mdx", { recursive: true });
+cpSync("src/mdx", "dist/mdx", {
+  recursive: true,
+  filter: (source) => !/\.test\.[jt]s$/.test(source),
+});
