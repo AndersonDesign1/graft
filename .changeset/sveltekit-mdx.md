@@ -14,7 +14,8 @@ server and when the page hydrates:
 
 The body is never evaluated, so `{expressions}`, `import`, `export` and spread
 attributes are refused under every trust level, along with `<script>`-like
-elements and `on…` handlers. Script URLs are dropped unless you pass
+elements, `on…` handlers and the `innerHTML`, `outerHTML` and
+`dangerouslySetInnerHTML` attributes. Script URLs are dropped unless you pass
 `{ trust: "full" }`. Svelte 5 is an optional peer, needed only for
 `MdxContent`.
 

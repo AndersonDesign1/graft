@@ -57,6 +57,15 @@ describe("prepareMdx", () => {
     expect(div).toMatchObject({ type: "element", tag: "div", props: { class: "box", for: "x" } });
   });
 
+  it("gives an HTML void element written as JSX no content, as HTML would", () => {
+    const [paragraph] = blocks(prepareMdx("a <br>lost</br> b"));
+    expect(paragraph).toMatchObject({
+      type: "element",
+      tag: "p",
+      children: [text("a "), { type: "element", tag: "br", props: {}, children: [] }, text(" b")],
+    });
+  });
+
   it("puts a fragment's children in its place", () => {
     const [paragraph] = blocks(prepareMdx("<>\n\nInside\n\n</>"));
     expect(paragraph).toMatchObject({ type: "element", tag: "p", children: [text("Inside")] });

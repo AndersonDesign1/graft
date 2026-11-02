@@ -69,6 +69,23 @@ export interface PrepareMdxOptions {
 
 const MDX_ELEMENTS = new Set(["mdxJsxFlowElement", "mdxJsxTextElement"]);
 
+/** HTML elements that cannot hold content. `<br>text</br>` written as JSX loses the text. */
+const VOID = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "source",
+  "track",
+  "wbr",
+]);
+
 /** Keep MDX's JSX elements in the HTML tree; this file turns them into nodes. */
 const TO_HAST: ToHastOptions = { passThrough: ["mdxJsxFlowElement", "mdxJsxTextElement"] };
 
@@ -168,7 +185,12 @@ function convert(nodes: TreeNode[] | undefined): MdxNode[] {
       const intrinsic = /^[a-z]/.test(node.name) && !node.name.includes(".");
       out.push(
         intrinsic
-          ? { type: "element", tag: node.name, props: jsxProps(node, true), children }
+          ? {
+              type: "element",
+              tag: node.name,
+              props: jsxProps(node, true),
+              children: VOID.has(node.name) ? [] : children,
+            }
           : { type: "component", name: node.name, props: jsxProps(node, false), children },
       );
     }

@@ -143,7 +143,7 @@ export const load: PageServerLoad = async ({ params }) => {
 ```svelte
 <script lang="ts">
   import { MdxContent } from "@usegraft/sdk-sveltekit/mdx";
-  import Callout from "$lib/Callout.svelte";
+  import Callout from "../../lib/Callout.svelte";
   import type { PageProps } from "./$types";
 
   let { data }: PageProps = $props();
@@ -157,17 +157,21 @@ export const load: PageServerLoad = async ({ params }) => {
 
 The tree is plain data, so it reaches the page in SvelteKit's own page data
 and renders the same on the server and when the page hydrates. A component
-receives the content between its tags as its `children` snippet. One the body
-names that `components` lacks renders its content without the wrapper. The
-parser stays on the server: `@usegraft/sdk-sveltekit/server` is for `load`
-functions and `+server.ts` routes only.
+receives the content between its tags as its `children` snippet. If the body
+names a component that `components` does not have, its content still renders,
+without the component around it. The parser stays on the server:
+`@usegraft/sdk-sveltekit/server` is for `load` functions and `+server.ts`
+routes only.
 
 Svelte has no JSX runtime, so this renderer never evaluates the body. That
 makes it stricter than `MdxBody` in Next.js: `{expressions}`, `import`,
 `export` and spread attributes are refused with `INPUT_VALIDATION_FAILED`
-under every trust level, along with `<script>`-like elements and `on…`
-handlers. Links with a script URL are dropped unless you pass
-`{ trust: "full" }`. See [MDX safety](/docs/mdx-safety).
+under every trust level, along with `<script>`-like elements, `on…` handlers
+and `innerHTML`-style attributes. A refused body makes `prepareMdx` throw, and
+the `load` answers 500 unless you catch it. `graft compile` refuses the same
+constructs unless the project sets `mdxTrust = "full"`, so this only comes up
+with full trust. Links with a script URL are dropped unless you call
+`prepareMdx(page.body, { trust: "full" })`. See [MDX safety](/docs/mdx-safety).
 
 ## Serve functions and MCP from your app
 

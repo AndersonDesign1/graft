@@ -267,6 +267,12 @@ try {
       "MdxContent renders the next body in the browser",
     );
     check(
+      withoutComments(await page.innerHTML("main")).includes(
+        '<aside class="callout callout-empty">No content.</aside>',
+      ),
+      "a component with no content gets no children, so its own fallback shows",
+    );
+    check(
       logged.length === 0,
       `no warnings or errors in the console${logged.length ? `: ${logged.join(" | ")}` : ""}`,
     );

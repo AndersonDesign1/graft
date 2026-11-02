@@ -9,6 +9,8 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
   const page = await graft.getContent("pages", params.slug);
   if (!page) error(404);
   setHeaders({ "Cache-Tag": tagsFor("main", "pages", params.slug).join(",") });
-  // The body as a tree MdxContent renders; it travels in the page data.
-  return { page, body: prepareMdx(page.body, { label: `pages/${params.slug}` }) };
+  // The body as a tree MdxContent renders, in place of its source: what a
+  // load returns is sent to the browser.
+  const { body, ...rest } = page;
+  return { page: rest, body: prepareMdx(body, { label: `pages/${params.slug}` }) };
 };

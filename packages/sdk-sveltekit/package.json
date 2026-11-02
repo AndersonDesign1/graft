@@ -47,7 +47,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts src/server.ts --format esm --dts --clean && node scripts/copy-svelte.mjs",
-    "dev": "tsup src/index.ts src/server.ts --format esm --watch",
+    "dev": "node scripts/copy-svelte.mjs && tsup src/index.ts src/server.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
