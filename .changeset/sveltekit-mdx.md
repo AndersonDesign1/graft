@@ -1,5 +1,5 @@
 ---
-"@usegraft/sdk-sveltekit": patch
+"@usegraft/sdk-sveltekit": minor
 "@usegraft/mcp": patch
 ---
 
