@@ -1,7 +1,7 @@
 /**
  * The files `graft create` writes: the schema and example content from a
  * template, an AGENTS.md for whoever opens the folder next, and, for a Next.js
- * site, a small app that lists and renders every collection.
+ * or Nuxt site, a small app that lists and renders every collection.
  *
  * Pure: it returns paths and contents, and the command writes them. That is
  * what lets the tests check every template compiles without a disk or a
@@ -10,7 +10,7 @@
 import { barrelSource } from "@usegraft/registry";
 import { templateFor, type TemplateName } from "./templates";
 
-export type Framework = "next" | "none";
+export type Framework = "next" | "nuxt" | "none";
 
 export interface ScaffoldOptions {
   /** The package name, from the folder. */
@@ -27,6 +27,9 @@ export interface ScaffoldOptions {
 
 const NEXT_VERSION = "^16.0.0";
 const REACT_VERSION = "^19.0.0";
+// `nuxt/server`, which the Graft module's server code imports, arrived in 4.6.0.
+const NUXT_VERSION = "^4.6.0";
+const VUE_VERSION = "^3.5.0";
 
 function configSource(options: ScaffoldOptions): string {
   const template = templateFor(options.template);
@@ -65,6 +68,15 @@ export const { collections, functions } = mergePrimitives([
 `;
 }
 
+function siteLine(framework: Framework): string {
+  if (framework === "next")
+    return "- `app/`: the Next.js site. `lib/graft.ts` reads the content.\n";
+  if (framework === "nuxt") {
+    return "- `app/`: the Nuxt site. `@usegraft/sdk-nuxt` in `nuxt.config.ts` reads the content, and `server/api/mdx/` compiles each body.\n";
+  }
+  return "";
+}
+
 function agentsMd(options: ScaffoldOptions): string {
   const template = templateFor(options.template);
   const online = options.source === "database";
@@ -79,10 +91,10 @@ anything: https://graft.page/start.md
 
 - \`graft.config.ts\`: the schema. Collections: ${template.collectionNames.map((name) => `\`${name}\``).join(", ")}.
 - ${online ? "Content is kept in the database and edited in Studio. Files under `content/` are a copy: `npx graft pull` refreshes them and `npx graft push` publishes your changes." : "`content/<collection>/<slug>.mdx`: one file per document. Git is the history."}
-${options.framework === "next" ? "- `app/`: the Next.js site. `lib/graft.ts` reads the content.\n" : ""}
+${siteLine(options.framework)}
 ## Commands
 
-- \`${run("dev")}\`: ${options.framework === "next" ? "the site at http://localhost:3000, recompiling content as it changes" : "recompile content as it changes"}.
+- \`${run("dev")}\`: ${options.framework === "none" ? "recompile content as it changes" : "the site at http://localhost:3000, recompiling content as it changes"}.
 - \`${run("studio")}\`: Studio, the editor, at http://localhost:4983.
 - \`npx graft doctor\`: what is set up and the one thing to do next.
 - \`npx graft check\`: check every content file against the schema.
@@ -103,60 +115,168 @@ function gitignore(options: ScaffoldOptions): string {
     "# Derived: `graft compile` rebuilds it, and the free database's claim details.",
     ".graft/",
     ...(options.framework === "next" ? [".next/", "next-env.d.ts"] : []),
+    ...(options.framework === "nuxt" ? [".nuxt/", ".output/"] : []),
     "",
   ].join("\n");
 }
 
+/** The stylesheet every generated site starts with: plain CSS, light and dark. */
+const SITE_CSS = `:root {
+  color-scheme: light dark;
+  --paper: #fdfcfb;
+  --ink: #1b1a16;
+  --muted: #5c5a52;
+  --line: rgb(27 26 22 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0e0d0c;
+    --ink: #f2f2ef;
+    --muted: #bcbcb9;
+    --line: rgb(242 242 239 / 0.14);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 17px/1.7 system-ui, sans-serif;
+}
+
+.site {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 0 1rem 4rem;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 2.5rem;
+}
+
+.nav a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.nav a:first-child {
+  color: var(--ink);
+  font-weight: 600;
+  margin-right: auto;
+}
+
+h1 {
+  font-size: 2.25rem;
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+}
+
+.line {
+  color: var(--muted);
+  margin: 0 0 2rem;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 2rem 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.list li {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.list a {
+  color: inherit;
+  font-weight: 600;
+}
+
+.list p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+`;
+
+/** Each framework's scripts and dependencies, on top of the ones every site has. */
+interface FrameworkPackage {
+  scripts: Record<string, string>;
+  dependencies: Record<string, string>;
+  devDependencies: Record<string, string>;
+}
+
+function frameworkPackage(options: ScaffoldOptions): FrameworkPackage {
+  const graft = options.graftVersion;
+  if (options.framework === "next") {
+    return {
+      scripts: {
+        dev: "graft compile && next dev",
+        build: "graft compile && next build",
+        start: "next start",
+      },
+      dependencies: {
+        "@usegraft/sdk-next": graft,
+        next: NEXT_VERSION,
+        react: REACT_VERSION,
+        "react-dom": REACT_VERSION,
+      },
+      devDependencies: {
+        "@types/node": "^22.0.0",
+        "@types/react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
+        typescript: "^5.8.0",
+      },
+    };
+  }
+  if (options.framework === "nuxt") {
+    return {
+      scripts: {
+        dev: "graft compile && nuxt dev",
+        build: "graft compile && nuxt build",
+        start: "node .output/server/index.mjs",
+      },
+      dependencies: { "@usegraft/sdk-nuxt": graft, nuxt: NUXT_VERSION, vue: VUE_VERSION },
+      devDependencies: {},
+    };
+  }
+  return {
+    scripts: { dev: "graft dev", build: "graft compile" },
+    dependencies: {},
+    devDependencies: {},
+  };
+}
+
 function packageJson(options: ScaffoldOptions): string {
   const graft = options.graftVersion;
-  const next = options.framework === "next";
+  const site = frameworkPackage(options);
   const pkg = {
     name: options.name,
     version: "0.1.0",
     private: true,
     type: "module",
-    scripts: next
-      ? {
-          dev: "graft compile && next dev",
-          build: "graft compile && next build",
-          start: "next start",
-          studio: "graft studio",
-          doctor: "graft doctor",
-        }
-      : {
-          dev: "graft dev",
-          build: "graft compile",
-          studio: "graft studio",
-          doctor: "graft doctor",
-        },
+    scripts: { ...site.scripts, studio: "graft studio", doctor: "graft doctor" },
     dependencies: {
       "@usegraft/core": graft,
       "@usegraft/db": graft,
-      ...(next
-        ? {
-            "@usegraft/sdk-next": graft,
-            next: NEXT_VERSION,
-            react: REACT_VERSION,
-            "react-dom": REACT_VERSION,
-          }
-        : {}),
+      ...site.dependencies,
     },
-    devDependencies: {
-      "@usegraft/cli": graft,
-      ...(next
-        ? {
-            "@types/node": "^22.0.0",
-            "@types/react": "^19.0.0",
-            "@types/react-dom": "^19.0.0",
-            typescript: "^5.8.0",
-          }
-        : {}),
-    },
+    devDependencies: { "@usegraft/cli": graft, ...site.devDependencies },
   };
   return `${JSON.stringify(pkg, null, 2)}\n`;
 }
 
-function nextFiles(options: ScaffoldOptions): Record<string, string> {
+function nextFiles(options: ScaffoldOptions) {
   const template = templateFor(options.template);
   const reader =
     options.index === "static"
@@ -281,93 +401,7 @@ export default withGraft({});
     )}\n`,
     "lib/graft.ts": `${reader}\n`,
     "lib/site.ts": site,
-    "app/globals.css": `:root {
-  color-scheme: light dark;
-  --paper: #fdfcfb;
-  --ink: #1b1a16;
-  --muted: #5c5a52;
-  --line: rgb(27 26 22 / 0.12);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #0e0d0c;
-    --ink: #f2f2ef;
-    --muted: #bcbcb9;
-    --line: rgb(242 242 239 / 0.14);
-  }
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: var(--paper);
-  color: var(--ink);
-  font: 17px/1.7 system-ui, sans-serif;
-}
-
-.site {
-  max-width: 42rem;
-  margin: 0 auto;
-  padding: 0 1rem 4rem;
-}
-
-.nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
-  padding: 1.25rem 0;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 2.5rem;
-}
-
-.nav a {
-  color: var(--muted);
-  text-decoration: none;
-}
-
-.nav a:first-child {
-  color: var(--ink);
-  font-weight: 600;
-  margin-right: auto;
-}
-
-h1 {
-  font-size: 2.25rem;
-  line-height: 1.2;
-  margin: 0 0 0.5rem;
-}
-
-.line {
-  color: var(--muted);
-  margin: 0 0 2rem;
-}
-
-.list {
-  list-style: none;
-  padding: 0;
-  margin: 2rem 0 0;
-  border-top: 1px solid var(--line);
-}
-
-.list li {
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.list a {
-  color: inherit;
-  font-weight: 600;
-}
-
-.list p {
-  margin: 0.25rem 0 0;
-  color: var(--muted);
-}
-`,
+    "app/globals.css": SITE_CSS,
     "app/layout.tsx": `import type { ReactNode } from "react";
 import Link from "next/link";
 import { LISTED, label } from "../lib/site";
@@ -479,6 +513,200 @@ export default async function EntryPage({
   };
 }
 
+function nuxtFiles(options: ScaffoldOptions) {
+  const template = templateFor(options.template);
+  const listed = template.collectionNames.filter((name) => name !== "pages");
+  const featured = template.featured;
+
+  const site = `/**
+ * What the pages need from the content: the collections the site lists, and
+ * each document as an entry with a title, a short line and its fields.
+ */
+import { collections } from "~~/graft.config";
+
+export type CollectionName = keyof typeof collections & string;
+
+/** The collections the site lists, in navigation order. */
+export const LISTED: CollectionName[] = ${JSON.stringify(listed)};
+
+export interface Entry {
+  slug: string;
+  title: string;
+  /** The short line under the title: a summary, description or tagline. */
+  line: string | null;
+  data: Record<string, unknown>;
+}
+
+export function isCollection(name: string): name is CollectionName {
+  return Object.hasOwn(collections, name);
+}
+
+export function entry(doc: { slug: string; data: object }): Entry {
+  const data = doc.data as Record<string, unknown>;
+  const line = [data.summary, data.description, data.tagline].find(
+    (value): value is string => typeof value === "string" && value.length > 0,
+  );
+  return {
+    slug: doc.slug,
+    title: typeof data.title === "string" ? data.title : doc.slug,
+    line: line ?? null,
+    data,
+  };
+}
+
+/** Newest first when entries have a date, in order when they have one, else by title. */
+export function byReadingOrder(a: Entry, b: Entry): number {
+  const date = (e: Entry) => (e.data.date instanceof Date ? e.data.date.getTime() : Date.parse(String(e.data.date ?? "")));
+  if (!Number.isNaN(date(a)) && !Number.isNaN(date(b))) return date(b) - date(a);
+  if (typeof a.data.order === "number" && typeof b.data.order === "number") return a.data.order - b.data.order;
+  if (typeof a.data.year === "number" && typeof b.data.year === "number") return b.data.year - a.data.year;
+  return a.title.localeCompare(b.title);
+}
+
+export function label(collection: string): string {
+  return collection.charAt(0).toUpperCase() + collection.slice(1);
+}
+`;
+
+  const featuredScript = featured
+    ? `
+const { data: featured } = await useGraftList(${JSON.stringify(featured)});
+const items = computed(() => (featured.value ?? []).map(entry).sort(byReadingOrder));`
+    : "";
+  const featuredList = featured
+    ? `
+  <ul v-if="items.length > 0" class="list">
+    <li v-for="item in items" :key="item.slug">
+      <NuxtLink :to="\`/${featured}/\${item.slug}\`">{{ item.title }}</NuxtLink>
+      <p v-if="item.line">{{ item.line }}</p>
+    </li>
+  </ul>`
+    : "";
+
+  return {
+    "nuxt.config.ts": `export default defineNuxtConfig({
+  compatibilityDate: "2026-10-01",
+  modules: ["@usegraft/sdk-nuxt"],
+  // The page composables read through the content API.
+  graft: { contentApi: true },
+  css: ["~/assets/site.css"],
+  app: { head: { title: ${JSON.stringify(options.name)} } },
+});
+`,
+    "tsconfig.json": `${JSON.stringify(
+      {
+        files: [],
+        references: [
+          { path: "./.nuxt/tsconfig.app.json" },
+          { path: "./.nuxt/tsconfig.server.json" },
+          { path: "./.nuxt/tsconfig.shared.json" },
+          { path: "./.nuxt/tsconfig.node.json" },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+    "app/assets/site.css": SITE_CSS,
+    "app/lib/site.ts": site,
+    "app/app.vue": `<script setup lang="ts">
+import { LISTED, label } from "~/lib/site";
+</script>
+
+<template>
+  <div class="site">
+    <nav class="nav">
+      <NuxtLink to="/">${options.name}</NuxtLink>
+      <NuxtLink v-for="collection in LISTED" :key="collection" :to="\`/\${collection}\`">
+        {{ label(collection) }}
+      </NuxtLink>
+    </nav>
+    <main><NuxtPage /></main>
+  </div>
+</template>
+`,
+    "app/pages/index.vue": `<script setup lang="ts">
+import { byReadingOrder, entry } from "~/lib/site";
+
+const { data: home } = await useGraftContent("pages", "home");
+const page = computed(() => (home.value ? entry(home.value) : null));
+const { data: mdx } = await useFetch("/api/mdx/pages/home");${featuredScript}
+</script>
+
+<template>
+  <h1>{{ page?.title ?? "Welcome" }}</h1>
+  <p v-if="page?.line" class="line">{{ page.line }}</p>
+  <GraftMdx v-if="page && mdx" :code="mdx.code" />${featuredList}
+</template>
+`,
+    "app/pages/[collection]/index.vue": `<script setup lang="ts">
+import { byReadingOrder, entry, isCollection, label } from "~/lib/site";
+
+const route = useRoute();
+const collection = String(route.params.collection);
+if (!isCollection(collection)) {
+  throw createError({ statusCode: 404, statusMessage: "No such collection" });
+}
+const { data } = await useGraftList(collection);
+const items = computed(() => (data.value ?? []).map(entry).sort(byReadingOrder));
+</script>
+
+<template>
+  <h1>{{ label(collection) }}</h1>
+  <ul class="list">
+    <li v-for="item in items" :key="item.slug">
+      <NuxtLink :to="\`/\${collection}/\${item.slug}\`">{{ item.title }}</NuxtLink>
+      <p v-if="item.line">{{ item.line }}</p>
+    </li>
+  </ul>
+</template>
+`,
+    "app/pages/[collection]/[slug].vue": `<script setup lang="ts">
+import { entry, isCollection } from "~/lib/site";
+
+const route = useRoute();
+const collection = String(route.params.collection);
+const slug = String(route.params.slug);
+if (!isCollection(collection)) {
+  throw createError({ statusCode: 404, statusMessage: "No such collection" });
+}
+const { data: doc, error } = await useGraftContent(collection, slug);
+if (error.value) throw error.value;
+if (!doc.value) throw createError({ statusCode: 404, statusMessage: "No such page" });
+const item = computed(() => (doc.value ? entry(doc.value) : null));
+const { data: mdx } = await useFetch(\`/api/mdx/\${collection}/\${slug}\`);
+</script>
+
+<template>
+  <article v-if="item">
+    <h1>{{ item.title }}</h1>
+    <p v-if="item.line" class="line">{{ item.line }}</p>
+    <GraftMdx v-if="mdx" :code="mdx.code" />
+  </article>
+</template>
+`,
+    "server/api/mdx/[collection]/[slug].get.ts": `/**
+ * A document's MDX body, compiled on the server for <GraftMdx> to render.
+ * \`useGraft\` and \`prepareMdx\` come from @usegraft/sdk-nuxt.
+ */
+import { createError, defineEventHandler, getRouterParam } from "nuxt/server";
+import { collections } from "~~/graft.config";
+
+const isCollection = (name: string): name is keyof typeof collections & string =>
+  Object.hasOwn(collections, name);
+
+export default defineEventHandler(async (event) => {
+  const collection = getRouterParam(event, "collection") ?? "";
+  const slug = getRouterParam(event, "slug") ?? "";
+  if (!isCollection(collection)) throw createError({ statusCode: 404 });
+  const graft = await useGraft();
+  const doc = await graft.getContent(collection, slug);
+  if (!doc) throw createError({ statusCode: 404 });
+  return { code: await prepareMdx(doc.body) };
+});
+`,
+  };
+}
+
 /** Every file a new site starts with, by path relative to its folder. */
 export function scaffoldFiles(options: ScaffoldOptions): Record<string, string> {
   const template = templateFor(options.template);
@@ -493,5 +721,6 @@ export function scaffoldFiles(options: ScaffoldOptions): Record<string, string> 
     files[`content/${path}`] = body;
   }
   if (options.framework === "next") Object.assign(files, nextFiles(options));
+  if (options.framework === "nuxt") Object.assign(files, nuxtFiles(options));
   return files;
 }

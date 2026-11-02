@@ -263,6 +263,11 @@ Today the flag accepts `next|none` (`packages/cli/src/registry.ts`,
 site that shows every collection, like the Next.js one. Rebuild the CLI and
 run `pnpm docs:cli` afterwards.
 
+`nuxt` is built. Each template's generated site was built with `nuxi build`
+inside the Nuxt 4 compat app, type-checked, served and driven in Chromium.
+`sveltekit` waits for unit 6: the generated site renders every body as MDX,
+and Svelte has no renderer until then, so it moves after the renderer.
+
 ### 6. Svelte MDX renderer
 
 Svelte has no JSX runtime, and mdsvex is a different dialect, not MDX. Compile
