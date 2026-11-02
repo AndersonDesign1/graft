@@ -25,7 +25,7 @@ change until you pass `--apply`.
 Make a new site: a template, a database, Studio and (by default) a Next.js app, installed and ready. `npm create graft` runs this. It asks a few questions; flags answer them, and --yes takes the defaults for the rest.
 
 ```text
-graft create [dir] [--template <name>] [--edit online|code] [--database new|none|<url>] [--framework next|nuxt|none] [--yes] [--no-install] [--no-input]
+graft create [dir] [--template <name>] [--edit online|code] [--database new|none|<url>] [--framework next|nuxt|sveltekit|none] [--yes] [--no-install] [--no-input]
 ```
 
 | Flag | What it does |
@@ -33,7 +33,7 @@ graft create [dir] [--template <name>] [--edit online|code] [--database new|none
 | `--template <name>` | blog, docs, shop, portfolio or blank (default: blog). |
 | `--edit online\|code` | online keeps content in the database, edited in Studio (default); code keeps it as files in git. |
 | `--database new\|none\|<url>` | new makes a free Postgres to claim later; none compiles content to a file (with --edit code); or your own Postgres 13+ URL. |
-| `--framework next\|nuxt\|none` | next for a Next.js site that shows every collection (default); nuxt for the same site in Nuxt; none for only the content. |
+| `--framework next\|nuxt\|sveltekit\|none` | next for a Next.js site that shows every collection (default); nuxt or sveltekit for the same site in Nuxt or SvelteKit; none for only the content. |
 | `-y, --yes` | Use the default for every question a flag did not answer. |
 | `--no-install` | Write the files and stop before installing. |
 | `--no-input` | Never stop to ask a question. Same as `GRAFT_PROMPT_DISABLED`. |

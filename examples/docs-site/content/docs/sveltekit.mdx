@@ -15,6 +15,10 @@ MCP endpoint from `+server.ts` routes.
 with compiled content. If you do not have those yet, run through
 [Getting started](/docs/getting-started) first.
 
+Starting from nothing? `npm create graft@latest my-site -- --framework sveltekit`
+makes a SvelteKit 3 site with all of this set up: a home page, a page for each
+collection and each entry, and MDX bodies rendered with `<MdxContent>`.
+
 <AgentPrompt>
   Add Graft to this SvelteKit app following
   https://graft.page/docs/sveltekit.md. Keep the client in
@@ -70,12 +74,17 @@ export const graft = createGraft({ db, collections });
 
 </CodeBlock>
 
-<Callout label="On SvelteKit 3, import with #lib" type="note">
+<Callout label="On SvelteKit 3: #lib and $app/env" type="note">
   SvelteKit 3 removed `$lib`. Map `#lib` in `package.json` instead, with
   `"imports": { "#lib/*": "./src/lib/*" }`, and write
   each `$lib/server/graft` import on this page as `#lib/server/graft.ts`. The
   file stays in `src/lib/server/`, which SvelteKit still keeps out of the
   browser.
+
+  It also replaced `$env/static/private`. Declare `DATABASE_URL` in
+  `src/env.ts` with `defineEnvVars` from `@sveltejs/kit/env`, and import it
+  from `$app/env/private`. `graft create --framework sveltekit` writes both
+  for a site on Postgres.
 </Callout>
 
 Static index instead of Postgres:
