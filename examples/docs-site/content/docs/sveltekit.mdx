@@ -70,6 +70,14 @@ export const graft = createGraft({ db, collections });
 
 </CodeBlock>
 
+<Callout label="On SvelteKit 3, import with #lib" type="note">
+  SvelteKit 3 removed `$lib`. Map `#lib` in `package.json` instead, with
+  `"imports": { "#lib": "./src/lib", "#lib/*": "./src/lib/*" }`, and write
+  each `$lib/server/graft` import on this page as `#lib/server/graft.ts`. The
+  file stays in `src/lib/server/`, which SvelteKit still keeps out of the
+  browser.
+</Callout>
+
 Static index instead of Postgres:
 
 ```ts
@@ -263,6 +271,16 @@ curl --fail -X POST https://example.com/api/revalidate \
 `Cache-Tag` is the header Cloudflare reads, with tags separated by commas.
 Fastly reads `Surrogate-Key`, with tags separated by spaces. Use the header
 your CDN expects.
+
+## Supported versions
+
+The adapter supports SvelteKit 2 and SvelteKit 3. CI builds a real SvelteKit 2
+app and a real SvelteKit 3 app on every pull request, type-checks the client,
+the reads and `graftRoute` from this page against each one, serves the build,
+and drives it in Chromium.
+
+`graftRoute` takes any event with a `request`, so the adapter does not depend
+on `@sveltejs/kit` and needs no change between majors.
 
 ## Next steps
 

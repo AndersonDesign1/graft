@@ -1,0 +1,7 @@
+# Copied from ../app-src by ../smoke.mjs, and what SvelteKit builds from them.
+src/
+content/
+graft.config.ts
+.graft/
+.svelte-kit/
+build/
