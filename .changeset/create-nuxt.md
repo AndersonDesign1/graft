@@ -1,5 +1,5 @@
 ---
-"@usegraft/cli": patch
+"@usegraft/cli": minor
 ---
 
 `graft create --framework nuxt` makes a Nuxt site with `@usegraft/sdk-nuxt`
