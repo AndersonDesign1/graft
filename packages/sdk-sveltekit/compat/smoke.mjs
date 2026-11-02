@@ -149,8 +149,21 @@ function stop() {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** HTML without the comment markers Svelte puts inside elements for hydration. */
-const withoutComments = (markup) => markup.replace(/<!--[\s\S]*?-->/g, "");
+/**
+ * HTML without the comment markers Svelte puts inside elements for hydration,
+ * so a check can match `<strong>Graft</strong>`. Repeated until nothing
+ * changes, so a removal can't leave a new `<!--` behind. For assertions on our
+ * own build only: this is not a sanitiser.
+ */
+function withoutComments(markup) {
+  let previous;
+  let current = markup;
+  do {
+    previous = current;
+    current = previous.replace(/<!--[\s\S]*?-->/g, "");
+  } while (current !== previous);
+  return current;
+}
 
 try {
   let ready = false;
