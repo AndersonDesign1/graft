@@ -78,7 +78,7 @@ export const PACKAGE_KNOWLEDGE = {
   },
   "@usegraft/sdk-sveltekit": {
     name: "@usegraft/sdk-sveltekit",
-    role: "SvelteKit adapter: typed reads in load functions, plus route handlers.",
+    role: "SvelteKit adapter: typed reads in load functions, route handlers, and an MDX renderer that evaluates nothing.",
     when: "You are on SvelteKit.",
     tier: "either",
     framework: "sveltekit",

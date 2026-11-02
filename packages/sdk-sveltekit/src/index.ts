@@ -3,9 +3,9 @@
  * SvelteKit adapter: typed reads (`createGraft`) + endpoint mounts
  * (`graftRoute`) over the same stateless handlers every other surface serves.
  * Cache invalidation is the sdk-core tag contract mapped onto CDN surrogate
- * keys. MDX bodies come back as authored source — render with your own
- * pipeline (mdsvex et al.; a React `MdxBody` equivalent is deliberately not
- * shipped here).
+ * keys. MDX bodies come back as authored source: `prepareMdx` from
+ * `@usegraft/sdk-sveltekit/server` turns one into a tree, and `MdxContent`
+ * from `@usegraft/sdk-sveltekit/mdx` renders it without evaluating anything.
  */
 export * from "./graft";
 export * from "./routes";

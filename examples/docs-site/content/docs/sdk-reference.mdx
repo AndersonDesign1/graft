@@ -133,9 +133,12 @@ never refreshes `main`.
 - **`MdxBody` is Next-only.** It evaluates MDX in a Server Component, which no
   other adapter here has. `@usegraft/sdk-vue` renders MDX the Pages Router way:
   `prepareMdx` on the server, `MdxContent` on the page. The Next.js Pages Router compiles with `prepareMdx`
-  in `getStaticProps` and renders with `MdxContent` instead. Astro and SvelteKit author bodies for `@astrojs/mdx`
-  or mdsvex; TanStack Start and React Router render authored source with their
-  own pipeline.
+  in `getStaticProps` and renders with `MdxContent` instead. `@usegraft/sdk-sveltekit`
+  prepares a body into a tree with `prepareMdx` from
+  `@usegraft/sdk-sveltekit/server` and renders it with `MdxContent` from
+  `@usegraft/sdk-sveltekit/mdx`, evaluating nothing. Astro authors bodies for `@astrojs/mdx`;
+  TanStack Start and React Router render authored source with their own
+  pipeline.
 - **No `React.cache` equivalent outside Next.** Call sites own memoization.
   TanStack Start route loaders are isomorphic, running on the server for first
   paint and in the browser on client navigation, so a handle holding a database

@@ -1,7 +1,8 @@
 # Nuxt, Nitro and SvelteKit adapters (research, 2026-11-01)
 
-**Status: plan agreed. Units 1 to 4 are built: `@usegraft/sdk-nitro`, `@usegraft/sdk-vue`,
-`@usegraft/sdk-nuxt`, and the SvelteKit 2 and 3 compat apps.** This note records where each
+**Status: plan agreed. Units 1 to 4 and 6 are built: `@usegraft/sdk-nitro`,
+`@usegraft/sdk-vue`, `@usegraft/sdk-nuxt`, the SvelteKit 2 and 3 compat apps,
+and the Svelte MDX renderer. Unit 5 has `nuxt` in main; `sveltekit` follows.** This note records where each
 framework stands today, what a spike proved, and the order to build in.
 
 Each claim is labeled: **verified** (run in the spike below), **registry**
@@ -274,6 +275,13 @@ the body to an AST and render it with a small recursive Svelte component
 that maps element names to an allowlisted component map. It never evaluates
 the body, so `{expr}` and `import` stay refused under every trust level. Say
 that difference from `MdxBody` in the docs.
+
+Built (**verified**): `prepareMdx` in `@usegraft/sdk-sveltekit/server` returns a JSON tree
+of text, element and component nodes, and `MdxContent` in
+`@usegraft/sdk-sveltekit/mdx` renders it. The components ship as Svelte source,
+compiled by the app's own Svelte. The compat apps render a body with Markdown,
+a GFM table, a component from the app and a dropped script URL, on SvelteKit
+2 and 3, and hydrate it with a clean console.
 
 ### Later: a Nitro module that runs `graft serve` anywhere Nitro deploys
 
