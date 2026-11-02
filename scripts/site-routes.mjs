@@ -77,10 +77,11 @@ export function expectedStaticFiles(authored) {
  *
  * So three kinds are dropped. `status >= 400` is a route that answers with an
  * error. `continue: true` only attaches headers and hands the request onward.
- * And a route with `has` applies only when the request carries a given header
- * or cookie: the docs' `Accept: text/markdown` rewrite matches every
- * `/docs/<anything>`, so counting it let `/docs/functions`, a page that never
- * existed, pass as a live link. A reader following a link sends none of that.
+ * And a route with `has` applies only when the request meets its header,
+ * cookie, host or query conditions: the docs' `Accept: text/markdown` rewrite
+ * matches every kebab-case `/docs/<slug>`, so counting it let `/docs/functions`,
+ * a page that never existed, pass as a live link. A link followed in a browser
+ * meets none of those conditions.
  *
  * @param {unknown} configRoutes
  * @returns {Array<{ src: string }>}
