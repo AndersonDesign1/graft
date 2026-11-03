@@ -1,9 +1,9 @@
 ---
-"@usegraft/sdk-nuxt": patch
+"@usegraft/sdk-nuxt": minor
 "@usegraft/sdk-nitro": patch
-"@usegraft/mcp": patch
+"@usegraft/mcp": minor
 "@usegraft/db": patch
-"@usegraft/auth": patch
+"@usegraft/auth": minor
 "@usegraft/cli": patch
 ---
 

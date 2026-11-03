@@ -123,10 +123,10 @@ graft compile --json > changes.json
 
 ### `graft dev`
 
-Watch content/ and graft.config.ts, and compile on every change.
+Compile, then recompile whenever a content file or graft.config.ts changes. Put your site's dev server after --, as in graft dev -- next dev, to run it too. It starts once the first compile is done, Ctrl+C stops both, and when it exits, so does graft dev.
 
 ```text
-graft dev [--branch <id>]
+graft dev [command...] [--branch <id>]
 ```
 
 | Flag | What it does |
@@ -134,6 +134,10 @@ graft dev [--branch <id>]
 | `-b, --branch <id>` | Content branch to work on (default: main). |
 
 Needs `DATABASE_URL` on the Postgres engine; none on the static engine. Runs until you stop it.
+
+```sh
+graft dev -- next dev
+```
 
 ### `graft check`
 

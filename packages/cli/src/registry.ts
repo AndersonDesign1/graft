@@ -289,8 +289,9 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: "Watch content/ and graft.config.ts, and compile on every change",
     description: [
       "Compile, then recompile whenever a content file or graft.config.ts changes.",
-      "After --, the site's own dev server: graft dev -- next dev starts it once the",
-      "first compile is done, and stops it on Ctrl+C. When it exits, so does graft dev.",
+      "Put your site's dev server after --, as in graft dev -- next dev, to run it too.",
+      "It starts once the first compile is done, Ctrl+C stops both, and when it exits,",
+      "so does graft dev.",
     ],
     args: [{ name: "command", variadic: true }],
     flags: [BRANCH],
