@@ -36,18 +36,30 @@ describe("the SvelteKit site", () => {
   });
 });
 
+describe("the dev script", () => {
+  it("runs the site's dev server under graft dev, so content edits recompile", () => {
+    for (const [framework, dev] of [
+      ["next", "graft dev -- next dev"],
+      ["nuxt", "graft dev -- nuxt dev"],
+      ["sveltekit", "graft dev -- vite dev --port 3000"],
+    ] as const) {
+      const files = scaffoldFiles({ ...base, framework });
+      expect(JSON.parse(files["package.json"] ?? "{}").scripts.dev, framework).toBe(dev);
+    }
+  });
+});
+
 describe("AGENTS.md", () => {
-  it("says a static site compiles content once, and a Postgres site reads it live", () => {
+  it("says files recompile as they are saved, and database content shows when published", () => {
     for (const framework of ["next", "nuxt", "sveltekit"] as const) {
-      const staticSite = scaffoldFiles({ ...base, framework })["AGENTS.md"];
-      expect(staticSite, framework).toContain(
-        "run `npx graft compile` after editing a content file",
-      );
-      expect(staticSite, framework).not.toContain("recompiling");
+      const fromFiles = scaffoldFiles({ ...base, framework })["AGENTS.md"];
+      expect(fromFiles, framework).toContain("Content recompiles as you save a file");
+      expect(fromFiles, framework).not.toContain("npx graft compile` after editing");
       const live = scaffoldFiles({ ...base, framework, source: "database", index: "postgres" })[
         "AGENTS.md"
       ];
       expect(live, framework).toContain("a publish in Studio shows on the next page load");
+      expect(live, framework).not.toContain("recompiles");
     }
   });
 });

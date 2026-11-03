@@ -93,11 +93,12 @@ function siteLine(framework: Framework): string {
 /** What `npm run dev` does, as AGENTS.md says it. */
 function devLine(options: ScaffoldOptions): string {
   if (options.framework === "none") return "recompile content as it changes";
-  // The site's dev script compiles once, at start. A static site reads the
-  // file that compile writes; a Postgres site reads what Studio publishes.
-  return options.index === "static"
-    ? "the site at http://localhost:3000. It compiles content once at start: run `npx graft compile` after editing a content file"
-    : "the site at http://localhost:3000, reading content from the database, so a publish in Studio shows on the next page load";
+  // The dev script is `graft dev -- <dev server>`: content files are watched
+  // and recompiled while the site runs. Content kept in the database is not
+  // read from files, so what shows is what Studio published.
+  return options.source === "database"
+    ? "the site at http://localhost:3000, reading content from the database, so a publish in Studio shows on the next page load"
+    : "the site at http://localhost:3000. Content recompiles as you save a file, so the change shows on the next page load";
 }
 
 function agentsMd(options: ScaffoldOptions): string {
@@ -256,7 +257,7 @@ function frameworkPackage(options: ScaffoldOptions): FrameworkPackage {
   if (options.framework === "next") {
     return {
       scripts: {
-        dev: "graft compile && next dev",
+        dev: "graft dev -- next dev",
         build: "graft compile && next build",
         start: "next start",
       },
@@ -277,7 +278,7 @@ function frameworkPackage(options: ScaffoldOptions): FrameworkPackage {
   if (options.framework === "nuxt") {
     return {
       scripts: {
-        dev: "graft compile && nuxt dev",
+        dev: "graft dev -- nuxt dev",
         build: "graft compile && nuxt build",
         start: "node .output/server/index.mjs",
       },
@@ -288,7 +289,7 @@ function frameworkPackage(options: ScaffoldOptions): FrameworkPackage {
   if (options.framework === "sveltekit") {
     return {
       scripts: {
-        dev: "graft compile && vite dev --port 3000",
+        dev: "graft dev -- vite dev --port 3000",
         build: "graft compile && vite build",
         start: "node build",
       },

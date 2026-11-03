@@ -147,7 +147,12 @@ const handlers = {
 
   async dev(ctx) {
     const { devCommand } = await import("./commands/dev");
-    await devCommand({ cwd: ctx.cwd, branchId: branchOf(ctx) });
+    const exitCode = await devCommand({
+      cwd: ctx.cwd,
+      branchId: branchOf(ctx),
+      command: ctx.args,
+    });
+    return { exitCode };
   },
 
   async check(ctx) {

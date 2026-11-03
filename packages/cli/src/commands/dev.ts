@@ -3,7 +3,12 @@
  *
  * Failures never stop the watcher: a validation error prints its `fix` and the
  * next save retries — the edit → compile → render loop an agent or human sits in.
+ *
+ * `graft dev -- next dev` also runs the site's own dev server, after the first
+ * compile so the index exists when it starts. One terminal, one Ctrl+C: when
+ * either stops, both do.
  */
+import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, watch, type FSWatcher } from "node:fs";
 import { basename, relative } from "node:path";
 import { GraftError } from "@usegraft/contracts";
@@ -24,10 +29,15 @@ const DEBOUNCE_MS = 150;
 export interface DevCommandOptions {
   cwd: string;
   branchId?: string;
+  /** A dev server to run alongside, such as ["next", "dev"]: what follows `--`. */
+  command?: readonly string[];
 }
 
-/** Resolves when the watcher is stopped (SIGINT/SIGTERM). */
-export async function devCommand(options: DevCommandOptions): Promise<void> {
+/**
+ * Resolves when the watcher is stopped (SIGINT/SIGTERM), or when the command
+ * it runs exits, with the exit code `graft dev` should end with.
+ */
+export async function devCommand(options: DevCommandOptions): Promise<number> {
   loadProjectEnv(options.cwd);
   const configPath = findConfig(options.cwd);
   let config: ProjectConfig = await loadConfig(configPath);
@@ -193,20 +203,62 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
       : `Watching ${watchedContent} + ${basename(configPath)} (branch: ${branchLabel}). Ctrl+C to stop.`,
   );
 
-  await new Promise<void>((resolveStopped) => {
-    const stop = (): void => {
+  const server = options.command?.length ? startServer(options.command, options.cwd) : undefined;
+  const exitCode = await new Promise<number>((resolveStopped) => {
+    const stop = (code: number): void => {
       clearTimeout(timer);
       clearInterval(announcer);
       contentWatcher?.close();
       for (const watcher of watchers) watcher.close();
-      resolveStopped();
+      process.off("SIGINT", onSignal);
+      process.off("SIGTERM", onSignal);
+      resolveStopped(code);
     };
-    process.once("SIGINT", stop);
-    process.once("SIGTERM", stop);
+    /** Set when graft dev itself was asked to stop: the server's exit is then expected. */
+    let stopping = false;
+    const onSignal = (signal: NodeJS.Signals): void => {
+      if (!server || server.exitCode !== null || server.signalCode !== null) return stop(0);
+      // The terminal sends Ctrl+C to the server too; a SIGTERM may reach only
+      // graft dev. Either way, stop once the server has.
+      stopping = true;
+      server.kill(signal);
+    };
+    process.once("SIGINT", onSignal);
+    process.once("SIGTERM", onSignal);
+    server?.once("exit", (code, signal) => {
+      if (stopping) return stop(0);
+      const how = signal === null ? `exited with ${code ?? 0}` : `was stopped by ${signal}`;
+      console.log(`${options.command?.join(" ")} ${how}; stopping graft dev.`);
+      stop(code ?? 1);
+    });
+    server?.once("error", (error) => {
+      reportError(
+        new GraftError({
+          code: "USAGE_INVALID",
+          message: `graft dev could not start \`${options.command?.join(" ")}\`: ${error.message}.`,
+          fix: "Check the command after `--` is installed (run it on its own to see), or drop `--` and what follows to only recompile.",
+          details: { command: options.command },
+        }),
+        false,
+      );
+      stop(127);
+    });
   });
 
   await branch?.close();
   await control?.close();
+  return exitCode;
+}
+
+/**
+ * Start the site's dev server with this terminal. Through a shell on Windows
+ * only, where `next` is `next.cmd`; elsewhere the arguments pass through as
+ * typed, spaces included.
+ */
+function startServer(command: readonly string[], cwd: string): ChildProcess {
+  const [file = "", ...args] = command;
+  console.log(`Starting ${command.join(" ")}`);
+  return spawn(file, args, { cwd, stdio: "inherit", shell: process.platform === "win32" });
 }
 
 /** How often `graft dev` asks whether anything was published in a database-sourced project. */
