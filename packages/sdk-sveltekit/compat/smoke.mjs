@@ -37,6 +37,7 @@ import {
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkDevLoop } from "../../../scripts/lib/dev-loop.mjs";
 
 const appDir = process.cwd();
 const compatDir = fileURLToPath(new URL(".", import.meta.url));
@@ -294,6 +295,20 @@ try {
 } finally {
   stop();
 }
+
+// The dev loop a generated site runs as `npm run dev`: `graft dev -- <dev
+// server>`, where saving a content file changes the page with no restart.
+const devPort = port + 1;
+await checkDevLoop({
+  appDir,
+  devServer: ["vite", "dev", "--port", String(devPort)],
+  url: `http://localhost:${devPort}/home`,
+  file: "content/pages/home.mdx",
+  edit: ["title: Home", "title: Home, edited"],
+  before: "<h1>Home</h1>",
+  after: "<h1>Home, edited</h1>",
+  check,
+});
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} check(s) failed on @sveltejs/kit@${kitVersion}.`);
