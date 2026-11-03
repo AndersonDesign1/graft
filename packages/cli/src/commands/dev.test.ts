@@ -26,7 +26,8 @@ describe("announce", () => {
   });
 });
 
-describe("graft dev -- <command>", () => {
+// Each runs a real compile, file watchers and a child process: give them room.
+describe("graft dev -- <command>", { timeout: 30_000 }, () => {
   const here = fileURLToPath(new URL(".", import.meta.url));
   // Inside the package so the scaffolded config's `@usegraft/core` import resolves.
   const projectDir = resolve(here, "../../.test-tmp/dev");
@@ -104,7 +105,11 @@ describe("graft dev -- <command>", () => {
     }
   });
 
-  it("ends with 127 and a fix when the command cannot start", async () => {
-    expect(await devCommand({ cwd: projectDir, command: ["graft-no-such-command"] })).toBe(127);
+  it("fails when the command cannot start", async () => {
+    const code = await devCommand({ cwd: projectDir, command: ["graft-no-such-command"] });
+    // spawn reports a missing program itself, as 127. On Windows the command
+    // runs through cmd.exe, which exits with its own code for a missing one.
+    if (process.platform === "win32") expect(code).not.toBe(0);
+    else expect(code).toBe(127);
   });
 });

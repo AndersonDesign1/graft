@@ -14,10 +14,11 @@ import { delimiter, join } from "node:path";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** The page without the comment markers frameworks put inside elements. */
-async function page(url) {
+async function page(url, until = Date.now() + 10_000) {
   try {
     // A server that accepts a request and stalls must not hold the smoke past its deadline.
-    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    const left = Math.max(1, Math.min(10_000, until - Date.now()));
+    const response = await fetch(url, { signal: AbortSignal.timeout(left) });
     let html = await response.text();
     let previous;
     do {
@@ -34,7 +35,7 @@ async function page(url) {
 async function waitFor(url, text, seconds, gone = () => false) {
   const until = Date.now() + seconds * 1000;
   while (Date.now() < until && !gone()) {
-    if ((await page(url)).includes(text)) return true;
+    if ((await page(url, until)).includes(text)) return true;
     await sleep(250);
   }
   return false;

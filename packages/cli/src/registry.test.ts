@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { HANDLERS } from "./handlers";
+import { parseCommand } from "./args";
 import { COMMANDS, commandId, flagsOf, usageOf } from "./registry";
 
 describe("the command registry", () => {
@@ -41,6 +42,25 @@ describe("the command registry", () => {
     const pull = COMMANDS.find((spec) => commandId(spec) === "pull");
     expect(pull && usageOf(pull)).toBe(
       "graft pull [doc...] [--branch <id>] [--only <doc>]... [--force] [--json]",
+    );
+    const dev = COMMANDS.find((spec) => commandId(spec) === "dev");
+    expect(dev && usageOf(dev)).toBe("graft dev [--branch <id>] [-- command...]");
+  });
+
+  it("takes graft dev's command only after --, so a stray word is not run", () => {
+    const dev = COMMANDS.find((spec) => commandId(spec) === "dev");
+    if (!dev) throw new Error("graft dev is not declared");
+    expect(parseCommand(dev, ["--", "vite", "dev", "--port", "3000"]).args).toEqual([
+      "vite",
+      "dev",
+      "--port",
+      "3000",
+    ]);
+    expect(() => parseCommand(dev, ["next", "dev"])).toThrowError(
+      expect.objectContaining({
+        message: 'unexpected argument "next" for graft dev.',
+        fix: "Put the command after --, as in: graft dev -- next dev",
+      }),
     );
   });
 

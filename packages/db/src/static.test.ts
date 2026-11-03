@@ -124,6 +124,10 @@ describe("static index round-trip", () => {
   });
 
   it("an open reader sees a recompile, as a dev server running beside `graft dev` needs", async () => {
+    await projectStaticContent(
+      [doc({ slug: "home" }), doc({ slug: "pricing", contentHash: "hash-new" })],
+      { path, gitSha: "abc123" },
+    );
     const index = await openStaticIndex(path);
     expect((await index.readContent({ collection: "pages" })).map((r) => r.slug)).toEqual([
       "home",

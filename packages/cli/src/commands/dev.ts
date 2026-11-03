@@ -229,10 +229,11 @@ export async function devCommand(options: DevCommandOptions): Promise<number> {
     /** Set when graft dev itself was asked to stop: the server's exit is then expected. */
     let stopping = false;
     const onSignal = (signal: NodeJS.Signals): void => {
+      // First, so a compile still running cannot start the server after this.
+      stopping = true;
       if (!server || server.exitCode !== null || server.signalCode !== null) return stop(0);
       // The terminal sends Ctrl+C to the server too; a SIGTERM may reach only
       // graft dev. Either way, stop once the server has.
-      stopping = true;
       stopServer(server, signal);
     };
     process.once("SIGINT", onSignal);

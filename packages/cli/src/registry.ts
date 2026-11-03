@@ -32,6 +32,8 @@ export interface ArgSpec {
   readonly required?: boolean;
   /** Takes every remaining argument. */
   readonly variadic?: boolean;
+  /** Only what follows a bare `--`, such as a command to run: a word before it is refused. */
+  readonly afterDashes?: boolean;
 }
 
 /** Whether a command needs DATABASE_URL. */
@@ -294,7 +296,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       "It starts after the first compile that succeeds, Ctrl+C stops both, and when it",
       "exits, graft dev exits with its exit code.",
     ],
-    args: [{ name: "command", variadic: true }],
+    args: [{ name: "command", variadic: true, afterDashes: true }],
     flags: [BRANCH],
     database: "postgres",
     longRunning: true,
@@ -1252,7 +1254,8 @@ export function flagsOf(spec: CommandSpec): FlagSpec[] {
 /** `graft branch create <name> [--from <parent>] [--backend overlay|neon] [--json]` */
 export function usageOf(spec: CommandSpec): string {
   const words = ["graft", ...spec.path];
-  for (const arg of spec.args ?? []) {
+  const args = spec.args ?? [];
+  for (const arg of args.filter((a) => !a.afterDashes)) {
     const name = arg.variadic ? `${arg.name}...` : arg.name;
     words.push(arg.required ? `<${name}>` : `[${name}]`);
   }
@@ -1260,6 +1263,9 @@ export function usageOf(spec: CommandSpec): string {
     if (flag === HELP_FLAG) continue;
     const value = flag.type === "boolean" ? "" : ` ${flag.value ?? "<value>"}`;
     words.push(`[--${flag.name}${value}]${flag.multiple ? "..." : ""}`);
+  }
+  for (const arg of args.filter((a) => a.afterDashes)) {
+    words.push(`[-- ${arg.name}${arg.variadic ? "..." : ""}]`);
   }
   return words.join(" ");
 }
