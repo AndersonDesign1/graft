@@ -21,6 +21,7 @@ import {
   DockerIcon,
   NextjsIcon,
   NodejsIcon,
+  NuxtIcon,
   PostgresqlIcon,
   ReactIcon,
   SqliteIcon,
@@ -48,6 +49,9 @@ function getTabIcon(rawLabel: string): ReactNode {
   }
   if (norm.includes("react")) {
     return <ReactIcon size={15} className="tab-icon" />;
+  }
+  if (norm.includes("nuxt")) {
+    return <NuxtIcon size={15} className="tab-icon" />;
   }
   if (norm.includes("svelte")) {
     return <SvelteIcon size={15} className="tab-icon" />;
