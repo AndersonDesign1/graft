@@ -14,6 +14,7 @@ import {
   type CommandSpec,
   type FlagSpec,
 } from "./registry";
+import { shellQuote } from "./shell-quote";
 import { closest } from "./suggest";
 
 /**
@@ -167,7 +168,7 @@ export function parseCommand(spec: CommandSpec, rest: readonly string[]): Parsed
       if (spec.args?.some((arg) => arg.afterDashes)) {
         throw new UsageError(
           `unexpected argument "${token}" for graft ${commandId(spec)}.`,
-          `Put the command after --, as in: graft ${commandId(spec)} -- ${rest.slice(i).join(" ")}`,
+          `Put the command after --, as in: graft ${commandId(spec)} -- ${rest.slice(i).map(shellQuote).join(" ")}`,
           { command: commandId(spec), argument: token },
         );
       }

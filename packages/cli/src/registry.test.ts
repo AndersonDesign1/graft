@@ -62,6 +62,12 @@ describe("the command registry", () => {
         fix: "Put the command after --, as in: graft dev -- next dev",
       }),
     );
+    // Copied back into a shell, the suggestion runs the same words.
+    expect(() => parseCommand(dev, ["sh", "-c", "echo it's"])).toThrowError(
+      expect.objectContaining({
+        fix: `Put the command after --, as in: graft dev -- sh -c 'echo it'\\''s'`,
+      }),
+    );
   });
 
   // `graft --help` loads these and nothing else, so they stay data: any

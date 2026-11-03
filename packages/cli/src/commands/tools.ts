@@ -9,6 +9,7 @@ import { GraftError } from "@usegraft/contracts";
 import type { ToolClient, ToolObject, ToolValue } from "@usegraft/mcp";
 import { readFrontmatter, writeFrontmatter } from "@usegraft/mdx-safety/frontmatter";
 import { UsageError } from "../args";
+import { shellQuote } from "../shell-quote";
 
 /* ---- reading arguments --------------------------------------------------- */
 
@@ -122,11 +123,6 @@ export function rethrowWithRetry(error: unknown, retry: string, remote = false):
   };
   if (error.details) options.details = error.details;
   throw new GraftError(options);
-}
-
-/** A word as a shell reads it back: bare when that is safe, else in single quotes. */
-export function shellQuote(word: string): string {
-  return /^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replaceAll("'", `'\\''`)}'`;
 }
 
 /**
