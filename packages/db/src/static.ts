@@ -406,8 +406,10 @@ export async function openStaticIndex(path: string): Promise<StaticIndexReader> 
     let next: SqliteDatabase;
     try {
       next = new Database(path, { readOnly: true });
-    } catch {
-      // Replaced again between the check and the open: the next read retries.
+    } catch (error) {
+      // Gone again between the check and the open (a Windows mid-swap): the
+      // next read retries. Any other failure is real, so it surfaces.
+      if (fileIdentity(path) !== null) throw error;
       return db;
     }
     db.close();

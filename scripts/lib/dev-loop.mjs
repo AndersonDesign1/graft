@@ -103,6 +103,12 @@ export async function checkDevLoop(options) {
     );
   } finally {
     writeFileSync(path, original);
+    // Exited on its own before Ctrl+C: a failure, but not a failed Ctrl+C.
+    if (gone) {
+      check(false, `graft dev exited on its own, with ${dev.exitCode ?? dev.signalCode}`);
+      console.log(`graft dev printed:\n${Buffer.concat(output).toString().slice(-4000)}`);
+      return;
+    }
     dev.kill("SIGINT");
     let timer;
     const code = await Promise.race([
