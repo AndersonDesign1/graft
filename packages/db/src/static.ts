@@ -403,7 +403,13 @@ export async function openStaticIndex(path: string): Promise<StaticIndexReader> 
     const now = fileIdentity(path);
     // Missing for a moment (a compile mid-swap on Windows): keep the old one.
     if (now === null || now === identity) return db;
-    const next = new Database(path, { readOnly: true });
+    let next: SqliteDatabase;
+    try {
+      next = new Database(path, { readOnly: true });
+    } catch {
+      // Replaced again between the check and the open: the next read retries.
+      return db;
+    }
     db.close();
     db = next;
     identity = now;

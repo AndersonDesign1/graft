@@ -147,13 +147,15 @@ export default async function Page() {
 will see `string`. `MdxBody` renders the Markdown body on the server.
 
 Run Next.js under `graft dev`, which recompiles your content whenever you save
-a file. Set the `dev` script in `package.json`:
+a file. Set the `dev` script in `package.json`, keeping your other scripts:
 
 <CodeBlock title="package.json">
 
 ```json
-"scripts": {
-  "dev": "graft dev -- next dev"
+{
+  "scripts": {
+    "dev": "graft dev -- next dev"
+  }
 }
 ```
 
@@ -253,13 +255,15 @@ const { data: home } = await useGraftContent("pages", "home");
 </CodeBlock>
 
 Run Nuxt under `graft dev`, which recompiles your content whenever you save a
-file. Set the `dev` script in `package.json`:
+file. Set the `dev` script in `package.json`, keeping your other scripts:
 
 <CodeBlock title="package.json">
 
 ```json
-"scripts": {
-  "dev": "graft dev -- nuxt dev"
+{
+  "scripts": {
+    "dev": "graft dev -- nuxt dev"
+  }
 }
 ```
 
@@ -291,7 +295,7 @@ Goal: render a compiled document from a server `load` function.
 
 <Step title="Install the SvelteKit SDK and CLI">
 
-The SDK supports SvelteKit 2 and 3.
+The SDK supports SvelteKit 2 and 3. SvelteKit 3 needs Node.js 22.17 or newer.
 
 ```sh
 npm i @usegraft/sdk-sveltekit @usegraft/db
@@ -379,13 +383,15 @@ export const load: PageServerLoad = async () => {
 </CodeBlock>
 
 Run Vite under `graft dev`, which recompiles your content whenever you save a
-file. Set the `dev` script in `package.json`:
+file. Set the `dev` script in `package.json`, keeping your other scripts:
 
 <CodeBlock title="package.json">
 
 ```json
-"scripts": {
-  "dev": "graft dev -- vite dev"
+{
+  "scripts": {
+    "dev": "graft dev -- vite dev"
+  }
 }
 ```
 

@@ -1,7 +1,7 @@
 ---
 "@usegraft/sdk-vue": minor
 "@usegraft/mdx-safety": minor
-"@usegraft/sdk-next": patch
+"@usegraft/sdk-next": minor
 "@usegraft/mcp": minor
 ---
 

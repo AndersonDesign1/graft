@@ -30,9 +30,10 @@ async function page(url) {
   }
 }
 
-async function waitFor(url, text, seconds) {
+/** Polls until `url` shows `text`, the time is up, or `gone()` says the process has exited. */
+async function waitFor(url, text, seconds, gone = () => false) {
   const until = Date.now() + seconds * 1000;
-  while (Date.now() < until) {
+  while (Date.now() < until && !gone()) {
     if ((await page(url)).includes(text)) return true;
     await sleep(250);
   }
@@ -52,7 +53,12 @@ async function waitFor(url, text, seconds) {
  */
 export async function checkDevLoop(options) {
   const { appDir, devServer, url, file, edit, before, after } = options;
-  if (process.platform === "win32") return;
+  if (process.platform === "win32") {
+    console.log(
+      "skip the dev loop check: it stops graft dev with SIGINT, which Windows cannot send",
+    );
+    return;
+  }
   let failed = false;
   const check = (ok, what) => {
     if (!ok) failed = true;
@@ -61,6 +67,8 @@ export async function checkDevLoop(options) {
   const cliDir = realpathSync(join(appDir, "node_modules/@usegraft/cli"));
   const { bin } = JSON.parse(readFileSync(join(cliDir, "package.json"), "utf8"));
   const cli = join(cliDir, typeof bin === "string" ? bin : bin.graft);
+  const path = join(appDir, file);
+  const original = readFileSync(path, "utf8");
   const output = [];
   // As `npm run dev` would: the app's own binaries first on PATH.
   const dev = spawn(process.execPath, [cli, "dev", "--", ...devServer], {
@@ -74,16 +82,20 @@ export async function checkDevLoop(options) {
     detached: true,
   });
   for (const stream of [dev.stdout, dev.stderr]) stream.on("data", (chunk) => output.push(chunk));
-  const exited = new Promise((resolve) => dev.once("exit", (code) => resolve(code)));
-  const path = join(appDir, file);
-  const original = readFileSync(path, "utf8");
+  let gone = false;
+  const exited = new Promise((resolve) =>
+    dev.once("exit", (code) => {
+      gone = true;
+      resolve(code);
+    }),
+  );
   try {
-    const up = await waitFor(url, before, 180);
+    const up = await waitFor(url, before, 180, () => gone);
     check(up, `graft dev -- ${devServer.join(" ")} serves the page`);
     if (!up) return;
     writeFileSync(path, original.replace(edit[0], edit[1]));
     const started = Date.now();
-    const shown = await waitFor(url, after, 30);
+    const shown = await waitFor(url, after, 30, () => gone);
     check(
       shown,
       `an edit to ${file} shows on the next request, no restart${shown ? ` (${Date.now() - started} ms)` : ""}`,
@@ -91,7 +103,14 @@ export async function checkDevLoop(options) {
   } finally {
     writeFileSync(path, original);
     dev.kill("SIGINT");
-    const code = await Promise.race([exited, sleep(30_000).then(() => "running")]);
+    let timer;
+    const code = await Promise.race([
+      exited,
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve("running"), 30_000);
+      }),
+    ]);
+    clearTimeout(timer);
     check(code === 0, `Ctrl+C stops graft dev with 0 (got ${code})`);
     if (code === "running") process.kill(-dev.pid, "SIGKILL");
     check(!(await page(url)), "and the dev server with it");

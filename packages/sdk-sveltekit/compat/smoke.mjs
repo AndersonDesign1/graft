@@ -298,10 +298,11 @@ try {
 
 // The dev loop a generated site runs as `npm run dev`: `graft dev -- <dev
 // server>`, where saving a content file changes the page with no restart.
-const devPort = port + 1;
+// Clear of every compat app's own port (3100 to 3199), so smokes can run side by side.
+const devPort = port + 100;
 await checkDevLoop({
   appDir,
-  devServer: ["vite", "dev", "--port", String(devPort)],
+  devServer: ["vite", "dev", "--port", String(devPort), "--strictPort"],
   url: `http://localhost:${devPort}/home`,
   file: "content/pages/home.mdx",
   edit: ["title: Home", "title: Home, edited"],
