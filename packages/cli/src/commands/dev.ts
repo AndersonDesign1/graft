@@ -8,7 +8,7 @@
  * compile so the index exists when it starts. One terminal, one Ctrl+C: when
  * either stops, both do.
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, watch, type FSWatcher } from "node:fs";
 import { basename, relative } from "node:path";
 import { GraftError } from "@usegraft/contracts";
@@ -75,6 +75,10 @@ export async function devCommand(options: DevCommandOptions): Promise<number> {
   let compiling = false;
   let dirty = false;
   let configDirty = false;
+  /** Whether a compile has succeeded: the dev server waits for one, so it never starts without an index. */
+  let compiled = false;
+  /** Starts the dev server once a compile has succeeded; set once the stop logic below exists. */
+  let startServerIfReady: (() => void) | undefined;
 
   const runCompile = async (): Promise<void> => {
     if (compiling) {
@@ -118,6 +122,8 @@ export async function devCommand(options: DevCommandOptions): Promise<number> {
               indexPath: (config.index as { driver: "static"; path: string }).path,
             });
       console.log(formatCompileResult(result));
+      compiled = true;
+      startServerIfReady?.();
     } catch (error) {
       // Keep watching: the next save is the retry.
       if (error instanceof GraftError) reportError(error, false);
@@ -203,7 +209,13 @@ export async function devCommand(options: DevCommandOptions): Promise<number> {
       : `Watching ${watchedContent} + ${basename(configPath)} (branch: ${branchLabel}). Ctrl+C to stop.`,
   );
 
-  const server = options.command?.length ? startServer(options.command, options.cwd) : undefined;
+  const command = options.command?.length ? options.command : undefined;
+  if (command && !compiled) {
+    console.log(
+      `Fix the error above and save: ${command.join(" ")} starts after the first compile that succeeds.`,
+    );
+  }
+  let server: ChildProcess | undefined;
   const exitCode = await new Promise<number>((resolveStopped) => {
     const stop = (code: number): void => {
       clearTimeout(timer);
@@ -221,28 +233,34 @@ export async function devCommand(options: DevCommandOptions): Promise<number> {
       // The terminal sends Ctrl+C to the server too; a SIGTERM may reach only
       // graft dev. Either way, stop once the server has.
       stopping = true;
-      server.kill(signal);
+      stopServer(server, signal);
     };
     process.once("SIGINT", onSignal);
     process.once("SIGTERM", onSignal);
-    server?.once("exit", (code, signal) => {
-      if (stopping) return stop(0);
-      const how = signal === null ? `exited with ${code ?? 0}` : `was stopped by ${signal}`;
-      console.log(`${options.command?.join(" ")} ${how}; stopping graft dev.`);
-      stop(code ?? 1);
-    });
-    server?.once("error", (error) => {
-      reportError(
-        new GraftError({
-          code: "USAGE_INVALID",
-          message: `graft dev could not start \`${options.command?.join(" ")}\`: ${error.message}.`,
-          fix: "Check the command after `--` is installed (run it on its own to see), or drop `--` and what follows to only recompile.",
-          details: { command: options.command },
-        }),
-        false,
-      );
-      stop(127);
-    });
+    startServerIfReady = (): void => {
+      if (!command || !compiled || server || stopping) return;
+      const started = startServer(command, options.cwd);
+      server = started;
+      started.once("exit", (code, signal) => {
+        if (stopping) return stop(0);
+        const how = signal === null ? `exited with ${code ?? 0}` : `was stopped by ${signal}`;
+        console.log(`${command.join(" ")} ${how}; stopping graft dev.`);
+        stop(code ?? 1);
+      });
+      started.once("error", (error) => {
+        reportError(
+          new GraftError({
+            code: "USAGE_INVALID",
+            message: `graft dev could not start \`${command.join(" ")}\`: ${error.message}.`,
+            fix: "Check the command after `--` is installed (run it on its own to see), or drop `--` and what follows to only recompile.",
+            details: { command },
+          }),
+          false,
+        );
+        stop(127);
+      });
+    };
+    startServerIfReady();
   });
 
   await branch?.close();
@@ -259,6 +277,18 @@ function startServer(command: readonly string[], cwd: string): ChildProcess {
   const [file = "", ...args] = command;
   console.log(`Starting ${command.join(" ")}`);
   return spawn(file, args, { cwd, stdio: "inherit", shell: process.platform === "win32" });
+}
+
+/**
+ * Stop the dev server. On Windows it runs through a shell, and a signal to
+ * the shell leaves the server it started running, so the whole tree goes.
+ */
+function stopServer(server: ChildProcess, signal: NodeJS.Signals): void {
+  if (process.platform === "win32" && server.pid !== undefined) {
+    spawnSync("taskkill", ["/pid", String(server.pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+  server.kill(signal);
 }
 
 /** How often `graft dev` asks whether anything was published in a database-sourced project. */

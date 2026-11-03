@@ -16,7 +16,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /** The page without the comment markers frameworks put inside elements. */
 async function page(url) {
   try {
-    const response = await fetch(url);
+    // A server that accepts a request and stalls must not hold the smoke past its deadline.
+    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     let html = await response.text();
     let previous;
     do {
@@ -69,6 +70,8 @@ export async function checkDevLoop(options) {
       PATH: `${join(appDir, "node_modules/.bin")}${delimiter}${process.env.PATH}`,
     },
     stdio: ["ignore", "pipe", "pipe"],
+    // Its own process group, so the last-resort kill below takes the dev server too.
+    detached: true,
   });
   for (const stream of [dev.stdout, dev.stderr]) stream.on("data", (chunk) => output.push(chunk));
   const exited = new Promise((resolve) => dev.once("exit", (code) => resolve(code)));
@@ -90,7 +93,7 @@ export async function checkDevLoop(options) {
     dev.kill("SIGINT");
     const code = await Promise.race([exited, sleep(30_000).then(() => "running")]);
     check(code === 0, `Ctrl+C stops graft dev with 0 (got ${code})`);
-    if (code === "running") dev.kill("SIGKILL");
+    if (code === "running") process.kill(-dev.pid, "SIGKILL");
     check(!(await page(url)), "and the dev server with it");
     if (failed) console.log(`graft dev printed:\n${Buffer.concat(output).toString().slice(-4000)}`);
   }

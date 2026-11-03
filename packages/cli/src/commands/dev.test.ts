@@ -1,8 +1,8 @@
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openStaticIndex } from "@usegraft/db";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { announce, devCommand } from "./dev";
 import { initCommand } from "./init";
 
@@ -72,6 +72,35 @@ describe("graft dev -- <command>", () => {
       expect(home?.data.title).toBe("Edited live");
     } finally {
       await index.close();
+    }
+  });
+
+  it("waits for a compile that succeeds before starting the command", async () => {
+    const doc = join(projectDir, "content/pages/home.mdx");
+    const good = readFileSync(doc, "utf8");
+    rmSync(indexPath, { force: true });
+    // A fresh checkout with a broken document: no index until it is fixed.
+    writeFileSync(doc, good.replace(/^title: .*$/m, "title: 42"));
+    // Fix the document once graft dev says it is waiting for that.
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logs = vi.spyOn(console, "log").mockImplementation((line: unknown) => {
+      if (String(line).startsWith("Fix the error above")) writeFileSync(doc, good);
+    });
+    try {
+      const code = await devCommand({
+        cwd: projectDir,
+        command: node(
+          `process.exit(require("node:fs").existsSync(${JSON.stringify(indexPath)}) ? 3 : 4)`,
+        ),
+      });
+      expect(errors).toHaveBeenCalledWith(
+        expect.stringContaining("error SCHEMA_VALIDATION_FAILED"),
+      );
+      expect(code).toBe(3);
+    } finally {
+      errors.mockRestore();
+      logs.mockRestore();
+      writeFileSync(doc, good);
     }
   });
 
