@@ -123,6 +123,28 @@ describe("static index round-trip", () => {
     await index.close();
   });
 
+  it("an open reader sees a recompile, as a dev server running beside `graft dev` needs", async () => {
+    await projectStaticContent(
+      [doc({ slug: "home" }), doc({ slug: "pricing", contentHash: "hash-new" })],
+      { path, gitSha: "abc123" },
+    );
+    const index = await openStaticIndex(path);
+    expect((await index.readContent({ collection: "pages" })).map((r) => r.slug)).toEqual([
+      "home",
+      "pricing",
+    ]);
+
+    await projectStaticContent([doc({ slug: "home", contentHash: "hash-edited" })], {
+      path,
+      gitSha: "def456",
+    });
+
+    expect((await index.readContent({ collection: "pages" })).map((r) => r.slug)).toEqual(["home"]);
+    expect((await index.searchContent({ query: "pricing" })).map((h) => h.row.slug)).toEqual([]);
+    expect(index.info.gitSha).toBe("def456");
+    await index.close();
+  });
+
   it("missing artifact fails with STATIC_INDEX_NOT_FOUND and a fix", async () => {
     const err = await openStaticIndex(join(dir, "nope.db")).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(GraftError);

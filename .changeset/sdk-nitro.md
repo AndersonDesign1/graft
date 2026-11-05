@@ -1,6 +1,6 @@
 ---
-"@usegraft/sdk-nitro": patch
-"@usegraft/mcp": patch
+"@usegraft/sdk-nitro": minor
+"@usegraft/mcp": minor
 ---
 
 Add `@usegraft/sdk-nitro`, the adapter for Nuxt 4, Nuxt 5 and standalone

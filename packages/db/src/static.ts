@@ -15,7 +15,7 @@
  * port. Operational data (Job B: data_records, audit, approvals) is out of
  * scope by design — that is what NEEDS_DATABASE teaches.
  */
-import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ContentSearchHit } from "@usegraft/contracts";
 import { GraftError } from "@usegraft/contracts";
@@ -355,7 +355,35 @@ export interface StaticIndexReader extends ContentIndexReader {
   readonly info: StaticIndexInfo;
 }
 
-/** Open the compiled artifact read-only as a ContentIndexReader. */
+/** What tells one compile's file from the next: a compile renames a new file over the old one. */
+function fileIdentity(path: string): string | null {
+  try {
+    const stat = statSync(path);
+    return `${stat.ino}:${stat.mtimeMs}:${stat.size}`;
+  } catch {
+    return null;
+  }
+}
+
+function readInfo(db: SqliteDatabase): StaticIndexInfo {
+  const metaRows = db.prepare("SELECT key, value FROM meta").all();
+  const meta = new Map(metaRows.map((r) => [r.key as string, r.value as string]));
+  return {
+    formatVersion: Number(meta.get("formatVersion") ?? 0),
+    branch: meta.get("branch") ?? "main",
+    gitSha: meta.get("gitSha") ?? null,
+    compiledAt: new Date(Number(meta.get("compiledAt") ?? 0)),
+  };
+}
+
+/**
+ * Open the compiled artifact read-only as a ContentIndexReader.
+ *
+ * A compile replaces the file rather than writing into it, and an open handle
+ * keeps reading the file it opened. So each read first checks whether the
+ * file at `path` is still the one open, and reopens it if not: a dev server
+ * that opened the index once sees every recompile `graft dev` makes.
+ */
 export async function openStaticIndex(path: string): Promise<StaticIndexReader> {
   const Database = await loadSqlite();
   if (!existsSync(path)) {
@@ -366,15 +394,29 @@ export async function openStaticIndex(path: string): Promise<StaticIndexReader> 
       details: { path },
     });
   }
-  const db = new Database(path, { readOnly: true });
+  let identity = fileIdentity(path);
+  let db = new Database(path, { readOnly: true });
+  let info = readInfo(db);
 
-  const metaRows = db.prepare("SELECT key, value FROM meta").all();
-  const meta = new Map(metaRows.map((r) => [r.key as string, r.value as string]));
-  const info: StaticIndexInfo = {
-    formatVersion: Number(meta.get("formatVersion") ?? 0),
-    branch: meta.get("branch") ?? "main",
-    gitSha: meta.get("gitSha") ?? null,
-    compiledAt: new Date(Number(meta.get("compiledAt") ?? 0)),
+  /** The open handle, reopened first if a compile replaced the file. */
+  const current = (): SqliteDatabase => {
+    const now = fileIdentity(path);
+    // Missing for a moment (a compile mid-swap on Windows): keep the old one.
+    if (now === null || now === identity) return db;
+    let next: SqliteDatabase;
+    try {
+      next = new Database(path, { readOnly: true });
+    } catch (error) {
+      // Gone again between the check and the open (a Windows mid-swap): the
+      // next read retries. Any other failure is real, so it surfaces.
+      if (fileIdentity(path) !== null) throw error;
+      return db;
+    }
+    db.close();
+    db = next;
+    identity = now;
+    info = readInfo(db);
+    return db;
   };
 
   const toContentRow = (r: Record<string, unknown>): ContentRow => ({
@@ -392,7 +434,10 @@ export async function openStaticIndex(path: string): Promise<StaticIndexReader> 
   });
 
   return {
-    info,
+    get info() {
+      current();
+      return info;
+    },
 
     // `branch` is deliberately ignored: the artifact IS the branch (each git
     // checkout compiles its own file — the P4.3 physical-scope idea as a file).
@@ -414,7 +459,7 @@ export async function openStaticIndex(path: string): Promise<StaticIndexReader> 
         sql += " OFFSET ?";
         params.push(options.offset);
       }
-      return db
+      return current()
         .prepare(sql)
         .all(...params)
         .map(toContentRow);
@@ -433,7 +478,7 @@ export async function openStaticIndex(path: string): Promise<StaticIndexReader> 
         params.push(...options.collections);
       }
       params.push(options.limit ?? 20);
-      const rows = db
+      const rows = current()
         .prepare(
           `SELECT ci.*,
                   -bm25(content_fts, ${BM25_WEIGHTS}) AS rank,

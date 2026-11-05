@@ -1,8 +1,8 @@
 ---
-"@usegraft/sdk-vue": patch
-"@usegraft/mdx-safety": patch
-"@usegraft/sdk-next": patch
-"@usegraft/mcp": patch
+"@usegraft/sdk-vue": minor
+"@usegraft/mdx-safety": minor
+"@usegraft/sdk-next": minor
+"@usegraft/mcp": minor
 ---
 
 Add `@usegraft/sdk-vue`, the Vue client. `createGraft({ endpoint, collections })`

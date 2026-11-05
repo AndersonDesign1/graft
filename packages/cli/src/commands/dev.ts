@@ -3,7 +3,12 @@
  *
  * Failures never stop the watcher: a validation error prints its `fix` and the
  * next save retries — the edit → compile → render loop an agent or human sits in.
+ *
+ * `graft dev -- next dev` also runs the site's own dev server, after the first
+ * compile so the index exists when it starts. One terminal, one Ctrl+C: when
+ * either stops, both do.
  */
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, watch, type FSWatcher } from "node:fs";
 import { basename, relative } from "node:path";
 import { GraftError } from "@usegraft/contracts";
@@ -24,10 +29,15 @@ const DEBOUNCE_MS = 150;
 export interface DevCommandOptions {
   cwd: string;
   branchId?: string;
+  /** A dev server to run alongside, such as ["next", "dev"]: what follows `--`. */
+  command?: readonly string[];
 }
 
-/** Resolves when the watcher is stopped (SIGINT/SIGTERM). */
-export async function devCommand(options: DevCommandOptions): Promise<void> {
+/**
+ * Resolves when the watcher is stopped (SIGINT/SIGTERM), or when the command
+ * it runs exits, with the exit code `graft dev` should end with.
+ */
+export async function devCommand(options: DevCommandOptions): Promise<number> {
   loadProjectEnv(options.cwd);
   const configPath = findConfig(options.cwd);
   let config: ProjectConfig = await loadConfig(configPath);
@@ -65,6 +75,10 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
   let compiling = false;
   let dirty = false;
   let configDirty = false;
+  /** Whether a compile has succeeded: the dev server waits for one, so it never starts without an index. */
+  let compiled = false;
+  /** Starts the dev server once a compile has succeeded; set once the stop logic below exists. */
+  let startServerIfReady: (() => void) | undefined;
 
   const runCompile = async (): Promise<void> => {
     if (compiling) {
@@ -108,6 +122,8 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
               indexPath: (config.index as { driver: "static"; path: string }).path,
             });
       console.log(formatCompileResult(result));
+      compiled = true;
+      startServerIfReady?.();
     } catch (error) {
       // Keep watching: the next save is the retry.
       if (error instanceof GraftError) reportError(error, false);
@@ -193,20 +209,87 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
       : `Watching ${watchedContent} + ${basename(configPath)} (branch: ${branchLabel}). Ctrl+C to stop.`,
   );
 
-  await new Promise<void>((resolveStopped) => {
-    const stop = (): void => {
+  const command = options.command?.length ? options.command : undefined;
+  if (command && !compiled) {
+    console.log(
+      `Fix the error above and save: ${command.join(" ")} starts after the first compile that succeeds.`,
+    );
+  }
+  let server: ChildProcess | undefined;
+  const exitCode = await new Promise<number>((resolveStopped) => {
+    const stop = (code: number): void => {
       clearTimeout(timer);
       clearInterval(announcer);
       contentWatcher?.close();
       for (const watcher of watchers) watcher.close();
-      resolveStopped();
+      process.off("SIGINT", onSignal);
+      process.off("SIGTERM", onSignal);
+      resolveStopped(code);
     };
-    process.once("SIGINT", stop);
-    process.once("SIGTERM", stop);
+    /** Set when graft dev itself was asked to stop: the server's exit is then expected. */
+    let stopping = false;
+    const onSignal = (signal: NodeJS.Signals): void => {
+      // First, so a compile still running cannot start the server after this.
+      stopping = true;
+      if (!server || server.exitCode !== null || server.signalCode !== null) return stop(0);
+      // The terminal sends Ctrl+C to the server too; a SIGTERM may reach only
+      // graft dev. Either way, stop once the server has.
+      stopServer(server, signal);
+    };
+    process.once("SIGINT", onSignal);
+    process.once("SIGTERM", onSignal);
+    startServerIfReady = (): void => {
+      if (!command || !compiled || server || stopping) return;
+      const started = startServer(command, options.cwd);
+      server = started;
+      started.once("exit", (code, signal) => {
+        if (stopping) return stop(0);
+        const how = signal === null ? `exited with ${code ?? 0}` : `was stopped by ${signal}`;
+        console.log(`${command.join(" ")} ${how}; stopping graft dev.`);
+        stop(code ?? 1);
+      });
+      started.once("error", (error) => {
+        reportError(
+          new GraftError({
+            code: "USAGE_INVALID",
+            message: `graft dev could not start \`${command.join(" ")}\`: ${error.message}.`,
+            fix: "Check the command after `--` is installed (run it on its own to see), or drop `--` and what follows to only recompile.",
+            details: { command },
+          }),
+          false,
+        );
+        stop(127);
+      });
+    };
+    startServerIfReady();
   });
 
   await branch?.close();
   await control?.close();
+  return exitCode;
+}
+
+/**
+ * Start the site's dev server with this terminal. Through a shell on Windows
+ * only, where `next` is `next.cmd`; elsewhere the arguments pass through as
+ * typed, spaces included.
+ */
+function startServer(command: readonly string[], cwd: string): ChildProcess {
+  const [file = "", ...args] = command;
+  console.log(`Starting ${command.join(" ")}`);
+  return spawn(file, args, { cwd, stdio: "inherit", shell: process.platform === "win32" });
+}
+
+/**
+ * Stop the dev server. On Windows it runs through a shell, and a signal to
+ * the shell leaves the server it started running, so the whole tree goes.
+ */
+function stopServer(server: ChildProcess, signal: NodeJS.Signals): void {
+  if (process.platform === "win32" && server.pid !== undefined) {
+    spawnSync("taskkill", ["/pid", String(server.pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+  server.kill(signal);
 }
 
 /** How often `graft dev` asks whether anything was published in a database-sourced project. */

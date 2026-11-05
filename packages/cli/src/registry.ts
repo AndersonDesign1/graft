@@ -32,6 +32,8 @@ export interface ArgSpec {
   readonly required?: boolean;
   /** Takes every remaining argument. */
   readonly variadic?: boolean;
+  /** Only what follows a bare `--`, such as a command to run: a word before it is refused. */
+  readonly afterDashes?: boolean;
 }
 
 /** Whether a command needs DATABASE_URL. */
@@ -286,10 +288,19 @@ export const COMMANDS: readonly CommandSpec[] = [
   {
     path: ["dev"],
     group: "content",
-    summary: "Watch content/ and graft.config.ts, and compile on every change",
+    summary: "Compile on every change to content and graft.config.ts; run your dev server with it",
+    description: [
+      "Compile, then recompile whenever a content file or graft.config.ts changes. When",
+      "content is in the database, files are not watched: edits arrive as Studio publishes.",
+      "Put your site's dev server after --, as in graft dev -- next dev, to run it too.",
+      "It starts after the first compile that succeeds, Ctrl+C stops both, and when it",
+      "exits, graft dev exits with its exit code.",
+    ],
+    args: [{ name: "command", variadic: true, afterDashes: true }],
     flags: [BRANCH],
     database: "postgres",
     longRunning: true,
+    examples: ["graft dev -- next dev"],
   },
   {
     path: ["check"],
@@ -1243,7 +1254,8 @@ export function flagsOf(spec: CommandSpec): FlagSpec[] {
 /** `graft branch create <name> [--from <parent>] [--backend overlay|neon] [--json]` */
 export function usageOf(spec: CommandSpec): string {
   const words = ["graft", ...spec.path];
-  for (const arg of spec.args ?? []) {
+  const args = spec.args ?? [];
+  for (const arg of args.filter((a) => !a.afterDashes)) {
     const name = arg.variadic ? `${arg.name}...` : arg.name;
     words.push(arg.required ? `<${name}>` : `[${name}]`);
   }
@@ -1251,6 +1263,9 @@ export function usageOf(spec: CommandSpec): string {
     if (flag === HELP_FLAG) continue;
     const value = flag.type === "boolean" ? "" : ` ${flag.value ?? "<value>"}`;
     words.push(`[--${flag.name}${value}]${flag.multiple ? "..." : ""}`);
+  }
+  for (const arg of args.filter((a) => a.afterDashes)) {
+    words.push(`[-- ${arg.name}${arg.variadic ? "..." : ""}]`);
   }
   return words.join(" ");
 }

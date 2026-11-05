@@ -36,11 +36,12 @@ module that ships with it. You do not need a database or a cloud account.
 ## Set up your first project
 
 Pick the tab that matches your project. Each one runs the same three steps:
-set up, compile, read. The Next.js and Astro paths end with a rendered page.
+set up, compile, read. The Next.js, Nuxt, SvelteKit and Astro paths end with a
+rendered page.
 The plain TypeScript path prints the document in your terminal, with no
 framework involved. Other frameworks are listed [after the tabs](#your-framework).
 
-<Tabs labels="Next.js, Plain TypeScript, Astro">
+<Tabs labels="Next.js, Nuxt, SvelteKit, Astro, Plain TypeScript">
 
 <Tab>
 
@@ -145,15 +146,333 @@ export default async function Page() {
 `home.data` is typed from your schema: hover `title` in your editor and you
 will see `string`. `MdxBody` renders the Markdown body on the server.
 
-Start your dev server and open `http://localhost:3000`:
+Run Next.js under `graft dev`, which recompiles your content whenever you save
+a file. Set the `dev` script in `package.json`, keeping your other scripts:
+
+<CodeBlock title="package.json">
+
+```json
+{
+  "scripts": {
+    "dev": "graft dev -- next dev"
+  }
+}
+```
+
+</CodeBlock>
+
+Then start it and open `http://localhost:3000`:
 
 ```sh
 npm run dev
 ```
 
 You should see the heading **Hello, Graft**, its tagline, and the body text
-from `content/pages/home.mdx`. Edit that file, run `npx graft compile` again,
-and refresh to see the change.
+from `content/pages/home.mdx`. Edit that file and refresh: the change is
+there, with no restart.
+
+</Step>
+
+</Steps>
+
+</Tab>
+
+<Tab>
+
+### Nuxt
+
+Goal: render a compiled document in a server-rendered Nuxt page.
+
+<Steps>
+
+<Step title="Install the Nuxt module and CLI">
+
+The module supports Nuxt 4.6 and newer, and Nuxt 5.
+
+```sh
+npm i @usegraft/sdk-nuxt
+npm i -D @usegraft/cli
+```
+
+</Step>
+
+<Step title="Initialize Graft">
+
+```sh
+npx @usegraft/cli@latest init
+```
+
+This scaffolds `graft.config.ts`, creates sample content in `content/pages/home.mdx`,
+and sets up the static index.
+
+</Step>
+
+<Step title="Compile your content">
+
+```sh
+npx graft compile
+```
+
+</Step>
+
+<Step title="Add the module">
+
+Add it to `modules`, and turn on the content API, which the page composables
+read through:
+
+<CodeBlock title="nuxt.config.ts">
+
+```ts
+export default defineNuxtConfig({
+  modules: ["@usegraft/sdk-nuxt"],
+  graft: { contentApi: true },
+});
+```
+
+</CodeBlock>
+
+</Step>
+
+<Step title="Read content in a page">
+
+`useGraftContent` is auto-imported. It reads on the server for the first paint:
+
+<CodeBlock title="app/pages/index.vue">
+
+```vue
+<script setup lang="ts">
+const { data: home } = await useGraftContent("pages", "home");
+</script>
+
+<template>
+  <main v-if="home">
+    <h1>{{ home.data.title }}</h1>
+    <p>{{ home.data.tagline }}</p>
+  </main>
+</template>
+```
+
+</CodeBlock>
+
+Run Nuxt under `graft dev`, which recompiles your content whenever you save a
+file. Set the `dev` script in `package.json`, keeping your other scripts:
+
+<CodeBlock title="package.json">
+
+```json
+{
+  "scripts": {
+    "dev": "graft dev -- nuxt dev"
+  }
+}
+```
+
+</CodeBlock>
+
+Then start it and open `http://localhost:3000`:
+
+```sh
+npm run dev
+```
+
+You should see the heading **Hello, Graft** and its tagline. Edit
+`content/pages/home.mdx` and refresh: the change is there, with no restart. The
+[Nuxt guide](/docs/nuxt) covers MDX bodies, server routes and the rest.
+
+</Step>
+
+</Steps>
+
+</Tab>
+
+<Tab>
+
+### SvelteKit
+
+Goal: render a compiled document from a server `load` function.
+
+<Steps>
+
+<Step title="Install the SvelteKit SDK and CLI">
+
+The SDK supports SvelteKit 2 and 3. SvelteKit 3 needs Node.js 22.17 or newer.
+
+```sh
+npm i @usegraft/sdk-sveltekit @usegraft/db
+npm i -D @usegraft/cli
+```
+
+</Step>
+
+<Step title="Initialize Graft">
+
+```sh
+npx @usegraft/cli@latest init
+```
+
+This scaffolds `graft.config.ts`, creates sample content in `content/pages/home.mdx`,
+and sets up the static index.
+
+</Step>
+
+<Step title="Compile your content">
+
+```sh
+npx graft compile
+```
+
+</Step>
+
+<Step title="Create the Graft client">
+
+Create it once, under `src/lib/server/`, which SvelteKit keeps out of the
+browser:
+
+<CodeBlock title="src/lib/server/graft.ts">
+
+```ts
+import { openStaticIndex } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-sveltekit";
+import { collections } from "../../../graft.config";
+
+export const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});
+```
+
+</CodeBlock>
+
+</Step>
+
+<Step title="Read content in a page">
+
+Read in a server `load`, and render what it returns:
+
+<CodeBlock title="src/routes/+page.server.ts">
+
+```ts
+import { error } from "@sveltejs/kit";
+import { graft } from "../lib/server/graft";
+import type { PageServerLoad } from "./$types";
+
+export const load: PageServerLoad = async () => {
+  const home = await graft.getContent("pages", "home");
+  if (!home) error(404);
+  return { home };
+};
+```
+
+</CodeBlock>
+
+<CodeBlock title="src/routes/+page.svelte">
+
+```svelte
+<script lang="ts">
+  import type { PageProps } from "./$types";
+
+  let { data }: PageProps = $props();
+</script>
+
+<main>
+  <h1>{data.home.data.title}</h1>
+  <p>{data.home.data.tagline}</p>
+</main>
+```
+
+</CodeBlock>
+
+Run Vite under `graft dev`, which recompiles your content whenever you save a
+file. Set the `dev` script in `package.json`, keeping your other scripts:
+
+<CodeBlock title="package.json">
+
+```json
+{
+  "scripts": {
+    "dev": "graft dev -- vite dev"
+  }
+}
+```
+
+</CodeBlock>
+
+Then start it and open `http://localhost:5173`:
+
+```sh
+npm run dev
+```
+
+You should see the heading **Hello, Graft** and its tagline. Edit
+`content/pages/home.mdx` and refresh: the change is there, with no restart. The
+[SvelteKit guide](/docs/sveltekit) covers MDX bodies, functions and the rest.
+
+</Step>
+
+</Steps>
+
+</Tab>
+
+<Tab>
+
+### In your Astro project
+
+Goal: render a compiled document in a zero-JavaScript Astro page.
+
+<Steps>
+
+<Step title="Install the Astro SDK and CLI">
+
+```sh
+npm i @usegraft/sdk-astro @usegraft/db
+npm i -D @usegraft/cli
+```
+
+</Step>
+
+<Step title="Initialize Graft">
+
+```sh
+npx @usegraft/cli@latest init
+```
+
+</Step>
+
+<Step title="Compile your content">
+
+```sh
+npx graft compile
+```
+
+</Step>
+
+<Step title="Read content in an Astro page">
+
+In `src/pages/index.astro`:
+
+```astro
+---
+import { openStaticIndex } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-astro";
+import { collections } from "../../graft.config";
+
+const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});
+
+const home = await graft.getContent("pages", "home");
+---
+
+<main>
+  <h1>{home?.data.title}</h1>
+  <p>{home?.data.tagline}</p>
+</main>
+```
+
+Run Astro under `graft dev`, which recompiles your content whenever you save a
+file: set the `dev` script in `package.json` to `graft dev -- astro dev`, then
+run `npm run dev`.
 
 </Step>
 
@@ -240,69 +559,6 @@ Tagline: Content lives in git; the index is a file.
 
 </Tab>
 
-<Tab>
-
-### In your Astro project
-
-Goal: render a compiled document in a zero-JavaScript Astro page.
-
-<Steps>
-
-<Step title="Install the Astro SDK and CLI">
-
-```sh
-npm i @usegraft/sdk-astro @usegraft/db
-npm i -D @usegraft/cli
-```
-
-</Step>
-
-<Step title="Initialize Graft">
-
-```sh
-npx @usegraft/cli@latest init
-```
-
-</Step>
-
-<Step title="Compile your content">
-
-```sh
-npx graft compile
-```
-
-</Step>
-
-<Step title="Read content in an Astro page">
-
-In `src/pages/index.astro`:
-
-```astro
----
-import { openStaticIndex } from "@usegraft/db";
-import { createGraft } from "@usegraft/sdk-astro";
-import { collections } from "../../graft.config";
-
-const graft = createGraft({
-  index: await openStaticIndex(".graft/index.db"),
-  collections,
-});
-
-const home = await graft.getContent("pages", "home");
----
-
-<main>
-  <h1>{home?.data.title}</h1>
-  <p>{home?.data.tagline}</p>
-</main>
-```
-
-</Step>
-
-</Steps>
-
-</Tab>
-
 </Tabs>
 
 ### Your framework
@@ -352,11 +608,13 @@ Welcome! This page lives in Git, next to your code.
 </CodeBlock>
 
 Then compile again, or leave `graft dev` running so it recompiles whenever a
-file changes:
+file changes. Put your dev server after `--` and `graft dev` runs it too, so one
+command and one Ctrl+C cover both:
 
 ```sh
-npx graft compile    # compile once
-npx graft dev        # recompile on every change
+npx graft compile               # compile once
+npx graft dev                   # recompile on every change
+npx graft dev -- next dev       # the same, with your dev server
 ```
 
 Read it the same way you read `home`: `graft.getContent("pages", "about")`.

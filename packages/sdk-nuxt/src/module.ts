@@ -23,6 +23,7 @@ import {
   addVitePlugin,
   addServerImports,
   createResolver,
+  isNuxtMajorVersion,
   defineNuxtModule,
 } from "@nuxt/kit";
 import type { NuxtModule } from "@nuxt/schema";
@@ -130,14 +131,16 @@ const graftModule: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
     nuxt.options.build.transpile.push(resolver.resolve("./runtime"), GRAFT_PACKAGES);
     nuxt.hook("nitro:config", (config) => {
       // The same for the server routes Nitro bundles. Nitro 2 (Nuxt 4) reads
-      // `externals.inline`; Nitro 3 (Nuxt 5) reads `noExternals`. Each ignores
-      // the other's key.
+      // `externals.inline`; Nitro 3 (Nuxt 5) reads `noExternals` as a list.
+      // Nitro 2 reads any truthy `noExternals` as "no externals at all", which
+      // breaks `nuxt dev` on an optional import of a package that is not
+      // installed, so the list is set on Nuxt 5 only.
       const nitro: NitroInline = config;
       nitro.externals = {
         ...nitro.externals,
         inline: [...(nitro.externals?.inline ?? []), GRAFT_PACKAGES],
       };
-      if (nitro.noExternals !== true) {
+      if (!isNuxtMajorVersion(4, nuxt) && nitro.noExternals !== true) {
         nitro.noExternals = [...(nitro.noExternals || []), GRAFT_PACKAGES];
       }
       // The MDX compiler behind `prepareMdx` stays external and traced. Nuxt

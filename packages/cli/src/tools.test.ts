@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
 import { connectInProcess } from "@usegraft/mcp";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { run } from "./cli";
-import { formatWrite, retryCommand, shellQuote } from "./commands/tools";
+import { formatWrite, retryCommand } from "./commands/tools";
+import { shellQuote } from "./shell-quote";
 import { openProjectMcp } from "./project-mcp";
 
 // Inside the package so the scaffolded config's `@usegraft/core` import resolves.

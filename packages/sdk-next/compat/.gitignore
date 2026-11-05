@@ -10,3 +10,5 @@ next*/.graft/
 next*/.next/
 next*/next-env.d.ts
 next*/*.tsbuildinfo
+# Written by `next dev` on Next 16, which the smoke's dev loop runs.
+next*/AGENTS.md
