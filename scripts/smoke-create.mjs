@@ -51,6 +51,13 @@ if (!framework || !(framework in CLIENT_DIR)) {
 /** The Playwright the compat smokes pin, so CI installs one browser for all of them. */
 const PLAYWRIGHT = "1.63.0";
 
+// It stops servers by process group and runs npm without a shell, neither of
+// which works on Windows. CI runs it on Linux.
+if (process.platform === "win32") {
+  console.error("scripts/smoke-create.mjs runs on Linux and macOS only.");
+  process.exit(2);
+}
+
 const failures = [];
 function check(ok, what) {
   console.log(`${ok ? "ok  " : "FAIL"} ${what}`);

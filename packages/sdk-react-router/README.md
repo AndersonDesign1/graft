@@ -1,6 +1,6 @@
 # @usegraft/sdk-react-router
 
-> React Router v7 adapter: typed content reads and loader/action mounts over the same handlers every other surface serves.
+> React Router 7 and 8 adapter (framework mode): typed content reads, loader/action mounts and MDX rendering over the same handlers every other surface serves.
 
 Part of [Graft](https://github.com/AndersonDesign1/graft), a CMS built so an AI agent is the primary operator. For framework mode, which is where React Router runs loaders and actions on a server.
 

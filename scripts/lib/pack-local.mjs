@@ -64,7 +64,10 @@ export function packLocal(outDir, roots) {
     if (shipsDist && !existsSync(join(dir, "dist"))) {
       throw new Error(`${name} has no dist/. Build it before packing.`);
     }
-    const result = spawnSync("pnpm", ["pack", "--pack-destination", outDir], {
+    // On Windows pnpm is a .cmd shim, which needs a shell, and the shell
+    // splits an unquoted path at its spaces.
+    const destination = process.platform === "win32" ? `"${outDir}"` : outDir;
+    const result = spawnSync("pnpm", ["pack", "--pack-destination", destination], {
       cwd: dir,
       encoding: "utf8",
       shell: process.platform === "win32",

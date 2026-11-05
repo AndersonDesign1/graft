@@ -94,7 +94,7 @@ export const ServerRoute = createServerFileRoute("/api/fn/$name").methods({
   GET: graftRoute(functionsHandler), // answers 405
 });
 
-// React Router v7: app/routes/api.fn.$name.ts
+// React Router: app/routes/api.fn.$name.ts
 export const action = graftRoute(functionsHandler); // POST
 export const loader = graftRoute(functionsHandler); // GET, answers 405
 
