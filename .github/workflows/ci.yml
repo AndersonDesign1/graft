@@ -390,8 +390,10 @@ jobs:
       # The CLI that makes the site, the adapter it depends on, and everything
       # they import: the smoke packs exactly these.
       - run: pnpm turbo run build --filter=@usegraft/cli... --filter=@usegraft/sdk-${{ matrix.framework }}...
-      # The browser the smoke drives, for the Playwright version it installs.
-      - run: npx --yes playwright@1.63.0 install --with-deps chromium
+      # The browser the smoke drives. The SvelteKit 3 compat app pins the same
+      # Playwright the smoke installs into the site, and the workspace install
+      # already has it; `npx playwright@…` at the root finds no binary on a runner.
+      - run: pnpm --filter sdk-sveltekit-compat-kit3 exec playwright install --with-deps chromium
       - run: node scripts/smoke-create.mjs --framework ${{ matrix.framework }}
 
       # Saved even when a step failed: turbo caches only tasks that passed,
