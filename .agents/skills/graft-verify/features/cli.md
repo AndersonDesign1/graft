@@ -91,6 +91,12 @@ Preconditions: `REPO` and `O` from the skill's Launch step, a sandbox from `scri
   `compat/smoke.mjs` does), run `$G compile`, then `node_modules/.bin/next
   build` and `next start -p 3217`. `/` lists "Hello, world" above "How we
   work", and `/posts/hello-world` renders its body.
+- **Create, build and serve a site in any other framework.** From the repo
+  root, after building the CLI and the framework's adapter,
+  `$O node scripts/smoke-create.mjs --framework astro` (or `react-router`,
+  `tanstack-start`) makes the site, installs this checkout's packages packed
+  as npm would see them, builds, serves and drives it in Chromium, and runs
+  the dev loop. It ends with `All checks passed for --framework astro.`
 - **Online editing goes live.** `create` with `--edit online --database
   "$URL" --no-install` against an empty scratch database, then `content
   import`, `doctor` (all pass except the Studio sign-in warning), `next

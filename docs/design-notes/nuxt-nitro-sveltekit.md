@@ -2,7 +2,8 @@
 
 **Status: units 1 to 6 are built: `@usegraft/sdk-nitro`, `@usegraft/sdk-vue`,
 `@usegraft/sdk-nuxt`, the SvelteKit 2 and 3 compat apps, `graft create
---framework nuxt|sveltekit`, and the Svelte MDX renderer. The Nitro
+--framework nuxt|sveltekit`, and the Svelte MDX renderer. So are
+`--framework astro|react-router|tanstack-start`, after the plan. The Nitro
 `graft serve` module waits for Nitro 3 to leave RC.** This note records where each
 framework stands today, what a spike proved, and the order to build in.
 
@@ -274,6 +275,33 @@ compat app. Building it found that SvelteKit 3 also replaced
 `$env/static/private`: a Postgres site declares `DATABASE_URL` in
 `src/env.ts` with `defineEnvVars` and imports it from `$app/env/private`.
 
+### After the plan: Astro, React Router and TanStack Start sites
+
+`graft create` reads its frameworks from one list, `SITE_FRAMEWORKS` in
+`packages/cli/src/registry.ts`: the flag's values, its help, the question it
+asks, the error for an unknown name, the short names and the CLI reference.
+A test fails when a `packages/sdk-*` adapter has neither an entry nor a
+reason it has none.
+
+`astro`, `react-router` and `tanstack-start` are built on it (**verified**):
+`scripts/smoke-create.mjs` makes each site from the checkout, installs the
+framework from npm, type-checks, builds, serves, renders the pages and each
+MDX body, checks the browser bundle, hydrates and navigates in Chromium, and
+runs the `npm run dev` loop. CI runs it as `create-site`. Building them found:
+
+- Astro 7 moves `astro dev` to the background when it detects an AI agent,
+  and `graft dev` then sees its child exit. The template passes
+  `--ignore-lock`, which keeps it in the foreground.
+- Astro 7 needs Node.js 22.23.4 and React Router 8 needs 22.22, above the
+  repo's 22.16 floor.
+- A TanStack Start build is a fetch handler with no Node server. The template
+  serves it with srvx rather than Nitro, which is still a release candidate.
+- The Svelte renderer's `prepareMdx` moved to `@usegraft/mdx-safety/prepare`,
+  so all three share it. React renders the tree with `MdxContent` from
+  `@usegraft/sdk-react/mdx`, Astro with an Astro component. The tree now drops
+  whitespace between table parts, which the HTML parser drops and React would
+  report as a hydration mismatch.
+
 ### 6. Svelte MDX renderer
 
 Svelte has no JSX runtime, and mdsvex is a different dialect, not MDX. Compile
@@ -282,7 +310,8 @@ that maps element names to an allowlisted component map. It never evaluates
 the body, so `{expr}` and `import` stay refused under every trust level. Say
 that difference from `MdxBody` in the docs.
 
-Built (**verified**): `prepareMdx` in `@usegraft/sdk-sveltekit/server` returns a JSON tree
+Built (**verified**): `prepareMdx` in `@usegraft/sdk-sveltekit/server` (now
+re-exported from `@usegraft/mdx-safety/prepare`) returns a JSON tree
 of text, element and component nodes, and `MdxContent` in
 `@usegraft/sdk-sveltekit/mdx` renders it. The components ship as Svelte source,
 compiled by the app's own Svelte. The compat apps render a body with Markdown,

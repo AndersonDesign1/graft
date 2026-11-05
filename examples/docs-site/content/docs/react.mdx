@@ -133,7 +133,9 @@ export function BlogPost({ slug }: { slug: string }) {
 
 `data` is `null` when the collection has no document with that slug, so a
 missing post is not an error. `post.body` is the Markdown or MDX source as
-written. Render it with your own Markdown or MDX renderer.
+written. Render it with your own Markdown or MDX renderer. When a server
+prepared the body with `prepareMdx`, as the React Router and TanStack Start
+adapters do, render the result with `MdxContent` from `@usegraft/sdk-react/mdx`.
 
 ## Add a search box
 

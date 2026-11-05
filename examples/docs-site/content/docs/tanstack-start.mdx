@@ -15,6 +15,12 @@ browser, and you can serve Graft's functions and MCP endpoint from server routes
 `graft.config.ts` with compiled content. If you do not have those yet, run
 through [Getting started](/docs/getting-started) first.
 
+Starting from nothing? `npm create graft@latest my-site -- --framework tanstack-start`
+makes a TanStack Start site with all of this set up: a home page, a page for
+each collection and each entry, read through server functions, and MDX bodies
+rendered with `<MdxContent>`. Its `npm start` serves the build on Node with
+[srvx](https://srvx.h3.dev).
+
 <AgentPrompt>
   Add Graft to this TanStack Start app following
   https://graft.page/docs/tanstack-start.md. Create the client in
@@ -106,6 +112,68 @@ const getDoc = createServerFn({ method: "GET" })
 
 Each call reads the index. If one request reads the same document in several
 places, cache the result yourself.
+
+## Render MDX bodies
+
+A document's body comes back as its MDX source. Prepare it inside the server
+function with `prepareMdx`, then render the result with `MdxContent` and your
+own React components:
+
+<CodeBlock title="src/routes/docs.$slug.tsx">
+
+```tsx
+import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { MdxContent } from "@usegraft/sdk-tanstack-start/mdx";
+import { prepareMdx } from "@usegraft/sdk-tanstack-start/server";
+import { Callout } from "../components/callout";
+import { graft } from "../lib/graft.server";
+
+const getDoc = createServerFn({ method: "GET" })
+  .validator((slug: string) => slug)
+  .handler(async ({ data: slug }) => {
+    const doc = await graft.getContent("docs", slug);
+    return doc ? { title: doc.data.title, body: prepareMdx(doc.body) } : null;
+  });
+
+export const Route = createFileRoute("/docs/$slug")({
+  loader: async ({ params }) => {
+    const doc = await getDoc({ data: params.slug });
+    if (!doc) throw notFound();
+    return doc;
+  },
+  component: Doc,
+});
+
+function Doc() {
+  const doc = Route.useLoaderData();
+  return (
+    <article>
+      <h1>{doc.title}</h1>
+      <MdxContent tree={doc.body} components={{ Callout }} />
+    </article>
+  );
+}
+```
+
+</CodeBlock>
+
+The prepared body is plain data, so the server function returns it and the
+page renders the same on the server and after a client-side navigation. A
+component gets its attributes as props and the content between its tags as
+`children`. If the body names a component that `components` does not have,
+its content still renders, without the component around it. The Markdown
+parser stays on the server: call `prepareMdx` only inside a server function
+or a server route.
+
+The body is never evaluated, which makes this renderer stricter than
+`MdxBody` in Next.js: `{expressions}`, `import`, `export` and spread
+attributes are refused with `INPUT_VALIDATION_FAILED` under every trust level,
+along with `<script>`-like elements, `on…` handlers and `innerHTML`-style
+attributes. `graft compile` refuses the same constructs unless the project
+sets `mdxTrust = "full"`, so this only comes up with full trust. Links with a
+script URL are dropped unless you pass `trust: "full"`. See
+[MDX safety](/docs/mdx-safety).
 
 ## Serve functions and MCP from your app
 

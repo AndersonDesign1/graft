@@ -16,6 +16,11 @@ from Astro routes.
 compiled content. If you do not have those yet, run through
 [Getting started](/docs/getting-started) first.
 
+Starting from nothing? `npm create graft@latest my-site -- --framework astro`
+makes an Astro 7 site with all of this set up: a home page, a page for each
+collection and each entry, and MDX bodies rendered with `<MdxContent>`.
+Astro 7 needs Node.js 22.23.4 or newer.
+
 <AgentPrompt>
   Add Graft to this Astro site following https://graft.page/docs/astro.md.
   Create the client in src/lib/graft.ts and render the pages collection at
@@ -105,10 +110,43 @@ so reading the same document twice reads the index twice. That is rarely worth
 worrying about: prerendered pages read once at build time, and a server-rendered
 page makes only a few reads.
 
-<Callout label="Rendering the body" type="warning">
-  Bodies come back as authored source. Render them with Astro's own MDX pipeline.
-  There is no `MdxBody` here. That evaluator is Next-only.
-</Callout>
+## Render MDX bodies
+
+A document's body comes back as its MDX source. `MdxContent` renders it in
+the page, with your own Astro components for the ones the body names:
+
+<CodeBlock title="src/pages/[slug].astro">
+
+```astro
+---
+import { MdxContent } from "@usegraft/sdk-astro/mdx";
+import Callout from "../components/Callout.astro";
+import { graft } from "../lib/graft";
+
+const page = await graft.getContent("pages", Astro.params.slug!);
+if (!page) return new Response("Not found", { status: 404 });
+---
+
+<h1>{page.data.title}</h1>
+<MdxContent source={page.body} components={{ Callout }} />
+```
+
+</CodeBlock>
+
+A component gets its attributes as props, and the content between its tags
+in its default `<slot />`. If the body names a component that `components`
+does not have, its content still renders, without the component around it.
+`MdxContent` parses the body in the page's frontmatter, on the server, and
+sends only HTML to the browser.
+
+The body is never evaluated, which makes this renderer stricter than
+`MdxBody` in Next.js: `{expressions}`, `import`, `export` and spread
+attributes are refused with `INPUT_VALIDATION_FAILED` under every trust level,
+along with `<script>`-like elements, `on…` handlers and `innerHTML`-style
+attributes. `graft compile` refuses the same constructs unless the project
+sets `mdxTrust = "full"`, so this only comes up with full trust. Links with a
+script URL are dropped unless you pass `trust: "full"`. See
+[MDX safety](/docs/mdx-safety).
 
 ## Serve functions and MCP from your app
 

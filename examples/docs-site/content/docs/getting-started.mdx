@@ -10,8 +10,10 @@ order: 1
 <Callout label="Starting from nothing?" type="note">
 
 `npm create graft@latest my-site` makes a whole site in one step: a template,
-a database, Studio and a Next.js app, with example content. This guide adds
-Graft to a project you already have.
+a database, Studio and a Next.js app, with example content. Add
+`-- --framework nuxt`, `sveltekit`, `astro`, `react-router` or
+`tanstack-start` for the same site in that framework. This guide adds Graft
+to a project you already have.
 
 </Callout>
 
@@ -36,12 +38,12 @@ module that ships with it. You do not need a database or a cloud account.
 ## Set up your first project
 
 Pick the tab that matches your project. Each one runs the same three steps:
-set up, compile, read. The Next.js, Nuxt, SvelteKit and Astro paths end with a
-rendered page.
+set up, compile, read. The Next.js, Nuxt, SvelteKit, Astro, React Router and
+TanStack Start paths end with a rendered page.
 The plain TypeScript path prints the document in your terminal, with no
 framework involved. Other frameworks are listed [after the tabs](#your-framework).
 
-<Tabs labels="Next.js, Nuxt, SvelteKit, Astro, Plain TypeScript">
+<Tabs labels="Next.js, Nuxt, SvelteKit, Astro, React Router, TanStack Start, Plain TypeScript">
 
 <Tab>
 
@@ -448,12 +450,13 @@ npx graft compile
 
 <Step title="Read content in an Astro page">
 
-In `src/pages/index.astro`:
+<CodeBlock title="src/pages/index.astro">
 
 ```astro
 ---
 import { openStaticIndex } from "@usegraft/db";
 import { createGraft } from "@usegraft/sdk-astro";
+import { MdxContent } from "@usegraft/sdk-astro/mdx";
 import { collections } from "../../graft.config";
 
 const graft = createGraft({
@@ -467,12 +470,292 @@ const home = await graft.getContent("pages", "home");
 <main>
   <h1>{home?.data.title}</h1>
   <p>{home?.data.tagline}</p>
+  {home && <MdxContent source={home.body} />}
 </main>
 ```
 
+</CodeBlock>
+
+`MdxContent` renders the Markdown body on the server and sends only HTML.
+
+</Step>
+
+<Step title="See it in your browser">
+
 Run Astro under `graft dev`, which recompiles your content whenever you save a
-file: set the `dev` script in `package.json` to `graft dev -- astro dev`, then
-run `npm run dev`.
+file. Set the `dev` script in `package.json`, keeping your other scripts:
+
+<CodeBlock title="package.json">
+
+```json
+{
+  "scripts": {
+    "dev": "graft dev -- astro dev --ignore-lock"
+  }
+}
+```
+
+</CodeBlock>
+
+`--ignore-lock` keeps Astro in the foreground when an AI agent runs it.
+Without it, Astro 7 starts its server in the background and exits, and
+`graft dev` stops with it. Then start it and open `http://localhost:4321`:
+
+```sh
+npm run dev
+```
+
+You should see the heading **Hello, Graft**, its tagline and the body text.
+The [Astro guide](/docs/astro) covers components in bodies, functions and the
+rest.
+
+</Step>
+
+</Steps>
+
+</Tab>
+
+<Tab>
+
+### React Router (framework mode)
+
+Goal: render a compiled document from a route loader.
+
+<Steps>
+
+<Step title="Install the React Router SDK and CLI">
+
+```sh
+npm i @usegraft/sdk-react-router @usegraft/db
+npm i -D @usegraft/cli
+```
+
+</Step>
+
+<Step title="Initialize Graft">
+
+```sh
+npx @usegraft/cli@latest init
+```
+
+</Step>
+
+<Step title="Compile your content">
+
+```sh
+npx graft compile
+```
+
+</Step>
+
+<Step title="Create the Graft client">
+
+Create it once, in a `.server.ts` module, which React Router refuses to put in
+the browser bundle:
+
+<CodeBlock title="app/lib/graft.server.ts">
+
+```ts
+import { openStaticIndex } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-react-router";
+import { collections } from "../../graft.config";
+
+export const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});
+```
+
+</CodeBlock>
+
+</Step>
+
+<Step title="Read content in a loader">
+
+The loader runs on the server. `prepareMdx` turns the body into plain data,
+and `MdxContent` renders it on the server and again when the page hydrates:
+
+<CodeBlock title="app/routes/home.tsx">
+
+```tsx
+import { MdxContent } from "@usegraft/sdk-react-router/mdx";
+import { prepareMdx } from "@usegraft/sdk-react-router/server";
+import { graft } from "../lib/graft.server";
+import type { Route } from "./+types/home";
+
+export async function loader() {
+  const home = await graft.getContent("pages", "home");
+  if (!home) throw new Response("Not found", { status: 404 });
+  return { title: home.data.title, tagline: home.data.tagline, body: prepareMdx(home.body) };
+}
+
+export default function Home({ loaderData }: Route.ComponentProps) {
+  return (
+    <main>
+      <h1>{loaderData.title}</h1>
+      <p>{loaderData.tagline}</p>
+      <MdxContent tree={loaderData.body} />
+    </main>
+  );
+}
+```
+
+</CodeBlock>
+
+</Step>
+
+<Step title="See it in your browser">
+
+Set the `dev` script in `package.json` to run React Router under `graft dev`,
+keeping your other scripts:
+
+<CodeBlock title="package.json">
+
+```json
+{
+  "scripts": {
+    "dev": "graft dev -- react-router dev"
+  }
+}
+```
+
+</CodeBlock>
+
+Then start it and open `http://localhost:5173`:
+
+```sh
+npm run dev
+```
+
+You should see the heading **Hello, Graft**, its tagline and the body text.
+Edit `content/pages/home.mdx` and refresh: the change is there, with no
+restart. The [React Router guide](/docs/react-router) covers components in
+bodies, functions and the rest.
+
+</Step>
+
+</Steps>
+
+</Tab>
+
+<Tab>
+
+### TanStack Start
+
+Goal: render a compiled document through a server function.
+
+<Steps>
+
+<Step title="Install the TanStack Start SDK and CLI">
+
+```sh
+npm i @usegraft/sdk-tanstack-start @usegraft/db
+npm i -D @usegraft/cli
+```
+
+</Step>
+
+<Step title="Initialize Graft">
+
+```sh
+npx @usegraft/cli@latest init
+```
+
+</Step>
+
+<Step title="Compile your content">
+
+```sh
+npx graft compile
+```
+
+</Step>
+
+<Step title="Create the Graft client">
+
+<CodeBlock title="src/lib/graft.server.ts">
+
+```ts
+import { openStaticIndex } from "@usegraft/db";
+import { createGraft } from "@usegraft/sdk-tanstack-start";
+import { collections } from "../../graft.config";
+
+export const graft = createGraft({
+  index: await openStaticIndex(".graft/index.db"),
+  collections,
+});
+```
+
+</CodeBlock>
+
+</Step>
+
+<Step title="Read content through a server function">
+
+A TanStack Start loader also runs in the browser, so the read goes in a server
+function, which the loader calls:
+
+<CodeBlock title="src/routes/index.tsx">
+
+```tsx
+import { createFileRoute } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { MdxContent } from "@usegraft/sdk-tanstack-start/mdx";
+import { prepareMdx } from "@usegraft/sdk-tanstack-start/server";
+import { graft } from "../lib/graft.server";
+
+const getHome = createServerFn({ method: "GET" }).handler(async () => {
+  const home = await graft.getContent("pages", "home");
+  return home ? { title: home.data.title, body: prepareMdx(home.body) } : null;
+});
+
+export const Route = createFileRoute("/")({
+  loader: () => getHome(),
+  component: Home,
+});
+
+function Home() {
+  const home = Route.useLoaderData();
+  return (
+    <main>
+      <h1>{home?.title}</h1>
+      {home ? <MdxContent tree={home.body} /> : null}
+    </main>
+  );
+}
+```
+
+</CodeBlock>
+
+</Step>
+
+<Step title="See it in your browser">
+
+Set the `dev` script in `package.json` to run Vite under `graft dev`, keeping
+your other scripts:
+
+<CodeBlock title="package.json">
+
+```json
+{
+  "scripts": {
+    "dev": "graft dev -- vite dev"
+  }
+}
+```
+
+</CodeBlock>
+
+Then start it and open `http://localhost:5173`:
+
+```sh
+npm run dev
+```
+
+You should see the heading **Hello, Graft** and the body text. Edit
+`content/pages/home.mdx` and refresh: the change is there, with no restart.
+The [TanStack Start guide](/docs/tanstack-start) covers components in bodies,
+functions and the rest.
 
 </Step>
 
@@ -563,20 +846,22 @@ Tagline: Content lives in git; the index is a file.
 
 ### Your framework
 
-Every framework reads the same index with the same typed calls. Pick your guide:
+Every framework reads the same index with the same typed calls. Pick your
+guide. To start a new site instead, run `npm create graft@latest my-site -- --framework <name>`
+with the name in the last column.
 
-| Framework | Package | Guide |
-| :--- | :--- | :--- |
-| Next.js (App Router or Pages Router) | `@usegraft/sdk-next` | [Next.js](/docs/next) |
-| Astro | `@usegraft/sdk-astro` | [Astro](/docs/astro) |
-| SvelteKit | `@usegraft/sdk-sveltekit` | [SvelteKit](/docs/sveltekit) |
-| TanStack Start | `@usegraft/sdk-tanstack-start` | [TanStack Start](/docs/tanstack-start) |
-| React Router (framework mode) | `@usegraft/sdk-react-router` | [React Router](/docs/react-router) |
-| Nuxt 4.6+ or 5 | `@usegraft/sdk-nuxt` | [Nuxt](/docs/nuxt) |
-| Nitro 3, or Nuxt before 4.6 | `@usegraft/sdk-nitro` | [Nitro](/docs/nitro) |
-| React in the browser | `@usegraft/sdk-react` | [React](/docs/react) |
-| Vue | `@usegraft/sdk-vue` | [Vue](/docs/vue) |
-| Plain Node or TypeScript | `@usegraft/sdk-core` | [SDK reference](/docs/sdk-reference) |
+| Framework | Package | Guide | `--framework` |
+| :--- | :--- | :--- | :--- |
+| Next.js (App Router or Pages Router) | `@usegraft/sdk-next` | [Next.js](/docs/next) | `next` |
+| Astro | `@usegraft/sdk-astro` | [Astro](/docs/astro) | `astro` |
+| SvelteKit | `@usegraft/sdk-sveltekit` | [SvelteKit](/docs/sveltekit) | `sveltekit` |
+| TanStack Start | `@usegraft/sdk-tanstack-start` | [TanStack Start](/docs/tanstack-start) | `tanstack-start` |
+| React Router (framework mode) | `@usegraft/sdk-react-router` | [React Router](/docs/react-router) | `react-router` |
+| Nuxt 4.6+ or 5 | `@usegraft/sdk-nuxt` | [Nuxt](/docs/nuxt) | `nuxt` |
+| Nitro 3, or Nuxt before 4.6 | `@usegraft/sdk-nitro` | [Nitro](/docs/nitro) | |
+| React in the browser | `@usegraft/sdk-react` | [React](/docs/react) | |
+| Vue | `@usegraft/sdk-vue` | [Vue](/docs/vue) | |
+| Plain Node or TypeScript | `@usegraft/sdk-core` | [SDK reference](/docs/sdk-reference) | `none` |
 
 ## Add your own content
 
