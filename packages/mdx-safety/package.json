@@ -30,6 +30,12 @@
     "*": {
       "frontmatter": [
         "./dist/frontmatter.d.ts"
+      ],
+      "tree": [
+        "./dist/tree.d.ts"
+      ],
+      "prepare": [
+        "./dist/prepare.d.ts"
       ]
     }
   },

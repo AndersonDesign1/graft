@@ -76,7 +76,7 @@ It is also not a server renderer. `useEffect` does not run during server renderi
 
 ## Render a prepared MDX body
 
-`MdxContent`, from its own entry `@usegraft/sdk-react/mdx`, renders a body that `prepareMdx` turned into a tree on a server. The React Router and TanStack Start adapters re-export both, so a site imports them from there:
+`MdxContent`, from its own entry `@usegraft/sdk-react/mdx`, renders a body that `prepareMdx` turned into a tree on a server. React Router and TanStack Start sites import it from their adapter's `/mdx` entry, and `prepareMdx` from its `/server` entry. Used directly:
 
 ```tsx
 import { MdxContent } from "@usegraft/sdk-react/mdx";

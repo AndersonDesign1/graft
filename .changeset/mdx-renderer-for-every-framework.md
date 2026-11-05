@@ -23,11 +23,18 @@ import { MdxContent } from "@usegraft/sdk-astro/mdx";
 
 ```tsx
 // React Router: prepare in the loader, render on the page.
-import { prepareMdx } from "@usegraft/sdk-react-router/server";
 import { MdxContent } from "@usegraft/sdk-react-router/mdx";
+import { prepareMdx } from "@usegraft/sdk-react-router/server";
 
-return { body: prepareMdx(doc.body) };
-<MdxContent tree={loaderData.body} components={{ Callout }} />;
+export async function loader({ params }: Route.LoaderArgs) {
+  const doc = await graft.getContent("docs", params.slug);
+  if (!doc) throw new Response("Not found", { status: 404 });
+  return { body: prepareMdx(doc.body) };
+}
+
+export default function Doc({ loaderData }: Route.ComponentProps) {
+  return <MdxContent tree={loaderData.body} components={{ Callout }} />;
+}
 ```
 
 TanStack Start has the same two entries, `@usegraft/sdk-tanstack-start/server`
@@ -35,4 +42,6 @@ and `/mdx`. React's `MdxContent` lives in `@usegraft/sdk-react/mdx`, and
 `prepareMdx` in `@usegraft/mdx-safety/prepare`, which `@usegraft/sdk-sveltekit/server`
 now re-exports. Its API is unchanged. A refused body's message no longer says
 "in Svelte", and a prepared table no longer keeps the whitespace between its
-rows, which browsers drop and React reported as a hydration mismatch.
+rows, which browsers drop and React reported as a hydration mismatch. Every
+renderer now also drops an element or attribute whose name is not a plain
+HTML name, such as `script ` or `x onerror`, from a tree built by hand.

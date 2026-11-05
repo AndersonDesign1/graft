@@ -124,8 +124,10 @@ describe("the frameworks graft create makes a site in", () => {
     expect(named.filter((name) => !adapters.includes(name))).toEqual([]);
   });
 
-  it("gives every name and short name to one framework only", () => {
+  it("gives every name and short name to one framework only, in lowercase", () => {
     const words = SITE_FRAMEWORKS.flatMap((framework) => [framework.name, ...framework.aliases]);
+    // resolveFramework lowercases what it is given, so an uppercase name could never match.
+    expect(words.filter((word) => word !== word.toLowerCase())).toEqual([]);
     expect(words.filter((word, i) => words.indexOf(word) !== i)).toEqual([]);
     expect(words).not.toContain("none");
   });

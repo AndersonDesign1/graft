@@ -38,6 +38,12 @@ function workspacePackages() {
  */
 export function packLocal(outDir, roots) {
   const workspace = workspacePackages();
+  // A name with no package here would install from the registry, and the
+  // caller would be testing the published package, not this checkout.
+  const unknown = roots.filter((name) => !workspace.has(name));
+  if (unknown.length > 0) {
+    throw new Error(`No published workspace package named ${unknown.join(", ")}.`);
+  }
   const wanted = new Set();
   const queue = [...roots];
   while (queue.length > 0) {

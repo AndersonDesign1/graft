@@ -22,7 +22,7 @@ const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input"
   if (node.type === "element") {
     if (!renderable(node.tag)) return null;
     const Tag = node.tag;
-    if (VOID.has(Tag)) return <Tag {...safeProps(node.props)} />;
+    if (VOID.has(Tag.toLowerCase())) return <Tag {...safeProps(node.props)} />;
     return <Tag {...safeProps(node.props)}><Astro.self nodes={node.children} components={components} /></Tag>;
   }
   const Custom = Object.hasOwn(components, node.name) ? (components[node.name] as any) : null;

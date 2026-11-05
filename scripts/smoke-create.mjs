@@ -64,10 +64,9 @@ function run(command, args, cwd = site) {
   console.log(`\n$ ${[command, ...args].join(" ")}`);
   // No shell: every argument is a fixed string or a path this script made.
   const result = spawnSync(command, args, { cwd, stdio: "inherit" });
-  if (result.status !== 0) {
-    console.error(`\n${command} exited with ${result.status}`);
-    process.exit(1);
-  }
+  // Thrown, not process.exit: a run after the server starts must still reach
+  // the `finally` that stops it.
+  if (result.status !== 0) throw new Error(`${command} ${args[0]} exited with ${result.status}`);
 }
 
 // 1. The site, as `npm create graft` writes it. Files and no database, so
@@ -152,17 +151,43 @@ const clientCode = existsSync(clientDir)
       .map((file) => readFileSync(join(clientDir, String(file)), "utf8"))
       .join("\n")
   : "";
+// An empty or missing bundle would pass the check below without testing it.
+// Astro's pages ship no JavaScript, so its client folder must exist and hold none.
+if (framework === "astro") {
+  check(
+    existsSync(clientDir) && clientCode === "",
+    `the build wrote ${CLIENT_DIR[framework]} with no JavaScript in it`,
+  );
+} else {
+  check(clientCode.length > 0, `the build wrote a browser bundle to ${CLIENT_DIR[framework]}`);
+}
 check(
   !/node:sqlite|openStaticIndex|content_index|micromark/.test(clientCode),
   "the browser bundle carries no server code, the Markdown parser included",
 );
 
 // 4. Serve the build the way `npm start` does, and read it over HTTP.
+/** A request that gives up after 10 seconds, so a stalled server cannot hang the smoke. */
+const get = (path) => fetch(`${base}${path}`, { signal: AbortSignal.timeout(10_000) });
+
+// Something already answering on the port would be checked in place of this site.
+if (
+  await get("/").then(
+    () => true,
+    () => false,
+  )
+) {
+  throw new Error(`Something already answers on ${base}. Pass a free --port.`);
+}
 const server = spawn("npm", ["start"], {
   cwd: site,
   stdio: ["ignore", "inherit", "inherit"],
   env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", NODE_ENV: "production" },
   detached: true,
+});
+let serverExited = false;
+server.once("exit", () => {
+  serverExited = true;
 });
 
 function stop() {
@@ -175,7 +200,7 @@ function stop() {
 
 /** The page without the comment markers frameworks put inside elements. */
 async function page(path) {
-  const response = await fetch(`${base}${path}`);
+  const response = await get(path);
   let html = await response.text();
   let previous;
   do {
@@ -190,14 +215,15 @@ const mainOf = (html) => html.slice(html.indexOf("<main"), html.indexOf("</main>
 
 try {
   let ready = false;
-  for (let i = 0; i < 120 && !ready; i++) {
+  for (let i = 0; i < 120 && !ready && !serverExited; i++) {
     await new Promise((done) => setTimeout(done, 500));
-    ready = await fetch(`${base}/`).then(
+    ready = await get("/").then(
       (r) => r.ok,
       () => false,
     );
   }
-  check(ready, `npm start serves the site on ${base}`);
+  // Still running: an answer from a server that has exited came from something else.
+  check(ready && !serverExited, `npm start serves the site on ${base}`);
   if (!ready) throw new Error("the server never came up");
 
   const home = await page("/");

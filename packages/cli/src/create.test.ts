@@ -8,7 +8,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createCommand, packageName } from "./commands/create";
+import { PassThrough } from "node:stream";
+import { askOnTerminal, createCommand, packageName } from "./commands/create";
 import { dbClaimCommand, setEnvVar } from "./commands/db-claim";
 import { doctorCommand } from "./commands/doctor";
 import { claimState, createClaimableDatabase, directUrlOf } from "./create/neon";
@@ -208,11 +209,14 @@ describe("graft create, with the content in git and no database", () => {
 
   it("asks the questions a flag didn't answer", async () => {
     const asked: string[] = [];
+    let shortNames: boolean[] = [];
     const result = await createCommand({
       dir: join(root, "asked"),
       install: false,
-      ask: async (question, choices, fallback) => {
+      ask: async (question, choices, fallback, accepts) => {
         asked.push(question.split(/[?.]/)[0] ?? question);
+        if (question.startsWith("Make"))
+          shortNames = ["rr", "Svelte", "gatsby"].map((name) => accepts?.(name) ?? false);
         return question.startsWith("How will")
           ? "code"
           : choices.includes("none") && !question.startsWith("Make")
@@ -227,7 +231,34 @@ describe("graft create, with the content in git and no database", () => {
       "Use a database",
       "Make the website too",
     ]);
+    // The framework question takes short names, so typing one does not ask again.
+    expect(shortNames).toEqual([true, true, false]);
     expect(result).toMatchObject({ template: "blog", source: "git", framework: "next" });
+  });
+});
+
+describe("a question on the terminal", () => {
+  async function answer(lines: string[], accepts?: (answer: string) => boolean) {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const queue = [...lines];
+    // One answer per prompt, as a person types: readline drops a line that
+    // arrives before its question.
+    output.on("data", (chunk: Buffer) => {
+      if (chunk.toString().endsWith("> ")) input.write(`${queue.shift() ?? ""}\n`);
+    });
+    return askOnTerminal("Which?", ["next", "none"], "next", accepts, { input, output });
+  }
+
+  it("takes a name, a number, or Enter for the default", async () => {
+    expect(await answer(["none"])).toBe("none");
+    expect(await answer(["2"])).toBe("none");
+    expect(await answer([""])).toBe("next");
+  });
+
+  it("asks again for an answer it does not take, and takes a short name when told to", async () => {
+    expect(await answer(["nextjs", "1"])).toBe("next");
+    expect(await answer(["nextjs"], (typed) => typed === "nextjs")).toBe("nextjs");
   });
 });
 

@@ -51,7 +51,13 @@ export interface CreateOptions {
   /** Overridable for tests: the network, the installer, the terminal. */
   fetch?: typeof fetch;
   runInstall?: (dir: string, packageManager: string) => void;
-  ask?: (question: string, choices: string[], fallback: string) => Promise<string>;
+  /** `accepts` takes an answer that is not one of `choices`, such as a framework's short name. */
+  ask?: (
+    question: string,
+    choices: string[],
+    fallback: string,
+    accepts?: (answer: string) => boolean,
+  ) => Promise<string>;
   log?: (line: string) => void;
 }
 
@@ -117,13 +123,22 @@ function defaultInstall(dir: string, pm: string): void {
   }
 }
 
-/** A question on the terminal, answered by number or name; Enter takes the default. */
-async function askOnTerminal(
+/**
+ * A question on the terminal, answered by number or name; Enter takes the
+ * default. An answer `accepts` takes is returned as typed; anything else asks
+ * again.
+ */
+export async function askOnTerminal(
   question: string,
   choices: string[],
   fallback: string,
+  accepts: (answer: string) => boolean = () => false,
+  io: { input: NodeJS.ReadableStream; output: NodeJS.WritableStream } = {
+    input: process.stdin,
+    output: process.stdout,
+  },
 ): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const rl = createInterface(io);
   try {
     for (;;) {
       const listed = choices.map((choice, i) => `  ${i + 1}. ${choice}`).join("\n");
@@ -131,7 +146,7 @@ async function askOnTerminal(
       if (answer === "") return fallback;
       const byNumber = choices[Number(answer) - 1];
       if (byNumber) return byNumber;
-      if (choices.includes(answer)) return answer;
+      if (choices.includes(answer) || accepts(answer)) return answer;
     }
   } finally {
     rl.close();
@@ -225,6 +240,7 @@ export async function createCommand(options: CreateOptions): Promise<CreateResul
       `Make the website too? ${FRAMEWORK_SUMMARY}.`,
       [...FRAMEWORK_NAMES],
       DEFAULT_FRAMEWORK,
+      (answer) => resolveFramework(answer) !== undefined,
     ));
   const framework = resolveFramework(named);
   if (!framework) refuse("framework", named, FRAMEWORK_NAMES, SHORT_NAMES);

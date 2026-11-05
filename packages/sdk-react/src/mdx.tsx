@@ -6,7 +6,8 @@
  * a loader's data and renders the same on the server and when the page
  * hydrates. Nothing in it is evaluated: text is text, HTML elements are
  * elements, and a component the body names renders only if `components` has
- * it under that name. One it lacks renders its content without the wrapper.
+ * it under that name. When `components` lacks it, its content renders
+ * without the wrapper.
  *
  * Its own entry, so a page that imports it pulls in no Markdown parser and no
  * server code. `prepareMdx` comes from the server side of your framework's
@@ -58,26 +59,85 @@ const VOID = new Set([
   "wbr",
 ]);
 
-/** The tree carries HTML attribute names. React spells these differently. */
+/**
+ * The tree carries HTML attribute names. These are the ones React spells
+ * differently; `aria-*` and `data-*` keep their names.
+ */
 const REACT_NAME: Record<string, string> = {
-  class: "className",
-  for: "htmlFor",
-  colspan: "colSpan",
-  rowspan: "rowSpan",
-  tabindex: "tabIndex",
-  srcset: "srcSet",
-  crossorigin: "crossOrigin",
-  readonly: "readOnly",
-  maxlength: "maxLength",
-  datetime: "dateTime",
+  "accept-charset": "acceptCharset",
+  accesskey: "accessKey",
   allowfullscreen: "allowFullScreen",
+  autocapitalize: "autoCapitalize",
+  autocomplete: "autoComplete",
+  autofocus: "autoFocus",
+  autoplay: "autoPlay",
+  cellpadding: "cellPadding",
+  cellspacing: "cellSpacing",
+  charset: "charSet",
+  class: "className",
+  colspan: "colSpan",
+  contenteditable: "contentEditable",
+  crossorigin: "crossOrigin",
+  datetime: "dateTime",
+  enctype: "encType",
+  enterkeyhint: "enterKeyHint",
+  fetchpriority: "fetchPriority",
+  for: "htmlFor",
+  formaction: "formAction",
+  formnovalidate: "formNoValidate",
+  frameborder: "frameBorder",
+  hreflang: "hrefLang",
+  "http-equiv": "httpEquiv",
+  inputmode: "inputMode",
+  itemprop: "itemProp",
+  itemscope: "itemScope",
+  itemtype: "itemType",
+  maxlength: "maxLength",
+  minlength: "minLength",
+  nomodule: "noModule",
+  novalidate: "noValidate",
+  playsinline: "playsInline",
+  readonly: "readOnly",
   referrerpolicy: "referrerPolicy",
+  rowspan: "rowSpan",
+  spellcheck: "spellCheck",
+  srcdoc: "srcDoc",
+  srclang: "srcLang",
+  srcset: "srcSet",
+  tabindex: "tabIndex",
+  usemap: "useMap",
 };
+
+/** The declarations of a style attribute, split on `;` outside quotes and parentheses. */
+function declarations(css: string): string[] {
+  const out: string[] = [];
+  let current = "";
+  let quote = "";
+  let depth = 0;
+  for (const char of css) {
+    if (quote) {
+      if (char === quote) quote = "";
+    } else if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === "(") {
+      depth += 1;
+    } else if (char === ")") {
+      depth = Math.max(0, depth - 1);
+    } else if (char === ";" && depth === 0) {
+      out.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  out.push(current);
+  return out;
+}
 
 /** `color: red; font-size: 2em` as React's style object. */
 function styleObject(css: string): CSSProperties {
   const style: Record<string, string> = {};
-  for (const declaration of css.split(";")) {
+  for (const declaration of declarations(css)) {
     const colon = declaration.indexOf(":");
     if (colon < 0) continue;
     const name = declaration.slice(0, colon).trim();
@@ -96,7 +156,7 @@ function elementProps(props: Readonly<Record<string, MdxPropValue>>, key: number
   const out: Record<string, unknown> = { key };
   for (const [name, value] of Object.entries(safeProps(props))) {
     if (name === "style" && typeof value === "string") out.style = styleObject(value);
-    else out[REACT_NAME[name] ?? name] = value;
+    else out[REACT_NAME[name.toLowerCase()] ?? name] = value;
   }
   return out;
 }
@@ -106,8 +166,10 @@ function renderNodes(nodes: readonly MdxNode[], components: MdxComponents): Reac
     if (node.type === "text") return node.value;
     if (node.type === "element") {
       if (!renderable(node.tag)) return null;
-      const children = VOID.has(node.tag) ? [] : renderNodes(node.children, components);
-      return createElement(node.tag, elementProps(node.props, key), ...children);
+      // HTML names are case-insensitive; React wants them lowercase.
+      const tag = node.tag.toLowerCase();
+      const children = VOID.has(tag) ? [] : renderNodes(node.children, components);
+      return createElement(tag, elementProps(node.props, key), ...children);
     }
     const children = renderNodes(node.children, components);
     const Custom = Object.hasOwn(components, node.name) ? components[node.name] : undefined;

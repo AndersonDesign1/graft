@@ -190,16 +190,17 @@ function convert(nodes: TreeNode[] | undefined): MdxNode[] {
  * body with anything executable is refused with INPUT_VALIDATION_FAILED.
  */
 export function prepareMdx(source: string, options: PrepareMdxOptions = {}): MdxTree {
-  const trimmed = source.trim();
-  if (trimmed.length === 0) return [];
-  assertRenderable(trimmed, options.label);
+  // Trimmed only to tell an empty body, so a refusal's line numbers count
+  // from the body's first line.
+  if (source.trim().length === 0) return [];
+  assertRenderable(source, options.label);
   const processor = unified()
     .use(remarkParse)
     .use(remarkMdx)
     .use(remarkGfm)
     .use(remarkRehype, TO_HAST);
   const restricted = (options.trust ?? "restricted") !== "full";
-  const hast: TreeNode = processor.runSync(processor.parse(trimmed));
+  const hast: TreeNode = processor.runSync(processor.parse(source));
   if (restricted) rehypeSafeUrls()(hast);
   return convert(hast.children);
 }

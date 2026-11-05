@@ -44,6 +44,30 @@ describe("MdxContent for React", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it("keeps a semicolon inside a quoted or bracketed style value", () => {
+    const tree: MdxTree = [
+      {
+        type: "element",
+        tag: "p",
+        props: { style: 'background: url("a;b.png"); content: "x;y"; color: red' },
+        children: [],
+      },
+    ];
+    expect(render(tree)).toBe(
+      '<p style="background:url(&quot;a;b.png&quot;);content:&quot;x;y&quot;;color:red"></p>',
+    );
+  });
+
+  it("maps boolean attributes React spells in camel case, and renders an uppercase void tag as an empty lowercase one", () => {
+    const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+    const tree: MdxTree = [
+      { type: "element", tag: "input", props: { autofocus: true, readonly: true }, children: [] },
+      { type: "element", tag: "BR", props: {}, children: [{ type: "text", value: "lost" }] },
+    ];
+    expect(render(tree)).toBe('<input autofocus="" readOnly=""/><br/>');
+    expect(warn.mock.calls.map((call) => String(call[0]))).toEqual([]);
+  });
+
   it("drops scripts, handlers and raw HTML from a tree built by hand", () => {
     const tree: MdxTree = [
       { type: "element", tag: "SCRIPT", props: {}, children: [{ type: "text", value: "x()" }] },

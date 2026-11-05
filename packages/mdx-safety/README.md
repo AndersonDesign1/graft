@@ -34,7 +34,7 @@ Source the checker cannot parse throws `UncheckableMdxError` rather than passing
 
 ## Prepare a body for rendering
 
-`prepareMdx`, from `@usegraft/mdx-safety/prepare`, parses a body into a tree of text, HTML elements and components that every framework adapter's `MdxContent` renders: Svelte, React and Astro. Nothing in it is evaluated, so it refuses expressions, `import`, `export` and spread attributes under every trust level, and drops script URLs unless `trust` is `"full"`.
+`prepareMdx`, from `@usegraft/mdx-safety/prepare`, parses a body into a tree of text, HTML elements and components that the Svelte, React and Astro adapters' `MdxContent` renders. (The Next.js and Vue adapters compile a body to code instead, with their own `prepareMdx`.) Nothing in it is evaluated, so it refuses expressions, `import`, `export` and spread attributes under every trust level, and drops script URLs unless `trust` is `"full"`.
 
 ```ts
 import { prepareMdx } from "@usegraft/mdx-safety/prepare";
@@ -42,7 +42,7 @@ import { prepareMdx } from "@usegraft/mdx-safety/prepare";
 const tree = prepareMdx(body, { label: "pages/home" });
 ```
 
-The tree's types, and the guard a renderer applies to a tree that did not come from `prepareMdx`, are in `@usegraft/mdx-safety/tree`, which has no dependencies and is safe in the browser. Use the adapter's entries in an app: `@usegraft/sdk-sveltekit/server`, `@usegraft/sdk-react-router/server` or `@usegraft/sdk-tanstack-start/server`.
+The tree's types, and the guard a renderer applies to a tree that did not come from `prepareMdx`, are in `@usegraft/mdx-safety/tree`, which has no dependencies and is safe in the browser. In an app, use the adapter's entries instead: `prepareMdx` from `@usegraft/sdk-sveltekit/server`, `@usegraft/sdk-react-router/server` or `@usegraft/sdk-tanstack-start/server`, and `MdxContent` from the same adapter's `/mdx`. Astro's `MdxContent`, from `@usegraft/sdk-astro/mdx`, takes the source and prepares it itself.
 
 ## Not a sanitiser
 

@@ -5,8 +5,8 @@
  * Pass the body as `source` and it is prepared here, in the page's
  * frontmatter, which only ever runs on the server. Nothing in it is
  * evaluated: text is text, HTML elements are elements, and a component the
- * body names renders only if `components` has it under that name. One it
- * lacks renders its content without the wrapper.
+ * body names renders only if `components` has it under that name. When
+ * `components` lacks it, its content renders without the wrapper.
  *
  * Expressions, `import`, `export` and scripting are refused under every trust
  * level, with an error that says how to fix the body. `trust` decides only

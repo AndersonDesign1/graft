@@ -46,14 +46,24 @@ const SCRIPTING = new Set(["script", "iframe", "object", "embed", "frame", "fram
 /** `on…` handlers, and attributes a renderer may treat as raw HTML. */
 const UNSAFE_ATTRIBUTE = /^(on[a-z]|innerhtml$|outerhtml$|dangerouslysetinnerhtml$)/i;
 
-/** Whether an element may render at all. */
+/** An HTML or custom element name. Anything else (`script `, `a b`) is refused. */
+const ELEMENT_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/i;
+
+/** Whether an element may render at all: a plain element name that cannot run code. */
 export function renderable(tag: string): boolean {
-  return !SCRIPTING.has(tag.toLowerCase());
+  return ELEMENT_NAME.test(tag) && !SCRIPTING.has(tag.toLowerCase());
 }
 
-/** The props without handlers or raw-HTML attributes. */
+/** An attribute name with nothing a renderer could write as markup around it. */
+const ATTRIBUTE_NAME = /^[a-z_:][a-z0-9_.:-]*$/i;
+
+/** The props without handlers, raw-HTML attributes, or names that are not attribute names. */
 export function safeProps(
   props: Readonly<Record<string, MdxPropValue>>,
 ): Record<string, MdxPropValue> {
-  return Object.fromEntries(Object.entries(props).filter(([name]) => !UNSAFE_ATTRIBUTE.test(name)));
+  return Object.fromEntries(
+    Object.entries(props).filter(
+      ([name]) => ATTRIBUTE_NAME.test(name) && !UNSAFE_ATTRIBUTE.test(name),
+    ),
+  );
 }
