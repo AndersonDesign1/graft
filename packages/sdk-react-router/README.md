@@ -95,7 +95,30 @@ The parameter is typed structurally as `{ request: Request }`, so this package n
 
 ## MDX
 
-Bodies come back as authored source. Render them with your own pipeline. The `MdxBody` in [`@usegraft/sdk-next`](https://www.npmjs.com/package/@usegraft/sdk-next) evaluates MDX in a Server Component, which framework mode does not have, so it is not re-exported here.
+Bodies come back as authored source. `prepareMdx` turns one into a tree in a loader, and `MdxContent` renders it with your React components:
+
+```tsx
+// app/routes/docs.$slug.tsx
+import { MdxContent } from "@usegraft/sdk-react-router/mdx";
+import { prepareMdx } from "@usegraft/sdk-react-router/server";
+import { Callout } from "../components/callout";
+import { graft } from "../lib/graft.server";
+import type { Route } from "./+types/docs.$slug";
+
+export async function loader({ params }: Route.LoaderArgs) {
+  const doc = await graft.getContent("docs", params.slug);
+  if (!doc) throw new Response("Not found", { status: 404 });
+  return { body: prepareMdx(doc.body) };
+}
+
+export default function Doc({ loaderData }: Route.ComponentProps) {
+  return <MdxContent tree={loaderData.body} components={{ Callout }} />;
+}
+```
+
+The tree is plain data: it travels in the loader's data and renders the same on the server and when the page hydrates. The body is never evaluated, so `{expressions}`, `import`, `export` and spread attributes are refused under every trust level, along with `<script>`-like elements, `on…` handlers and `innerHTML`-style attributes, with a `GraftError` whose code is `INPUT_VALIDATION_FAILED`. Keep `/server` to loaders, actions and `.server.ts` modules: it carries the Markdown parser. `/mdx` is safe in the browser.
+
+`graft create --framework react-router` makes a site that renders every collection this way.
 
 ## Cache invalidation
 

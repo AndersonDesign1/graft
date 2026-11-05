@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { prepareMdx, type MdxNode, type MdxTree } from "./server";
+import { prepareMdx } from "./prepare";
+import type { MdxNode, MdxTree } from "./tree";
 
 /** The tree without the whitespace text between blocks, to keep expectations short. */
 function blocks(tree: MdxTree): MdxNode[] {
@@ -66,6 +67,43 @@ describe("prepareMdx", () => {
     });
   });
 
+  it("keeps no whitespace between table parts, which the HTML parser would drop", () => {
+    const [table] = blocks(prepareMdx("| a |\n| - |\n| 1 |"));
+    expect(table).toEqual({
+      type: "element",
+      tag: "table",
+      props: {},
+      children: [
+        {
+          type: "element",
+          tag: "thead",
+          props: {},
+          children: [
+            {
+              type: "element",
+              tag: "tr",
+              props: {},
+              children: [{ type: "element", tag: "th", props: {}, children: [text("a")] }],
+            },
+          ],
+        },
+        {
+          type: "element",
+          tag: "tbody",
+          props: {},
+          children: [
+            {
+              type: "element",
+              tag: "tr",
+              props: {},
+              children: [{ type: "element", tag: "td", props: {}, children: [text("1")] }],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
   it("puts a fragment's children in its place", () => {
     const [paragraph] = blocks(prepareMdx("<>\n\nInside\n\n</>"));
     expect(paragraph).toMatchObject({ type: "element", tag: "p", children: [text("Inside")] });
@@ -125,7 +163,7 @@ describe("prepareMdx", () => {
     }
   });
 
-  it("is JSON all the way down, so it survives SvelteKit's data serialization", () => {
+  it("is JSON all the way down, so it survives any framework's page data", () => {
     const tree = prepareMdx('# T\n\n<Callout type="tip">\n\n- a\n- b\n\n</Callout>');
     expect(JSON.parse(JSON.stringify(tree))).toEqual(tree);
   });

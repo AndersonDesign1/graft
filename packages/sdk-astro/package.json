@@ -32,19 +32,24 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./mdx": {
+      "types": "./dist/mdx/index.d.ts",
+      "import": "./dist/mdx/index.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
-    "dev": "tsup src/index.ts --format esm --watch",
+    "build": "tsup src/index.ts --format esm --dts --clean && node scripts/copy-astro.mjs",
+    "dev": "node scripts/copy-astro.mjs && tsup src/index.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@usegraft/db": "workspace:*",
+    "@usegraft/mdx-safety": "workspace:*",
     "@usegraft/sdk-core": "workspace:*"
   },
   "devDependencies": {

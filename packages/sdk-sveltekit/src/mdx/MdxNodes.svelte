@@ -5,7 +5,7 @@
 -->
 <script>
   import MdxNodes from "./MdxNodes.svelte";
-  import { renderable, safeProps } from "./guard.js";
+  import { renderable, safeProps } from "@usegraft/mdx-safety/tree";
 
   /** @type {{ nodes: import("../server.js").MdxTree, components: Record<string, import("svelte").Component<any>> }} */
   let { nodes, components } = $props();

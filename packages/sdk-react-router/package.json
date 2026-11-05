@@ -32,23 +32,36 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./mdx": {
+      "types": "./dist/mdx.d.ts",
+      "import": "./dist/mdx.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
-    "dev": "tsup src/index.ts --format esm --watch",
+    "build": "tsup src/index.ts src/server.ts src/mdx.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts src/server.ts src/mdx.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@usegraft/db": "workspace:*",
-    "@usegraft/sdk-core": "workspace:*"
+    "@usegraft/mdx-safety": "workspace:*",
+    "@usegraft/sdk-core": "workspace:*",
+    "@usegraft/sdk-react": "workspace:*"
   },
   "devDependencies": {
     "@usegraft/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
   },
   "engines": {
     "node": ">=22.16"

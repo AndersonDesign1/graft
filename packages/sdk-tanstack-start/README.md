@@ -84,7 +84,28 @@ The name of the server-route factory has moved across TanStack Start releases. W
 
 ## MDX
 
-Bodies come back as authored source. Render them with your own pipeline. The React `MdxBody` in [`@usegraft/sdk-next`](https://www.npmjs.com/package/@usegraft/sdk-next) evaluates MDX in a Server Component, which Start does not have, so it is not re-exported here.
+Bodies come back as authored source. `prepareMdx` turns one into a tree inside a server function, and `MdxContent` renders it with your React components:
+
+```tsx
+import { createServerFn } from "@tanstack/react-start";
+import { MdxContent } from "@usegraft/sdk-tanstack-start/mdx";
+import { prepareMdx } from "@usegraft/sdk-tanstack-start/server";
+import { graft } from "./lib/graft.server";
+
+export const getDoc = createServerFn({ method: "GET" })
+  .validator((slug: string) => slug)
+  .handler(async ({ data: slug }) => {
+    const doc = await graft.getContent("docs", slug);
+    return doc ? { body: prepareMdx(doc.body) } : null;
+  });
+
+// In the route component, with the loader's result:
+<MdxContent tree={doc.body} components={{ Callout }} />;
+```
+
+The tree is plain data: the server function returns it, and it renders the same on the server and after a client-side navigation. The body is never evaluated, so `{expressions}`, `import`, `export` and spread attributes are refused under every trust level, along with `<script>`-like elements, `on…` handlers and `innerHTML`-style attributes, with a `GraftError` whose code is `INPUT_VALIDATION_FAILED`. Call `prepareMdx` only inside a server function or a server route: it carries the Markdown parser. `/mdx` is safe in the browser.
+
+`graft create --framework tanstack-start` makes a site that renders every collection this way, and serves its build on Node with [srvx](https://srvx.h3.dev).
 
 ## Cache invalidation
 

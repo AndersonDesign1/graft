@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderable, safeProps } from "./guard.js";
+import { renderable, safeProps } from "./tree";
 
 describe("MdxContent's render-time guard", () => {
   it("refuses the elements that load or run code, in any case", () => {
