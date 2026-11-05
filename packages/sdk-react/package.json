@@ -32,20 +32,25 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./mdx": {
+      "types": "./dist/mdx.d.ts",
+      "import": "./dist/mdx.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --external react --external react/jsx-runtime",
-    "dev": "tsup src/index.ts --format esm --watch --external react --external react/jsx-runtime",
+    "build": "tsup src/index.ts src/mdx.tsx --format esm --dts --clean --external react --external react/jsx-runtime",
+    "dev": "tsup src/index.ts src/mdx.tsx --format esm --watch --external react --external react/jsx-runtime",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@usegraft/content-api": "workspace:*",
     "@usegraft/contracts": "workspace:*",
+    "@usegraft/mdx-safety": "workspace:*",
     "@usegraft/sdk-core": "workspace:*"
   },
   "devDependencies": {

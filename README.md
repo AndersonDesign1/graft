@@ -108,18 +108,22 @@ place, list, update, and cancel functions).
 
 ## Read it from your framework
 
-| Package                                                       | Framework                                                              |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| [`@usegraft/sdk-next`](packages/sdk-next)                     | Next.js. React.cache-deduped reads, `revalidateContent`, and `MdxBody` |
-| [`@usegraft/sdk-astro`](packages/sdk-astro)                   | Astro. Typed reads plus `graftRoute` endpoint mounts                   |
-| [`@usegraft/sdk-sveltekit`](packages/sdk-sveltekit)           | SvelteKit. Typed reads plus `graftRoute` for `+server.ts`              |
-| [`@usegraft/sdk-tanstack-start`](packages/sdk-tanstack-start) | TanStack Start. Typed reads plus `graftRoute` for server routes        |
-| [`@usegraft/sdk-react-router`](packages/sdk-react-router)     | React Router v7 framework mode. Typed reads plus loader/action mounts  |
-| [`@usegraft/sdk-nuxt`](packages/sdk-nuxt)                     | Nuxt 4.6+ and 5. A module: page composables, `useGraft()`, routes      |
-| [`@usegraft/sdk-nitro`](packages/sdk-nitro)                   | Nitro 3. Typed reads plus `graftHandler` for h3 1 and 2                |
-| [`@usegraft/sdk-react`](packages/sdk-react)                   | The browser. Reads over HTTP, plus hooks                               |
-| [`@usegraft/sdk-vue`](packages/sdk-vue)                       | Vue. Reads over HTTP, composables, and MDX rendering                   |
-| [`@usegraft/sdk-core`](packages/sdk-core)                     | Anything else. The typed client the others wrap                        |
+| Package                                                       | Framework                                                                                 |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [`@usegraft/sdk-next`](packages/sdk-next)                     | Next.js. React.cache-deduped reads, `revalidateContent`, and `MdxBody`                    |
+| [`@usegraft/sdk-astro`](packages/sdk-astro)                   | Astro. Typed reads, `graftRoute` endpoint mounts, and `MdxContent`                        |
+| [`@usegraft/sdk-sveltekit`](packages/sdk-sveltekit)           | SvelteKit. Typed reads, `graftRoute` for `+server.ts`, and `MdxContent`                   |
+| [`@usegraft/sdk-tanstack-start`](packages/sdk-tanstack-start) | TanStack Start. Typed reads, `graftRoute` for server routes, and `MdxContent`             |
+| [`@usegraft/sdk-react-router`](packages/sdk-react-router)     | React Router 7 and 8, framework mode. Typed reads, loader/action mounts, and `MdxContent` |
+| [`@usegraft/sdk-nuxt`](packages/sdk-nuxt)                     | Nuxt 4.6+ and 5. A module: page composables, `useGraft()`, routes                         |
+| [`@usegraft/sdk-nitro`](packages/sdk-nitro)                   | Nitro 3. Typed reads plus `graftHandler` for h3 1 and 2                                   |
+| [`@usegraft/sdk-react`](packages/sdk-react)                   | The browser. Reads over HTTP, plus hooks                                                  |
+| [`@usegraft/sdk-vue`](packages/sdk-vue)                       | Vue. Reads over HTTP, composables, and MDX rendering                                      |
+| [`@usegraft/sdk-core`](packages/sdk-core)                     | Anything else. The typed client the others wrap                                           |
+
+To start a new site in one of these instead, run
+`npm create graft@latest my-site -- --framework <name>` with `next`, `nuxt`,
+`sveltekit`, `astro`, `react-router` or `tanstack-start`.
 
 Every adapter is typed structurally, so none of them depends on the framework it
 adapts. The exception is `sdk-nuxt`, which is a Nuxt module and builds on
@@ -148,7 +152,7 @@ and your OIDC issuer.
 | `@usegraft/sdk-astro`          | Astro adapter                                                                |
 | `@usegraft/sdk-sveltekit`      | SvelteKit adapter                                                            |
 | `@usegraft/sdk-tanstack-start` | TanStack Start adapter                                                       |
-| `@usegraft/sdk-react-router`   | React Router v7 adapter, framework mode                                      |
+| `@usegraft/sdk-react-router`   | React Router 7 and 8 adapter, framework mode                                 |
 | `@usegraft/sdk-nuxt`           | Nuxt module, for Nuxt 4.6+ and Nuxt 5                                        |
 | `@usegraft/sdk-nitro`          | Nitro adapter, for Nitro 3 and Nuxt apps that mount their own routes         |
 | `@usegraft/sdk-react`          | Browser client and hooks over the content API                                |

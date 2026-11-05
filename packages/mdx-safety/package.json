@@ -30,6 +30,12 @@
     "*": {
       "frontmatter": [
         "./dist/frontmatter.d.ts"
+      ],
+      "tree": [
+        "./dist/tree.d.ts"
+      ],
+      "prepare": [
+        "./dist/prepare.d.ts"
       ]
     }
   },
@@ -41,23 +47,34 @@
     "./frontmatter": {
       "types": "./dist/frontmatter.d.ts",
       "default": "./dist/frontmatter.js"
+    },
+    "./tree": {
+      "types": "./dist/tree.d.ts",
+      "default": "./dist/tree.js"
+    },
+    "./prepare": {
+      "types": "./dist/prepare.d.ts",
+      "default": "./dist/prepare.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/frontmatter.ts --format esm --dts --clean",
-    "dev": "tsup src/index.ts src/frontmatter.ts --format esm --watch",
+    "build": "tsup src/index.ts src/frontmatter.ts src/tree.ts src/prepare.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts src/frontmatter.ts src/tree.ts src/prepare.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@usegraft/contracts": "workspace:*",
     "gray-matter": "^4.0.3",
+    "mdast-util-mdx-jsx": "^3.2.0",
+    "property-information": "^7.1.0",
     "remark-gfm": "^4.0.1",
     "remark-mdx": "^3.1.1",
     "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.1.0"
   },

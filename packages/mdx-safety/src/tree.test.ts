@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderable, safeProps } from "./guard.js";
+import { renderable, safeProps } from "./tree";
 
 describe("MdxContent's render-time guard", () => {
   it("refuses the elements that load or run code, in any case", () => {
@@ -15,7 +15,12 @@ describe("MdxContent's render-time guard", () => {
     ]) {
       expect(renderable(tag), tag).toBe(false);
     }
-    for (const tag of ["p", "a", "img", "table", "pre", "aside"])
+    // A name with anything around it is not an element name: Astro would
+    // write `<script >` as it is.
+    for (const tag of ["script ", " script", "script\t", "a b", "img/", "", "1p"]) {
+      expect(renderable(tag), JSON.stringify(tag)).toBe(false);
+    }
+    for (const tag of ["p", "a", "img", "table", "pre", "aside", "h1", "my-widget"])
       expect(renderable(tag), tag).toBe(true);
   });
 
@@ -32,6 +37,10 @@ describe("MdxContent's render-time guard", () => {
         open: true,
         // Not a handler: no letter after "on".
         "on-the-fly": "kept",
+        // Not an attribute name: Astro would write it as markup.
+        "x onerror": "steal()",
+        'a="b"': "x",
+        "": "x",
       }),
     ).toEqual({ href: "/about", class: "box", open: true, "on-the-fly": "kept" });
   });

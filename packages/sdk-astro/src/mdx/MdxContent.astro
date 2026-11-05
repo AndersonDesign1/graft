@@ -1,0 +1,35 @@
+---
+/**
+ * MdxContent: render a document's MDX body in an Astro page.
+ *
+ * Pass the body as `source` and it is prepared here, in the page's
+ * frontmatter, which only ever runs on the server. Nothing in it is
+ * evaluated: text is text, HTML elements are elements, and a component the
+ * body names renders only if `components` has it under that name. When
+ * `components` lacks it, its content renders without the wrapper.
+ *
+ * Expressions, `import`, `export` and scripting are refused under every trust
+ * level, with an error that says how to fix the body. `trust` decides only
+ * whether link and source URLs are filtered.
+ */
+import { prepareMdx, type MdxTree, type MdxTrust } from "@usegraft/mdx-safety/prepare";
+import MdxNodes from "./MdxNodes.astro";
+
+interface Props {
+  /** The document's MDX body, such as `doc.body`. */
+  source?: string;
+  /** A tree `prepareMdx` already prepared, instead of `source`. */
+  tree?: MdxTree;
+  /** Astro components the body names, such as `{ Callout }`. */
+  components?: Record<string, unknown>;
+  /** "restricted" (the default) keeps only relative, http, https, mailto and tel URLs. */
+  trust?: MdxTrust;
+  /** What is being rendered, for error messages, such as "posts/hello". */
+  label?: string;
+}
+
+const { source = "", tree, components = {}, trust, label } = Astro.props;
+const nodes = tree ?? prepareMdx(source, { trust, label });
+---
+
+<MdxNodes nodes={nodes} components={components} />

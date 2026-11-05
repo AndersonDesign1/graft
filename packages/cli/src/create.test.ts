@@ -1,6 +1,6 @@
 /**
- * Unit: `graft create` with no database. Every template, with and without the
- * Next.js app, writes a project whose example content compiles, and that
+ * Unit: `graft create` with no database. Every template, in every framework
+ * and with none, writes a project whose example content compiles, and that
  * `graft doctor` calls ready. The database paths are in
  * create.integration.test.ts.
  */
@@ -8,11 +8,33 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createCommand, packageName } from "./commands/create";
+import { PassThrough } from "node:stream";
+import { askOnTerminal, createCommand, packageName } from "./commands/create";
 import { dbClaimCommand, setEnvVar } from "./commands/db-claim";
 import { doctorCommand } from "./commands/doctor";
 import { claimState, createClaimableDatabase, directUrlOf } from "./create/neon";
 import { TEMPLATE_NAMES, templateFor } from "./create/templates";
+import { FRAMEWORK_NAMES, type Framework } from "./registry";
+
+/** A file only that framework's site has: its page for one entry. */
+const ENTRY_PAGE: Record<Exclude<Framework, "none">, string> = {
+  next: "app/[collection]/[slug]/page.tsx",
+  nuxt: "app/pages/[collection]/[slug].vue",
+  sveltekit: "src/routes/[collection]/[slug]/+page.svelte",
+  astro: "src/pages/[collection]/[slug].astro",
+  "react-router": "app/routes/entry.tsx",
+  "tanstack-start": "src/routes/$collection/$slug.tsx",
+};
+
+/** The adapter each framework's site depends on. */
+const ADAPTER: Record<Exclude<Framework, "none">, string> = {
+  next: "@usegraft/sdk-next",
+  nuxt: "@usegraft/sdk-nuxt",
+  sveltekit: "@usegraft/sdk-sveltekit",
+  astro: "@usegraft/sdk-astro",
+  "react-router": "@usegraft/sdk-react-router",
+  "tanstack-start": "@usegraft/sdk-tanstack-start",
+};
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 // Inside the package so the scaffolded config's `@usegraft/core` import resolves.
@@ -44,7 +66,7 @@ function fakeFetch(answers: Array<{ status: number; body: unknown }>): typeof fe
 
 describe("graft create, with the content in git and no database", () => {
   for (const template of TEMPLATE_NAMES) {
-    for (const framework of ["next", "nuxt", "sveltekit", "none"] as const) {
+    for (const framework of FRAMEWORK_NAMES) {
       it(`makes a ${template} site (${framework}) whose content compiles`, async () => {
         const dir = join(root, `${template}-${framework}`);
         const installs: string[] = [];
@@ -62,25 +84,26 @@ describe("graft create, with the content in git and no database", () => {
         expect(result).toMatchObject({ source: "git", index: "static", database: "none" });
         expect(result.files).toContain("AGENTS.md");
         expect(result.files).not.toContain(".env");
-        expect(result.files.includes("app/[collection]/[slug]/page.tsx")).toBe(
-          framework === "next",
-        );
-        expect(result.files.includes("app/pages/[collection]/[slug].vue")).toBe(
-          framework === "nuxt",
-        );
-        expect(result.files.includes("src/routes/[collection]/[slug]/+page.svelte")).toBe(
-          framework === "sveltekit",
-        );
+        for (const [site, page] of Object.entries(ENTRY_PAGE)) {
+          expect(result.files.includes(page), page).toBe(framework === site);
+        }
 
         const config = readFileSync(join(dir, "graft.config.ts"), "utf8");
         expect(config).toContain('export const index = "static"');
         expect(config).not.toContain("source:");
         const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
         expect(pkg.dependencies["@usegraft/core"]).toMatch(/^\d/);
+        for (const [site, adapter] of Object.entries(ADAPTER)) {
+          expect(Boolean(pkg.dependencies[adapter]), adapter).toBe(framework === site);
+        }
         expect(Boolean(pkg.dependencies.next)).toBe(framework === "next");
         expect(Boolean(pkg.dependencies.nuxt)).toBe(framework === "nuxt");
-        expect(Boolean(pkg.dependencies["@usegraft/sdk-nuxt"])).toBe(framework === "nuxt");
         expect(Boolean(pkg.devDependencies["@sveltejs/kit"])).toBe(framework === "sveltekit");
+        expect(Boolean(pkg.dependencies.astro)).toBe(framework === "astro");
+        expect(Boolean(pkg.dependencies["react-router"])).toBe(framework === "react-router");
+        expect(Boolean(pkg.dependencies["@tanstack/react-start"])).toBe(
+          framework === "tanstack-start",
+        );
         // SvelteKit 3 has no $lib: the site imports #lib through package.json.
         expect(pkg.imports).toEqual(
           framework === "sveltekit" ? { "#lib/*": "./src/lib/*" } : undefined,
@@ -95,6 +118,41 @@ describe("graft create, with the content in git and no database", () => {
       });
     }
   }
+
+  it("takes a framework's short name, in any case", async () => {
+    const result = await createCommand({
+      dir: join(root, "short-name"),
+      template: "blank",
+      framework: "Svelte",
+      edit: "code",
+      database: "none",
+      install: false,
+      log: quiet,
+    });
+    expect(result.framework).toBe("sveltekit");
+    expect(result.files).toContain("src/routes/+page.svelte");
+  });
+
+  it("refuses a framework it does not know, naming every one it does", async () => {
+    await expect(
+      createCommand({
+        dir: join(root, "unknown-framework"),
+        template: "blank",
+        framework: "gatsby",
+        edit: "code",
+        database: "none",
+        install: false,
+        log: quiet,
+      }),
+    ).rejects.toMatchObject({
+      code: "INPUT_VALIDATION_FAILED",
+      message: "--framework gatsby isn't one of the choices.",
+      fix: expect.stringContaining(
+        "Use --framework with one of: next, nuxt, sveltekit, astro, react-router, tanstack-start, none.",
+      ),
+    });
+    expect(existsSync(join(root, "unknown-framework"))).toBe(false);
+  });
 
   it("writes the files and stops before installing with --no-install", async () => {
     const dir = join(root, "no-install");
@@ -151,11 +209,14 @@ describe("graft create, with the content in git and no database", () => {
 
   it("asks the questions a flag didn't answer", async () => {
     const asked: string[] = [];
+    let shortNames: boolean[] = [];
     const result = await createCommand({
       dir: join(root, "asked"),
       install: false,
-      ask: async (question, choices, fallback) => {
+      ask: async (question, choices, fallback, accepts) => {
         asked.push(question.split(/[?.]/)[0] ?? question);
+        if (question.startsWith("Make"))
+          shortNames = ["rr", "Svelte", "gatsby"].map((name) => accepts?.(name) ?? false);
         return question.startsWith("How will")
           ? "code"
           : choices.includes("none") && !question.startsWith("Make")
@@ -170,7 +231,34 @@ describe("graft create, with the content in git and no database", () => {
       "Use a database",
       "Make the website too",
     ]);
+    // The framework question takes short names, so typing one does not ask again.
+    expect(shortNames).toEqual([true, true, false]);
     expect(result).toMatchObject({ template: "blog", source: "git", framework: "next" });
+  });
+});
+
+describe("a question on the terminal", () => {
+  async function answer(lines: string[], accepts?: (answer: string) => boolean) {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const queue = [...lines];
+    // One answer per prompt, as a person types: readline drops a line that
+    // arrives before its question.
+    output.on("data", (chunk: Buffer) => {
+      if (chunk.toString().endsWith("> ")) input.write(`${queue.shift() ?? ""}\n`);
+    });
+    return askOnTerminal("Which?", ["next", "none"], "next", accepts, { input, output });
+  }
+
+  it("takes a name, a number, or Enter for the default", async () => {
+    expect(await answer(["none"])).toBe("none");
+    expect(await answer(["2"])).toBe("none");
+    expect(await answer([""])).toBe("next");
+  });
+
+  it("asks again for an answer it does not take, and takes a short name when told to", async () => {
+    expect(await answer(["nextjs", "1"])).toBe("next");
+    expect(await answer(["nextjs"], (typed) => typed === "nextjs")).toBe("nextjs");
   });
 });
 

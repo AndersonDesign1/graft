@@ -21,13 +21,13 @@ types all of them.
 | --- | --- | --- |
 | `@usegraft/sdk-core` | any JS | `getDocument` / `listDocuments` / `searchDocuments`; branch-aware; cache-tag helpers. Postgres lives behind `@usegraft/sdk-core/db` |
 | `@usegraft/sdk-next` | Next (RSC) | `React.cache` memo; `MdxBody`; `revalidateContent` / `updateContent` |
-| `@usegraft/sdk-astro` | Astro | No request memo; `graftRoute` for endpoint mounts |
+| `@usegraft/sdk-astro` | Astro | No request memo; `graftRoute` for endpoint mounts; `MdxContent` from `@usegraft/sdk-astro/mdx` for MDX |
 | `@usegraft/sdk-sveltekit` | SvelteKit | `graftRoute` for `+server.ts`; CDN surrogate keys for tags |
-| `@usegraft/sdk-tanstack-start` | TanStack Start | `graftRoute` for server routes; build the handle in a server-only module |
-| `@usegraft/sdk-react-router` | React Router v7 | Framework mode; `graftRoute` returns both `action` and `loader` |
+| `@usegraft/sdk-tanstack-start` | TanStack Start | `graftRoute` for server routes; build the handle in a server-only module; `MdxContent` for MDX, prepared by `prepareMdx` from `@usegraft/sdk-tanstack-start/server` |
+| `@usegraft/sdk-react-router` | React Router 7 and 8 | Framework mode; `graftRoute` returns both `action` and `loader`; `MdxContent` for MDX, prepared by `prepareMdx` from `@usegraft/sdk-react-router/server` |
 | `@usegraft/sdk-nuxt` | Nuxt 4.6+ and 5 | A module: `useGraftContent`, `useGraftList` and `useGraftSearch` for pages, `useGraft()` in `server/`, `<GraftMdx>`, and the content API, functions and MCP routes |
 | `@usegraft/sdk-nitro` | Nitro 3, and Nuxt apps that mount their own routes | `graftHandler` for event handlers on h3 1 and h3 2; records the caller's address for rate limits |
-| `@usegraft/sdk-react` | the browser | Reads over HTTP; `createGraftHooks`; no `db` option, by design |
+| `@usegraft/sdk-react` | the browser | Reads over HTTP; `createGraftHooks`; no `db` option, by design; `MdxContent` from `@usegraft/sdk-react/mdx` renders a prepared body |
 | `@usegraft/sdk-vue` | Vue | Reads over HTTP; `createGraftComposables`; `MdxContent` for MDX, compiled by `prepareMdx` from `@usegraft/sdk-vue/server` |
 
 Every adapter is typed **structurally**, so none of them takes a dependency on
@@ -94,7 +94,7 @@ export const ServerRoute = createServerFileRoute("/api/fn/$name").methods({
   GET: graftRoute(functionsHandler), // answers 405
 });
 
-// React Router v7: app/routes/api.fn.$name.ts
+// React Router: app/routes/api.fn.$name.ts
 export const action = graftRoute(functionsHandler); // POST
 export const loader = graftRoute(functionsHandler); // GET, answers 405
 
@@ -136,9 +136,10 @@ never refreshes `main`.
   in `getStaticProps` and renders with `MdxContent` instead. `@usegraft/sdk-sveltekit`
   prepares a body into a tree with `prepareMdx` from
   `@usegraft/sdk-sveltekit/server` and renders it with `MdxContent` from
-  `@usegraft/sdk-sveltekit/mdx`, evaluating nothing. Astro authors bodies for `@astrojs/mdx`;
-  TanStack Start and React Router render authored source with their own
-  pipeline.
+  `@usegraft/sdk-sveltekit/mdx`, evaluating nothing. React Router and TanStack
+  Start do the same with React: `prepareMdx` from their `/server` entry, and
+  `MdxContent` from their `/mdx` entry. Astro's `MdxContent` takes the source
+  and prepares it in the page's frontmatter, on the server.
 - **No `React.cache` equivalent outside Next.** Call sites own memoization.
   TanStack Start route loaders are isomorphic, running on the server for first
   paint and in the browser on client navigation, so a handle holding a database

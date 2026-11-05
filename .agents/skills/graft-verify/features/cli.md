@@ -91,6 +91,17 @@ Preconditions: `REPO` and `O` from the skill's Launch step, a sandbox from `scri
   `compat/smoke.mjs` does), run `$G compile`, then `node_modules/.bin/next
   build` and `next start -p 3217`. `/` lists "Hello, world" above "How we
   work", and `/posts/hello-world` renders its body.
+- **Create, build and serve a site in any other framework.** First build the
+  CLI and the adapter with everything they import
+  (`pnpm -r --filter "@usegraft/cli..." --filter "@usegraft/sdk-<framework>..." run build`,
+  with `astro`, `react-router` or `tanstack-start` for `<framework>`),
+  and have Chromium for Playwright 1.63.0
+  (`pnpm --filter sdk-sveltekit-compat-kit3 exec playwright install chromium`).
+  Then, from the repo root,
+  `$O node scripts/smoke-create.mjs --framework <framework>` (`astro`, `react-router` or
+  `tanstack-start`) makes the site, installs this checkout's packages packed
+  as npm would see them, builds, serves and drives it in Chromium, and runs
+  the dev loop. It ends with `All checks passed for --framework <framework>.`
 - **Online editing goes live.** `create` with `--edit online --database
   "$URL" --no-install` against an empty scratch database, then `content
   import`, `doctor` (all pass except the Studio sign-in warning), `next

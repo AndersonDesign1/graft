@@ -74,6 +74,18 @@ Shipping a worse copy of a query client inside an SDK is the wrong trade, so the
 
 It is also not a server renderer. `useEffect` does not run during server rendering, so on the server these hooks report their loading state and nothing else. Content that has to be in the HTML belongs in a loader or a server adapter: [`@usegraft/sdk-next`](https://www.npmjs.com/package/@usegraft/sdk-next), [`sdk-astro`](https://www.npmjs.com/package/@usegraft/sdk-astro), [`sdk-sveltekit`](https://www.npmjs.com/package/@usegraft/sdk-sveltekit), [`sdk-react-router`](https://www.npmjs.com/package/@usegraft/sdk-react-router), [`sdk-tanstack-start`](https://www.npmjs.com/package/@usegraft/sdk-tanstack-start).
 
+## Render a prepared MDX body
+
+`MdxContent`, from its own entry `@usegraft/sdk-react/mdx`, renders a body that `prepareMdx` turned into a tree on a server. React Router and TanStack Start sites import it from their adapter's `/mdx` entry, and `prepareMdx` from its `/server` entry. Used directly:
+
+```tsx
+import { MdxContent } from "@usegraft/sdk-react/mdx";
+
+<MdxContent tree={body} components={{ Callout }} />;
+```
+
+Nothing in the tree is evaluated, and the entry carries no Markdown parser. As a second line, it drops `<script>`-like elements, `on…` handlers and `innerHTML`-style attributes from any tree it is given.
+
 ## Point a subtree somewhere else
 
 `GraftProvider` is optional — the hooks fall back to the handle the factory was built with. Mount one to override it for a subtree: a preview branch's endpoint, or a fake in tests.

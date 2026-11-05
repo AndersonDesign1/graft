@@ -55,7 +55,7 @@ export const PACKAGE_KNOWLEDGE = {
   },
   "create-graft": {
     name: "create-graft",
-    role: "`npm create graft`: a new site from a template, with a database, Studio and a Next.js app.",
+    role: "`npm create graft`: a new site from a template, with a database, Studio and a website in Next.js, Nuxt, SvelteKit, Astro, React Router or TanStack Start (`--framework`).",
     when: "Starting a site from nothing. Never a dependency: it runs once, through npm create.",
     tier: "either",
     direct: false,
@@ -70,7 +70,7 @@ export const PACKAGE_KNOWLEDGE = {
   },
   "@usegraft/sdk-astro": {
     name: "@usegraft/sdk-astro",
-    role: "Astro adapter: typed reads in components, plus `graftRoute`.",
+    role: "Astro adapter: typed reads in components, `graftRoute`, and `MdxContent`, an MDX renderer that evaluates nothing.",
     when: "You are on Astro.",
     tier: "either",
     framework: "astro",
@@ -86,7 +86,7 @@ export const PACKAGE_KNOWLEDGE = {
   },
   "@usegraft/sdk-react-router": {
     name: "@usegraft/sdk-react-router",
-    role: "React Router adapter: typed reads in loaders and actions.",
+    role: "React Router adapter: typed reads in loaders and actions, and an MDX renderer that evaluates nothing (`prepareMdx` in the loader, `MdxContent` on the page).",
     when: "You are on React Router in framework mode, which runs a server.",
     tier: "either",
     framework: "react-router",
@@ -94,7 +94,7 @@ export const PACKAGE_KNOWLEDGE = {
   },
   "@usegraft/sdk-tanstack-start": {
     name: "@usegraft/sdk-tanstack-start",
-    role: "TanStack Start adapter: typed reads in server functions and loaders.",
+    role: "TanStack Start adapter: typed reads in server functions, and an MDX renderer that evaluates nothing (`prepareMdx` in the server function, `MdxContent` on the page).",
     when: "You are on TanStack Start.",
     tier: "either",
     framework: "tanstack-start",
@@ -118,7 +118,7 @@ export const PACKAGE_KNOWLEDGE = {
   },
   "@usegraft/sdk-react": {
     name: "@usegraft/sdk-react",
-    role: "Browser client: typed reads over the content API, with a provider and hooks.",
+    role: "Browser client: typed reads over the content API, with a provider and hooks, and `MdxContent` for a body a server prepared.",
     when: "You need reads in the browser — a search box, an editor preview, a widget on an already-rendered page. No database reaches this package.",
     tier: "postgres",
     framework: "react",

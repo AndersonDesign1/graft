@@ -1,8 +1,16 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { HANDLERS } from "./handlers";
 import { parseCommand } from "./args";
-import { COMMANDS, commandId, flagsOf, usageOf } from "./registry";
+import {
+  COMMANDS,
+  FRAMEWORK_NAMES,
+  SITE_FRAMEWORKS,
+  commandId,
+  flagsOf,
+  resolveFramework,
+  usageOf,
+} from "./registry";
 
 describe("the command registry", () => {
   it("names every command once", () => {
@@ -76,5 +84,68 @@ describe("the command registry", () => {
     const source = readFileSync(new URL(file, import.meta.url), "utf8");
     const imports = source.split("\n").filter((line) => /^import\s/.test(line));
     expect(imports.filter((line) => !line.startsWith("import type "))).toEqual([]);
+  });
+});
+
+/**
+ * The packages in packages/ that are not a framework `graft create` makes a
+ * site in, each with why. A new adapter that is neither here nor in
+ * SITE_FRAMEWORKS fails the test below, so it cannot ship without a
+ * --framework entry, or a reason it has none.
+ */
+const NOT_A_SITE: Record<string, string> = {
+  "@usegraft/sdk-core": "the reads every adapter shares, not a framework",
+  "@usegraft/sdk-nitro": "a server module that serves Graft from a Nitro app, not a site",
+  "@usegraft/sdk-react": "the browser client for React; a Vite React site is not made yet",
+  "@usegraft/sdk-vue": "the browser client for Vue; a Vite Vue site is not made yet",
+};
+
+describe("the frameworks graft create makes a site in", () => {
+  const packagesDir = new URL("../../", import.meta.url);
+  const adapters = readdirSync(packagesDir)
+    .filter((folder) => folder.startsWith("sdk-"))
+    .map((folder) => new URL(`${folder}/package.json`, packagesDir))
+    .filter((manifest) => existsSync(manifest))
+    .map((manifest) => (JSON.parse(readFileSync(manifest, "utf8")) as { name: string }).name);
+
+  it("has an entry, or a reason for none, for every adapter in packages/", () => {
+    const listed = new Set<string>([
+      ...SITE_FRAMEWORKS.map((framework) => framework.package),
+      ...Object.keys(NOT_A_SITE),
+    ]);
+    expect(adapters.filter((name) => !listed.has(name))).toEqual([]);
+  });
+
+  it("names only adapters that exist", () => {
+    const named = [
+      ...SITE_FRAMEWORKS.map((framework) => framework.package),
+      ...Object.keys(NOT_A_SITE),
+    ];
+    expect(named.filter((name) => !adapters.includes(name))).toEqual([]);
+  });
+
+  it("gives every name and short name to one framework only, in lowercase", () => {
+    const words = SITE_FRAMEWORKS.flatMap((framework) => [framework.name, ...framework.aliases]);
+    // resolveFramework lowercases what it is given, so an uppercase name could never match.
+    expect(words.filter((word) => word !== word.toLowerCase())).toEqual([]);
+    expect(words.filter((word, i) => words.indexOf(word) !== i)).toEqual([]);
+    expect(words).not.toContain("none");
+  });
+
+  it("resolves names and short names in any case, and nothing else", () => {
+    expect(resolveFramework("nextjs")).toBe("next");
+    expect(resolveFramework("Svelte")).toBe("sveltekit");
+    expect(resolveFramework("rr")).toBe("react-router");
+    expect(resolveFramework(" TanStack ")).toBe("tanstack-start");
+    expect(resolveFramework("astro")).toBe("astro");
+    expect(resolveFramework("none")).toBe("none");
+    expect(resolveFramework("gatsby")).toBeUndefined();
+  });
+
+  it("lists every framework in --framework's usage and help", () => {
+    const create = COMMANDS.find((spec) => commandId(spec) === "create");
+    const flag = create && flagsOf(create).find((entry) => entry.name === "framework");
+    expect(flag?.value).toBe("next|nuxt|sveltekit|astro|react-router|tanstack-start|none");
+    for (const name of FRAMEWORK_NAMES) expect(flag?.summary).toContain(name);
   });
 });

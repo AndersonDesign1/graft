@@ -15,6 +15,11 @@ MCP endpoint from resource routes.
 `graft.config.ts` with compiled content. If you do not have those yet, run
 through [Getting started](/docs/getting-started) first.
 
+Starting from nothing? `npm create graft@latest my-site -- --framework react-router`
+makes a React Router 8 site with all of this set up: a home page, a page for
+each collection and each entry, and MDX bodies rendered with `<MdxContent>`.
+React Router 8 needs Node.js 22.22 or newer.
+
 <AgentPrompt>
   Add Graft to this React Router app following
   https://graft.page/docs/react-router.md. Create the client in
@@ -102,6 +107,59 @@ a bundle.
 
 To read content in the browser (a search box, an editor preview), use
 [the React adapter](/docs/react).
+
+## Render MDX bodies
+
+A document's body comes back as its MDX source. Prepare it in the loader with
+`prepareMdx`, then render the result with `MdxContent` and your own React
+components:
+
+<CodeBlock title="app/routes/docs.$slug.tsx">
+
+```tsx
+import { data } from "react-router";
+import { MdxContent } from "@usegraft/sdk-react-router/mdx";
+import { prepareMdx } from "@usegraft/sdk-react-router/server";
+import { Callout } from "../components/callout";
+import { graft } from "../lib/graft.server";
+import type { Route } from "./+types/docs.$slug";
+
+export async function loader({ params }: Route.LoaderArgs) {
+  const doc = await graft.getContent("docs", params.slug);
+  if (!doc) throw data("Not found", { status: 404 });
+  return { title: doc.data.title, body: prepareMdx(doc.body) };
+}
+
+export default function Doc({ loaderData }: Route.ComponentProps) {
+  return (
+    <article>
+      <h1>{loaderData.title}</h1>
+      <MdxContent tree={loaderData.body} components={{ Callout }} />
+    </article>
+  );
+}
+```
+
+</CodeBlock>
+
+The prepared body is plain data, so it reaches the page in the loader's data
+and renders the same on the server and when the page hydrates. A component
+gets its attributes as props and the content between its tags as `children`.
+If the body names a component that `components` does not have, its content
+still renders, without the component around it. The Markdown parser stays on
+the server: import `@usegraft/sdk-react-router/server` only from loaders,
+actions and `.server.ts` modules.
+
+The body is never evaluated, which makes this renderer stricter than
+`MdxBody` in Next.js: `{expressions}`, `import`, `export` and spread
+attributes are refused with `INPUT_VALIDATION_FAILED` under every trust level,
+along with `<script>`-like elements, `on…` handlers and `innerHTML`-style
+attributes. `graft compile` refuses the same constructs unless the project
+sets `mdxTrust = "full"`, so a body that compiled meets this only with full
+trust, or when it reached the index another way, such as a direct database
+write. Under restricted trust, a script URL is removed from any link, image or
+other source, and the rest of the body renders: a link keeps its text. Pass `trust: "full"` to keep every URL. See
+[MDX safety](/docs/mdx-safety).
 
 ## Serve functions and MCP from your app
 

@@ -76,7 +76,24 @@ The parameter is typed structurally as `{ request: Request }`, so this package n
 
 ## MDX
 
-Bodies come back as authored source. Render them with Astro's own MDX pipeline rather than a runtime evaluator, which is why this package ships no `MdxBody` equivalent.
+Bodies come back as authored source. `MdxContent` renders one in a page, with your Astro components for the ones the body names:
+
+```astro
+---
+import { MdxContent } from "@usegraft/sdk-astro/mdx";
+import Callout from "../components/Callout.astro";
+import { graft } from "../lib/graft";
+
+const page = await graft.getContent("pages", Astro.params.slug!);
+if (!page) return new Response("Not found", { status: 404 });
+---
+
+<MdxContent source={page.body} components={{ Callout }} />
+```
+
+It parses the body in the page's frontmatter, on the server, and sends only HTML. A component gets its attributes as props and its content in the default `<slot />`. The body is never evaluated: `{expressions}`, `import`, `export` and spread attributes are refused under every trust level, along with `<script>`-like elements, `on…` handlers and `innerHTML`-style attributes, with a `GraftError` whose code is `INPUT_VALIDATION_FAILED`. Under restricted trust, a script URL is removed from any link or source, and a link keeps its text; pass `trust="full"` to keep every URL.
+
+`graft create --framework astro` makes a site that renders every collection this way.
 
 ## Cache invalidation
 

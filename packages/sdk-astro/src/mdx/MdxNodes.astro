@@ -1,0 +1,31 @@
+---
+/**
+ * One level of a prepared tree, rendering itself for each node's children.
+ * As a second line, it drops `<script>`-like elements, `on…` handlers and
+ * `innerHTML`-style attributes from any tree it is given.
+ */
+import { renderable, safeProps, type MdxTree } from "@usegraft/mdx-safety/tree";
+
+interface Props {
+  nodes: MdxTree;
+  components: Record<string, unknown>;
+}
+
+const { nodes, components } = Astro.props;
+
+/** HTML elements that cannot hold content. */
+const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
+---
+
+{nodes.map((node) => {
+  if (node.type === "text") return node.value;
+  if (node.type === "element") {
+    if (!renderable(node.tag)) return null;
+    const Tag = node.tag;
+    if (VOID.has(Tag.toLowerCase())) return <Tag {...safeProps(node.props)} />;
+    return <Tag {...safeProps(node.props)}><Astro.self nodes={node.children} components={components} /></Tag>;
+  }
+  const Custom = Object.hasOwn(components, node.name) ? (components[node.name] as any) : null;
+  if (!Custom) return <Astro.self nodes={node.children} components={components} />;
+  return <Custom {...safeProps(node.props)}><Astro.self nodes={node.children} components={components} /></Custom>;
+})}

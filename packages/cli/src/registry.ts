@@ -149,6 +149,80 @@ const ONLY: FlagSpec = {
   summary: "Only this document, like posts/launch (same as naming it as an argument)",
 };
 
+/* ---- the sites graft create makes ------------------------------------------ */
+
+/**
+ * Every framework `graft create --framework` can make a site in. The flag's
+ * value list, its help, the question it asks, the error for an unknown name
+ * and the CLI reference all read this list, so adding a framework here is
+ * the whole of adding it to the CLI's words. `registry.test.ts` fails when a
+ * site adapter in packages/ has no entry.
+ */
+export const SITE_FRAMEWORKS = [
+  {
+    name: "next",
+    label: "Next.js",
+    aliases: ["nextjs", "next.js"],
+    package: "@usegraft/sdk-next",
+  },
+  { name: "nuxt", label: "Nuxt", aliases: ["nuxtjs"], package: "@usegraft/sdk-nuxt" },
+  {
+    name: "sveltekit",
+    label: "SvelteKit",
+    aliases: ["svelte", "svelte-kit"],
+    package: "@usegraft/sdk-sveltekit",
+  },
+  { name: "astro", label: "Astro", aliases: ["astrojs"], package: "@usegraft/sdk-astro" },
+  {
+    name: "react-router",
+    label: "React Router",
+    aliases: ["rr", "reactrouter"],
+    package: "@usegraft/sdk-react-router",
+  },
+  {
+    name: "tanstack-start",
+    label: "TanStack Start",
+    aliases: ["tanstack", "tanstackstart"],
+    package: "@usegraft/sdk-tanstack-start",
+  },
+] as const;
+
+/** A framework `graft create` makes a site in, or "none" for only the content. */
+export type Framework = (typeof SITE_FRAMEWORKS)[number]["name"] | "none";
+
+/** The site `graft create` makes when no framework is named. */
+export const DEFAULT_FRAMEWORK: Framework = "next";
+
+/** Every name `--framework` takes, without the short names. */
+export const FRAMEWORK_NAMES: readonly Framework[] = [
+  ...SITE_FRAMEWORKS.map((framework) => framework.name),
+  "none",
+];
+
+/**
+ * The framework a name means: its own name or a short name, in any case.
+ * `undefined` when it means none of them.
+ */
+export function resolveFramework(input: string): Framework | undefined {
+  const wanted = input.trim().toLowerCase();
+  if (wanted === "none") return "none";
+  return SITE_FRAMEWORKS.find(
+    (framework) => framework.name === wanted || framework.aliases.some((alias) => alias === wanted),
+  )?.name;
+}
+
+/** "next, nuxt or sveltekit", for a sentence. */
+function orList(words: readonly string[]): string {
+  return words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} or ${words.at(-1)}`;
+}
+
+const OTHER_SITES = SITE_FRAMEWORKS.filter((framework) => framework.name !== DEFAULT_FRAMEWORK);
+const DEFAULT_LABEL =
+  SITE_FRAMEWORKS.find((framework) => framework.name === DEFAULT_FRAMEWORK)?.label ?? "";
+
+/** What --framework does, for its help line and the question `graft create` asks. */
+export const FRAMEWORK_SUMMARY = `${DEFAULT_FRAMEWORK} for a ${DEFAULT_LABEL} site that shows every collection (default); ${orList(OTHER_SITES.map((framework) => framework.name))} for the same site in ${orList(OTHER_SITES.map((framework) => framework.label))}; none for only the content. Short names work too, such as ${SITE_FRAMEWORKS.map((framework) => framework.aliases[0]).join(", ")}`;
+
 /* ---- the commands -------------------------------------------------------- */
 
 export const COMMANDS: readonly CommandSpec[] = [
@@ -156,11 +230,12 @@ export const COMMANDS: readonly CommandSpec[] = [
   {
     path: ["create"],
     group: "start",
-    summary: "Make a new site with a template, a database, Studio and a Next.js app",
+    summary: "Make a new site with a template, a database, Studio and a website in your framework",
     description: [
-      "Make a new site: a template, a database, Studio and (by default) a Next.js app,",
-      "installed and ready. `npm create graft` runs this. It asks a few questions;",
-      "flags answer them, and --yes takes the defaults for the rest.",
+      "Make a new site: a template, a database, Studio and a website, installed and",
+      "ready. The website is Next.js unless --framework names another. `npm create graft`",
+      "runs this. It asks a few questions; flags answer them, and --yes takes the",
+      "defaults for the rest.",
     ],
     args: [{ name: "dir" }],
     flags: [
@@ -190,10 +265,9 @@ export const COMMANDS: readonly CommandSpec[] = [
       {
         name: "framework",
         type: "string",
-        value: "next|nuxt|sveltekit|none",
-        example: "next",
-        summary:
-          "next for a Next.js site that shows every collection (default); nuxt or sveltekit for the same site in Nuxt or SvelteKit; none for only the content",
+        value: FRAMEWORK_NAMES.join("|"),
+        example: DEFAULT_FRAMEWORK,
+        summary: FRAMEWORK_SUMMARY,
       },
       {
         name: "yes",

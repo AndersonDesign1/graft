@@ -16,7 +16,15 @@ import { createInterface } from "node:readline/promises";
 import { CLAIMABLE_DATABASE_FILE } from "@usegraft/compiler";
 import { GraftError } from "@usegraft/contracts";
 import { createClaimableDatabase, type NewDatabase } from "../create/neon";
-import { scaffoldFiles, type Framework } from "../create/scaffold";
+import { scaffoldFiles } from "../create/scaffold";
+import {
+  DEFAULT_FRAMEWORK,
+  FRAMEWORK_NAMES,
+  FRAMEWORK_SUMMARY,
+  SITE_FRAMEWORKS,
+  resolveFramework,
+  type Framework,
+} from "../registry";
 import {
   TEMPLATE_NAMES,
   isTemplateName,
@@ -43,7 +51,13 @@ export interface CreateOptions {
   /** Overridable for tests: the network, the installer, the terminal. */
   fetch?: typeof fetch;
   runInstall?: (dir: string, packageManager: string) => void;
-  ask?: (question: string, choices: string[], fallback: string) => Promise<string>;
+  /** `accepts` takes an answer that is not one of `choices`, such as a framework's short name. */
+  ask?: (
+    question: string,
+    choices: string[],
+    fallback: string,
+    accepts?: (answer: string) => boolean,
+  ) => Promise<string>;
   log?: (line: string) => void;
 }
 
@@ -61,21 +75,13 @@ export interface CreateResult {
   next: string[];
 }
 
-const DEFAULTS = { template: "blog", framework: "next", edit: "online", database: "new" } as const;
+const DEFAULTS = { template: "blog", edit: "online", database: "new" } as const;
 
-const FRAMEWORKS = ["next", "nuxt", "sveltekit", "none"] as const satisfies readonly Framework[];
-
-function isFramework(name: string): name is Framework {
-  return FRAMEWORKS.some((framework) => framework === name);
+/** How the "Wrote a … site" line names the framework. */
+function withFramework(framework: Framework): string {
+  const site = SITE_FRAMEWORKS.find((entry) => entry.name === framework);
+  return site ? ` with ${site.label}` : "";
 }
-
-/** How the "Wrote a … site" line names each framework. */
-const FRAMEWORK_LABEL: Record<Framework, string> = {
-  next: " with Next.js",
-  nuxt: " with Nuxt",
-  sveltekit: " with SvelteKit",
-  none: "",
-};
 
 /** The folder's name as an npm package name: lowercase, no leading dot or dash. */
 export function packageName(dir: string): string {
@@ -117,13 +123,22 @@ function defaultInstall(dir: string, pm: string): void {
   }
 }
 
-/** A question on the terminal, answered by number or name; Enter takes the default. */
-async function askOnTerminal(
+/**
+ * A question on the terminal, answered by number or name; Enter takes the
+ * default. An answer `accepts` takes is returned as typed; anything else asks
+ * again.
+ */
+export async function askOnTerminal(
   question: string,
   choices: string[],
   fallback: string,
+  accepts: (answer: string) => boolean = () => false,
+  io: { input: NodeJS.ReadableStream; output: NodeJS.WritableStream } = {
+    input: process.stdin,
+    output: process.stdout,
+  },
 ): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const rl = createInterface(io);
   try {
     for (;;) {
       const listed = choices.map((choice, i) => `  ${i + 1}. ${choice}`).join("\n");
@@ -131,20 +146,25 @@ async function askOnTerminal(
       if (answer === "") return fallback;
       const byNumber = choices[Number(answer) - 1];
       if (byNumber) return byNumber;
-      if (choices.includes(answer)) return answer;
+      if (choices.includes(answer) || accepts(answer)) return answer;
     }
   } finally {
     rl.close();
   }
 }
 
-function refuse(flag: string, value: string, allowed: readonly string[]): never {
+function refuse(flag: string, value: string, allowed: readonly string[], more = ""): never {
   throw new GraftError({
     code: "INPUT_VALIDATION_FAILED",
     message: `--${flag} ${value} isn't one of the choices.`,
-    fix: `Use --${flag} with one of: ${allowed.join(", ")}.`,
+    fix: `Use --${flag} with one of: ${allowed.join(", ")}.${more}`,
   });
 }
+
+/** The short names, for the fix line of an unknown --framework. */
+const SHORT_NAMES = ` Short names work too: ${SITE_FRAMEWORKS.map(
+  (framework) => `${framework.aliases.join(", ")} (${framework.name})`,
+).join("; ")}.`;
 
 export async function createCommand(options: CreateOptions): Promise<CreateResult> {
   const log = options.log ?? ((line: string) => console.log(line));
@@ -214,14 +234,16 @@ export async function createCommand(options: CreateOptions): Promise<CreateResul
     });
   }
 
-  const framework =
+  const named =
     options.framework ??
     (await ask(
-      "Make the website too? next: a Next.js site that shows every collection. nuxt or sveltekit: the same site in Nuxt or SvelteKit. none: just the content, for a site you already have.",
-      ["next", "nuxt", "sveltekit", "none"],
-      DEFAULTS.framework,
+      `Make the website too? ${FRAMEWORK_SUMMARY}.`,
+      [...FRAMEWORK_NAMES],
+      DEFAULT_FRAMEWORK,
+      (answer) => resolveFramework(answer) !== undefined,
     ));
-  if (!isFramework(framework)) refuse("framework", framework, [...FRAMEWORKS]);
+  const framework = resolveFramework(named);
+  if (!framework) refuse("framework", named, FRAMEWORK_NAMES, SHORT_NAMES);
 
   const source = edit === "online" ? "database" : "git";
   const index = database === "none" ? "static" : "postgres";
@@ -265,7 +287,7 @@ export async function createCommand(options: CreateOptions): Promise<CreateResul
     writeFileSync(target, body, path === ".env" ? { mode: 0o600 } : undefined);
   }
   log(
-    `✓ Wrote a ${template} site${FRAMEWORK_LABEL[framework]} in ${projectDir} (${Object.keys(files).length} files)`,
+    `✓ Wrote a ${template} site${withFramework(framework)} in ${projectDir} (${Object.keys(files).length} files)`,
   );
 
   // ---- the schema, before anything needs it ------------------------------
