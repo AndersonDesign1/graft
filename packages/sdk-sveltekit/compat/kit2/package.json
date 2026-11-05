@@ -15,7 +15,7 @@
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "5.5.7",
-    "@sveltejs/kit": "2.70.3",
+    "@sveltejs/kit": "3.0.0",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@usegraft/cli": "workspace:*",
     "playwright": "1.63.0",
