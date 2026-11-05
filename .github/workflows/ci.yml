@@ -341,6 +341,72 @@ jobs:
           path: .turbo/cache
           key: turbo-${{ runner.os }}-sdk-nuxt-${{ matrix.nuxt }}-${{ github.sha }}
 
+  # `graft create --framework <name>` for the frameworks with no compat app of
+  # their own: each leg makes a site from this checkout, installs it with the
+  # framework version a new site gets from npm today, type-checks, builds,
+  # serves it, and checks the pages, each MDX body, the browser bundle,
+  # hydration and a navigation in Chromium, and the `npm run dev` loop
+  # (scripts/smoke-create.mjs). Advisory, like the compat jobs: it is not a
+  # required check in .github/rulesets/main.json, because a new framework
+  # release can break it for reasons outside this repo.
+  create-site:
+    name: graft create --framework ${{ matrix.framework }}
+    runs-on: ubuntu-latest
+    strategy:
+      # One failing framework must not hide the result of the others.
+      fail-fast: false
+      matrix:
+        framework: ["astro", "react-router", "tanstack-start"]
+    env:
+      TURBO_RUN_SUMMARY: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this job pushes, and a persisted token in .git/config
+          # is one careless artifact upload away from being published.
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The newest Node 22, not the repo's floor: Astro 7 needs 22.23.4 and
+          # React Router 8 needs 22.22.
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      # Turbo's cache from this job's last run; see the note in `verify`.
+      - name: Restore the turbo cache
+        id: turbo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-create-${{ matrix.framework }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-create-${{ matrix.framework }}-
+
+      # The CLI that makes the site, the adapter it depends on, and everything
+      # they import: the smoke packs exactly these.
+      - run: pnpm turbo run build --filter=@usegraft/cli... --filter=@usegraft/sdk-${{ matrix.framework }}...
+      # The browser the smoke drives, for the Playwright version it installs.
+      - run: npx --yes playwright@1.63.0 install --with-deps chromium
+      - run: node scripts/smoke-create.mjs --framework ${{ matrix.framework }}
+
+      # Saved even when a step failed: turbo caches only tasks that passed,
+      # and the next push can reuse those. Skipped on a re-run of the same
+      # commit, whose cache is already saved.
+      - name: Keep only the turbo cache entries this run used
+        if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
+        run: node scripts/prune-turbo-cache.mjs
+      - name: Save the turbo cache
+        if: ${{ !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-create-${{ matrix.framework }}-${{ github.sha }}
+
   # The integration suite is opt-in (RUN_INTEGRATION=1 + DATABASE_URL) and was
   # therefore never running here — including the only test that proves a
   # requester cannot approve their own destructive operation. A throwaway

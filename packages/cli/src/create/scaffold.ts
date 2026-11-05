@@ -1,16 +1,17 @@
 /**
  * The files `graft create` writes: the schema and example content from a
- * template, an AGENTS.md for whoever opens the folder next, and, for a Next.js
- * Nuxt or SvelteKit site, a small app that lists and renders every collection.
+ * template, an AGENTS.md for whoever opens the folder next, and, unless the
+ * framework is "none", a small site that lists and renders every collection.
  *
  * Pure: it returns paths and contents, and the command writes them. That is
  * what lets the tests check every template compiles without a disk or a
  * network.
  */
 import { barrelSource } from "@usegraft/registry";
+import type { Framework } from "../registry";
 import { templateFor, type TemplateName } from "./templates";
 
-export type Framework = "next" | "nuxt" | "sveltekit" | "none";
+export type { Framework };
 
 export interface ScaffoldOptions {
   /** The package name, from the folder. */
@@ -39,6 +40,19 @@ const SVELTEKIT_DEV_DEPENDENCIES = {
   svelte: "^5.57.0",
   typescript: "^6.0.0",
   vite: "^8.0.0",
+};
+const ASTRO_VERSION = "^7.4.0";
+const ASTRO_NODE_VERSION = "^11.1.0";
+const REACT_ROUTER_VERSION = "^8.5.0";
+const TANSTACK_ROUTER_VERSION = "^1.170.0";
+const TANSTACK_START_VERSION = "^1.169.0";
+const VITE_VERSION = "^8.0.0";
+/** The types a React site on Vite type-checks against. */
+const REACT_TYPES = {
+  "@types/node": "^22.0.0",
+  "@types/react": "^19.0.0",
+  "@types/react-dom": "^19.0.0",
+  typescript: "^5.8.0",
 };
 
 function configSource(options: ScaffoldOptions): string {
@@ -86,6 +100,15 @@ function siteLine(framework: Framework): string {
   }
   if (framework === "sveltekit") {
     return "- `src/`: the SvelteKit site. `src/lib/server/` reads the content and prepares each body; `src/routes/` renders it.\n";
+  }
+  if (framework === "astro") {
+    return "- `src/`: the Astro site. `src/lib/` reads the content; `src/pages/` renders it, with `MdxContent` from `@usegraft/sdk-astro/mdx` for each body.\n";
+  }
+  if (framework === "react-router") {
+    return "- `app/`: the React Router site. `app/lib/*.server.ts` reads the content and prepares each body in the route loaders; `app/routes/` renders it.\n";
+  }
+  if (framework === "tanstack-start") {
+    return "- `src/`: the TanStack Start site. `src/lib/content.ts` reads the content in server functions, which the route loaders call; `src/routes/` renders it.\n";
   }
   return "";
 }
@@ -141,6 +164,9 @@ function gitignore(options: ScaffoldOptions): string {
     ...(options.framework === "next" ? [".next/", "next-env.d.ts"] : []),
     ...(options.framework === "nuxt" ? [".nuxt/", ".output/"] : []),
     ...(options.framework === "sveltekit" ? [".svelte-kit/", "build/"] : []),
+    ...(options.framework === "astro" ? [".astro/", "dist/"] : []),
+    ...(options.framework === "react-router" ? [".react-router/", "build/"] : []),
+    ...(options.framework === "tanstack-start" ? [".tanstack/", "dist/"] : []),
     "",
   ].join("\n");
 }
@@ -298,6 +324,72 @@ function frameworkPackage(options: ScaffoldOptions): FrameworkPackage {
       imports: { "#lib/*": "./src/lib/*" },
     };
   }
+  if (options.framework === "astro") {
+    return {
+      scripts: {
+        // --ignore-lock keeps astro dev in the foreground when an AI agent runs
+        // it; otherwise Astro moves it to the background and graft dev, which
+        // owns the dev server, sees it exit.
+        dev: "graft dev -- astro dev --ignore-lock",
+        build: "graft compile && astro build",
+        start: "node dist/server/entry.mjs",
+      },
+      dependencies: {
+        "@usegraft/sdk-astro": graft,
+        "@astrojs/node": ASTRO_NODE_VERSION,
+        astro: ASTRO_VERSION,
+      },
+      devDependencies: {},
+    };
+  }
+  if (options.framework === "react-router") {
+    return {
+      scripts: {
+        dev: "graft dev -- react-router dev --port 3000",
+        build: "graft compile && react-router build",
+        start: "react-router-serve ./build/server/index.js",
+        typecheck: "react-router typegen && tsc",
+      },
+      dependencies: {
+        "@usegraft/sdk-react-router": graft,
+        "@react-router/node": REACT_ROUTER_VERSION,
+        "@react-router/serve": REACT_ROUTER_VERSION,
+        isbot: "^5.1.0",
+        react: REACT_VERSION,
+        "react-dom": REACT_VERSION,
+        "react-router": REACT_ROUTER_VERSION,
+      },
+      devDependencies: {
+        "@react-router/dev": REACT_ROUTER_VERSION,
+        ...REACT_TYPES,
+        vite: VITE_VERSION,
+      },
+    };
+  }
+  if (options.framework === "tanstack-start") {
+    return {
+      scripts: {
+        dev: "graft dev -- vite dev --port 3000",
+        build: "graft compile && vite build",
+        // The build is a fetch handler; srvx serves it, and the browser files, on Node.
+        start: "srvx serve --prod --dir . --entry dist/server/server.js --static dist/client",
+        typecheck: "tsc",
+      },
+      dependencies: {
+        "@usegraft/sdk-tanstack-start": graft,
+        "@tanstack/react-router": TANSTACK_ROUTER_VERSION,
+        "@tanstack/react-start": TANSTACK_START_VERSION,
+        react: REACT_VERSION,
+        "react-dom": REACT_VERSION,
+        srvx: "^1.0.0",
+      },
+      devDependencies: {
+        "@vitejs/plugin-react": "^6.0.0",
+        ...REACT_TYPES,
+        vite: VITE_VERSION,
+      },
+    };
+  }
   return {
     scripts: { dev: "graft dev", build: "graft compile" },
     dependencies: {},
@@ -326,29 +418,152 @@ function packageJson(options: ScaffoldOptions): string {
   return `${JSON.stringify(pkg, null, 2)}\n`;
 }
 
-function nextFiles(options: ScaffoldOptions) {
-  const template = templateFor(options.template);
-  const reader =
-    options.index === "static"
-      ? `import { openStaticIndex } from "@usegraft/db";
-import { createGraft } from "@usegraft/sdk-next";
-import { collections } from "../graft.config";
+/**
+ * The module that opens the content index: the static file `graft compile`
+ * writes, or Postgres at DATABASE_URL. `graft dev` loads .env first, so the
+ * dev server sees DATABASE_URL; in production the host sets it.
+ */
+function readerModule(options: ScaffoldOptions, sdk: string, configImport: string): string {
+  if (options.index === "static") {
+    return `import { openStaticIndex } from "@usegraft/db";
+import { createGraft } from "${sdk}";
+import { collections } from "${configImport}";
 
 /** Reads the content index that \`graft compile\` writes to .graft/index.db. */
 export const graft = createGraft({
   index: await openStaticIndex(".graft/index.db"),
   collections,
-});`
-      : `import { createDb } from "@usegraft/db";
-import { createGraft } from "@usegraft/sdk-next";
-import { collections } from "../graft.config";
+});
+`;
+  }
+  return `import { createDb } from "@usegraft/db";
+import { createGraft } from "${sdk}";
+import { collections } from "${configImport}";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set: add it to .env (npx graft doctor explains).");
 
 /** Reads the content index in Postgres, where a publish in Studio lands. */
-export const graft = createGraft({ db: createDb(url).db, collections });`;
+export const graft = createGraft({ db: createDb(url).db, collections });
+`;
+}
 
+/**
+ * The half of a site's content helpers that reads nothing: collection names,
+ * labels and the shape of an entry. Safe in the browser, so navigation and
+ * pages can import it.
+ */
+function siteModule(options: ScaffoldOptions, configImport: string): string {
+  const template = templateFor(options.template);
+  const listed = template.collectionNames.filter((name) => name !== "pages");
+  return `/**
+ * What the pages need from the content: the collections the site lists, and
+ * each document as an entry with a title and a short line. Safe in the
+ * browser: it reads nothing.
+ */
+import { collections } from "${configImport}";
+
+export type CollectionName = keyof typeof collections & string;
+
+/** The collections the site lists, in navigation order. */
+export const LISTED: CollectionName[] = ${JSON.stringify(listed)};
+
+export const FEATURED: CollectionName | null = ${template.featured ? JSON.stringify(template.featured) : "null"};
+
+export interface Entry {
+  slug: string;
+  title: string;
+  /** The short line under the title: a summary, description or tagline. */
+  line: string | null;
+}
+
+export function isCollection(name: string): name is CollectionName {
+  return Object.hasOwn(collections, name);
+}
+
+export function label(collection: string): string {
+  return collection.charAt(0).toUpperCase() + collection.slice(1);
+}
+`;
+}
+
+interface ContentModule {
+  /** Why this module never reaches the browser, for its header. */
+  serverOnly: string;
+  /** Where `Entry` and `CollectionName` come from. */
+  site: string;
+  /** Where `graft` comes from. */
+  reader: string;
+  /**
+   * The package `prepareMdx` comes from, so each body arrives as a tree; or
+   * null to hand the page the MDX source, for a renderer that prepares it.
+   */
+  prepare: string | null;
+}
+
+/** The half of a site's content helpers that reads, on the server only. */
+function contentModule(spec: ContentModule): string {
+  const body = spec.prepare
+    ? {
+        import: `import { prepareMdx, type MdxTree } from "${spec.prepare}";\n`,
+        type: "MdxTree",
+        doc: "with its body prepared for MdxContent",
+        value: "prepareMdx(doc.body, { label: `${collection}/${slug}` })",
+      }
+    : { import: "", type: "string", doc: "with its MDX body", value: "doc.body" };
+  return `/**
+ * Reading entries, on the server only: ${spec.serverOnly}
+ */
+${body.import}import type { CollectionName, Entry } from "${spec.site}";
+import { graft } from "${spec.reader}";
+
+function entry(doc: { slug: string; data: object }): Entry & { data: Record<string, unknown> } {
+  const data = doc.data as Record<string, unknown>;
+  const line = [data.summary, data.description, data.tagline].find(
+    (value): value is string => typeof value === "string" && value.length > 0,
+  );
+  return {
+    slug: doc.slug,
+    title: typeof data.title === "string" ? data.title : doc.slug,
+    line: line ?? null,
+    data,
+  };
+}
+
+/** Newest first when entries have a date, in order when they have one, else by title. */
+function byReadingOrder(a: ReturnType<typeof entry>, b: ReturnType<typeof entry>): number {
+  const date = (e: ReturnType<typeof entry>) =>
+    e.data.date instanceof Date ? e.data.date.getTime() : Date.parse(String(e.data.date ?? ""));
+  if (!Number.isNaN(date(a)) && !Number.isNaN(date(b))) return date(b) - date(a);
+  if (typeof a.data.order === "number" && typeof b.data.order === "number") return a.data.order - b.data.order;
+  if (typeof a.data.year === "number" && typeof b.data.year === "number") return b.data.year - a.data.year;
+  return a.title.localeCompare(b.title);
+}
+
+/** A collection's entries in reading order, with only what a list shows. */
+export async function entries(collection: CollectionName): Promise<Entry[]> {
+  const docs = await graft.listContent(collection);
+  return docs
+    .map(entry)
+    .sort(byReadingOrder)
+    .map(({ slug, title, line }) => ({ slug, title, line }));
+}
+
+/** One entry ${body.doc}, or null when there is none. */
+export async function findEntry(
+  collection: CollectionName,
+  slug: string,
+): Promise<(Entry & { body: ${body.type} }) | null> {
+  const doc = await graft.getContent(collection, slug);
+  if (!doc) return null;
+  const { title, line } = entry(doc);
+  return { slug, title, line, body: ${body.value} };
+}
+`;
+}
+
+function nextFiles(options: ScaffoldOptions) {
+  const template = templateFor(options.template);
   const site = `/**
  * What the pages need from the content: every collection's entries, in the
  * order a reader expects, and one entry by its slug.
@@ -449,7 +664,7 @@ export default withGraft({});
       null,
       2,
     )}\n`,
-    "lib/graft.ts": `${reader}\n`,
+    "lib/graft.ts": readerModule(options, "@usegraft/sdk-next", "../graft.config"),
     "lib/site.ts": site,
     "app/globals.css": SITE_CSS,
     "app/layout.tsx": `import type { ReactNode } from "react";
@@ -758,21 +973,11 @@ export default defineEventHandler(async (event) => {
 }
 
 function sveltekitFiles(options: ScaffoldOptions) {
-  const template = templateFor(options.template);
-  const listed = template.collectionNames.filter((name) => name !== "pages");
-  const featured = template.featured;
-
+  // SvelteKit 3 reads only the variables src/env.ts declares, so the Postgres
+  // reader takes DATABASE_URL from \`$app/env/private\` rather than process.env.
   const reader =
     options.index === "static"
-      ? `import { openStaticIndex } from "@usegraft/db";
-import { createGraft } from "@usegraft/sdk-sveltekit";
-import { collections } from "../../../graft.config";
-
-/** Reads the content index that \`graft compile\` writes to .graft/index.db. */
-export const graft = createGraft({
-  index: await openStaticIndex(".graft/index.db"),
-  collections,
-});`
+      ? readerModule(options, "@usegraft/sdk-sveltekit", "../../../graft.config")
       : `// SvelteKit 3 reads only the variables src/env.ts declares, and refuses to
 // start without DATABASE_URL.
 import { DATABASE_URL } from "$app/env/private";
@@ -781,88 +986,7 @@ import { createGraft } from "@usegraft/sdk-sveltekit";
 import { collections } from "../../../graft.config";
 
 /** Reads the content index in Postgres, where a publish in Studio lands. */
-export const graft = createGraft({ db: createDb(DATABASE_URL).db, collections });`;
-
-  const site = `/**
- * What the pages need from the content: the collections the site lists, and
- * each document as an entry with a title and a short line. Safe in the
- * browser: it reads nothing.
- */
-import { collections } from "../../graft.config";
-
-export type CollectionName = keyof typeof collections & string;
-
-/** The collections the site lists, in navigation order. */
-export const LISTED: CollectionName[] = ${JSON.stringify(listed)};
-
-export const FEATURED: CollectionName | null = ${featured ? JSON.stringify(featured) : "null"};
-
-export interface Entry {
-  slug: string;
-  title: string;
-  /** The short line under the title: a summary, description or tagline. */
-  line: string | null;
-}
-
-export function isCollection(name: string): name is CollectionName {
-  return Object.hasOwn(collections, name);
-}
-
-export function label(collection: string): string {
-  return collection.charAt(0).toUpperCase() + collection.slice(1);
-}
-`;
-
-  const serverSite = `/**
- * Reading entries, on the server only: \`src/lib/server/\` never reaches the
- * browser.
- */
-import { prepareMdx, type MdxTree } from "@usegraft/sdk-sveltekit/server";
-import type { CollectionName, Entry } from "#lib/site.ts";
-import { graft } from "./graft.ts";
-
-function entry(doc: { slug: string; data: object }): Entry & { data: Record<string, unknown> } {
-  const data = doc.data as Record<string, unknown>;
-  const line = [data.summary, data.description, data.tagline].find(
-    (value): value is string => typeof value === "string" && value.length > 0,
-  );
-  return {
-    slug: doc.slug,
-    title: typeof data.title === "string" ? data.title : doc.slug,
-    line: line ?? null,
-    data,
-  };
-}
-
-/** Newest first when entries have a date, in order when they have one, else by title. */
-function byReadingOrder(a: ReturnType<typeof entry>, b: ReturnType<typeof entry>): number {
-  const date = (e: ReturnType<typeof entry>) =>
-    e.data.date instanceof Date ? e.data.date.getTime() : Date.parse(String(e.data.date ?? ""));
-  if (!Number.isNaN(date(a)) && !Number.isNaN(date(b))) return date(b) - date(a);
-  if (typeof a.data.order === "number" && typeof b.data.order === "number") return a.data.order - b.data.order;
-  if (typeof a.data.year === "number" && typeof b.data.year === "number") return b.data.year - a.data.year;
-  return a.title.localeCompare(b.title);
-}
-
-/** A collection's entries in reading order, with only what a list shows. */
-export async function entries(collection: CollectionName): Promise<Entry[]> {
-  const docs = await graft.listContent(collection);
-  return docs
-    .map(entry)
-    .sort(byReadingOrder)
-    .map(({ slug, title, line }) => ({ slug, title, line }));
-}
-
-/** One entry with its body prepared for MdxContent, or null when there is none. */
-export async function findEntry(
-  collection: CollectionName,
-  slug: string,
-): Promise<(Entry & { body: MdxTree }) | null> {
-  const doc = await graft.getContent(collection, slug);
-  if (!doc) return null;
-  const { title, line } = entry(doc);
-  return { slug, title, line, body: prepareMdx(doc.body, { label: \`\${collection}/\${slug}\` }) };
-}
+export const graft = createGraft({ db: createDb(DATABASE_URL).db, collections });
 `;
 
   return {
@@ -894,9 +1018,14 @@ export default defineConfig({ plugins: [sveltekit({ adapter: adapter() })] });
 </html>
 `,
     "src/app.css": SITE_CSS,
-    "src/lib/site.ts": site,
-    "src/lib/server/graft.ts": `${reader}\n`,
-    "src/lib/server/site.ts": serverSite,
+    "src/lib/site.ts": siteModule(options, "../../graft.config"),
+    "src/lib/server/graft.ts": reader,
+    "src/lib/server/site.ts": contentModule({
+      serverOnly: "`src/lib/server/` never reaches the\n * browser.",
+      site: "#lib/site.ts",
+      reader: "./graft.ts",
+      prepare: "@usegraft/sdk-sveltekit/server",
+    }),
     "src/routes/+layout.svelte": `<script lang="ts">
   import type { Snippet } from "svelte";
   import { LISTED, label } from "#lib/site.ts";
@@ -1003,6 +1132,542 @@ export const load: PageServerLoad = async ({ params }) => {
   };
 }
 
+function astroFiles(options: ScaffoldOptions) {
+  const list = (collection: string, items: string) => `<ul class="list">
+    {${items}.map((item) => (
+      <li>
+        <a href={\`/\${${collection}}/\${item.slug}\`}>{item.title}</a>
+        {item.line && <p>{item.line}</p>}
+      </li>
+    ))}
+  </ul>`;
+  return {
+    "astro.config.mjs": `import node from "@astrojs/node";
+import { defineConfig } from "astro/config";
+
+// Every page reads the index when it is requested, so a recompile or a
+// publish shows on the next page load.
+export default defineConfig({
+  output: "server",
+  adapter: node({ mode: "standalone" }),
+  server: { port: 3000 },
+});
+`,
+    "tsconfig.json": `${JSON.stringify(
+      {
+        extends: "astro/tsconfigs/strict",
+        include: [".astro/types.d.ts", "**/*"],
+        exclude: ["dist"],
+      },
+      null,
+      2,
+    )}\n`,
+    "src/styles/site.css": SITE_CSS,
+    "src/lib/graft.ts": readerModule(options, "@usegraft/sdk-astro", "../../graft.config"),
+    "src/lib/site.ts": siteModule(options, "../../graft.config"),
+    "src/lib/content.ts": contentModule({
+      serverOnly:
+        "an Astro page's frontmatter runs on the server, and\n * nothing here is sent to the browser.",
+      site: "./site",
+      reader: "./graft",
+      prepare: null,
+    }),
+    "src/layouts/Site.astro": `---
+import { LISTED, label } from "../lib/site";
+import "../styles/site.css";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${options.name}</title>
+  </head>
+  <body>
+    <div class="site">
+      <nav class="nav">
+        <a href="/">${options.name}</a>
+        {LISTED.map((collection) => <a href={\`/\${collection}\`}>{label(collection)}</a>)}
+      </nav>
+      <main><slot /></main>
+    </div>
+  </body>
+</html>
+`,
+    "src/pages/index.astro": `---
+import { MdxContent } from "@usegraft/sdk-astro/mdx";
+import Site from "../layouts/Site.astro";
+import { entries, findEntry } from "../lib/content";
+import { FEATURED } from "../lib/site";
+
+const home = await findEntry("pages", "home");
+const featured = FEATURED ? await entries(FEATURED) : [];
+---
+
+<Site>
+  <h1>{home?.title ?? "Welcome"}</h1>
+  {home?.line && <p class="line">{home.line}</p>}
+  {home && <MdxContent source={home.body} label="pages/home" />}
+  {featured.length > 0 && (
+  ${list("FEATURED", "featured")}
+  )}
+</Site>
+`,
+    "src/pages/[collection]/index.astro": `---
+import Site from "../../layouts/Site.astro";
+import { entries } from "../../lib/content";
+import { isCollection, label } from "../../lib/site";
+
+const { collection = "" } = Astro.params;
+if (!isCollection(collection)) return new Response("No such collection", { status: 404 });
+const items = await entries(collection);
+---
+
+<Site>
+  <h1>{label(collection)}</h1>
+  ${list("collection", "items")}
+</Site>
+`,
+    "src/pages/[collection]/[slug].astro": `---
+import { MdxContent } from "@usegraft/sdk-astro/mdx";
+import Site from "../../layouts/Site.astro";
+import { findEntry } from "../../lib/content";
+import { isCollection } from "../../lib/site";
+
+const { collection = "", slug = "" } = Astro.params;
+if (!isCollection(collection)) return new Response("No such collection", { status: 404 });
+const item = await findEntry(collection, slug);
+if (!item) return new Response("No such page", { status: 404 });
+---
+
+<Site>
+  <article>
+    <h1>{item.title}</h1>
+    {item.line && <p class="line">{item.line}</p>}
+    <MdxContent source={item.body} label={\`\${collection}/\${slug}\`} />
+  </article>
+</Site>
+`,
+  };
+}
+
+/** The list every React page shows: links to entries, each with its short line. */
+const reactList = (href: string) => `<ul className="list">
+          {items.map((item) => (
+            <li key={item.slug}>
+              <Link to={${href}}>{item.title}</Link>
+              {item.line ? <p>{item.line}</p> : null}
+            </li>
+          ))}
+        </ul>`;
+
+function reactRouterFiles(options: ScaffoldOptions) {
+  return {
+    "react-router.config.ts": `import type { Config } from "@react-router/dev/config";
+
+// Rendered on the server for every request, so a recompile or a publish
+// shows on the next page load.
+export default { ssr: true } satisfies Config;
+`,
+    "vite.config.ts": `import { reactRouter } from "@react-router/dev/vite";
+import { defineConfig } from "vite";
+
+export default defineConfig({ plugins: [reactRouter()] });
+`,
+    "tsconfig.json": `${JSON.stringify(
+      {
+        include: ["**/*", "**/.server/**/*", "**/.client/**/*", ".react-router/types/**/*"],
+        compilerOptions: {
+          lib: ["DOM", "DOM.Iterable", "ES2022"],
+          types: ["node", "vite/client"],
+          target: "ES2022",
+          module: "ES2022",
+          moduleResolution: "bundler",
+          jsx: "react-jsx",
+          rootDirs: [".", "./.react-router/types"],
+          esModuleInterop: true,
+          verbatimModuleSyntax: true,
+          noEmit: true,
+          resolveJsonModule: true,
+          skipLibCheck: true,
+          strict: true,
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    "app/app.css": SITE_CSS,
+    "app/lib/graft.server.ts": readerModule(
+      options,
+      "@usegraft/sdk-react-router",
+      "../../graft.config",
+    ),
+    "app/lib/site.ts": siteModule(options, "../../graft.config"),
+    "app/lib/content.server.ts": contentModule({
+      serverOnly:
+        "React Router refuses to build a browser bundle that\n * imports a `.server.ts` module.",
+      site: "./site",
+      reader: "./graft.server",
+      prepare: "@usegraft/sdk-react-router/server",
+    }),
+    "app/routes.ts": `import { index, route, type RouteConfig } from "@react-router/dev/routes";
+
+export default [
+  index("routes/home.tsx"),
+  route(":collection", "routes/collection.tsx"),
+  route(":collection/:slug", "routes/entry.tsx"),
+] satisfies RouteConfig;
+`,
+    "app/root.tsx": `import type { ReactNode } from "react";
+import {
+  isRouteErrorResponse,
+  Link,
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+} from "react-router";
+import type { Route } from "./+types/root";
+import { LISTED, label } from "./lib/site";
+import "./app.css";
+
+export function meta() {
+  return [{ title: ${JSON.stringify(options.name)} }];
+}
+
+export function Layout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <Meta />
+        <Links />
+      </head>
+      <body>
+        <div className="site">
+          <nav className="nav">
+            <Link to="/">${options.name}</Link>
+            {LISTED.map((collection) => (
+              <Link key={collection} to={\`/\${collection}\`}>
+                {label(collection)}
+              </Link>
+            ))}
+          </nav>
+          <main>{children}</main>
+        </div>
+        <ScrollRestoration />
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+export default function App() {
+  return <Outlet />;
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  const missing = isRouteErrorResponse(error) && error.status === 404;
+  return <h1>{missing ? "Not found" : "Something went wrong"}</h1>;
+}
+`,
+    "app/routes/home.tsx": `import { Link } from "react-router";
+import { MdxContent } from "@usegraft/sdk-react-router/mdx";
+import { entries, findEntry } from "../lib/content.server";
+import { FEATURED } from "../lib/site";
+import type { Route } from "./+types/home";
+
+export async function loader() {
+  return {
+    home: await findEntry("pages", "home"),
+    items: FEATURED ? await entries(FEATURED) : [],
+  };
+}
+
+export default function Home({ loaderData }: Route.ComponentProps) {
+  const { home, items } = loaderData;
+  return (
+    <>
+      <h1>{home?.title ?? "Welcome"}</h1>
+      {home?.line ? <p className="line">{home.line}</p> : null}
+      {home ? <MdxContent tree={home.body} /> : null}
+      {items.length > 0 ? (
+        ${reactList("`/${FEATURED}/${item.slug}`")}
+      ) : null}
+    </>
+  );
+}
+`,
+    "app/routes/collection.tsx": `import { data, Link } from "react-router";
+import { entries } from "../lib/content.server";
+import { isCollection, label } from "../lib/site";
+import type { Route } from "./+types/collection";
+
+export async function loader({ params }: Route.LoaderArgs) {
+  if (!isCollection(params.collection)) throw data("No such collection", { status: 404 });
+  return { collection: params.collection, items: await entries(params.collection) };
+}
+
+export default function Collection({ loaderData }: Route.ComponentProps) {
+  const { collection, items } = loaderData;
+  return (
+    <>
+      <h1>{label(collection)}</h1>
+      ${reactList("`/${collection}/${item.slug}`").replace(/\n {2}/g, "\n")}
+    </>
+  );
+}
+`,
+    "app/routes/entry.tsx": `import { data } from "react-router";
+import { MdxContent } from "@usegraft/sdk-react-router/mdx";
+import { findEntry } from "../lib/content.server";
+import { isCollection } from "../lib/site";
+import type { Route } from "./+types/entry";
+
+export async function loader({ params }: Route.LoaderArgs) {
+  if (!isCollection(params.collection)) throw data("No such collection", { status: 404 });
+  const item = await findEntry(params.collection, params.slug);
+  if (!item) throw data("No such page", { status: 404 });
+  return { item };
+}
+
+export default function EntryPage({ loaderData }: Route.ComponentProps) {
+  const { item } = loaderData;
+  return (
+    <article>
+      <h1>{item.title}</h1>
+      {item.line ? <p className="line">{item.line}</p> : null}
+      <MdxContent tree={item.body} />
+    </article>
+  );
+}
+`,
+  };
+}
+
+function tanstackStartFiles(options: ScaffoldOptions) {
+  return {
+    "vite.config.ts": `import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+
+// tanstackStart() comes before react().
+export default defineConfig({ plugins: [tanstackStart(), react()] });
+`,
+    "tsconfig.json": `${JSON.stringify(
+      {
+        include: ["**/*.ts", "**/*.tsx"],
+        compilerOptions: {
+          target: "ES2022",
+          lib: ["DOM", "DOM.Iterable", "ES2022"],
+          module: "ESNext",
+          moduleResolution: "Bundler",
+          jsx: "react-jsx",
+          types: ["node", "vite/client"],
+          strict: true,
+          noEmit: true,
+          skipLibCheck: true,
+          verbatimModuleSyntax: true,
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    "src/styles.css": SITE_CSS,
+    "src/lib/graft.server.ts": readerModule(
+      options,
+      "@usegraft/sdk-tanstack-start",
+      "../../graft.config",
+    ),
+    "src/lib/site.ts": siteModule(options, "../../graft.config"),
+    "src/lib/content.server.ts": contentModule({
+      serverOnly:
+        "only the server functions in `content.ts` import it,\n * and TanStack Start leaves their bodies out of the browser bundle.",
+      site: "./site",
+      reader: "./graft.server",
+      prepare: "@usegraft/sdk-tanstack-start/server",
+    }),
+    "src/lib/content.ts": `/**
+ * The reads the pages make. A TanStack Start loader also runs in the browser
+ * on client-side navigation, so each read is a server function: the loader
+ * calls it, and in the browser that call is a request to the server.
+ */
+import { createServerFn } from "@tanstack/react-start";
+import { entries, findEntry } from "./content.server";
+import { FEATURED, isCollection, type CollectionName } from "./site";
+
+function collectionName(name: string): CollectionName | null {
+  return isCollection(name) ? name : null;
+}
+
+export const getHome = createServerFn({ method: "GET" }).handler(async () => ({
+  home: await findEntry("pages", "home"),
+  items: FEATURED ? await entries(FEATURED) : [],
+}));
+
+export const getEntries = createServerFn({ method: "GET" })
+  .validator((collection: string) => collection)
+  .handler(async ({ data }) => {
+    const collection = collectionName(data);
+    return collection ? await entries(collection) : null;
+  });
+
+export const getEntry = createServerFn({ method: "GET" })
+  .validator((input: { collection: string; slug: string }) => input)
+  .handler(async ({ data }) => {
+    const collection = collectionName(data.collection);
+    return collection ? await findEntry(collection, data.slug) : null;
+  });
+`,
+    "src/router.tsx": `import { createRouter } from "@tanstack/react-router";
+import { routeTree } from "./routeTree.gen";
+
+export function getRouter() {
+  return createRouter({ routeTree, scrollRestoration: true });
+}
+`,
+    "src/routes/__root.tsx": `import type { ReactNode } from "react";
+import { createRootRoute, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router";
+import { LISTED, label } from "../lib/site";
+import css from "../styles.css?url";
+
+export const Route = createRootRoute({
+  head: () => ({
+    meta: [
+      { charSet: "utf-8" },
+      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { title: ${JSON.stringify(options.name)} },
+    ],
+    links: [{ rel: "stylesheet", href: css }],
+  }),
+  component: () => (
+    <Document>
+      <Outlet />
+    </Document>
+  ),
+  notFoundComponent: () => <h1>Not found</h1>,
+});
+
+function Document({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <div className="site">
+          <nav className="nav">
+            <Link to="/">${options.name}</Link>
+            {LISTED.map((collection) => (
+              <Link key={collection} to="/$collection" params={{ collection }}>
+                {label(collection)}
+              </Link>
+            ))}
+          </nav>
+          <main>{children}</main>
+        </div>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+`,
+    "src/routes/index.tsx": `import { createFileRoute, Link } from "@tanstack/react-router";
+import { MdxContent } from "@usegraft/sdk-tanstack-start/mdx";
+import { getHome } from "../lib/content";
+import { FEATURED } from "../lib/site";
+
+export const Route = createFileRoute("/")({
+  loader: () => getHome(),
+  component: Home,
+});
+
+function Home() {
+  const { home, items } = Route.useLoaderData();
+  const featured = FEATURED;
+  return (
+    <>
+      <h1>{home?.title ?? "Welcome"}</h1>
+      {home?.line ? <p className="line">{home.line}</p> : null}
+      {home ? <MdxContent tree={home.body} /> : null}
+      {featured && items.length > 0 ? (
+        <ul className="list">
+          {items.map((item) => (
+            <li key={item.slug}>
+              <Link to="/$collection/$slug" params={{ collection: featured, slug: item.slug }}>
+                {item.title}
+              </Link>
+              {item.line ? <p>{item.line}</p> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </>
+  );
+}
+`,
+    "src/routes/$collection/index.tsx": `import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { getEntries } from "../../lib/content";
+import { label } from "../../lib/site";
+
+export const Route = createFileRoute("/$collection/")({
+  loader: async ({ params }) => {
+    const items = await getEntries({ data: params.collection });
+    if (!items) throw notFound();
+    return items;
+  },
+  component: Collection,
+});
+
+function Collection() {
+  const { collection } = Route.useParams();
+  const items = Route.useLoaderData();
+  return (
+    <>
+      <h1>{label(collection)}</h1>
+      <ul className="list">
+        {items.map((item) => (
+          <li key={item.slug}>
+            <Link to="/$collection/$slug" params={{ collection, slug: item.slug }}>
+              {item.title}
+            </Link>
+            {item.line ? <p>{item.line}</p> : null}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+`,
+    "src/routes/$collection/$slug.tsx": `import { createFileRoute, notFound } from "@tanstack/react-router";
+import { MdxContent } from "@usegraft/sdk-tanstack-start/mdx";
+import { getEntry } from "../../lib/content";
+
+export const Route = createFileRoute("/$collection/$slug")({
+  loader: async ({ params }) => {
+    const item = await getEntry({ data: params });
+    if (!item) throw notFound();
+    return item;
+  },
+  component: EntryPage,
+});
+
+function EntryPage() {
+  const item = Route.useLoaderData();
+  return (
+    <article>
+      <h1>{item.title}</h1>
+      {item.line ? <p className="line">{item.line}</p> : null}
+      <MdxContent tree={item.body} />
+    </article>
+  );
+}
+`,
+  };
+}
+
 /** Every file a new site starts with, by path relative to its folder. */
 export function scaffoldFiles(options: ScaffoldOptions): Record<string, string> {
   const template = templateFor(options.template);
@@ -1022,5 +1687,8 @@ export function scaffoldFiles(options: ScaffoldOptions): Record<string, string> 
     Object.assign(files, sveltekitFiles(options));
     if (options.index === "postgres") files["src/env.ts"] = SVELTEKIT_ENV;
   }
+  if (options.framework === "astro") Object.assign(files, astroFiles(options));
+  if (options.framework === "react-router") Object.assign(files, reactRouterFiles(options));
+  if (options.framework === "tanstack-start") Object.assign(files, tanstackStartFiles(options));
   return files;
 }

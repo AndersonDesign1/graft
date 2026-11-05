@@ -37,7 +37,7 @@ export const index = "postgres";
 
 | Command                   | What it does                                                                        |
 | ------------------------- | ----------------------------------------------------------------------------------- |
-| `graft create`            | Make a new site with a template, a database, Studio and a Next.js app               |
+| `graft create`            | Make a new site with a template, a database, Studio and a website in your framework |
 | `graft init`              | Add Graft to a folder: graft.config.ts, content/ and llms.txt                       |
 | `graft doctor`            | Check the setup and print the one thing to do next                                  |
 | `graft add`               | Copy a ready-made primitive and its dependencies into graft/; alone, list them      |

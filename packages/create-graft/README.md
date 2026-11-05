@@ -15,5 +15,9 @@ prompts:
 npm create graft@latest my-site -- --template blog --edit online --database new --yes
 ```
 
+The website is Next.js unless `--framework` names another: `nuxt`,
+`sveltekit`, `astro`, `react-router` or `tanstack-start`, or `none` for only
+the content. Short names work too, such as `svelte`, `rr` and `tanstack`.
+
 This runs `graft create` from `@usegraft/cli`; `npx graft create --help` lists
 every option.

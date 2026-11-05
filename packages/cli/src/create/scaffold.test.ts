@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SITE_FRAMEWORKS } from "../registry";
 import { scaffoldFiles, type ScaffoldOptions } from "./scaffold";
 
 const base: ScaffoldOptions = {
@@ -42,6 +43,10 @@ describe("the dev script", () => {
       ["next", "graft dev -- next dev"],
       ["nuxt", "graft dev -- nuxt dev"],
       ["sveltekit", "graft dev -- vite dev --port 3000"],
+      // Astro 7 moves astro dev to the background when an agent runs it, unless --ignore-lock.
+      ["astro", "graft dev -- astro dev --ignore-lock"],
+      ["react-router", "graft dev -- react-router dev --port 3000"],
+      ["tanstack-start", "graft dev -- vite dev --port 3000"],
     ] as const) {
       const files = scaffoldFiles({ ...base, framework });
       expect(JSON.parse(files["package.json"] ?? "{}").scripts.dev, framework).toBe(dev);
@@ -51,7 +56,7 @@ describe("the dev script", () => {
 
 describe("AGENTS.md", () => {
   it("says files recompile as they are saved, and database content shows when published", () => {
-    for (const framework of ["next", "nuxt", "sveltekit"] as const) {
+    for (const { name: framework } of SITE_FRAMEWORKS) {
       const fromFiles = scaffoldFiles({ ...base, framework })["AGENTS.md"];
       expect(fromFiles, framework).toContain("Content recompiles as you save a file");
       expect(fromFiles, framework).not.toContain("npx graft compile` after editing");
@@ -61,5 +66,38 @@ describe("AGENTS.md", () => {
       expect(live, framework).toContain("a publish in Studio shows on the next page load");
       expect(live, framework).not.toContain("recompiles");
     }
+  });
+});
+
+describe("the Astro, React Router and TanStack Start sites", () => {
+  it("read Postgres at DATABASE_URL, which graft dev loads from .env", () => {
+    for (const [framework, reader] of [
+      ["astro", "src/lib/graft.ts"],
+      ["react-router", "app/lib/graft.server.ts"],
+      ["tanstack-start", "src/lib/graft.server.ts"],
+    ] as const) {
+      const files = scaffoldFiles({ ...base, framework, source: "database", index: "postgres" });
+      expect(files[reader], framework).toContain("process.env.DATABASE_URL");
+      expect(files[reader], framework).not.toContain("openStaticIndex");
+      expect(scaffoldFiles({ ...base, framework })[reader], framework).toContain("openStaticIndex");
+    }
+  });
+
+  it("never let a TanStack Start route import the reader, since its loader runs in the browser too", () => {
+    const files = scaffoldFiles({ ...base, framework: "tanstack-start" });
+    const routes = Object.entries(files).filter(([path]) => path.startsWith("src/routes/"));
+    expect(routes.length).toBeGreaterThan(0);
+    for (const [path, body] of routes) {
+      expect(body, path).not.toMatch(/graft\.server|content\.server/);
+    }
+    expect(files["src/lib/content.ts"]).toContain("createServerFn");
+  });
+
+  it("keep React Router's reads in .server.ts modules, which it refuses to bundle for the browser", () => {
+    const files = scaffoldFiles({ ...base, framework: "react-router" });
+    const readers = Object.entries(files)
+      .filter(([, body]) => body.includes("graft.listContent") || body.includes("createGraft("))
+      .map(([path]) => path);
+    expect(readers.sort()).toEqual(["app/lib/content.server.ts", "app/lib/graft.server.ts"]);
   });
 });
