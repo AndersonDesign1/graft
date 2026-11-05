@@ -166,8 +166,9 @@ function renderNodes(nodes: readonly MdxNode[], components: MdxComponents): Reac
     if (node.type === "text") return node.value;
     if (node.type === "element") {
       if (!renderable(node.tag)) return null;
-      // HTML names are case-insensitive; React wants them lowercase.
-      const tag = node.tag.toLowerCase();
+      // A tag in capitals (`BR`) is an HTML name, which React wants lowercase.
+      // Mixed case is SVG (`linearGradient`, `foreignObject`) and stays as written.
+      const tag = node.tag === node.tag.toUpperCase() ? node.tag.toLowerCase() : node.tag;
       const children = VOID.has(tag) ? [] : renderNodes(node.children, components);
       return createElement(tag, elementProps(node.props, key), ...children);
     }

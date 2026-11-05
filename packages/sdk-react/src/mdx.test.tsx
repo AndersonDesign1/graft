@@ -68,6 +68,17 @@ describe("MdxContent for React", () => {
     expect(warn.mock.calls.map((call) => String(call[0]))).toEqual([]);
   });
 
+  it("keeps the case of SVG elements, which React and the browser both need", () => {
+    const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+    const tree = prepareMdx(
+      '<svg viewBox="0 0 10 10">\n  <linearGradient id="g" />\n  <foreignObject width="10" height="10" />\n</svg>',
+    );
+    const markup = render(tree);
+    expect(markup).toContain("<linearGradient");
+    expect(markup).toContain("<foreignObject");
+    expect(warn.mock.calls.map((call) => String(call[0]))).toEqual([]);
+  });
+
   it("drops scripts, handlers and raw HTML from a tree built by hand", () => {
     const tree: MdxTree = [
       { type: "element", tag: "SCRIPT", props: {}, children: [{ type: "text", value: "x()" }] },

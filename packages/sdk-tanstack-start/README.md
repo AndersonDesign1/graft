@@ -108,8 +108,13 @@ export const Route = createFileRoute("/docs/$slug")({
     if (!doc) throw notFound();
     return doc;
   },
-  component: () => <MdxContent tree={Route.useLoaderData().body} components={{ Callout }} />,
+  component: Doc,
 });
+
+function Doc() {
+  const doc = Route.useLoaderData();
+  return <MdxContent tree={doc.body} components={{ Callout }} />;
+}
 ```
 
 The tree is plain data: the server function returns it, and it renders the same on the server and after a client-side navigation. The body is never evaluated, so `{expressions}`, `import`, `export` and spread attributes are refused under every trust level, along with `<script>`-like elements, `on…` handlers and `innerHTML`-style attributes, with a `GraftError` whose code is `INPUT_VALIDATION_FAILED`. Call `prepareMdx` only inside a server function or a server route: it carries the Markdown parser. `/mdx` is safe in the browser.

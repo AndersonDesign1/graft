@@ -146,8 +146,8 @@ along with `<script>`-like elements, `on…` handlers and `innerHTML`-style
 attributes. `graft compile` refuses the same constructs unless the project
 sets `mdxTrust = "full"`, so a body that compiled meets this only with full
 trust, or when it reached the index another way, such as a direct database
-write. Under restricted trust, a link or source with a script URL loses that
-URL and keeps its text. Pass `trust="full"` to keep every URL. See
+write. Under restricted trust, a script URL is removed from any link, image or
+other source, and the rest of the body renders: a link keeps its text. Pass `trust="full"` to keep every URL. See
 [MDX safety](/docs/mdx-safety).
 
 ## Serve functions and MCP from your app
