@@ -19,14 +19,16 @@ import "../styles/lab.css";
 interface Props {
   title: string;
   description: string;
-  variant: "a" | "b" | "c" | "index";
-  /** The scheme this preview was drawn for; the toggle overrides it. */
-  theme?: "light" | "dark";
+  variant: "mix" | "a" | "b" | "c" | "map" | "index";
+  /** The scheme this preview opens in: its own, or the visitor's system
+   *  scheme. The toggle overrides either. */
+  theme?: "light" | "dark" | "system";
 }
 
 const { title, description, variant, theme = "dark" } = Astro.props;
 
 const previews = [
+  { id: "mix", name: "The mix", label: "Mix" },
   { id: "a", name: "The product" },
   { id: "b", name: "The seam" },
   { id: "c", name: "The printed page" },
@@ -34,7 +36,7 @@ const previews = [
 ---
 
 <!doctype html>
-<html lang="en" data-theme={theme} data-default-theme={theme}>
+<html lang="en" data-theme={theme === "system" ? undefined : theme} data-default-theme={theme}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -48,6 +50,13 @@ const previews = [
         if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
       } catch (_) {
         /* private mode: the preview's default scheme stands */
+      }
+      // The styles key off data-theme, so a preview that follows the system
+      // scheme resolves it here, before first paint.
+      if (!document.documentElement.dataset.theme) {
+        document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
       }
     </script>
   </head>
@@ -137,10 +146,11 @@ const previews = [
             aria-current={variant === preview.id ? "page" : undefined}
             title={preview.name}
           >
-            {preview.id.toUpperCase()}
+            {"label" in preview ? preview.label : preview.id.toUpperCase()}
           </a>
         ))
       }
+      <a href="/lab/map" aria-current={variant === "map" ? "page" : undefined}>Content</a>
       <button type="button" class="lab-bar-theme" data-theme-toggle>
         <span data-theme-label>Light</span>
       </button>
@@ -155,6 +165,22 @@ const previews = [
         if (label) label.textContent = root.dataset.theme === "dark" ? "Light" : "Dark";
       };
       paint();
+
+      // A preview on the system scheme follows it live until the toggle is used.
+      const system = matchMedia("(prefers-color-scheme: dark)");
+      system.addEventListener("change", () => {
+        let chosen = null;
+        try {
+          chosen = sessionStorage.getItem("graft-lab-theme");
+        } catch {
+          /* private mode: no stored choice to respect */
+        }
+        if (chosen || root.dataset.defaultTheme !== "system") return;
+        root.dataset.theme = system.matches ? "dark" : "light";
+        paint();
+        document.dispatchEvent(new CustomEvent("lab:theme", { detail: root.dataset.theme }));
+      });
+
       document.querySelector("[data-theme-toggle]")?.addEventListener("click", () => {
         const next = root.dataset.theme === "dark" ? "light" : "dark";
         root.dataset.theme = next;

@@ -1,0 +1,52 @@
+---
+/**
+ * The two storage engines. A content site needs no services; Postgres is
+ * for data users write at runtime. The error is what `graft compile` prints
+ * when a project on the static index adds the comments primitive.
+ */
+---
+
+<section class="screen" id="tiers">
+  <div class="wrap tiers">
+    <div class="tiers-head">
+      <h2 class="h2">No database to start. Postgres when users write.</h2>
+      <p class="lead">
+        A content site compiles to one SQLite file and deploys with your app. The day you need
+        orders, comments or sign-ups, you change one line, and Graft tells you when that day is.
+      </p>
+    </div>
+    <div class="tiers-grid">
+      <div class="tier">
+        <p class="tier-name">Static</p>
+        <p class="tier-line"><code>.graft/index.db</code>, built by <code>graft compile</code></p>
+        <ul class="facts">
+          <li><span>Content</span><span>Typed reads and full-text search</span></li>
+          <li><span>Previews</span><span>A Git branch is a preview</span></li>
+          <li><span>Hosting</span><span>Vercel, Netlify, Cloudflare Pages</span></li>
+          <li><span>Services</span><span>None</span></li>
+        </ul>
+      </div>
+      <div class="tier-switch" aria-hidden="true">
+        <code><span class="tk-kw">export const</span> index = <span class="tk-s">"postgres"</span>;</code>
+      </div>
+      <div class="tier">
+        <p class="tier-name">Postgres</p>
+        <p class="tier-line">Your database, after <code>graft db migrate</code></p>
+        <ul class="facts">
+          <li><span>Data</span><span>Orders, submissions, comments</span></li>
+          <li><span>Functions</span><span>Typed, with auth and rate limits</span></li>
+          <li><span>Safety</span><span>Audit log and approvals</span></li>
+          <li><span>Previews</span><span>Copy-on-write branches</span></li>
+        </ul>
+      </div>
+      <div class="tier-error turn" data-who="graft" data-kind="error">
+        <p class="turn-head"><span class="turn-who">Graft</span><code>NEEDS_DATABASE</code></p>
+        <pre><code><span class="tk-k">"message"</span>: <span class="tk-s">"graft.config.ts uses the static index, but declares
+  db-authoritative collection(s) \"comments\""</span>
+<span class="tk-fix"><span class="tk-k">"fix"</span>: "Upgrade this project to the Postgres tier: set DATABASE_URL in .env,
+  change graft.config to `export const index = \"postgres\"`,
+  run `graft db migrate`, then `graft compile`."</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>

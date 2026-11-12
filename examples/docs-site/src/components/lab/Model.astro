@@ -1,0 +1,68 @@
+---
+/**
+ * The model in one picture: files in Git go in, `graft compile` checks them,
+ * and the index, the typed reads and the MCP tools all come out of it.
+ */
+import { PostgresqlIcon, SqliteIcon, TypescriptIcon } from "../icons/FrameworkIcons";
+import { agents } from "./agents";
+---
+
+<section class="screen" id="model">
+  <div class="wrap c-model">
+    <div class="c-model-head">
+      <h2 class="h2">Git is the source. The rest is derived.</h2>
+      <p class="lead">
+        You and your agent change files. <code>graft compile</code> checks them against the schema
+        and rebuilds everything that reads them. If the index and Git disagree, recompile: Git
+        wins.
+      </p>
+    </div>
+    <div class="c-diagram" data-diagram>
+      <svg class="c-wires" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-hidden="true">
+        <path class="wire" d="M250 210 H470"></path>
+        <path class="wire" d="M730 210 C800 210 800 70 900 70"></path>
+        <path class="wire" d="M730 210 H900"></path>
+        <path class="wire" d="M730 210 C800 210 800 350 900 350"></path>
+        <path class="pulse" pathLength="1" d="M250 210 H470"></path>
+        <path class="pulse pulse-2" pathLength="1" d="M730 210 C800 210 800 70 900 70"></path>
+        <path class="pulse pulse-2" pathLength="1" d="M730 210 H900"></path>
+        <path class="pulse pulse-2" pathLength="1" d="M730 210 C800 210 800 350 900 350"></path>
+      </svg>
+      <div class="node node-source">
+        <p class="node-title">Your repo</p>
+        <ul class="node-files">
+          <li><code>content/pages/home.mdx</code></li>
+          <li><code>content/docs/*.mdx</code></li>
+          <li><code>graft.config.ts</code></li>
+        </ul>
+      </div>
+      <div class="node node-compile">
+        <p class="node-title"><code><span class="cli-bin">graft</span> <span class="cli-cmd">compile</span></code></p>
+        <p class="node-note">Checks every file against the schema</p>
+      </div>
+      <div class="node node-out node-out-1">
+        <p class="node-title">The index</p>
+        <p class="node-note">
+          <span class="marks"><SqliteIcon size={18} /><PostgresqlIcon size={18} /></span>
+          A file, or your Postgres
+        </p>
+      </div>
+      <div class="node node-out node-out-2">
+        <p class="node-title">Typed reads</p>
+        <p class="node-note">
+          <span class="marks"><TypescriptIcon size={18} /></span>
+          <code>page.data.title</code>
+        </p>
+      </div>
+      <div class="node node-out node-out-3">
+        <p class="node-title">MCP tools</p>
+        <p class="node-note">
+          <span class="marks">
+            {agents.slice(0, 3).map((agent) => <img src={agent.src} alt="" width="18" height="18" />)}
+          </span>
+          <code>write_content</code>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>

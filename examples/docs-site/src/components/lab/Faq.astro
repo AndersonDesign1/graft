@@ -1,0 +1,33 @@
+---
+/**
+ * The questions, read from this site's own `home` document through the SDK,
+ * so the section is served by the CMS it describes.
+ */
+import { getGraft } from "../../lib/graft";
+
+const doc = await getGraft().getContent("pages", "home");
+const faqs = doc?.data.faqs ?? [];
+---
+
+<section class="screen" id="questions">
+  <div class="wrap split faq">
+    <div class="split-text">
+      <h2 class="h2">Questions people ask first</h2>
+      <p class="lead">
+        These answers are a field in <code>content/pages/home.mdx</code>, read back through the same
+        typed call your app would make.
+      </p>
+      <a class="link" href="/docs/what-is-graft">Read what Graft is</a>
+    </div>
+    <div class="split-visual faq-list">
+      {
+        faqs.map((faq, i) => (
+          <details name="faq" open={i === 0}>
+            <summary>{faq.question}</summary>
+            <p>{faq.answer}</p>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>

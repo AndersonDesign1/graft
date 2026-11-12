@@ -19,7 +19,7 @@ interface Props {
 const { route = "/c/pages/home" } = Astro.props;
 ---
 
-<div class="window studio-frame" data-studio data-route={route}>
+<div class="window studio-frame" data-studio data-route={route} data-demo="/studio-demo/index.html">
   <div class="window-bar">
     <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
     <span class="window-title">graft studio</span>
@@ -50,12 +50,18 @@ const { route = "/c/pages/home" } = Astro.props;
 </div>
 
 <script>
-  const DEMO = "/studio-demo/index.html";
-  let available: Promise<boolean> | undefined;
-  const demoExists = () =>
-    (available ??= fetch(DEMO, { method: "HEAD" })
-      .then((res) => res.ok && (res.headers.get("content-type") ?? "").includes("html"))
-      .catch(() => false));
+  // Asked once per page, with a GET: some static hosts do not answer HEAD.
+  const checked = new Map<string, Promise<boolean>>();
+  const demoExists = (url: string) => {
+    let answer = checked.get(url);
+    if (!answer) {
+      answer = fetch(url)
+        .then((res) => res.ok && (res.headers.get("content-type") ?? "").includes("html"))
+        .catch(() => false);
+      checked.set(url, answer);
+    }
+    return answer;
+  };
 
   for (const frame of document.querySelectorAll<HTMLElement>("[data-studio]")) {
     const view = frame.querySelector<HTMLElement>(".studio-view")!;
@@ -77,9 +83,11 @@ const { route = "/c/pages/home" } = Astro.props;
     }).observe(view);
 
     const load = async () => {
-      if (!(await demoExists())) return;
+      // The address comes from the markup, so the page works wherever it is served.
+      const demo = new URL(frame.dataset.demo ?? "", location.href).href;
+      if (!(await demoExists(demo))) return;
       const theme = document.documentElement.dataset.theme === "light" ? "light" : "dark";
-      iframe.src = `${DEMO}?theme=${theme}#${frame.dataset.route}`;
+      iframe.src = `${demo}?theme=${theme}#${frame.dataset.route}`;
       iframe.addEventListener(
         "load",
         () => {

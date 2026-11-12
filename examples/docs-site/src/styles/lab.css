@@ -1412,7 +1412,7 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 
 .lab-cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: var(--col-gap);
   margin: var(--space-6) 0 0;
   padding: 0;
@@ -1461,6 +1461,249 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   font-size: var(--lab-label);
 }
 
+/* ============================================================== mix === */
+
+/* The seam as a section: the page side is a heading and a browser window. */
+.lab .b-browser-page {
+  display: grid;
+  gap: var(--space-3);
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+.lab .b-browser-title {
+  font-size: clamp(1.5rem, 1rem + 1.6vw, 2.25rem);
+  font-weight: var(--weight-medium);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  overflow-wrap: break-word;
+}
+
+.lab .b-browser-tagline {
+  color: var(--muted-foreground);
+}
+
+.lab .b-browser [hidden] {
+  display: none;
+}
+
+.lab .sdk-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .sdk-row a {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  text-decoration-color: var(--border-strong);
+}
+
+.lab .sdk-row a:hover {
+  color: var(--foreground);
+}
+
+/* Storage engines: two grounds, the one line that moves you between them,
+   and the error that says when. */
+.lab .tiers {
+  display: grid;
+  align-content: center;
+  gap: clamp(1.75rem, 5vh, 3rem);
+}
+
+.lab .tiers-head {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-5) var(--col-gap);
+  align-items: end;
+}
+
+.lab .tiers-head .h2 {
+  grid-column: 1 / span 7;
+}
+
+.lab .tiers-head .lead {
+  grid-column: 8 / -1;
+}
+
+.lab .tiers-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--space-5) var(--col-gap);
+  align-items: stretch;
+}
+
+.lab .tier {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  border-radius: var(--radius-outer);
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.lab .tier-name {
+  font-size: var(--text-h3);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.01em;
+}
+
+.lab .tier-line {
+  margin-bottom: var(--space-3);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.lab .tier-line code {
+  color: var(--foreground);
+  font-size: 0.8125rem;
+}
+
+.lab .tier-switch {
+  align-self: center;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--elevated);
+  box-shadow: var(--shadow-floating);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.lab .tier-error {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.lab .primitives-list li {
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+}
+
+.lab .terminal .code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Questions: one open at a time, the answer under its question. */
+.lab .faq {
+  align-items: start;
+  align-content: center;
+}
+
+.lab .faq-list details {
+  border-top: 1px solid var(--border);
+}
+
+.lab .faq-list details:last-child {
+  border-bottom: 1px solid var(--border);
+}
+
+.lab .faq-list summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-5);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  list-style: none;
+  cursor: pointer;
+}
+
+.lab .faq-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.lab .faq-list summary::after {
+  content: "+";
+  color: var(--faint-foreground);
+  font-weight: var(--weight-regular);
+}
+
+.lab .faq-list details[open] summary::after {
+  content: "\2212";
+}
+
+.lab .faq-list details p {
+  max-width: 38rem;
+  padding-bottom: var(--space-5);
+  color: var(--muted-foreground);
+}
+
+/* ============================================================== map === */
+
+.lab .lab-map .wrap {
+  display: grid;
+  align-content: start;
+  gap: var(--space-6);
+}
+
+.lab-map-title {
+  margin-top: var(--space-8);
+  font-size: var(--type-section);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-section);
+}
+
+.lab-table {
+  overflow-x: auto;
+  border-radius: var(--radius-outer);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.lab-table table {
+  width: 100%;
+  min-width: 46rem;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.lab-table th,
+.lab-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.lab-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.lab-table thead th {
+  background: var(--muted);
+  color: var(--faint-foreground);
+  font-size: var(--lab-label);
+  font-weight: var(--weight-medium);
+}
+
+.lab-table tbody th {
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.lab-table td {
+  color: var(--muted-foreground);
+}
+
+.lab-table code {
+  color: var(--faint-foreground);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: var(--weight-regular);
+}
+
+.lab-table-n {
+  display: inline-block;
+  min-width: 1.5rem;
+  color: var(--faint-foreground);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-regular);
+}
+
 /* ====================================================== narrower ====== */
 
 @media (max-width: 63.99rem) {
@@ -1507,6 +1750,20 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   .lab .b-reads,
   .lab-cards {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lab .tiers-head .h2,
+  .lab .tiers-head .lead {
+    grid-column: 1 / -1;
+  }
+
+  .lab .tiers-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lab .tier-switch {
+    justify-self: start;
+    white-space: normal;
   }
 
   /* The seam turns: the page first, then the file under it. */

@@ -1,0 +1,59 @@
+---
+/**
+ * Owned primitives: a feature arrives as source in your repo. The terminal
+ * is the output of `graft add comments` in a new project, as printed.
+ */
+import Rings from "./Rings.astro";
+
+const items = [
+  { name: "comments", line: "Threads, moderation and the functions behind them" },
+  { name: "commerce", line: "A product catalog and orders" },
+  { name: "seo", line: "Meta and social fields for any collection" },
+  { name: "faq", line: "Question and answer blocks" },
+  { name: "callout", line: "An MDX callout component" },
+  { name: "scoped-access", line: "Access rules by scope" },
+];
+---
+
+<section class="screen" id="primitives">
+  <div class="wrap split">
+    <div class="split-text">
+      <h2 class="h2">Features arrive as code you own</h2>
+      <p class="lead">
+        <code>graft add</code> writes a feature into your repo as TypeScript: its schema, its functions
+        and its MDX blocks. There is no plugin to configure and nothing you cannot read or change.
+      </p>
+      <ul class="facts primitives-list">
+        {
+          items.map((item) => (
+            <li>
+              <span>
+                <code>{item.name}</code>
+              </span>
+              <span>{item.line}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <a class="link" href="/docs/owned-primitives">See the registry</a>
+    </div>
+    <div class="tray split-visual">
+      <Rings cx={24} cy={30} seed={31} />
+      <div class="window terminal">
+        <div class="window-bar">
+          <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="window-title">Terminal</span>
+        </div>
+        <pre class="code"><code><span class="tk-p">$</span> <span class="cli-bin">graft</span> <span class="cli-cmd">add</span> comments
+Adding scoped-access (access), comments (bundle):
+  <span class="tk-add">create    graft/scoped-access.ts</span>
+  <span class="tk-add">create    graft/comments.ts</span>
+  regenerate graft/index.ts
+
+Added scoped-access, comments (2 written); graft/index.ts regenerated.
+
+<span class="tk-c">It's live on your next `graft compile` — no graft.config.ts edit needed.</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>

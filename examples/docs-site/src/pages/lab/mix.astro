@@ -1,0 +1,39 @@
+---
+/**
+ * The mix: the strongest part of each preview, in the order a stranger needs
+ * them, with every claim the landing page has to carry.
+ *
+ * C's headline opens. Then the model, B's editable file, the typed reads,
+ * A's agent exchange and approval, the live Studio, the two storage engines,
+ * the owned primitives, and the questions. It follows the visitor's scheme.
+ */
+import Agents from "../../components/lab/Agents.astro";
+import Faq from "../../components/lab/Faq.astro";
+import Gate from "../../components/lab/Gate.astro";
+import Headline from "../../components/lab/Headline.astro";
+import Model from "../../components/lab/Model.astro";
+import Primitives from "../../components/lab/Primitives.astro";
+import Reads from "../../components/lab/Reads.astro";
+import Seam from "../../components/lab/Seam.astro";
+import StudioSection from "../../components/lab/StudioSection.astro";
+import Tiers from "../../components/lab/Tiers.astro";
+import Lab from "../../layouts/Lab.astro";
+---
+
+<Lab
+  title="Graft, a CMS for agents and the people who run them"
+  description="Content as MDX in your Git repo, checked by one Zod schema, operated by agents over MCP and the CLI."
+  variant="mix"
+  theme="system"
+>
+  <Headline />
+  <Model />
+  <Seam mode="section" />
+  <Reads frameworks />
+  <Agents />
+  <Gate />
+  <StudioSection />
+  <Tiers />
+  <Primitives />
+  <Faq />
+</Lab>

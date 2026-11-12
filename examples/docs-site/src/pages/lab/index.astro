@@ -7,6 +7,12 @@ import Lab from "../../layouts/Lab.astro";
 
 const previews = [
   {
+    id: "mix",
+    name: "The mix",
+    line: "The best of the three in one page, with every section the landing page needs. C's headline, B's editable file, A's agent exchange, approval and live Studio.",
+    scheme: "Follows your system",
+  },
+  {
     id: "a",
     name: "The product",
     line: "Every screen is the product at work: the live Studio, a real MCP exchange, an approval you can decide.",
@@ -31,21 +37,22 @@ const previews = [
   title="Graft landing previews"
   description="Three directions for the Graft landing page."
   variant="index"
-  theme="dark"
+  theme="system"
 >
   <section class="screen lab-index">
     <div class="wrap">
-      <h1 class="h2">Three directions for the landing page</h1>
+      <h1 class="h2">The landing page, and the three directions behind it</h1>
       <p class="lead">
-        Each preview is a hero, two sections and the close. All three work in light and dark; the
-        switch is in the bar at the foot of the page.
+        The mix is the full page. A, B and C are the directions it draws on, each a hero, two
+        sections and the close. Everything works in light and dark; the switch and the content map
+        are in the bar at the foot of the page.
       </p>
       <ul class="lab-cards">
         {
           previews.map((preview) => (
             <li>
               <a class="lab-card" href={`/lab/${preview.id}`}>
-                <span class="lab-card-id">{preview.id.toUpperCase()}</span>
+                <span class="lab-card-id">{preview.id === "mix" ? "Mix" : preview.id.toUpperCase()}</span>
                 <span class="lab-card-name">{preview.name}</span>
                 <span class="lab-card-line">{preview.line}</span>
                 <span class="lab-card-scheme">{preview.scheme}</span>

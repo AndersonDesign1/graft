@@ -1,0 +1,138 @@
+---
+/**
+ * Typed reads: the schema on one side, the read in each framework on the
+ * other. Pointing at a field lights it up on both.
+ */
+import { AstroIcon, NextjsIcon, SvelteIcon } from "../icons/FrameworkIcons";
+
+interface Props {
+  /** Also list every framework Graft has an SDK for, under the code. */
+  frameworks?: boolean;
+}
+const { frameworks = false } = Astro.props;
+const sdks = [
+  { name: "Next.js", href: "/docs/next" },
+  { name: "Astro", href: "/docs/astro" },
+  { name: "SvelteKit", href: "/docs/sveltekit" },
+  { name: "TanStack Start", href: "/docs/tanstack-start" },
+  { name: "React Router", href: "/docs/react-router" },
+  { name: "Nuxt", href: "/docs/nuxt" },
+  { name: "Nitro", href: "/docs/nitro" },
+  { name: "React", href: "/docs/react" },
+  { name: "Vue", href: "/docs/vue" },
+];
+---
+
+  <section class="screen" id="types">
+    <div class="wrap b-types">
+      <div class="b-types-head">
+        <h2 class="h2">One schema types every read</h2>
+        <p class="lead">
+          The same file that checks a write types the read. There is no codegen step, and a field
+          you rename is a compile error in your app.
+        </p>
+      </div>
+      <div class="b-reads" data-tabs>
+        <div class="window">
+          <div class="window-bar">
+            <span class="window-title"><code>graft.config.ts</code></span>
+          </div>
+          <pre class="code"><code><span class="tk-kw">import</span> <span class="tk-p">&#123;</span> defineCollection, field <span class="tk-p">&#125;</span> <span class="tk-kw">from</span> <span class="tk-s">"@usegraft/core"</span>;
+
+<span class="tk-kw">export const</span> pages = <span class="tk-t">defineCollection</span>(<span class="tk-p">&#123;</span>
+  name: <span class="tk-s">"pages"</span>,
+  fields: <span class="tk-p">&#123;</span>
+    <mark data-pair="title">title</mark>: field.<span class="tk-t">string</span>(),
+    <mark data-pair="tagline">tagline</mark>: field.<span class="tk-t">string</span>(<span class="tk-p">&#123;</span> optional: <span class="tk-kw">true</span> <span class="tk-p">&#125;</span>),
+  <span class="tk-p">&#125;</span>,
+<span class="tk-p">&#125;</span>);</code></pre>
+        </div>
+        <div class="window">
+          <div class="window-bar window-tabs" role="tablist" aria-label="Framework">
+            <button role="tab" type="button" aria-selected="true" data-tab="next">
+              <NextjsIcon size={16} /> Next.js
+            </button>
+            <button role="tab" type="button" aria-selected="false" data-tab="astro" tabindex="-1">
+              <AstroIcon size={16} /> Astro
+            </button>
+            <button role="tab" type="button" aria-selected="false" data-tab="svelte" tabindex="-1">
+              <SvelteIcon size={16} /> SvelteKit
+            </button>
+          </div>
+          <pre class="code" role="tabpanel" data-panel="next"><code><span class="tk-kw">const</span> page = <span class="tk-kw">await</span> graft.<span class="tk-t">getContent</span>(<span class="tk-s">"pages"</span>, slug);
+<span class="tk-kw">if</span> (!page) <span class="tk-t">notFound</span>();
+
+<span class="tk-kw">return</span> (
+  &lt;<span class="tk-k">article</span>&gt;
+    &lt;<span class="tk-k">h1</span>&gt;<span class="tk-p">&#123;</span>page.data.<mark data-pair="title">title</mark><span class="tk-p">&#125;</span>&lt;/<span class="tk-k">h1</span>&gt;
+    <span class="tk-p">&#123;</span>page.data.<mark data-pair="tagline">tagline</mark> &amp;&amp; &lt;<span class="tk-k">p</span>&gt;<span class="tk-p">&#123;</span>page.data.<mark data-pair="tagline">tagline</mark><span class="tk-p">&#125;</span>&lt;/<span class="tk-k">p</span>&gt;<span class="tk-p">&#125;</span>
+    &lt;<span class="tk-t">MdxBody</span> source=<span class="tk-p">&#123;</span>page.body<span class="tk-p">&#125;</span> /&gt;
+  &lt;/<span class="tk-k">article</span>&gt;
+);</code></pre>
+          <pre class="code" role="tabpanel" data-panel="astro" hidden><code><span class="tk-c">---</span>
+<span class="tk-kw">import</span> <span class="tk-p">&#123;</span> graft <span class="tk-p">&#125;</span> <span class="tk-kw">from</span> <span class="tk-s">"../lib/graft"</span>;
+
+<span class="tk-kw">const</span> page = <span class="tk-kw">await</span> graft.<span class="tk-t">getContent</span>(<span class="tk-s">"pages"</span>, <span class="tk-s">"home"</span>);
+<span class="tk-c">---</span>
+
+&lt;<span class="tk-k">h1</span>&gt;<span class="tk-p">&#123;</span>page?.data.<mark data-pair="title">title</mark><span class="tk-p">&#125;</span>&lt;/<span class="tk-k">h1</span>&gt;
+&lt;<span class="tk-k">p</span>&gt;<span class="tk-p">&#123;</span>page?.data.<mark data-pair="tagline">tagline</mark><span class="tk-p">&#125;</span>&lt;/<span class="tk-k">p</span>&gt;</code></pre>
+          <pre class="code" role="tabpanel" data-panel="svelte" hidden><code><span class="tk-kw">import</span> <span class="tk-p">&#123;</span> graft <span class="tk-p">&#125;</span> <span class="tk-kw">from</span> <span class="tk-s">"$lib/server/graft"</span>;
+
+<span class="tk-kw">export const</span> load = <span class="tk-kw">async</span> () =&gt; <span class="tk-p">&#123;</span>
+  <span class="tk-kw">const</span> page = <span class="tk-kw">await</span> graft.<span class="tk-t">getContent</span>(<span class="tk-s">"pages"</span>, <span class="tk-s">"home"</span>);
+  <span class="tk-kw">return</span> <span class="tk-p">&#123;</span>
+    title: page?.data.<mark data-pair="title">title</mark>,
+    tagline: page?.data.<mark data-pair="tagline">tagline</mark>,
+  <span class="tk-p">&#125;</span>;
+<span class="tk-p">&#125;</span>;</code></pre>
+        </div>
+      </div>
+      {
+        frameworks && (
+          <ul class="sdk-row" aria-label="Frameworks with an SDK">
+            {sdks.map((sdk) => (
+              <li>
+                <a href={sdk.href}>{sdk.name}</a>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    </div>
+  </section>
+
+<script>
+  // Framework tabs, and the field that lights up on both sides.
+  for (const group of document.querySelectorAll<HTMLElement>("[data-tabs]")) {
+    const tabs = [...group.querySelectorAll<HTMLButtonElement>("[data-tab]")];
+    const select = (tab: HTMLButtonElement) => {
+      for (const other of tabs) {
+        const on = other === tab;
+        other.setAttribute("aria-selected", String(on));
+        other.tabIndex = on ? 0 : -1;
+        const panel = group.querySelector<HTMLElement>(`[data-panel="${other.dataset.tab}"]`);
+        if (panel) panel.hidden = !on;
+      }
+    };
+    tabs.forEach((tab, i) => {
+      tab.addEventListener("click", () => select(tab));
+      tab.addEventListener("keydown", (event) => {
+        const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+        if (!step) return;
+        const next = tabs[(i + step + tabs.length) % tabs.length]!;
+        select(next);
+        next.focus();
+      });
+    });
+    for (const mark of group.querySelectorAll<HTMLElement>("[data-pair]")) {
+      const set = (on: boolean) => {
+        for (const peer of group.querySelectorAll(`[data-pair="${mark.dataset.pair}"]`)) {
+          peer.toggleAttribute("data-on", on);
+        }
+      };
+      mark.addEventListener("pointerenter", () => set(true));
+      mark.addEventListener("pointerleave", () => set(false));
+    }
+  }
+</script>

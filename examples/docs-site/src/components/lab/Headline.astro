@@ -1,0 +1,52 @@
+---
+/**
+ * The headline as the picture: each line carries one piece of the product,
+ * set as a pill at the height of the letters.
+ */
+import Command from "./Command.astro";
+import { agents } from "./agents";
+---
+
+<section class="screen hero c-hero" data-enter>
+  <div class="wrap c-hero-grid">
+    <h1 class="c-h1">
+      <span class="c-line"
+        >A CMS for agents
+        <span class="c-pill c-pill-agents" role="img" aria-label="Claude, Cursor, Codex, Copilot and Gemini">
+          {agents.map((agent) => <img src={agent.src} alt="" width="96" height="96" />)}
+        </span>
+      </span>
+      <span class="c-line"
+        >and the people
+        <span class="c-pill c-pill-studio" aria-hidden="true">
+          <img class="studio-poster-dark" src="/lab/studio-dark.jpg" alt="" width="2560" height="1600" />
+          <img class="studio-poster-light" src="/lab/studio-light.jpg" alt="" width="2560" height="1600" />
+        </span>
+      </span>
+      <span class="c-line"
+        >who run them
+        <span class="c-pill c-pill-cli" aria-hidden="true">
+          <code><span class="cli-bin">graft</span> <span class="cli-cmd">compile</span></code>
+        </span>
+      </span>
+    </h1>
+    <div class="c-hero-foot">
+      <div class="c-hero-lead">
+        <p class="lead">
+          Content is MDX in your Git repo. One Zod schema checks every write. Agents work over
+          MCP and the CLI, and the team reviews in Studio.
+        </p>
+        <div class="actions">
+          <Command />
+          <a class="btn btn-ghost" href="/docs/what-is-graft">Read the docs</a>
+        </div>
+      </div>
+      <ul class="facts c-hero-facts">
+        <li><span>Content</span><span>MDX files in Git</span></li>
+        <li><span>Schema</span><span>One Zod file</span></li>
+        <li><span>Agents</span><span>MCP and a CLI</span></li>
+        <li><span>License</span><span>MIT, self-hosted</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
