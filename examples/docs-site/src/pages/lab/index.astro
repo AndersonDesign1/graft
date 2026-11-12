@@ -1,0 +1,59 @@
+---
+/**
+ * The three landing previews, side by side. Each is one direction built far
+ * enough to judge: a hero, two sections and the close.
+ */
+import Lab from "../../layouts/Lab.astro";
+
+const previews = [
+  {
+    id: "a",
+    name: "The product",
+    line: "Every screen is the product at work: the live Studio, a real MCP exchange, an approval you can decide.",
+    scheme: "Drawn for dark",
+  },
+  {
+    id: "b",
+    name: "The seam",
+    line: "The hero is a file and the page it becomes, joined by the compile. Edit the file and the page follows.",
+    scheme: "Drawn for dark",
+  },
+  {
+    id: "c",
+    name: "The printed page",
+    line: "Chalk paper and ink. The headline is the picture, with the product set inside its lines.",
+    scheme: "Drawn for light",
+  },
+];
+---
+
+<Lab
+  title="Graft landing previews"
+  description="Three directions for the Graft landing page."
+  variant="index"
+  theme="dark"
+>
+  <section class="screen lab-index">
+    <div class="wrap">
+      <h1 class="h2">Three directions for the landing page</h1>
+      <p class="lead">
+        Each preview is a hero, two sections and the close. All three work in light and dark; the
+        switch is in the bar at the foot of the page.
+      </p>
+      <ul class="lab-cards">
+        {
+          previews.map((preview) => (
+            <li>
+              <a class="lab-card" href={`/lab/${preview.id}`}>
+                <span class="lab-card-id">{preview.id.toUpperCase()}</span>
+                <span class="lab-card-name">{preview.name}</span>
+                <span class="lab-card-line">{preview.line}</span>
+                <span class="lab-card-scheme">{preview.scheme}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+</Lab>

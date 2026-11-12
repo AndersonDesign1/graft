@@ -1,0 +1,158 @@
+---
+/**
+ * Preview C, "The printed page". Chalk paper, ink, and type large enough to
+ * be the picture. The headline carries the product inside its own lines: the
+ * agents that operate it, the command that compiles it, the Studio the team
+ * reviews in. Color comes only from those marks and from syntax.
+ */
+import Command from "../../components/lab/Command.astro";
+import Rings from "../../components/lab/Rings.astro";
+import StudioFrame from "../../components/lab/StudioFrame.astro";
+import {
+  PostgresqlIcon,
+  SqliteIcon,
+  TypescriptIcon,
+} from "../../components/icons/FrameworkIcons";
+import Lab from "../../layouts/Lab.astro";
+
+const agents = [
+  { name: "Claude", src: "/agents/claude.svg" },
+  { name: "Cursor", src: "/agents/cursor.svg" },
+  { name: "Codex", src: "/agents/codex.svg" },
+  { name: "Copilot", src: "/agents/copilot.svg" },
+  { name: "Gemini", src: "/agents/gemini.svg" },
+];
+---
+
+<Lab
+  title="Graft, a CMS for agents and the people who run them"
+  description="Content as MDX in your Git repo, checked by one Zod schema, operated by agents over MCP and the CLI."
+  variant="c"
+  theme="light"
+>
+  <section class="screen hero c-hero" data-enter>
+    <div class="wrap c-hero-grid">
+      <h1 class="c-h1">
+        <span class="c-line"
+          >A CMS for agents
+          <span class="c-pill c-pill-agents" role="img" aria-label="Claude, Cursor, Codex, Copilot and Gemini">
+            {agents.map((agent) => <img src={agent.src} alt="" width="96" height="96" />)}
+          </span>
+        </span>
+        <span class="c-line"
+          >and the people
+          <span class="c-pill c-pill-studio" aria-hidden="true">
+            <img class="studio-poster-dark" src="/lab/studio-dark.jpg" alt="" width="2560" height="1600" />
+            <img class="studio-poster-light" src="/lab/studio-light.jpg" alt="" width="2560" height="1600" />
+          </span>
+        </span>
+        <span class="c-line"
+          >who run them
+          <span class="c-pill c-pill-cli" aria-hidden="true">
+            <code><span class="cli-bin">graft</span> <span class="cli-cmd">compile</span></code>
+          </span>
+        </span>
+      </h1>
+      <div class="c-hero-foot">
+        <div class="c-hero-lead">
+          <p class="lead">
+            Content is MDX in your Git repo. One Zod schema checks every write. Agents work over
+            MCP and the CLI, and the team reviews in Studio.
+          </p>
+          <div class="actions">
+            <Command />
+            <a class="btn btn-ghost" href="/docs/what-is-graft">Read the docs</a>
+          </div>
+        </div>
+        <ul class="facts c-hero-facts">
+          <li><span>Content</span><span>MDX files in Git</span></li>
+          <li><span>Schema</span><span>One Zod file</span></li>
+          <li><span>Agents</span><span>MCP and a CLI</span></li>
+          <li><span>License</span><span>MIT, self-hosted</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="model">
+    <div class="wrap c-model">
+      <div class="c-model-head">
+        <h2 class="h2">Git is the source. The rest is derived.</h2>
+        <p class="lead">
+          You and your agent change files. <code>graft compile</code> checks them against the schema
+          and rebuilds everything that reads them. If the index and Git disagree, recompile: Git
+          wins.
+        </p>
+      </div>
+      <div class="c-diagram" data-diagram>
+        <svg class="c-wires" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-hidden="true">
+          <path class="wire" d="M250 210 H470"></path>
+          <path class="wire" d="M730 210 C800 210 800 70 900 70"></path>
+          <path class="wire" d="M730 210 H900"></path>
+          <path class="wire" d="M730 210 C800 210 800 350 900 350"></path>
+          <path class="pulse" pathLength="1" d="M250 210 H470"></path>
+          <path class="pulse pulse-2" pathLength="1" d="M730 210 C800 210 800 70 900 70"></path>
+          <path class="pulse pulse-2" pathLength="1" d="M730 210 H900"></path>
+          <path class="pulse pulse-2" pathLength="1" d="M730 210 C800 210 800 350 900 350"></path>
+        </svg>
+        <div class="node node-source">
+          <p class="node-title">Your repo</p>
+          <ul class="node-files">
+            <li><code>content/pages/home.mdx</code></li>
+            <li><code>content/docs/*.mdx</code></li>
+            <li><code>graft.config.ts</code></li>
+          </ul>
+        </div>
+        <div class="node node-compile">
+          <p class="node-title"><code><span class="cli-bin">graft</span> <span class="cli-cmd">compile</span></code></p>
+          <p class="node-note">Checks every file against the schema</p>
+        </div>
+        <div class="node node-out node-out-1">
+          <p class="node-title">The index</p>
+          <p class="node-note">
+            <span class="marks"><SqliteIcon size={18} /><PostgresqlIcon size={18} /></span>
+            A file, or your Postgres
+          </p>
+        </div>
+        <div class="node node-out node-out-2">
+          <p class="node-title">Typed reads</p>
+          <p class="node-note">
+            <span class="marks"><TypescriptIcon size={18} /></span>
+            <code>page.data.title</code>
+          </p>
+        </div>
+        <div class="node node-out node-out-3">
+          <p class="node-title">MCP tools</p>
+          <p class="node-note">
+            <span class="marks">
+              {agents.slice(0, 3).map((agent) => <img src={agent.src} alt="" width="18" height="18" />)}
+            </span>
+            <code>write_content</code>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="studio">
+    <div class="wrap split split-wide">
+      <div class="split-text">
+        <h2 class="h2">Studio, for the rest of the team</h2>
+        <p class="lead">
+          An editor opens Studio, changes a field, and commits. It writes the same files an agent
+          does, so nothing is locked inside it. This one is running on this site's content.
+        </p>
+        <ul class="facts">
+          <li><span>Start it</span><span><code>graft studio</code></span></li>
+          <li><span>Saves</span><span>Drafts, then a Git commit</span></li>
+          <li><span>Optional</span><span>The CLI and MCP do the same</span></li>
+        </ul>
+        <a class="link" href="/docs/studio">Read about Studio</a>
+      </div>
+      <div class="tray split-visual">
+        <Rings cx={80} cy={24} seed={16} />
+        <StudioFrame route="/c/docs/getting-started" />
+      </div>
+    </div>
+  </section>
+</Lab>

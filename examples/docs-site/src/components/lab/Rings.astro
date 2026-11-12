@@ -1,0 +1,35 @@
+---
+/**
+ * Growth rings: the ground a product window sits on.
+ *
+ * A graft takes where the cambium of two stems lines up, and a cut stem shows
+ * that as rings. Here they are concentric circles pushed around by one noise
+ * field, drawn in the ink color at low opacity, so the ground follows the
+ * scheme and stays monochrome. Static: no canvas, no script.
+ */
+interface Props {
+  /** Where the heart of the stem sits, in percent of the ground. */
+  cx?: number;
+  cy?: number;
+  seed?: number;
+  rings?: number;
+}
+const { cx = 72, cy = 38, seed = 7, rings = 34 } = Astro.props;
+const id = `rings-${seed}-${cx}-${cy}`;
+const radii = Array.from({ length: rings }, (_, i) => 18 + i * 30 + ((i * 37) % 11));
+---
+
+<svg class="rings" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <filter id={id} x="-20%" y="-20%" width="140%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.0045" numOctaves="2" seed={seed}
+    ></feTurbulence>
+    <feDisplacementMap in="SourceGraphic" scale="90"></feDisplacementMap>
+  </filter>
+  <g filter={`url(#${id})`} fill="none" stroke="currentColor" vector-effect="non-scaling-stroke">
+    {
+      radii.map((r, i) => (
+        <circle cx={cx * 10} cy={cy * 10} r={r} stroke-width={i % 5 === 4 ? 1.6 : 0.8} />
+      ))
+    }
+  </g>
+</svg>

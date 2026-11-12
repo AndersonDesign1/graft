@@ -1,0 +1,76 @@
+---
+/**
+ * One MCP exchange, as it happens: the agent writes, the schema refuses with
+ * a fix, the agent corrects, the compile lands. The error is the output of
+ * `graft compile --json` on a page with no title, copied as printed.
+ *
+ * The turns play once when the window comes into view, and Replay runs them
+ * again. With reduced motion, or without script, all four are simply there.
+ */
+---
+
+<div class="window transcript" data-transcript>
+  <div class="window-bar">
+    <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span class="window-title">graft mcp</span>
+    <button class="window-action" type="button" data-replay>Replay</button>
+  </div>
+  <ol class="turns">
+    <li class="turn" data-who="agent">
+      <p class="turn-head"><span class="turn-who">Agent</span><code>write_content</code></p>
+      <pre><code><span class="tk-p">&#123;</span> <span class="tk-k">"collection"</span>: <span class="tk-s">"pages"</span>, <span class="tk-k">"slug"</span>: <span class="tk-s">"why"</span>,
+  <span class="tk-k">"frontmatter"</span>: <span class="tk-p">&#123;</span> <span class="tk-k">"tagline"</span>: <span class="tk-s">"Built for how people ship now."</span> <span class="tk-p">&#125;</span> <span class="tk-p">&#125;</span></code></pre>
+    </li>
+    <li class="turn" data-who="graft" data-kind="error">
+      <p class="turn-head">
+        <span class="turn-who">Graft</span><code>SCHEMA_VALIDATION_FAILED</code>
+      </p>
+      <pre><code><span class="tk-k">"message"</span>: <span class="tk-s">"pages/why.mdx does not match collection \"pages\""</span>
+<span class="tk-fix"><span class="tk-k">"fix"</span>: "Update the frontmatter to satisfy the \"pages\" schema —
+  title: Invalid input: expected string, received undefined"</span></code></pre>
+    </li>
+    <li class="turn" data-who="agent">
+      <p class="turn-head"><span class="turn-who">Agent</span><code>write_content</code></p>
+      <pre><code><span class="tk-p">&#123;</span> <span class="tk-k">"collection"</span>: <span class="tk-s">"pages"</span>, <span class="tk-k">"slug"</span>: <span class="tk-s">"why"</span>,
+  <span class="tk-k">"frontmatter"</span>: <span class="tk-p">&#123;</span> <span class="tk-add"><span class="tk-k">"title"</span>: <span class="tk-s">"Why Graft"</span>,</span>
+    <span class="tk-k">"tagline"</span>: <span class="tk-s">"Built for how people ship now."</span> <span class="tk-p">&#125;</span> <span class="tk-p">&#125;</span></code></pre>
+    </li>
+    <li class="turn" data-who="graft" data-kind="ok">
+      <p class="turn-head"><span class="turn-who">Graft</span><code>compiled</code></p>
+      <pre><code>Compiled 52 doc(s) @ 176d3ef: +0 added, ~1 changed, -0 removed, 51 unchanged
+  <span class="tk-c">upserted pages/why</span></code></pre>
+    </li>
+  </ol>
+</div>
+
+<script>
+  const still = matchMedia("(prefers-reduced-motion: reduce)");
+  for (const el of document.querySelectorAll<HTMLElement>("[data-transcript]")) {
+    const turns = [...el.querySelectorAll<HTMLElement>(".turn")];
+    let timers: number[] = [];
+    const play = () => {
+      for (const timer of timers) clearTimeout(timer);
+      if (still.matches) return;
+      el.dataset.playing = "true";
+      for (const turn of turns) delete turn.dataset.shown;
+      timers = turns.map((turn, i) =>
+        window.setTimeout(
+          () => {
+            turn.dataset.shown = "true";
+          },
+          250 + i * 1100,
+        ),
+      );
+    };
+    el.querySelector("[data-replay]")?.addEventListener("click", play);
+    const seen = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        seen.disconnect();
+        play();
+      },
+      { threshold: 0.5 },
+    );
+    seen.observe(el);
+  }
+</script>

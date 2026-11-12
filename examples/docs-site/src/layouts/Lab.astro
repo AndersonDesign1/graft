@@ -1,0 +1,195 @@
+---
+/**
+ * The shell for the landing previews under /lab. Each preview is one
+ * direction for the landing page, built far enough to judge: a hero, two
+ * sections and the close. Nothing here replaces `/`.
+ *
+ * Unlike Landing.astro, the previews work in both schemes. The page stamps
+ * `data-theme` before first paint: the visitor's choice if they made one in
+ * this tab, otherwise the preview's own default.
+ */
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
+import "../styles/global.css";
+import "../styles/lab.css";
+
+interface Props {
+  title: string;
+  description: string;
+  variant: "a" | "b" | "c" | "index";
+  /** The scheme this preview was drawn for; the toggle overrides it. */
+  theme?: "light" | "dark";
+}
+
+const { title, description, variant, theme = "dark" } = Astro.props;
+
+const previews = [
+  { id: "a", name: "The product" },
+  { id: "b", name: "The seam" },
+  { id: "c", name: "The printed page" },
+] as const;
+---
+
+<!doctype html>
+<html lang="en" data-theme={theme} data-default-theme={theme}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script is:inline>
+      try {
+        var t = sessionStorage.getItem("graft-lab-theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (_) {
+        /* private mode: the preview's default scheme stands */
+      }
+    </script>
+  </head>
+  <body class="lab" data-variant={variant}>
+    <a class="lab-skip" href="#main">Skip to content</a>
+    <header class="lab-nav">
+      <nav class="wrap lab-nav-row" aria-label="Main">
+        <a class="lab-wordmark" href="/lab">graft.</a>
+        <ul class="lab-nav-links">
+          <li><a href="/docs">Docs</a></li>
+          <li><a href="/why">Why Graft</a></li>
+          <li><a href="/security">Security</a></li>
+          <li><a href="https://github.com/AndersonDesign1/graft">GitHub</a></li>
+        </ul>
+        <a class="btn btn-primary btn-small" href="/docs/getting-started">Start a project</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="closing">
+      <div class="wrap closing-grid">
+        <div class="closing-lead">
+          <h2 class="h2">Start with one command</h2>
+          <p class="lead">
+            It writes <code>graft.config.ts</code> and your first MDX document into the repo you
+            already have. No account, and no database until you want one.
+          </p>
+          <div class="actions">
+            <button class="btn btn-command" type="button" data-copy="npx @usegraft/cli@latest init">
+              <span class="btn-command-text">npx @usegraft/cli@latest init</span>
+              <svg
+                class="icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect width="14" height="14" x="8" y="8" rx="2"></rect>
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+              </svg>
+              <span class="visually-hidden" aria-live="polite"></span>
+            </button>
+            <a class="btn btn-ghost" href="/docs/getting-started">Read the guide</a>
+          </div>
+        </div>
+        <div class="closing-links">
+          <ul>
+            <li><a href="/docs/what-is-graft">What is Graft</a></li>
+            <li><a href="/docs/the-model">How Graft works</a></li>
+            <li><a href="/docs/studio">Studio</a></li>
+            <li><a href="/docs/agent-surface">Agents and MCP</a></li>
+          </ul>
+          <ul>
+            <li><a href="/docs/next">Next.js</a></li>
+            <li><a href="/docs/astro">Astro</a></li>
+            <li><a href="/docs/sveltekit">SvelteKit</a></li>
+            <li><a href="/docs/tanstack-start">TanStack Start</a></li>
+          </ul>
+          <ul>
+            <li><a href="https://github.com/AndersonDesign1/graft">GitHub</a></li>
+            <li><a href="/docs/changelog">Changelog</a></li>
+            <li><a href="/security">Security</a></li>
+            <li><a href="/why">Why Graft</a></li>
+          </ul>
+        </div>
+        <p class="closing-legal">
+          <span class="lab-wordmark">graft.</span>
+          <span>Open source under the MIT license.</span>
+        </p>
+      </div>
+    </footer>
+
+    <div class="lab-bar" role="group" aria-label="Landing previews">
+      <a class="lab-bar-home" href="/lab" aria-current={variant === "index" ? "page" : undefined}
+        >Previews</a
+      >
+      {
+        previews.map((preview) => (
+          <a
+            href={`/lab/${preview.id}`}
+            aria-current={variant === preview.id ? "page" : undefined}
+            title={preview.name}
+          >
+            {preview.id.toUpperCase()}
+          </a>
+        ))
+      }
+      <button type="button" class="lab-bar-theme" data-theme-toggle>
+        <span data-theme-label>Light</span>
+      </button>
+    </div>
+
+    <script>
+      const root = document.documentElement;
+
+      // Theme: the toggle wins for this tab and tells any Studio frame.
+      const label = document.querySelector<HTMLElement>("[data-theme-label]");
+      const paint = () => {
+        if (label) label.textContent = root.dataset.theme === "dark" ? "Light" : "Dark";
+      };
+      paint();
+      document.querySelector("[data-theme-toggle]")?.addEventListener("click", () => {
+        const next = root.dataset.theme === "dark" ? "light" : "dark";
+        root.dataset.theme = next;
+        try {
+          sessionStorage.setItem("graft-lab-theme", next);
+        } catch {
+          /* private mode: the choice lasts until the next navigation */
+        }
+        paint();
+        document.dispatchEvent(new CustomEvent("lab:theme", { detail: next }));
+      });
+
+      // Copy buttons keep their label and say the result through a live region.
+      for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
+        button.addEventListener("click", async () => {
+          const live = button.querySelector("[aria-live]");
+          try {
+            await navigator.clipboard.writeText(button.dataset.copy ?? "");
+            button.dataset.copied = "true";
+            if (live) live.textContent = "Copied";
+          } catch {
+            if (live) live.textContent = "Copy failed";
+          }
+          setTimeout(() => {
+            delete button.dataset.copied;
+            if (live) live.textContent = "";
+          }, 2000);
+        });
+      }
+
+      // The nav takes a ground once the page has moved under it.
+      const nav = document.querySelector(".lab-nav");
+      const onScroll = () => nav?.toggleAttribute("data-scrolled", window.scrollY > 8);
+      onScroll();
+      addEventListener("scroll", onScroll, { passive: true });
+    </script>
+  </body>
+</html>

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "node ../../packages/cli/dist/index.js compile && astro build",
+    "build": "node ../../packages/cli/dist/index.js compile && node scripts/studio-demo.mjs && astro build",
+    "studio-demo": "node scripts/studio-demo.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "compile": "graft compile",
@@ -50,6 +51,7 @@
     "@usegraft/cli": "workspace:*",
     "@usegraft/compiler": "workspace:*",
     "@usegraft/mdx-safety": "workspace:*",
+    "@usegraft/studio": "workspace:*",
     "rehype-raw": "^7.0.0",
     "tailwindcss": "^4.3.3"
   },

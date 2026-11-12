@@ -1,0 +1,125 @@
+---
+/**
+ * A window holding the real Studio.
+ *
+ * It first shows a screenshot of Studio (so the frame is never empty and
+ * costs one image). When the frame nears the viewport, and the static demo
+ * exists (`scripts/studio-demo.mjs`), the screenshot is replaced by the live
+ * app in an iframe, drawn at 1280x800 and scaled to the frame.
+ *
+ * The iframe ignores the pointer until someone presses "Use the live
+ * Studio" in the window's bar: a frame that scrolls inside itself would
+ * otherwise trap the page's own scroll on the way past. Moving the pointer
+ * away, or Escape, hands the page back.
+ */
+interface Props {
+  /** Studio's hash route to open, such as "/c/pages/home". */
+  route?: string;
+}
+const { route = "/c/pages/home" } = Astro.props;
+---
+
+<div class="window studio-frame" data-studio data-route={route}>
+  <div class="window-bar">
+    <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span class="window-title">graft studio</span>
+    <span class="window-note" data-studio-note>This site's own content</span>
+    <button class="window-action studio-use" type="button" hidden>Use the live Studio</button>
+  </div>
+  <div class="studio-view">
+    <img
+      class="studio-poster studio-poster-dark"
+      src="/lab/studio-dark.jpg"
+      width="2560"
+      height="1600"
+      alt="Graft Studio with the home page open: a list of pages, the page's fields, and its changes."
+      loading="lazy"
+      decoding="async"
+    />
+    <img
+      class="studio-poster studio-poster-light"
+      src="/lab/studio-light.jpg"
+      width="2560"
+      height="1600"
+      alt=""
+      loading="lazy"
+      decoding="async"
+    />
+    <iframe class="studio-live" title="Graft Studio, live demo" tabindex="-1" hidden></iframe>
+  </div>
+</div>
+
+<script>
+  const DEMO = "/studio-demo/index.html";
+  let available: Promise<boolean> | undefined;
+  const demoExists = () =>
+    (available ??= fetch(DEMO, { method: "HEAD" })
+      .then((res) => res.ok && (res.headers.get("content-type") ?? "").includes("html"))
+      .catch(() => false));
+
+  for (const frame of document.querySelectorAll<HTMLElement>("[data-studio]")) {
+    const view = frame.querySelector<HTMLElement>(".studio-view")!;
+    const iframe = frame.querySelector<HTMLIFrameElement>(".studio-live")!;
+    const use = frame.querySelector<HTMLButtonElement>(".studio-use")!;
+
+    const note = frame.querySelector<HTMLElement>("[data-studio-note]")!;
+    const resting = note.textContent;
+
+    // The app is laid out at desktop width and scaled, so it reads as a
+    // window at any frame width. A narrow frame gets Studio's tablet layout
+    // instead of a desktop shrunk past reading.
+    new ResizeObserver(([entry]) => {
+      const width = entry!.contentRect.width;
+      const logical = width >= 720 ? 1280 : 800;
+      view.style.setProperty("--studio-width", `${logical}px`);
+      view.style.setProperty("--studio-height", `${logical * 0.625}px`);
+      view.style.setProperty("--studio-scale", String(width / logical));
+    }).observe(view);
+
+    const load = async () => {
+      if (!(await demoExists())) return;
+      const theme = document.documentElement.dataset.theme === "light" ? "light" : "dark";
+      iframe.src = `${DEMO}?theme=${theme}#${frame.dataset.route}`;
+      iframe.addEventListener(
+        "load",
+        () => {
+          iframe.hidden = false;
+          use.hidden = false;
+          frame.dataset.live = "true";
+        },
+        { once: true },
+      );
+    };
+    const near = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        near.disconnect();
+        void load();
+      },
+      { rootMargin: "400px" },
+    );
+    near.observe(frame);
+
+    const release = () => {
+      delete frame.dataset.active;
+      note.textContent = resting;
+      iframe.tabIndex = -1;
+      use.hidden = frame.dataset.live !== "true";
+    };
+    use.addEventListener("click", () => {
+      frame.dataset.active = "true";
+      note.textContent = "Live. Edits stay in this tab.";
+      iframe.tabIndex = 0;
+      use.hidden = true;
+      iframe.focus();
+    });
+    frame.addEventListener("pointerleave", release);
+    addEventListener("keydown", (event) => {
+      if (event.key === "Escape") release();
+    });
+    document.addEventListener("lab:theme", (event) => {
+      if (!(event instanceof CustomEvent)) return;
+      iframe.contentWindow?.postMessage({ graftStudioTheme: event.detail }, location.origin);
+    });
+  }
+</script>

@@ -1,0 +1,275 @@
+---
+/**
+ * Preview B, "The seam". A graft joins two stems along one cut. Here the cut
+ * runs down the hero: the file on one side, the page it becomes on the other,
+ * and `graft compile` on the line between them. The file is editable, the
+ * page follows it, and an empty title is refused with the error the real
+ * compiler prints.
+ */
+import Command from "../../components/lab/Command.astro";
+import Rings from "../../components/lab/Rings.astro";
+import Transcript from "../../components/lab/Transcript.astro";
+import { AstroIcon, NextjsIcon, SvelteIcon } from "../../components/icons/FrameworkIcons";
+import Lab from "../../layouts/Lab.astro";
+
+const title = "The agent-native CMS";
+const tagline =
+  "Content is MDX in your Git repo. One Zod schema checks every write, and agents work over MCP and the CLI.";
+---
+
+<Lab
+  title="Graft, the agent-native CMS"
+  description="Content as MDX in your Git repo, checked by one Zod schema, operated by agents over MCP and the CLI."
+  variant="b"
+  theme="dark"
+>
+  <section class="screen hero b-hero" data-enter data-seam data-state="ok">
+    <div class="b-file">
+      <Rings cx={18} cy={62} seed={9} />
+      <div class="b-pane">
+        <div class="window b-editor">
+          <div class="window-bar">
+            <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="window-title"><code>content/pages/home.mdx</code></span>
+            <span class="window-note">Edit a line</span>
+          </div>
+          <div class="b-code" role="group" aria-label="The page's frontmatter">
+            <span class="b-ln" aria-hidden="true">1</span>
+            <span class="tk-c">---</span>
+            <span class="b-ln" aria-hidden="true">2</span>
+            <label class="b-field">
+              <span><span class="tk-k">title</span><span class="tk-p">:</span></span>
+              <input
+                class="b-input"
+                type="text"
+                value={title}
+                data-seam-field="title"
+                spellcheck="false"
+                autocomplete="off"
+              />
+            </label>
+            <span class="b-ln" aria-hidden="true">3</span>
+            <label class="b-field b-field-block">
+              <span><span class="tk-k">tagline</span><span class="tk-p">:</span> <span class="tk-c">&gt;-</span></span>
+              <textarea class="b-input" rows="3" data-seam-field="tagline" spellcheck="false"
+                >{tagline}</textarea
+              >
+            </label>
+            <span class="b-ln" aria-hidden="true">7</span>
+            <span class="tk-c">---</span>
+          </div>
+          <div class="window-bar b-editor-second">
+            <span class="window-title"><code>graft.config.ts</code></span>
+            <span class="window-note">The schema both sides answer to</span>
+          </div>
+          <pre class="b-schema"><code><span class="tk-kw">export const</span> pages = <span class="tk-t">defineCollection</span>(<span class="tk-p">&#123;</span>
+  fields: <span class="tk-p">&#123;</span>
+    <span data-seam-key="title">title: field.<span class="tk-t">string</span>(),</span>
+    <span data-seam-key="tagline">tagline: field.<span class="tk-t">string</span>(<span class="tk-p">&#123;</span> optional: <span class="tk-kw">true</span> <span class="tk-p">&#125;</span>),</span>
+  <span class="tk-p">&#125;</span>,
+<span class="tk-p">&#125;</span>);</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="b-seam" aria-hidden="true">
+      <span class="b-seam-line"></span>
+    </div>
+    <p class="b-status" role="status">
+      <code class="b-status-cmd">graft compile</code>
+      <span class="b-status-text" data-seam-status>validated, 0 errors</span>
+    </p>
+
+    <div class="b-page">
+      <div class="b-pane">
+        <h1 class="h1" data-seam-out="title">{title}</h1>
+        <p class="lead" data-seam-out="tagline">{tagline}</p>
+        <div class="actions">
+          <Command />
+          <a class="btn btn-ghost" href="/docs/what-is-graft">Read the docs</a>
+        </div>
+        <div class="b-error" data-seam-error hidden>
+          <p class="turn-head"><span class="turn-who">Graft</span><code>SCHEMA_VALIDATION_FAILED</code></p>
+          <pre><code><span class="tk-k">"message"</span>: <span class="tk-s">"pages/home.mdx does not match collection \"pages\""</span>
+<span class="tk-fix"><span class="tk-k">"fix"</span>: "Update the frontmatter to satisfy the \"pages\" schema —
+  title: Invalid input: expected string, received undefined"</span></code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="agents">
+    <div class="wrap split">
+      <div class="split-text">
+        <h2 class="h2">Every error carries its fix</h2>
+        <p class="lead">
+          The refusal you just saw is what an agent gets over MCP: a code, a message, and a
+          <code>fix</code> it can act on. It corrects the write and the compile lands, with nobody
+          in the loop.
+        </p>
+        <ul class="facts">
+          <li><span>Protocol</span><span>MCP over stdio or HTTP</span></li>
+          <li><span>Command</span><span><code>graft mcp</code></span></li>
+          <li><span>Deletes</span><span>Held until a person approves</span></li>
+        </ul>
+        <a class="link" href="/docs/agent-surface">See the MCP tools</a>
+      </div>
+      <div class="tray tray-plain split-visual">
+        <Transcript />
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="types">
+    <div class="wrap b-types">
+      <div class="b-types-head">
+        <h2 class="h2">One schema types every read</h2>
+        <p class="lead">
+          The same file that checks a write types the read. There is no codegen step, and a field
+          you rename is a compile error in your app.
+        </p>
+      </div>
+      <div class="b-reads" data-tabs>
+        <div class="window">
+          <div class="window-bar">
+            <span class="window-title"><code>graft.config.ts</code></span>
+          </div>
+          <pre class="code"><code><span class="tk-kw">import</span> <span class="tk-p">&#123;</span> defineCollection, field <span class="tk-p">&#125;</span> <span class="tk-kw">from</span> <span class="tk-s">"@usegraft/core"</span>;
+
+<span class="tk-kw">export const</span> pages = <span class="tk-t">defineCollection</span>(<span class="tk-p">&#123;</span>
+  name: <span class="tk-s">"pages"</span>,
+  fields: <span class="tk-p">&#123;</span>
+    <mark data-pair="title">title</mark>: field.<span class="tk-t">string</span>(),
+    <mark data-pair="tagline">tagline</mark>: field.<span class="tk-t">string</span>(<span class="tk-p">&#123;</span> optional: <span class="tk-kw">true</span> <span class="tk-p">&#125;</span>),
+  <span class="tk-p">&#125;</span>,
+<span class="tk-p">&#125;</span>);</code></pre>
+        </div>
+        <div class="window">
+          <div class="window-bar window-tabs" role="tablist" aria-label="Framework">
+            <button role="tab" type="button" aria-selected="true" data-tab="next">
+              <NextjsIcon size={16} /> Next.js
+            </button>
+            <button role="tab" type="button" aria-selected="false" data-tab="astro" tabindex="-1">
+              <AstroIcon size={16} /> Astro
+            </button>
+            <button role="tab" type="button" aria-selected="false" data-tab="svelte" tabindex="-1">
+              <SvelteIcon size={16} /> SvelteKit
+            </button>
+          </div>
+          <pre class="code" role="tabpanel" data-panel="next"><code><span class="tk-kw">const</span> page = <span class="tk-kw">await</span> graft.<span class="tk-t">getContent</span>(<span class="tk-s">"pages"</span>, slug);
+<span class="tk-kw">if</span> (!page) <span class="tk-t">notFound</span>();
+
+<span class="tk-kw">return</span> (
+  &lt;<span class="tk-k">article</span>&gt;
+    &lt;<span class="tk-k">h1</span>&gt;<span class="tk-p">&#123;</span>page.data.<mark data-pair="title">title</mark><span class="tk-p">&#125;</span>&lt;/<span class="tk-k">h1</span>&gt;
+    <span class="tk-p">&#123;</span>page.data.<mark data-pair="tagline">tagline</mark> &amp;&amp; &lt;<span class="tk-k">p</span>&gt;<span class="tk-p">&#123;</span>page.data.<mark data-pair="tagline">tagline</mark><span class="tk-p">&#125;</span>&lt;/<span class="tk-k">p</span>&gt;<span class="tk-p">&#125;</span>
+    &lt;<span class="tk-t">MdxBody</span> source=<span class="tk-p">&#123;</span>page.body<span class="tk-p">&#125;</span> /&gt;
+  &lt;/<span class="tk-k">article</span>&gt;
+);</code></pre>
+          <pre class="code" role="tabpanel" data-panel="astro" hidden><code><span class="tk-c">---</span>
+<span class="tk-kw">import</span> <span class="tk-p">&#123;</span> graft <span class="tk-p">&#125;</span> <span class="tk-kw">from</span> <span class="tk-s">"../lib/graft"</span>;
+
+<span class="tk-kw">const</span> page = <span class="tk-kw">await</span> graft.<span class="tk-t">getContent</span>(<span class="tk-s">"pages"</span>, <span class="tk-s">"home"</span>);
+<span class="tk-c">---</span>
+
+&lt;<span class="tk-k">h1</span>&gt;<span class="tk-p">&#123;</span>page?.data.<mark data-pair="title">title</mark><span class="tk-p">&#125;</span>&lt;/<span class="tk-k">h1</span>&gt;
+&lt;<span class="tk-k">p</span>&gt;<span class="tk-p">&#123;</span>page?.data.<mark data-pair="tagline">tagline</mark><span class="tk-p">&#125;</span>&lt;/<span class="tk-k">p</span>&gt;</code></pre>
+          <pre class="code" role="tabpanel" data-panel="svelte" hidden><code><span class="tk-kw">import</span> <span class="tk-p">&#123;</span> graft <span class="tk-p">&#125;</span> <span class="tk-kw">from</span> <span class="tk-s">"$lib/server/graft"</span>;
+
+<span class="tk-kw">export const</span> load = <span class="tk-kw">async</span> () =&gt; <span class="tk-p">&#123;</span>
+  <span class="tk-kw">const</span> page = <span class="tk-kw">await</span> graft.<span class="tk-t">getContent</span>(<span class="tk-s">"pages"</span>, <span class="tk-s">"home"</span>);
+  <span class="tk-kw">return</span> <span class="tk-p">&#123;</span>
+    title: page?.data.<mark data-pair="title">title</mark>,
+    tagline: page?.data.<mark data-pair="tagline">tagline</mark>,
+  <span class="tk-p">&#125;</span>;
+<span class="tk-p">&#125;</span>;</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+</Lab>
+
+<script>
+  // The seam: the file drives the page, and the schema sits between them.
+  for (const seam of document.querySelectorAll<HTMLElement>("[data-seam]")) {
+    const status = seam.querySelector<HTMLElement>("[data-seam-status]")!;
+    const error = seam.querySelector<HTMLElement>("[data-seam-error]")!;
+    const outputs = new Map(
+      [...seam.querySelectorAll<HTMLElement>("[data-seam-out]")].map((el) => [
+        el.dataset.seamOut!,
+        el,
+      ]),
+    );
+    let timer = 0;
+    const compile = () => {
+      const values = new Map(
+        [...seam.querySelectorAll<HTMLInputElement>("[data-seam-field]")].map((field) => [
+          field.dataset.seamField!,
+          field.value.replace(/\s+/g, " ").trim(),
+        ]),
+      );
+      const title = values.get("title") ?? "";
+      const ok = title.length > 0;
+      seam.dataset.state = ok ? "ok" : "error";
+      error.hidden = ok;
+      status.textContent = ok ? "validated, 0 errors" : "1 error, nothing written";
+      if (!ok) return;
+      for (const [key, el] of outputs) {
+        const value = values.get(key) ?? "";
+        el.textContent = value;
+        el.hidden = value.length === 0;
+      }
+    };
+    for (const field of seam.querySelectorAll<HTMLElement>("[data-seam-field]")) {
+      const key = field.dataset.seamField!;
+      const schemaLine = seam.querySelector<HTMLElement>(`[data-seam-key="${key}"]`);
+      field.addEventListener("input", () => {
+        seam.dataset.state = "busy";
+        status.textContent = "compiling";
+        clearTimeout(timer);
+        timer = window.setTimeout(compile, 320);
+      });
+      field.addEventListener("focus", () => {
+        seam.dataset.focus = key;
+        schemaLine?.setAttribute("data-on", "true");
+      });
+      field.addEventListener("blur", () => {
+        delete seam.dataset.focus;
+        schemaLine?.removeAttribute("data-on");
+      });
+    }
+  }
+
+  // Framework tabs, and the field that lights up on both sides.
+  for (const group of document.querySelectorAll<HTMLElement>("[data-tabs]")) {
+    const tabs = [...group.querySelectorAll<HTMLButtonElement>("[data-tab]")];
+    const select = (tab: HTMLButtonElement) => {
+      for (const other of tabs) {
+        const on = other === tab;
+        other.setAttribute("aria-selected", String(on));
+        other.tabIndex = on ? 0 : -1;
+        const panel = group.querySelector<HTMLElement>(`[data-panel="${other.dataset.tab}"]`);
+        if (panel) panel.hidden = !on;
+      }
+    };
+    tabs.forEach((tab, i) => {
+      tab.addEventListener("click", () => select(tab));
+      tab.addEventListener("keydown", (event) => {
+        const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+        if (!step) return;
+        const next = tabs[(i + step + tabs.length) % tabs.length]!;
+        select(next);
+        next.focus();
+      });
+    });
+    for (const mark of group.querySelectorAll<HTMLElement>("[data-pair]")) {
+      const set = (on: boolean) => {
+        for (const peer of group.querySelectorAll(`[data-pair="${mark.dataset.pair}"]`)) {
+          peer.toggleAttribute("data-on", on);
+        }
+      };
+      mark.addEventListener("pointerenter", () => set(true));
+      mark.addEventListener("pointerleave", () => set(false));
+    }
+  }
+</script>

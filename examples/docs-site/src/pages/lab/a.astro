@@ -1,0 +1,156 @@
+---
+/**
+ * Preview A, "The product". The picture on every screen is the product at
+ * work, large: the real Studio on this site's content, a real MCP exchange,
+ * and the approval that holds a delete until a person decides.
+ */
+import Command from "../../components/lab/Command.astro";
+import Rings from "../../components/lab/Rings.astro";
+import StudioFrame from "../../components/lab/StudioFrame.astro";
+import Transcript from "../../components/lab/Transcript.astro";
+import Lab from "../../layouts/Lab.astro";
+---
+
+<Lab
+  title="Graft, the CMS for agents and the people who run them"
+  description="Content as MDX in your Git repo, checked by one Zod schema, operated by agents over MCP and the CLI."
+  variant="a"
+  theme="dark"
+>
+  <section class="screen hero a-hero" data-enter>
+    <div class="wrap a-hero-grid">
+      <h1 class="h1">The CMS for agents and the people who run them</h1>
+      <div class="a-hero-side">
+        <p class="lead">
+          Content is MDX in your Git repo. One Zod schema checks every write. Agents work over MCP
+          and the CLI, and the team reviews in Studio.
+        </p>
+        <div class="actions">
+          <Command />
+          <a class="btn btn-ghost" href="/docs/what-is-graft">Read the docs</a>
+        </div>
+      </div>
+      <div class="tray a-hero-tray">
+        <Rings cx={78} cy={30} seed={4} />
+        <StudioFrame route="/c/pages/home" />
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="agents">
+    <div class="wrap split">
+      <div class="split-text">
+        <h2 class="h2">An error tells the agent how to fix it</h2>
+        <p class="lead">
+          A dashboard is a dead end for an agent. Graft answers over MCP and the CLI, and every
+          refusal carries a <code>fix</code> line the agent can act on without a person.
+        </p>
+        <ul class="facts">
+          <li><span>Protocol</span><span>MCP over stdio or HTTP</span></li>
+          <li><span>Schema</span><span>One Zod file, <code>graft.config.ts</code></span></li>
+          <li><span>Errors</span><span>A code, a message and a fix</span></li>
+        </ul>
+        <a class="link" href="/docs/agent-surface">See the MCP tools</a>
+      </div>
+      <div class="tray split-visual">
+        <Rings cx={20} cy={78} seed={11} />
+        <Transcript />
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="approvals">
+    <div class="wrap split">
+      <div class="split-text">
+        <h2 class="h2">A delete waits for a person</h2>
+        <p class="lead">
+          Destructive calls never run the first time. Graft files an approval and holds the call
+          until someone on the team says yes.
+        </p>
+        <ul class="facts">
+          <li><span>Once</span><span>An approval works for one call</span></li>
+          <li><span>Exact</span><span>It is tied to the input it was asked for</span></li>
+          <li><span>Separate</span><span>The requester cannot approve it</span></li>
+        </ul>
+        <a class="link" href="/docs/audit-and-approvals">Read how approvals work</a>
+      </div>
+      <div class="tray split-visual">
+        <Rings cx={84} cy={70} seed={23} />
+        <div class="window gate" data-gate data-state="pending">
+          <div class="window-bar">
+            <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="window-title">Approvals</span>
+            <button class="window-action" type="button" data-gate-reset hidden>Reset</button>
+          </div>
+          <div class="gate-body">
+            <div class="turn" data-who="agent" data-shown="true">
+              <p class="turn-head"><span class="turn-who">Agent</span><code>delete_content</code></p>
+              <pre><code><span class="tk-p">&#123;</span> <span class="tk-k">"collection"</span>: <span class="tk-s">"pages"</span>, <span class="tk-k">"slug"</span>: <span class="tk-s">"pricing"</span> <span class="tk-p">&#125;</span></code></pre>
+            </div>
+            <div class="turn" data-who="graft" data-kind="error" data-shown="true">
+              <p class="turn-head">
+                <span class="turn-who">Graft</span><code>DESTRUCTIVE_OP_REQUIRES_APPROVAL</code>
+              </p>
+              <pre><code><span class="tk-k">"approvalId"</span>: <span class="tk-s">"ap_7f3k2m"</span></code></pre>
+            </div>
+            <div class="gate-card">
+              <div class="gate-card-text">
+                <p class="gate-title">Delete the page “Pricing”</p>
+                <p class="gate-meta">
+                  <code>pages/pricing.mdx</code> on <code>main</code>, asked by an agent
+                </p>
+              </div>
+              <div class="gate-actions">
+                <button class="btn btn-ghost btn-small" type="button" data-gate-decide="denied">
+                  Deny
+                </button>
+                <button class="btn btn-primary btn-small" type="button" data-gate-decide="approved">
+                  Approve the delete
+                </button>
+              </div>
+              <p class="gate-result" aria-live="polite"></p>
+            </div>
+            <div class="turn gate-after" data-who="agent" data-for="approved">
+              <p class="turn-head"><span class="turn-who">Agent</span><code>delete_content</code></p>
+              <pre><code><span class="tk-p">&#123;</span> <span class="tk-k">"collection"</span>: <span class="tk-s">"pages"</span>, <span class="tk-k">"slug"</span>: <span class="tk-s">"pricing"</span>,
+  <span class="tk-add"><span class="tk-k">"approval"</span>: <span class="tk-s">"ap_7f3k2m"</span></span> <span class="tk-p">&#125;</span></code></pre>
+            </div>
+            <div class="turn gate-after" data-who="graft" data-kind="ok" data-for="approved">
+              <p class="turn-head"><span class="turn-who">Graft</span><code>compiled</code></p>
+              <pre><code>Compiled 51 doc(s): +0 added, ~0 changed, -1 removed, 51 unchanged</code></pre>
+            </div>
+            <div class="turn gate-after" data-who="graft" data-kind="error" data-for="denied">
+              <p class="turn-head"><span class="turn-who">Graft</span><code>APPROVAL_INVALID</code></p>
+              <pre><code><span class="tk-fix"><span class="tk-k">"fix"</span>: "A human denied this operation. Do not retry it;
+  ask the operator why it was refused."</span></code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</Lab>
+
+<script>
+  for (const gate of document.querySelectorAll<HTMLElement>("[data-gate]")) {
+    const result = gate.querySelector<HTMLElement>(".gate-result")!;
+    const reset = gate.querySelector<HTMLButtonElement>("[data-gate-reset]")!;
+    const words = {
+      approved: "Approved by you. The agent may repeat the call once.",
+      denied: "Denied by you. The page stays.",
+    };
+    for (const button of gate.querySelectorAll<HTMLButtonElement>("[data-gate-decide]")) {
+      button.addEventListener("click", () => {
+        const state = button.dataset.gateDecide === "approved" ? "approved" : "denied";
+        gate.dataset.state = state;
+        result.textContent = words[state];
+        reset.hidden = false;
+      });
+    }
+    reset.addEventListener("click", () => {
+      gate.dataset.state = "pending";
+      result.textContent = "";
+      reset.hidden = true;
+    });
+  }
+</script>
