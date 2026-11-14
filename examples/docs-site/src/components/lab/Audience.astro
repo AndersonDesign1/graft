@@ -18,22 +18,22 @@ import Transcript from "./Transcript.astro";
           For agents
         </button>
         <button type="button" role="tab" id="way-tab-people" aria-controls="way-people" aria-selected="false" tabindex="-1" data-way="people">
-          For people
+          For your content team
         </button>
       </div>
     </div>
 
     <div class="split audience-row" id="way-agents" role="tabpanel" aria-labelledby="way-tab-agents" data-way-panel="agents">
       <div class="split-text">
-        <h3 class="h3">Dashboards lock agents out. Graft lets them in.</h3>
+        <h3 class="h3">Agents that edit content without breaking it</h3>
         <p class="lead">
-          An agent cannot click around an admin screen. Graft gives it a direct way to read and
-          write your content, and tells it how to fix its own mistakes.
-        </p>
+          Most CMSs hand an agent an admin panel it cannot use. Graft hands it your content model
+          and a set of tools, so it knows what a page needs before it writes one.
+</p>
         <ul class="points">
-          <li>It reads how your content is set up before it writes anything</li>
-          <li>When it gets something wrong, the error says how to fix it</li>
-          <li>Every change is saved in Git, so you can always undo it</li>
+          <li>Reads your content model first, so every field is filled in right</li>
+          <li>Gets a fix with every error, so it corrects its own work</li>
+          <li>Needs a person's approval before anything is deleted</li>
         </ul>
         <a class="link" href="/docs/agent-surface">See what agents can do</a>
       </div>
@@ -45,15 +45,15 @@ import Transcript from "./Transcript.astro";
 
     <div class="split audience-row" id="way-people" role="tabpanel" aria-labelledby="way-tab-people" data-way-panel="people" hidden>
       <div class="split-text">
-        <h3 class="h3">An editor for everyone else</h3>
+        <h3 class="h3">A CMS your content team will recognise</h3>
         <p class="lead">
-          Not everyone wants to edit files. Studio is a simple editor in the browser, and it saves
-          to the same place your agent does.
-        </p>
+          Editors get Studio: lists of content, a rich text editor, drafts and publish. It works
+          like the CMS they already know, with no code to touch.
+</p>
         <ul class="points">
-          <li>Write and publish without touching code</li>
-          <li>See what changed before it goes live</li>
-          <li>Say yes or no when an agent asks to delete something</li>
+          <li>Create, edit and publish from the browser</li>
+          <li>Review every change before it goes live</li>
+          <li>Restore any earlier version of a page</li>
         </ul>
         <a class="link" href="/docs/studio">Read about Studio</a>
       </div>

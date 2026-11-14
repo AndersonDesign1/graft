@@ -400,6 +400,7 @@ html[data-theme="dark"] .lab {
 }
 
 .lab .window-action {
+  position: relative;
   margin-left: auto;
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border-strong);
@@ -414,6 +415,13 @@ html[data-theme="dark"] .lab {
     background-color var(--duration-fast) var(--ease-out),
     border-color var(--duration-fast) var(--ease-out),
     transform var(--duration-press) var(--ease-out);
+}
+
+/* The button is 28px tall in a 40px bar; its hit area fills the bar. */
+.lab .window-action::after {
+  content: "";
+  position: absolute;
+  inset: -0.375rem 0;
 }
 
 .lab .window-action:hover {
@@ -1426,9 +1434,11 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
     transform var(--duration-fast) var(--ease-out);
 }
 
-.lab-card:hover {
-  box-shadow: inset 0 0 0 1px var(--border-strong);
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .lab-card:hover {
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    transform: translateY(-2px);
+  }
 }
 
 .lab-card-id {
@@ -1774,9 +1784,11 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
     transform var(--duration-fast) var(--ease-out);
 }
 
-.lab .chip:hover {
-  box-shadow: inset 0 0 0 1px var(--border-strong);
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .lab .chip:hover {
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    transform: translateY(-2px);
+  }
 }
 
 /* The hero: the claim centered, then one wide window that runs to the fold. */
@@ -1806,7 +1818,8 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 }
 
 .lab .w-h1 {
-  font-size: var(--lab-h1);
+  font-size: clamp(2.25rem, 1.2rem + 3.6vw, 4rem); /* 36 to 64 */
+  line-height: 1.02;
 }
 
 .lab .w-line {
@@ -2088,9 +2101,11 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
     transform var(--duration-fast) var(--ease-out);
 }
 
-.lab .closing-card:hover {
-  box-shadow: inset 0 0 0 1px var(--border-strong);
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .lab .closing-card:hover {
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    transform: translateY(-2px);
+  }
 }
 
 .lab .closing-card > p:not(.who) {
@@ -2139,34 +2154,6 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   width: 100%;
 }
 
-/* The agents, in their own band. */
-.lab .agent-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
-  gap: var(--space-3);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.lab .agent-tile {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-3);
-  padding: var(--space-6) var(--space-3);
-  border-radius: var(--radius-outer);
-  background: var(--muted);
-  box-shadow: inset 0 0 0 1px var(--border);
-  color: var(--muted-foreground);
-  font-size: 0.9375rem;
-  font-weight: var(--weight-medium);
-  text-align: center;
-}
-
-.lab .agent-tile .mark {
-  color: var(--foreground);
-}
-
 /* A step's progress: a line along the foot of the tab that is playing. */
 .lab .step-tabs button {
   position: relative;
@@ -2204,13 +2191,13 @@ html.motion .lab [data-peel] {
   clip-path: inset(100% 0 0 0 round var(--tray-radius));
   transform: translateY(2.5rem);
   transition:
-    clip-path 1100ms var(--ease-out),
-    transform 1100ms var(--ease-out);
+    clip-path 900ms var(--ease-out),
+    transform 900ms var(--ease-out);
 }
 
 html.motion .lab [data-peel] > .window {
   transform: translateY(3.5rem);
-  transition: transform 1300ms var(--ease-out);
+  transition: transform 1000ms var(--ease-out);
 }
 
 html.motion .lab [data-peel][data-in] {
@@ -2233,10 +2220,10 @@ html.motion .lab .w-hero-tray > .window {
 
 html.motion .lab [data-reveal] > * {
   opacity: 0;
-  transform: translateY(1.25rem);
+  transform: translateY(0.75rem);
   transition:
-    opacity 700ms var(--ease-out),
-    transform 700ms var(--ease-out);
+    opacity 600ms var(--ease-out),
+    transform 600ms var(--ease-out);
 }
 
 html.motion .lab [data-reveal] > :nth-child(2) {
@@ -2258,11 +2245,18 @@ html.motion .lab [data-reveal][data-in] > * {
 
 /* Switching readers: the side that arrives rises into place. */
 html.motion .lab .audience-row:not([hidden]) > * {
-  animation: lab-rise 600ms var(--ease-out) backwards;
+  animation: switch-in 240ms var(--ease-out) backwards;
 }
 
 html.motion .lab .audience-row:not([hidden]) > .split-visual {
-  animation-delay: 90ms;
+  animation-delay: 50ms;
+}
+
+@keyframes switch-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
 }
 
 html.motion .lab .belt-track {
@@ -2280,28 +2274,6 @@ html.motion .lab .belt:hover .belt-track {
 @keyframes belt {
   to {
     transform: translateX(-100%);
-  }
-}
-
-/* The light that passes along the agents, one tile per slot of the cycle. */
-html.motion .lab .agent-tile {
-  animation: tile-lit calc(var(--count) * 1.5s) var(--ease-in-out) calc(var(--i) * 1.5s) infinite;
-}
-
-@keyframes tile-lit {
-  0%,
-  16%,
-  100% {
-    background: var(--muted);
-    color: var(--muted-foreground);
-    transform: none;
-  }
-  4%,
-  11% {
-    background: var(--elevated);
-    color: var(--foreground);
-    box-shadow: inset 0 0 0 1px var(--border-strong);
-    transform: translateY(-3px);
   }
 }
 

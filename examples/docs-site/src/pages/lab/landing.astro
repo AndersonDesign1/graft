@@ -5,7 +5,6 @@
  * real Studio, the stack it fits, what agents get and what people get, how
  * the loop works, and everything the old page said, in order.
  */
-import AgentsBand from "../../components/lab/AgentsBand.astro";
 import Audience from "../../components/lab/Audience.astro";
 import Branching from "../../components/lab/Branching.astro";
 import Command from "../../components/lab/Command.astro";
@@ -30,7 +29,6 @@ import Lab from "../../layouts/Lab.astro";
   theme="system"
 >
   <HeroWide />
-  <AgentsBand />
   <Stack />
   <Audience />
   <Model id="how" heading="Edit a file. Compile. Refresh." steps plain />
@@ -45,7 +43,7 @@ import Lab from "../../layouts/Lab.astro";
   <Fragment slot="closing">
     <div class="closing-lead closing-drop">
       <h2 class="h2">Drop Graft onto your repo</h2>
-      <p class="lead">You set it up. Your agent writes. Your team edits. It is open source and yours to host.</p>
+      <p class="lead">Developers set it up in a minute. Agents and editors take it from there.</p>
     </div>
     <div class="closing-cards">
       <div class="closing-card">

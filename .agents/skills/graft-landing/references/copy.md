@@ -3,6 +3,44 @@
 `graft-writing` applies in full. This adds what changes when the reader may
 not be a developer.
 
+## Who is reading
+
+Someone who already runs a CMS and is deciding whether to switch: a
+developer, an editor or marketer, or the person who pays for it. They know
+what a content model, an editor, a draft, a preview and a publish button are.
+They do not know what "compile", "index" or "MCP" mean to Graft. Copy that
+only the author of Graft understands has failed.
+
+Before writing, read how the CMS they use now talks to them. Payload and
+Sanity are the nearest:
+
+```sh
+node .agents/skills/graft-landing/scripts/page-copy.cjs https://payloadcms.com/ https://www.sanity.io/
+```
+
+What both do, and Graft should too:
+
+- The h1 is the category in a few words. The line under it says who it is
+  for and what they get.
+- They name the readers by role: developers, editors, marketers, content
+  teams. "Code-first for builders. Content-first for marketers."
+- A section heading is an outcome for one of those roles.
+- They use the buyer's words for the buyer's things.
+
+| Graft's word | What a CMS reader calls it |
+| --- | --- |
+| Schema, `defineCollection` | Content model |
+| Compile | Validate, check, build |
+| The index | Your content, ready to query |
+| Studio | The editor, the admin |
+| Approval, human gate | Approval, sign-off |
+| Overlay branch | A preview branch |
+| Owned primitives | Features you add: comments, commerce, SEO |
+| `data_records` | Form submissions, orders, comments |
+
+Use Graft's word once where the section is about that thing, next to the
+reader's word.
+
 ## The test
 
 Read the line to someone who builds websites with an agent and has never

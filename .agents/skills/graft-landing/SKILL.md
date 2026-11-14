@@ -38,7 +38,10 @@ Do these in order. Each ends in something the user can look at.
 6. **Preview, then wait.** Give the user a link they can open. Commit
    locally. Do not push until they say so.
    → [references/preview.md](references/preview.md)
-7. **Section by section.** After the first full preview, work one section at
+7. **Review with outside eyes.** Run the motion, the details and the
+   composition past the three review lenses, fix what they find, and say
+   what you rejected and why. → [references/review.md](references/review.md)
+8. **Section by section.** After the first full preview, work one section at
    a time, starting with the nav and the hero.
 
 Ask when a decision is the user's: which direction, what proof exists
@@ -49,14 +52,18 @@ settle by rendering two versions.
 
 These came from corrections. Do not reopen them without being asked.
 
-- **It is a marketing page.** Lead with what the reader gets. Code appears as
+- **It is a marketing page for people who already use a CMS.** Lead with
+  what the reader gets, in the words Payload and Sanity use with them. Code appears as
   a picture of the product, never as the explanation.
-- **Hero.** The headline is two lines, set large, in a block on the left of
-  the page, not centered and not full width. Under it, one wide window of the
-  real product runs the width of the page and is cut by the fold. No logo row
-  and no feature list in the hero.
-- **Agents get their own band** directly under the hero, with the current
-  marks. Not in the hero, and not inside tab labels.
+- **Hero.** The headline is two lines in a block on the left of the page,
+  not centered and not full width, and no larger than 64px: it names the
+  category and who it is for ("The truly native CMS for agents and humans").
+  Under it, one wide window of the real product runs the width of the page
+  and is cut by the fold. No logo row and no feature list in the hero.
+- **Agents and stack share one band** directly under the hero: one heading,
+  one lead, then belts of marks that drift. No second heading and lead
+  straight after it, and no highlight that steps through the marks one by
+  one. Marks do not go in the hero or inside tab labels.
 - **Stack marks.** Every framework, host, database and agent named on the
   page sits beside its real mark.
 - **For agents and for people.** One section with a switch, two equal tabs

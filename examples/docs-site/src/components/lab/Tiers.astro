@@ -33,10 +33,9 @@ const places = [
     <div class="tiers-head">
       <h2 class="h2">Your Postgres. Your box. Or no database at all.</h2>
       <p class="lead">
-        A content site needs no database. Graft builds one small file and your site reads it. When
-        your visitors start placing orders or leaving comments, you add Postgres by changing one
-        line.
-      </p>
+        Host it yourself, anywhere. A content site runs with no database at all. Add your own
+        Postgres when you need forms, orders or comments.
+</p>
     </div>
     <div class="tiers-grid">
       <div class="tier">
@@ -79,8 +78,8 @@ const places = [
       <p>It runs anywhere your site already does</p>
       <div class="belt" data-dir="forth" role="group" aria-label="Places Graft runs">
         {
-          [0, 1].map((copy) => (
-            <ul class="belt-track" aria-hidden={copy === 1 ? "true" : undefined}>
+          [0, 1, 2].map((copy) => (
+            <ul class="belt-track" aria-hidden={copy > 0 ? "true" : undefined}>
               {places.map((place) => (
                 <li class="chip">
                   <Mark name={place.mark} size={20} />

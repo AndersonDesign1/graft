@@ -1,7 +1,7 @@
 ---
 /**
- * The stack: Graft goes into the site you already have. Two belts of real
- * marks drift past each other and stop under the pointer; with reduced
+ * What Graft works with: the agents people use, the frameworks, and where
+ * it runs. Three belts of real marks drift past each other and stop under the pointer; with reduced
  * motion they rest as two wrapped rows.
  */
 import {
@@ -17,6 +17,7 @@ import {
   TypescriptIcon,
 } from "../icons/FrameworkIcons";
 import Mark from "./Mark.astro";
+import { agents } from "./agents";
 
 const frameworks = [
   { name: "Next.js", Icon: NextjsIcon },
@@ -43,6 +44,7 @@ const places = [
   { name: "MCP", mark: "mcp" },
 ];
 const belts = [
+  { label: "Agents", items: agents.map((agent) => ({ name: agent.name, mark: agent.mark })) },
   { label: "Frameworks", items: frameworks },
   { label: "Hosting, data and formats", items: places },
 ];
@@ -51,17 +53,18 @@ const belts = [
 <section class="screen screen-short" id="stack">
   <div class="wrap stack">
     <div class="stack-head" data-reveal>
-      <h2 class="h2">It fits the site you already have</h2>
+      <h2 class="h2">Works with your agents and your stack</h2>
       <p class="lead">
-        You do not move to Graft. You add it to the project you have, in the framework you use, on
-        the host you already pay for.
-      </p>
+        Graft is made of things you already run: MDX files, a TypeScript schema, Git, and Postgres
+        when you need it. Your agent, your framework and your host already know what to do with
+        them.
+</p>
     </div>
     {
       belts.map((belt, b) => (
         <div class="belt" data-belt data-dir={b % 2 ? "back" : "forth"} aria-label={belt.label} role="group">
-          {[0, 1].map((copy) => (
-            <ul class="belt-track" aria-hidden={copy === 1 ? "true" : undefined}>
+          {[0, 1, 2].map((copy) => (
+            <ul class="belt-track" aria-hidden={copy > 0 ? "true" : undefined}>
               {belt.items.map((item) => (
                 <li class="chip">
                   {"Icon" in item && item.Icon ? <item.Icon size={22} /> : <Mark name={item.mark ?? ""} size={22} />}
