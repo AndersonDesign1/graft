@@ -1,0 +1,24 @@
+---
+/**
+ * The top of a page that is not the landing page: a claim, a lead, and at
+ * most two actions, with room for one product window under them.
+ */
+interface Props {
+  title: string;
+  lead: string;
+}
+const { title, lead } = Astro.props;
+---
+
+<section class="screen screen-short page-hero" data-enter>
+  <div class="wrap page-hero-grid">
+    <div class="w-hero-copy">
+      <h1 class="h1 w-h1">{title}</h1>
+      <p class="lead">{lead}</p>
+      <div class="actions">
+        <slot name="actions" />
+      </div>
+    </div>
+    <slot />
+  </div>
+</section>

@@ -19,7 +19,7 @@ import "../styles/lab.css";
 interface Props {
   title: string;
   description: string;
-  variant: "landing" | "a" | "b" | "c" | "map" | "index";
+  variant: "landing" | "page" | "a" | "b" | "c" | "map" | "index";
   /** The scheme this preview opens in: its own, or the visitor's system
    *  scheme. The toggle overrides either. */
   theme?: "light" | "dark" | "system";
@@ -190,7 +190,11 @@ const previews = [
 
       document.querySelector("[data-theme-toggle]")?.addEventListener("click", () => {
         const next = root.dataset.theme === "dark" ? "light" : "dark";
+        // A scheme change is not something to animate: every color on the
+        // page would cross-fade at once.
+        root.dataset.switching = "";
         root.dataset.theme = next;
+        requestAnimationFrame(() => requestAnimationFrame(() => delete root.dataset.switching));
         try {
           sessionStorage.setItem("graft-lab-theme", next);
         } catch {

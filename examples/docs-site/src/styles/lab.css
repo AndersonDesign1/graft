@@ -95,8 +95,10 @@ html[data-theme="dark"] .lab {
   text-decoration-color: var(--border-strong);
 }
 
-.lab .link:hover {
-  text-decoration-color: var(--foreground);
+@media (hover: hover) and (pointer: fine) {
+  .lab .link:hover {
+    text-decoration-color: var(--foreground);
+  }
 }
 
 /* ---------------------------------------------------------- buttons --- */
@@ -134,9 +136,11 @@ html[data-theme="dark"] .lab {
   color: var(--primary-foreground);
 }
 
-.lab .btn-primary:hover,
-.lab .btn-command:hover {
-  background: var(--primary-hover);
+@media (hover: hover) and (pointer: fine) {
+  .lab .btn-primary:hover,
+  .lab .btn-command:hover {
+    background: var(--primary-hover);
+  }
 }
 
 .lab .btn-ghost {
@@ -145,9 +149,11 @@ html[data-theme="dark"] .lab {
   color: var(--foreground);
 }
 
-.lab .btn-ghost:hover {
-  border-color: var(--foreground);
-  background: color-mix(in oklch, var(--ink) 5%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .lab .btn-ghost:hover {
+    border-color: var(--foreground);
+    background: color-mix(in oklch, var(--ink) 5%, transparent);
+  }
 }
 
 .lab .btn-small {
@@ -252,8 +258,10 @@ html[data-theme="dark"] .lab {
   transition: color var(--duration-fast) var(--ease-out);
 }
 
-.lab-nav-links a:hover {
-  color: var(--foreground);
+@media (hover: hover) and (pointer: fine) {
+  .lab-nav-links a:hover {
+    color: var(--foreground);
+  }
 }
 
 /* ---------------------------------------------------------- screens --- */
@@ -424,9 +432,11 @@ html[data-theme="dark"] .lab {
   inset: -0.375rem 0;
 }
 
-.lab .window-action:hover {
-  border-color: var(--foreground);
-  background: color-mix(in oklch, var(--ink) 5%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .lab .window-action:hover {
+    border-color: var(--foreground);
+    background: color-mix(in oklch, var(--ink) 5%, transparent);
+  }
 }
 
 .lab .window-action:active {
@@ -686,8 +696,10 @@ html[data-theme="dark"] .lab .studio-poster-light {
   transition: color var(--duration-fast) var(--ease-out);
 }
 
-.lab .closing-links a:hover {
-  color: var(--foreground);
+@media (hover: hover) and (pointer: fine) {
+  .lab .closing-links a:hover {
+    color: var(--foreground);
+  }
 }
 
 .lab .closing-legal {
@@ -718,7 +730,7 @@ html[data-theme="dark"] .lab .studio-poster-light {
   box-shadow: var(--shadow-floating);
   font-size: var(--lab-label);
   transform: translateX(-50%);
-  max-width: calc(100vw - 1rem);
+  max-width: calc(100% - 1rem);
   overflow-x: auto;
   white-space: nowrap;
 }
@@ -742,9 +754,11 @@ html[data-theme="dark"] .lab .studio-poster-light {
     color var(--duration-fast) var(--ease-out);
 }
 
-.lab-bar a:hover,
-.lab-bar button:hover {
-  color: var(--foreground);
+@media (hover: hover) and (pointer: fine) {
+  .lab-bar a:hover,
+  .lab-bar button:hover {
+    color: var(--foreground);
+  }
 }
 
 .lab-bar a[aria-current="page"] {
@@ -921,8 +935,10 @@ html[data-theme="dark"] .lab .studio-poster-light {
   field-sizing: content;
 }
 
-.lab .b-input:hover {
-  background: color-mix(in srgb, var(--primary) 12%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .lab .b-input:hover {
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+  }
 }
 
 .lab .b-input:focus-visible {
@@ -1092,8 +1108,10 @@ html[data-theme="dark"] .lab .studio-poster-light {
     color var(--duration-fast) var(--ease-out);
 }
 
-.lab .window-tabs button:hover {
-  color: var(--foreground);
+@media (hover: hover) and (pointer: fine) {
+  .lab .window-tabs button:hover {
+    color: var(--foreground);
+  }
 }
 
 .lab .window-tabs button[aria-selected="true"] {
@@ -1503,8 +1521,10 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   text-decoration-color: var(--border-strong);
 }
 
-.lab .sdk-row a:hover {
-  color: var(--foreground);
+@media (hover: hover) and (pointer: fine) {
+  .lab .sdk-row a:hover {
+    color: var(--foreground);
+  }
 }
 
 /* Storage engines: two grounds, the one line that moves you between them,
@@ -1932,8 +1952,10 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
     transform var(--duration-press) var(--ease-out);
 }
 
-.lab .switch button:hover {
-  color: var(--foreground);
+@media (hover: hover) and (pointer: fine) {
+  .lab .switch button:hover {
+    color: var(--foreground);
+  }
 }
 
 .lab .switch button:active {
@@ -2010,8 +2032,10 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
     transform var(--duration-press) var(--ease-out);
 }
 
-.lab .step-tabs button:hover {
-  color: var(--foreground);
+@media (hover: hover) and (pointer: fine) {
+  .lab .step-tabs button:hover {
+    color: var(--foreground);
+  }
 }
 
 .lab .step-tabs button:active {
@@ -2170,6 +2194,353 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   transform-origin: left;
 }
 
+/* Three questions, three answers. */
+.lab .asks {
+  display: grid;
+}
+
+.lab .asks-title {
+  padding-bottom: var(--space-4);
+  color: var(--faint-foreground);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.lab .ask {
+  display: grid;
+  gap: var(--space-2);
+  padding-block: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.lab .ask-q {
+  font-size: var(--text-h3);
+  font-weight: var(--weight-medium);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.lab .ask-a {
+  color: var(--muted-foreground);
+}
+
+/* The words to hand an agent. */
+.lab .prompt {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.lab .prompt-label {
+  color: var(--faint-foreground);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.lab .prompt-copy {
+  max-width: 100%;
+  font-family: var(--font-sans);
+}
+
+/* A conversation: what a person and an agent say is set as speech, not code. */
+.lab .say-text {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.lab .chat .turn[data-who="graft"] .say-text {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.lab .chat .turn {
+  width: min(100%, 26rem);
+}
+
+.lab .chat .turn[data-who="graft"] .turn-head {
+  justify-content: flex-end;
+}
+
+/* Everything in the box. */
+.lab .bento-wrap {
+  display: grid;
+  align-content: center;
+  gap: clamp(1.5rem, 4vh, 2.5rem);
+}
+
+.lab .bento-head {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-5) var(--col-gap);
+  align-items: end;
+}
+
+.lab .bento-head .h2 {
+  grid-column: 1 / span 6;
+}
+
+.lab .bento-head .lead {
+  grid-column: 8 / -1;
+}
+
+.lab .bento {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--col-gap);
+}
+
+.lab .cell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-4);
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--space-5);
+  border-radius: var(--radius-outer);
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.lab .cell-wide {
+  grid-column: span 2;
+}
+
+.lab .cell-note {
+  grid-column: span 2;
+  grid-template-rows: auto;
+  gap: var(--space-2);
+}
+
+.lab .cell-text {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.lab .cell-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 1.0625rem;
+  font-weight: var(--weight-medium);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.lab .cell-title svg {
+  flex: none;
+}
+
+.lab .cell p {
+  color: var(--muted-foreground);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+.lab .cell-art {
+  align-self: end;
+  width: 100%;
+  color: var(--foreground);
+}
+
+/* The Studio cell: a real screenshot in a window that runs off the cell. */
+.lab .cell-shot {
+  height: 7.5rem;
+  margin-bottom: calc(-1 * var(--space-5));
+}
+
+.lab .cell-shot .window {
+  width: 100%;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.lab .cell-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.lab svg.cell-art {
+  height: 4.5rem;
+}
+
+.lab svg.art-search {
+  height: 8.5rem;
+}
+
+/* The drawings share one small vocabulary. */
+.lab .art-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.45;
+  vector-effect: non-scaling-stroke;
+}
+
+.lab .art-fill {
+  fill: currentColor;
+  opacity: 0.07;
+}
+
+.lab .art-dim {
+  fill: currentColor;
+  opacity: 0.2;
+}
+
+.lab .art-hit,
+.lab .art-node,
+.lab .art-dot,
+.lab .art-caret {
+  fill: currentColor;
+}
+
+.lab .art-type {
+  fill: currentColor;
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+.lab .art-dot {
+  offset-path: path("M48 62 C78 62 78 24 108 24 H132 C162 24 162 62 192 62");
+  offset-distance: 100%;
+}
+
+.lab .art-caret {
+  opacity: 0;
+}
+
+.lab .art-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .art-roles li {
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  background: var(--background);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+/* Other pages. */
+.lab .page-hero-grid {
+  display: grid;
+  gap: clamp(2rem, 6vh, 3.5rem);
+}
+
+.lab .page-hero {
+  padding-top: calc(var(--nav-h) + clamp(2.5rem, 8vh, 5rem));
+}
+
+.lab .page-hero .lead {
+  max-width: 40rem;
+}
+
+.lab .agent-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .tools {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-6);
+}
+
+.lab .tool-groups {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--col-gap);
+  width: 100%;
+}
+
+.lab .tool-group {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-outer);
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.lab .tool-group-name {
+  font-weight: var(--weight-medium);
+}
+
+.lab .tool-group ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  list-style: none;
+}
+
+.lab .jobs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-8) var(--col-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .jobs li {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-strong);
+}
+
+.lab .jobs p:not(.step-n) {
+  color: var(--muted-foreground);
+}
+
+.lab .jobs .step-n {
+  color: var(--faint-foreground);
+  font-size: var(--text-sm);
+  opacity: 1;
+}
+
+.lab-table-link {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+}
+
+/* An anchor lands under the fixed nav, not behind it. */
+html:has(.lab) {
+  scroll-padding-top: 4rem;
+}
+
+/* A scheme change is not animated. */
+html[data-switching] .lab *,
+html[data-switching] .lab *::before,
+html[data-switching] .lab *::after {
+  transition: none !important;
+}
+
 /* ----------------------------------------------------------- motion --- */
 
 /* Everything below runs only with script on and motion welcome (the layout
@@ -2293,6 +2664,105 @@ html.motion .lab [data-steps]:is(:hover, :focus-within) .step-progress {
   }
 }
 
+/* Search: the query is typed, the results arrive, then it rests and repeats. */
+html.motion .lab .art-search .art-type {
+  animation: art-type 7s steps(13, end) infinite;
+}
+
+html.motion .lab .art-search .art-result {
+  animation: art-result 7s var(--ease-out) infinite;
+  animation-delay: calc(var(--n) * 140ms);
+}
+
+@keyframes art-type {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  22%,
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes art-result {
+  0%,
+  24% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  32%,
+  92% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+/* A branch leaves the main line, a change travels it, and it rejoins. */
+html.motion .lab .art-branch .art-draw {
+  stroke-dasharray: 1;
+  animation: art-draw 6s var(--ease-in-out) infinite;
+}
+
+html.motion .lab .art-branch .art-dot {
+  animation: art-travel 6s var(--ease-in-out) infinite;
+}
+
+@keyframes art-draw {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  35%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes art-travel {
+  0%,
+  35% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  40% {
+    offset-distance: 0%;
+    opacity: 1;
+  }
+  80%,
+  92% {
+    offset-distance: 100%;
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* The log: a new entry lands on top and the rest move down one row. */
+html.motion .lab .art-log .art-rows {
+  animation: art-log 5s var(--ease-in-out) infinite;
+}
+
+@keyframes art-log {
+  0%,
+  70% {
+    transform: translateY(-24px);
+  }
+  82%,
+  100% {
+    transform: none;
+  }
+}
+
+/* The bento holds its motion under the pointer, like every loop here. */
+html.motion .lab .cell:hover * {
+  animation-play-state: paused;
+}
+
 /* Without motion the belts rest as wrapped rows, each mark shown once. */
 html:not(.motion) .lab .belt {
   -webkit-mask-image: none;
@@ -2386,6 +2856,16 @@ html.motion .lab .step-term:not([hidden]) .term-line {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .lab .bento-head .h2,
+  .lab .bento-head .lead {
+    grid-column: 1 / -1;
+  }
+
+  .lab .bento,
+  .lab .tool-groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .lab .tier-switch {
     justify-self: start;
     white-space: normal;
@@ -2444,6 +2924,21 @@ html.motion .lab .step-term:not([hidden]) .term-line {
 }
 
 @media (max-width: 39.99rem) {
+  .lab .bento,
+  .lab .tool-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lab .cell-wide,
+  .lab .cell-note {
+    grid-column: auto;
+  }
+
+  /* A field under 16px makes iOS zoom the page when it is focused. */
+  .lab .b-input {
+    font-size: 1rem;
+  }
+
   /* On a phone the headline is type alone: a pill at this size is a smudge,
      and it pushes each line onto two. */
   .lab .c-pill {

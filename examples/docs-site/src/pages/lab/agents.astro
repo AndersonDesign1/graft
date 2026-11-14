@@ -1,0 +1,82 @@
+---
+/**
+ * The Agents page, first draft: what the landing page says about agents in
+ * one section, told in full.
+ */
+import Agents from "../../components/lab/Agents.astro";
+import Command from "../../components/lab/Command.astro";
+import DayOne from "../../components/lab/DayOne.astro";
+import Gate from "../../components/lab/Gate.astro";
+import Mark from "../../components/lab/Mark.astro";
+import PageHero from "../../components/lab/PageHero.astro";
+import { agents } from "../../components/lab/agents";
+import Lab from "../../layouts/Lab.astro";
+
+const tools = [
+  { group: "Read", names: ["get_content", "list_content", "search_content", "list_collections"] },
+  { group: "Write", names: ["write_content", "put_asset", "delete_content"] },
+  { group: "Understand", names: ["describe_schema", "describe_item", "explain_error"] },
+  { group: "Run", names: ["list_functions", "run_function", "list_approvals"] },
+];
+---
+
+<Lab
+  title="Graft for agents"
+  description="What an AI agent can do in a Graft project, how it connects, and the limits that keep your content safe."
+  variant="page"
+  theme="system"
+>
+  <PageHero
+    title="A CMS your agent can run"
+    lead="Connect the agent you already use. It reads your content model, writes and edits content, and asks a person before it deletes anything."
+  >
+    <Fragment slot="actions">
+      <Command command="graft mcp" />
+      <a class="btn btn-ghost" href="/docs/connecting-agents">Connect an agent</a>
+    </Fragment>
+    <ul class="agent-chips" aria-label="Agents Graft works with">
+      {
+        agents.map((agent) => (
+          <li class="chip">
+            <Mark name={agent.mark} size={20} />
+            {agent.name}
+          </li>
+        ))
+      }
+    </ul>
+  </PageHero>
+
+  <DayOne />
+  <Agents />
+
+  <section class="screen screen-short" id="tools">
+    <div class="wrap tools">
+      <div class="stack-head">
+        <h2 class="h2">The tools an agent gets</h2>
+        <p class="lead">
+          Each tool describes itself, so an agent that has never seen Graft can use it. These are
+          the ones it reaches for most.
+        </p>
+      </div>
+      <div class="tool-groups">
+        {
+          tools.map((group) => (
+            <div class="tool-group">
+              <p class="tool-group-name">{group.group}</p>
+              <ul>
+                {group.names.map((name) => (
+                  <li>
+                    <code>{name}</code>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+      </div>
+      <a class="link" href="/docs/mcp-tools">See every tool</a>
+    </div>
+  </section>
+
+  <Gate />
+</Lab>

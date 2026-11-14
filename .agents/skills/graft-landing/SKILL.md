@@ -57,7 +57,8 @@ These came from corrections. Do not reopen them without being asked.
   a picture of the product, never as the explanation.
 - **Hero.** The headline is two lines in a block on the left of the page,
   not centered and not full width, and no larger than 64px: it names the
-  category and who it is for ("The truly native CMS for agents and humans").
+  category and who it is for ("The native CMS for agents and humans"). No
+  "truly": it is on the writing skill's list of words that sell.
   Under it, one wide window of the real product runs the width of the page
   and is cut by the fold. No logo row and no feature list in the hero.
 - **Agents and stack share one band** directly under the hero: one heading,
@@ -69,6 +70,18 @@ These came from corrections. Do not reopen them without being asked.
 - **For agents and for people.** One section with a switch, two equal tabs
   with plain labels. Each side says what that reader gets and shows the real
   surface: an MCP exchange for agents, Studio for people.
+- **Three messages the page must carry.** Graft was built for agents from
+  day one. Someone with no technical knowledge can start, by telling their
+  agent what they want. Everything a CMS needs is in the box. Say the first
+  as questions a reader can put to any CMS, with Graft's answers. Never name
+  another product or state a fact about one.
+- **A bento for "everything in the box".** Cells of different sizes, each
+  with an icon, a title, one line, and a picture: a real screenshot in a
+  window, or a small drawing made for the page in the ink color that moves
+  only to show what the feature does.
+- **The landing page summarises; other pages go deep.** Each big message
+  gets its own page (Agents, Studio, Start, Why, Security). Draft them under
+  `/lab` and list them on `/lab/map`.
 - **Show the product live.** Studio is the real bundle on recorded data, not
   a screenshot. Product windows sit on a tray, never on the bare page.
 - **Motion is part of the brief.** The headline rises by line, product

@@ -8,13 +8,13 @@ rmSync(out, { recursive: true, force: true });
 const put = (rel, data) => { const to = join(out, rel); mkdirSync(dirname(to), { recursive: true }); writeFileSync(to, data); };
 const copy = (rel) => { const to = join(out, rel); mkdirSync(dirname(to), { recursive: true }); cpSync(join(src, rel), to); };
 
-const pages = ["lab/index.html", ...["landing", "a", "b", "c", "map"].map((p) => `lab/${p}/index.html`)];
+const pages = ["lab/index.html", ...["landing", "agents", "studio", "start", "a", "b", "c", "map"].map((p) => `lab/${p}/index.html`)];
 for (const page of pages) {
   const up = "../".repeat(page.split("/").length - 1);
   let html = readFileSync(join(src, page), "utf8");
   html = html.replace(/\b(href|src|data-demo)="\/([^"/][^"]*|)"/g, (_, attr, path) => {
     if (path === "lab") return `${attr}="${up}lab/index.html"`;
-    const lab = path.match(/^lab\/(landing|a|b|c|map)$/);
+    const lab = path.match(/^lab\/(landing|agents|studio|start|a|b|c|map)$/);
     if (lab) return `${attr}="${up}lab/${lab[1]}/index.html"`;
     // The host reserves names that start with "_", so Astro's folder is renamed.
     if (path.startsWith("_astro/")) return `${attr}="${up}${path.replace("_astro/", "site-assets/")}"`;

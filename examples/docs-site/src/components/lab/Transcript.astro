@@ -48,17 +48,22 @@
   for (const el of document.querySelectorAll<HTMLElement>("[data-transcript]")) {
     const turns = [...el.querySelectorAll<HTMLElement>(".turn")];
     let timers: number[] = [];
+    let replayed = false;
     const play = () => {
       for (const timer of timers) clearTimeout(timer);
       if (still.matches) return;
       el.dataset.playing = "true";
+      // Inside a tray that peels open, wait for the tray: two entrances at
+      // once compete for the eye.
+      const start = el.closest("[data-peel]") && !replayed ? 950 : 250;
+      replayed = true;
       for (const turn of turns) delete turn.dataset.shown;
       timers = turns.map((turn, i) =>
         window.setTimeout(
           () => {
             turn.dataset.shown = "true";
           },
-          250 + i * 1100,
+          start + i * 1100,
         ),
       );
     };

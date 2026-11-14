@@ -1,0 +1,45 @@
+---
+/**
+ * The Start page, first draft: for someone who has never opened a terminal.
+ */
+import NoCode from "../../components/lab/NoCode.astro";
+import PageHero from "../../components/lab/PageHero.astro";
+import Primitives from "../../components/lab/Primitives.astro";
+import Lab from "../../layouts/Lab.astro";
+
+const steps = [
+  { title: "Tell your agent what you want", body: "A blog, a shop, a portfolio, documentation. Plain words are enough." },
+  { title: "Answer three questions", body: "What the site is for, who edits it, and whether you have a database. \"I don't know\" is a fine answer." },
+  { title: "Open your site", body: "It runs with example content. You change it in a browser from then on." },
+];
+---
+
+<Lab
+  title="Start with Graft"
+  description="Get a website you can edit yourself, with an AI agent doing the setup."
+  variant="page"
+  theme="system"
+>
+  <PageHero
+    title="Get a site you can edit, without writing code"
+    lead="You do not need to know what a repo or a database is. Your agent sets Graft up for you and explains each step as it goes."
+  >
+    <Fragment slot="actions">
+      <a class="btn btn-primary" href="/docs/start">Read the guide your agent follows</a>
+    </Fragment>
+    <ol class="jobs jobs-steps">
+      {
+        steps.map((step, i) => (
+          <li>
+            <p class="step-n">{i + 1}</p>
+            <h2 class="h3">{step.title}</h2>
+            <p>{step.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </PageHero>
+
+  <NoCode />
+  <Primitives />
+</Lab>

@@ -1,0 +1,45 @@
+---
+/**
+ * Built for agents from day one. The claim is made as three questions a
+ * reader can put to any CMS that says it works with agents, with Graft's
+ * answers. It names no other product and says nothing about one.
+ */
+const asks = [
+  {
+    ask: "Can an agent do everything an editor can?",
+    answer: "Yes. Anything you can do in Studio, an agent can do over MCP or the CLI.",
+  },
+  {
+    ask: "Is agent access included, or an add-on?",
+    answer: "Included. Graft is open source under the MIT license, with no paid tier.",
+  },
+  {
+    ask: "Do the same rules apply to agents?",
+    answer: "Yes. The same permissions, the same audit trail, the same approval before a delete.",
+  },
+];
+---
+
+<section class="screen" id="day-one">
+  <div class="wrap split dayone">
+    <div class="split-text" data-reveal>
+      <h2 class="h2">Built for agents from day one</h2>
+      <p class="lead">
+        Most CMSs were built for people clicking in an admin, and connected to agents later. In
+        Graft, agents were part of the design from the first line.
+      </p>
+      <a class="link" href="/why">Read why that matters</a>
+    </div>
+    <div class="split-visual asks" data-reveal>
+      <p class="asks-title">Three things to ask any CMS that says it works with agents</p>
+      {
+        asks.map((row) => (
+          <div class="ask">
+            <p class="ask-q">{row.ask}</p>
+            <p class="ask-a">{row.answer}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

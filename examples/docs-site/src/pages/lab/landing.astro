@@ -6,13 +6,16 @@
  * the loop works, and everything the old page said, in order.
  */
 import Audience from "../../components/lab/Audience.astro";
+import Bento from "../../components/lab/Bento.astro";
 import Branching from "../../components/lab/Branching.astro";
 import Command from "../../components/lab/Command.astro";
+import DayOne from "../../components/lab/DayOne.astro";
 import Faq from "../../components/lab/Faq.astro";
 import Gate from "../../components/lab/Gate.astro";
 import HeroWide from "../../components/lab/HeroWide.astro";
 import Mark from "../../components/lab/Mark.astro";
 import Model from "../../components/lab/Model.astro";
+import NoCode from "../../components/lab/NoCode.astro";
 import Primitives from "../../components/lab/Primitives.astro";
 import Reads from "../../components/lab/Reads.astro";
 import Seam from "../../components/lab/Seam.astro";
@@ -31,11 +34,14 @@ import Lab from "../../layouts/Lab.astro";
   <HeroWide />
   <Stack />
   <Audience />
+  <DayOne />
+  <NoCode />
   <Model id="how" heading="Edit a file. Compile. Refresh." steps plain />
   <Seam mode="section" />
   <Reads frameworks heading="One schema. No codegen." />
   <Gate />
   <Branching />
+  <Bento />
   <Tiers />
   <Primitives />
   <Faq />

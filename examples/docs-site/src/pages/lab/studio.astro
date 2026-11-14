@@ -1,0 +1,57 @@
+---
+/**
+ * The Studio page, first draft: the editor, for the people who will use it.
+ */
+import Branching from "../../components/lab/Branching.astro";
+import Gate from "../../components/lab/Gate.astro";
+import PageHero from "../../components/lab/PageHero.astro";
+import Rings from "../../components/lab/Rings.astro";
+import StudioFrame from "../../components/lab/StudioFrame.astro";
+import Lab from "../../layouts/Lab.astro";
+
+const jobs = [
+  { title: "Write", body: "A rich text editor for the page, and a form for its fields, built from your content model." },
+  { title: "Review", body: "Every edit is a draft first. See exactly what changed before it goes live." },
+  { title: "Publish", body: "One button. Your site updates, and the change is saved in your content's history." },
+  { title: "Undo", body: "Open the history of any page and restore an earlier version as a new draft." },
+];
+---
+
+<Lab
+  title="Graft Studio"
+  description="An editor for people who would rather not edit files: find, create, edit and publish content in a browser."
+  variant="page"
+  theme="system"
+>
+  <PageHero
+    title="The editor your content team already knows"
+    lead="Studio is the part of Graft your editors use. Lists of content, a rich text editor, drafts and publish, in a browser, with no code to touch."
+  >
+    <Fragment slot="actions">
+      <a class="btn btn-primary" href="/docs/studio">Read about Studio</a>
+      <a class="btn btn-ghost" href="/docs/studio-hosting">Host it for your team</a>
+    </Fragment>
+    <div class="tray page-hero-tray" data-peel>
+      <Rings cx={50} cy={10} seed={52} rings={40} />
+      <StudioFrame route="/c/docs/getting-started" />
+    </div>
+  </PageHero>
+
+  <section class="screen screen-short" id="jobs">
+    <div class="wrap">
+      <ul class="jobs">
+        {
+          jobs.map((job) => (
+            <li>
+              <h2 class="h3">{job.title}</h2>
+              <p>{job.body}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <Gate />
+  <Branching />
+</Lab>

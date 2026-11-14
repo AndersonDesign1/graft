@@ -1,0 +1,80 @@
+---
+/**
+ * Starting with no technical knowledge. The exchange is the one the docs
+ * give an agent for exactly this job (/docs/start): the three questions, the
+ * command, and the words it reports back with.
+ */
+import Rings from "./Rings.astro";
+
+const prompt = "Set up a Graft site for me. Follow https://graft.page/docs/start";
+---
+
+<section class="screen" id="plain-words">
+  <div class="wrap split">
+    <div class="split-text" data-reveal>
+      <h2 class="h2">No code needed to get started</h2>
+      <p class="lead">
+        Tell your agent what you want in plain words. It asks you three questions, sets up your
+        site, your editor and a database, and tells you what it did.
+      </p>
+      <ul class="points">
+        <li>You answer in plain words, and "I don't know" is fine</li>
+        <li>You get a working site with example content</li>
+        <li>You edit it in a browser from then on</li>
+      </ul>
+      <div class="prompt">
+        <p class="prompt-label">Give your agent this</p>
+        <button class="btn btn-command prompt-copy" type="button" data-copy={prompt}>
+          <span class="btn-command-text">{prompt}</span>
+          <svg class="icon icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect width="14" height="14" x="8" y="8" rx="2"></rect>
+            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+          </svg>
+          <svg class="icon icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 6 9 17l-5-5"></path>
+          </svg>
+          <span class="visually-hidden" aria-live="polite"></span>
+        </button>
+      </div>
+    </div>
+    <div class="tray split-visual" data-peel>
+      <Rings cx={76} cy={70} seed={41} />
+      <div class="window transcript chat" data-transcript>
+        <div class="window-bar">
+          <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="window-title">Your agent</span>
+          <button class="window-action" type="button" data-replay>Replay</button>
+        </div>
+        <ol class="turns">
+          <li class="turn say" data-who="graft">
+            <p class="turn-head"><span class="turn-who">You</span></p>
+            <p class="say-text">Make me a website for my bakery that I can edit myself.</p>
+          </li>
+          <li class="turn say" data-who="agent">
+            <p class="turn-head"><span class="turn-who">Agent</span></p>
+            <p class="say-text">
+              Three quick questions. What is the site for? Who changes the content, and how? Do
+              you already have a database?
+            </p>
+          </li>
+          <li class="turn say" data-who="graft">
+            <p class="turn-head"><span class="turn-who">You</span></p>
+            <p class="say-text">A shop. Me, in a browser. I don't know.</p>
+          </li>
+          <li class="turn" data-who="agent">
+            <p class="turn-head"><span class="turn-who">Agent</span><code>runs one command</code></p>
+            <pre><code><span class="cli-bin">npm</span> <span class="cli-cmd">create</span> graft@latest bakery -- --template shop
+  --edit online --database new --yes</code></pre>
+          </li>
+          <li class="turn say" data-who="agent">
+            <p class="turn-head"><span class="turn-who">Agent</span></p>
+            <p class="say-text">
+              Your site is set up with example content. I also made a free database for it. I'll
+              walk you through keeping it next.
+            </p>
+          </li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
