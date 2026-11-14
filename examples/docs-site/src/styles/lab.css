@@ -3380,6 +3380,145 @@ html[data-switching] .lab *::after {
   letter-spacing: -0.02em;
 }
 
+/* Why and Security: the claim, then four foundations under it. */
+.lab .page-top {
+  display: grid;
+  align-content: center;
+  gap: clamp(2rem, 6vh, 3.5rem);
+}
+
+.lab .pillars {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.lab .two-up {
+  display: grid;
+  align-content: center;
+  gap: var(--space-8);
+}
+
+.lab .operator {
+  background: var(--muted);
+}
+
+.lab .operator .points {
+  margin-top: var(--space-2);
+}
+
+/* What a login cannot do: the same list, marked with a bar, not a tick. */
+.lab .points-no {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+.lab .points-no li::before {
+  top: 0.65em;
+  left: 0.3rem;
+  width: 0.7rem;
+  height: 0;
+  border-width: 0 0 2px 0;
+  border-color: var(--danger);
+  transform: none;
+}
+
+/* Links to the docs, as a grid of plain cards. */
+.lab .receipts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--col-gap);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .receipt {
+  display: grid;
+  gap: var(--space-1);
+  height: 100%;
+  padding: var(--space-5);
+  border-radius: var(--radius-outer);
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--foreground);
+  text-decoration: none;
+  transition:
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.lab .receipt-title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+
+.lab .receipt-note {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lab .receipt:hover {
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    transform: translateY(-2px);
+  }
+}
+
+/* A sequence: who, what they sent, and what it means. */
+.lab .sequence {
+  display: grid;
+  margin: 0;
+  padding: var(--space-2) var(--space-5);
+  list-style: none;
+}
+
+.lab .sequence li {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  gap: 2px var(--space-4);
+  padding-block: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.lab .sequence li:first-child {
+  border-top: 0;
+}
+
+.lab .sequence-who {
+  grid-row: span 2;
+  color: var(--faint-foreground);
+  font-size: var(--lab-label);
+  font-weight: var(--weight-medium);
+}
+
+.lab .sequence code {
+  overflow-wrap: anywhere;
+  font-size: 0.8125rem;
+}
+
+.lab .sequence-note {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.lab .audit-facts {
+  padding: var(--space-2) var(--space-5);
+}
+
+.lab .audit-facts li {
+  grid-template-columns: 9rem minmax(0, 1fr);
+}
+
+.lab .audit-facts li:first-child {
+  border-top: 0;
+}
+
+.lab .audit-facts code {
+  background: none;
+  padding: 0;
+}
+
 /* ----------------------------------------------------------- motion --- */
 
 /* Everything below runs only with script on and motion welcome (the layout
@@ -3964,8 +4103,12 @@ html.motion .lab .step-term:not([hidden]) .term-line {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .lab .bounds-grid {
-    grid-template-columns: minmax(0, 1fr);
+  .lab .pillars {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lab .receipts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .lab .path {
@@ -4037,6 +4180,12 @@ html.motion .lab .step-term:not([hidden]) .term-line {
 
   .lab .wall-grid,
   .lab .kind-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lab .bounds-grid,
+  .lab .pillars,
+  .lab .receipts {
     grid-template-columns: minmax(0, 1fr);
   }
 
