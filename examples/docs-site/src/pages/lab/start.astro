@@ -5,6 +5,15 @@
  * could type it into, and the kinds of site turn over inside it.
  */
 import { BookOpen, Images, Newspaper, ShoppingBag, Square } from "lucide-react";
+import {
+  AstroIcon,
+  NextjsIcon,
+  NuxtIcon,
+  SvelteIcon,
+  TanstackIcon,
+} from "../../components/icons/FrameworkIcons";
+import FaqList from "../../components/lab/FaqList.astro";
+import Mark from "../../components/lab/Mark.astro";
 import NoCode from "../../components/lab/NoCode.astro";
 import Shot from "../../components/lab/Shot.astro";
 import Lab from "../../layouts/Lab.astro";
@@ -17,6 +26,42 @@ const kinds = [
   { name: "Shop", line: "For products, or a menu", Icon: ShoppingBag },
   { name: "Portfolio", line: "For showing your work", Icon: Images },
   { name: "Blank", line: "Start empty", Icon: Square },
+];
+const path = [
+  { title: "Say what you want", body: "A shop, a blog, a portfolio, your docs. One sentence is enough." },
+  { title: "Answer three questions", body: "What the site is for, who will change it, and whether you have a database. \"I don't know\" is a fine answer." },
+  { title: "Your site is made", body: "It arrives with example content, so you can see how everything fits before you write a word." },
+  { title: "Keep your free database", body: "Your agent hands you a link. Sign up once, at no cost, and the place your content is stored becomes yours." },
+  { title: "Try the editor", body: "Open a page, change a word, press Publish, and reload your site. That is the whole job." },
+  { title: "Put it online", body: "Your agent sets it up on a host. You open it first, so you are the owner, and you invite everyone else." },
+];
+const words = [
+  { not: "Repository, commit, push", say: "The site's files, save a version" },
+  { not: "Database, Postgres", say: "Where the content is stored" },
+  { not: "Environment variable", say: "A setting" },
+  { not: "Deploy", say: "Put it online" },
+];
+const promises = [
+  "It asks before it publishes anything for you",
+  "It never puts your passwords or settings anywhere public",
+  "When something fails, it follows the fix Graft gives it before trying anything else",
+  "When it is unsure, it checks where things stand and does the one next thing",
+];
+const builds = [
+  { name: "Next.js", Icon: NextjsIcon },
+  { name: "Nuxt", Icon: NuxtIcon },
+  { name: "SvelteKit", Icon: SvelteIcon },
+  { name: "Astro", Icon: AstroIcon },
+  { name: "React Router", mark: "reactrouter" },
+  { name: "TanStack Start", Icon: TanstackIcon },
+];
+const questions = [
+  { q: "Do I need to know how to code?", a: "No. Your agent does the setup and explains each step in plain words. After that you work in an editor in your browser." },
+  { q: "Which agent do I need?", a: "One that can run commands on your computer, such as Claude Code, Codex, Cursor or OpenCode. Give it the line at the top of this page." },
+  { q: "What does it cost?", a: "Graft is free and open source. The database your agent makes is free too. It is deleted after 72 hours unless you keep it, which takes one sign-up and costs nothing." },
+  { q: "Is the content mine?", a: "Yes. Once you keep the database, your content is in an account you own, and the site runs on a host you choose. Graft has no server of its own that holds it." },
+  { q: "Can a developer take over later?", a: "Yes. Everything your agent made is ordinary code and content that a developer can open, read and change." },
+  { q: "Can I add a shop or comments later?", a: "Yes. Ask your agent. Graft adds features such as comments, a product catalog or SEO fields as code in your own site." },
 ];
 const outcomes = [
   { title: "A site that runs", body: "With example content in it, so you can see how it fits together before you write a word." },
@@ -71,6 +116,25 @@ const outcomes = [
 
   <NoCode />
 
+  <section class="screen" id="path">
+    <div class="wrap path-wrap">
+      <div class="stack-head" data-reveal>
+        <h2 class="h2">From one sentence to a site online</h2>
+        <p class="lead">Six steps. Your agent does the work in each one and tells you what happened.</p>
+      </div>
+      <ol class="path" data-reveal>
+        {
+          path.map((step) => (
+            <li>
+              <h3 class="h3">{step.title}</h3>
+              <p>{step.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
   <section class="screen" id="kinds">
     <div class="wrap kinds">
       <div class="stack-head" data-reveal>
@@ -88,6 +152,29 @@ const outcomes = [
           ))
         }
       </ul>
+    </div>
+  </section>
+
+  <section class="screen screen-short" id="builds">
+    <div class="wrap stack">
+      <div class="stack-head" data-reveal>
+        <h2 class="h2">Built on tools developers already trust</h2>
+        <p class="lead">You never have to choose one. If a developer joins later, they will know their way around.</p>
+      </div>
+      <div class="belt" data-dir="forth" role="group" aria-label="What your site can be built with">
+        {
+          [0, 1, 2].map((copy) => (
+            <ul class="belt-track" aria-hidden={copy > 0 ? "true" : undefined}>
+              {builds.map((item) => (
+                <li class="chip">
+                  {"Icon" in item && item.Icon ? <item.Icon size={22} /> : <Mark name={item.mark ?? ""} size={22} />}
+                  {item.name}
+                </li>
+              ))}
+            </ul>
+          ))
+        }
+      </div>
     </div>
   </section>
 
@@ -111,4 +198,52 @@ const outcomes = [
       </div>
     </div>
   </section>
+
+  <section class="screen" id="plain">
+    <div class="wrap split">
+      <div class="split-text" data-reveal>
+        <h2 class="h2">It talks to you in plain words</h2>
+        <p class="lead">
+          Your agent is told to leave the jargon out. When it has to use a technical word, it
+          explains it once, in a few words.
+        </p>
+        <ul class="points">
+          {promises.map((line) => <li>{line}</li>)}
+        </ul>
+      </div>
+      <ul class="split-visual words" data-reveal aria-label="What your agent says in place of technical words">
+        {
+          words.map((row) => (
+            <li>
+              <s>{row.not}</s>
+              <span>{row.say}</span>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="screen screen-short" id="cost">
+    <div class="wrap run">
+      <h2 class="h2" data-reveal><span>What it costs</span></h2>
+      <div class="closing-cards">
+        <div class="closing-card">
+          <p class="who">Graft</p>
+          <h3 class="h3">Free, and open source</h3>
+          <p>There is no plan to pick and no account to make. The code is public under the MIT license.</p>
+        </div>
+        <div class="closing-card">
+          <p class="who">Your database</p>
+          <h3 class="h3">Free to start, yours to keep</h3>
+          <p>
+            Your agent makes one with no account. It holds up to 100 MB and is deleted after 72
+            hours unless you keep it, which takes one free sign-up.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <FaqList heading="Questions before you start" group="start-faq" items={questions} />
 </Lab>

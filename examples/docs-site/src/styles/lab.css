@@ -3298,6 +3298,88 @@ html[data-switching] .lab *::after {
   width: 40%;
 }
 
+/* The path: six stops on one line, three to a row. */
+.lab .path-wrap {
+  display: grid;
+  align-content: center;
+  gap: var(--space-8);
+}
+
+.lab .path {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-12) var(--col-gap);
+  margin: 0;
+  padding: 0;
+  counter-reset: stop;
+  list-style: none;
+}
+
+.lab .path li {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--border-strong);
+  counter-increment: stop;
+}
+
+/* Each stop is a node on the line, with its number in it. */
+.lab .path li::before {
+  content: counter(stop);
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: var(--lab-label);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-medium);
+  transform: translateY(-50%);
+}
+
+.lab .path p {
+  color: var(--muted-foreground);
+}
+
+/* Jargon, struck out, and what is said in its place. */
+.lab .words {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .words li {
+  display: grid;
+  gap: var(--space-1);
+  padding-block: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.lab .words li:last-child {
+  border-bottom: 1px solid var(--border);
+}
+
+.lab .words s {
+  color: var(--faint-foreground);
+  font-size: 0.9375rem;
+  text-decoration-color: var(--border-strong);
+}
+
+.lab .words span {
+  font-size: clamp(1.25rem, 1rem + 0.8vw, 1.625rem);
+  font-weight: var(--weight-medium);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
 /* ----------------------------------------------------------- motion --- */
 
 /* Everything below runs only with script on and motion welcome (the layout
@@ -3884,6 +3966,11 @@ html.motion .lab .step-term:not([hidden]) .term-line {
 
   .lab .bounds-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lab .path {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-8);
   }
 
   .lab .tier-switch {
