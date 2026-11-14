@@ -75,10 +75,14 @@ These came from corrections. Do not reopen them without being asked.
   agent what they want. Everything a CMS needs is in the box. Say the first
   as questions a reader can put to any CMS, with Graft's answers. Never name
   another product or state a fact about one.
-- **A bento for "everything in the box".** Cells of different sizes, each
-  with an icon, a title, one line, and a picture: a real screenshot in a
-  window, or a small drawing made for the page in the ink color that moves
-  only to show what the feature does.
+- **A bento for "everything in the box".** Cells of different sizes. Words
+  sit in the top corner with an icon and a two-tone title (the thing in ink,
+  the rest of the line quieter). No picture sits whole inside its cell: it
+  comes in from an edge and is cut by it. Real screenshots are stacked and
+  run off the corner; drawings sit on a card that slides in from the bottom
+  or the right; a field of dots lights the corner the picture comes from.
+  Drawings are made for the page in the ink color and move only to show what
+  the feature does.
 - **The landing page summarises; other pages go deep.** Each big message
   gets its own page (Agents, Studio, Start, Why, Security). Draft them under
   `/lab` and list them on `/lab/map`.

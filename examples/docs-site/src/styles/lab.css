@@ -2290,61 +2290,110 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 
 .lab .bento {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(3, minmax(0, auto));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--col-gap);
 }
 
-/* The editor stands two rows tall beside search and previews. */
-.lab .cell-studio {
-  grid-column: 1 / span 2;
-  grid-row: 1 / span 2;
-}
-
-.lab .cell-search,
-.lab .cell-preview {
-  grid-column: 3 / span 2;
-}
-
+/* A cell is a stage: words in the top corner, and a picture that comes in
+   from one edge and is cut by it. */
 .lab .cell {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: var(--space-4);
-  min-width: 0;
+  position: relative;
+  isolation: isolate;
   overflow: hidden;
-  padding: var(--space-5);
-  border-radius: var(--radius-outer);
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  min-height: 18.5rem;
+  padding: var(--space-6);
+  border-radius: calc(var(--radius-outer) + 0.375rem);
   background: var(--muted);
   box-shadow: inset 0 0 0 1px var(--border);
+  --dots-x: 100%;
+  --dots-y: 100%;
 }
 
-.lab .cell-wide {
-  grid-column: span 2;
+.lab .cell[data-from="bottom"] {
+  --dots-x: 50%;
 }
 
-.lab .cell-note {
-  grid-column: span 2;
-  grid-template-rows: auto;
-  gap: var(--space-2);
+/* A field of dots, brightest in the corner the picture comes from. */
+.lab .cell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--foreground) 26%, transparent) 1px,
+    transparent 1.5px
+  );
+  background-size: 0.875rem 0.875rem;
+  -webkit-mask-image: radial-gradient(
+    ellipse 75% 80% at var(--dots-x) var(--dots-y),
+    #000 0%,
+    transparent 72%
+  );
+  mask-image: radial-gradient(
+    ellipse 75% 80% at var(--dots-x) var(--dots-y),
+    #000 0%,
+    transparent 72%
+  );
+}
+
+.lab .cell-a {
+  grid-column: span 7;
+  min-height: 22rem;
+}
+
+.lab .cell-b {
+  grid-column: span 5;
+  min-height: 22rem;
+}
+
+.lab .cell-c,
+.lab .cell-d,
+.lab .cell-e {
+  grid-column: span 4;
+}
+
+.lab .cell-f,
+.lab .cell-g {
+  grid-column: span 6;
+  min-height: 14.5rem;
 }
 
 .lab .cell-text {
+  position: relative;
+  z-index: 1;
   display: grid;
+  justify-items: start;
   gap: var(--space-2);
+  max-width: 23rem;
 }
 
+.lab .cell-a .cell-text,
+.lab .cell-f .cell-text,
+.lab .cell-g .cell-text {
+  max-width: min(100%, 17.5rem);
+}
+
+.lab .cell-text > svg {
+  margin-bottom: var(--space-2);
+}
+
+/* Two tones: the thing in ink, the rest of the line quieter. */
 .lab .cell-title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 1.0625rem;
+  color: var(--muted-foreground);
+  font-size: clamp(1.1875rem, 1rem + 0.6vw, 1.4375rem);
   font-weight: var(--weight-medium);
-  line-height: 1.3;
-  letter-spacing: -0.01em;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
-.lab .cell-title svg {
-  flex: none;
+.lab .cell-title b {
+  color: var(--foreground);
+  font-weight: inherit;
 }
 
 .lab .cell p {
@@ -2353,39 +2402,140 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   line-height: 1.45;
 }
 
-.lab .cell-art {
-  align-self: end;
+/* Three real screens, stacked and running off the corner. */
+.lab .cell-stack {
+  position: absolute;
+  right: -5%;
+  bottom: -24%;
+  width: 56%;
+}
+
+.lab .cell-stack .shot {
+  box-shadow:
+    var(--shadow-floating),
+    0 0 0 1px var(--border-strong);
+}
+
+.lab .cell-stack .shot:nth-child(1),
+.lab .cell-stack .shot:nth-child(2) {
+  position: absolute;
+  inset: 0 auto auto 0;
   width: 100%;
+}
+
+.lab .cell-stack .shot:nth-child(1) {
+  transform: translate(-20%, -22%) rotate(-5deg);
+  opacity: 0.55;
+}
+
+.lab .cell-stack .shot:nth-child(2) {
+  transform: translate(-10%, -11%) rotate(-2.5deg);
+  opacity: 0.8;
+}
+
+/* A drawing on its own card, sliding in from the bottom or the right. */
+.lab .cell-card {
+  position: absolute;
+  padding: var(--space-5);
+  border-radius: var(--radius-outer);
+  background: var(--background);
+  box-shadow:
+    var(--shadow-floating),
+    0 0 0 1px var(--border-strong);
   color: var(--foreground);
 }
 
-/* The Studio cell: a real screenshot in a window that runs off the cell. */
-.lab .cell-shot {
-  height: 100%;
-  min-height: 12rem;
-  margin-bottom: calc(-1 * var(--space-5));
-}
-
-.lab .cell-shot .window {
-  width: 100%;
-  border-bottom-right-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-.lab .cell-shot img {
+.lab .cell-card svg {
   display: block;
   width: 100%;
   height: auto;
+  overflow: visible;
 }
 
-.lab svg.cell-art {
-  height: 4.25rem;
+.lab .cell-card-bottom {
+  right: var(--space-6);
+  bottom: calc(-1 * var(--space-5));
+  left: var(--space-6);
+  padding-bottom: var(--space-8);
 }
 
-/* The two wide drawings are drawn to the cell's own proportions. */
-.lab svg.art-search,
-.lab svg.art-preview {
-  height: auto;
+.lab .cell-card-right {
+  right: -3.5rem;
+  bottom: -1.25rem;
+  left: var(--space-6);
+  padding-bottom: var(--space-8);
+}
+
+/* The drawing is wider than its card, so the card's edge cuts it too. */
+.lab .cell-card-right svg {
+  width: 118%;
+}
+
+/* The log's newest row lands above the others, so its card sits lower. */
+.lab .cell-e .cell-card {
+  bottom: -3.25rem;
+}
+
+/* In a wide cell the card keeps to the right half, clear of the words. */
+.lab .cell-g .cell-card {
+  left: 50%;
+}
+
+/* The roles rise out of the floor of the cell, each a step higher. */
+.lab .cell-stairs {
+  position: absolute;
+  right: var(--space-6);
+  bottom: 0;
+  left: var(--space-6);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+  align-items: end;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8125rem;
+  list-style: none;
+}
+
+.lab .cell-stairs li {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  min-height: calc(3.75rem + var(--step) * 1.75rem);
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: color-mix(in srgb, var(--foreground) calc(7% + var(--step) * 6%), var(--background));
+  box-shadow: inset 0 1px 0 var(--border-strong);
+}
+
+.lab .cell-stairs .stair-name,
+.lab .cell-stairs .stair-can {
+  overflow: hidden;
+  font-size: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Image cards fanned from one point, the way a hand holds them. */
+.lab .cell-fan {
+  position: absolute;
+  right: 5%;
+  bottom: -6%;
+  width: 48%;
+  aspect-ratio: 16 / 10;
+  color: var(--foreground);
+}
+
+.lab .fan-card {
+  position: absolute;
+  bottom: 0;
+  left: 25%;
+  width: 50%;
+  overflow: visible;
+  filter: drop-shadow(0 6px 14px rgb(0 0 0 / 0.25));
+  transform: rotate(calc((var(--n) - 1) * 13deg)) translateX(calc((var(--n) - 1) * 58%));
+  transform-origin: 50% 160%;
 }
 
 /* The drawings share one small vocabulary. */
@@ -3376,6 +3526,38 @@ html.motion .lab .art-log .art-rows {
   }
 }
 
+/* The pictures arrive from the edge they are cut by, once, with the grid. */
+html.motion .lab .bento :is(.cell-stack, .cell-card, .cell-stairs, .cell-fan) {
+  transition: transform 900ms var(--ease-out) 150ms;
+}
+
+html.motion .lab .bento:not([data-in]) [data-from="right"] :is(.cell-stack, .cell-card) {
+  transform: translateX(4rem);
+}
+
+html.motion
+  .lab
+  .bento:not([data-in])
+  [data-from="bottom"]
+  :is(.cell-card, .cell-stairs, .cell-fan) {
+  transform: translateY(4rem);
+}
+
+/* Under a real pointer, a cell's picture leans in a little. */
+@media (hover: hover) and (pointer: fine) {
+  html.motion .lab .bento[data-in] .cell :is(.cell-stack, .cell-card, .cell-fan) {
+    transition: transform 400ms var(--ease-out);
+  }
+
+  html.motion .lab .cell:hover .cell-stack {
+    transform: translate(-2%, -3%);
+  }
+
+  html.motion .lab .cell:hover :is(.cell-card, .cell-fan) {
+    transform: translateY(-0.5rem);
+  }
+}
+
 /* The bento holds its motion under the pointer, like every loop here. */
 html.motion .lab .cell:hover * {
   animation-play-state: paused;
@@ -3503,16 +3685,19 @@ html.motion .lab .step-term:not([hidden]) .term-line {
     grid-column: 1 / -1;
   }
 
-  .lab .bento,
   .lab .tool-groups {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .lab .cell-studio,
-  .lab .cell-search,
-  .lab .cell-preview {
+  .lab .cell-a,
+  .lab .cell-b,
+  .lab .cell-c,
+  .lab .cell-d,
+  .lab .cell-e,
+  .lab .cell-f,
+  .lab .cell-g {
     grid-column: 1 / -1;
-    grid-row: auto;
+    min-height: 22rem;
   }
 
   .lab .wall-grid,
@@ -3582,7 +3767,6 @@ html.motion .lab .step-term:not([hidden]) .term-line {
 }
 
 @media (max-width: 39.99rem) {
-  .lab .bento,
   .lab .tool-groups {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3599,11 +3783,6 @@ html.motion .lab .step-term:not([hidden]) .term-line {
   .lab .stair li {
     min-height: 0;
     border-radius: var(--radius);
-  }
-
-  .lab .cell-wide,
-  .lab .cell-note {
-    grid-column: auto;
   }
 
   /* On a phone the turning words may wrap; a long one must not push the
