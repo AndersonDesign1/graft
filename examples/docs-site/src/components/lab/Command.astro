@@ -4,11 +4,13 @@ import { INIT_CMD } from "../../lib/install";
 
 interface Props {
   command?: string;
+  /** Outlined, for when another button on the screen is the main one. */
+  quiet?: boolean;
 }
-const { command = INIT_CMD } = Astro.props;
+const { command = INIT_CMD, quiet = false } = Astro.props;
 ---
 
-<button class="btn btn-command" type="button" data-copy={command}>
+<button class:list={["btn", "btn-command", quiet && "btn-command-quiet"]} type="button" data-copy={command}>
   <span class="btn-command-text">{command}</span>
   <svg
     class="icon icon-copy"

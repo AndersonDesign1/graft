@@ -1,16 +1,27 @@
 ---
 /**
- * The Start page, first draft: for someone who has never opened a terminal.
+ * The Start page, for someone who has never opened a terminal. Its own
+ * shape: the hero is the sentence you would say to your agent, in a box you
+ * could type it into, and the kinds of site turn over inside it.
  */
+import { BookOpen, Images, Newspaper, ShoppingBag, Square } from "lucide-react";
 import NoCode from "../../components/lab/NoCode.astro";
-import PageHero from "../../components/lab/PageHero.astro";
-import Primitives from "../../components/lab/Primitives.astro";
+import Shot from "../../components/lab/Shot.astro";
 import Lab from "../../layouts/Lab.astro";
 
-const steps = [
-  { title: "Tell your agent what you want", body: "A blog, a shop, a portfolio, documentation. Plain words are enough." },
-  { title: "Answer three questions", body: "What the site is for, who edits it, and whether you have a database. \"I don't know\" is a fine answer." },
-  { title: "Open your site", body: "It runs with example content. You change it in a browser from then on." },
+const prompt = "Set up a Graft site for me. Follow https://graft.page/docs/start";
+const wants = ["a shop for my bakery", "a blog I can write on", "a portfolio for my photos", "the docs for my product"];
+const kinds = [
+  { name: "Blog", line: "For writing regularly", Icon: Newspaper },
+  { name: "Docs", line: "For guides and reference", Icon: BookOpen },
+  { name: "Shop", line: "For products, or a menu", Icon: ShoppingBag },
+  { name: "Portfolio", line: "For showing your work", Icon: Images },
+  { name: "Blank", line: "Start empty", Icon: Square },
+];
+const outcomes = [
+  { title: "A site that runs", body: "With example content in it, so you can see how it fits together before you write a word." },
+  { title: "An editor in your browser", body: "Change a page, press publish, and it is live. No rebuild and no code." },
+  { title: "A history of every change", body: "If something goes wrong, open the page's history and bring the old version back." },
 ];
 ---
 
@@ -20,26 +31,84 @@ const steps = [
   variant="page"
   theme="system"
 >
-  <PageHero
-    title="Get a site you can edit, without writing code"
-    lead="You do not need to know what a repo or a database is. Your agent sets Graft up for you and explains each step as it goes."
-  >
-    <Fragment slot="actions">
-      <a class="btn btn-primary" href="/docs/start">Read the guide your agent follows</a>
-    </Fragment>
-    <ol class="jobs jobs-steps">
-      {
-        steps.map((step, i) => (
-          <li>
-            <p class="step-n">{i + 1}</p>
-            <h2 class="h3">{step.title}</h2>
-            <p>{step.body}</p>
-          </li>
-        ))
-      }
-    </ol>
-  </PageHero>
+  <section class="screen hero start-hero" data-enter>
+    <div class="wrap center-copy">
+      <h1 class="h1 w-h1">Get a site you can edit, without writing code</h1>
+      <p class="lead">
+        You do not need to know what a repo or a database is. Tell your agent what you want. It
+        sets Graft up and explains each step as it goes.
+      </p>
+      <div class="composer" aria-label="An example of what to tell your agent">
+        <p class="composer-line">
+          <span>Make me</span>
+          <span class="composer-wants" style={`--count:${wants.length}`}>
+            {
+              wants.map((want, i) => (
+                <span style={`--i:${i}`} aria-hidden={i === 0 ? undefined : "true"}>
+                  {want}
+                </span>
+              ))
+            }
+          </span>
+        </p>
+        <div class="composer-foot">
+          <span>Then give your agent this</span>
+          <button class="btn btn-command" type="button" data-copy={prompt}>
+            <span class="btn-command-text">{prompt}</span>
+            <svg class="icon icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect width="14" height="14" x="8" y="8" rx="2"></rect>
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+            </svg>
+            <svg class="icon icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 6 9 17l-5-5"></path>
+            </svg>
+            <span class="visually-hidden" aria-live="polite"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <NoCode />
-  <Primitives />
+
+  <section class="screen" id="kinds">
+    <div class="wrap kinds">
+      <div class="stack-head" data-reveal>
+        <h2 class="h2">Start from the kind of site you want</h2>
+        <p class="lead">Your agent picks the one that fits your answer. You can change it later.</p>
+      </div>
+      <ul class="kind-row" data-reveal>
+        {
+          kinds.map((kind) => (
+            <li class="kind">
+              <kind.Icon size={28} strokeWidth={1.5} />
+              <span class="kind-name">{kind.name}</span>
+              <span class="kind-line">{kind.line}</span>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="screen" id="outcome">
+    <div class="wrap split split-wide">
+      <div class="split-text" data-reveal>
+        <h2 class="h2">What you end up with</h2>
+        <ol class="numbered">
+          {
+            outcomes.map((item) => (
+              <li>
+                <h3 class="h3">{item.title}</h3>
+                <p>{item.body}</p>
+              </li>
+            ))
+          }
+        </ol>
+      </div>
+      <div class="tray split-visual" data-peel>
+        <Shot name="write" alt="The Studio editor with a page open, its fields above and its content below." />
+      </div>
+    </div>
+  </section>
 </Lab>

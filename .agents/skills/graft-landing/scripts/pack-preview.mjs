@@ -29,7 +29,8 @@ for (const file of readdirSync(join(src, "_astro"))) {
   else if (file.endsWith(".woff2") || /^page\./.test(file)) { const to = join(out, "site-assets", file); mkdirSync(dirname(to), { recursive: true }); cpSync(join(src, "_astro", file), to); }
 }
 for (const file of readdirSync(join(src, "agents"))) copy(`agents/${file}`);
-copy("favicon.svg"); copy("lab/studio-dark.jpg"); copy("lab/studio-light.jpg");
+copy("favicon.svg");
+for (const file of readdirSync(join(src, "lab"))) if (file.endsWith(".jpg")) copy(`lab/${file}`);
 for (const file of ["index.html", "demo-shim.js", "demo-fixtures.json"]) copy(`studio-demo/${file}`);
 for (const file of readdirSync(join(src, "studio-demo/assets"))) {
   if (file.endsWith(".ttf") || file.endsWith(".woff")) continue;

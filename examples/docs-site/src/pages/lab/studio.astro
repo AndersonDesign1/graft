@@ -1,19 +1,27 @@
 ---
 /**
- * The Studio page, first draft: the editor, for the people who will use it.
+ * The Studio page. Its own shape: the live app is the hero at full size,
+ * the middle is four real screens of a working day, and the roles climb
+ * like a staircase.
  */
-import Branching from "../../components/lab/Branching.astro";
+import Command from "../../components/lab/Command.astro";
 import Gate from "../../components/lab/Gate.astro";
-import PageHero from "../../components/lab/PageHero.astro";
 import Rings from "../../components/lab/Rings.astro";
+import Shot from "../../components/lab/Shot.astro";
 import StudioFrame from "../../components/lab/StudioFrame.astro";
 import Lab from "../../layouts/Lab.astro";
 
-const jobs = [
-  { title: "Write", body: "A rich text editor for the page, and a form for its fields, built from your content model." },
-  { title: "Review", body: "Every edit is a draft first. See exactly what changed before it goes live." },
-  { title: "Publish", body: "One button. Your site updates, and the change is saved in your content's history." },
-  { title: "Undo", body: "Open the history of any page and restore an earlier version as a new draft." },
+const day = [
+  { name: "list", title: "Find it", body: "Every page in one list. Search it, filter drafts, or sort it the way your site does.", alt: "Studio's list of documentation pages with a search field and a drafts filter." },
+  { name: "write", title: "Write it", body: "A form for the page's details and a rich text editor for the rest.", alt: "Studio's editor with a page's fields and its content." },
+  { name: "changes", title: "Review it", body: "See exactly what changed, line by line, before anyone publishes.", alt: "Studio showing the lines removed and added in a page." },
+  { name: "history", title: "Undo it", body: "Open a page's history and bring back any earlier version as a draft.", alt: "Studio's history panel listing earlier versions of a page." },
+] as const;
+const roles = [
+  { name: "Viewer", can: "Reads everything" },
+  { name: "Contributor", can: "Writes drafts and sends them for review" },
+  { name: "Editor", can: "Publishes" },
+  { name: "Admin", can: "Approves deletes and invites people" },
 ];
 ---
 
@@ -23,35 +31,89 @@ const jobs = [
   variant="page"
   theme="system"
 >
-  <PageHero
-    title="The editor your content team already knows"
-    lead="Studio is the part of Graft your editors use. Lists of content, a rich text editor, drafts and publish, in a browser, with no code to touch."
-  >
-    <Fragment slot="actions">
-      <a class="btn btn-primary" href="/docs/studio">Read about Studio</a>
-      <a class="btn btn-ghost" href="/docs/studio-hosting">Host it for your team</a>
-    </Fragment>
-    <div class="tray page-hero-tray" data-peel>
-      <Rings cx={50} cy={10} seed={52} rings={40} />
-      <StudioFrame route="/c/docs/getting-started" />
+  <section class="screen hero studio-hero" data-enter>
+    <div class="wrap studio-hero-grid">
+      <div class="center-copy">
+        <h1 class="h1 w-h1">The editor your content team already knows</h1>
+        <p class="lead">
+          Studio is the part of Graft your editors use. Lists of content, a rich text editor,
+          drafts and publish, in a browser, with no code to touch.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/lab/start">Get started</a>
+          <a class="btn btn-ghost" href="/docs/studio">Read about Studio</a>
+        </div>
+      </div>
+      <div class="tray studio-hero-tray" data-peel>
+        <Rings cx={50} cy={6} seed={52} rings={44} />
+        <StudioFrame route="/c/docs/getting-started" />
+      </div>
     </div>
-  </PageHero>
+  </section>
 
-  <section class="screen screen-short" id="jobs">
-    <div class="wrap">
-      <ul class="jobs">
+  <section class="screen" id="day">
+    <div class="wrap day">
+      <h2 class="h2" data-reveal><span>A working day in Studio</span></h2>
+      <div class="day-grid">
         {
-          jobs.map((job) => (
-            <li>
-              <h2 class="h3">{job.title}</h2>
-              <p>{job.body}</p>
+          day.map((item) => (
+            <article class="day-item">
+              <div class="day-text" data-reveal>
+                <h3 class="h3">{item.title}</h3>
+                <p>{item.body}</p>
+              </div>
+              <div class="tray day-tray" data-peel>
+                <Shot name={item.name} alt={item.alt} />
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="roles">
+    <div class="wrap split">
+      <div class="split-text" data-reveal>
+        <h2 class="h2">Everyone gets the access they need</h2>
+        <p class="lead">
+          Invite people by email. Each role can do everything the one before it can, and one thing
+          more.
+        </p>
+        <a class="link" href="/docs/studio-hosting">Read about hosting Studio for a team</a>
+      </div>
+      <ol class="split-visual stair" data-reveal>
+        {
+          roles.map((role, i) => (
+            <li style={`--step:${i}`}>
+              <span class="stair-name">{role.name}</span>
+              <span class="stair-can">{role.can}</span>
             </li>
           ))
         }
-      </ul>
+      </ol>
+    </div>
+  </section>
+
+  <section class="screen screen-short" id="run">
+    <div class="wrap run">
+      <h2 class="h2" data-reveal><span>Two ways to run it</span></h2>
+      <div class="closing-cards">
+        <div class="closing-card">
+          <p class="who">On your own computer</p>
+          <h3 class="h3">Open it next to your site</h3>
+          <p>One command opens Studio on your project. Saving makes a commit in Git.</p>
+          <Command command="graft studio" />
+        </div>
+        <div class="closing-card">
+          <p class="who">For your team</p>
+          <h3 class="h3">Host it and sign in</h3>
+          <p>Run it on a server. Editors sign in with an email, GitHub, Google or your single sign-on.</p>
+          <Command command="graft serve --studio" />
+        </div>
+      </div>
     </div>
   </section>
 
   <Gate />
-  <Branching />
 </Lab>

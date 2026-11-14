@@ -1,0 +1,21 @@
+---
+/**
+ * A real screenshot of Studio in a window, in the visitor's scheme. The
+ * files are captured from a running `graft studio` on this site's content.
+ */
+interface Props {
+  name: "list" | "changes" | "history" | "write";
+  alt: string;
+  title?: string;
+}
+const { name, alt, title = "graft studio" } = Astro.props;
+---
+
+<div class="window shot">
+  <div class="window-bar">
+    <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span class="window-title">{title}</span>
+  </div>
+  <img class="studio-poster-dark" src={`/lab/studio-${name}-dark.jpg`} alt={alt} width="1920" height="1200" loading="lazy" decoding="async" />
+  <img class="studio-poster-light" src={`/lab/studio-${name}-light.jpg`} alt="" width="1920" height="1200" loading="lazy" decoding="async" />
+</div>

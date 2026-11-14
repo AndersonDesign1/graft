@@ -2291,7 +2291,19 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 .lab .bento {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, auto));
   gap: var(--col-gap);
+}
+
+/* The editor stands two rows tall beside search and previews. */
+.lab .cell-studio {
+  grid-column: 1 / span 2;
+  grid-row: 1 / span 2;
+}
+
+.lab .cell-search,
+.lab .cell-preview {
+  grid-column: 3 / span 2;
 }
 
 .lab .cell {
@@ -2349,7 +2361,8 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 
 /* The Studio cell: a real screenshot in a window that runs off the cell. */
 .lab .cell-shot {
-  height: 7.5rem;
+  height: 100%;
+  min-height: 12rem;
   margin-bottom: calc(-1 * var(--space-5));
 }
 
@@ -2366,11 +2379,13 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 }
 
 .lab svg.cell-art {
-  height: 4.5rem;
+  height: 4.25rem;
 }
 
-.lab svg.art-search {
-  height: 8.5rem;
+/* The two wide drawings are drawn to the cell's own proportions. */
+.lab svg.art-search,
+.lab svg.art-preview {
+  height: auto;
 }
 
 /* The drawings share one small vocabulary. */
@@ -2417,22 +2432,76 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 }
 
 .lab .art-roles {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: var(--space-2);
   margin: 0;
   padding: 0;
+  font-size: 0.8125rem;
   list-style: none;
 }
 
 .lab .art-roles li {
-  padding: var(--space-1) var(--space-3);
-  border-radius: 999px;
-  background: var(--background);
-  box-shadow: inset 0 0 0 1px var(--border);
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
+  display: grid;
+  grid-template-columns: 5.5rem auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.lab .role-name {
   font-weight: var(--weight-medium);
+}
+
+.lab .role-meter {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.lab .role-meter i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.lab .role-meter i[data-on] {
+  background: var(--foreground);
+}
+
+.lab .role-can {
+  color: var(--muted-foreground);
+  text-align: right;
+}
+
+.lab .art-card {
+  fill: var(--background);
+  stroke: currentColor;
+  stroke-opacity: 0.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.lab .art-label {
+  fill: currentColor;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+.lab .art-ring {
+  fill: var(--muted);
+  stroke: currentColor;
+  stroke-opacity: 0.5;
+}
+
+/* At rest the story is over: the branch is merged and both pages show the
+   new headline. */
+.lab .art-old,
+.lab .art-live-old {
+  opacity: 0;
+}
+
+.lab .art-preview .art-dot {
+  offset-path: path("M110 92 C152 92 152 34 198 34 H342 C388 34 388 92 430 92");
+  offset-distance: 100%;
 }
 
 /* Other pages. */
@@ -2539,6 +2608,378 @@ html[data-switching] .lab *,
 html[data-switching] .lab *::before,
 html[data-switching] .lab *::after {
   transition: none !important;
+}
+
+.lab .btn-command-quiet {
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--foreground);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lab .btn-command-quiet:hover {
+    border-color: var(--foreground);
+    background: color-mix(in oklch, var(--ink) 5%, transparent);
+  }
+}
+
+/* ============================================================ pages === */
+
+.lab .split-hero {
+  align-content: center;
+}
+
+.lab .center-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: var(--space-5);
+  text-align: center;
+}
+
+.lab .center-copy .h1 {
+  max-width: 18ch;
+}
+
+.lab .center-copy .lead {
+  max-width: 40rem;
+}
+
+.lab .center-copy .actions {
+  justify-content: center;
+}
+
+/* A numbered list whose numbers are part of the type. */
+.lab .numbered {
+  display: grid;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  counter-reset: n;
+  list-style: none;
+}
+
+.lab .numbered li {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  padding-left: var(--space-12);
+  counter-increment: n;
+}
+
+.lab .numbered li::before {
+  content: counter(n);
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--faint-foreground);
+  font-size: var(--text-h3);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-medium);
+  line-height: 1.3;
+}
+
+.lab .numbered p {
+  color: var(--muted-foreground);
+}
+
+/* Agents: the tool wall. */
+.lab .wall {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: clamp(1.5rem, 4.5vh, 2.75rem);
+}
+
+.lab .wall-head {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.lab .wall-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--col-gap);
+  width: 100%;
+}
+
+.lab .wall-col {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+}
+
+.lab .wall-name {
+  color: var(--faint-foreground);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.lab .wall-col ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .tool {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.lab .tool code {
+  font-size: 0.8125rem;
+}
+
+.lab .tool span {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lab .tool:hover {
+    background: var(--elevated);
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+  }
+}
+
+.lab .win-foot {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.lab .win-foot li {
+  display: grid;
+}
+
+/* Studio: the hero window whole, the day in four screens, the staircase. */
+.lab .studio-hero-grid {
+  display: grid;
+  gap: clamp(1.75rem, 5vh, 3rem);
+}
+
+.lab .studio-hero {
+  min-height: 0;
+}
+
+.lab .studio-hero-tray {
+  --tray-pad: clamp(0.75rem, 2.4vw, 2.25rem);
+}
+
+.lab .day {
+  display: grid;
+  align-content: center;
+  gap: clamp(1.5rem, 4vh, 2.5rem);
+}
+
+.lab .day-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8) var(--col-gap);
+}
+
+.lab .day-item {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.lab .day-text {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.lab .day-text p {
+  color: var(--muted-foreground);
+}
+
+.lab .day-tray {
+  --tray-pad: clamp(0.5rem, 1.4vw, 1.25rem);
+  padding-bottom: 0;
+}
+
+.lab .day-tray .shot {
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.lab .shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* A screen in the day grid shows its upper part; the tray cuts the rest. */
+.lab .day-tray .shot img {
+  aspect-ratio: 16 / 6;
+  object-fit: cover;
+  object-position: top left;
+}
+
+.lab .stair {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  align-items: end;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .stair li {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-height: calc(9rem + var(--step) * 4.5rem);
+  padding: var(--space-4);
+  border-radius: var(--radius-outer) var(--radius-outer) 0 0;
+  background: color-mix(in srgb, var(--foreground) calc(5% + var(--step) * 4%), transparent);
+  box-shadow: inset 0 1px 0 var(--border-strong);
+}
+
+.lab .stair-name {
+  font-weight: var(--weight-medium);
+}
+
+.lab .stair-can {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.lab .run {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.lab .run .closing-card {
+  background: var(--muted);
+}
+
+/* Start: the sentence you would say, in a box you could type it into. */
+.lab .start-hero .wrap {
+  align-content: center;
+}
+
+.lab .composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: min(100%, 46rem);
+  margin-top: var(--space-6);
+  border-radius: var(--radius-outer);
+  background: var(--muted);
+  box-shadow:
+    inset 0 0 0 1px var(--border-strong),
+    var(--shadow-floating);
+  text-align: left;
+}
+
+.lab .composer-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.3em;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  font-size: clamp(1.25rem, 0.9rem + 1.6vw, 2rem);
+  font-weight: var(--weight-medium);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.lab .composer-wants {
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+}
+
+.lab .composer-wants > span {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+}
+
+.lab .composer-wants > span:not(:first-child) {
+  visibility: hidden;
+}
+
+.lab .composer-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  color: var(--faint-foreground);
+  font-size: var(--text-sm);
+}
+
+.lab .composer-foot > * {
+  min-width: 0;
+}
+
+.lab .composer-foot .btn {
+  max-width: 100%;
+  font-family: var(--font-sans);
+}
+
+.lab .kinds {
+  display: grid;
+  align-content: center;
+  gap: var(--space-4);
+}
+
+.lab .kind-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--col-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .kind {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-5);
+  border-radius: var(--radius-outer);
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition:
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.lab .kind-name {
+  margin-top: var(--space-4);
+  font-size: var(--text-h3);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.01em;
+}
+
+.lab .kind-line {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lab .kind:hover {
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    transform: translateY(-2px);
+  }
 }
 
 /* ----------------------------------------------------------- motion --- */
@@ -2742,6 +3183,183 @@ html.motion .lab .art-branch .art-dot {
   }
 }
 
+/* Preview: the branch draws, its page gets the new headline, the change
+   travels back, and only then does the live page take it. */
+html.motion .lab .art-preview .art-draw {
+  stroke-dasharray: 1;
+  animation: pv-draw 9s var(--ease-in-out) infinite;
+}
+
+html.motion .lab .art-preview .art-page-preview,
+html.motion .lab .art-preview .art-branch-label {
+  animation: pv-page 9s var(--ease-out) infinite;
+}
+
+html.motion .lab .art-preview .art-new {
+  animation: pv-new 9s var(--ease-out) infinite;
+}
+
+html.motion .lab .art-preview .art-old {
+  animation: pv-old 9s var(--ease-out) infinite;
+}
+
+html.motion .lab .art-preview .art-dot {
+  animation: pv-dot 9s var(--ease-in-out) infinite;
+}
+
+html.motion .lab .art-preview .art-live-new {
+  animation: pv-live-new 9s var(--ease-out) infinite;
+}
+
+html.motion .lab .art-preview .art-live-old {
+  animation: pv-live-old 9s var(--ease-out) infinite;
+}
+
+@keyframes pv-draw {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  18%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pv-page {
+  0%,
+  16% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  22%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pv-old {
+  0%,
+  34% {
+    opacity: 1;
+  }
+  38%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes pv-new {
+  0%,
+  34% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  42%,
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes pv-dot {
+  0%,
+  46% {
+    offset-distance: 50%;
+    opacity: 0;
+  }
+  50% {
+    offset-distance: 50%;
+    opacity: 1;
+  }
+  66%,
+  70% {
+    offset-distance: 100%;
+    opacity: 1;
+  }
+  76%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes pv-live-old {
+  0%,
+  66% {
+    opacity: 1;
+  }
+  70%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes pv-live-new {
+  0%,
+  66% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  74%,
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Images: tiles arrive one after another, as an upload would. */
+html.motion .lab .art-media .art-tile {
+  animation: art-tile 6s var(--ease-out) infinite;
+  animation-delay: calc(var(--n) * 300ms);
+}
+
+@keyframes art-tile {
+  0%,
+  12% {
+    opacity: 0;
+  }
+  22%,
+  100% {
+    opacity: 0.07;
+  }
+}
+
+/* A form: what a visitor sends travels to a new row. */
+html.motion .lab .art-form .art-send {
+  stroke-dasharray: 1;
+  animation: art-send 5s var(--ease-in-out) infinite;
+}
+
+html.motion .lab .art-form .art-saved {
+  animation: art-saved 5s var(--ease-out) infinite;
+}
+
+@keyframes art-send {
+  0%,
+  15% {
+    stroke-dashoffset: 1;
+  }
+  45%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes art-saved {
+  0%,
+  45% {
+    opacity: 0.07;
+  }
+  55%,
+  85% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0.07;
+  }
+}
+
 /* The log: a new entry lands on top and the rest move down one row. */
 html.motion .lab .art-log .art-rows {
   animation: art-log 5s var(--ease-in-out) infinite;
@@ -2750,17 +3368,41 @@ html.motion .lab .art-log .art-rows {
 @keyframes art-log {
   0%,
   70% {
-    transform: translateY(-24px);
+    transform: none;
   }
   82%,
   100% {
-    transform: none;
+    transform: translateY(22px);
   }
 }
 
 /* The bento holds its motion under the pointer, like every loop here. */
 html.motion .lab .cell:hover * {
   animation-play-state: paused;
+}
+
+/* The kinds of site turn over in the composer, one slot of the cycle each. */
+html.motion .lab .composer-wants > span {
+  visibility: visible;
+  opacity: 0;
+  animation: want-turn calc(var(--count) * 2.6s) var(--ease-out) calc(var(--i) * 2.6s) infinite;
+}
+
+@keyframes want-turn {
+  0% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  4%,
+  21% {
+    opacity: 1;
+    transform: none;
+  }
+  25%,
+  100% {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
 }
 
 /* Without motion the belts rest as wrapped rows, each mark shown once. */
@@ -2866,6 +3508,22 @@ html.motion .lab .step-term:not([hidden]) .term-line {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .lab .cell-studio,
+  .lab .cell-search,
+  .lab .cell-preview {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+
+  .lab .wall-grid,
+  .lab .kind-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lab .day-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .lab .tier-switch {
     justify-self: start;
     white-space: normal;
@@ -2929,9 +3587,29 @@ html.motion .lab .step-term:not([hidden]) .term-line {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .lab .wall-grid,
+  .lab .kind-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lab .stair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lab .stair li {
+    min-height: 0;
+    border-radius: var(--radius);
+  }
+
   .lab .cell-wide,
   .lab .cell-note {
     grid-column: auto;
+  }
+
+  /* On a phone the turning words may wrap; a long one must not push the
+     page wider. */
+  .lab .composer-wants > span {
+    white-space: normal;
   }
 
   /* A field under 16px makes iOS zoom the page when it is focused. */
