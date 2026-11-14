@@ -1,0 +1,57 @@
+---
+/**
+ * The hero: the claim centered over one wide window of the real Studio, cut
+ * by the fold. The words arrive line by line and the tray peels up from the
+ * fold behind them, once, on load.
+ */
+import Command from "./Command.astro";
+import Mark from "./Mark.astro";
+import Rings from "./Rings.astro";
+import StudioFrame from "./StudioFrame.astro";
+import { agents } from "./agents";
+
+const lines = ["The CMS for agents", "and the people", "who run them"];
+---
+
+<section class="screen hero w-hero" data-enter>
+  <div class="wrap w-hero-grid">
+    <div class="w-hero-top">
+      <div class="w-hero-copy">
+        <h1 class="h1 w-h1">
+          {
+            lines.map((line, i) => (
+              <span class="w-line" style={`--i:${i}`}>
+                <span>{line}</span>
+              </span>
+            ))
+          }
+        </h1>
+        <p class="lead">
+          Your content lives in your own repo. AI agents write and update it safely, your team
+          edits it in a browser, and nothing is locked inside a dashboard.
+        </p>
+        <div class="actions">
+          <Command />
+          <a class="btn btn-ghost" href="#how">See how it works</a>
+        </div>
+      </div>
+      <div class="w-works">
+        <p class="w-agents-label">Works with the agent you already use</p>
+        <ul class="w-agents">
+          {
+            agents.map((agent) => (
+              <li>
+                <Mark name={agent.mark} size={18} />
+                {agent.name}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+    <div class="tray w-hero-tray" data-peel>
+      <Rings cx={50} cy={8} seed={4} rings={40} />
+      <StudioFrame route="/c/pages/home" />
+    </div>
+  </div>
+</section>

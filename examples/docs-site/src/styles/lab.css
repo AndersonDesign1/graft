@@ -710,6 +710,9 @@ html[data-theme="dark"] .lab .studio-poster-light {
   box-shadow: var(--shadow-floating);
   font-size: var(--lab-label);
   transform: translateX(-50%);
+  max-width: calc(100vw - 1rem);
+  overflow-x: auto;
+  white-space: nowrap;
 }
 
 .lab-bar a,
@@ -1141,17 +1144,6 @@ html[data-theme="dark"] .lab .studio-poster-light {
 .lab .c-pill-agents {
   gap: 0;
   padding-inline: 0.1em;
-}
-
-.lab .c-pill-agents img {
-  width: 0.54em;
-  height: 0.54em;
-  border-radius: 50%;
-  box-shadow: 0 0 0 0.03em var(--muted);
-}
-
-.lab .c-pill-agents img + img {
-  margin-left: -0.12em;
 }
 
 .lab .c-pill-studio {
@@ -1704,6 +1696,677 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   font-weight: var(--weight-regular);
 }
 
+/* ========================================================== landing === */
+
+.lab .h3 {
+  font-size: clamp(1.375rem, 1.1rem + 0.9vw, 1.75rem);
+  font-weight: var(--weight-medium);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.lab .mark {
+  flex: none;
+}
+
+.lab .mark-img {
+  border-radius: 22%;
+}
+
+/* Who a part of the page is for, with the marks of who that is. */
+.lab .who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.lab .who-marks {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--foreground);
+}
+
+.lab .points {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .points li {
+  position: relative;
+  padding-left: var(--space-8);
+  line-height: 1.45;
+}
+
+.lab .points li::before {
+  content: "";
+  position: absolute;
+  top: 0.3em;
+  left: 0.4rem;
+  width: 0.4rem;
+  height: 0.7rem;
+  border: solid var(--foreground);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.lab .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: 999px;
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--foreground);
+  font-size: 0.9375rem;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  transition:
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.lab .chip:hover {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  transform: translateY(-2px);
+}
+
+/* The hero: the claim centered, then one wide window that runs to the fold. */
+.lab .w-hero-grid {
+  display: grid;
+  grid-template-rows: auto minmax(15rem, 1fr);
+  gap: clamp(1.5rem, 4.5vh, 2.75rem);
+}
+
+.lab .w-hero-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 19rem);
+  gap: var(--space-8) var(--col-gap);
+  align-items: end;
+}
+
+.lab .w-hero-copy {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-5);
+  /* The words keep to the left of the page; the window under them is what
+     runs the full width. */
+  max-width: 46rem;
+}
+
+.lab .w-hero-top > *,
+.lab .w-hero-copy > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.lab .w-h1 {
+  font-size: clamp(2.5rem, 1.1rem + 4.4vw, 4.5rem);
+}
+
+.lab .w-works {
+  display: grid;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.lab .w-line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.1em;
+  margin-bottom: -0.1em;
+}
+
+.lab .w-line > span {
+  display: inline-block;
+}
+
+.lab .w-hero .lead {
+  max-width: 36rem;
+}
+
+.lab .w-agents {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  color: var(--muted-foreground);
+  list-style: none;
+}
+
+.lab .w-agents li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lab .w-agents-label {
+  color: var(--faint-foreground);
+}
+
+.lab .w-agents .mark {
+  color: var(--foreground);
+}
+
+.lab .w-hero-tray {
+  --tray-pad: clamp(0.75rem, 3vw, 2.75rem);
+  padding-bottom: 0;
+}
+
+.lab .w-hero-tray .window {
+  position: absolute;
+  inset: var(--tray-pad) var(--tray-pad) auto;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+/* The stack: a shorter band between two full screens. */
+.lab .screen-short {
+  min-height: 0;
+  padding-block: clamp(3.5rem, 10vh, 6rem);
+}
+
+.lab .stack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.lab .stack-head {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+  text-align: center;
+}
+
+.lab .stack-head .lead {
+  max-width: 40rem;
+}
+
+.lab .belt {
+  display: flex;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+
+.lab .belt-track {
+  display: flex;
+  flex: none;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-1) var(--space-3) var(--space-1) 0;
+  list-style: none;
+}
+
+/* Agents and people. */
+.lab .audience {
+  display: grid;
+  align-content: center;
+  gap: clamp(1.5rem, 4.5vh, 2.75rem);
+}
+
+.lab .audience-head {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-5);
+  text-align: center;
+}
+
+/* The switch between the two readers. */
+.lab .switch {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: 999px;
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.lab .switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 2.75rem;
+  padding: 0 var(--space-5);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+.lab .switch button:hover {
+  color: var(--foreground);
+}
+
+.lab .switch button:active {
+  transform: scale(var(--press-scale));
+}
+
+.lab .switch button[aria-selected="true"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.lab .switch button[aria-selected="true"] .who-marks {
+  color: inherit;
+}
+
+/* Beside the switch the exchange is set tighter, so both fit one screen. */
+.lab .audience .turns {
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.lab .audience .turn pre {
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.lab .audience .tray {
+  --tray-pad: clamp(0.75rem, 1.6vw, 1.5rem);
+}
+
+.lab .audience-row[hidden] {
+  display: none;
+}
+
+.lab .loop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  padding: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  list-style: none;
+}
+
+.lab .loop li + li::before {
+  content: "\2192";
+  margin-right: var(--space-3);
+  color: var(--faint-foreground);
+}
+
+/* Branching: four steps, one terminal. */
+.lab .step-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.lab .step-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+.lab .step-tabs button:hover {
+  color: var(--foreground);
+}
+
+.lab .step-tabs button:active {
+  transform: scale(var(--press-scale));
+}
+
+.lab .step-tabs button[aria-selected="true"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.lab .step-n {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
+
+.lab .step-copy {
+  display: grid;
+  gap: var(--space-2);
+  min-height: 8.5rem;
+  align-content: start;
+}
+
+.lab .step-copy[hidden] {
+  display: none;
+}
+
+.lab .step-copy p {
+  color: var(--muted-foreground);
+}
+
+.lab .step-term {
+  min-height: 11rem;
+  white-space: pre-wrap;
+}
+
+.lab .term-ok {
+  color: var(--code-ok);
+}
+
+.lab .term-dim {
+  color: var(--code-comment);
+}
+
+.lab .term-cmd {
+  color: var(--foreground);
+}
+
+.lab .tiers-deploy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2) var(--space-3);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.lab .tiers-deploy .chip {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+/* The close, as the old page had it: one card for the agent, one for you. */
+.lab .closing-drop {
+  grid-column: 1 / -1;
+}
+
+.lab .closing-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--col-gap);
+  grid-column: 1 / -1;
+}
+
+.lab .closing-card {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: var(--space-3);
+  padding: clamp(1.25rem, 2.5vw, 2rem);
+  border-radius: var(--radius-outer);
+  background: var(--background);
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition:
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.lab .closing-card:hover {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  transform: translateY(-2px);
+}
+
+.lab .closing-card > p:not(.who) {
+  color: var(--muted-foreground);
+}
+
+.lab .closing-card .btn {
+  margin-top: var(--space-2);
+  max-width: 100%;
+}
+
+.lab .closing-grid:has(.closing-cards) .closing-links {
+  grid-column: 1 / -1;
+}
+
+/* The agents pill in the big headline: each mark on its own round ground. */
+.lab .c-pill-mark {
+  display: grid;
+  place-items: center;
+  width: 0.54em;
+  height: 0.54em;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: 0 0 0 0.03em var(--muted);
+  color: var(--foreground);
+}
+
+.lab .c-pill-mark + .c-pill-mark {
+  margin-left: -0.1em;
+}
+
+.lab .c-pill-mark .mark {
+  width: 0.3em;
+  height: 0.3em;
+}
+
+/* "Any agent": one line whose subject keeps changing. */
+.lab .anyone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+
+.lab .anyone-names {
+  position: relative;
+  display: inline-grid;
+  overflow: hidden;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: 999px;
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+  list-style: none;
+}
+
+.lab .anyone-names li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  grid-area: 1 / 1;
+  white-space: nowrap;
+}
+
+/* At rest only the first name shows; the marks of the rest follow it. */
+.lab .anyone-names li:not(:first-child) {
+  visibility: hidden;
+}
+
+.lab .tiers-belt {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.lab .tiers-belt .belt {
+  width: 100%;
+}
+
+/* ----------------------------------------------------------- motion --- */
+
+/* Everything below runs only with script on and motion welcome (the layout
+   adds .motion to <html>), so the page is complete without it. */
+
+html.motion .lab [data-enter] .w-line > span {
+  animation: line-up 900ms var(--ease-out) calc(var(--i) * 120ms) both;
+}
+
+@keyframes line-up {
+  from {
+    transform: translateY(110%);
+  }
+}
+
+/* The peel: a tray opens upward from its lower edge, and the window in it
+   rides up a little further. */
+html.motion .lab [data-peel] {
+  clip-path: inset(100% 0 0 0 round var(--tray-radius));
+  transform: translateY(2.5rem);
+  transition:
+    clip-path 1100ms var(--ease-out),
+    transform 1100ms var(--ease-out);
+}
+
+html.motion .lab [data-peel] > .window {
+  transform: translateY(3.5rem);
+  transition: transform 1300ms var(--ease-out);
+}
+
+html.motion .lab [data-peel][data-in] {
+  clip-path: inset(0 0 0 0 round var(--tray-radius));
+  transform: none;
+}
+
+html.motion .lab [data-peel][data-in] > .window {
+  transform: none;
+}
+
+html.motion .lab .w-hero-tray {
+  animation: none;
+  transition-delay: 380ms;
+}
+
+html.motion .lab .w-hero-tray > .window {
+  transition-delay: 380ms;
+}
+
+html.motion .lab [data-reveal] > * {
+  opacity: 0;
+  transform: translateY(1.25rem);
+  transition:
+    opacity 700ms var(--ease-out),
+    transform 700ms var(--ease-out);
+}
+
+html.motion .lab [data-reveal] > :nth-child(2) {
+  transition-delay: 80ms;
+}
+
+html.motion .lab [data-reveal] > :nth-child(3) {
+  transition-delay: 160ms;
+}
+
+html.motion .lab [data-reveal] > :nth-child(n + 4) {
+  transition-delay: 240ms;
+}
+
+html.motion .lab [data-reveal][data-in] > * {
+  opacity: 1;
+  transform: none;
+}
+
+/* Switching readers: the side that arrives rises into place. */
+html.motion .lab .audience-row:not([hidden]) > * {
+  animation: lab-rise 600ms var(--ease-out) backwards;
+}
+
+html.motion .lab .audience-row:not([hidden]) > .split-visual {
+  animation-delay: 90ms;
+}
+
+html.motion .lab .belt-track {
+  animation: belt 52s linear infinite;
+}
+
+html.motion .lab .belt[data-dir="back"] .belt-track {
+  animation-direction: reverse;
+}
+
+html.motion .lab .belt:hover .belt-track {
+  animation-play-state: paused;
+}
+
+@keyframes belt {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+html.motion .lab .anyone-names li {
+  visibility: visible;
+  opacity: 0;
+  animation: name-turn calc(var(--count) * 2.4s) var(--ease-out) calc(var(--i) * 2.4s) infinite;
+}
+
+/* Each name rises in, holds, and leaves upward; one slot of the cycle each. */
+@keyframes name-turn {
+  0% {
+    opacity: 0;
+    transform: translateY(110%);
+  }
+  3%,
+  12% {
+    opacity: 1;
+    transform: none;
+  }
+  14.2857%,
+  100% {
+    opacity: 0;
+    transform: translateY(-110%);
+  }
+}
+
+/* Without motion the belts rest as wrapped rows, each mark shown once. */
+html:not(.motion) .lab .belt {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+html:not(.motion) .lab .belt-track {
+  flex: 1;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+html:not(.motion) .lab .belt-track[aria-hidden] {
+  display: none;
+}
+
+html.motion .lab .step-term:not([hidden]) .term-line {
+  animation: line-in 420ms var(--ease-out) calc(var(--n) * 240ms) both;
+}
+
+@keyframes line-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+}
+
+.lab .term-line {
+  display: inline-block;
+  width: 100%;
+}
+
 /* ====================================================== narrower ====== */
 
 @media (max-width: 63.99rem) {
@@ -1758,6 +2421,14 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   }
 
   .lab .tiers-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lab .closing-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lab .w-hero-top {
     grid-template-columns: minmax(0, 1fr);
   }
 

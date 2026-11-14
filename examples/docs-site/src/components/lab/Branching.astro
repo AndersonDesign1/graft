@@ -1,0 +1,140 @@
+---
+/**
+ * Branching, as four steps a visitor can pick. The commands and their output
+ * are the old landing page's, kept as written.
+ */
+import Rings from "./Rings.astro";
+
+const steps = [
+  {
+    id: "create",
+    label: "Create",
+    title: "Start a branch. Nothing is copied.",
+    body: "A branch starts in an instant and stays out of the way. It reads from the main content until it changes something.",
+    lines: [
+      ["cmd", "graft branch create preview"],
+      ["ok", 'Created branch "preview" from "main"'],
+      ["dim", "overlay, zero rows copied"],
+    ],
+  },
+  {
+    id: "edit",
+    label: "Edit",
+    title: "Change it on the branch.",
+    body: "You or your agent edit and compile on the branch. Reviewers see the change; your live site does not.",
+    lines: [
+      ["cmd", "graft compile --branch preview"],
+      ["ok", "pages/pricing     validated ✓"],
+      ["out", "projected to content_index @ preview"],
+      ["dim", "+0 added  ~1 changed  −0 removed"],
+    ],
+  },
+  {
+    id: "hide",
+    label: "Remove",
+    title: "Take a page away, only here.",
+    body: "Deleting on a branch hides the page on that branch. The live copy is untouched until you merge.",
+    lines: [
+      ["out", 'delete_content({ slug: "changelog" })'],
+      ["ok", "tombstone written on preview"],
+      ["dim", "main.changelog still intact"],
+    ],
+  },
+  {
+    id: "merge",
+    label: "Merge",
+    title: "Check it first. Then land it.",
+    body: "A merge shows what it would do before it does it. Then the content goes live and the branch is gone.",
+    lines: [
+      ["cmd", "graft merge preview --apply"],
+      ["out", "Ledger: replaying 2 data_records onto main"],
+      ["ok", "would recompile working tree → main"],
+      ["dim", 'branch "preview" dropped'],
+    ],
+  },
+];
+---
+
+<section class="screen" id="branching">
+  <div class="wrap split branching" data-steps>
+    <div class="split-text" data-reveal>
+      <h2 class="h2">Branch content the way you branch code</h2>
+      <p class="lead">
+        Try a redesign, a launch or a risky edit away from your live site. Show it to the people
+        who need to see it, then merge.
+      </p>
+      <div class="step-tabs" role="tablist" aria-label="Branching steps">
+        {
+          steps.map((step, i) => (
+            <button
+              type="button"
+              role="tab"
+              id={`step-tab-${step.id}`}
+              aria-selected={i === 0 ? "true" : "false"}
+              aria-controls={`step-${step.id}`}
+              tabindex={i === 0 ? 0 : -1}
+              data-step={step.id}
+            >
+              <span class="step-n">{i + 1}</span>
+              {step.label}
+            </button>
+          ))
+        }
+      </div>
+      {
+        steps.map((step, i) => (
+          <div class="step-copy" data-step-copy={step.id} hidden={i !== 0}>
+            <h3 class="h3">{step.title}</h3>
+            <p>{step.body}</p>
+          </div>
+        ))
+      }
+      <a class="link" href="/docs/branching-previews">Read about branches and previews</a>
+    </div>
+    <div class="tray split-visual" data-peel>
+      <Rings cx={70} cy={76} seed={27} />
+      <div class="window terminal">
+        <div class="window-bar">
+          <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="window-title">Terminal</span>
+        </div>
+        {
+          steps.map((step, i) => (
+            <pre class="code step-term" id={`step-${step.id}`} role="tabpanel" aria-labelledby={`step-tab-${step.id}`} data-step-panel={step.id} hidden={i !== 0}><code>{step.lines.map(([kind, text], n) => (
+              <span class={`term-line term-${kind}`} style={`--n:${n}`}>{kind === "cmd" ? <><span class="tk-p">$ </span><span class="cli-bin">graft</span>{text.slice(5)}</> : text}{"\n"}</span>
+            ))}</code></pre>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  for (const group of document.querySelectorAll<HTMLElement>("[data-steps]")) {
+    const tabs = [...group.querySelectorAll<HTMLButtonElement>("[data-step]")];
+    const select = (tab: HTMLButtonElement) => {
+      for (const other of tabs) {
+        const on = other === tab;
+        const id = other.dataset.step;
+        other.setAttribute("aria-selected", String(on));
+        other.tabIndex = on ? 0 : -1;
+        for (const el of group.querySelectorAll<HTMLElement>(
+          `[data-step-copy="${id}"], [data-step-panel="${id}"]`,
+        )) {
+          el.hidden = !on;
+        }
+      }
+    };
+    tabs.forEach((tab, i) => {
+      tab.addEventListener("click", () => select(tab));
+      tab.addEventListener("keydown", (event) => {
+        const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+        if (!step) return;
+        const next = tabs[(i + step + tabs.length) % tabs.length]!;
+        select(next);
+        next.focus();
+      });
+    });
+  }
+</script>

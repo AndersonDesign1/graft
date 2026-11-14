@@ -4,20 +4,56 @@
  * and the index, the typed reads and the MCP tools all come out of it.
  */
 import { PostgresqlIcon, SqliteIcon, TypescriptIcon } from "../icons/FrameworkIcons";
+import Mark from "./Mark.astro";
 import { agents } from "./agents";
+
+interface Props {
+  heading?: string;
+  /** The five steps of the loop, shown under the heading. */
+  steps?: boolean;
+  id?: string;
+  /** Say it for a reader who never opens a terminal. */
+  plain?: boolean;
+}
+const {
+  heading = "Git is the source. The rest is derived.",
+  steps = false,
+  id = "model",
+  plain = false,
+} = Astro.props;
+const loop = ["Write", "Check", "Index", "Read", "Render"];
 ---
 
-<section class="screen" id="model">
+<section class="screen" id={id}>
   <div class="wrap c-model">
     <div class="c-model-head">
-      <h2 class="h2">Git is the source. The rest is derived.</h2>
-      <p class="lead">
+      <h2 class="h2">{heading}</h2>
+      {
+          plain ? (
+            <p class="lead">
+              You or your agent change a file. Graft checks it, then updates everything that reads
+              it: your site, your search and your agent's tools. There is no publish button to
+              forget, and Git keeps every version.
+            </p>
+          ) : (
+            <p class="lead">
         You and your agent change files. <code>graft compile</code> checks them against the schema
         and rebuilds everything that reads them. If the index and Git disagree, recompile: Git
         wins.
       </p>
+          )
+        }
     </div>
-    <div class="c-diagram" data-diagram>
+    {
+        steps && (
+          <ol class="loop" aria-label="The loop">
+            {loop.map((step) => (
+              <li>{step}</li>
+            ))}
+          </ol>
+        )
+      }
+      <div class="c-diagram" data-diagram>
       <svg class="c-wires" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-hidden="true">
         <path class="wire" d="M250 210 H470"></path>
         <path class="wire" d="M730 210 C800 210 800 70 900 70"></path>
@@ -58,7 +94,7 @@ import { agents } from "./agents";
         <p class="node-title">MCP tools</p>
         <p class="node-note">
           <span class="marks">
-            {agents.slice(0, 3).map((agent) => <img src={agent.src} alt="" width="18" height="18" />)}
+            {agents.slice(0, 3).map((agent) => <Mark name={agent.mark} size={18} />)}
           </span>
           <code>write_content</code>
         </p>

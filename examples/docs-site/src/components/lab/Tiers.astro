@@ -4,12 +4,34 @@
  * for data users write at runtime. The error is what `graft compile` prints
  * when a project on the static index adds the comments primitive.
  */
+import Mark from "./Mark.astro";
+
+interface Props {
+  /** Show the error a static project prints when it needs Postgres. */
+  error?: boolean;
+}
+const { error = false } = Astro.props;
+
+const places = [
+  { name: "Vercel", mark: "vercel" },
+  { name: "Netlify", mark: "netlify" },
+  { name: "Cloudflare", mark: "cloudflare" },
+  { name: "Railway", mark: "railway" },
+  { name: "Fly.io", mark: "flydotio" },
+  { name: "Docker", mark: "docker" },
+  { name: "Vercel", mark: "vercel" },
+  { name: "Netlify", mark: "netlify" },
+  { name: "Cloudflare", mark: "cloudflare" },
+  { name: "Railway", mark: "railway" },
+  { name: "Fly.io", mark: "flydotio" },
+  { name: "Docker", mark: "docker" },
+];
 ---
 
 <section class="screen" id="tiers">
   <div class="wrap tiers">
     <div class="tiers-head">
-      <h2 class="h2">No database to start. Postgres when users write.</h2>
+      <h2 class="h2">Your Postgres. Your box. Or no database at all.</h2>
       <p class="lead">
         A content site compiles to one SQLite file and deploys with your app. The day you need
         orders, comments or sign-ups, you change one line, and Graft tells you when that day is.
@@ -39,13 +61,34 @@
           <li><span>Previews</span><span>Copy-on-write branches</span></li>
         </ul>
       </div>
-      <div class="tier-error turn" data-who="graft" data-kind="error">
+      {
+        error && (
+          <div class="tier-error turn" data-who="graft" data-kind="error">
         <p class="turn-head"><span class="turn-who">Graft</span><code>NEEDS_DATABASE</code></p>
         <pre><code><span class="tk-k">"message"</span>: <span class="tk-s">"graft.config.ts uses the static index, but declares
   db-authoritative collection(s) \"comments\""</span>
 <span class="tk-fix"><span class="tk-k">"fix"</span>: "Upgrade this project to the Postgres tier: set DATABASE_URL in .env,
   change graft.config to `export const index = \"postgres\"`,
   run `graft db migrate`, then `graft compile`."</span></code></pre>
+      </div>
+        )
+      }
+    </div>
+    <div class="tiers-belt">
+      <p>It runs anywhere your site already does</p>
+      <div class="belt" data-dir="forth" role="group" aria-label="Places Graft runs">
+        {
+          [0, 1].map((copy) => (
+            <ul class="belt-track" aria-hidden={copy === 1 ? "true" : undefined}>
+              {places.map((place) => (
+                <li class="chip">
+                  <Mark name={place.mark} size={20} />
+                  {place.name}
+                </li>
+              ))}
+            </ul>
+          ))
+        }
       </div>
     </div>
   </div>

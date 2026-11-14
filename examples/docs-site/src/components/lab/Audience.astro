@@ -1,0 +1,109 @@
+---
+/**
+ * Two ways in. The same content, schema and rules, reached by an agent over
+ * MCP and the CLI and by a person in Studio. A switch picks the reader; each
+ * side says what that reader gets in plain words and shows the real surface.
+ */
+import Mark from "./Mark.astro";
+import Rings from "./Rings.astro";
+import StudioFrame from "./StudioFrame.astro";
+import Transcript from "./Transcript.astro";
+import { agents } from "./agents";
+---
+
+<section class="screen" id="agents">
+  <div class="wrap audience" data-audience>
+    <div class="audience-head" data-reveal>
+      <h2 class="h2">One CMS, two ways in</h2>
+      <div class="switch" role="tablist" aria-label="Who is working">
+        <button type="button" role="tab" id="way-tab-agents" aria-controls="way-agents" aria-selected="true" data-way="agents">
+          <span class="who-marks">
+            {agents.slice(0, 3).map((agent) => <Mark name={agent.mark} size={16} />)}
+          </span>
+          For agents
+        </button>
+        <button type="button" role="tab" id="way-tab-people" aria-controls="way-people" aria-selected="false" tabindex="-1" data-way="people">
+          For people
+        </button>
+      </div>
+    </div>
+
+    <div class="split audience-row" id="way-agents" role="tabpanel" aria-labelledby="way-tab-agents" data-way-panel="agents">
+      <div class="split-text">
+        <div class="anyone">
+          <ul class="anyone-names" style={`--count:${agents.length}`} aria-label={agents.map((agent) => agent.name).join(", ")}>
+            {
+              agents.map((agent, i) => (
+                <li style={`--i:${i}`} aria-hidden={i === 0 ? undefined : "true"}>
+                  <Mark name={agent.mark} size={18} />
+                  {agent.name}
+                </li>
+              ))
+            }
+          </ul>
+          <span>already understands Graft</span>
+        </div>
+        <h3 class="h3">Dashboards lock agents out. Graft lets them in.</h3>
+        <p class="lead">
+          A screen built for a mouse is a dead end for an agent. Graft gives it a real way to work,
+          and tells it exactly what to do when something is wrong.
+        </p>
+        <ul class="points">
+          <li>Your content model is plain TypeScript, which every agent already reads</li>
+          <li>Every error comes with the fix, so it corrects itself</li>
+          <li>It writes files in your repo, so every change is in Git</li>
+        </ul>
+        <a class="link" href="/docs/agent-surface">See what agents can do</a>
+      </div>
+      <div class="tray split-visual" data-peel>
+        <Rings cx={20} cy={78} seed={11} />
+        <Transcript />
+      </div>
+    </div>
+
+    <div class="split audience-row" id="way-people" role="tabpanel" aria-labelledby="way-tab-people" data-way-panel="people" hidden>
+      <div class="split-text">
+        <h3 class="h3">An editor for the rest of the team</h3>
+        <p class="lead">
+          Not everyone wants to edit files. Studio is a familiar editor in the browser, and it saves
+          to the same place your agents do.
+        </p>
+        <ul class="points">
+          <li>Find, write and publish content without touching code</li>
+          <li>See what changed before it goes live</li>
+          <li>Approve or refuse what an agent asks to delete</li>
+        </ul>
+        <a class="link" href="/docs/studio">Read about Studio</a>
+      </div>
+      <div class="tray split-visual">
+        <Rings cx={80} cy={24} seed={16} />
+        <StudioFrame route="/c/docs/getting-started" />
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  for (const group of document.querySelectorAll<HTMLElement>("[data-audience]")) {
+    const tabs = [...group.querySelectorAll<HTMLButtonElement>("[data-way]")];
+    const select = (tab: HTMLButtonElement) => {
+      for (const other of tabs) {
+        const on = other === tab;
+        other.setAttribute("aria-selected", String(on));
+        other.tabIndex = on ? 0 : -1;
+        const panel = group.querySelector<HTMLElement>(`[data-way-panel="${other.dataset.way}"]`);
+        if (panel) panel.hidden = !on;
+      }
+    };
+    tabs.forEach((tab, i) => {
+      tab.addEventListener("click", () => select(tab));
+      tab.addEventListener("keydown", (event) => {
+        const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+        if (!step) return;
+        const next = tabs[(i + step + tabs.length) % tabs.length]!;
+        select(next);
+        next.focus();
+      });
+    });
+  }
+</script>

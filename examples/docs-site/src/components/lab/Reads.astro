@@ -8,8 +8,9 @@ import { AstroIcon, NextjsIcon, SvelteIcon } from "../icons/FrameworkIcons";
 interface Props {
   /** Also list every framework Graft has an SDK for, under the code. */
   frameworks?: boolean;
+  heading?: string;
 }
-const { frameworks = false } = Astro.props;
+const { frameworks = false, heading = "One schema types every read" } = Astro.props;
 const sdks = [
   { name: "Next.js", href: "/docs/next" },
   { name: "Astro", href: "/docs/astro" },
@@ -26,7 +27,7 @@ const sdks = [
   <section class="screen" id="types">
     <div class="wrap b-types">
       <div class="b-types-head">
-        <h2 class="h2">One schema types every read</h2>
+        <h2 class="h2">{heading}</h2>
         <p class="lead">
           The same file that checks a write types the read. There is no codegen step, and a field
           you rename is a compile error in your app.

@@ -24,3 +24,16 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+--------------------------------------------------------------------------
+
+Brand marks on the landing pages
+
+The marks of Claude Code, Codex, Cursor, OpenCode, Gemini, GitHub Copilot and
+the Model Context Protocol are the vendors' own, as distributed in
+@lobehub/icons-static-svg (MIT License, Copyright (c) LobeHub). The marks of
+Vue, React Router, Vercel, Netlify, Cloudflare, Railway, Fly.io, Docker, Git,
+MDX and Zod are as distributed in simple-icons (CC0-1.0). The T3 Code mark is
+the icon published at t3.codes. Each mark belongs to its owner and is shown
+only beside the product it names.

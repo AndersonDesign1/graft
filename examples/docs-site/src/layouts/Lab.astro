@@ -19,7 +19,7 @@ import "../styles/lab.css";
 interface Props {
   title: string;
   description: string;
-  variant: "mix" | "a" | "b" | "c" | "map" | "index";
+  variant: "landing" | "a" | "b" | "c" | "map" | "index";
   /** The scheme this preview opens in: its own, or the visitor's system
    *  scheme. The toggle overrides either. */
   theme?: "light" | "dark" | "system";
@@ -28,7 +28,7 @@ interface Props {
 const { title, description, variant, theme = "dark" } = Astro.props;
 
 const previews = [
-  { id: "mix", name: "The mix", label: "Mix" },
+  { id: "landing", name: "The landing page", label: "Landing" },
   { id: "a", name: "The product" },
   { id: "b", name: "The seam" },
   { id: "c", name: "The printed page" },
@@ -50,6 +50,11 @@ const previews = [
         if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
       } catch (_) {
         /* private mode: the preview's default scheme stands */
+      }
+      // Entrances only run where motion is welcome and script is on, so a
+      // page without either is simply complete.
+      if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        document.documentElement.classList.add("motion");
       }
       // The styles key off data-theme, so a preview that follows the system
       // scheme resolves it here, before first paint.
@@ -81,6 +86,7 @@ const previews = [
 
     <footer class="closing">
       <div class="wrap closing-grid">
+        <slot name="closing">
         <div class="closing-lead">
           <h2 class="h2">Start with one command</h2>
           <p class="lead">
@@ -108,6 +114,7 @@ const previews = [
             <a class="btn btn-ghost" href="/docs/getting-started">Read the guide</a>
           </div>
         </div>
+        </slot>
         <div class="closing-links">
           <ul>
             <li><a href="/docs/what-is-graft">What is Graft</a></li>
@@ -192,6 +199,27 @@ const previews = [
         paint();
         document.dispatchEvent(new CustomEvent("lab:theme", { detail: next }));
       });
+
+      // Sections arrive once, the first time they are seen: text rises and
+      // a tray peels up from its lower edge.
+      // A peeling tray starts fully clipped, and a clipped box never counts
+      // as seen, so its parent is watched in its place.
+      const watched = new Map<Element, Element[]>();
+      const arrive = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            for (const el of watched.get(entry.target) ?? []) el.setAttribute("data-in", "");
+            arrive.unobserve(entry.target);
+          }
+        },
+        { threshold: 0.12 },
+      );
+      for (const el of document.querySelectorAll("[data-reveal], [data-peel]")) {
+        const seen = el.hasAttribute("data-peel") ? (el.parentElement ?? el) : el;
+        watched.set(seen, [...(watched.get(seen) ?? []), el]);
+        arrive.observe(seen);
+      }
 
       // Copy buttons keep their label and say the result through a live region.
       for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy]")) {

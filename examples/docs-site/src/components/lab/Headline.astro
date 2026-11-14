@@ -4,6 +4,7 @@
  * set as a pill at the height of the letters.
  */
 import Command from "./Command.astro";
+import Mark from "./Mark.astro";
 import { agents } from "./agents";
 ---
 
@@ -12,8 +13,8 @@ import { agents } from "./agents";
     <h1 class="c-h1">
       <span class="c-line"
         >A CMS for agents
-        <span class="c-pill c-pill-agents" role="img" aria-label="Claude, Cursor, Codex, Copilot and Gemini">
-          {agents.map((agent) => <img src={agent.src} alt="" width="96" height="96" />)}
+        <span class="c-pill c-pill-agents" role="img" aria-label={agents.map((agent) => agent.name).join(", ")}>
+          {agents.slice(0, 5).map((agent) => <span class="c-pill-mark"><Mark name={agent.mark} size={64} /></span>)}
         </span>
       </span>
       <span class="c-line"

@@ -1,0 +1,68 @@
+---
+/**
+ * The landing page. A marketing page for two readers, the developer and the
+ * person who never opens a terminal: the claim over a wide window of the
+ * real Studio, the stack it fits, what agents get and what people get, how
+ * the loop works, and everything the old page said, in order.
+ */
+import Audience from "../../components/lab/Audience.astro";
+import Branching from "../../components/lab/Branching.astro";
+import Command from "../../components/lab/Command.astro";
+import Faq from "../../components/lab/Faq.astro";
+import Gate from "../../components/lab/Gate.astro";
+import HeroWide from "../../components/lab/HeroWide.astro";
+import Mark from "../../components/lab/Mark.astro";
+import Model from "../../components/lab/Model.astro";
+import Primitives from "../../components/lab/Primitives.astro";
+import Reads from "../../components/lab/Reads.astro";
+import Seam from "../../components/lab/Seam.astro";
+import Stack from "../../components/lab/Stack.astro";
+import Tiers from "../../components/lab/Tiers.astro";
+import { agents } from "../../components/lab/agents";
+import Lab from "../../layouts/Lab.astro";
+---
+
+<Lab
+  title="Graft, the CMS for agents and the people who run them"
+  description="An open-source CMS that keeps your content in your own repo, lets AI agents edit it safely, and gives your team an editor in the browser."
+  variant="landing"
+  theme="system"
+>
+  <HeroWide />
+  <Stack />
+  <Audience />
+  <Model id="how" heading="Edit a file. Compile. Refresh." steps plain />
+  <Seam mode="section" />
+  <Reads frameworks heading="One schema. No codegen." />
+  <Gate />
+  <Branching />
+  <Tiers />
+  <Primitives />
+  <Faq />
+
+  <Fragment slot="closing">
+    <div class="closing-lead closing-drop">
+      <h2 class="h2">Drop Graft onto your repo</h2>
+      <p class="lead">You scaffold. Your agent authors. Your team edits. Open source, and yours to host.</p>
+    </div>
+    <div class="closing-cards">
+      <div class="closing-card">
+        <p class="who">
+          <span class="who-marks">
+            {agents.slice(0, 5).map((agent) => <Mark name={agent.mark} size={18} />)}
+          </span>
+          For your agent
+        </p>
+        <h3 class="h3">Connect it over MCP</h3>
+        <p>Claude Code, Codex, Cursor, OpenCode, T3 Code, or anything else that speaks MCP.</p>
+        <Command command="graft mcp" />
+      </div>
+      <div class="closing-card">
+        <p class="who">For you</p>
+        <h3 class="h3">Start with one command</h3>
+        <p>It writes the config and your first page into the repo you already have. No account.</p>
+        <Command />
+      </div>
+    </div>
+  </Fragment>
+</Lab>

@@ -1,0 +1,77 @@
+---
+/**
+ * The stack: Graft goes into the site you already have. Two belts of real
+ * marks drift past each other and stop under the pointer; with reduced
+ * motion they rest as two wrapped rows.
+ */
+import {
+  AstroIcon,
+  DockerIcon,
+  NextjsIcon,
+  NuxtIcon,
+  PostgresqlIcon,
+  ReactIcon,
+  SqliteIcon,
+  SvelteIcon,
+  TanstackIcon,
+  TypescriptIcon,
+} from "../icons/FrameworkIcons";
+import Mark from "./Mark.astro";
+
+const frameworks = [
+  { name: "Next.js", Icon: NextjsIcon },
+  { name: "Astro", Icon: AstroIcon },
+  { name: "SvelteKit", Icon: SvelteIcon },
+  { name: "Nuxt", Icon: NuxtIcon },
+  { name: "TanStack Start", Icon: TanstackIcon },
+  { name: "React Router", mark: "reactrouter" },
+  { name: "React", Icon: ReactIcon },
+  { name: "Vue", mark: "vuedotjs" },
+  { name: "TypeScript", Icon: TypescriptIcon },
+];
+const places = [
+  { name: "Vercel", mark: "vercel" },
+  { name: "Netlify", mark: "netlify" },
+  { name: "Cloudflare", mark: "cloudflare" },
+  { name: "Railway", mark: "railway" },
+  { name: "Fly.io", mark: "flydotio" },
+  { name: "Docker", Icon: DockerIcon },
+  { name: "Postgres", Icon: PostgresqlIcon },
+  { name: "SQLite", Icon: SqliteIcon },
+  { name: "Git", mark: "git" },
+  { name: "MDX", mark: "mdx" },
+  { name: "MCP", mark: "mcp" },
+];
+const belts = [
+  { label: "Frameworks", items: frameworks },
+  { label: "Hosting, data and formats", items: places },
+];
+---
+
+<section class="screen screen-short" id="stack">
+  <div class="wrap stack">
+    <div class="stack-head" data-reveal>
+      <h2 class="h2">It fits the site you already have</h2>
+      <p class="lead">
+        Graft is not a platform you move to. It goes into your existing project, speaks your
+        framework, and deploys wherever that project already runs.
+      </p>
+    </div>
+    {
+      belts.map((belt, b) => (
+        <div class="belt" data-belt data-dir={b % 2 ? "back" : "forth"} aria-label={belt.label} role="group">
+          {[0, 1].map((copy) => (
+            <ul class="belt-track" aria-hidden={copy === 1 ? "true" : undefined}>
+              {belt.items.map((item) => (
+                <li class="chip">
+                  {"Icon" in item && item.Icon ? <item.Icon size={22} /> : <Mark name={item.mark ?? ""} size={22} />}
+                  {item.name}
+                </li>
+              ))}
+            </ul>
+          ))}
+        </div>
+      ))
+    }
+  </div>
+</section>

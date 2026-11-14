@@ -7,9 +7,9 @@ import Lab from "../../layouts/Lab.astro";
 
 const previews = [
   {
-    id: "mix",
-    name: "The mix",
-    line: "The best of the three in one page, with every section the landing page needs. C's headline, B's editable file, A's agent exchange, approval and live Studio.",
+    id: "landing",
+    name: "The landing page",
+    line: "A's wide hero, centered, over the live Studio. Then the stack, what agents get and what people get, how it works, and everything the old page said.",
     scheme: "Follows your system",
   },
   {
@@ -43,7 +43,7 @@ const previews = [
     <div class="wrap">
       <h1 class="h2">The landing page, and the three directions behind it</h1>
       <p class="lead">
-        The mix is the full page. A, B and C are the directions it draws on, each a hero, two
+        The landing page is the full page. A, B and C are the directions it draws on, each a hero, two
         sections and the close. Everything works in light and dark; the switch and the content map
         are in the bar at the foot of the page.
       </p>
@@ -52,7 +52,7 @@ const previews = [
           previews.map((preview) => (
             <li>
               <a class="lab-card" href={`/lab/${preview.id}`}>
-                <span class="lab-card-id">{preview.id === "mix" ? "Mix" : preview.id.toUpperCase()}</span>
+                <span class="lab-card-id">{preview.id === "landing" ? "Landing" : preview.id.toUpperCase()}</span>
                 <span class="lab-card-name">{preview.name}</span>
                 <span class="lab-card-line">{preview.line}</span>
                 <span class="lab-card-scheme">{preview.scheme}</span>

@@ -1,0 +1,33 @@
+---
+/**
+ * A real brand mark, inlined so a one-color mark takes the text color in
+ * both schemes. The files in ./marks are the vendors' own marks as two open
+ * icon sets publish them (see public/third-party-notices.txt); none is
+ * redrawn. T3 Code publishes its mark only as a PNG, served from /agents.
+ */
+interface Props {
+  name: string;
+  size?: number;
+}
+const { name, size = 20 } = Astro.props;
+
+const files = import.meta.glob<string>("./marks/*.svg", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+const raw = files[`./marks/${name}.svg`];
+const svg = raw
+  ?.replace(/<title>.*?<\/title>/, "")
+  .replace(/\s(width|height|style|role)="[^"]*"/g, "")
+  .replace("<svg", `<svg width="${size}" height="${size}" aria-hidden="true" class="mark"`)
+  .replace(/<svg(?![^>]*\sfill=)/, '<svg fill="currentColor"');
+---
+
+{
+  name === "t3-code" ? (
+    <img class="mark mark-img" src="/agents/t3-code.png" alt="" width={size} height={size} />
+  ) : (
+    <Fragment set:html={svg} />
+  )
+}
