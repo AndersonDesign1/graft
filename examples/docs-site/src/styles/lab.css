@@ -3159,6 +3159,145 @@ html[data-switching] .lab *::after {
   }
 }
 
+/* A ledger: a name, what you give, what you get. */
+.lab .ledger {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .ledger li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2) var(--col-gap);
+  padding-block: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.lab .ledger li:last-child {
+  border-bottom: 1px solid var(--border);
+}
+
+.lab .ledger-name {
+  grid-column: 1 / -1;
+  color: var(--foreground);
+  font-size: 0.875rem;
+}
+
+.lab .ledger p {
+  display: grid;
+  gap: 2px;
+  color: var(--muted-foreground);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+.lab .ledger p span {
+  color: var(--faint-foreground);
+  font-size: var(--lab-label);
+}
+
+/* Four limits, two by two. */
+.lab .bounds {
+  display: grid;
+  align-content: center;
+  gap: var(--space-6);
+}
+
+.lab .bounds-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--col-gap);
+  margin: 0;
+  padding: 0;
+  counter-reset: bound;
+  list-style: none;
+}
+
+.lab .bounds-grid li {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  border-radius: var(--radius-outer);
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+  counter-increment: bound;
+}
+
+.lab .bounds-grid li::before {
+  content: counter(bound);
+  color: var(--faint-foreground);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-medium);
+}
+
+.lab .bounds-grid p {
+  color: var(--muted-foreground);
+}
+
+/* A key and the three things it can be allowed to open. */
+.lab .keycard {
+  display: grid;
+  gap: var(--space-6);
+  padding: clamp(1.25rem, 3vw, 2.25rem) clamp(1.25rem, 3vw, 2.25rem) 0;
+  overflow: hidden;
+  border-radius: var(--tray-radius);
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.lab .keycard-key {
+  justify-self: start;
+  padding: var(--space-3) var(--space-5);
+  border-radius: 999px;
+  background: var(--background);
+  box-shadow:
+    var(--shadow-floating),
+    0 0 0 1px var(--border-strong);
+  font-size: var(--text-md);
+}
+
+.lab .keycard-levels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  align-items: end;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .keycard-levels li {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  min-height: calc(7rem + var(--step) * 3.5rem);
+  padding: var(--space-4);
+  border-radius: var(--radius-outer) var(--radius-outer) 0 0;
+  background: color-mix(in srgb, var(--foreground) calc(7% + var(--step) * 6%), var(--background));
+  box-shadow: inset 0 1px 0 var(--border-strong);
+}
+
+/* The media library: files fanned on a tray. */
+.lab .media-tray {
+  min-height: 25rem;
+}
+
+.lab .media-fan {
+  position: absolute;
+  inset: 6.5rem 14% auto 14%;
+  height: 16rem;
+  color: var(--foreground);
+}
+
+.lab .media-fan .fan-card {
+  left: 30%;
+  width: 40%;
+}
+
 /* ----------------------------------------------------------- motion --- */
 
 /* Everything below runs only with script on and motion welcome (the layout
@@ -3740,6 +3879,10 @@ html.motion .lab .step-term:not([hidden]) .term-line {
   }
 
   .lab .day-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lab .bounds-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 

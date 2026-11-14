@@ -5,6 +5,7 @@
  */
 import Command from "../../components/lab/Command.astro";
 import DayOne from "../../components/lab/DayOne.astro";
+import FaqList from "../../components/lab/FaqList.astro";
 import Gate from "../../components/lab/Gate.astro";
 import Mark from "../../components/lab/Mark.astro";
 import Rings from "../../components/lab/Rings.astro";
@@ -51,6 +52,30 @@ const tools = [
     ],
   },
 ];
+const prompts = [
+  { name: "author-document", give: "A collection and a topic", get: "The real fields of that collection, with the required ones marked" },
+  { name: "revise-document", give: "A page and what you want changed", get: "Where the page lives and what its fields allow" },
+  { name: "fix-error", give: "An error code", get: "What it means, why it usually happens, and how to recover" },
+  { name: "plan-migration", give: "A collection and the change you want", get: "The current fields and the safe steps, as a commit you review" },
+];
+const bounds = [
+  { title: "Every write is checked", body: "A page that does not fit your content model is refused, with a message saying what to fix." },
+  { title: "Content cannot run code", body: "Anything in a page that could run on your server is refused before it is saved." },
+  { title: "Your rules still apply", body: "When an agent runs one of your functions, the same access rules, rate limits and audit log apply as for your app's users." },
+  { title: "Deletes wait for a person", body: "A delete files a request and stops. Nothing is removed until someone on your team approves it." },
+];
+const levels = [
+  { name: "Read", can: "Reads content" },
+  { name: "Write drafts", can: "Writes drafts and opens a pull request" },
+  { name: "Publish", can: "Publishes" },
+];
+const questions = [
+  { q: "Which agents work with Graft?", a: "Any agent that speaks MCP: Claude Code, Codex, Cursor, OpenCode, T3 Code, Gemini CLI, Copilot and others. Agents that only run shell commands can use the CLI, which prints JSON." },
+  { q: "Does agent access cost extra?", a: "No. Graft is open source under the MIT license. The MCP server is part of it, with every tool included." },
+  { q: "Can an agent delete my content?", a: "Not by itself. A delete files an approval request and stops. A person approves or denies it, and an approval works once, for that one page." },
+  { q: "Can I see what an agent did?", a: "Yes. Content changes are files in Git, so every edit has a history. Function calls are recorded in the audit log with who called them and how it went." },
+  { q: "Do my editors need to use an agent?", a: "No. Studio is a full editor in the browser. Agents and editors work on the same drafts, and neither needs the other." },
+];
 const steps = [
   { title: "Add Graft to your agent", body: "One entry in your agent's MCP settings. It is the same for every agent." },
   { title: "Ask in plain words", body: "\"Add a pricing page.\" The agent reads your content model and writes the page." },
@@ -80,6 +105,28 @@ const steps = [
       <div class="tray split-visual" data-peel>
         <Rings cx={20} cy={78} seed={11} />
         <Transcript />
+      </div>
+    </div>
+  </section>
+
+  <section class="screen screen-short" id="works-with">
+    <div class="wrap stack">
+      <div class="stack-head" data-reveal>
+        <h2 class="h2">Use the agent you already have</h2>
+      </div>
+      <div class="belt" data-dir="forth" role="group" aria-label="Agents Graft works with">
+        {
+          [0, 1, 2].map((copy) => (
+            <ul class="belt-track" aria-hidden={copy > 0 ? "true" : undefined}>
+              {agents.map((agent) => (
+                <li class="chip">
+                  <Mark name={agent.mark} size={22} />
+                  {agent.name}
+                </li>
+              ))}
+            </ul>
+          ))
+        }
       </div>
     </div>
   </section>
@@ -115,6 +162,58 @@ const steps = [
   </section>
 
   <DayOne />
+
+  <section class="screen" id="workflows">
+    <div class="wrap split">
+      <div class="split-text" data-reveal>
+        <h2 class="h2">Ready-made jobs, filled in from your project</h2>
+        <p class="lead">
+          Pick a job and your agent starts with the facts of your own site, not a guess. Each one
+          tells it how to work safely here.
+        </p>
+        <a class="link" href="/docs/mcp-resources-and-prompts">Read about prompts and attachments</a>
+      </div>
+      <ol class="split-visual ledger" data-reveal>
+        {
+          prompts.map((prompt) => (
+            <li>
+              <code class="ledger-name">{prompt.name}</code>
+              <p>
+                <span>You give it</span>
+                {prompt.give}
+              </p>
+              <p>
+                <span>It gets</span>
+                {prompt.get}
+              </p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <section class="screen" id="bounds">
+    <div class="wrap bounds">
+      <div class="stack-head" data-reveal>
+        <h2 class="h2">An agent gets no special access</h2>
+        <p class="lead">
+          Everything it does goes through the same checks as a person using your site or your
+          terminal.
+        </p>
+      </div>
+      <ol class="bounds-grid" data-reveal>
+        {
+          bounds.map((item) => (
+            <li>
+              <h3 class="h3">{item.title}</h3>
+              <p>{item.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
 
   <section class="screen" id="connect">
     <div class="wrap split">
@@ -160,5 +259,63 @@ const steps = [
     </div>
   </section>
 
+  <section class="screen" id="tokens">
+    <div class="wrap split">
+      <div class="split-text" data-reveal>
+        <h2 class="h2">One key per agent, and you choose what it opens</h2>
+        <p class="lead">
+          On a hosted site, each agent gets its own key from Studio. Pick how much it may do, and
+          take the key back the moment you want to.
+        </p>
+        <ul class="points">
+          <li>Its work arrives as drafts, in the same place your editors review</li>
+          <li>Without the publish level, it opens a pull request instead</li>
+          <li>Revoke a key and the agent is refused from its next request</li>
+        </ul>
+        <a class="link" href="/docs/connecting-agents">Read about connecting over HTTP</a>
+      </div>
+      <div class="split-visual keycard" data-reveal>
+        <p class="keycard-key"><code>graft_at_…</code></p>
+        <ol class="keycard-levels">
+          {
+            levels.map((level, i) => (
+              <li style={`--step:${i}`}>
+                <span class="stair-name">{level.name}</span>
+                <span class="stair-can">{level.can}</span>
+              </li>
+            ))
+          }
+        </ol>
+      </div>
+    </div>
+  </section>
+
   <Gate />
+
+  <section class="screen screen-short" id="docs-agents">
+    <div class="wrap run">
+      <div class="closing-cards">
+        <div class="closing-card">
+          <p class="who">For other people's agents</p>
+          <h3 class="h3">Let agents read your docs</h3>
+          <p>
+            A second, read-only endpoint serves your documentation to anyone's agent. It is
+            separate from the private one, and it cannot write.
+          </p>
+          <a class="link" href="/docs/docs-mcp">Read about the public docs endpoint</a>
+        </div>
+        <div class="closing-card">
+          <p class="who">For scripts and CI</p>
+          <h3 class="h3">The same work, from a terminal</h3>
+          <p>
+            Every command prints JSON and exits with a code that says what kind of failure it was,
+            so a script or an agent that runs shell commands can drive Graft too.
+          </p>
+          <a class="link" href="/docs/cli">Read about scripting the CLI</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <FaqList heading="Questions about agents" group="agents-faq" items={questions} />
 </Lab>

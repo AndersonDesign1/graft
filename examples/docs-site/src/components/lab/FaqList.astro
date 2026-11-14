@@ -1,0 +1,29 @@
+---
+/** Questions and answers for a page, one open at a time. */
+interface Props {
+  heading: string;
+  lead?: string;
+  group: string;
+  items: { q: string; a: string }[];
+}
+const { heading, lead, group, items } = Astro.props;
+---
+
+<section class="screen" id="questions">
+  <div class="wrap split faq">
+    <div class="split-text" data-reveal>
+      <h2 class="h2">{heading}</h2>
+      {lead && <p class="lead">{lead}</p>}
+    </div>
+    <div class="split-visual faq-list">
+      {
+        items.map((item, i) => (
+          <details name={group} open={i === 0}>
+            <summary>{item.q}</summary>
+            <p>{item.a}</p>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>

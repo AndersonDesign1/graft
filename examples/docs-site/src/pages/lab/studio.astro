@@ -5,6 +5,8 @@
  * like a staircase.
  */
 import Command from "../../components/lab/Command.astro";
+import Branching from "../../components/lab/Branching.astro";
+import FaqList from "../../components/lab/FaqList.astro";
 import Gate from "../../components/lab/Gate.astro";
 import Rings from "../../components/lab/Rings.astro";
 import Shot from "../../components/lab/Shot.astro";
@@ -17,6 +19,17 @@ const day = [
   { name: "changes", title: "Review it", body: "See exactly what changed, line by line, before anyone publishes.", alt: "Studio showing the lines removed and added in a page." },
   { name: "history", title: "Undo it", body: "Open a page's history and bring back any earlier version as a draft.", alt: "Studio's history panel listing earlier versions of a page." },
 ] as const;
+const saves = [
+  { who: "Content in Git", title: "Publish saves to your repository", body: "Changes are saved to your repository. On GitHub, a contributor's work becomes a pull request for an editor to merge." , link: "/docs/studio-hosting", label: "Read about hosting on GitHub"},
+  { who: "Content in the database", title: "Publish goes live at once", body: "Editors publish with no rebuild and no GitHub setup. Developers can still pull the content into files.", link: "/docs/content-in-the-database", label: "Read about content in the database" },
+];
+const questions = [
+  { q: "Do I have to use Studio?", a: "No. Studio is optional. Everything it does can also be done from the command line or by an agent, so a team of developers can skip it." },
+  { q: "Does Studio need a database?", a: "Not to edit content. Without one, Studio still finds, edits and saves your pages. Sign-in for a team, approvals and preview branches need Postgres." },
+  { q: "Who can sign in?", a: "On your own computer, nobody needs to. On a server, people sign in with an email and password, GitHub, Google or your single sign-on, and an admin invites the rest." },
+  { q: "Can agents and editors work at the same time?", a: "Yes. An agent's work arrives as drafts in the same place an editor's does, and waits for someone who can publish." },
+  { q: "What happens after I publish?", a: "Your site updates. If it needs a rebuild, add a deploy hook in Settings and Studio calls it after every publish." },
+];
 const roles = [
   { name: "Viewer", can: "Reads everything" },
   { name: "Contributor", can: "Writes drafts and sends them for review" },
@@ -72,6 +85,60 @@ const roles = [
     </div>
   </section>
 
+  <section class="screen" id="media">
+    <div class="wrap split">
+      <div class="split-text" data-reveal>
+        <h2 class="h2">Your images and files, in one library</h2>
+        <p class="lead">
+          Upload images and PDFs, search them by name or description, and see which pages use each
+          one before you change it.
+        </p>
+        <ul class="points">
+          <li>Write the description once, where the file lives</li>
+          <li>A file in use cannot be deleted by accident</li>
+          <li>Files are stored in your own bucket</li>
+        </ul>
+        <a class="link" href="/docs/assets">Read about images and files</a>
+      </div>
+      <div class="tray split-visual media-tray" data-peel>
+        <div class="media-fan" aria-hidden="true">
+          {
+            [0, 1, 2].map((n) => (
+              <svg class="fan-card" style={`--n:${n}`} viewBox="0 0 120 90">
+                <rect class="art-card" x="0.5" y="0.5" width="119" height="89" rx="8" />
+                <path class="art-line" d="m12 72 26-28 20 20 14-14 36 26" />
+                <circle class="art-line" cx="88" cy="26" r="9" />
+              </svg>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen screen-short" id="bulk">
+    <div class="wrap run">
+      <div class="closing-cards">
+        <div class="closing-card">
+          <p class="who">Many pages at once</p>
+          <h3 class="h3">Change one field on fifty pages</h3>
+          <p>
+            Select the pages, choose the field, set its value. Each one is saved as a draft, so
+            nothing changes on your site until you publish.
+          </p>
+        </div>
+        <div class="closing-card">
+          <p class="who">What is waiting for you</p>
+          <h3 class="h3">One inbox for every decision</h3>
+          <p>
+            Changes sent for review and requests from agents land in the inbox. The sidebar shows
+            how many are waiting.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="screen" id="roles">
     <div class="wrap split">
       <div class="split-text" data-reveal>
@@ -95,6 +162,24 @@ const roles = [
     </div>
   </section>
 
+  <section class="screen screen-short" id="saves">
+    <div class="wrap run">
+      <h2 class="h2" data-reveal><span>Publish the way your site works</span></h2>
+      <div class="closing-cards">
+        {
+          saves.map((item) => (
+            <div class="closing-card">
+              <p class="who">{item.who}</p>
+              <h3 class="h3">{item.title}</h3>
+              <p>{item.body}</p>
+              <a class="link" href={item.link}>{item.label}</a>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
   <section class="screen screen-short" id="run">
     <div class="wrap run">
       <h2 class="h2" data-reveal><span>Two ways to run it</span></h2>
@@ -115,5 +200,7 @@ const roles = [
     </div>
   </section>
 
+  <Branching />
   <Gate />
+  <FaqList heading="Questions about Studio" group="studio-faq" items={questions} />
 </Lab>
