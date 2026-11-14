@@ -1788,9 +1788,6 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 
 .lab .w-hero-top {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 19rem);
-  gap: var(--space-8) var(--col-gap);
-  align-items: end;
 }
 
 .lab .w-hero-copy {
@@ -1799,7 +1796,7 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   gap: var(--space-5);
   /* The words keep to the left of the page; the window under them is what
      runs the full width. */
-  max-width: 46rem;
+  max-width: 68rem;
 }
 
 .lab .w-hero-top > *,
@@ -1809,13 +1806,7 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 }
 
 .lab .w-h1 {
-  font-size: clamp(2.5rem, 1.1rem + 4.4vw, 4.5rem);
-}
-
-.lab .w-works {
-  display: grid;
-  gap: var(--space-3);
-  font-size: var(--text-sm);
+  font-size: var(--lab-h1);
 }
 
 .lab .w-line {
@@ -1831,30 +1822,6 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 
 .lab .w-hero .lead {
   max-width: 36rem;
-}
-
-.lab .w-agents {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2) var(--space-4);
-  margin: 0;
-  padding: 0;
-  color: var(--muted-foreground);
-  list-style: none;
-}
-
-.lab .w-agents li {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.lab .w-agents-label {
-  color: var(--faint-foreground);
-}
-
-.lab .w-agents .mark {
-  color: var(--foreground);
 }
 
 .lab .w-hero-tray {
@@ -1963,10 +1930,6 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 .lab .switch button[aria-selected="true"] {
   background: var(--primary);
   color: var(--primary-foreground);
-}
-
-.lab .switch button[aria-selected="true"] .who-marks {
-  color: inherit;
 }
 
 /* Beside the switch the exchange is set tighter, so both fit one screen. */
@@ -2164,41 +2127,6 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   height: 0.3em;
 }
 
-/* "Any agent": one line whose subject keeps changing. */
-.lab .anyone {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-  font-size: var(--text-md);
-  font-weight: var(--weight-medium);
-}
-
-.lab .anyone-names {
-  position: relative;
-  display: inline-grid;
-  overflow: hidden;
-  margin: 0;
-  padding: var(--space-2) var(--space-4);
-  border-radius: 999px;
-  background: var(--muted);
-  box-shadow: inset 0 0 0 1px var(--border);
-  list-style: none;
-}
-
-.lab .anyone-names li {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  grid-area: 1 / 1;
-  white-space: nowrap;
-}
-
-/* At rest only the first name shows; the marks of the rest follow it. */
-.lab .anyone-names li:not(:first-child) {
-  visibility: hidden;
-}
-
 .lab .tiers-belt {
   display: grid;
   gap: var(--space-3);
@@ -2209,6 +2137,50 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 
 .lab .tiers-belt .belt {
   width: 100%;
+}
+
+/* The agents, in their own band. */
+.lab .agent-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab .agent-tile {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-3);
+  border-radius: var(--radius-outer);
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--muted-foreground);
+  font-size: 0.9375rem;
+  font-weight: var(--weight-medium);
+  text-align: center;
+}
+
+.lab .agent-tile .mark {
+  color: var(--foreground);
+}
+
+/* A step's progress: a line along the foot of the tab that is playing. */
+.lab .step-tabs button {
+  position: relative;
+  overflow: hidden;
+}
+
+.lab .step-progress {
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.55;
+  transform: scaleX(0);
+  transform-origin: left;
 }
 
 /* ----------------------------------------------------------- motion --- */
@@ -2311,27 +2283,41 @@ html.motion .lab .belt:hover .belt-track {
   }
 }
 
-html.motion .lab .anyone-names li {
-  visibility: visible;
-  opacity: 0;
-  animation: name-turn calc(var(--count) * 2.4s) var(--ease-out) calc(var(--i) * 2.4s) infinite;
+/* The light that passes along the agents, one tile per slot of the cycle. */
+html.motion .lab .agent-tile {
+  animation: tile-lit calc(var(--count) * 1.5s) var(--ease-in-out) calc(var(--i) * 1.5s) infinite;
 }
 
-/* Each name rises in, holds, and leaves upward; one slot of the cycle each. */
-@keyframes name-turn {
-  0% {
-    opacity: 0;
-    transform: translateY(110%);
-  }
-  3%,
-  12% {
-    opacity: 1;
+@keyframes tile-lit {
+  0%,
+  16%,
+  100% {
+    background: var(--muted);
+    color: var(--muted-foreground);
     transform: none;
   }
-  14.2857%,
-  100% {
-    opacity: 0;
-    transform: translateY(-110%);
+  4%,
+  11% {
+    background: var(--elevated);
+    color: var(--foreground);
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    transform: translateY(-3px);
+  }
+}
+
+/* The branching tour: the line fills, and its end moves to the next step.
+   Hovering or focusing the section holds it. */
+html.motion .lab [data-steps][data-auto] button[aria-selected="true"] .step-progress {
+  animation: step-fill 5s linear forwards;
+}
+
+html.motion .lab [data-steps]:is(:hover, :focus-within) .step-progress {
+  animation-play-state: paused;
+}
+
+@keyframes step-fill {
+  to {
+    transform: scaleX(1);
   }
 }
 
@@ -2425,10 +2411,6 @@ html.motion .lab .step-term:not([hidden]) .term-line {
   }
 
   .lab .closing-cards {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .lab .w-hero-top {
     grid-template-columns: minmax(0, 1fr);
   }
 

@@ -5,6 +5,7 @@
  * real Studio, the stack it fits, what agents get and what people get, how
  * the loop works, and everything the old page said, in order.
  */
+import AgentsBand from "../../components/lab/AgentsBand.astro";
 import Audience from "../../components/lab/Audience.astro";
 import Branching from "../../components/lab/Branching.astro";
 import Command from "../../components/lab/Command.astro";
@@ -29,6 +30,7 @@ import Lab from "../../layouts/Lab.astro";
   theme="system"
 >
   <HeroWide />
+  <AgentsBand />
   <Stack />
   <Audience />
   <Model id="how" heading="Edit a file. Compile. Refresh." steps plain />
@@ -43,7 +45,7 @@ import Lab from "../../layouts/Lab.astro";
   <Fragment slot="closing">
     <div class="closing-lead closing-drop">
       <h2 class="h2">Drop Graft onto your repo</h2>
-      <p class="lead">You scaffold. Your agent authors. Your team edits. Open source, and yours to host.</p>
+      <p class="lead">You set it up. Your agent writes. Your team edits. It is open source and yours to host.</p>
     </div>
     <div class="closing-cards">
       <div class="closing-card">
@@ -54,13 +56,13 @@ import Lab from "../../layouts/Lab.astro";
           For your agent
         </p>
         <h3 class="h3">Connect it over MCP</h3>
-        <p>Claude Code, Codex, Cursor, OpenCode, T3 Code, or anything else that speaks MCP.</p>
+        <p>It works with Claude Code, Codex, Cursor, OpenCode, T3 Code and anything else that speaks MCP.</p>
         <Command command="graft mcp" />
       </div>
       <div class="closing-card">
         <p class="who">For you</p>
         <h3 class="h3">Start with one command</h3>
-        <p>It writes the config and your first page into the repo you already have. No account.</p>
+        <p>It adds a config file and your first page to the repo you already have. No account needed.</p>
         <Command />
       </div>
     </div>

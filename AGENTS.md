@@ -19,6 +19,7 @@ Skills live in `.agents/skills/` (`.claude/skills` links to it).
 | Touch anything a person sees                | `graft-design`, which reads `DESIGN.md` |
 | Write any words: docs, errors, commits, PRs | `graft-writing`                         |
 | Add, change, review or delete a test        | `graft-testing`                         |
+| Build or change a marketing page            | `graft-landing`                         |
 
 ## Facts that save you an hour
 
@@ -76,4 +77,6 @@ file is a candidate to move up into a check.
 | Tests await events, never sleep for a guessed duration                                                                        | `anti-slop/no-sleep-in-tests`                                                              |
 | A skipped test says why                                                                                                       | `anti-slop/no-unreasoned-test-skip`                                                        |
 | An integration test that needs a scratch database fails in CI instead of skipping                                             | `createScratchDatabase` and the scratch setups throw under `CI`                            |
+| A marketing page is previewed by the user before it is pushed                                                                 | `graft-landing` only                                                                       |
+| A redesign keeps every section the old page had unless the user agrees to cut it                                              | `graft-landing` only                                                                       |
 | Visual changes are rendered before they are claimed                                                                           | This file and `graft-design` only                                                          |

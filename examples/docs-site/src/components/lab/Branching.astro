@@ -60,8 +60,8 @@ const steps = [
     <div class="split-text" data-reveal>
       <h2 class="h2">Branch content the way you branch code</h2>
       <p class="lead">
-        Try a redesign, a launch or a risky edit away from your live site. Show it to the people
-        who need to see it, then merge.
+        Try a redesign or a launch on a copy of your content. Show it to the people who need to see
+        it. Your live site does not change until you merge.
       </p>
       <div class="step-tabs" role="tablist" aria-label="Branching steps">
         {
@@ -77,6 +77,7 @@ const steps = [
             >
               <span class="step-n">{i + 1}</span>
               {step.label}
+              <span class="step-progress" aria-hidden="true" />
             </button>
           ))
         }
@@ -111,6 +112,12 @@ const steps = [
 </section>
 
 <script>
+  // The steps play through on their own, one every few seconds, while the
+  // section is on screen. Each tab carries its own progress line, and the
+  // end of that line is what moves to the next step, so pausing the line
+  // (pointer over the section, or keyboard focus in it) pauses the tour.
+  // Picking a step by hand stops the tour for good.
+  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
   for (const group of document.querySelectorAll<HTMLElement>("[data-steps]")) {
     const tabs = [...group.querySelectorAll<HTMLButtonElement>("[data-step]")];
     const select = (tab: HTMLButtonElement) => {
@@ -126,15 +133,35 @@ const steps = [
         }
       }
     };
+    const stop = () => delete group.dataset.auto;
     tabs.forEach((tab, i) => {
-      tab.addEventListener("click", () => select(tab));
+      tab.addEventListener("click", () => {
+        stop();
+        select(tab);
+      });
       tab.addEventListener("keydown", (event) => {
         const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
         if (!step) return;
+        stop();
         const next = tabs[(i + step + tabs.length) % tabs.length]!;
         select(next);
         next.focus();
       });
+      tab.querySelector(".step-progress")?.addEventListener("animationend", () => {
+        if (group.dataset.auto === undefined) return;
+        select(tabs[(i + 1) % tabs.length]!);
+      });
     });
+    if (calm) continue;
+    new IntersectionObserver(
+      ([entry]) => {
+        if (group.dataset.picked) return;
+        if (entry?.isIntersecting) group.dataset.auto = "";
+        else stop();
+      },
+      { threshold: 0.5 },
+    ).observe(group);
+    for (const tab of tabs) tab.addEventListener("click", () => (group.dataset.picked = "true"));
   }
 </script>
+
