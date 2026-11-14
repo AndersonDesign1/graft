@@ -34,16 +34,18 @@ const roles = [
       </p>
     </div>
     <div class="bento" data-reveal>
-      <article class="cell cell-a" data-from="right">
+      <article class="cell cell-side cell-a" data-from="right">
         <div class="cell-text">
           <PenLine size={20} strokeWidth={1.75} />
           <h3 class="cell-title"><b>An editor</b> your team can use today</h3>
           <p>Lists, a rich text editor, drafts and publish. It ships with Graft.</p>
         </div>
-        <div class="cell-stack" aria-hidden="true">
+        <div class="cell-art">
+          <div class="cell-stack" aria-hidden="true">
           <Shot name="list" alt="" />
           <Shot name="changes" alt="" />
           <Shot name="write" alt="" />
+        </div>
         </div>
       </article>
 
@@ -53,7 +55,8 @@ const roles = [
           <h3 class="cell-title"><b>Preview</b> before it goes live</h3>
           <p>Change a page on a branch, share it, then merge. Your live site waits.</p>
         </div>
-        <div class="cell-card cell-card-bottom" aria-hidden="true">
+        <div class="cell-art">
+          <div class="cell-card cell-card-bottom" aria-hidden="true">
           <svg class="art-preview" viewBox="0 0 560 118" preserveAspectRatio="xMinYMax meet" aria-hidden="true">
           <!-- the live line, and the branch that leaves and rejoins it -->
           <path class="art-line" d="M6 92 H554"></path>
@@ -85,6 +88,7 @@ const roles = [
           <circle class="art-dot" r="4"></circle>
         </svg>
         </div>
+        </div>
       </article>
 
       <article class="cell cell-c" data-from="right">
@@ -93,7 +97,8 @@ const roles = [
           <h3 class="cell-title"><b>Search</b>, with no search service</h3>
           <p>Ranked results and highlighted snippets across all your content.</p>
         </div>
-        <div class="cell-card cell-card-right" aria-hidden="true">
+        <div class="cell-art">
+          <div class="cell-card cell-card-right" aria-hidden="true">
           <svg class="art-search" viewBox="0 0 560 118" preserveAspectRatio="xMinYMax meet" aria-hidden="true">
           <rect class="art-line" x="1" y="1" width="558" height="34" rx="6"></rect>
           <circle class="art-line" cx="19" cy="17" r="5.5"></circle>
@@ -117,6 +122,7 @@ const roles = [
           </g>
         </svg>
         </div>
+        </div>
       </article>
 
       <article class="cell cell-d" data-from="bottom">
@@ -125,7 +131,8 @@ const roles = [
           <h3 class="cell-title"><b>Roles</b> for your team</h3>
           <p>Sign-in and four roles, built in.</p>
         </div>
-        <ol class="cell-stairs" aria-label="Roles and what each can do">
+        <div class="cell-art">
+          <ol class="cell-stairs" aria-label="Roles and what each can do">
           {
             roles.map((role, i) => (
               <li style={`--step:${i}`}>
@@ -135,6 +142,7 @@ const roles = [
             ))
           }
         </ol>
+        </div>
       </article>
 
       <article class="cell cell-e" data-from="right">
@@ -143,7 +151,8 @@ const roles = [
           <h3 class="cell-title"><b>A record</b> of every change</h3>
           <p>Who did what and when, for people and agents.</p>
         </div>
-        <div class="cell-card cell-card-right" aria-hidden="true">
+        <div class="cell-art">
+          <div class="cell-card cell-card-right" aria-hidden="true">
           <svg class="art-log" viewBox="0 0 220 76" preserveAspectRatio="xMinYMax meet" aria-hidden="true">
           <g class="art-rows">
             <g><circle class="art-node" cx="6" cy="-14" r="3"></circle><rect class="art-hit" x="18" y="-17" width="64" height="6" rx="2"></rect><rect class="art-dim" x="90" y="-17" width="70" height="6" rx="2"></rect></g>
@@ -155,15 +164,17 @@ const roles = [
           <path class="art-line" d="M6 0 V76"></path>
         </svg>
         </div>
+        </div>
       </article>
 
-      <article class="cell cell-f" data-from="bottom">
+      <article class="cell cell-side cell-f" data-from="bottom">
         <div class="cell-text">
           <Image size={20} strokeWidth={1.75} />
           <h3 class="cell-title"><b>Images and files</b> in your own bucket</h3>
           <p>Upload once and link them from any page.</p>
         </div>
-        <div class="cell-fan" aria-hidden="true">
+        <div class="cell-art">
+          <div class="cell-fan" aria-hidden="true">
           {
             [0, 1, 2].map((n) => (
               <svg class="fan-card" style={`--n:${n}`} viewBox="0 0 120 90">
@@ -174,15 +185,17 @@ const roles = [
             ))
           }
         </div>
+        </div>
       </article>
 
-      <article class="cell cell-g" data-from="right">
+      <article class="cell cell-side cell-g" data-from="right">
         <div class="cell-text">
           <Blocks size={20} strokeWidth={1.75} />
           <h3 class="cell-title"><b>Forms, orders and comments</b> when you need them</h3>
           <p>Add Postgres and Graft stores what your visitors send.</p>
         </div>
-        <div class="cell-card cell-card-right" aria-hidden="true">
+        <div class="cell-art">
+          <div class="cell-card cell-card-right" aria-hidden="true">
           <svg class="art-form" viewBox="0 0 220 76" preserveAspectRatio="xMinYMax meet" aria-hidden="true">
           <rect class="art-line" x="1" y="1" width="92" height="18" rx="4"></rect>
           <rect class="art-line" x="1" y="25" width="92" height="18" rx="4"></rect>
@@ -193,6 +206,7 @@ const roles = [
           <rect class="art-fill" x="156" y="42" width="63" height="14" rx="3"></rect>
           <rect class="art-fill" x="156" y="60" width="63" height="14" rx="3"></rect>
         </svg>
+        </div>
         </div>
       </article>
     </div>

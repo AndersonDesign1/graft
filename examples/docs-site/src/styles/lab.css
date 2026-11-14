@@ -251,6 +251,28 @@ html[data-theme="dark"] .lab {
   list-style: none;
 }
 
+.lab-nav-links a[aria-current="page"] {
+  color: var(--foreground);
+}
+
+/* The GitHub mark: a 40px target around an 18px mark. */
+.lab-nav-github {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-right: calc(-1 * var(--space-4));
+  border-radius: var(--radius-inner);
+  color: var(--muted-foreground);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lab-nav-github:hover {
+    color: var(--foreground);
+  }
+}
+
 .lab-nav-links a {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
@@ -2294,22 +2316,35 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   gap: var(--col-gap);
 }
 
-/* A cell is a stage: words in the top corner, and a picture that comes in
-   from one edge and is cut by it. */
+/* A cell has two parts that never touch: words, and under or beside them a
+   stage for the picture. The picture starts at the top of its stage and
+   runs off the cell's lower or right edge, so the cell cuts it and the
+   words stay clear. */
 .lab .cell {
   position: relative;
   isolation: isolate;
   overflow: hidden;
   display: grid;
-  align-content: start;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-8);
   min-width: 0;
-  min-height: 18.5rem;
-  padding: var(--space-6);
+  padding: var(--space-6) var(--space-6) 0;
   border-radius: calc(var(--radius-outer) + 0.375rem);
   background: var(--muted);
   box-shadow: inset 0 0 0 1px var(--border);
   --dots-x: 100%;
   --dots-y: 100%;
+}
+
+/* A wide cell puts the stage beside the words. */
+.lab .cell-side {
+  grid-template-rows: auto;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: var(--space-8);
+}
+
+.lab .cell-side .cell-text {
+  padding-bottom: var(--space-6);
 }
 
 .lab .cell[data-from="bottom"] {
@@ -2342,12 +2377,10 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 
 .lab .cell-a {
   grid-column: span 7;
-  min-height: 22rem;
 }
 
 .lab .cell-b {
   grid-column: span 5;
-  min-height: 22rem;
 }
 
 .lab .cell-c,
@@ -2359,22 +2392,14 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 .lab .cell-f,
 .lab .cell-g {
   grid-column: span 6;
-  min-height: 14.5rem;
 }
 
 .lab .cell-text {
-  position: relative;
-  z-index: 1;
   display: grid;
+  align-content: start;
   justify-items: start;
   gap: var(--space-2);
-  max-width: 23rem;
-}
-
-.lab .cell-a .cell-text,
-.lab .cell-f .cell-text,
-.lab .cell-g .cell-text {
-  max-width: min(100%, 17.5rem);
+  min-width: 0;
 }
 
 .lab .cell-text > svg {
@@ -2402,12 +2427,35 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   line-height: 1.45;
 }
 
-/* Three real screens, stacked and running off the corner. */
+/* The stage. Its height is fixed, so every row of cells lines up, and what
+   stands on it may run off the bottom and the right of the cell. */
+.lab .cell-art {
+  position: relative;
+  min-width: 0;
+  height: 9.5rem;
+  color: var(--foreground);
+}
+
+.lab .cell-side .cell-art {
+  height: auto;
+  min-height: 12.5rem;
+}
+
+.lab .cell-a .cell-art {
+  min-height: 17rem;
+}
+
+.lab .cell-b .cell-art {
+  height: 11rem;
+}
+
+/* Three real screens, stacked, running off the corner. The back two are
+   set up and to the left inside the stage, never over the words. */
 .lab .cell-stack {
   position: absolute;
-  right: -5%;
-  bottom: -24%;
-  width: 56%;
+  top: 3.25rem;
+  left: 16%;
+  width: 104%;
 }
 
 .lab .cell-stack .shot {
@@ -2424,25 +2472,29 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 }
 
 .lab .cell-stack .shot:nth-child(1) {
-  transform: translate(-20%, -22%) rotate(-5deg);
-  opacity: 0.55;
+  transform: translate(-12%, -2.5rem) rotate(-3deg);
+  transform-origin: top left;
+  opacity: 0.5;
 }
 
 .lab .cell-stack .shot:nth-child(2) {
-  transform: translate(-10%, -11%) rotate(-2.5deg);
+  transform: translate(-6%, -1.25rem) rotate(-1.5deg);
+  transform-origin: top left;
   opacity: 0.8;
 }
 
-/* A drawing on its own card, sliding in from the bottom or the right. */
+/* A drawing on its own card. The card starts at the top of the stage and
+   is taller and wider than it, so the cell cuts its far edges. */
 .lab .cell-card {
   position: absolute;
+  inset: 0 0 auto 0;
+  min-height: 130%;
   padding: var(--space-5);
   border-radius: var(--radius-outer);
   background: var(--background);
   box-shadow:
     var(--shadow-floating),
     0 0 0 1px var(--border-strong);
-  color: var(--foreground);
 }
 
 .lab .cell-card svg {
@@ -2452,41 +2504,19 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   overflow: visible;
 }
 
-.lab .cell-card-bottom {
-  right: var(--space-6);
-  bottom: calc(-1 * var(--space-5));
-  left: var(--space-6);
-  padding-bottom: var(--space-8);
-}
-
 .lab .cell-card-right {
-  right: -3.5rem;
-  bottom: -1.25rem;
-  left: var(--space-6);
-  padding-bottom: var(--space-8);
+  right: -5rem;
 }
 
-/* The drawing is wider than its card, so the card's edge cuts it too. */
-.lab .cell-card-right svg {
-  width: 118%;
-}
-
-/* The log's newest row lands above the others, so its card sits lower. */
+/* The log's newest row lands above the others; leave it room in the card. */
 .lab .cell-e .cell-card {
-  bottom: -3.25rem;
+  padding-top: var(--space-8);
 }
 
-/* In a wide cell the card keeps to the right half, clear of the words. */
-.lab .cell-g .cell-card {
-  left: 50%;
-}
-
-/* The roles rise out of the floor of the cell, each a step higher. */
+/* The roles stand on the floor of the cell, each a step higher. */
 .lab .cell-stairs {
   position: absolute;
-  right: var(--space-6);
-  bottom: 0;
-  left: var(--space-6);
+  inset: auto 0 0 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-1);
@@ -2502,7 +2532,7 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   align-content: start;
   gap: 2px;
   min-width: 0;
-  min-height: calc(3.75rem + var(--step) * 1.75rem);
+  height: calc(3.75rem + var(--step) * 1.75rem);
   padding: var(--space-3) var(--space-2);
   border-radius: var(--radius) var(--radius) 0 0;
   background: color-mix(in srgb, var(--foreground) calc(7% + var(--step) * 6%), var(--background));
@@ -2517,25 +2547,22 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   white-space: nowrap;
 }
 
-/* Image cards fanned from one point, the way a hand holds them. */
+/* Image cards fanned from one point, standing in the middle of the stage. */
 .lab .cell-fan {
   position: absolute;
-  right: 5%;
-  bottom: -6%;
-  width: 48%;
-  aspect-ratio: 16 / 10;
-  color: var(--foreground);
+  inset: 1.5rem 0 auto 0;
+  height: 16rem;
 }
 
 .lab .fan-card {
   position: absolute;
-  bottom: 0;
-  left: 25%;
-  width: 50%;
+  top: 0;
+  left: 27%;
+  width: 46%;
   overflow: visible;
   filter: drop-shadow(0 6px 14px rgb(0 0 0 / 0.25));
-  transform: rotate(calc((var(--n) - 1) * 13deg)) translateX(calc((var(--n) - 1) * 58%));
-  transform-origin: 50% 160%;
+  transform: rotate(calc((var(--n) - 1) * 12deg)) translateX(calc((var(--n) - 1) * 52%));
+  transform-origin: 50% 170%;
 }
 
 /* The drawings share one small vocabulary. */
@@ -3697,7 +3724,14 @@ html.motion .lab .step-term:not([hidden]) .term-line {
   .lab .cell-f,
   .lab .cell-g {
     grid-column: 1 / -1;
-    min-height: 22rem;
+  }
+
+  .lab .cell-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lab .cell-side .cell-text {
+    padding-bottom: 0;
   }
 
   .lab .wall-grid,

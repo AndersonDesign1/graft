@@ -15,6 +15,7 @@ import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "../styles/global.css";
 import "../styles/lab.css";
+import Mark from "../components/lab/Mark.astro";
 
 interface Props {
   title: string;
@@ -69,14 +70,17 @@ const previews = [
     <a class="lab-skip" href="#main">Skip to content</a>
     <header class="lab-nav">
       <nav class="wrap lab-nav-row" aria-label="Main">
-        <a class="lab-wordmark" href="/lab">graft.</a>
+        <a class="lab-wordmark" href="/lab/landing">graft.</a>
         <ul class="lab-nav-links">
+          <li><a href="/lab/agents" aria-current={Astro.url.pathname.startsWith("/lab/agents") ? "page" : undefined}>Agents</a></li>
+          <li><a href="/lab/studio" aria-current={Astro.url.pathname.startsWith("/lab/studio") ? "page" : undefined}>Studio</a></li>
           <li><a href="/docs">Docs</a></li>
           <li><a href="/why">Why Graft</a></li>
-          <li><a href="/security">Security</a></li>
-          <li><a href="https://github.com/AndersonDesign1/graft">GitHub</a></li>
         </ul>
-        <a class="btn btn-primary btn-small" href="/docs/getting-started">Start a project</a>
+        <a class="lab-nav-github" href="https://github.com/AndersonDesign1/graft" aria-label="Graft on GitHub">
+          <Mark name="github" size={18} />
+        </a>
+        <a class="btn btn-primary btn-small" href="/lab/start">Get started</a>
       </nav>
     </header>
 
