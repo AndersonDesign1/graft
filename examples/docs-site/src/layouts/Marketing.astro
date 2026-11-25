@@ -132,7 +132,7 @@ const { title, description, variant } = Astro.props;
           <span class="lab-wordmark">graft.</span>
           <span>Open source under the MIT license.</span>
           <button type="button" class="closing-theme" data-theme-toggle>
-            <span data-theme-label>Light</span> mode
+            <span data-theme-label>Dark mode</span>
           </button>
         </p>
       </div>
@@ -144,7 +144,7 @@ const { title, description, variant } = Astro.props;
       // Theme: the toggle wins from then on and tells any Studio frame.
       const label = document.querySelector<HTMLElement>("[data-theme-label]");
       const paint = () => {
-        if (label) label.textContent = root.dataset.theme === "dark" ? "Light" : "Dark";
+        if (label) label.textContent = root.dataset.theme === "dark" ? "Light mode" : "Dark mode";
       };
       paint();
 
