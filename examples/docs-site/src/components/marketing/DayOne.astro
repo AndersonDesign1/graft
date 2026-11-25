@@ -28,7 +28,9 @@ const asks = [
         Most CMSs were built for people clicking in an admin, and connected to agents later. In
         Graft, agents were part of the design from the first line.
       </p>
-      <a class="link" href="/why">Read why that matters</a>
+      {Astro.url.pathname.replace(/\/$/, "") !== "/why" && (
+        <a class="link" href="/why">Read why that matters</a>
+      )}
     </div>
     <div class="split-visual asks" data-reveal>
       <p class="asks-title">Three things to ask any CMS that says it works with agents</p>
