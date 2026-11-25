@@ -37,22 +37,14 @@ const items = [
       </ul>
       <a class="link" href="/docs/owned-primitives">See the registry</a>
     </div>
-    <div class="tray split-visual">
+    <div class="tray split-visual" data-peel>
       <Rings cx={24} cy={30} seed={31} />
       <div class="window terminal">
         <div class="window-bar">
           <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
           <span class="window-title">Terminal</span>
         </div>
-        <pre class="code"><code><span class="tk-p">$</span> <span class="cli-bin">graft</span> <span class="cli-cmd">add</span> comments
-Adding scoped-access (access), comments (bundle):
-  <span class="tk-add">create    graft/scoped-access.ts</span>
-  <span class="tk-add">create    graft/comments.ts</span>
-  regenerate graft/index.ts
-
-Added scoped-access, comments (2 written); graft/index.ts regenerated.
-
-<span class="tk-c">It's live on your next `graft compile` — no graft.config.ts edit needed.</span></code></pre>
+        <pre class="code"><code><span class="term-line term-cmd" style="--d:250;--c:18"><span class="tk-p">$ </span><span class="cli-bin">graft</span> <span class="cli-cmd">add</span> comments{"\n"}</span><span class="term-line" style="--d:1284">Adding scoped-access (access), comments (bundle):{"\n"}</span><span class="term-line" style="--d:1734">  <span class="tk-add">create    graft/scoped-access.ts</span>{"\n"}</span><span class="term-line" style="--d:2034">  <span class="tk-add">create    graft/comments.ts</span>{"\n"}</span><span class="term-line" style="--d:2334">  regenerate graft/index.ts{"\n"}</span><span class="term-line" style="--d:2334">{"\n"}</span><span class="term-line" style="--d:2784">Added scoped-access, comments (2 written); graft/index.ts regenerated.{"\n"}</span><span class="term-line" style="--d:2784">{"\n"}</span><span class="term-line" style="--d:3234"><span class="tk-c">It's live on your next `graft compile` — no graft.config.ts edit needed.</span></span></code></pre>
       </div>
     </div>
   </div>

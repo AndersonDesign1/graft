@@ -1819,7 +1819,7 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
 /* The hero: the claim centered, then one wide window that runs to the fold. */
 .lab .w-hero-grid {
   display: grid;
-  grid-template-rows: auto minmax(15rem, 1fr);
+  grid-template-rows: auto auto;
   gap: clamp(1.5rem, 4.5vh, 2.75rem);
 }
 
@@ -1862,16 +1862,10 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   max-width: 36rem;
 }
 
+/* The whole window shows: the live Studio is the proof, so none of it is
+   cut by the tray or the fold. */
 .lab .w-hero-tray {
   --tray-pad: clamp(0.75rem, 3vw, 2.75rem);
-  padding-bottom: 0;
-}
-
-.lab .w-hero-tray .window {
-  position: absolute;
-  inset: var(--tray-pad) var(--tray-pad) auto;
-  border-bottom-right-radius: 0;
-  border-bottom-left-radius: 0;
 }
 
 /* The stack: a shorter band between two full screens. */
@@ -3612,7 +3606,7 @@ html.motion .lab .belt:hover .belt-track {
 /* The branching tour: the line fills, and its end moves to the next step.
    Hovering or focusing the section holds it. */
 html.motion .lab [data-steps][data-auto] button[aria-selected="true"] .step-progress {
-  animation: step-fill 5s linear forwards;
+  animation: step-fill 7s linear forwards;
 }
 
 html.motion .lab [data-steps]:is(:hover, :focus-within) .step-progress {
@@ -3973,8 +3967,23 @@ html:not(.motion) .lab .belt-track[aria-hidden] {
   display: none;
 }
 
-html.motion .lab .step-term:not([hidden]) .term-line {
-  animation: line-in 420ms var(--ease-out) calc(var(--n) * 240ms) both;
+/* Terminals play once their tray is in view, not on load, so the visitor
+   sees the command typed and the output arrive line by line. */
+html.motion .lab [data-peel][data-in] .term-line {
+  animation: line-in 500ms var(--ease-out) calc(var(--d) * 1ms) both;
+}
+
+html.motion .lab [data-peel][data-in] .term-cmd {
+  animation: term-type calc(var(--c) * 38ms) steps(var(--c), end) calc(var(--d) * 1ms) both;
+}
+
+@keyframes term-type {
+  from {
+    clip-path: inset(0 calc(100% - 2ch) 0 0);
+  }
+  to {
+    clip-path: inset(0 calc(100% - (var(--c) + 2) * 1ch) 0 0);
+  }
 }
 
 @keyframes line-in {

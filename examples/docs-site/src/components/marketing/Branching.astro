@@ -53,6 +53,22 @@ const steps = [
     ],
   },
 ];
+
+/**
+ * When each line appears, in ms. A command is typed out a character at a
+ * time; its output follows a beat after the last key, one line at a time,
+ * slow enough to read.
+ */
+const TYPE_MS = 38;
+const timeline = (lines: string[][]) => {
+  let at = 250;
+  return lines.map(([kind = "out", text = ""]) => {
+    const chars = kind === "cmd" ? text.length : 0;
+    const delay = at;
+    at += kind === "cmd" ? chars * TYPE_MS + 350 : 450;
+    return { kind, text, delay, chars };
+  });
+};
 ---
 
 <section class="screen" id="branching">
@@ -101,8 +117,8 @@ const steps = [
         </div>
         {
           steps.map((step, i) => (
-            <pre class="code step-term" id={`step-${step.id}`} role="tabpanel" aria-labelledby={`step-tab-${step.id}`} data-step-panel={step.id} hidden={i !== 0}><code>{step.lines.map(([kind, text], n) => (
-              <span class={`term-line term-${kind}`} style={`--n:${n}`}>{kind === "cmd" ? <><span class="tk-p">$ </span><span class="cli-bin">graft</span>{text.slice(5)}</> : text}{"\n"}</span>
+            <pre class="code step-term" id={`step-${step.id}`} role="tabpanel" aria-labelledby={`step-tab-${step.id}`} data-step-panel={step.id} hidden={i !== 0}><code>{timeline(step.lines).map(({ kind, text, delay, chars }) => (
+              <span class={`term-line term-${kind}`} style={`--d:${delay};--c:${chars}`}>{kind === "cmd" ? <><span class="tk-p">$ </span><span class="cli-bin">graft</span>{text.slice(5)}</> : text}{"\n"}</span>
             ))}</code></pre>
           ))
         }
