@@ -180,13 +180,35 @@ html[data-theme="dark"] .lab {
   height: 1rem;
 }
 
+/* The copy and check icons share one spot, so copying swaps one for the
+   other in place instead of popping. */
+.lab .icon-swap {
+  display: grid;
+  flex: none;
+}
+
+.lab .icon-swap > .icon {
+  grid-area: 1 / 1;
+}
+
 .lab .btn-command .icon-check,
 .lab .btn-command[data-copied] .icon-copy {
-  display: none;
+  opacity: 0;
+  filter: blur(4px);
+  transform: scale(0.25);
 }
 
 .lab .btn-command[data-copied] .icon-check {
-  display: block;
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
+html.motion .lab .icon-swap > .icon {
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    filter var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .lab .actions {
@@ -3698,6 +3720,38 @@ html.motion .lab .audience-row:not([hidden]) > .split-visual {
   from {
     opacity: 0;
     transform: translateY(0.5rem);
+  }
+}
+
+/* Things that change while you watch get the same short rise, so nothing
+   pops: the step text as the tour moves on, the outcome of an approval, and
+   the error that appears when the title is cleared. */
+html.motion .lab .step-copy:not([hidden]),
+html.motion .lab .b-error:not([hidden]),
+html.motion .lab .gate:not([data-state="pending"]) :is(.gate-result, .gate-after) {
+  animation: switch-in 240ms var(--ease-out) backwards;
+}
+
+html.motion .lab .gate:not([data-state="pending"]) .gate-after {
+  animation-delay: 140ms;
+}
+
+html.motion
+  .lab
+  .gate:not([data-state="pending"])
+  .gate-after[data-who="graft"][data-for="approved"] {
+  animation-delay: 280ms;
+}
+
+/* Framework code swaps with a quick fade only: it is text to read, so it
+   does not move. */
+html.motion .lab [data-tabs] [data-panel]:not([hidden]) {
+  animation: panel-in var(--duration-fast) var(--ease-out) backwards;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
   }
 }
 

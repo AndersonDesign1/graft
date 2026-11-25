@@ -12,7 +12,7 @@ const { command = INIT_CMD, quiet = false } = Astro.props;
 
 <button class:list={["btn", "btn-command", quiet && "btn-command-quiet"]} type="button" data-copy={command}>
   <span class="btn-command-text">{command}</span>
-  <svg
+  <span class="icon-swap" aria-hidden="true"><svg
     class="icon icon-copy"
     viewBox="0 0 24 24"
     fill="none"
@@ -36,6 +36,6 @@ const { command = INIT_CMD, quiet = false } = Astro.props;
     aria-hidden="true"
   >
     <path d="M20 6 9 17l-5-5"></path>
-  </svg>
+  </svg></span>
   <span class="visually-hidden" aria-live="polite"></span>
 </button>
