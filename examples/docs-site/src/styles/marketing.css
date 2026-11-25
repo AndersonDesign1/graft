@@ -878,7 +878,7 @@ html[data-theme="dark"] .lab .studio-poster-light {
 
 .lab .closing-legal {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
   grid-column: 1 / -1;
@@ -897,33 +897,49 @@ html[data-theme="dark"] .lab .studio-poster-light {
   margin-inline-start: auto;
 }
 
-.lab .closing-theme {
+.lab .theme-switch {
   display: inline-flex;
-  align-items: center;
-  min-height: 2rem;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border);
+  gap: 2px;
+  padding: 2px;
   border-radius: var(--radius);
+  background: var(--muted);
+}
+
+.lab .theme-switch button {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
   background: transparent;
   color: var(--muted-foreground);
-  font: inherit;
-  font-weight: var(--weight-medium);
   cursor: pointer;
   transition:
-    border-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+.lab .theme-switch button:active {
+  transform: scale(var(--press-scale));
+}
+
+.lab .theme-switch button[aria-checked="true"] {
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: var(--shadow-floating);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .lab .closing-theme:hover {
-    border-color: var(--muted-foreground);
+  .lab .theme-switch button:hover {
     color: var(--foreground);
   }
 }
 
-.lab .closing-theme:focus-visible {
+.lab .theme-switch button:focus-visible {
   outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: 1px;
 }
 
 /* ------------------------------------------------- hero entrance ------ */

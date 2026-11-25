@@ -1,0 +1,38 @@
+---
+/**
+ * The agent setup prompt in a dialog, once per page. Any button marked
+ * `data-agent-open` opens it: the hero's second button and the footer's.
+ */
+import Command from "./Command.astro";
+
+/** The same words the "No code needed" section hands an agent. */
+const prompt = "Set up a Graft site for me.";
+---
+
+<dialog class="agent-dialog" aria-labelledby="agent-dialog-title" data-agent-dialog>
+  <div class="agent-dialog-body">
+    <h2 class="h3" id="agent-dialog-title">Set up Graft with your agent</h2>
+    <p>
+      Paste this into Claude Code, Codex, Cursor or any agent you use. It asks you three questions,
+      then sets up your site and tells you what it did.
+    </p>
+    <Command command={prompt} />
+    <form method="dialog" class="agent-dialog-actions">
+      <button class="btn btn-ghost btn-small" type="submit">Close</button>
+    </form>
+  </div>
+</dialog>
+
+<script>
+  // Any agent button opens the prompt; a tap on the backdrop closes it, as
+  // do Escape and the Close button.
+  const dialog = document.querySelector<HTMLDialogElement>("[data-agent-dialog]");
+  if (dialog) {
+    for (const opener of document.querySelectorAll<HTMLButtonElement>("[data-agent-open]")) {
+      opener.addEventListener("click", () => dialog.showModal());
+    }
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  }
+</script>
