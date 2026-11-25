@@ -20,7 +20,7 @@ const { heading, lead, group, items } = Astro.props;
         items.map((item, i) => (
           <details name={group} open={i === 0}>
             <summary>{item.q}</summary>
-            <p>{item.a}</p>
+            <div class="faq-a"><p>{item.a}</p></div>
           </details>
         ))
       }

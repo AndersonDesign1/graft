@@ -129,8 +129,8 @@ const timeline = (lines: string[][]) => {
 
 <script>
   // The steps play through on their own, one every few seconds, while the
-  // section is on screen. Each tab carries its own progress line, and the
-  // end of that line is what moves to the next step, so pausing the line
+  // section is on screen. Each tab carries its own loading fill, and the
+  // end of that fill is what moves to the next step, so pausing the fill
   // (pointer over the section, or keyboard focus in it) pauses the tour.
   // Picking a step by hand stops the tour for good.
   const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;

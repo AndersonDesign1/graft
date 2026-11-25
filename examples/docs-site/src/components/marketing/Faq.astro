@@ -21,7 +21,7 @@ const faqs = doc?.data.faqs ?? [];
         faqs.map((faq, i) => (
           <details name="faq" open={i === 0}>
             <summary>{faq.question}</summary>
-            <p>{faq.answer}</p>
+            <div class="faq-a"><p>{faq.answer}</p></div>
           </details>
         ))
       }

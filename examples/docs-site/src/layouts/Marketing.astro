@@ -218,6 +218,59 @@ const { title, description, variant } = Astro.props;
         });
       }
 
+      // Questions open and close by their height, so an answer slides in
+      // under its question instead of snapping. Without script, or with
+      // reduced motion, the browser's own one-open-at-a-time details stand.
+      if (root.classList.contains("motion")) {
+        const all = [...document.querySelectorAll<HTMLDetailsElement>(".faq-list details")];
+        // The group is kept by hand: a shared name would close the other
+        // answer at once, before it could slide shut.
+        for (const details of all) {
+          details.dataset.group = details.name;
+          details.removeAttribute("name");
+        }
+        const isOpen = (details: HTMLDetailsElement) =>
+          details.open && details.dataset.closing === undefined;
+        const move = (details: HTMLDetailsElement, open: boolean) => {
+          const body = details.querySelector<HTMLElement>(".faq-a");
+          if (!body) {
+            details.open = open;
+            return;
+          }
+          const from = details.open ? body.getBoundingClientRect().height : 0;
+          for (const running of body.getAnimations()) running.cancel();
+          details.open = true;
+          const to = open ? body.scrollHeight : 0;
+          if (open) delete details.dataset.closing;
+          else details.dataset.closing = "";
+          const slide = body.animate(
+            [
+              { height: `${from}px`, opacity: open && from === 0 ? 0 : 1 },
+              { height: `${to}px`, opacity: open ? 1 : 0 },
+            ],
+            { duration: 280, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
+          );
+          slide.addEventListener("finish", () => {
+            if (open) return;
+            details.open = false;
+            delete details.dataset.closing;
+          });
+        };
+        for (const details of all) {
+          details.querySelector("summary")?.addEventListener("click", (event) => {
+            event.preventDefault();
+            const opening = !isOpen(details);
+            if (opening) {
+              for (const other of all) {
+                if (other !== details && other.dataset.group === details.dataset.group && isOpen(other))
+                  move(other, false);
+              }
+            }
+            move(details, opening);
+          });
+        }
+      }
+
       // The nav takes a ground once the page has moved under it.
       const nav = document.querySelector(".lab-nav");
       const onScroll = () => nav?.toggleAttribute("data-scrolled", window.scrollY > 8);
