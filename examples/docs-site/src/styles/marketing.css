@@ -359,6 +359,64 @@ html[data-theme="dark"] .lab {
   }
 }
 
+/* The agent prompt, opened from the hero. */
+.lab .agent-dialog {
+  width: min(32rem, calc(100% - 2rem));
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-outer);
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: var(--shadow-floating);
+}
+
+.lab .agent-dialog::backdrop {
+  background: color-mix(in oklch, var(--background) 70%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.lab .agent-dialog-body {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-4);
+  padding: clamp(1.25rem, 4vw, 2rem);
+}
+
+.lab .agent-dialog-body p {
+  color: var(--muted-foreground);
+}
+
+.lab .agent-dialog-body .btn-command {
+  max-width: 100%;
+}
+
+.lab .agent-dialog-actions {
+  justify-self: end;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lab .agent-dialog[open] {
+    transition:
+      opacity var(--duration-base) var(--ease-out),
+      transform var(--duration-base) var(--ease-out);
+  }
+
+  .lab .agent-dialog[open]::backdrop {
+    transition: opacity var(--duration-base) var(--ease-out);
+  }
+
+  @starting-style {
+    .lab .agent-dialog[open] {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+
+    .lab .agent-dialog[open]::backdrop {
+      opacity: 0;
+    }
+  }
+}
+
 /* ---------------------------------------------------------- screens --- */
 
 /* One section, one screen. A section is at least the height of the window
