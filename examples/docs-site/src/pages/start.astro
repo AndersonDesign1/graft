@@ -11,12 +11,12 @@ import {
   NuxtIcon,
   SvelteIcon,
   TanstackIcon,
-} from "../../components/icons/FrameworkIcons";
-import FaqList from "../../components/lab/FaqList.astro";
-import Mark from "../../components/lab/Mark.astro";
-import NoCode from "../../components/lab/NoCode.astro";
-import Shot from "../../components/lab/Shot.astro";
-import Lab from "../../layouts/Lab.astro";
+} from "../components/icons/FrameworkIcons";
+import FaqList from "../components/marketing/FaqList.astro";
+import Mark from "../components/marketing/Mark.astro";
+import NoCode from "../components/marketing/NoCode.astro";
+import Shot from "../components/marketing/Shot.astro";
+import Marketing from "../layouts/Marketing.astro";
 
 const prompt = "Set up a Graft site for me. Follow https://graft.page/docs/start";
 const wants = ["a shop for my bakery", "a blog I can write on", "a portfolio for my photos", "the docs for my product"];
@@ -70,11 +70,10 @@ const outcomes = [
 ];
 ---
 
-<Lab
+<Marketing
   title="Start with Graft"
   description="Get a website you can edit yourself, with an AI agent doing the setup."
   variant="page"
-  theme="system"
 >
   <section class="screen hero start-hero" data-enter>
     <div class="wrap center-copy">
@@ -246,4 +245,4 @@ const outcomes = [
   </section>
 
   <FaqList heading="Questions before you start" group="start-faq" items={questions} />
-</Lab>
+</Marketing>

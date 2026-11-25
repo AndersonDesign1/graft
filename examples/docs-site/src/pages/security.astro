@@ -1,216 +1,167 @@
 ---
 /**
- * Security — "why it's safe to let an agent run your CMS."
- *
- * The argument is structural, so the page shows structures: the approval
- * gate as a transcript, role separation as two credential columns, the audit
- * row as a receipt, and a content edit as the diff it always was. Every claim
- * links to the doc that teaches the mechanism (receipts grid, §05).
- *
- * Meta (title / tagline / description / faqs) comes from the `security`
- * document in Graft — same dogfood pattern as the Why page.
+ * Security, in the new design. Every section of the old page is here: the
+ * four defaults, the gate step by step, the two credentials and what each
+ * can do, the audit row, an agent edit as a diff, the mechanisms with their
+ * docs, and the questions read from the `security` document.
  */
-import { LandingFaq } from "../components/landing/faq";
-import Landing from "../layouts/Landing.astro";
+import FaqList from "../components/marketing/FaqList.astro";
+import Rings from "../components/marketing/Rings.astro";
+import Shot from "../components/marketing/Shot.astro";
+import Marketing from "../layouts/Marketing.astro";
 import { getGraft } from "../lib/graft";
 
 const doc = await getGraft().getContent("pages", "security");
-if (!doc) {
-  return new Response(null, { status: 404, statusText: "Not Found" });
-}
-
-const faqs = doc.data.faqs ?? [];
-
-/* ---- §00 the default position ------------------------------------------- */
+const faqs = (doc?.data.faqs ?? []).map((faq) => ({ q: faq.question, a: faq.answer }));
 
 const pillars = [
-  {
-    n: "01",
-    title: "Git is the record",
-    body: "Every content write lands as a file in your repository. Nothing bypasses history: a change is a reviewable diff before it is anything else.",
-  },
-  {
-    n: "02",
-    title: "Destructive waits for you",
-    body: "Functions marked destructive never execute on the first call. They file a one-shot, input-bound approval and stop until a human decides.",
-  },
-  {
-    n: "03",
-    title: "Identity is verified, never minted",
-    body: "Tokens are checked against OIDC issuers you name. A bad token is a 401 that says so — never a silent downgrade to anonymous.",
-  },
-  {
-    n: "04",
-    title: "Your infrastructure, no phone-home",
-    body: "Your Postgres. Your object store. No telemetry. There is no Graft cloud in the path — nothing extra to trust or harden.",
-  },
-] as const;
-
-/* ---- §01 the gate -------------------------------------------------------- */
-
-// The real sequence, verbatim in shape: 403 with an id, a human decision, a
-// one-shot retry. The comment column is part of the teaching.
+  { title: "Git is the record", body: "Every content change lands as a file in your repository. A change is something you can read and undo before it is anything else." },
+  { title: "Destructive waits for you", body: "Anything marked destructive never runs on the first call. It files a request for that one action and stops until a person decides." },
+  { title: "Identity is verified, never assumed", body: "Sign-in tokens are checked against the providers you name. A bad token is refused outright, never quietly treated as a guest." },
+  { title: "Your infrastructure, nothing phoning home", body: "Your database and your file storage. No telemetry, and no Graft cloud in the path to trust or secure." },
+];
 const gate = [
-  { who: "agent", text: 'deleteSubmission { id: "sub_9f2c" }', note: "destructive" },
-  {
-    who: "graft",
-    text: "403 · approval filed: ap_01H…",
-    note: "nothing executed",
-  },
-  { who: "human", text: "graft approve ap_01H…", note: "your call" },
-  { who: "agent", text: 'retry · approval: "ap_01H…"', note: "bound to this exact input" },
-  { who: "graft", text: "200 { data: … }", note: "consumed once; replay files nothing" },
-] as const;
-
+  { who: "Agent", text: 'deleteSubmission { id: "sub_9f2c" }', note: "A destructive call" },
+  { who: "Graft", text: "403 · approval filed: ap_01H…", note: "Nothing has run" },
+  { who: "You", text: "graft approve ap_01H…", note: "Your decision" },
+  { who: "Agent", text: 'retry · approval: "ap_01H…"', note: "Tied to this exact request" },
+  { who: "Graft", text: "200 { data: … }", note: "Used once. A replay does nothing" },
+];
 const gateProps = [
-  { k: "One-shot", v: "consume flips approved → consumed exactly once" },
-  { k: "Input-bound", v: "approve A, execute B is impossible" },
-  { k: "Self-decision refused", v: "the approver cannot be the requester" },
-] as const;
-
-/* ---- §02 role separation -------------------------------------------------- */
-
+  { k: "Once", v: "An approval is used up by the one call it allows" },
+  { k: "Exact", v: "Approving one thing can never run another" },
+  { k: "Separate", v: "Whoever asked cannot be the one who approves" },
+];
 const roles = [
   {
-    label: "Runtime credential",
-    sub: "serves your app and its agents",
-    can: [
-      "Serve functions under your access rules",
-      "File an approval request (INSERT)",
-      "Consume an approved row — via SECURITY DEFINER only",
-      "Write its own audit rows",
-    ],
-    cannot: ["Flip pending → approved", "Decide its own request", "Touch approvals directly"],
+    label: "The site's own login",
+    sub: "Runs your app and serves its agents",
+    can: ["Serve your functions under your access rules", "File an approval request", "Use an approval a person has granted", "Write its own audit rows"],
+    cannot: ["Mark a request approved", "Decide its own request", "Change approvals directly"],
   },
   {
-    label: "Operator credential",
-    sub: "yours, used by graft approve",
-    can: [
-      "Decide approvals (approve / deny)",
-      "Compile, migrate, branch, merge",
-      "Own the schema and migrations",
-    ],
+    label: "Your login",
+    sub: "Used when you run graft approve",
+    can: ["Approve or deny requests", "Build, migrate, branch and merge", "Own the database structure"],
     cannot: [],
   },
-] as const;
-
-/* ---- §03 receipts ---------------------------------------------------------- */
-
+];
 const auditRow = [
-  { k: "actor", v: "agent:mcp · 9f2c…" },
-  { k: "function", v: "deleteSubmission" },
-  { k: "git sha", v: "cb3060b" },
-  { k: "status", v: "403" },
-  { k: "duration", v: "1.8 ms" },
-  { k: "correlation", v: "x-graft-correlation-id" },
-] as const;
-
-/* ---- §05 receipts in the docs --------------------------------------------- */
-
+  { k: "Who", v: "agent:mcp · 9f2c…" },
+  { k: "What", v: "deleteSubmission" },
+  { k: "Version of the site", v: "cb3060b" },
+  { k: "Result", v: "403" },
+  { k: "Took", v: "1.8 ms" },
+  { k: "Trace", v: "x-graft-correlation-id" },
+];
 const receipts = [
-  { href: "/docs/audit-and-approvals", title: "Audit & approvals", note: "The gate, end to end" },
-  { href: "/docs/auth", title: "Auth", note: "Verify identity, never mint it" },
-  { href: "/docs/functions-and-access", title: "Functions & access", note: "Scopes, public opt-out" },
-  { href: "/docs/the-model", title: "The model", note: "Git authoritative, index derived" },
-  { href: "/docs/deploy", title: "Deploy & harden", note: "graft harden, container defaults" },
-  { href: "/docs/agent-surface", title: "Agent surface", note: "What agents can reach, precisely" },
-] as const;
+  { href: "/docs/audit-and-approvals", title: "Audit and approvals", note: "The gate, end to end" },
+  { href: "/docs/auth", title: "Auth", note: "Checking who is calling" },
+  { href: "/docs/functions-and-access", title: "Functions and access", note: "Who may call what" },
+  { href: "/docs/the-model", title: "How Graft works", note: "Git is the source, the index is derived" },
+  { href: "/docs/hardening", title: "Hardening", note: "A site login that cannot approve" },
+  { href: "/docs/agent-surface", title: "Agents", note: "Exactly what an agent can reach" },
+];
 ---
 
-<Landing title={`${doc.data.title} — Graft`} description={doc.data.description}>
-  <div class="why landing">
-    <section class="why-hero section">
-      <p class="section-label"><em>security</em></p>
-      <h1>
-        Let the agent drive.<br />
-        <span class="marked">Keep the keys.</span>
-      </h1>
-      <p class="section-lede why-lede">
-        {doc.data.tagline ??
-          "Graft assumes the operator is an autonomous agent. The safety story is structural."}
-      </p>
-      <div class="why-hero-actions">
-        <a class="button-primary" href="/docs/audit-and-approvals">How the gate works</a>
-        <a class="button-ghost" href="/docs/getting-started">Getting started</a>
+<Marketing
+  title="Graft security"
+  description={doc?.data.description ?? "How Graft keeps an agent-operated site safe."}
+  variant="page"
+>
+  <section class="screen hero" data-enter>
+    <div class="wrap page-top">
+      <div class="w-hero-copy">
+        <h1 class="h1 w-h1">Let the agent drive. Keep the keys.</h1>
+        <p class="lead">
+          {doc?.data.tagline ?? "Graft assumes the one doing the work is an agent."}
+          So the safety is built into how it works, not left to a promise or a setting you might
+          forget.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/docs/audit-and-approvals">See how approvals work</a>
+          <a class="btn btn-ghost" href="/start">Get started</a>
+        </div>
       </div>
-    </section>
-
-    <section class="section reveal" aria-label="The default position">
-      <p class="section-label"><em>the default position</em></p>
-      <h2>Safe by construction, <span class="marked">not by promise.</span></h2>
-      <p class="section-lede">
-        Four properties hold before you configure anything. Each one is code you
-        can read.
-      </p>
-      <ul class="why-pillar-grid">
+      <ol class="bounds-grid pillars" data-reveal>
         {
-          pillars.map((p) => (
-            <li class="why-pillar">
-              <h3>{p.title}</h3>
-              <p>{p.body}</p>
+          pillars.map((item) => (
+            <li>
+              <h2 class="h3">{item.title}</h2>
+              <p>{item.body}</p>
             </li>
           ))
         }
-      </ul>
-    </section>
+      </ol>
+    </div>
+  </section>
 
-    <section class="section reveal" aria-label="The approval gate">
-      <p class="section-label"><em>the gate</em></p>
-      <h2>Destructive ops <span class="marked">ask twice.</span></h2>
-      <p class="section-lede">
-        A destructive function's first call never executes. It files an approval
-        bound to the exact input, and the retry only succeeds after a human has
-        decided.
-      </p>
-      <div class="sec-flow" role="img" aria-label="Approval flow: agent call refused with an approval id, human approves, retry succeeds once">
-        {
-          gate.map((line) => (
-            <div class="sec-flow-line">
-              <span class="sec-flow-who" data-who={line.who}>
-                {line.who}
-              </span>
-              <code class="sec-flow-text">{line.text}</code>
-              <span class="sec-flow-note">{line.note}</span>
-            </div>
-          ))
-        }
+  <section class="screen" id="gate">
+    <div class="wrap split">
+      <div class="split-text" data-reveal>
+        <h2 class="h2">Destructive actions ask twice</h2>
+        <p class="lead">
+          The first call never runs. It files a request and stops. Only after a person approves
+          does the same call, repeated, go through.
+        </p>
+        <ul class="facts">
+          {
+            gateProps.map((item) => (
+              <li>
+                <span>{item.k}</span>
+                <span>{item.v}</span>
+              </li>
+            ))
+          }
+        </ul>
       </div>
-      <dl class="sec-props">
-        {
-          gateProps.map((p) => (
-            <div class="sec-prop">
-              <dt>{p.k}</dt>
-              <dd>{p.v}</dd>
-            </div>
-          ))
-        }
-      </dl>
-    </section>
+      <div class="tray split-visual" data-peel>
+        <Rings cx={78} cy={72} seed={71} />
+        <div class="window">
+          <div class="window-bar">
+            <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="window-title">A delete, step by step</span>
+          </div>
+          <ol class="sequence">
+            {
+              gate.map((step) => (
+                <li>
+                  <span class="sequence-who">{step.who}</span>
+                  <code>{step.text}</code>
+                  <span class="sequence-note">{step.note}</span>
+                </li>
+              ))
+            }
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    <section class="section reveal" aria-label="Role separation">
-      <p class="section-label"><em>role separation</em></p>
-      <h2>The runtime role <span class="marked">cannot self-approve.</span></h2>
-      <p class="section-lede">
-        Separation of duties lives in Postgres, not in a promise: consuming an
-        approved request rides a SECURITY DEFINER function, while deciding stays
-        an operator-role UPDATE stamped server-side with <code>decided_role</code>.
-        Raw SQL with the runtime credential does not change that.
-      </p>
-      <div class="why-role-grid">
+  <section class="screen" id="logins">
+    <div class="wrap two-up">
+      <div class="stack-head" data-reveal>
+        <h2 class="h2">The site cannot approve its own request</h2>
+        <p class="lead">
+          Graft uses two database logins. The one that runs your site can ask. Only yours can say
+          yes. Even direct access with the site's login cannot change that.
+        </p>
+      </div>
+      <div class="closing-cards" data-reveal>
         {
-          roles.map((r) => (
-            <div class="why-role">
-              <p class="why-role-label">{r.label}</p>
-              <p class="sec-role-sub">{r.sub}</p>
-              <ul>
-                {r.can.map((item) => (
+          roles.map((role) => (
+            <div class="closing-card operator">
+              <p class="who">{role.sub}</p>
+              <h3 class="h3">{role.label}</h3>
+              <ul class="points">
+                {role.can.map((item) => (
                   <li>{item}</li>
                 ))}
               </ul>
               {
-                r.cannot.length > 0 && (
-                  <ul class="sec-role-cannot">
-                    {r.cannot.map((item) => (
+                role.cannot.length > 0 && (
+                  <ul class="points points-no">
+                    {role.cannot.map((item) => (
                       <li>{item}</li>
                     ))}
                   </ul>
@@ -220,96 +171,80 @@ const receipts = [
           ))
         }
       </div>
-      <p class="sec-hardening">
-        One command sets it up on your database:
-        <code>graft harden graft_runtime</code>
-      </p>
-    </section>
+    </div>
+  </section>
 
-    <section class="section reveal" aria-label="Audit trail">
-      <p class="section-label"><em>receipts</em></p>
-      <h2>Every call leaves a row.</h2>
-      <p class="section-lede">
-        Actor, function, input hash, status, duration, correlation id, and the
-        git SHA of the serving code. Hand the correlation id back and the row
-        comes up; rate limits count these same rows, refusals included.
-      </p>
-      <div class="sec-audit">
-        <p class="sec-audit-table">audit_log</p>
-        <dl class="sec-audit-grid">
-          {
-            auditRow.map((f) => (
-              <div class="sec-audit-field">
-                <dt>{f.k}</dt>
-                <dd>{f.v}</dd>
-              </div>
-            ))
-          }
-        </dl>
+  <section class="screen" id="audit">
+    <div class="wrap split">
+      <div class="split-text" data-reveal>
+        <h2 class="h2">Every call leaves a row</h2>
+        <p class="lead">
+          Each function call is recorded: who made it, what it was, how it went and how long it
+          took. What they sent is not recorded, so the log never becomes a second copy of your
+          users' data.
+        </p>
+        <a class="link" href="/docs/observability">Read about tracing a call</a>
       </div>
-    </section>
+      <div class="tray split-visual" data-peel>
+        <Rings cx={24} cy={30} seed={83} />
+        <div class="window">
+          <div class="window-bar">
+            <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="window-title">audit_log</span>
+          </div>
+          <ul class="facts audit-facts">
+            {
+              auditRow.map((item) => (
+                <li>
+                  <span>{item.k}</span>
+                  <span>
+                    <code>{item.v}</code>
+                  </span>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    <section class="section reveal" aria-label="Blast radius">
-      <p class="section-label"><em>blast radius</em></p>
-      <h2>An agent edit <span class="marked">is a diff.</span></h2>
-      <p class="section-lede">
-        An agent edit is a file edit. It shows up in <code>git status</code>, in
-        your editor, in the Studio's Changes drawer. Undo belongs to git — scoped
-        to the content directory, nothing else.
-      </p>
-      <pre class="sec-diff" aria-hidden="true"><code><span class="sec-diff-meta">content/pages/home.mdx</span><span class="sec-diff-del">-  description: The old positioning line</span><span class="sec-diff-add">+  description: The new positioning line</span></code></pre>
-      <p class="sec-blast-caveat">
-        The honest limit: a stolen <strong>runtime</strong> credential is the
-        exception. Raw SQL under that role can rewrite or hide{" "}
-        <code>content_index</code> rows, and those writes never appear in git —
-        undo is a restore or a recompile, not <code>git checkout</code>.
-        Projection needs <code>INSERT</code>/<code>UPDATE</code> on that table.
-        The human gate on MCP <code>delete_content</code> is an application
-        control against a tool being misused — not a database lock. The
-        approval table is the exception, deliberately: the runtime role cannot
-        decide, even with raw SQL.
-      </p>
-    </section>
+  <section class="screen" id="diff">
+    <div class="wrap split split-wide">
+      <div class="split-text" data-reveal>
+        <h2 class="h2">An agent's edit is something you can read</h2>
+        <p class="lead">
+          Agents write files, not hidden records. Every edit shows up as lines removed and lines
+          added, in Studio and in Git, before it goes live.
+        </p>
+        <a class="link" href="/docs/the-model">Read how Graft works</a>
+      </div>
+      <div class="tray split-visual" data-peel>
+        <Shot name="changes" alt="Studio showing the lines removed and added in a page." />
+      </div>
+    </div>
+  </section>
 
-    <section class="why-receipts section reveal" aria-label="Receipts in the docs">
-      <p class="section-label"><em>in the docs</em></p>
-      <h2>Mechanisms, documented.</h2>
-      <p class="section-lede">Every claim on this page links to the page that teaches it.</p>
-      <ul class="why-receipt-grid">
+  <section class="screen" id="receipts">
+    <div class="wrap wall">
+      <div class="wall-head" data-reveal>
+        <h2 class="h2">Mechanisms, documented</h2>
+        <p class="lead">Each protection links to the page that explains how it is built.</p>
+      </div>
+      <ul class="receipts" data-reveal>
         {
-          receipts.map((r) => (
+          receipts.map((item) => (
             <li>
-              <a href={r.href}>
-                <span class="why-receipt-title">{r.title}</span>
-                <span class="why-receipt-note">{r.note}</span>
+              <a class="receipt" href={item.href}>
+                <span class="receipt-title">{item.title}</span>
+                <span class="receipt-note">{item.note}</span>
               </a>
             </li>
           ))
         }
       </ul>
-    </section>
+    </div>
+  </section>
 
-    {
-      faqs.length > 0 && (
-        <section class="section reveal" id="faq" aria-labelledby="security-faq-heading">
-          <p class="section-label"><em>faq</em></p>
-          <h2 id="security-faq-heading">Asked about trust</h2>
-          <LandingFaq items={faqs} />
-        </section>
-      )
-    }
-
-    <section class="section section-start reveal" id="start">
-      <p class="section-label"><em>begin</em></p>
-      <h2>Run it on <span class="marked">your keys.</span></h2>
-      <p class="section-lede">
-        Scaffold locally. Point it at your Postgres. Harden the runtime role
-        before anything external speaks to it.
-      </p>
-      <div class="why-hero-actions">
-        <a class="button-primary" href="/docs/getting-started">Getting started</a>
-        <a class="button-ghost" href="/docs/deploy">Self-host & deploy</a>
-      </div>
-    </section>
-  </div>
-</Landing>
+  {faqs.length > 0 && <FaqList heading="Asked about trust" group="security-faq" items={faqs} />}
+</Marketing>

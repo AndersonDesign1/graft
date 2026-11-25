@@ -1,5 +1,6 @@
 /**
- * The landing previews under /lab.
+ * graft.page's marketing pages: the landing page, Agents, Studio, Start,
+ * Why and Security.
  *
  * Every color, radius, shadow and easing is a token from @usegraft/tokens,
  * and the faces are the ones the docs use: IBM Plex Sans for everything a
@@ -8,7 +9,7 @@
  * What is new here is what a landing page needs and a docs page does not:
  * a display scale (below), a page laid out in screens, and the tray, the
  * ground a product window sits on. These are proposals for a "Landing"
- * section in DESIGN.md and stay in this file until one direction is chosen.
+ * section in DESIGN.md.
  */
 
 .lab {
@@ -736,61 +737,43 @@ html[data-theme="dark"] .lab .studio-poster-light {
   font-size: var(--lab-label);
 }
 
-/* ---------------------------------------------------- preview bar ----- */
+/* --------------------------------------------------- theme switch ----- */
 
-.lab-bar {
-  position: fixed;
-  bottom: var(--space-4);
-  left: 50%;
-  z-index: 25;
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border-radius: var(--radius-outer);
-  background: var(--elevated);
-  box-shadow: var(--shadow-floating);
-  font-size: var(--lab-label);
-  transform: translateX(-50%);
-  max-width: calc(100% - 1rem);
-  overflow-x: auto;
-  white-space: nowrap;
+.lab .closing-legal {
+  flex-wrap: wrap;
 }
 
-.lab-bar a,
-.lab-bar button {
+.lab .closing-legal > span:nth-child(2) {
+  margin-inline-start: auto;
+}
+
+.lab .closing-theme {
   display: inline-flex;
   align-items: center;
   min-height: 2rem;
   padding: 0 var(--space-3);
-  border: 0;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: transparent;
   color: var(--muted-foreground);
   font: inherit;
   font-weight: var(--weight-medium);
-  text-decoration: none;
   cursor: pointer;
   transition:
-    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
     color var(--duration-fast) var(--ease-out);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .lab-bar a:hover,
-  .lab-bar button:hover {
+  .lab .closing-theme:hover {
+    border-color: var(--muted-foreground);
     color: var(--foreground);
   }
 }
 
-.lab-bar a[aria-current="page"] {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.lab-bar-theme {
-  margin-left: var(--space-1);
-  box-shadow: -1px 0 0 var(--border);
+.lab .closing-theme:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* ------------------------------------------------- hero entrance ------ */

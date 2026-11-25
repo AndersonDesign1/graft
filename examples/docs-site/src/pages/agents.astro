@@ -3,15 +3,15 @@
  * The Agents page. Its own shape: the exchange is the hero, and the middle
  * of the page is a wall of every tool an agent gets, in plain words.
  */
-import Command from "../../components/lab/Command.astro";
-import DayOne from "../../components/lab/DayOne.astro";
-import FaqList from "../../components/lab/FaqList.astro";
-import Gate from "../../components/lab/Gate.astro";
-import Mark from "../../components/lab/Mark.astro";
-import Rings from "../../components/lab/Rings.astro";
-import Transcript from "../../components/lab/Transcript.astro";
-import { agents } from "../../components/lab/agents";
-import Lab from "../../layouts/Lab.astro";
+import Command from "../components/marketing/Command.astro";
+import DayOne from "../components/marketing/DayOne.astro";
+import FaqList from "../components/marketing/FaqList.astro";
+import Gate from "../components/marketing/Gate.astro";
+import Mark from "../components/marketing/Mark.astro";
+import Rings from "../components/marketing/Rings.astro";
+import Transcript from "../components/marketing/Transcript.astro";
+import { agents } from "../components/marketing/agents";
+import Marketing from "../layouts/Marketing.astro";
 
 const tools = [
   {
@@ -83,11 +83,10 @@ const steps = [
 ];
 ---
 
-<Lab
+<Marketing
   title="Graft for agents"
   description="What an AI agent can do in a Graft project, how it connects, and the limits that keep your content safe."
   variant="page"
-  theme="system"
 >
   <section class="screen hero" data-enter>
     <div class="wrap split split-hero">
@@ -318,4 +317,4 @@ const steps = [
   </section>
 
   <FaqList heading="Questions about agents" group="agents-faq" items={questions} />
-</Lab>
+</Marketing>

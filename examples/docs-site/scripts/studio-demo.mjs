@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Put a static copy of Studio in `public/studio-demo/` for the landing
- * previews under `/lab`.
+ * marketing pages.
  *
  * It copies the built Studio bundle (`packages/studio/dist/ui`), adds the
  * recorded API responses and the script that replays them

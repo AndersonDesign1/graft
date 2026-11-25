@@ -4,14 +4,14 @@
  * the middle is four real screens of a working day, and the roles climb
  * like a staircase.
  */
-import Command from "../../components/lab/Command.astro";
-import Branching from "../../components/lab/Branching.astro";
-import FaqList from "../../components/lab/FaqList.astro";
-import Gate from "../../components/lab/Gate.astro";
-import Rings from "../../components/lab/Rings.astro";
-import Shot from "../../components/lab/Shot.astro";
-import StudioFrame from "../../components/lab/StudioFrame.astro";
-import Lab from "../../layouts/Lab.astro";
+import Command from "../components/marketing/Command.astro";
+import Branching from "../components/marketing/Branching.astro";
+import FaqList from "../components/marketing/FaqList.astro";
+import Gate from "../components/marketing/Gate.astro";
+import Rings from "../components/marketing/Rings.astro";
+import Shot from "../components/marketing/Shot.astro";
+import StudioFrame from "../components/marketing/StudioFrame.astro";
+import Marketing from "../layouts/Marketing.astro";
 
 const day = [
   { name: "list", title: "Find it", body: "Every page in one list. Search it, filter drafts, or sort it the way your site does.", alt: "Studio's list of documentation pages with a search field and a drafts filter." },
@@ -38,11 +38,10 @@ const roles = [
 ];
 ---
 
-<Lab
+<Marketing
   title="Graft Studio"
   description="An editor for people who would rather not edit files: find, create, edit and publish content in a browser."
   variant="page"
-  theme="system"
 >
   <section class="screen hero studio-hero" data-enter>
     <div class="wrap studio-hero-grid">
@@ -53,7 +52,7 @@ const roles = [
           drafts and publish, in a browser, with no code to touch.
         </p>
         <div class="actions">
-          <a class="btn btn-primary" href="/lab/start">Get started</a>
+          <a class="btn btn-primary" href="/start">Get started</a>
           <a class="btn btn-ghost" href="/docs/studio">Read about Studio</a>
         </div>
       </div>
@@ -203,4 +202,4 @@ const roles = [
   <Branching />
   <Gate />
   <FaqList heading="Questions about Studio" group="studio-faq" items={questions} />
-</Lab>
+</Marketing>

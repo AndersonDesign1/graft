@@ -1,121 +1,91 @@
 ---
 /**
- * Why Graft — the argument, not a second hero. Pillars, roles, and receipts
- * live here; FAQ + meta come from the `why` document. Landing stage copy
- * stays on `/`.
+ * Why Graft, in the new design. Every section of the old page is here: the
+ * four foundations, the two operators, the claims with their docs, and the
+ * questions read from the `why` document. It adds the day-one argument the
+ * landing page only states.
  */
-import { LandingFaq } from "../components/landing/faq";
-import Landing from "../layouts/Landing.astro";
+import DayOne from "../components/marketing/DayOne.astro";
+import FaqList from "../components/marketing/FaqList.astro";
+import Marketing from "../layouts/Marketing.astro";
 import { getGraft } from "../lib/graft";
 
 const doc = await getGraft().getContent("pages", "why");
-if (!doc) {
-  return new Response(null, { status: 404, statusText: "Not Found" });
-}
-
-const faqs = doc.data.faqs ?? [];
+const faqs = (doc?.data.faqs ?? []).map((faq) => ({ q: faq.question, a: faq.answer }));
 
 const pillars = [
-  {
-    n: "01",
-    title: "Open source",
-    body: "Packages live in the monorepo. Read the compiler, the MCP server, the CLI. No hosted CMS black box.",
-  },
-  {
-    n: "02",
-    title: "Self-hostable",
-    body: "Your Postgres. Your object store. One Docker image, split compose, or handlers mounted in your app.",
-  },
-  {
-    n: "03",
-    title: "No dashboard required",
-    body: "Admin UIs lock agents behind a mouse. Author MDX, run the CLI, or speak MCP. Same loop for you and the agent.",
-  },
-  {
-    n: "04",
-    title: "You still own the gate",
-    body: "Destructive ops file an approval. You decide with graft approve. Runtime credentials cannot self-approve.",
-  },
-] as const;
-
+  { title: "Open source", body: "All of Graft is public. Read how it checks your content, how agents connect, and what the editor does. There is no hosted black box." },
+  { title: "Yours to host", body: "Your database, your file storage, your server. Run it as one container, or inside the app you already have." },
+  { title: "No dashboard required", body: "An admin screen locks an agent behind a mouse. In Graft you can edit files, use the command line or connect an agent. The editor is there for the people who want one." },
+  { title: "You still hold the gate", body: "Anything destructive files a request and waits. A person decides, and the system that runs your site cannot approve its own request." },
+];
 const roles = [
   {
     label: "You",
-    items: [
-      "Own the repo and merges",
-      "Define schema and access in code",
-      "Run graft approve on destructive ops",
-      "Deploy a hardened runtime role",
-    ],
+    items: ["Own the site's files and what gets merged", "Define the content model and who has access", "Approve or refuse anything destructive", "Choose where it runs"],
   },
   {
     label: "Your agent",
-    items: [
-      "Author and refactor content via MCP / CLI",
-      "Discover schema with describe_schema",
-      "Retry gated calls with the approval id",
-      "Call functions under runtime limits",
-    ],
+    items: ["Writes and reworks content", "Reads your content model before it writes", "Repeats a held request once you approve it", "Runs your functions within your limits"],
   },
-] as const;
-
+];
 const receipts = [
-  { href: "/docs/what-is-graft", title: "What is Graft", note: "Open source, self-host, the loop" },
-  { href: "/docs/branching-previews", title: "Branching", note: "Overlay or Neon CoW previews" },
-  { href: "/docs/owned-primitives", title: "Owned primitives", note: "graft add copies source in" },
-  { href: "/docs/deploy", title: "Deploy", note: "Container or embedded handlers" },
-  { href: "/docs/audit-and-approvals", title: "Approvals", note: "Human gates, audit trail" },
-  { href: "/docs/agent-surface", title: "Agent surface", note: "MCP tools that teach the fix" },
-] as const;
+  { href: "/docs/what-is-graft", title: "What is Graft", note: "Open source, self-hosted, how it works" },
+  { href: "/docs/branching-previews", title: "Branching", note: "Preview a change before it is live" },
+  { href: "/docs/owned-primitives", title: "Owned primitives", note: "Features added as your own code" },
+  { href: "/docs/deploy", title: "Deploy", note: "A container, or inside your app" },
+  { href: "/docs/audit-and-approvals", title: "Approvals", note: "A person decides, and it is recorded" },
+  { href: "/docs/agent-surface", title: "Agents", note: "Tools that tell an agent the fix" },
+];
 ---
 
-<Landing title={`${doc.data.title} — Graft`} description={doc.data.description}>
-  <div class="why landing">
-    <section class="why-hero section">
-      <p class="section-label"><em>why</em></p>
-      <h1>
-        Content as code.<br />
-        <span class="marked">Skip the dashboard.</span>
-      </h1>
-      <p class="section-lede why-lede">
-        {doc.data.tagline ??
-          "Built for agents and the people who run them. Open source. Self-hostable."}
-      </p>
-      <div class="why-hero-actions">
-        <a class="button-primary" href="/docs/what-is-graft">What is Graft</a>
-        <a class="button-ghost" href="/docs/getting-started">Getting started</a>
+<Marketing
+  title="Why Graft"
+  description={doc?.data.description ?? "Why a CMS built for agents and the people who run them."}
+  variant="page"
+>
+  <section class="screen hero" data-enter>
+    <div class="wrap page-top">
+      <div class="w-hero-copy">
+        <h1 class="h1 w-h1">Content as code. Skip the dashboard.</h1>
+        <p class="lead">
+          {doc?.data.tagline ?? "Built for how people ship now. Agents and the humans who run them."}
+          Most of the work on a site is now done with an agent. Graft is the CMS that was designed
+          around that.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/start">Get started</a>
+          <a class="btn btn-ghost" href="/docs/what-is-graft">Read what Graft is</a>
+        </div>
       </div>
-    </section>
-
-    <section class="why-pillars section" aria-label="What Graft is">
-      <p class="section-label"><em>foundations</em></p>
-      <h2>Open source. Self-hostable. <span class="marked">Yours to run.</span></h2>
-      <p class="section-lede">
-        No Graft cloud in the critical path. Point <code>DATABASE_URL</code> at your database,
-        mount your project, ship.
-      </p>
-      <ul class="why-pillar-grid">
+      <ol class="bounds-grid pillars" data-reveal>
         {
-          pillars.map((p) => (
-            <li class="why-pillar">
-              <h3>{p.title}</h3>
-              <p>{p.body}</p>
+          pillars.map((item) => (
+            <li>
+              <h2 class="h3">{item.title}</h2>
+              <p>{item.body}</p>
             </li>
           ))
         }
-      </ul>
-    </section>
+      </ol>
+    </div>
+  </section>
 
-    <section class="why-roles section" aria-label="You and your agent">
-      <p class="section-label"><em>roles</em></p>
-      <h2>Same product. <span class="marked">Two operators.</span></h2>
-      <div class="why-role-grid">
+  <DayOne />
+
+  <section class="screen" id="operators">
+    <div class="wrap two-up">
+      <div class="stack-head" data-reveal>
+        <h2 class="h2">Same product. Two operators.</h2>
+        <p class="lead">You decide. Your agent does the repetitive work. Neither one needs the other's tools.</p>
+      </div>
+      <div class="closing-cards" data-reveal>
         {
-          roles.map((r) => (
-            <div class="why-role">
-              <p class="why-role-label">{r.label}</p>
-              <ul>
-                {r.items.map((item) => (
+          roles.map((role) => (
+            <div class="closing-card operator">
+              <p class="who">{role.label}</p>
+              <ul class="points">
+                {role.items.map((item) => (
                   <li>{item}</li>
                 ))}
               </ul>
@@ -123,46 +93,29 @@ const receipts = [
           ))
         }
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="why-receipts section" aria-label="Receipts in the docs">
-      <p class="section-label"><em>receipts</em></p>
-      <h2>Claims with docs attached.</h2>
-      <p class="section-lede">Every capability links to the page that teaches it.</p>
-      <ul class="why-receipt-grid">
+  <section class="screen" id="receipts">
+    <div class="wrap wall">
+      <div class="wall-head" data-reveal>
+        <h2 class="h2">Claims with docs attached</h2>
+        <p class="lead">Every claim on this site links to the page that shows how it works.</p>
+      </div>
+      <ul class="receipts" data-reveal>
         {
-          receipts.map((r) => (
+          receipts.map((item) => (
             <li>
-              <a href={r.href}>
-                <span class="why-receipt-title">{r.title}</span>
-                <span class="why-receipt-note">{r.note}</span>
+              <a class="receipt" href={item.href}>
+                <span class="receipt-title">{item.title}</span>
+                <span class="receipt-note">{item.note}</span>
               </a>
             </li>
           ))
         }
       </ul>
-    </section>
+    </div>
+  </section>
 
-    {
-      faqs.length > 0 && (
-        <section class="section" id="faq" aria-labelledby="why-faq-heading">
-          <p class="section-label"><em>faq</em></p>
-          <h2 id="why-faq-heading">Common questions</h2>
-          <LandingFaq items={faqs} />
-        </section>
-      )
-    }
-
-    <section class="section section-start" id="start">
-      <p class="section-label"><em>begin</em></p>
-      <h2>Drop Graft onto <span class="marked">your repo.</span></h2>
-      <p class="section-lede">
-        Scaffold locally. Connect your database. Point your agent at MCP or the CLI.
-      </p>
-      <div class="why-hero-actions">
-        <a class="button-primary" href="/docs/getting-started">Getting started</a>
-        <a class="button-ghost" href="/docs/deploy">Self-host & deploy</a>
-      </div>
-    </section>
-  </div>
-</Landing>
+  {faqs.length > 0 && <FaqList heading="Common questions" group="why-faq" items={faqs} />}
+</Marketing>

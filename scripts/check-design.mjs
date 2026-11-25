@@ -4,8 +4,8 @@
  *
  * A rule that lives only in prose gets broken by the next person or agent who
  * did not read it, so every rule here was a review comment first. Scope is the
- * docs and Studio: `global.css` and `landing.css` belong to the landing page,
- * which keeps its own look until it is rebuilt.
+ * docs and Studio: `global.css` and `marketing.css` belong to the marketing
+ * pages, which keep their own look.
  *
  * CSS (docs and Studio stylesheets):
  *   - mono only on code: `code`, `pre`, `kbd`, `samp`, file paths, type names,

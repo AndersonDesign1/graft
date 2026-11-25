@@ -1,12 +1,10 @@
 ---
 /**
- * The shell for the landing previews under /lab. Each preview is one
- * direction for the landing page, built far enough to judge: a hero, two
- * sections and the close. Nothing here replaces `/`.
+ * The shell for graft.page's marketing pages: the landing page, Agents,
+ * Studio, Start, Why and Security. Docs have their own shell.
  *
- * Unlike Landing.astro, the previews work in both schemes. The page stamps
- * `data-theme` before first paint: the visitor's choice if they made one in
- * this tab, otherwise the preview's own default.
+ * The pages work in both schemes. The page stamps `data-theme` before first
+ * paint: the visitor's choice if they made one, otherwise their system's.
  */
 import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/500.css";
@@ -14,50 +12,40 @@ import "@fontsource/ibm-plex-sans/600.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "../styles/global.css";
-import "../styles/lab.css";
-import Mark from "../components/lab/Mark.astro";
+import "../styles/marketing.css";
+import Mark from "../components/marketing/Mark.astro";
 
 interface Props {
   title: string;
   description: string;
-  variant: "landing" | "page" | "a" | "b" | "c" | "map" | "index";
-  /** The scheme this preview opens in: its own, or the visitor's system
-   *  scheme. The toggle overrides either. */
-  theme?: "light" | "dark" | "system";
+  variant: "landing" | "page";
 }
 
-const { title, description, variant, theme = "dark" } = Astro.props;
-
-const previews = [
-  { id: "landing", name: "The landing page", label: "Landing" },
-  { id: "a", name: "The product" },
-  { id: "b", name: "The seam" },
-  { id: "c", name: "The printed page" },
-] as const;
+const { title, description, variant } = Astro.props;
 ---
 
 <!doctype html>
-<html lang="en" data-theme={theme === "system" ? undefined : theme} data-default-theme={theme}>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta name="robots" content="noindex" />
+    <link rel="canonical" href={new URL(Astro.url.pathname, "https://graft.page").href} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script is:inline>
       try {
-        var t = sessionStorage.getItem("graft-lab-theme");
+        var t = localStorage.getItem("graft-theme");
         if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
       } catch (_) {
-        /* private mode: the preview's default scheme stands */
+        /* private mode: the system scheme stands */
       }
       // Entrances only run where motion is welcome and script is on, so a
       // page without either is simply complete.
       if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
         document.documentElement.classList.add("motion");
       }
-      // The styles key off data-theme, so a preview that follows the system
+      // The styles key off data-theme, so a page that follows the system
       // scheme resolves it here, before first paint.
       if (!document.documentElement.dataset.theme) {
         document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches
@@ -70,18 +58,18 @@ const previews = [
     <a class="lab-skip" href="#main">Skip to content</a>
     <header class="lab-nav">
       <nav class="wrap lab-nav-row" aria-label="Main">
-        <a class="lab-wordmark" href="/lab/landing">graft.</a>
+        <a class="lab-wordmark" href="/">graft.</a>
         <ul class="lab-nav-links">
-          <li><a href="/lab/agents" aria-current={Astro.url.pathname.startsWith("/lab/agents") ? "page" : undefined}>Agents</a></li>
-          <li><a href="/lab/studio" aria-current={Astro.url.pathname.startsWith("/lab/studio") ? "page" : undefined}>Studio</a></li>
+          <li><a href="/agents" aria-current={Astro.url.pathname.startsWith("/agents") ? "page" : undefined}>Agents</a></li>
+          <li><a href="/studio" aria-current={Astro.url.pathname.startsWith("/studio") ? "page" : undefined}>Studio</a></li>
           <li><a href="/docs">Docs</a></li>
-          <li><a href="/lab/why" aria-current={Astro.url.pathname.startsWith("/lab/why") ? "page" : undefined}>Why Graft</a></li>
-          <li><a href="/lab/security" aria-current={Astro.url.pathname.startsWith("/lab/security") ? "page" : undefined}>Security</a></li>
+          <li><a href="/why" aria-current={Astro.url.pathname.startsWith("/why") ? "page" : undefined}>Why Graft</a></li>
+          <li><a href="/security" aria-current={Astro.url.pathname.startsWith("/security") ? "page" : undefined}>Security</a></li>
         </ul>
         <a class="lab-nav-github" href="https://github.com/AndersonDesign1/graft" aria-label="Graft on GitHub">
           <Mark name="github" size={18} />
         </a>
-        <a class="btn btn-primary btn-small" href="/lab/start">Get started</a>
+        <a class="btn btn-primary btn-small" href="/start">Get started</a>
       </nav>
     </header>
 
@@ -143,54 +131,36 @@ const previews = [
         <p class="closing-legal">
           <span class="lab-wordmark">graft.</span>
           <span>Open source under the MIT license.</span>
+          <button type="button" class="closing-theme" data-theme-toggle>
+            <span data-theme-label>Light</span> mode
+          </button>
         </p>
       </div>
     </footer>
 
-    <div class="lab-bar" role="group" aria-label="Landing previews">
-      <a class="lab-bar-home" href="/lab" aria-current={variant === "index" ? "page" : undefined}
-        >Previews</a
-      >
-      {
-        previews.map((preview) => (
-          <a
-            href={`/lab/${preview.id}`}
-            aria-current={variant === preview.id ? "page" : undefined}
-            title={preview.name}
-          >
-            {"label" in preview ? preview.label : preview.id.toUpperCase()}
-          </a>
-        ))
-      }
-      <a href="/lab/map" aria-current={variant === "map" ? "page" : undefined}>Content</a>
-      <button type="button" class="lab-bar-theme" data-theme-toggle>
-        <span data-theme-label>Light</span>
-      </button>
-    </div>
-
     <script>
       const root = document.documentElement;
 
-      // Theme: the toggle wins for this tab and tells any Studio frame.
+      // Theme: the toggle wins from then on and tells any Studio frame.
       const label = document.querySelector<HTMLElement>("[data-theme-label]");
       const paint = () => {
         if (label) label.textContent = root.dataset.theme === "dark" ? "Light" : "Dark";
       };
       paint();
 
-      // A preview on the system scheme follows it live until the toggle is used.
+      // The page follows the system scheme live until the toggle is used.
       const system = matchMedia("(prefers-color-scheme: dark)");
       system.addEventListener("change", () => {
         let chosen = null;
         try {
-          chosen = sessionStorage.getItem("graft-lab-theme");
+          chosen = localStorage.getItem("graft-theme");
         } catch {
           /* private mode: no stored choice to respect */
         }
-        if (chosen || root.dataset.defaultTheme !== "system") return;
+        if (chosen) return;
         root.dataset.theme = system.matches ? "dark" : "light";
         paint();
-        document.dispatchEvent(new CustomEvent("lab:theme", { detail: root.dataset.theme }));
+        document.dispatchEvent(new CustomEvent("graft:theme", { detail: root.dataset.theme }));
       });
 
       document.querySelector("[data-theme-toggle]")?.addEventListener("click", () => {
@@ -201,12 +171,12 @@ const previews = [
         root.dataset.theme = next;
         requestAnimationFrame(() => requestAnimationFrame(() => delete root.dataset.switching));
         try {
-          sessionStorage.setItem("graft-lab-theme", next);
+          localStorage.setItem("graft-theme", next);
         } catch {
           /* private mode: the choice lasts until the next navigation */
         }
         paint();
-        document.dispatchEvent(new CustomEvent("lab:theme", { detail: next }));
+        document.dispatchEvent(new CustomEvent("graft:theme", { detail: next }));
       });
 
       // Sections arrive once, the first time they are seen: text rises and

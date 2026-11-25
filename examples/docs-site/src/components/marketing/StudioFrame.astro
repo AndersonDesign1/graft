@@ -29,7 +29,7 @@ const { route = "/c/pages/home" } = Astro.props;
   <div class="studio-view">
     <img
       class="studio-poster studio-poster-dark"
-      src="/lab/studio-dark.jpg"
+      src="/marketing/studio-dark.jpg"
       width="2560"
       height="1600"
       alt="Graft Studio with the home page open: a list of pages, the page's fields, and its changes."
@@ -38,7 +38,7 @@ const { route = "/c/pages/home" } = Astro.props;
     />
     <img
       class="studio-poster studio-poster-light"
-      src="/lab/studio-light.jpg"
+      src="/marketing/studio-light.jpg"
       width="2560"
       height="1600"
       alt=""
@@ -125,7 +125,7 @@ const { route = "/c/pages/home" } = Astro.props;
     addEventListener("keydown", (event) => {
       if (event.key === "Escape") release();
     });
-    document.addEventListener("lab:theme", (event) => {
+    document.addEventListener("graft:theme", (event) => {
       if (!(event instanceof CustomEvent)) return;
       iframe.contentWindow?.postMessage({ graftStudioTheme: event.detail }, location.origin);
     });

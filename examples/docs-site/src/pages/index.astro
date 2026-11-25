@@ -1,84 +1,73 @@
 ---
 /**
- * The landing — five sections on one persistent stage.
- *
- * v5 (docs/design-notes/landing-redesign.md §3): the page scrolls like a
- * document, but the background never changes and the product frame holds.
- * Hero → the stage (four beats against one sticky frame) → branching →
- * FAQ → CTA. Everything is still live: the terminal types real CLI output,
- * the MCP transcript replays a real error → fix exchange, the branching model
- * is a toy you can poke, and the contact form writes an actual data_records
- * row. Hero copy + FAQ come from the `home` document — the page eats its own
- * dogfood.
+ * The landing page. A marketing page for two readers, the developer and the
+ * person who never opens a terminal: the claim over a wide window of the
+ * real Studio, the stack it fits, what agents get and what people get, how
+ * the loop works, and everything the old page said, in order.
  */
-import { BranchingDemo } from "../components/landing/branching";
-import { ClosingCta } from "../components/landing/cta";
-import { LandingFaq } from "../components/landing/faq";
-import { Hero } from "../components/landing/hero";
-import { Stage } from "../components/landing/stage";
-import Landing from "../layouts/Landing.astro";
-import { getGraft } from "../lib/graft";
-import {
-  HERO_INIT,
-  STAGE_COMPILE,
-  STAGE_SELFHOST,
-  highlightSession,
-} from "../lib/highlight";
-
-const doc = await getGraft().getContent("pages", "home");
-const faqs = doc?.data.faqs ?? [];
-
-// Tokenized at build time with the same shiki themes the docs use, so the
-// terminals and a fenced ```console block are colored by one highlighter.
-const [heroTerminal, compileTerminal, selfhostTerminal] = await Promise.all([
-  highlightSession(HERO_INIT),
-  highlightSession(STAGE_COMPILE),
-  highlightSession(STAGE_SELFHOST),
-]);
+import Audience from "../components/marketing/Audience.astro";
+import Bento from "../components/marketing/Bento.astro";
+import Branching from "../components/marketing/Branching.astro";
+import Command from "../components/marketing/Command.astro";
+import DayOne from "../components/marketing/DayOne.astro";
+import Faq from "../components/marketing/Faq.astro";
+import Gate from "../components/marketing/Gate.astro";
+import HeroWide from "../components/marketing/HeroWide.astro";
+import Mark from "../components/marketing/Mark.astro";
+import Model from "../components/marketing/Model.astro";
+import NoCode from "../components/marketing/NoCode.astro";
+import Primitives from "../components/marketing/Primitives.astro";
+import Reads from "../components/marketing/Reads.astro";
+import Seam from "../components/marketing/Seam.astro";
+import Stack from "../components/marketing/Stack.astro";
+import Tiers from "../components/marketing/Tiers.astro";
+import { agents } from "../components/marketing/agents";
+import Marketing from "../layouts/Marketing.astro";
 ---
 
-<Landing
-  title="Graft — CMS for agents and the people who run them"
-  description={doc?.data.description ??
-    "Content as code: MDX in git, one Zod schema, a derived Postgres index. CLI and MCP — no dashboard required."}
+<Marketing
+  title="Graft, the CMS for agents and the people who run them"
+  description="An open-source CMS that keeps your content in your own repo, lets AI agents edit it safely, and gives your team an editor in the browser."
+  variant="landing"
 >
-  <div class="landing">
-    <Hero tagline={doc?.data.tagline} terminal={heroTerminal} client:load />
+  <HeroWide />
+  <Stack />
+  <Audience />
+  <DayOne />
+  <NoCode />
+  <Model id="how" heading="Edit a file. Compile. Refresh." steps plain />
+  <Seam mode="section" />
+  <Reads frameworks heading="One schema. No codegen." />
+  <Gate />
+  <Branching />
+  <Bento />
+  <Tiers />
+  <Primitives />
+  <Faq />
 
-    <Stage compile={compileTerminal} selfhost={selfhostTerminal} client:visible />
-
-    <section class="section" id="branching">
-      <p class="section-label"><em>branching</em></p>
-      <div class="reveal">
-        <h2>Branch content the way you branch code.</h2>
-        <p class="section-lede">
-          Copy-on-write overlays on any Postgres, or Neon forks when you want a physical
-          database. Merge dry-runs first. Pick a step:
+  <Fragment slot="closing">
+    <div class="closing-lead closing-drop">
+      <h2 class="h2">Drop Graft onto your repo</h2>
+      <p class="lead">Developers set it up in a minute. Agents and editors take it from there.</p>
+    </div>
+    <div class="closing-cards">
+      <div class="closing-card">
+        <p class="who">
+          <span class="who-marks">
+            {agents.slice(0, 5).map((agent) => <Mark name={agent.mark} size={18} />)}
+          </span>
+          For your agent
         </p>
+        <h3 class="h3">Connect it over MCP</h3>
+        <p>It works with Claude Code, Codex, Cursor, OpenCode, T3 Code and anything else that speaks MCP.</p>
+        <Command command="graft mcp" />
       </div>
-      <BranchingDemo client:visible />
-    </section>
-
-    <section class="section" id="faq">
-      <p class="section-label"><em>faq — served from content_index</em></p>
-      <div class="reveal">
-        <h2>Common questions</h2>
+      <div class="closing-card">
+        <p class="who">For you</p>
+        <h3 class="h3">Start with one command</h3>
+        <p>It adds a config file and your first page to the repo you already have. No account needed.</p>
+        <Command />
       </div>
-      <LandingFaq items={faqs.slice(0, 5)} />
-    </section>
-
-    <section class="section section-start" id="start">
-      <p class="section-label"><em>begin</em></p>
-      <div class="reveal">
-        <h2>Drop Graft onto <span class="marked">your repo.</span></h2>
-        <p class="section-lede cta-subhead">You scaffold. Your agent authors.</p>
-        <p class="section-lede">
-          Open source and self-hostable. One command writes <code>graft.config.ts</code> and
-          the first MDX doc. You and a cold agent share the same loop: compile, branch, merge.
-          No admin login.
-        </p>
-      </div>
-      <ClosingCta client:visible />
-    </section>
-  </div>
-</Landing>
+    </div>
+  </Fragment>
+</Marketing>
