@@ -287,6 +287,78 @@ html[data-theme="dark"] .lab {
   }
 }
 
+/* The menu on narrow screens. Hidden on wide ones, where the links sit in
+   the bar. */
+.lab-nav-menu {
+  display: none;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-press) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lab-nav-menu:hover {
+    background: var(--muted);
+  }
+}
+
+.lab-nav-menu:active {
+  transform: scale(var(--press-scale));
+}
+
+.lab-nav-menu:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.lab-nav[data-menu] {
+  background: var(--background);
+}
+
+.lab-nav-panel {
+  position: absolute;
+  inset: var(--nav-h) 0 auto;
+  padding-block: var(--space-2) var(--space-6);
+  background: var(--background);
+  box-shadow: var(--shadow-floating);
+}
+
+.lab-nav-panel ul {
+  display: grid;
+  margin: 0 auto;
+  list-style: none;
+}
+
+.lab-nav-panel a {
+  display: block;
+  padding-block: var(--space-3);
+  color: var(--muted-foreground);
+  font-size: var(--text-h3);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+
+.lab-nav-panel a[aria-current="page"] {
+  color: var(--foreground);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lab-nav-panel a:hover {
+    color: var(--foreground);
+  }
+}
+
 /* ---------------------------------------------------------- screens --- */
 
 /* One section, one screen. A section is at least the height of the window
@@ -3994,6 +4066,19 @@ html.motion .lab [data-peel][data-in] .term-cmd {
 
   .lab-nav-row {
     justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .lab-nav-row .lab-wordmark {
+    margin-right: auto;
+  }
+
+  .lab-nav-menu {
+    display: inline-flex;
+  }
+
+  .lab-nav-github {
+    margin-right: 0;
   }
 
   .lab .split-text,
