@@ -1352,7 +1352,6 @@ html.motion .lab .b-hero[data-state="busy"] .b-seam-line {
   margin-left: 0.08em;
   border-radius: 999px;
   background: var(--muted);
-  box-shadow: inset 0 0 0 1px var(--border);
   letter-spacing: 0;
   vertical-align: -0.06em;
 }
@@ -1997,21 +1996,10 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   padding: var(--space-2) var(--space-4);
   border-radius: 999px;
   background: var(--muted);
-  box-shadow: inset 0 0 0 1px var(--border);
   color: var(--foreground);
   font-size: 0.9375rem;
   font-weight: var(--weight-medium);
   white-space: nowrap;
-  transition:
-    box-shadow var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .lab .chip:hover {
-    box-shadow: inset 0 0 0 1px var(--border-strong);
-    transform: translateY(-2px);
-  }
 }
 
 /* The hero: the claim centered, then one wide window that runs to the fold. */
@@ -2316,17 +2304,6 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   padding: clamp(1.25rem, 2.5vw, 2rem);
   border-radius: var(--radius-outer);
   background: var(--background);
-  box-shadow: inset 0 0 0 1px var(--border);
-  transition:
-    box-shadow var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .lab .closing-card:hover {
-    box-shadow: inset 0 0 0 1px var(--border-strong);
-    transform: translateY(-2px);
-  }
 }
 
 .lab .closing-card > p:not(.who) {
@@ -3081,10 +3058,6 @@ html[data-switching] .lab *::after {
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius);
   background: var(--muted);
-  box-shadow: inset 0 0 0 1px var(--border);
-  transition:
-    background-color var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .lab .tool code {
@@ -3094,13 +3067,6 @@ html[data-switching] .lab *::after {
 .lab .tool span {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .lab .tool:hover {
-    background: var(--elevated);
-    box-shadow: inset 0 0 0 1px var(--border-strong);
-  }
 }
 
 .lab .win-foot {
@@ -3308,10 +3274,6 @@ html[data-switching] .lab *::after {
   padding: var(--space-6) var(--space-5);
   border-radius: var(--radius-outer);
   background: var(--muted);
-  box-shadow: inset 0 0 0 1px var(--border);
-  transition:
-    box-shadow var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
 }
 
 .lab .kind-name {
@@ -3324,13 +3286,6 @@ html[data-switching] .lab *::after {
 .lab .kind-line {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .lab .kind:hover {
-    box-shadow: inset 0 0 0 1px var(--border-strong);
-    transform: translateY(-2px);
-  }
 }
 
 /* A ledger: a name, what you give, what you get. */

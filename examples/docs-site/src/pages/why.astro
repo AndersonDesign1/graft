@@ -16,7 +16,7 @@ const faqs = (doc?.data.faqs ?? []).map((faq) => ({ q: faq.question, a: faq.answ
 const pillars = [
   { title: "Open source", body: "All of Graft is public. Read how it checks your content, how agents connect, and what the editor does. There is no hosted black box." },
   { title: "Yours to host", body: "Your database, your file storage, your server. Run it as one container, or inside the app you already have." },
-  { title: "No dashboard required", body: "An admin screen locks an agent behind a mouse. In Graft you can edit files, use the command line or connect an agent. The editor is there for the people who want one." },
+  { title: "Every way in", body: "Edit the files, use the command line, connect an agent or open Studio in a browser. Each one can do what the others can." },
   { title: "You still hold the gate", body: "Anything destructive files a request and waits. A person decides, and the system that runs your site cannot approve its own request." },
 ];
 const roles = [
@@ -47,11 +47,11 @@ const receipts = [
   <section class="screen hero" data-enter>
     <div class="wrap page-top">
       <div class="w-hero-copy">
-        <h1 class="h1 w-h1">Content as code. Skip the dashboard.</h1>
+        <h1 class="h1 w-h1">Content as code. Edit it any way you like.</h1>
         <p class="lead">
           {doc?.data.tagline ?? "Built for how people ship now. Agents and the humans who run them."}{" "}
-          Most of the work on a site is now done with an agent. Graft is the CMS that was designed
-          around that.
+          Graft was designed around agents from the start, with an editor for the people who want
+          one.
         </p>
         <div class="actions">
           <a class="btn btn-primary" href="/start">Get started</a>
