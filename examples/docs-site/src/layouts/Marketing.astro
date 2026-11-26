@@ -14,6 +14,7 @@ import "@fontsource/ibm-plex-mono/500.css";
 import "../styles/global.css";
 import "../styles/marketing.css";
 import AgentSetup from "../components/marketing/AgentSetup.astro";
+import { cardFor } from "../lib/marketing-cards";
 import Mark from "../components/marketing/Mark.astro";
 
 interface Props {
@@ -23,6 +24,10 @@ interface Props {
 }
 
 const { title, description, variant } = Astro.props;
+
+// The page's address and its social card, for search results and shares.
+const canonical = new URL(Astro.url.pathname, "https://graft.page").href;
+const ogImage = new URL(`/og/site/${cardFor(Astro.url.pathname)}.png`, "https://graft.page").href;
 
 // The nav's links, shared by the bar on wide screens and the menu on narrow
 // ones. Docs is its own site, so it is never the current page here.
@@ -45,7 +50,16 @@ const links = [
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={new URL(Astro.url.pathname, "https://graft.page").href} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Graft" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script is:inline>
       try {
@@ -58,6 +72,12 @@ const links = [
       // page without either is simply complete.
       if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
         document.documentElement.classList.add("motion");
+        // If the page's script never runs, nothing would arrive: show it all.
+        setTimeout(() => {
+          if (!("ready" in document.documentElement.dataset)) {
+            document.documentElement.classList.remove("motion");
+          }
+        }, 4000);
       }
       // The styles key off data-theme, so a page that follows the system
       // scheme resolves it here, before first paint.
@@ -218,7 +238,11 @@ const links = [
           apply(choice);
         });
         button.addEventListener("keydown", (event) => {
-          const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+          const step = ["ArrowRight", "ArrowDown"].includes(event.key)
+            ? 1
+            : ["ArrowLeft", "ArrowUp"].includes(event.key)
+              ? -1
+              : 0;
           if (!step) return;
           event.preventDefault();
           const next = choices[(i + step + choices.length) % choices.length]!;
@@ -247,6 +271,15 @@ const links = [
         watched.set(seen, [...(watched.get(seen) ?? []), el]);
         arrive.observe(seen);
       }
+
+      // Loops run only while they are on screen.
+      const onscreen = new IntersectionObserver((entries) => {
+        for (const entry of entries) entry.target.toggleAttribute("data-onscreen", entry.isIntersecting);
+      });
+      for (const el of document.querySelectorAll(".belt, .bento, .composer, .b-hero")) {
+        onscreen.observe(el);
+      }
+      root.dataset.ready = "";
 
       // Copy buttons keep their label and say the result through a live region.
       for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy]")) {

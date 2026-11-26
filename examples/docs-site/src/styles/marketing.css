@@ -127,8 +127,10 @@ html[data-theme="dark"] .lab {
     transform var(--duration-press) var(--ease-out);
 }
 
-.lab .btn:active {
-  transform: scale(var(--press-scale));
+@media (prefers-reduced-motion: no-preference) {
+  .lab .btn:active {
+    transform: scale(var(--press-scale));
+  }
 }
 
 .lab .btn-primary,
@@ -393,8 +395,7 @@ html.motion .lab .icon-swap > .icon {
 }
 
 .lab .agent-dialog::backdrop {
-  background: color-mix(in oklch, var(--background) 70%, transparent);
-  backdrop-filter: blur(6px);
+  background: var(--scrim);
 }
 
 .lab .agent-dialog-body {
@@ -906,6 +907,7 @@ html[data-theme="dark"] .lab .studio-poster-light {
 }
 
 .lab .theme-switch button {
+  position: relative;
   display: inline-grid;
   place-items: center;
   width: 2rem;
@@ -919,6 +921,13 @@ html[data-theme="dark"] .lab .studio-poster-light {
     background-color var(--duration-fast) var(--ease-out),
     color var(--duration-fast) var(--ease-out),
     transform var(--duration-press) var(--ease-out);
+}
+
+/* Each icon is small; its tap target is 40px tall. */
+.lab .theme-switch button::after {
+  position: absolute;
+  inset: calc((1.75rem - 2.5rem) / 2) 0;
+  content: "";
 }
 
 .lab .theme-switch button:active {
@@ -945,7 +954,7 @@ html[data-theme="dark"] .lab .studio-poster-light {
 /* ------------------------------------------------- hero entrance ------ */
 
 @media (prefers-reduced-motion: no-preference) {
-  .lab [data-enter] :is(.h1, .c-line, .lead, .actions, .facts, .tray, .b-pane) {
+  .lab [data-enter] :is(.h1:not(.w-h1), .c-line, .lead, .actions, .facts, .tray, .b-pane) {
     animation: lab-rise 700ms var(--ease-out) backwards;
   }
 
@@ -1157,6 +1166,9 @@ html[data-theme="dark"] .lab .studio-poster-light {
 
 .lab .b-hero[data-state="busy"] .b-seam-line {
   opacity: 1;
+}
+
+html.motion .lab .b-hero[data-state="busy"] .b-seam-line {
   animation: seam-run 640ms linear infinite;
 }
 
@@ -1472,8 +1484,10 @@ html[data-theme="dark"] .lab .c-pill-studio .studio-poster-dark {
   }
 
   /* Pointing at the diagram runs it again. */
-  .lab .c-diagram:hover .pulse {
-    animation-name: pulse-run-again;
+  @media (hover: hover) and (pointer: fine) {
+    .lab .c-diagram:hover .pulse {
+      animation-name: pulse-run-again;
+    }
   }
 }
 
@@ -3691,11 +3705,11 @@ html.motion .lab [data-peel][data-in] > .window {
 
 html.motion .lab .w-hero-tray {
   animation: none;
-  transition-delay: 380ms;
+  transition-delay: 120ms;
 }
 
 html.motion .lab .w-hero-tray > .window {
-  transition-delay: 380ms;
+  transition-delay: 120ms;
 }
 
 html.motion .lab [data-reveal] > * {
@@ -3779,7 +3793,14 @@ html.motion .lab .belt[data-dir="back"] .belt-track {
   animation-direction: reverse;
 }
 
-html.motion .lab .belt:hover .belt-track {
+@media (hover: hover) and (pointer: fine) {
+  html.motion .lab .belt:hover .belt-track {
+    animation-play-state: paused;
+  }
+}
+
+/* Loops rest while they are off screen; the layout marks what is on it. */
+html.motion .lab :is(.belt, .bento, .composer, .b-hero):not([data-onscreen]) * {
   animation-play-state: paused;
 }
 
@@ -3796,8 +3817,14 @@ html.motion .lab [data-steps][data-auto] button[aria-selected="true"] .step-prog
   animation: step-fill 7s linear forwards;
 }
 
-html.motion .lab [data-steps]:is(:hover, :focus-within) .step-progress {
+html.motion .lab [data-steps]:focus-within .step-progress {
   animation-play-state: paused;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html.motion .lab [data-steps]:hover .step-progress {
+    animation-play-state: paused;
+  }
 }
 
 @keyframes step-fill {
@@ -4110,8 +4137,10 @@ html.motion
 }
 
 /* The bento holds its motion under the pointer, like every loop here. */
-html.motion .lab .cell:hover * {
-  animation-play-state: paused;
+@media (hover: hover) and (pointer: fine) {
+  html.motion .lab .cell:hover * {
+    animation-play-state: paused;
+  }
 }
 
 /* The kinds of site turn over in the composer, one slot of the cycle each. */

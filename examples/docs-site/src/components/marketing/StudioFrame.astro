@@ -15,8 +15,13 @@
 interface Props {
   /** Studio's hash route to open, such as "/c/pages/home". */
   route?: string;
+  /** The first thing on the page: its poster loads at once, not lazily. */
+  eager?: boolean;
 }
-const { route = "/c/pages/home" } = Astro.props;
+const { route = "/c/pages/home", eager = false } = Astro.props;
+const alt = "Graft Studio with the home page open: a list of pages, the page's fields, and its changes.";
+const loading = eager ? "eager" : "lazy";
+const fetchpriority = eager ? "high" : undefined;
 ---
 
 <div class="window studio-frame" data-studio data-route={route} data-demo="/studio-demo/index.html">
@@ -32,8 +37,9 @@ const { route = "/c/pages/home" } = Astro.props;
       src="/marketing/studio-dark.jpg"
       width="2560"
       height="1600"
-      alt="Graft Studio with the home page open: a list of pages, the page's fields, and its changes."
-      loading="lazy"
+      alt={alt}
+      loading={loading}
+      fetchpriority={fetchpriority}
       decoding="async"
     />
     <img
@@ -41,8 +47,9 @@ const { route = "/c/pages/home" } = Astro.props;
       src="/marketing/studio-light.jpg"
       width="2560"
       height="1600"
-      alt=""
-      loading="lazy"
+      alt={alt}
+      loading={loading}
+      fetchpriority={fetchpriority}
       decoding="async"
     />
     <iframe class="studio-live" title="Graft Studio, live demo" tabindex="-1" hidden></iframe>
@@ -98,11 +105,22 @@ const { route = "/c/pages/home" } = Astro.props;
         { once: true },
       );
     };
+    // The live app is several megabytes, so it waits until the page itself
+    // has loaded and the browser is idle; the poster stands in until then.
+    const whenIdle = () =>
+      new Promise<void>((resolve) => {
+        const idle = () =>
+          "requestIdleCallback" in window
+            ? requestIdleCallback(() => resolve(), { timeout: 2000 })
+            : setTimeout(resolve, 200);
+        if (document.readyState === "complete") idle();
+        else addEventListener("load", idle, { once: true });
+      });
     const near = new IntersectionObserver(
       (entries) => {
         if (!entries.some((entry) => entry.isIntersecting)) return;
         near.disconnect();
-        void load();
+        void whenIdle().then(load);
       },
       { rootMargin: "400px" },
     );
@@ -122,8 +140,17 @@ const { route = "/c/pages/home" } = Astro.props;
       iframe.focus();
     });
     frame.addEventListener("pointerleave", release);
-    addEventListener("keydown", (event) => {
+    const onEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") release();
+    };
+    addEventListener("keydown", onEscape);
+    // Focus is inside the Studio while it is live, so Escape is heard there too.
+    iframe.addEventListener("load", () => {
+      try {
+        iframe.contentWindow?.addEventListener("keydown", onEscape);
+      } catch {
+        /* another origin: the page's own Escape and the pointer still release it */
+      }
     });
     document.addEventListener("graft:theme", (event) => {
       if (!(event instanceof CustomEvent)) return;

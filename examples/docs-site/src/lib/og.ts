@@ -33,7 +33,12 @@ export async function renderOgCard(card: {
   title: string;
   description: string;
   section: string;
+  /** The wordmark line at the top; the docs cards say "graft. docs". */
+  brand?: string;
+  /** The address line at the bottom. */
+  footer?: string;
 }): Promise<Buffer> {
+  const { brand = "graft. docs", footer = "graft.page/docs" } = card;
   const svg = await satori(
     el(
       "div",
@@ -49,7 +54,7 @@ export async function renderOgCard(card: {
         fontFamily: "Plex",
       },
       [
-        el("div", { display: "flex", fontSize: 30, fontWeight: 600, color: INK }, "graft. docs"),
+        el("div", { display: "flex", fontSize: 30, fontWeight: 600, color: INK }, brand),
         el("div", { display: "flex", flexDirection: "column", gap: 24 }, [
           el("div", { display: "flex", fontSize: 26, color: FAINT }, card.section),
           el(
@@ -63,7 +68,7 @@ export async function renderOgCard(card: {
             card.description,
           ),
         ]),
-        el("div", { display: "flex", fontSize: 24, color: FAINT }, "graft.page/docs"),
+        el("div", { display: "flex", fontSize: 24, color: FAINT }, footer),
       ],
     ),
     {
