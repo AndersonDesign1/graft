@@ -29,6 +29,10 @@
   --col-gap: clamp(1rem, 1.7vw, 1.5rem);
   --nav-h: 4rem;
 
+  /* Faint text on the light page sits a step darker than the shared token,
+     so small labels clear 4.5:1 on paper and on the sunken wells. */
+  --faint-foreground: light-dark(color-mix(in oklch, var(--ink-1) 35%, var(--ink-2)), var(--n-7));
+
   /* The tray: outer radius is the window's radius plus the tray's padding. */
   --tray-pad: clamp(0.75rem, 2.2vw, 2rem);
   --tray-radius: calc(var(--radius-outer) + 0.5rem);
@@ -298,7 +302,9 @@ html.motion .lab .icon-swap > .icon {
   }
 }
 
+/* Text links in the bar get a 44px-tall target without changing the look. */
 .lab-nav-links a {
+  position: relative;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
   text-decoration: none;
@@ -600,11 +606,11 @@ html.motion .lab .icon-swap > .icon {
     transform var(--duration-press) var(--ease-out);
 }
 
-/* The button is 28px tall in a 40px bar; its hit area fills the bar. */
+/* The button is 28px tall in a 40px bar; its hit area is 44px. */
 .lab .window-action::after {
   content: "";
   position: absolute;
-  inset: -0.375rem 0;
+  inset: -0.5rem 0;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -865,6 +871,7 @@ html[data-theme="dark"] .lab .studio-poster-light {
 }
 
 .lab .closing-links a {
+  position: relative;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
   text-decoration: none;
@@ -923,10 +930,10 @@ html[data-theme="dark"] .lab .studio-poster-light {
     transform var(--duration-press) var(--ease-out);
 }
 
-/* Each icon is small; its tap target is 40px tall. */
+/* Each icon is small; its tap target is 44px tall. */
 .lab .theme-switch button::after {
   position: absolute;
-  inset: calc((1.75rem - 2.5rem) / 2) 0;
+  inset: calc((1.75rem - 2.75rem) / 2) 0;
   content: "";
 }
 
@@ -4456,4 +4463,17 @@ html.motion .lab [data-peel][data-in] .term-cmd {
   .lab .window-note {
     display: none;
   }
+}
+
+.lab-nav-links a::after {
+  position: absolute;
+  inset: -0.75rem -0.5rem;
+  content: "";
+}
+
+/* Footer links sit 12px apart; each target grows into half of that gap. */
+.lab .closing-links a::after {
+  position: absolute;
+  inset: -0.375rem 0;
+  content: "";
 }
